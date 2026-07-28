@@ -7,6 +7,46 @@ export interface RectUm {
   height: number;
 }
 
+export interface Vector2 {
+  x: number;
+  y: number;
+}
+
+export interface Size2 {
+  width: number;
+  height: number;
+}
+
+export interface NumberRange {
+  minimum: number;
+  maximum: number;
+}
+
+export interface Matrix2 {
+  xx: number;
+  xy: number;
+  yx: number;
+  yy: number;
+}
+
+export interface PhotoPlacement {
+  center: Vector2;
+  size: Size2;
+}
+
+export interface PhotoPlacementPlan {
+  currentPan: Vector2;
+  currentZoom: number;
+  panRange: NumberRange;
+  zoomRange: NumberRange;
+  current: PhotoPlacement;
+  panOrigin: Vector2;
+  panToCenter: Matrix2;
+  centerToPan: Matrix2;
+  centerPerZoom: Vector2;
+  sizePerZoom: Size2;
+}
+
 export interface MediaTransform {
   panX: number;
   panY: number;
@@ -69,6 +109,7 @@ export interface ComposedPhoto {
   mediaId: string;
   name: string;
   drawRect: RectUm;
+  placement: PhotoPlacementPlan;
   rotationDegrees: number;
   mirrorX: boolean;
   palette: [string, string, string];

@@ -1,0 +1,140 @@
+{
+  "cases": [
+    {
+      "name": "horizontal pan remains stable while zooming",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 300000,
+        "height": 200000
+      },
+      "photo": {
+        "mediaId": "media-horizontal",
+        "name": "Foto horizontal.jpg",
+        "sourceWidthPx": 6000,
+        "sourceHeightPx": 3000,
+        "palette": ["#10202b", "#648493", "#dfa75e"],
+        "transform": {
+          "panX": -0.9,
+          "panY": 0,
+          "userZoom": 1,
+          "quarterTurns": 0,
+          "fineRotationDegrees": 0,
+          "mirrorX": false
+        }
+      },
+      "expectedPlan": {
+        "currentPan": { "x": -0.9, "y": 0 },
+        "currentZoom": 1,
+        "panRange": { "minimum": -1, "maximum": 1 },
+        "zoomRange": { "minimum": 1, "maximum": 4 },
+        "current": {
+          "center": { "x": 105000, "y": 100000 },
+          "size": { "width": 400000, "height": 200000 }
+        },
+        "panOrigin": { "x": 150000, "y": 100000 },
+        "panToCenter": {
+          "xx": 50000,
+          "xy": 0,
+          "yx": 0,
+          "yy": 0
+        },
+        "centerToPan": {
+          "xx": 0.00002,
+          "xy": 0,
+          "yx": 0,
+          "yy": 0
+        },
+        "centerPerZoom": { "x": -180000, "y": 0 },
+        "sizePerZoom": { "width": 400000, "height": 200000 }
+      },
+      "panPreviews": [
+        {
+          "center": { "x": 1000000, "y": 1000000 },
+          "expectedPan": { "x": 1, "y": 0 },
+          "expectedPlacement": {
+            "center": { "x": 200000, "y": 100000 },
+            "size": { "width": 400000, "height": 200000 }
+          }
+        }
+      ],
+      "zoomPreviews": [
+        {
+          "zoom": 1.12,
+          "expectedPlacement": {
+            "center": { "x": 83400, "y": 100000 },
+            "size": { "width": 448000, "height": 224000 }
+          }
+        }
+      ]
+    },
+    {
+      "name": "rotated axes constrain pan independently",
+      "frame": {
+        "x": 20000,
+        "y": 30000,
+        "width": 300000,
+        "height": 200000
+      },
+      "photo": {
+        "mediaId": "media-rotated",
+        "name": "Foto girada.jpg",
+        "sourceWidthPx": 6000,
+        "sourceHeightPx": 4000,
+        "palette": ["#21372f", "#92a277", "#e5d7b9"],
+        "transform": {
+          "panX": 1,
+          "panY": -1,
+          "userZoom": 1.5,
+          "quarterTurns": 1,
+          "fineRotationDegrees": 0,
+          "mirrorX": false
+        }
+      },
+      "expectedPlan": {
+        "currentPan": { "x": 1, "y": -1 },
+        "currentZoom": 1.5,
+        "panRange": { "minimum": -1, "maximum": 1 },
+        "zoomRange": { "minimum": 1, "maximum": 4 },
+        "current": {
+          "center": { "x": 225000, "y": 337500 },
+          "size": { "width": 675000, "height": 450000 }
+        },
+        "panOrigin": { "x": 150000, "y": 100000 },
+        "panToCenter": {
+          "xx": 0,
+          "xy": -75000,
+          "yx": 237500,
+          "yy": 0
+        },
+        "centerToPan": {
+          "xx": 0,
+          "xy": 0.000004210526315789474,
+          "yx": -0.000013333333333333334,
+          "yy": 0
+        },
+        "centerPerZoom": { "x": 150000, "y": 225000 },
+        "sizePerZoom": { "width": 450000, "height": 300000 }
+      },
+      "panPreviews": [
+        {
+          "center": { "x": -1000000, "y": -1000000 },
+          "expectedPan": { "x": -1, "y": 1 },
+          "expectedPlacement": {
+            "center": { "x": 75000, "y": -137500 },
+            "size": { "width": 675000, "height": 450000 }
+          }
+        }
+      ],
+      "zoomPreviews": [
+        {
+          "zoom": 2,
+          "expectedPlacement": {
+            "center": { "x": 300000, "y": 450000 },
+            "size": { "width": 900000, "height": 600000 }
+          }
+        }
+      ]
+    }
+  ]
+}

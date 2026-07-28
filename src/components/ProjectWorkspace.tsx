@@ -55,19 +55,12 @@ export function ProjectWorkspace({
         .find((frame) => frame.id === selectedFrameId) ?? null,
     [projection.state.album.sheets, selectedFrameId],
   );
-
-  const photoZoomByFrameId = useMemo(
+  const selectedComposedPhoto = useMemo(
     () =>
-      Object.fromEntries(
-        projection.state.album.sheets.flatMap((sheet) =>
-          sheet.frames.flatMap((frame) =>
-            frame.photo
-              ? [[frame.id, frame.photo.transform.userZoom] as const]
-              : [],
-          ),
-        ),
-      ),
-    [projection.state.album.sheets],
+      projection.composition.sheets
+        .flatMap((sheet) => sheet.frames)
+        .find((frame) => frame.frameId === selectedFrameId)?.photo ?? null,
+    [projection.composition.sheets, selectedFrameId],
   );
 
   function setZoomDraft(next: ZoomDraft | null) {
@@ -287,7 +280,6 @@ export function ProjectWorkspace({
             selectedFrameId={selectedFrameId}
             focusedSheetId={focusedSheetId}
             viewport={viewport}
-            photoZoomByFrameId={photoZoomByFrameId}
             photoZoomPreview={
               zoomDraft
                 ? {
@@ -341,7 +333,7 @@ export function ProjectWorkspace({
                       (selectedFrame.photo?.transform.panX ?? 0) * 100,
                     )}%`}
                   />
-                  {selectedFrame.photo && (
+                  {selectedFrame.photo && selectedComposedPhoto && (
                     <label className="photo-zoom-control">
                       <span className="photo-zoom-label">
                         <span>Zoom da Foto</span>
@@ -352,8 +344,14 @@ export function ProjectWorkspace({
                       <input
                         type="range"
                         aria-label="Zoom da Foto"
-                        min="100"
-                        max="400"
+                        min={
+                          selectedComposedPhoto.placement.zoomRange.minimum *
+                          100
+                        }
+                        max={
+                          selectedComposedPhoto.placement.zoomRange.maximum *
+                          100
+                        }
                         step="1"
                         value={Math.round(displayedPhotoZoom * 100)}
                         disabled={Boolean(zoomDraft?.committing)}

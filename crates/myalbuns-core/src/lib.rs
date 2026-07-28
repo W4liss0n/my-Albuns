@@ -6,6 +6,10 @@ use thiserror::Error;
 pub const PROJECT_SCHEMA_VERSION: u32 = 1;
 pub const SHEET_WIDTH_UM: i64 = 600_000;
 pub const SHEET_HEIGHT_UM: i64 = 300_000;
+pub const PHOTO_PAN_MIN: f32 = -1.0;
+pub const PHOTO_PAN_MAX: f32 = 1.0;
+pub const PHOTO_ZOOM_MIN: f32 = 1.0;
+pub const PHOTO_ZOOM_MAX: f32 = 4.0;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +18,58 @@ pub struct RectUm {
     pub y: i64,
     pub width: i64,
     pub height: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VectorUm {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SizeUm {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NumberRange {
+    pub minimum: f64,
+    pub maximum: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Matrix2 {
+    pub xx: f64,
+    pub xy: f64,
+    pub yx: f64,
+    pub yy: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoPlacement {
+    pub center: VectorUm,
+    pub size: SizeUm,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoPlacementPlan {
+    pub current_pan: VectorUm,
+    pub current_zoom: f64,
+    pub pan_range: NumberRange,
+    pub zoom_range: NumberRange,
+    pub current: PhotoPlacement,
+    pub pan_origin: VectorUm,
+    pub pan_to_center: Matrix2,
+    pub center_to_pan: Matrix2,
+    pub center_per_zoom: VectorUm,
+    pub size_per_zoom: SizeUm,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -115,6 +171,7 @@ pub struct ComposedPhoto {
     pub media_id: String,
     pub name: String,
     pub draw_rect: RectUm,
+    pub placement: PhotoPlacementPlan,
     pub rotation_degrees: f32,
     pub mirror_x: bool,
     pub palette: [String; 3],
@@ -336,8 +393,10 @@ impl ProjectSession {
                     .as_mut()
                     .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
 
-                photo.transform.pan_x = (photo.transform.pan_x + delta_x).clamp(-1.0, 1.0);
-                photo.transform.pan_y = (photo.transform.pan_y + delta_y).clamp(-1.0, 1.0);
+                photo.transform.pan_x =
+                    (photo.transform.pan_x + delta_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
+                photo.transform.pan_y =
+                    (photo.transform.pan_y + delta_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
             }
             ProjectIntent::ZoomPhoto { frame_id, delta } => {
                 let frame = find_frame_mut(&mut self.state.album, &frame_id)
@@ -346,7 +405,8 @@ impl ProjectSession {
                     .photo
                     .as_mut()
                     .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
-                photo.transform.user_zoom = (photo.transform.user_zoom + delta).clamp(1.0, 4.0);
+                photo.transform.user_zoom =
+                    (photo.transform.user_zoom + delta).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
             }
             ProjectIntent::FillLeftmostPlaceholder { sheet_id, media_id } => {
                 let media = self
@@ -571,53 +631,130 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
     let required_width = cosine.abs() * frame_width + sine.abs() * frame_height;
     let required_height = sine.abs() * frame_width + cosine.abs() * frame_height;
     let fill_scale = (required_width / source_width).max(required_height / source_height);
-    let zoom = photo.transform.user_zoom.max(1.0) as f64;
-    let draw_width = (source_width * fill_scale * zoom).ceil() as i64;
-    let draw_height = (source_height * fill_scale * zoom).ceil() as i64;
-    let half_width = draw_width as f64 / 2.0;
-    let half_height = draw_height as f64 / 2.0;
-
-    let mut minimum_u = f64::INFINITY;
-    let mut maximum_u = f64::NEG_INFINITY;
-    let mut minimum_v = f64::INFINITY;
-    let mut maximum_v = f64::NEG_INFINITY;
-    for (corner_x, corner_y) in [
-        (0.0, 0.0),
-        (frame_width, 0.0),
-        (0.0, frame_height),
-        (frame_width, frame_height),
-    ] {
-        let u = cosine * corner_x + sine * corner_y;
-        let v = -sine * corner_x + cosine * corner_y;
-        minimum_u = minimum_u.min(u);
-        maximum_u = maximum_u.max(u);
-        minimum_v = minimum_v.min(v);
-        maximum_v = maximum_v.max(v);
-    }
-
-    let lower_u = maximum_u - half_width;
-    let upper_u = minimum_u + half_width;
-    let lower_v = maximum_v - half_height;
-    let upper_v = minimum_v + half_height;
-    let pan_x = photo.transform.pan_x.clamp(-1.0, 1.0) as f64;
-    let pan_y = photo.transform.pan_y.clamp(-1.0, 1.0) as f64;
-    let center_u = (lower_u + upper_u) / 2.0 + pan_x * (upper_u - lower_u) / 2.0;
-    let center_v = (lower_v + upper_v) / 2.0 + pan_y * (upper_v - lower_v) / 2.0;
-    let center_x = cosine * center_u - sine * center_v;
-    let center_y = sine * center_u + cosine * center_v;
+    let draw_width_at_fill = source_width * fill_scale;
+    let draw_height_at_fill = source_height * fill_scale;
+    let current_pan = VectorUm {
+        x: photo.transform.pan_x.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
+        y: photo.transform.pan_y.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
+    };
+    let current_zoom = photo
+        .transform
+        .user_zoom
+        .clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX) as f64;
+    let pan_origin = VectorUm {
+        x: frame_width / 2.0,
+        y: frame_height / 2.0,
+    };
+    let horizontal_direction = VectorUm { x: cosine, y: sine };
+    let vertical_direction = VectorUm {
+        x: -sine,
+        y: cosine,
+    };
+    let horizontal_span = (draw_width_at_fill * current_zoom - required_width).max(0.0);
+    let vertical_span = (draw_height_at_fill * current_zoom - required_height).max(0.0);
+    let horizontal_offset = scale_vector(&horizontal_direction, horizontal_span / 2.0);
+    let vertical_offset = scale_vector(&vertical_direction, vertical_span / 2.0);
+    let pan_to_center = matrix_from_columns(&horizontal_offset, &vertical_offset);
+    let center_to_pan = inverse_orthogonal_columns(&horizontal_offset, &vertical_offset);
+    let current_offset = apply_matrix(&pan_to_center, &current_pan);
+    let current = PhotoPlacement {
+        center: VectorUm {
+            x: pan_origin.x + current_offset.x,
+            y: pan_origin.y + current_offset.y,
+        },
+        size: SizeUm {
+            width: draw_width_at_fill * current_zoom,
+            height: draw_height_at_fill * current_zoom,
+        },
+    };
+    let horizontal_zoom_delta = scale_vector(
+        &horizontal_direction,
+        current_pan.x * draw_width_at_fill / 2.0,
+    );
+    let vertical_zoom_delta = scale_vector(
+        &vertical_direction,
+        current_pan.y * draw_height_at_fill / 2.0,
+    );
+    let placement = PhotoPlacementPlan {
+        current_pan,
+        current_zoom,
+        pan_range: NumberRange {
+            minimum: PHOTO_PAN_MIN as f64,
+            maximum: PHOTO_PAN_MAX as f64,
+        },
+        zoom_range: NumberRange {
+            minimum: PHOTO_ZOOM_MIN as f64,
+            maximum: PHOTO_ZOOM_MAX as f64,
+        },
+        current: current.clone(),
+        pan_origin,
+        pan_to_center,
+        center_to_pan,
+        center_per_zoom: VectorUm {
+            x: horizontal_zoom_delta.x + vertical_zoom_delta.x,
+            y: horizontal_zoom_delta.y + vertical_zoom_delta.y,
+        },
+        size_per_zoom: SizeUm {
+            width: draw_width_at_fill,
+            height: draw_height_at_fill,
+        },
+    };
 
     ComposedPhoto {
         media_id: photo.media_id.clone(),
         name: photo.name.clone(),
         draw_rect: RectUm {
-            x: frame.x + (center_x - half_width).round() as i64,
-            y: frame.y + (center_y - half_height).round() as i64,
-            width: draw_width,
-            height: draw_height,
+            x: frame.x + (current.center.x - current.size.width / 2.0).round() as i64,
+            y: frame.y + (current.center.y - current.size.height / 2.0).round() as i64,
+            width: current.size.width.ceil() as i64,
+            height: current.size.height.ceil() as i64,
         },
+        placement,
         rotation_degrees,
         mirror_x: photo.transform.mirror_x,
         palette: photo.palette.clone(),
+    }
+}
+
+fn scale_vector(vector: &VectorUm, factor: f64) -> VectorUm {
+    VectorUm {
+        x: vector.x * factor,
+        y: vector.y * factor,
+    }
+}
+
+fn matrix_from_columns(horizontal: &VectorUm, vertical: &VectorUm) -> Matrix2 {
+    Matrix2 {
+        xx: horizontal.x,
+        xy: vertical.x,
+        yx: horizontal.y,
+        yy: vertical.y,
+    }
+}
+
+fn inverse_orthogonal_columns(horizontal: &VectorUm, vertical: &VectorUm) -> Matrix2 {
+    let horizontal_norm = horizontal.x.powi(2) + horizontal.y.powi(2);
+    let vertical_norm = vertical.x.powi(2) + vertical.y.powi(2);
+    Matrix2 {
+        xx: divide_or_zero(horizontal.x, horizontal_norm),
+        xy: divide_or_zero(horizontal.y, horizontal_norm),
+        yx: divide_or_zero(vertical.x, vertical_norm),
+        yy: divide_or_zero(vertical.y, vertical_norm),
+    }
+}
+
+fn divide_or_zero(value: f64, divisor: f64) -> f64 {
+    if divisor <= f64::EPSILON {
+        0.0
+    } else {
+        value / divisor
+    }
+}
+
+fn apply_matrix(matrix: &Matrix2, vector: &VectorUm) -> VectorUm {
+    VectorUm {
+        x: matrix.xx * vector.x + matrix.xy * vector.y,
+        y: matrix.yx * vector.x + matrix.yy * vector.y,
     }
 }
 
@@ -701,9 +838,9 @@ fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
                     || !transform.pan_y.is_finite()
                     || !transform.user_zoom.is_finite()
                     || !transform.fine_rotation_degrees.is_finite()
-                    || !(-1.0..=1.0).contains(&transform.pan_x)
-                    || !(-1.0..=1.0).contains(&transform.pan_y)
-                    || !(1.0..=4.0).contains(&transform.user_zoom)
+                    || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&transform.pan_x)
+                    || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&transform.pan_y)
+                    || !(PHOTO_ZOOM_MIN..=PHOTO_ZOOM_MAX).contains(&transform.user_zoom)
                 {
                     return Err(CoreError::InvalidProject(format!(
                         "transformação inválida para a Foto {}",
@@ -858,9 +995,25 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
 #[cfg(test)]
 mod tests {
     use super::{
-        CompositionCore, MediaTransform, PhotoSnapshot, ProjectCore, ProjectIntent, RectUm,
-        compose_photo,
+        CompositionCore, Matrix2, MediaTransform, PhotoPlacement, PhotoPlacementPlan,
+        PhotoSnapshot, ProjectCore, ProjectIntent, RectUm, VectorUm, compose_photo,
     };
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PhotoPlacementFixture {
+        cases: Vec<PhotoPlacementCase>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PhotoPlacementCase {
+        name: String,
+        frame: RectUm,
+        photo: PhotoSnapshot,
+        expected_plan: PhotoPlacementPlan,
+    }
 
     #[test]
     fn opens_a_representative_long_album() {
@@ -1004,6 +1157,92 @@ mod tests {
             assert!(local_x.abs() <= half_width + 1.0);
             assert!(local_y.abs() <= half_height + 1.0);
         }
+    }
+
+    #[test]
+    fn photo_placement_plan_matches_the_shared_renderer_contract() {
+        let fixture: PhotoPlacementFixture = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/photo-placement-cases.json"
+        ))
+        .expect("the shared Photo placement fixture is valid");
+
+        for case in fixture.cases {
+            let composed = compose_photo(&case.frame, &case.photo);
+            assert_plan_close(&composed.placement, &case.expected_plan, &case.name);
+        }
+    }
+
+    fn assert_plan_close(
+        actual: &PhotoPlacementPlan,
+        expected: &PhotoPlacementPlan,
+        case_name: &str,
+    ) {
+        assert_vector_close(&actual.current_pan, &expected.current_pan, case_name);
+        assert_close(actual.current_zoom, expected.current_zoom, case_name);
+        assert_close(
+            actual.pan_range.minimum,
+            expected.pan_range.minimum,
+            case_name,
+        );
+        assert_close(
+            actual.pan_range.maximum,
+            expected.pan_range.maximum,
+            case_name,
+        );
+        assert_close(
+            actual.zoom_range.minimum,
+            expected.zoom_range.minimum,
+            case_name,
+        );
+        assert_close(
+            actual.zoom_range.maximum,
+            expected.zoom_range.maximum,
+            case_name,
+        );
+        assert_placement_close(&actual.current, &expected.current, case_name);
+        assert_vector_close(&actual.pan_origin, &expected.pan_origin, case_name);
+        assert_matrix_close(&actual.pan_to_center, &expected.pan_to_center, case_name);
+        assert_matrix_close(&actual.center_to_pan, &expected.center_to_pan, case_name);
+        assert_vector_close(
+            &actual.center_per_zoom,
+            &expected.center_per_zoom,
+            case_name,
+        );
+        assert_close(
+            actual.size_per_zoom.width,
+            expected.size_per_zoom.width,
+            case_name,
+        );
+        assert_close(
+            actual.size_per_zoom.height,
+            expected.size_per_zoom.height,
+            case_name,
+        );
+    }
+
+    fn assert_matrix_close(actual: &Matrix2, expected: &Matrix2, case_name: &str) {
+        assert_close(actual.xx, expected.xx, case_name);
+        assert_close(actual.xy, expected.xy, case_name);
+        assert_close(actual.yx, expected.yx, case_name);
+        assert_close(actual.yy, expected.yy, case_name);
+    }
+
+    fn assert_placement_close(actual: &PhotoPlacement, expected: &PhotoPlacement, case_name: &str) {
+        assert_vector_close(&actual.center, &expected.center, case_name);
+        assert_close(actual.size.width, expected.size.width, case_name);
+        assert_close(actual.size.height, expected.size.height, case_name);
+    }
+
+    fn assert_vector_close(actual: &VectorUm, expected: &VectorUm, case_name: &str) {
+        assert_close(actual.x, expected.x, case_name);
+        assert_close(actual.y, expected.y, case_name);
+    }
+
+    fn assert_close(actual: f64, expected: f64, case_name: &str) {
+        assert!(
+            (actual - expected).abs() <= 0.01,
+            "{case_name}: expected {expected}, received {actual}"
+        );
     }
 
     #[test]

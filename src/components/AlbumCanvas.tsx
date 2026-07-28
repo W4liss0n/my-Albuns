@@ -9,7 +9,7 @@ import {
   Text,
 } from "pixi.js";
 
-import type { CompositionPlan } from "../domain/project";
+import type { CompositionPlan, Vector2 } from "../domain/project";
 import type { ViewportState } from "../state/editorView";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
@@ -18,6 +18,15 @@ import {
   SHEET_LABEL_HEIGHT_PX,
   sheetOffsetInCanvasPixels,
 } from "./canvasGeometry";
+import {
+  createPhotoGeometry,
+  type PhotoGeometry,
+} from "./photoGeometry";
+import {
+  advancePhotoZoomGesture,
+  finishPhotoZoomGesture,
+  type PhotoZoomGesture,
+} from "./photoZoomGesture";
 
 const PRELOAD_MARGIN = 1;
 const ZOOM_GESTURE_SETTLE_MS = 500;
@@ -32,7 +41,6 @@ interface AlbumCanvasProps {
   selectedFrameId: string | null;
   focusedSheetId: string;
   viewport: ViewportState;
-  photoZoomByFrameId?: Readonly<Record<string, number>>;
   photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
@@ -46,18 +54,12 @@ interface AlbumCanvasProps {
 interface PhotoRenderNode {
   frameId: string;
   layer: Container;
+  geometry: PhotoGeometry;
   baseZoom: number;
   baseScaleX: number;
-  drawWidth: number;
-  drawHeight: number;
-  frameWidth: number;
-  frameHeight: number;
-  rotationCosine: number;
-  rotationSine: number;
   originalX: number;
   originalY: number;
-  panX: number;
-  panY: number;
+  pan: Vector2;
 }
 
 interface DragGesture {
@@ -70,12 +72,11 @@ interface DragGesture {
   originalY: number;
   currentX: number;
   currentY: number;
+  currentPan: Vector2;
 }
 
-interface ZoomGesture {
-  frameId: string;
-  baseZoom: number;
-  delta: number;
+interface ZoomGestureRuntime {
+  gesture: PhotoZoomGesture;
   timer: number;
 }
 
@@ -83,7 +84,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const applicationRef = useRef<Application | null>(null);
   const dragRef = useRef<DragGesture | null>(null);
-  const zoomGestureRef = useRef<ZoomGesture | null>(null);
+  const zoomGestureRef = useRef<ZoomGestureRuntime | null>(null);
   const photoNodesRef = useRef(new Map<string, PhotoRenderNode>());
   const externalPreviewFrameRef = useRef<string | null>(null);
   const lastAutoScaleRef = useRef<number | null>(null);
@@ -291,19 +292,17 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
         let photoNode: PhotoRenderNode | null = null;
         if (frame.photo) {
-          const drawWidth =
-            frame.photo.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
-          const drawHeight =
-            frame.photo.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
+          const geometry = createPhotoGeometry(
+            frame.photo.placement,
+            MICROMETER_TO_CANVAS_PIXEL,
+          );
+          const drawWidth = geometry.current.size.width;
+          const drawHeight = geometry.current.size.height;
           const photoLayer = new Container();
           photoLayer.pivot.set(drawWidth / 2, drawHeight / 2);
           photoLayer.position.set(
-            (frame.photo.drawRect.x - frame.clipRect.x) *
-              MICROMETER_TO_CANVAS_PIXEL +
-              drawWidth / 2,
-            (frame.photo.drawRect.y - frame.clipRect.y) *
-              MICROMETER_TO_CANVAS_PIXEL +
-              drawHeight / 2,
+            geometry.current.center.x,
+            geometry.current.center.y,
           );
           photoLayer.rotation =
             (frame.photo.rotationDegrees * Math.PI) / 180;
@@ -344,34 +343,17 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           photoViewport.mask = clip;
           frameContainer.addChild(photoViewport, clip);
 
-          const rotationCosine = Math.cos(photoLayer.rotation);
-          const rotationSine = Math.sin(photoLayer.rotation);
-          const baseZoom =
-            props.photoZoomByFrameId?.[frame.frameId] ?? 1;
+          const baseZoom = frame.photo.placement.currentZoom;
           photoNode = {
             frameId: frame.frameId,
             layer: photoLayer,
+            geometry,
             baseZoom,
             baseScaleX: frame.photo.mirrorX ? -1 : 1,
-            drawWidth,
-            drawHeight,
-            frameWidth,
-            frameHeight,
-            rotationCosine,
-            rotationSine,
             originalX: photoLayer.x,
             originalY: photoLayer.y,
-            panX: 0,
-            panY: 0,
+            pan: frame.photo.placement.currentPan,
           };
-          const normalizedPan = normalizedPhotoPan(
-            photoNode,
-            photoLayer.x,
-            photoLayer.y,
-            1,
-          );
-          photoNode.panX = normalizedPan.x;
-          photoNode.panY = normalizedPan.y;
           photoNodesRef.current.set(frame.frameId, photoNode);
           if (props.photoZoomPreview?.frameId === frame.frameId) {
             applyPhotoZoomPreview(
@@ -423,6 +405,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             originalY: photoNode.layer.y,
             currentX: photoNode.layer.x,
             currentY: photoNode.layer.y,
+            currentPan: photoNode.pan,
           };
           frameContainer.cursor = "grabbing";
         });
@@ -431,47 +414,39 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           event.preventDefault();
 
           const current = zoomGestureRef.current;
-          if (current && current.frameId !== frame.frameId) {
-            window.clearTimeout(current.timer);
-            if (Math.abs(current.delta) > 0.0001) {
-              propsRef.current.onZoomCommit(
-                current.frameId,
-                current.delta,
-              );
-            }
-          } else if (current) {
-            window.clearTimeout(current.timer);
+          if (current) window.clearTimeout(current.timer);
+          const transition = advancePhotoZoomGesture(
+            current?.gesture ?? null,
+            {
+              frameId: frame.frameId,
+              baseZoom: photoNode.baseZoom,
+              zoomRange: photoNode.geometry.zoomRange,
+              wheelDeltaY: event.deltaY,
+            },
+          );
+          if (transition.interruptedCommit) {
+            propsRef.current.onZoomCommit(
+              transition.interruptedCommit.frameId,
+              transition.interruptedCommit.delta,
+            );
           }
 
-          const baseZoom =
-            current?.frameId === frame.frameId
-              ? current.baseZoom
-              : (propsRef.current.photoZoomByFrameId?.[frame.frameId] ?? 1);
-          const previousDelta =
-            current?.frameId === frame.frameId ? current.delta : 0;
-          const eventDelta = clamp(-event.deltaY * 0.0012, -0.18, 0.18);
-          const accumulated = clamp(
-            previousDelta + eventDelta,
-            1 - baseZoom,
-            4 - baseZoom,
-          );
-
-          applyPhotoZoomPreview(photoNode, baseZoom + accumulated);
+          applyPhotoZoomPreview(photoNode, transition.previewZoom);
           const timer = window.setTimeout(() => {
-            const gesture = zoomGestureRef.current;
-            if (!gesture) return;
-            if (Math.abs(gesture.delta) > 0.0001) {
+            const runtime = zoomGestureRef.current;
+            const commit = finishPhotoZoomGesture(
+              runtime?.gesture ?? null,
+            );
+            if (commit) {
               propsRef.current.onZoomCommit(
-                gesture.frameId,
-                gesture.delta,
+                commit.frameId,
+                commit.delta,
               );
             }
             zoomGestureRef.current = null;
           }, ZOOM_GESTURE_SETTLE_MS);
           zoomGestureRef.current = {
-            frameId: frame.frameId,
-            baseZoom,
-            delta: accumulated,
+            gesture: transition.gesture,
             timer,
           };
         });
@@ -514,20 +489,14 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       updatePanPreview(gesture, event.global.x, event.global.y);
       dragRef.current = null;
 
-      const currentPan = normalizedPhotoPan(
-        gesture.node,
-        gesture.currentX,
-        gesture.currentY,
-        1,
-      );
-      const deltaX = currentPan.x - gesture.node.panX;
-      const deltaY = currentPan.y - gesture.node.panY;
+      const deltaX = gesture.currentPan.x - gesture.node.pan.x;
+      const deltaY = gesture.currentPan.y - gesture.node.pan.y;
 
       if (Math.abs(deltaX) > 0.0001 || Math.abs(deltaY) > 0.0001) {
         propsRef.current.onPanCommit(
           gesture.frameId,
-          clamp(deltaX, -2, 2),
-          clamp(deltaY, -2, 2),
+          deltaX,
+          deltaY,
         );
       }
     };
@@ -556,7 +525,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     props.composition,
     props.focusedSheetId,
     props.onMaterializedChange,
-    props.photoZoomByFrameId,
     props.selectedFrameId,
     props.viewport.offsetX,
     canvasSizeRevision,
@@ -611,28 +579,23 @@ function updatePanPreview(
   const nextY =
     gesture.originalY +
     (pointerY - gesture.startY) / gesture.canvasScale;
-  const clampedCenter = clampPhotoCenter(
-    gesture.node,
-    nextX,
-    nextY,
-    1,
+  const constrained = gesture.node.geometry.constrain(
+    { x: nextX, y: nextY },
   );
-  gesture.currentX = clampedCenter.x;
-  gesture.currentY = clampedCenter.y;
+  gesture.currentX = constrained.placement.center.x;
+  gesture.currentY = constrained.placement.center.y;
+  gesture.currentPan = constrained.pan;
   gesture.node.layer.position.set(gesture.currentX, gesture.currentY);
 }
 
 function applyPhotoZoomPreview(node: PhotoRenderNode, targetZoom: number) {
-  const boundedZoom = clamp(targetZoom, 1, 4);
-  const factor = boundedZoom / node.baseZoom;
+  const zoomed = node.geometry.zoom(targetZoom);
+  const factor = zoomed.zoom / node.baseZoom;
   node.layer.scale.set(node.baseScaleX * factor, factor);
-  const targetCenter = photoCenterForPan(
-    node,
-    node.panX,
-    node.panY,
-    factor,
+  node.layer.position.set(
+    zoomed.placement.center.x,
+    zoomed.placement.center.y,
   );
-  node.layer.position.set(targetCenter.x, targetCenter.y);
 }
 
 function resetPhotoPreview(node: PhotoRenderNode) {
@@ -640,141 +603,6 @@ function resetPhotoPreview(node: PhotoRenderNode) {
   node.layer.position.set(node.originalX, node.originalY);
 }
 
-function photoPanRanges(node: PhotoRenderNode, scale: number) {
-  let minimumFrameU = Number.POSITIVE_INFINITY;
-  let maximumFrameU = Number.NEGATIVE_INFINITY;
-  let minimumFrameV = Number.POSITIVE_INFINITY;
-  let maximumFrameV = Number.NEGATIVE_INFINITY;
-
-  for (const [cornerX, cornerY] of [
-    [0, 0],
-    [node.frameWidth, 0],
-    [0, node.frameHeight],
-    [node.frameWidth, node.frameHeight],
-  ]) {
-    const u =
-      node.rotationCosine * cornerX + node.rotationSine * cornerY;
-    const v =
-      -node.rotationSine * cornerX + node.rotationCosine * cornerY;
-    minimumFrameU = Math.min(minimumFrameU, u);
-    maximumFrameU = Math.max(maximumFrameU, u);
-    minimumFrameV = Math.min(minimumFrameV, v);
-    maximumFrameV = Math.max(maximumFrameV, v);
-  }
-
-  const halfWidth = (node.drawWidth * scale) / 2;
-  const halfHeight = (node.drawHeight * scale) / 2;
-  return {
-    minimumU: maximumFrameU - halfWidth,
-    maximumU: minimumFrameU + halfWidth,
-    minimumV: maximumFrameV - halfHeight,
-    maximumV: minimumFrameV + halfHeight,
-  };
-}
-
-function clampPhotoCenter(
-  node: PhotoRenderNode,
-  centerX: number,
-  centerY: number,
-  scale: number,
-) {
-  const ranges = photoPanRanges(node, scale);
-  const centerU =
-    node.rotationCosine * centerX + node.rotationSine * centerY;
-  const centerV =
-    -node.rotationSine * centerX + node.rotationCosine * centerY;
-  const clampedU = clamp(centerU, ranges.minimumU, ranges.maximumU);
-  const clampedV = clamp(centerV, ranges.minimumV, ranges.maximumV);
-
-  return {
-    x:
-      node.rotationCosine * clampedU -
-      node.rotationSine * clampedV,
-    y:
-      node.rotationSine * clampedU +
-      node.rotationCosine * clampedV,
-  };
-}
-
-function normalizedPhotoPan(
-  node: PhotoRenderNode,
-  centerX: number,
-  centerY: number,
-  scale: number,
-) {
-  const ranges = photoPanRanges(node, scale);
-  const centerU =
-    node.rotationCosine * centerX + node.rotationSine * centerY;
-  const centerV =
-    -node.rotationSine * centerX + node.rotationCosine * centerY;
-
-  return {
-    x: normalizedPosition(
-      centerU,
-      ranges.minimumU,
-      ranges.maximumU,
-    ),
-    y: normalizedPosition(
-      centerV,
-      ranges.minimumV,
-      ranges.maximumV,
-    ),
-  };
-}
-
-function photoCenterForPan(
-  node: PhotoRenderNode,
-  panX: number,
-  panY: number,
-  scale: number,
-) {
-  const ranges = photoPanRanges(node, scale);
-  const centerU = positionFromNormalized(
-    panX,
-    ranges.minimumU,
-    ranges.maximumU,
-  );
-  const centerV = positionFromNormalized(
-    panY,
-    ranges.minimumV,
-    ranges.maximumV,
-  );
-
-  return {
-    x:
-      node.rotationCosine * centerU -
-      node.rotationSine * centerV,
-    y:
-      node.rotationSine * centerU +
-      node.rotationCosine * centerV,
-  };
-}
-
-function normalizedPosition(
-  position: number,
-  minimum: number,
-  maximum: number,
-) {
-  const span = maximum - minimum;
-  if (span <= 0.0001) return 0;
-  return clamp(((position - minimum) * 2) / span - 1, -1, 1);
-}
-
-function positionFromNormalized(
-  normalized: number,
-  minimum: number,
-  maximum: number,
-) {
-  return (
-    (minimum + maximum) / 2 +
-    (clamp(normalized, -1, 1) * (maximum - minimum)) / 2
-  );
-}
-
 function hexToNumber(value: string): number {
   return Number.parseInt(value.replace("#", ""), 16);
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.min(maximum, Math.max(minimum, value));
 }

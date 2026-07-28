@@ -1,7 +1,11 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-import type { CompositionPlan } from "../domain/project";
+import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
+import type {
+  CompositionPlan,
+  PhotoPlacementPlan,
+} from "../domain/project";
 import { AlbumCanvas } from "./AlbumCanvas";
 
 const pixiLifecycle = vi.hoisted(() => ({
@@ -197,6 +201,27 @@ const composition: CompositionPlan = {
   ],
 };
 
+const horizontalPlacementPlan: PhotoPlacementPlan = {
+  currentPan: { x: 0, y: 0 },
+  currentZoom: 1,
+  panRange: { minimum: -1, maximum: 1 },
+  zoomRange: { minimum: 1, maximum: 4 },
+  current: {
+    center: { x: 150_000, y: 100_000 },
+    size: { width: 400_000, height: 200_000 },
+  },
+  panOrigin: { x: 150_000, y: 100_000 },
+  panToCenter: {
+    xx: 50_000,
+    xy: 0,
+    yx: 0,
+    yy: 0,
+  },
+  centerToPan: { xx: 0.00002, xy: 0, yx: 0, yy: 0 },
+  centerPerZoom: { x: 0, y: 0 },
+  sizePerZoom: { width: 400_000, height: 200_000 },
+};
+
 const interactiveComposition: CompositionPlan = {
   sheets: [
     {
@@ -224,6 +249,7 @@ const interactiveComposition: CompositionPlan = {
               width: 400_000,
               height: 200_000,
             },
+            placement: horizontalPlacementPlan,
             rotationDegrees: 0,
             mirrorX: false,
             palette: ["#10202b", "#648493", "#dfa75e"],
@@ -247,6 +273,15 @@ const pannedInteractiveComposition: CompositionPlan = {
               ...interactiveComposition.sheets[0].frames[0].photo!.drawRect,
               x: -95_000,
             },
+            placement: {
+              ...horizontalPlacementPlan,
+              currentPan: { x: -0.9, y: 0 },
+              current: {
+                ...horizontalPlacementPlan.current,
+                center: { x: 105_000, y: 100_000 },
+              },
+              centerPerZoom: { x: -180_000, y: 0 },
+            },
           },
         },
       ],
@@ -264,12 +299,25 @@ const rotatedInteractiveComposition: CompositionPlan = {
           photo: {
             ...interactiveComposition.sheets[0].frames[0].photo!,
             drawRect: {
-              x: -100_000,
-              y: -80_000,
-              width: 500_000,
-              height: 360_000,
+              x: -187_500,
+              y: -125_000,
+              width: 675_000,
+              height: 450_000,
             },
-            rotationDegrees: 30,
+            placement: {
+              ...(placementFixture.cases[1]
+                .expectedPlan as PhotoPlacementPlan),
+              currentPan: { x: 0, y: 0 },
+              current: {
+                center: { x: 150_000, y: 100_000 },
+                size: {
+                  width: 675_000,
+                  height: 450_000,
+                },
+              },
+              centerPerZoom: { x: 0, y: 0 },
+            },
+            rotationDegrees: 90,
           },
         },
       ],
@@ -488,6 +536,7 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
       (child as { children: unknown[] }).children.length > 0,
   ) as {
     position: { x: number; y: number };
+    pivot: { x: number; y: number };
     rotation: number;
     scale: { x: number; y: number };
   };
@@ -498,7 +547,7 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
     stopPropagation: vi.fn(),
   });
   pixiLifecycle.instances[0].stage.emit("globalpointermove", {
-    global: { x: 10_000, y: 0 },
+    global: { x: 10_000, y: 10_000 },
   });
 
   const cosine = Math.cos(photoLayer.rotation);
@@ -518,12 +567,16 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
       (-sine * deltaX + cosine * deltaY) /
       Math.abs(photoLayer.scale.y);
 
-    expect(Math.abs(localX)).toBeLessThanOrEqual(250.001);
-    expect(Math.abs(localY)).toBeLessThanOrEqual(180.001);
+    expect(Math.abs(localX)).toBeLessThanOrEqual(
+      photoLayer.pivot.x + 0.001,
+    );
+    expect(Math.abs(localY)).toBeLessThanOrEqual(
+      photoLayer.pivot.y + 0.001,
+    );
   }
 
   pixiLifecycle.instances[0].stage.emit("pointerup", {
-    global: { x: 10_000, y: 0 },
+    global: { x: 10_000, y: 10_000 },
   });
 
   expect(onPanCommit).toHaveBeenCalledOnce();

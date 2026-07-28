@@ -1,7 +1,12 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { EditorProjection, ProjectBridge } from "../domain/project";
+import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
+import type {
+  EditorProjection,
+  PhotoPlacementPlan,
+  ProjectBridge,
+} from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
@@ -95,7 +100,33 @@ const projection: EditorProjection = {
         widthUm: 600_000,
         heightUm: 300_000,
         hasOverlay: false,
-        frames: [],
+        frames: [
+          {
+            frameId: "frame-001",
+            clipRect: {
+              x: 20_000,
+              y: 20_000,
+              width: 280_000,
+              height: 260_000,
+            },
+            zIndex: 0,
+            photo: {
+              mediaId: "media-001",
+              name: "Serra ao amanhecer.jpg",
+              drawRect: {
+                x: -50_000,
+                y: 20_000,
+                width: 400_000,
+                height: 260_000,
+              },
+              placement: placementFixture.cases[0]
+                .expectedPlan as PhotoPlacementPlan,
+              rotationDegrees: 0,
+              mirrorX: false,
+              palette: ["#10202b", "#648493", "#dfa75e"],
+            },
+          },
+        ],
       },
     ],
   },
