@@ -77,7 +77,6 @@ function App({
     <ProjectWorkspace
       projection={projection}
       bridge={bridge}
-      graphics={graphics}
       onProjectionChange={setProjection}
     />
   );

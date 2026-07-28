@@ -559,40 +559,63 @@ fn build_render_snapshot(
 }
 
 fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
-    let frame_ratio = frame.width as f64 / frame.height as f64;
-    let source_ratio = photo.source_width_px as f64 / photo.source_height_px as f64;
-
-    let (fill_width, fill_height) = if source_ratio >= frame_ratio {
-        (
-            (frame.height as f64 * source_ratio).round() as i64,
-            frame.height,
-        )
-    } else {
-        (
-            frame.width,
-            (frame.width as f64 / source_ratio).round() as i64,
-        )
-    };
-
+    let rotation_degrees =
+        photo.transform.quarter_turns as f32 * 90.0 + photo.transform.fine_rotation_degrees;
+    let radians = (rotation_degrees as f64).to_radians();
+    let cosine = radians.cos();
+    let sine = radians.sin();
+    let frame_width = frame.width as f64;
+    let frame_height = frame.height as f64;
+    let source_width = photo.source_width_px as f64;
+    let source_height = photo.source_height_px as f64;
+    let required_width = cosine.abs() * frame_width + sine.abs() * frame_height;
+    let required_height = sine.abs() * frame_width + cosine.abs() * frame_height;
+    let fill_scale = (required_width / source_width).max(required_height / source_height);
     let zoom = photo.transform.user_zoom.max(1.0) as f64;
-    let draw_width = (fill_width as f64 * zoom).round() as i64;
-    let draw_height = (fill_height as f64 * zoom).round() as i64;
-    let overflow_x = draw_width - frame.width;
-    let overflow_y = draw_height - frame.height;
+    let draw_width = (source_width * fill_scale * zoom).ceil() as i64;
+    let draw_height = (source_height * fill_scale * zoom).ceil() as i64;
+    let half_width = draw_width as f64 / 2.0;
+    let half_height = draw_height as f64 / 2.0;
+
+    let mut minimum_u = f64::INFINITY;
+    let mut maximum_u = f64::NEG_INFINITY;
+    let mut minimum_v = f64::INFINITY;
+    let mut maximum_v = f64::NEG_INFINITY;
+    for (corner_x, corner_y) in [
+        (0.0, 0.0),
+        (frame_width, 0.0),
+        (0.0, frame_height),
+        (frame_width, frame_height),
+    ] {
+        let u = cosine * corner_x + sine * corner_y;
+        let v = -sine * corner_x + cosine * corner_y;
+        minimum_u = minimum_u.min(u);
+        maximum_u = maximum_u.max(u);
+        minimum_v = minimum_v.min(v);
+        maximum_v = maximum_v.max(v);
+    }
+
+    let lower_u = maximum_u - half_width;
+    let upper_u = minimum_u + half_width;
+    let lower_v = maximum_v - half_height;
+    let upper_v = minimum_v + half_height;
     let pan_x = photo.transform.pan_x.clamp(-1.0, 1.0) as f64;
     let pan_y = photo.transform.pan_y.clamp(-1.0, 1.0) as f64;
+    let center_u = (lower_u + upper_u) / 2.0 + pan_x * (upper_u - lower_u) / 2.0;
+    let center_v = (lower_v + upper_v) / 2.0 + pan_y * (upper_v - lower_v) / 2.0;
+    let center_x = cosine * center_u - sine * center_v;
+    let center_y = sine * center_u + cosine * center_v;
 
     ComposedPhoto {
         media_id: photo.media_id.clone(),
         name: photo.name.clone(),
         draw_rect: RectUm {
-            x: frame.x - overflow_x / 2 + (pan_x * overflow_x as f64 / 2.0).round() as i64,
-            y: frame.y - overflow_y / 2 + (pan_y * overflow_y as f64 / 2.0).round() as i64,
+            x: frame.x + (center_x - half_width).round() as i64,
+            y: frame.y + (center_y - half_height).round() as i64,
             width: draw_width,
             height: draw_height,
         },
-        rotation_degrees: photo.transform.quarter_turns as f32 * 90.0
-            + photo.transform.fine_rotation_degrees,
+        rotation_degrees,
         mirror_x: photo.transform.mirror_x,
         palette: photo.palette.clone(),
     }
@@ -834,7 +857,10 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CompositionCore, ProjectCore, ProjectIntent, RectUm};
+    use super::{
+        CompositionCore, MediaTransform, PhotoSnapshot, ProjectCore, ProjectIntent, RectUm,
+        compose_photo,
+    };
 
     #[test]
     fn opens_a_representative_long_album() {
@@ -929,6 +955,55 @@ mod tests {
         let wire = serde_json::to_string(&snapshot).expect("snapshot is serializable");
         assert!(!wire.contains("viewport"));
         assert!(!wire.contains("selection"));
+    }
+
+    #[test]
+    fn rotated_composition_keeps_every_frame_corner_covered() {
+        let frame = RectUm {
+            x: 20_000,
+            y: 30_000,
+            width: 300_000,
+            height: 200_000,
+        };
+        let photo = PhotoSnapshot {
+            media_id: "media-rotated".into(),
+            name: "Foto rotacionada.jpg".into(),
+            source_width_px: 6_000,
+            source_height_px: 4_000,
+            palette: ["#10202b".into(), "#648493".into(), "#dfa75e".into()],
+            transform: MediaTransform {
+                pan_x: 1.0,
+                pan_y: -1.0,
+                user_zoom: 1.0,
+                quarter_turns: 0,
+                fine_rotation_degrees: 30.0,
+                mirror_x: false,
+            },
+        };
+
+        let composed = compose_photo(&frame, &photo);
+        let radians = (composed.rotation_degrees as f64).to_radians();
+        let cosine = radians.cos();
+        let sine = radians.sin();
+        let center_x = composed.draw_rect.x as f64 + composed.draw_rect.width as f64 / 2.0;
+        let center_y = composed.draw_rect.y as f64 + composed.draw_rect.height as f64 / 2.0;
+        let half_width = composed.draw_rect.width as f64 / 2.0;
+        let half_height = composed.draw_rect.height as f64 / 2.0;
+
+        for (corner_x, corner_y) in [
+            (frame.x, frame.y),
+            (frame.x + frame.width, frame.y),
+            (frame.x, frame.y + frame.height),
+            (frame.x + frame.width, frame.y + frame.height),
+        ] {
+            let delta_x = corner_x as f64 - center_x;
+            let delta_y = corner_y as f64 - center_y;
+            let local_x = cosine * delta_x + sine * delta_y;
+            let local_y = -sine * delta_x + cosine * delta_y;
+
+            assert!(local_x.abs() <= half_width + 1.0);
+            assert!(local_y.abs() <= half_height + 1.0);
+        }
     }
 
     #[test]

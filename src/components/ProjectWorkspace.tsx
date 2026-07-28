@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "react-aria-components";
 
 import type {
@@ -7,35 +7,46 @@ import type {
   ProjectBridge,
   ProjectIntent,
 } from "../domain/project";
-import type { GraphicsDiagnostic } from "../platform/graphics";
 import { useEditorView } from "../state/editorView";
 import { AlbumCanvas } from "./AlbumCanvas";
+import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
 
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   bridge: ProjectBridge;
-  graphics: GraphicsDiagnostic;
   onProjectionChange(projection: EditorProjection): void;
+}
+
+interface ZoomDraft {
+  frameId: string;
+  startValue: number;
+  value: number;
+  committing: boolean;
+}
+
+const ignoreMaterializedCount = () => undefined;
+
+function messageFromError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export function ProjectWorkspace({
   projection,
   bridge,
-  graphics,
   onProjectionChange,
 }: ProjectWorkspaceProps) {
   const selectedFrameId = useEditorView((state) => state.selectedFrameId);
   const focusedSheetId = useEditorView((state) => state.focusedSheetId);
   const viewport = useEditorView((state) => state.viewport);
-  const inspectorTab = useEditorView((state) => state.inspectorTab);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
   const setViewport = useEditorView((state) => state.setViewport);
-  const setInspectorTab = useEditorView((state) => state.setInspectorTab);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
-  const [materializedCount, setMaterializedCount] = useState(0);
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(null);
+  const zoomDraftRef = useRef<ZoomDraft | null>(null);
 
   const selectedFrame = useMemo(
     () =>
@@ -45,7 +56,26 @@ export function ProjectWorkspace({
     [projection.state.album.sheets, selectedFrameId],
   );
 
-  async function run(
+  const photoZoomByFrameId = useMemo(
+    () =>
+      Object.fromEntries(
+        projection.state.album.sheets.flatMap((sheet) =>
+          sheet.frames.flatMap((frame) =>
+            frame.photo
+              ? [[frame.id, frame.photo.transform.userZoom] as const]
+              : [],
+          ),
+        ),
+      ),
+    [projection.state.album.sheets],
+  );
+
+  function setZoomDraft(next: ZoomDraft | null) {
+    zoomDraftRef.current = next;
+    setZoomDraftState(next);
+  }
+
+  async function runWithGlobalFeedback(
     label: string,
     operation: () => Promise<EditorProjection>,
   ) {
@@ -54,16 +84,25 @@ export function ProjectWorkspace({
     try {
       onProjectionChange(await operation());
     } catch (error: unknown) {
-      setMessage(
-        error instanceof Error ? error.message : String(error),
-      );
+      setMessage(messageFromError(error));
     } finally {
       setBusy(null);
     }
   }
 
-  function apply(intent: ProjectIntent) {
-    return run("Aplicando alteração", () => bridge.apply(intent));
+  function applyWithStatus(intent: ProjectIntent) {
+    return runWithGlobalFeedback("Aplicando alteração", () =>
+      bridge.apply(intent),
+    );
+  }
+
+  async function commitInteraction(intent: ProjectIntent) {
+    setMessage(null);
+    try {
+      onProjectionChange(await bridge.apply(intent));
+    } catch (error: unknown) {
+      setMessage(messageFromError(error));
+    }
   }
 
   async function exportPreview() {
@@ -73,9 +112,67 @@ export function ProjectWorkspace({
       const result = await bridge.exportPreview();
       setExportResult(result);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(messageFromError(error));
     } finally {
       setBusy(null);
+    }
+  }
+
+  function beginZoomGesture(frameId: string, currentValue: number) {
+    const currentDraft = zoomDraftRef.current;
+    if (
+      currentDraft?.frameId === frameId &&
+      !currentDraft.committing
+    ) {
+      return;
+    }
+    setZoomDraft({
+      frameId,
+      startValue: currentValue,
+      value: currentValue,
+      committing: false,
+    });
+  }
+
+  function updateZoomGesture(
+    frameId: string,
+    currentValue: number,
+    nextValue: number,
+  ) {
+    const currentDraft = zoomDraftRef.current;
+    const draft =
+      currentDraft?.frameId === frameId && !currentDraft.committing
+        ? currentDraft
+        : {
+            frameId,
+            startValue: currentValue,
+            value: currentValue,
+            committing: false,
+          };
+    setZoomDraft({
+      ...draft,
+      value: nextValue,
+    });
+  }
+
+  async function finishZoomGesture(frameId: string) {
+    const draft = zoomDraftRef.current;
+    if (!draft || draft.frameId !== frameId || draft.committing) return;
+
+    const delta = Number((draft.value - draft.startValue).toFixed(4));
+    if (Math.abs(delta) < 0.0001) {
+      setZoomDraft(null);
+      return;
+    }
+
+    setZoomDraft({ ...draft, committing: true });
+    await commitInteraction({
+      kind: "zoomPhoto",
+      frameId,
+      delta,
+    });
+    if (zoomDraftRef.current?.frameId === frameId) {
+      setZoomDraft(null);
     }
   }
 
@@ -84,16 +181,25 @@ export function ProjectWorkspace({
       if (!event.ctrlKey || event.altKey) return;
       if (event.key.toLocaleLowerCase() === "z" && projection.state.canUndo) {
         event.preventDefault();
-        void run("Desfazendo", bridge.undo);
+        void runWithGlobalFeedback("Desfazendo", bridge.undo);
       }
       if (event.key.toLocaleLowerCase() === "y" && projection.state.canRedo) {
         event.preventDefault();
-        void run("Refazendo", bridge.redo);
+        void runWithGlobalFeedback("Refazendo", bridge.redo);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
+
+  useEffect(() => {
+    if (
+      zoomDraftRef.current &&
+      zoomDraftRef.current.frameId !== selectedFrameId
+    ) {
+      setZoomDraft(null);
+    }
+  }, [selectedFrameId]);
 
   const sheetCount = projection.state.album.sheets.length;
   const photoCount = projection.state.album.sheets.reduce(
@@ -102,15 +208,16 @@ export function ProjectWorkspace({
     0,
   );
 
+  const selectedPhotoZoom =
+    selectedFrame?.photo?.transform.userZoom ?? 1;
+  const displayedPhotoZoom =
+    zoomDraft && zoomDraft.frameId === selectedFrame?.id
+      ? zoomDraft.value
+      : selectedPhotoZoom;
+
   return (
     <div className="app-shell">
       <header className="titlebar">
-        <div className="brand-mini" aria-label="MyAlbuns">
-          <span className="brand-mini-mark" aria-hidden="true">
-            M
-          </span>
-          <span>MyAlbuns</span>
-        </div>
         <nav className="app-menu" aria-label="Menu principal">
           <button type="button">Arquivo</button>
           <button type="button">Editar</button>
@@ -119,18 +226,6 @@ export function ProjectWorkspace({
           <button type="button">Ferramentas</button>
           <button type="button">Ajuda</button>
         </nav>
-        <div className="project-title">
-          <span>{projection.state.projectName}</span>
-          {projection.state.dirty && (
-            <span className="dirty-indicator" aria-label="Alterações pendentes">
-              •
-            </span>
-          )}
-        </div>
-        <div className="hardware-chip" title={graphics.reason}>
-          <span className="hardware-dot" aria-hidden="true" />
-          <span>{graphics.renderer}</span>
-        </div>
       </header>
 
       <div className="commandbar">
@@ -139,7 +234,9 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Desfazer"
             isDisabled={!projection.state.canUndo || Boolean(busy)}
-            onPress={() => void run("Desfazendo", bridge.undo)}
+            onPress={() =>
+              void runWithGlobalFeedback("Desfazendo", bridge.undo)
+            }
           >
             ↶
           </Button>
@@ -147,7 +244,9 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Refazer"
             isDisabled={!projection.state.canRedo || Boolean(busy)}
-            onPress={() => void run("Refazendo", bridge.redo)}
+            onPress={() =>
+              void runWithGlobalFeedback("Refazendo", bridge.redo)
+            }
           >
             ↷
           </Button>
@@ -158,9 +257,6 @@ export function ProjectWorkspace({
           <span>Selecionar</span>
         </div>
         <div className="command-spacer" />
-        <span className="revision-label">
-          revisão {projection.state.revision}
-        </span>
         <Button
           className="primary-command"
           onPress={() => void exportPreview()}
@@ -176,12 +272,14 @@ export function ProjectWorkspace({
           <div className="canvas-heading">
             <div>
               <span className="canvas-kicker">Canvas contínuo</span>
-              <strong>{sheetCount} Lâminas no Álbum</strong>
+              <strong>
+                {sheetCount} {sheetCount === 1 ? "Lâmina" : "Lâminas"} no Álbum
+              </strong>
             </div>
             <div className="canvas-help">
               <kbd>Alt</kbd> + arrastar: Pan da Foto
               <span>·</span>
-              <kbd>Ctrl</kbd> + roda: Zoom do Canvas
+              <kbd>Alt</kbd> + roda: Zoom da Foto
             </div>
           </div>
           <AlbumCanvas
@@ -189,11 +287,20 @@ export function ProjectWorkspace({
             selectedFrameId={selectedFrameId}
             focusedSheetId={focusedSheetId}
             viewport={viewport}
+            photoZoomByFrameId={photoZoomByFrameId}
+            photoZoomPreview={
+              zoomDraft
+                ? {
+                    frameId: zoomDraft.frameId,
+                    value: zoomDraft.value,
+                  }
+                : null
+            }
             onSelectFrame={selectFrame}
             onFocusSheet={focusSheet}
             onViewportChange={setViewport}
             onPanCommit={(frameId, deltaX, deltaY) =>
-              void apply({
+              void commitInteraction({
                 kind: "panPhoto",
                 frameId,
                 deltaX,
@@ -201,78 +308,32 @@ export function ProjectWorkspace({
               })
             }
             onZoomCommit={(frameId, delta) =>
-              void apply({ kind: "zoomPhoto", frameId, delta })
+              void commitInteraction({ kind: "zoomPhoto", frameId, delta })
             }
-            onMaterializedChange={setMaterializedCount}
+            onMaterializedChange={ignoreMaterializedCount}
+            onAutoScaleChange={setCanvasScale}
           />
-          <div className="canvas-status">
-            <span>
-              {materializedCount}/{sheetCount} Lâminas materializadas
-            </span>
-            <div className="zoom-controls" aria-label="Zoom do Canvas">
-              <button
-                type="button"
-                aria-label="Reduzir Zoom do Canvas"
-                onClick={() =>
-                  setViewport({
-                    ...viewport,
-                    zoom: Math.max(0.45, viewport.zoom - 0.1),
-                  })
-                }
-              >
-                −
-              </button>
-              <span>{Math.round(viewport.zoom * 100)}%</span>
-              <button
-                type="button"
-                aria-label="Aumentar Zoom do Canvas"
-                onClick={() =>
-                  setViewport({
-                    ...viewport,
-                    zoom: Math.min(1.55, viewport.zoom + 0.1),
-                  })
-                }
-              >
-                +
-              </button>
-            </div>
-          </div>
         </section>
 
         <aside className="inspector" aria-label="Painel contextual">
-          <div className="inspector-tabs">
-            <Button
-              className={inspectorTab === "album" ? "active" : ""}
-              onPress={() => setInspectorTab("album")}
-            >
-              Geral
-            </Button>
-            <Button
-              className={inspectorTab === "sheets" ? "active" : ""}
-              onPress={() => setInspectorTab("sheets")}
-            >
-              Lâminas
-            </Button>
-          </div>
-          {inspectorTab === "album" ? (
-            <div className="inspector-content">
-              <div className="context-heading">
-                <span>{selectedFrame ? "Frame selecionado" : "Álbum"}</span>
-                <h2>
-                  {selectedFrame?.photo?.name ?? projection.state.projectName}
-                </h2>
-              </div>
-              {selectedFrame ? (
-                <>
+          <div className="inspector-scroll">
+            {selectedFrame ? (
+              <>
+                <div className="context-heading">
+                  <span>Frame selecionado</span>
+                  <h2>{selectedFrame.photo?.name ?? "Frame placeholder"}</h2>
+                </div>
+                <InspectorSection
+                  key="frame-photo-design"
+                  title="Design"
+                  preferenceKey="frame-photo.design"
+                  defaultOpen
+                >
                   <PropertyRow
                     label="Frame"
-                    value={selectedFrame.id.replace("frame-", "").toUpperCase()}
-                  />
-                  <PropertyRow
-                    label="Zoom da Foto"
-                    value={`${Math.round(
-                      (selectedFrame.photo?.transform.userZoom ?? 1) * 100,
-                    )}%`}
+                    value={selectedFrame.id
+                      .replace("frame-", "")
+                      .toUpperCase()}
                   />
                   <PropertyRow
                     label="Pan horizontal"
@@ -280,85 +341,138 @@ export function ProjectWorkspace({
                       (selectedFrame.photo?.transform.panX ?? 0) * 100,
                     )}%`}
                   />
-                  <div className="property-actions">
-                    <Button
-                      onPress={() =>
-                        void apply({
-                          kind: "zoomPhoto",
-                          frameId: selectedFrame.id,
-                          delta: -0.1,
-                        })
-                      }
-                      isDisabled={!selectedFrame.photo}
-                    >
-                      − Zoom
-                    </Button>
-                    <Button
-                      onPress={() =>
-                        void apply({
-                          kind: "zoomPhoto",
-                          frameId: selectedFrame.id,
-                          delta: 0.1,
-                        })
-                      }
-                      isDisabled={!selectedFrame.photo}
-                    >
-                      + Zoom
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
+                  {selectedFrame.photo && (
+                    <label className="photo-zoom-control">
+                      <span className="photo-zoom-label">
+                        <span>Zoom da Foto</span>
+                        <output>
+                          {Math.round(displayedPhotoZoom * 100)}%
+                        </output>
+                      </span>
+                      <input
+                        type="range"
+                        aria-label="Zoom da Foto"
+                        min="100"
+                        max="400"
+                        step="1"
+                        value={Math.round(displayedPhotoZoom * 100)}
+                        disabled={Boolean(zoomDraft?.committing)}
+                        onPointerDown={() =>
+                          beginZoomGesture(
+                            selectedFrame.id,
+                            selectedPhotoZoom,
+                          )
+                        }
+                        onChange={(event) =>
+                          updateZoomGesture(
+                            selectedFrame.id,
+                            selectedPhotoZoom,
+                            Number(event.currentTarget.value) / 100,
+                          )
+                        }
+                        onPointerUp={() =>
+                          void finishZoomGesture(selectedFrame.id)
+                        }
+                        onKeyDown={(event) => {
+                          if (
+                            [
+                              "ArrowLeft",
+                              "ArrowRight",
+                              "ArrowUp",
+                              "ArrowDown",
+                              "Home",
+                              "End",
+                              "PageUp",
+                              "PageDown",
+                            ].includes(event.key)
+                          ) {
+                            beginZoomGesture(
+                              selectedFrame.id,
+                              selectedPhotoZoom,
+                            );
+                          }
+                        }}
+                        onKeyUp={(event) => {
+                          if (
+                            [
+                              "ArrowLeft",
+                              "ArrowRight",
+                              "ArrowUp",
+                              "ArrowDown",
+                              "Home",
+                              "End",
+                              "PageUp",
+                              "PageDown",
+                            ].includes(event.key)
+                          ) {
+                            void finishZoomGesture(selectedFrame.id);
+                          }
+                        }}
+                        onBlur={() =>
+                          void finishZoomGesture(selectedFrame.id)
+                        }
+                      />
+                    </label>
+                  )}
+                </InspectorSection>
+              </>
+            ) : (
+              <>
+                <InspectorSection
+                  key="album-information"
+                  title="Informações do Álbum"
+                  preferenceKey="album.information"
+                  defaultOpen
+                >
                   <PropertyRow label="Lâminas" value={String(sheetCount)} />
                   <PropertyRow
                     label="Fotos posicionadas"
                     value={String(photoCount)}
                   />
-                  <PropertyRow
-                    label="Dimensão"
-                    value="60 × 30 cm"
-                  />
+                  <PropertyRow label="Dimensão" value="60 × 30 cm" />
                   <PropertyRow label="Resolução" value="300 DPI" />
-                  <div className="architecture-note">
-                    <span className="architecture-icon" aria-hidden="true">
-                      ✓
-                    </span>
-                    <div>
-                      <strong>Estado canônico no Rust</strong>
-                      <p>
-                        Seleção e navegação ficam somente nesta Janela.
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <div className="sheet-grid">
-              {projection.state.album.sheets.map((sheet) => (
-                <Button
-                  key={sheet.id}
-                  className={
-                    sheet.id === focusedSheetId ? "sheet-tile active" : "sheet-tile"
-                  }
-                  onPress={() => {
-                    focusSheet(sheet.id);
-                    const index = sheet.number - 1;
-                    setViewport({
-                      ...viewport,
-                      offsetX: 42 - index * (600 + 52) * viewport.zoom,
-                    });
-                  }}
+                </InspectorSection>
+                <InspectorSection
+                  key="album-sheet-grid"
+                  title="Grade de Lâminas"
+                  preferenceKey="album.sheet-grid"
+                  defaultOpen
                 >
-                  <span className="sheet-miniature">
-                    <i />
-                    <i />
-                  </span>
-                  <span>{String(sheet.number).padStart(2, "0")}</span>
-                </Button>
-              ))}
-            </div>
-          )}
+                  <div className="sheet-grid">
+                    {projection.state.album.sheets.map((sheet, index) => {
+                      const sheetOffset = sheetOffsetInCanvasPixels(
+                        projection.composition.sheets,
+                        index,
+                      );
+                      return (
+                        <Button
+                          key={sheet.id}
+                          className={
+                            sheet.id === focusedSheetId
+                              ? "sheet-tile active"
+                              : "sheet-tile"
+                          }
+                          onPress={() => {
+                            focusSheet(sheet.id);
+                            setViewport({
+                              ...viewport,
+                              offsetX: 42 - sheetOffset * canvasScale,
+                            });
+                          }}
+                        >
+                          <span className="sheet-miniature">
+                            <i />
+                            <i />
+                          </span>
+                          <span>{String(sheet.number).padStart(2, "0")}</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </InspectorSection>
+              </>
+            )}
+          </div>
         </aside>
 
         <section className="media-panel" aria-label="Painel de imagens">
@@ -373,9 +487,6 @@ export function ProjectWorkspace({
               <span aria-hidden="true">⌕</span>
               <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
             </label>
-            <span className="media-count">
-              {projection.state.album.media.length} Fotos vinculadas
-            </span>
           </div>
           <div className="media-strip">
             {projection.state.album.media.map((media) => (
@@ -384,7 +495,7 @@ export function ProjectWorkspace({
                 type="button"
                 key={media.id}
                 onDoubleClick={() =>
-                  void apply({
+                  void applyWithStatus({
                     kind: "fillLeftmostPlaceholder",
                     sheetId: focusedSheetId,
                     mediaId: media.id,
@@ -451,6 +562,73 @@ export function ProjectWorkspace({
       )}
     </div>
   );
+}
+
+function InspectorSection({
+  title,
+  preferenceKey,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  preferenceKey: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(() =>
+    readInspectorSectionPreference(preferenceKey, defaultOpen),
+  );
+
+  function toggle() {
+    setOpen((current) => {
+      const next = !current;
+      writeInspectorSectionPreference(preferenceKey, next);
+      return next;
+    });
+  }
+
+  return (
+    <section className="inspector-section">
+      <button
+        type="button"
+        className="inspector-section-trigger"
+        aria-expanded={open}
+        onClick={toggle}
+      >
+        <span>{title}</span>
+        <span aria-hidden="true">{open ? "−" : "+"}</span>
+      </button>
+      {open && <div className="inspector-section-content">{children}</div>}
+    </section>
+  );
+}
+
+function readInspectorSectionPreference(
+  preferenceKey: string,
+  fallback: boolean,
+) {
+  try {
+    const stored = window.localStorage.getItem(
+      `myalbuns.inspector.${preferenceKey}`,
+    );
+    return stored === null ? fallback : stored === "open";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeInspectorSectionPreference(
+  preferenceKey: string,
+  open: boolean,
+) {
+  try {
+    window.localStorage.setItem(
+      `myalbuns.inspector.${preferenceKey}`,
+      open ? "open" : "closed",
+    );
+  } catch {
+    // The in-memory preference remains usable when storage is unavailable.
+  }
 }
 
 function PropertyRow({ label, value }: { label: string; value: string }) {

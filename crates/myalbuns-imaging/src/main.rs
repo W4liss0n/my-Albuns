@@ -102,16 +102,18 @@ fn draw_frame(image: &mut RgbaImage, frame: &ComposedFrame) {
         let draw_top = to_pixels_precise(photo.draw_rect.y);
         let draw_width = to_pixels_precise(photo.draw_rect.width).max(1.0);
         let draw_height = to_pixels_precise(photo.draw_rect.height).max(1.0);
+        let draw_center_x = draw_left + draw_width / 2.0;
+        let draw_center_y = draw_top + draw_height / 2.0;
         let radians = (photo.rotation_degrees as f64).to_radians();
         let cosine = radians.cos();
         let sine = radians.sin();
 
         for y in top..bottom {
             for x in left..right {
-                let normalized_x = (x as f64 + 0.5 - draw_left) / draw_width - 0.5;
-                let normalized_y = (y as f64 + 0.5 - draw_top) / draw_height - 0.5;
-                let mut source_x = cosine * normalized_x + sine * normalized_y;
-                let source_y = -sine * normalized_x + cosine * normalized_y;
+                let delta_x = x as f64 + 0.5 - draw_center_x;
+                let delta_y = y as f64 + 0.5 - draw_center_y;
+                let mut source_x = (cosine * delta_x + sine * delta_y) / draw_width;
+                let source_y = (-sine * delta_x + cosine * delta_y) / draw_height;
                 if photo.mirror_x {
                     source_x = -source_x;
                 }

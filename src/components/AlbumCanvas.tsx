@@ -11,37 +11,70 @@ import {
 
 import type { CompositionPlan } from "../domain/project";
 import type { ViewportState } from "../state/editorView";
+import {
+  CANVAS_VERTICAL_MARGIN_PX,
+  continuousCanvasScale,
+  MICROMETER_TO_CANVAS_PIXEL,
+  SHEET_LABEL_HEIGHT_PX,
+  sheetOffsetInCanvasPixels,
+} from "./canvasGeometry";
 
-const UM_TO_PX = 0.001;
-const SHEET_GAP = 52;
 const PRELOAD_MARGIN = 1;
+const ZOOM_GESTURE_SETTLE_MS = 500;
+
+interface PhotoZoomPreview {
+  frameId: string;
+  value: number;
+}
 
 interface AlbumCanvasProps {
   composition: CompositionPlan;
   selectedFrameId: string | null;
   focusedSheetId: string;
   viewport: ViewportState;
+  photoZoomByFrameId?: Readonly<Record<string, number>>;
+  photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
   onViewportChange(viewport: ViewportState): void;
   onPanCommit(frameId: string, deltaX: number, deltaY: number): void;
   onZoomCommit(frameId: string, delta: number): void;
   onMaterializedChange(count: number): void;
+  onAutoScaleChange?(scale: number): void;
+}
+
+interface PhotoRenderNode {
+  frameId: string;
+  layer: Container;
+  baseZoom: number;
+  baseScaleX: number;
+  drawWidth: number;
+  drawHeight: number;
+  frameWidth: number;
+  frameHeight: number;
+  rotationCosine: number;
+  rotationSine: number;
+  originalX: number;
+  originalY: number;
+  panX: number;
+  panY: number;
 }
 
 interface DragGesture {
   frameId: string;
   startX: number;
   startY: number;
-  frameWidth: number;
-  frameHeight: number;
-  photoLayer: Container;
+  canvasScale: number;
+  node: PhotoRenderNode;
   originalX: number;
   originalY: number;
+  currentX: number;
+  currentY: number;
 }
 
 interface ZoomGesture {
   frameId: string;
+  baseZoom: number;
   delta: number;
   timer: number;
 }
@@ -51,8 +84,12 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const applicationRef = useRef<Application | null>(null);
   const dragRef = useRef<DragGesture | null>(null);
   const zoomGestureRef = useRef<ZoomGesture | null>(null);
+  const photoNodesRef = useRef(new Map<string, PhotoRenderNode>());
+  const externalPreviewFrameRef = useRef<string | null>(null);
+  const lastAutoScaleRef = useRef<number | null>(null);
   const propsRef = useRef(props);
   const [ready, setReady] = useState(false);
+  const [canvasSizeRevision, setCanvasSizeRevision] = useState(0);
   propsRef.current = props;
 
   useEffect(() => {
@@ -72,6 +109,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         resizeTo: hostRef.current,
         backgroundAlpha: 0,
         antialias: true,
+        autoDensity: true,
+        resolution: window.devicePixelRatio,
         preference: "webgl",
         preferWebGLVersion: 2,
         powerPreference: "high-performance",
@@ -85,7 +124,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         app.canvas.className = "pixi-canvas";
         app.canvas.setAttribute(
           "aria-label",
-          "Canvas contínuo do Álbum. Use a roda para navegar e Ctrl mais roda para ampliar.",
+          "Canvas contínuo do Álbum. Use a roda para navegar e Alt mais roda para ajustar a Foto.",
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
@@ -102,6 +141,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       disposed = true;
       setReady(false);
       applicationRef.current = null;
+      photoNodesRef.current.clear();
       if (zoomGestureRef.current) {
         window.clearTimeout(zoomGestureRef.current.timer);
         zoomGestureRef.current = null;
@@ -111,32 +151,54 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }, [props.composition.sheets.length]);
 
   useEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      setCanvasSizeRevision((revision) => revision + 1);
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [props.composition.sheets.length]);
+
+  useEffect(() => {
     const app = applicationRef.current;
     if (!app || !ready) return;
 
     const removed = app.stage.removeChildren();
     removed.forEach((child) => child.destroy({ children: true }));
+    photoNodesRef.current.clear();
     const world = new Container();
     app.stage.addChild(world);
 
-    const sheetWidths = props.composition.sheets.map(
-      (sheet) => sheet.widthUm * UM_TO_PX,
+    const sheetHeight =
+      props.composition.sheets[0].heightUm *
+      MICROMETER_TO_CANVAS_PIXEL;
+    const canvasScale = continuousCanvasScale(
+      hostRef.current?.clientHeight || app.screen.height,
+      sheetHeight,
     );
-    const sheetOffsets: number[] = [];
-    let cursor = 0;
-    for (const width of sheetWidths) {
-      sheetOffsets.push(cursor);
-      cursor += width + SHEET_GAP;
+    if (
+      lastAutoScaleRef.current === null ||
+      Math.abs(lastAutoScaleRef.current - canvasScale) > 0.0001
+    ) {
+      lastAutoScaleRef.current = canvasScale;
+      props.onAutoScaleChange?.(canvasScale);
     }
 
-    const viewportLeft = -props.viewport.offsetX / props.viewport.zoom;
-    const viewportRight =
-      viewportLeft + app.screen.width / props.viewport.zoom;
+    const sheetOffsets = props.composition.sheets.map((_, index) =>
+      sheetOffsetInCanvasPixels(props.composition.sheets, index),
+    );
+
+    const viewportLeft = -props.viewport.offsetX / canvasScale;
+    const viewportRight = viewportLeft + app.screen.width / canvasScale;
     const visibleIndexes = props.composition.sheets
       .map((sheet, index) => ({
         index,
         left: sheetOffsets[index],
-        right: sheetOffsets[index] + sheet.widthUm * UM_TO_PX,
+        right:
+          sheetOffsets[index] +
+          sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL,
       }))
       .filter(
         ({ left, right }) =>
@@ -156,22 +218,18 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
     world.position.set(
       props.viewport.offsetX,
-      Math.max(
-        42,
-        (app.screen.height -
-          props.composition.sheets[0].heightUm *
-            UM_TO_PX *
-            props.viewport.zoom) /
-          2,
-      ),
+      CANVAS_VERTICAL_MARGIN_PX +
+        SHEET_LABEL_HEIGHT_PX * canvasScale,
     );
-    world.scale.set(props.viewport.zoom);
+    world.scale.set(canvasScale);
 
     for (let index = firstVisible; index <= lastVisible; index += 1) {
       const sheet = props.composition.sheets[index];
       const sheetContainer = new Container();
-      const width = sheet.widthUm * UM_TO_PX;
-      const height = sheet.heightUm * UM_TO_PX;
+      const width =
+        sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+      const height =
+        sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
       sheetContainer.position.set(sheetOffsets[index], 0);
       sheetContainer.eventMode = "static";
       sheetContainer.hitArea = new Rectangle(0, 0, width, height);
@@ -202,7 +260,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           letterSpacing: 1.4,
         },
       });
-      label.position.set(2, -24);
+      label.position.set(2, -SHEET_LABEL_HEIGHT_PX);
       sheetContainer.addChild(label);
 
       const centerLine = new Graphics()
@@ -213,10 +271,14 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
       for (const frame of sheet.frames) {
         const frameContainer = new Container();
-        const frameX = frame.clipRect.x * UM_TO_PX;
-        const frameY = frame.clipRect.y * UM_TO_PX;
-        const frameWidth = frame.clipRect.width * UM_TO_PX;
-        const frameHeight = frame.clipRect.height * UM_TO_PX;
+        const frameX =
+          frame.clipRect.x * MICROMETER_TO_CANVAS_PIXEL;
+        const frameY =
+          frame.clipRect.y * MICROMETER_TO_CANVAS_PIXEL;
+        const frameWidth =
+          frame.clipRect.width * MICROMETER_TO_CANVAS_PIXEL;
+        const frameHeight =
+          frame.clipRect.height * MICROMETER_TO_CANVAS_PIXEL;
         frameContainer.position.set(frameX, frameY);
         frameContainer.eventMode = "static";
         frameContainer.hitArea = new Rectangle(
@@ -227,23 +289,26 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         );
         frameContainer.cursor = frame.photo ? "grab" : "pointer";
 
-        const clip = new Graphics()
-          .rect(0, 0, frameWidth, frameHeight)
-          .fill(0xffffff);
-        const photoLayer = new Container();
+        let photoNode: PhotoRenderNode | null = null;
         if (frame.photo) {
-          const drawWidth = frame.photo.drawRect.width * UM_TO_PX;
-          const drawHeight = frame.photo.drawRect.height * UM_TO_PX;
+          const drawWidth =
+            frame.photo.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
+          const drawHeight =
+            frame.photo.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
+          const photoLayer = new Container();
           photoLayer.pivot.set(drawWidth / 2, drawHeight / 2);
           photoLayer.position.set(
-            (frame.photo.drawRect.x - frame.clipRect.x) * UM_TO_PX +
+            (frame.photo.drawRect.x - frame.clipRect.x) *
+              MICROMETER_TO_CANVAS_PIXEL +
               drawWidth / 2,
-            (frame.photo.drawRect.y - frame.clipRect.y) * UM_TO_PX +
+            (frame.photo.drawRect.y - frame.clipRect.y) *
+              MICROMETER_TO_CANVAS_PIXEL +
               drawHeight / 2,
           );
           photoLayer.rotation =
             (frame.photo.rotationDegrees * Math.PI) / 180;
-          photoLayer.scale.x = frame.photo.mirrorX ? -1 : 1;
+          photoLayer.scale.set(frame.photo.mirrorX ? -1 : 1, 1);
+
           const stripeCount = 12;
           for (let stripe = 0; stripe < stripeCount; stripe += 1) {
             const paletteIndex = Math.min(
@@ -263,11 +328,57 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             photoLayer.addChild(stripeGraphic);
           }
           const light = new Graphics()
-            .circle(drawWidth * 0.73, drawHeight * 0.28, drawHeight * 0.18)
+            .circle(
+              drawWidth * 0.73,
+              drawHeight * 0.28,
+              drawHeight * 0.18,
+            )
             .fill({ color: 0xfff3d0, alpha: 0.32 });
           photoLayer.addChild(light);
-          photoLayer.mask = clip;
-          frameContainer.addChild(photoLayer, clip);
+
+          const clip = new Graphics()
+            .rect(0, 0, frameWidth, frameHeight)
+            .fill(0xffffff);
+          const photoViewport = new Container();
+          photoViewport.addChild(photoLayer);
+          photoViewport.mask = clip;
+          frameContainer.addChild(photoViewport, clip);
+
+          const rotationCosine = Math.cos(photoLayer.rotation);
+          const rotationSine = Math.sin(photoLayer.rotation);
+          const baseZoom =
+            props.photoZoomByFrameId?.[frame.frameId] ?? 1;
+          photoNode = {
+            frameId: frame.frameId,
+            layer: photoLayer,
+            baseZoom,
+            baseScaleX: frame.photo.mirrorX ? -1 : 1,
+            drawWidth,
+            drawHeight,
+            frameWidth,
+            frameHeight,
+            rotationCosine,
+            rotationSine,
+            originalX: photoLayer.x,
+            originalY: photoLayer.y,
+            panX: 0,
+            panY: 0,
+          };
+          const normalizedPan = normalizedPhotoPan(
+            photoNode,
+            photoLayer.x,
+            photoLayer.y,
+            1,
+          );
+          photoNode.panX = normalizedPan.x;
+          photoNode.panY = normalizedPan.y;
+          photoNodesRef.current.set(frame.frameId, photoNode);
+          if (props.photoZoomPreview?.frameId === frame.frameId) {
+            applyPhotoZoomPreview(
+              photoNode,
+              props.photoZoomPreview.value,
+            );
+          }
         } else {
           const placeholder = new Graphics()
             .rect(0, 0, frameWidth, frameHeight)
@@ -300,40 +411,66 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           }
         });
         frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
-          if (!event.altKey || !frame.photo) return;
+          if (!event.altKey || !photoNode) return;
           event.stopPropagation();
           dragRef.current = {
             frameId: frame.frameId,
             startX: event.global.x,
             startY: event.global.y,
-            frameWidth: frameWidth * props.viewport.zoom,
-            frameHeight: frameHeight * props.viewport.zoom,
-            photoLayer,
-            originalX: photoLayer.x,
-            originalY: photoLayer.y,
+            canvasScale,
+            node: photoNode,
+            originalX: photoNode.layer.x,
+            originalY: photoNode.layer.y,
+            currentX: photoNode.layer.x,
+            currentY: photoNode.layer.y,
           };
           frameContainer.cursor = "grabbing";
         });
         frameContainer.on("wheel", (event: FederatedWheelEvent) => {
-          if (!event.altKey || !frame.photo) return;
+          if (!event.altKey || !photoNode) return;
           event.preventDefault();
-          const delta = event.deltaY < 0 ? 0.08 : -0.08;
+
           const current = zoomGestureRef.current;
-          if (current) window.clearTimeout(current.timer);
-          const accumulated =
-            current?.frameId === frame.frameId ? current.delta + delta : delta;
+          if (current && current.frameId !== frame.frameId) {
+            window.clearTimeout(current.timer);
+            if (Math.abs(current.delta) > 0.0001) {
+              propsRef.current.onZoomCommit(
+                current.frameId,
+                current.delta,
+              );
+            }
+          } else if (current) {
+            window.clearTimeout(current.timer);
+          }
+
+          const baseZoom =
+            current?.frameId === frame.frameId
+              ? current.baseZoom
+              : (propsRef.current.photoZoomByFrameId?.[frame.frameId] ?? 1);
+          const previousDelta =
+            current?.frameId === frame.frameId ? current.delta : 0;
+          const eventDelta = clamp(-event.deltaY * 0.0012, -0.18, 0.18);
+          const accumulated = clamp(
+            previousDelta + eventDelta,
+            1 - baseZoom,
+            4 - baseZoom,
+          );
+
+          applyPhotoZoomPreview(photoNode, baseZoom + accumulated);
           const timer = window.setTimeout(() => {
             const gesture = zoomGestureRef.current;
-            if (gesture) {
+            if (!gesture) return;
+            if (Math.abs(gesture.delta) > 0.0001) {
               propsRef.current.onZoomCommit(
                 gesture.frameId,
                 gesture.delta,
               );
-              zoomGestureRef.current = null;
             }
-          }, 180);
+            zoomGestureRef.current = null;
+          }, ZOOM_GESTURE_SETTLE_MS);
           zoomGestureRef.current = {
             frameId: frame.frameId,
+            baseZoom,
             delta: accumulated,
             timer,
           };
@@ -360,26 +497,39 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     }
 
     app.stage.eventMode = "static";
-    app.stage.hitArea = new Rectangle(0, 0, app.screen.width, app.screen.height);
+    app.stage.hitArea = new Rectangle(
+      0,
+      0,
+      app.screen.width,
+      app.screen.height,
+    );
     app.stage.on("globalpointermove", (event: FederatedPointerEvent) => {
       const gesture = dragRef.current;
       if (!gesture) return;
-      gesture.photoLayer.position.set(
-        gesture.originalX +
-          (event.global.x - gesture.startX) / props.viewport.zoom,
-        gesture.originalY +
-          (event.global.y - gesture.startY) / props.viewport.zoom,
-      );
+      updatePanPreview(gesture, event.global.x, event.global.y);
     });
     const finishDrag = (event: FederatedPointerEvent) => {
       const gesture = dragRef.current;
       if (!gesture) return;
-      const deltaX =
-        ((event.global.x - gesture.startX) / gesture.frameWidth) * 2;
-      const deltaY =
-        ((event.global.y - gesture.startY) / gesture.frameHeight) * 2;
+      updatePanPreview(gesture, event.global.x, event.global.y);
       dragRef.current = null;
-      propsRef.current.onPanCommit(gesture.frameId, deltaX, deltaY);
+
+      const currentPan = normalizedPhotoPan(
+        gesture.node,
+        gesture.currentX,
+        gesture.currentY,
+        1,
+      );
+      const deltaX = currentPan.x - gesture.node.panX;
+      const deltaY = currentPan.y - gesture.node.panY;
+
+      if (Math.abs(deltaX) > 0.0001 || Math.abs(deltaY) > 0.0001) {
+        propsRef.current.onPanCommit(
+          gesture.frameId,
+          clamp(deltaX, -2, 2),
+          clamp(deltaY, -2, 2),
+        );
+      }
     };
     app.stage.on("pointerup", finishDrag);
     app.stage.on("pointerupoutside", finishDrag);
@@ -387,18 +537,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     const handleWheel = (event: WheelEvent) => {
       if (event.altKey) return;
       event.preventDefault();
-      if (event.ctrlKey) {
-        const direction = event.deltaY < 0 ? 0.08 : -0.08;
-        propsRef.current.onViewportChange({
-          ...propsRef.current.viewport,
-          zoom: clamp(
-            propsRef.current.viewport.zoom + direction,
-            0.45,
-            1.55,
-          ),
-        });
-        return;
-      }
+      if (event.ctrlKey) return;
       propsRef.current.onViewportChange({
         ...propsRef.current.viewport,
         offsetX:
@@ -411,15 +550,40 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     return () => {
       app.canvas.removeEventListener("wheel", handleWheel);
       app.stage.removeAllListeners();
+      photoNodesRef.current.clear();
     };
   }, [
     props.composition,
     props.focusedSheetId,
     props.onMaterializedChange,
+    props.photoZoomByFrameId,
     props.selectedFrameId,
-    props.viewport,
+    props.viewport.offsetX,
+    canvasSizeRevision,
     ready,
   ]);
+
+  useEffect(() => {
+    const previousFrameId = externalPreviewFrameRef.current;
+    const nextPreview = props.photoZoomPreview;
+
+    if (previousFrameId && previousFrameId !== nextPreview?.frameId) {
+      const previousNode = photoNodesRef.current.get(previousFrameId);
+      if (previousNode) resetPhotoPreview(previousNode);
+    }
+
+    if (nextPreview) {
+      const nextNode = photoNodesRef.current.get(nextPreview.frameId);
+      if (nextNode) applyPhotoZoomPreview(nextNode, nextPreview.value);
+      externalPreviewFrameRef.current = nextPreview.frameId;
+    } else {
+      if (previousFrameId) {
+        const previousNode = photoNodesRef.current.get(previousFrameId);
+        if (previousNode) resetPhotoPreview(previousNode);
+      }
+      externalPreviewFrameRef.current = null;
+    }
+  }, [props.photoZoomPreview]);
 
   if (props.composition.sheets.length === 0) {
     return (
@@ -433,6 +597,177 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     <div className="canvas-host" ref={hostRef}>
       {!ready && <span className="canvas-loading">Iniciando WebGL2…</span>}
     </div>
+  );
+}
+
+function updatePanPreview(
+  gesture: DragGesture,
+  pointerX: number,
+  pointerY: number,
+) {
+  const nextX =
+    gesture.originalX +
+    (pointerX - gesture.startX) / gesture.canvasScale;
+  const nextY =
+    gesture.originalY +
+    (pointerY - gesture.startY) / gesture.canvasScale;
+  const clampedCenter = clampPhotoCenter(
+    gesture.node,
+    nextX,
+    nextY,
+    1,
+  );
+  gesture.currentX = clampedCenter.x;
+  gesture.currentY = clampedCenter.y;
+  gesture.node.layer.position.set(gesture.currentX, gesture.currentY);
+}
+
+function applyPhotoZoomPreview(node: PhotoRenderNode, targetZoom: number) {
+  const boundedZoom = clamp(targetZoom, 1, 4);
+  const factor = boundedZoom / node.baseZoom;
+  node.layer.scale.set(node.baseScaleX * factor, factor);
+  const targetCenter = photoCenterForPan(
+    node,
+    node.panX,
+    node.panY,
+    factor,
+  );
+  node.layer.position.set(targetCenter.x, targetCenter.y);
+}
+
+function resetPhotoPreview(node: PhotoRenderNode) {
+  node.layer.scale.set(node.baseScaleX, 1);
+  node.layer.position.set(node.originalX, node.originalY);
+}
+
+function photoPanRanges(node: PhotoRenderNode, scale: number) {
+  let minimumFrameU = Number.POSITIVE_INFINITY;
+  let maximumFrameU = Number.NEGATIVE_INFINITY;
+  let minimumFrameV = Number.POSITIVE_INFINITY;
+  let maximumFrameV = Number.NEGATIVE_INFINITY;
+
+  for (const [cornerX, cornerY] of [
+    [0, 0],
+    [node.frameWidth, 0],
+    [0, node.frameHeight],
+    [node.frameWidth, node.frameHeight],
+  ]) {
+    const u =
+      node.rotationCosine * cornerX + node.rotationSine * cornerY;
+    const v =
+      -node.rotationSine * cornerX + node.rotationCosine * cornerY;
+    minimumFrameU = Math.min(minimumFrameU, u);
+    maximumFrameU = Math.max(maximumFrameU, u);
+    minimumFrameV = Math.min(minimumFrameV, v);
+    maximumFrameV = Math.max(maximumFrameV, v);
+  }
+
+  const halfWidth = (node.drawWidth * scale) / 2;
+  const halfHeight = (node.drawHeight * scale) / 2;
+  return {
+    minimumU: maximumFrameU - halfWidth,
+    maximumU: minimumFrameU + halfWidth,
+    minimumV: maximumFrameV - halfHeight,
+    maximumV: minimumFrameV + halfHeight,
+  };
+}
+
+function clampPhotoCenter(
+  node: PhotoRenderNode,
+  centerX: number,
+  centerY: number,
+  scale: number,
+) {
+  const ranges = photoPanRanges(node, scale);
+  const centerU =
+    node.rotationCosine * centerX + node.rotationSine * centerY;
+  const centerV =
+    -node.rotationSine * centerX + node.rotationCosine * centerY;
+  const clampedU = clamp(centerU, ranges.minimumU, ranges.maximumU);
+  const clampedV = clamp(centerV, ranges.minimumV, ranges.maximumV);
+
+  return {
+    x:
+      node.rotationCosine * clampedU -
+      node.rotationSine * clampedV,
+    y:
+      node.rotationSine * clampedU +
+      node.rotationCosine * clampedV,
+  };
+}
+
+function normalizedPhotoPan(
+  node: PhotoRenderNode,
+  centerX: number,
+  centerY: number,
+  scale: number,
+) {
+  const ranges = photoPanRanges(node, scale);
+  const centerU =
+    node.rotationCosine * centerX + node.rotationSine * centerY;
+  const centerV =
+    -node.rotationSine * centerX + node.rotationCosine * centerY;
+
+  return {
+    x: normalizedPosition(
+      centerU,
+      ranges.minimumU,
+      ranges.maximumU,
+    ),
+    y: normalizedPosition(
+      centerV,
+      ranges.minimumV,
+      ranges.maximumV,
+    ),
+  };
+}
+
+function photoCenterForPan(
+  node: PhotoRenderNode,
+  panX: number,
+  panY: number,
+  scale: number,
+) {
+  const ranges = photoPanRanges(node, scale);
+  const centerU = positionFromNormalized(
+    panX,
+    ranges.minimumU,
+    ranges.maximumU,
+  );
+  const centerV = positionFromNormalized(
+    panY,
+    ranges.minimumV,
+    ranges.maximumV,
+  );
+
+  return {
+    x:
+      node.rotationCosine * centerU -
+      node.rotationSine * centerV,
+    y:
+      node.rotationSine * centerU +
+      node.rotationCosine * centerV,
+  };
+}
+
+function normalizedPosition(
+  position: number,
+  minimum: number,
+  maximum: number,
+) {
+  const span = maximum - minimum;
+  if (span <= 0.0001) return 0;
+  return clamp(((position - minimum) * 2) / span - 1, -1, 1);
+}
+
+function positionFromNormalized(
+  normalized: number,
+  minimum: number,
+  maximum: number,
+) {
+  return (
+    (minimum + maximum) / 2 +
+    (clamp(normalized, -1, 1) * (maximum - minimum)) / 2
   );
 }
 

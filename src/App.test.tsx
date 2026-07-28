@@ -71,10 +71,11 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Álbum Horizonte" }),
+    await screen.findByRole("button", { name: "Exportar prova" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("navigation", { name: "Menu principal" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("NVIDIA GeForce RTX")).toBeInTheDocument();
+  expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
+  expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
 });
