@@ -73,6 +73,39 @@ test("adapts the plan units once at the renderer seam", () => {
   expect(geometry.current.size.height).toBeCloseTo(200, 6);
 });
 
+test("constrains Pan against transient Zoom without moving the preview", () => {
+  const geometry = createPhotoGeometry(
+    placementCases[0].expectedPlan,
+  );
+
+  const combined = geometry.constrain(
+    geometry.current.center,
+    1.12,
+  );
+
+  expect(combined.zoom).toBeCloseTo(1.12, 6);
+  expect(combined.pan.x).toBeCloseTo(-45_000 / 74_000, 6);
+  expect(combined.placement.center.x).toBeCloseTo(105_000, 6);
+  expect(combined.placement.center.y).toBeCloseTo(100_000, 6);
+  expect(combined.placement.size.width).toBeCloseTo(448_000, 6);
+  expect(combined.placement.size.height).toBeCloseTo(224_000, 6);
+
+  const rotatedGeometry = createPhotoGeometry(
+    placementCases[1].expectedPlan,
+  );
+  const rotated = rotatedGeometry.constrain(
+    rotatedGeometry.current.center,
+    2,
+  );
+
+  expect(rotated.pan.x).toBeCloseTo(237_500 / 350_000, 6);
+  expect(rotated.pan.y).toBeCloseTo(-0.5, 6);
+  expect(rotated.placement.center.x).toBeCloseTo(225_000, 6);
+  expect(rotated.placement.center.y).toBeCloseTo(337_500, 6);
+  expect(rotated.placement.size.width).toBeCloseTo(900_000, 6);
+  expect(rotated.placement.size.height).toBeCloseTo(600_000, 6);
+});
+
 function expectPlacementClose(
   actual: PhotoPlacement,
   expected: PhotoPlacement,

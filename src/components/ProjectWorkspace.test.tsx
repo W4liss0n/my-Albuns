@@ -13,6 +13,12 @@ import { ProjectWorkspace } from "./ProjectWorkspace";
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     onZoomCommit(frameId: string, delta: number): void;
+    onTransformCommit(
+      frameId: string,
+      deltaPanX: number,
+      deltaPanY: number,
+      deltaZoom: number,
+    ): void;
   },
 }));
 
@@ -260,5 +266,33 @@ test("commits a slider zoom once without flashing a global busy state", async ()
   await act(async () => {
     pending.resolve(projection);
     await pending.promise;
+  });
+});
+
+test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
+  const apply = vi.fn(async () => projection);
+
+  render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  canvasHarness.props?.onTransformCommit(
+    "frame-001",
+    0.35,
+    -0.2,
+    0.12,
+  );
+
+  expect(apply).toHaveBeenCalledOnce();
+  expect(apply).toHaveBeenCalledWith({
+    kind: "transformPhoto",
+    frameId: "frame-001",
+    deltaPanX: 0.35,
+    deltaPanY: -0.2,
+    deltaZoom: 0.12,
   });
 });

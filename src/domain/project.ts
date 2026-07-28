@@ -43,7 +43,7 @@ export interface PhotoPlacementPlan {
   panOrigin: Vector2;
   panToCenter: Matrix2;
   centerToPan: Matrix2;
-  centerPerZoom: Vector2;
+  panToCenterPerZoom: Matrix2;
   sizePerZoom: Size2;
 }
 
@@ -156,6 +156,13 @@ export type ProjectIntent =
       kind: "zoomPhoto";
       frameId: string;
       delta: number;
+    }
+  | {
+      kind: "transformPhoto";
+      frameId: string;
+      deltaPanX: number;
+      deltaPanY: number;
+      deltaZoom: number;
     };
 
 export interface ExportResult {

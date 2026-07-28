@@ -8,6 +8,7 @@ import type {
 
 export interface ConstrainedPhotoPlacement {
   pan: Vector2;
+  zoom: number;
   placement: PhotoPlacement;
 }
 
@@ -21,7 +22,10 @@ export interface PhotoGeometry {
   panRange: NumberRange;
   zoomRange: NumberRange;
   zoom(targetZoom: number): ZoomedPhotoPlacement;
-  constrain(center: Vector2): ConstrainedPhotoPlacement;
+  constrain(
+    center: Vector2,
+    targetZoom?: number,
+  ): ConstrainedPhotoPlacement;
 }
 
 export function createPhotoGeometry(
@@ -32,57 +36,85 @@ export function createPhotoGeometry(
 
   function zoom(targetZoom: number): ZoomedPhotoPlacement {
     const boundedZoom = clampToRange(targetZoom, plan.zoomRange);
-    const delta = boundedZoom - plan.currentZoom;
     return {
       zoom: boundedZoom,
-      placement: {
-        center: {
-          x: plan.current.center.x + plan.centerPerZoom.x * delta,
-          y: plan.current.center.y + plan.centerPerZoom.y * delta,
-        },
-        size: {
-          width:
-            plan.current.size.width + plan.sizePerZoom.width * delta,
-          height:
-            plan.current.size.height + plan.sizePerZoom.height * delta,
-        },
-      },
+      placement: placementAt(plan.currentPan, boundedZoom),
     };
   }
 
-  function constrain(center: Vector2): ConstrainedPhotoPlacement {
+  function constrain(
+    center: Vector2,
+    targetZoom = plan.currentZoom,
+  ): ConstrainedPhotoPlacement {
+    const boundedZoom = clampToRange(targetZoom, plan.zoomRange);
+    const panToCenter = panToCenterAtZoom(boundedZoom);
     const offset = {
       x: center.x - plan.panOrigin.x,
       y: center.y - plan.panOrigin.y,
     };
-    const projectedPan = applyMatrix(plan.centerToPan, offset);
     const pan = {
-      x: constrainedPanAxis(
-        projectedPan.x,
-        plan.centerToPan.xx,
-        plan.centerToPan.xy,
+      x: projectPanAxis(
+        offset,
+        panToCenter.xx,
+        panToCenter.yx,
         plan.currentPan.x,
         plan.panRange,
       ),
-      y: constrainedPanAxis(
-        projectedPan.y,
-        plan.centerToPan.yx,
-        plan.centerToPan.yy,
+      y: projectPanAxis(
+        offset,
+        panToCenter.xy,
+        panToCenter.yy,
         plan.currentPan.y,
         plan.panRange,
       ),
     };
-    const centerOffset = applyMatrix(plan.panToCenter, pan);
 
     return {
       pan,
-      placement: {
-        center: {
-          x: plan.panOrigin.x + centerOffset.x,
-          y: plan.panOrigin.y + centerOffset.y,
-        },
-        size: plan.current.size,
+      zoom: boundedZoom,
+      placement: placementAt(pan, boundedZoom),
+    };
+  }
+
+  function placementAt(
+    pan: Vector2,
+    boundedZoom: number,
+  ): PhotoPlacement {
+    const delta = boundedZoom - plan.currentZoom;
+    const centerOffset = applyMatrix(
+      panToCenterAtZoom(boundedZoom),
+      pan,
+    );
+
+    return {
+      center: {
+        x: plan.panOrigin.x + centerOffset.x,
+        y: plan.panOrigin.y + centerOffset.y,
       },
+      size: {
+        width:
+          plan.current.size.width + plan.sizePerZoom.width * delta,
+        height:
+          plan.current.size.height + plan.sizePerZoom.height * delta,
+      },
+    };
+  }
+
+  function panToCenterAtZoom(targetZoom: number): Matrix2 {
+    const delta = targetZoom - plan.currentZoom;
+    return {
+      xx:
+        plan.panToCenter.xx +
+        plan.panToCenterPerZoom.xx * delta,
+      xy:
+        plan.panToCenter.xy +
+        plan.panToCenterPerZoom.xy * delta,
+      yx:
+        plan.panToCenter.yx +
+        plan.panToCenterPerZoom.yx * delta,
+      yy:
+        plan.panToCenter.yy +
+        plan.panToCenterPerZoom.yy * delta,
     };
   }
 
@@ -105,7 +137,10 @@ function scalePlan(
     panOrigin: scaleVector(plan.panOrigin, unitScale),
     panToCenter: scaleMatrix(plan.panToCenter, unitScale),
     centerToPan: scaleMatrix(plan.centerToPan, 1 / unitScale),
-    centerPerZoom: scaleVector(plan.centerPerZoom, unitScale),
+    panToCenterPerZoom: scaleMatrix(
+      plan.panToCenterPerZoom,
+      unitScale,
+    ),
     sizePerZoom: {
       width: plan.sizePerZoom.width * unitScale,
       height: plan.sizePerZoom.height * unitScale,
@@ -149,17 +184,21 @@ function applyMatrix(matrix: Matrix2, vector: Vector2): Vector2 {
   };
 }
 
-function constrainedPanAxis(
-  projected: number,
-  matrixX: number,
-  matrixY: number,
+function projectPanAxis(
+  offset: Vector2,
+  axisX: number,
+  axisY: number,
   fallback: number,
   range: NumberRange,
 ) {
-  if (Math.abs(matrixX) + Math.abs(matrixY) <= Number.EPSILON) {
+  const squaredLength = axisX * axisX + axisY * axisY;
+  if (squaredLength <= Number.EPSILON) {
     return fallback;
   }
-  return clampToRange(projected, range);
+  return clampToRange(
+    (offset.x * axisX + offset.y * axisY) / squaredLength,
+    range,
+  );
 }
 
 function clampToRange(value: number, range: NumberRange) {

@@ -302,6 +302,20 @@ export function ProjectWorkspace({
             onZoomCommit={(frameId, delta) =>
               void commitInteraction({ kind: "zoomPhoto", frameId, delta })
             }
+            onTransformCommit={(
+              frameId,
+              deltaPanX,
+              deltaPanY,
+              deltaZoom,
+            ) =>
+              void commitInteraction({
+                kind: "transformPhoto",
+                frameId,
+                deltaPanX,
+                deltaPanY,
+                deltaZoom,
+              })
+            }
             onMaterializedChange={ignoreMaterializedCount}
             onAutoScaleChange={setCanvasScale}
           />

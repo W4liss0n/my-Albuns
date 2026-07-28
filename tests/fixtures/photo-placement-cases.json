@@ -45,7 +45,12 @@
           "yx": 0,
           "yy": 0
         },
-        "centerPerZoom": { "x": -180000, "y": 0 },
+        "panToCenterPerZoom": {
+          "xx": 200000,
+          "xy": 0,
+          "yx": 0,
+          "yy": 100000
+        },
         "sizePerZoom": { "width": 400000, "height": 200000 }
       },
       "panPreviews": [
@@ -113,7 +118,12 @@
           "yx": -0.000013333333333333334,
           "yy": 0
         },
-        "centerPerZoom": { "x": 150000, "y": 225000 },
+        "panToCenterPerZoom": {
+          "xx": 0,
+          "xy": -150000,
+          "yx": 225000,
+          "yy": 0
+        },
         "sizePerZoom": { "width": 450000, "height": 300000 }
       },
       "panPreviews": [

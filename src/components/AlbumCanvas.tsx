@@ -9,7 +9,11 @@ import {
   Text,
 } from "pixi.js";
 
-import type { CompositionPlan, Vector2 } from "../domain/project";
+import type {
+  CompositionPlan,
+  PhotoPlacement,
+  Vector2,
+} from "../domain/project";
 import type { ViewportState } from "../state/editorView";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
@@ -47,6 +51,12 @@ interface AlbumCanvasProps {
   onViewportChange(viewport: ViewportState): void;
   onPanCommit(frameId: string, deltaX: number, deltaY: number): void;
   onZoomCommit(frameId: string, delta: number): void;
+  onTransformCommit(
+    frameId: string,
+    deltaPanX: number,
+    deltaPanY: number,
+    deltaZoom: number,
+  ): void;
   onMaterializedChange(count: number): void;
   onAutoScaleChange?(scale: number): void;
 }
@@ -73,11 +83,12 @@ interface DragGesture {
   currentX: number;
   currentY: number;
   currentPan: Vector2;
+  currentZoom: number;
 }
 
 interface ZoomGestureRuntime {
   gesture: PhotoZoomGesture;
-  timer: number;
+  timer: number | null;
 }
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
@@ -144,7 +155,9 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       applicationRef.current = null;
       photoNodesRef.current.clear();
       if (zoomGestureRef.current) {
-        window.clearTimeout(zoomGestureRef.current.timer);
+        if (zoomGestureRef.current.timer !== null) {
+          window.clearTimeout(zoomGestureRef.current.timer);
+        }
         zoomGestureRef.current = null;
       }
       destroyInitializedApp();
@@ -395,6 +408,13 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
           if (!event.altKey || !photoNode) return;
           event.stopPropagation();
+          const activeZoom = zoomGestureRef.current;
+          const continuesZoom =
+            activeZoom?.gesture.frameId === frame.frameId;
+          if (continuesZoom && activeZoom.timer !== null) {
+            window.clearTimeout(activeZoom.timer);
+            activeZoom.timer = null;
+          }
           dragRef.current = {
             frameId: frame.frameId,
             startX: event.global.x,
@@ -406,6 +426,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             currentX: photoNode.layer.x,
             currentY: photoNode.layer.y,
             currentPan: photoNode.pan,
+            currentZoom: continuesZoom
+              ? activeZoom.gesture.baseZoom +
+                activeZoom.gesture.delta
+              : photoNode.baseZoom,
           };
           frameContainer.cursor = "grabbing";
         });
@@ -414,7 +438,9 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           event.preventDefault();
 
           const current = zoomGestureRef.current;
-          if (current) window.clearTimeout(current.timer);
+          if (current?.timer != null) {
+            window.clearTimeout(current.timer);
+          }
           const transition = advancePhotoZoomGesture(
             current?.gesture ?? null,
             {
@@ -429,6 +455,31 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
               transition.interruptedCommit.frameId,
               transition.interruptedCommit.delta,
             );
+          }
+
+          const activeDrag = dragRef.current;
+          if (activeDrag?.frameId === frame.frameId) {
+            const combined = photoNode.geometry.constrain(
+              {
+                x: activeDrag.currentX,
+                y: activeDrag.currentY,
+              },
+              transition.previewZoom,
+            );
+            activeDrag.currentX = combined.placement.center.x;
+            activeDrag.currentY = combined.placement.center.y;
+            activeDrag.currentPan = combined.pan;
+            activeDrag.currentZoom = combined.zoom;
+            applyPhotoPlacementPreview(
+              photoNode,
+              combined.zoom,
+              combined.placement,
+            );
+            zoomGestureRef.current = {
+              gesture: transition.gesture,
+              timer: null,
+            };
+            return;
           }
 
           applyPhotoZoomPreview(photoNode, transition.previewZoom);
@@ -491,8 +542,30 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
       const deltaX = gesture.currentPan.x - gesture.node.pan.x;
       const deltaY = gesture.currentPan.y - gesture.node.pan.y;
+      const deltaZoom =
+        gesture.currentZoom - gesture.node.baseZoom;
+      const combinedZoom = zoomGestureRef.current;
+      const ownsCombinedZoom =
+        combinedZoom?.gesture.frameId === gesture.frameId;
 
-      if (Math.abs(deltaX) > 0.0001 || Math.abs(deltaY) > 0.0001) {
+      if (ownsCombinedZoom) {
+        if (combinedZoom.timer !== null) {
+          window.clearTimeout(combinedZoom.timer);
+        }
+        zoomGestureRef.current = null;
+      }
+
+      if (ownsCombinedZoom && Math.abs(deltaZoom) > 0.0001) {
+        propsRef.current.onTransformCommit(
+          gesture.frameId,
+          deltaX,
+          deltaY,
+          deltaZoom,
+        );
+      } else if (
+        Math.abs(deltaX) > 0.0001 ||
+        Math.abs(deltaY) > 0.0001
+      ) {
         propsRef.current.onPanCommit(
           gesture.frameId,
           deltaX,
@@ -581,6 +654,7 @@ function updatePanPreview(
     (pointerY - gesture.startY) / gesture.canvasScale;
   const constrained = gesture.node.geometry.constrain(
     { x: nextX, y: nextY },
+    gesture.currentZoom,
   );
   gesture.currentX = constrained.placement.center.x;
   gesture.currentY = constrained.placement.center.y;
@@ -590,11 +664,19 @@ function updatePanPreview(
 
 function applyPhotoZoomPreview(node: PhotoRenderNode, targetZoom: number) {
   const zoomed = node.geometry.zoom(targetZoom);
-  const factor = zoomed.zoom / node.baseZoom;
+  applyPhotoPlacementPreview(node, zoomed.zoom, zoomed.placement);
+}
+
+function applyPhotoPlacementPreview(
+  node: PhotoRenderNode,
+  targetZoom: number,
+  placement: PhotoPlacement,
+) {
+  const factor = targetZoom / node.baseZoom;
   node.layer.scale.set(node.baseScaleX * factor, factor);
   node.layer.position.set(
-    zoomed.placement.center.x,
-    zoomed.placement.center.y,
+    placement.center.x,
+    placement.center.y,
   );
 }
 

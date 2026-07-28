@@ -218,7 +218,12 @@ const horizontalPlacementPlan: PhotoPlacementPlan = {
     yy: 0,
   },
   centerToPan: { xx: 0.00002, xy: 0, yx: 0, yy: 0 },
-  centerPerZoom: { x: 0, y: 0 },
+  panToCenterPerZoom: {
+    xx: 200_000,
+    xy: 0,
+    yx: 0,
+    yy: 100_000,
+  },
   sizePerZoom: { width: 400_000, height: 200_000 },
 };
 
@@ -280,7 +285,6 @@ const pannedInteractiveComposition: CompositionPlan = {
                 ...horizontalPlacementPlan.current,
                 center: { x: 105_000, y: 100_000 },
               },
-              centerPerZoom: { x: -180_000, y: 0 },
             },
           },
         },
@@ -315,7 +319,6 @@ const rotatedInteractiveComposition: CompositionPlan = {
                   height: 450_000,
                 },
               },
-              centerPerZoom: { x: 0, y: 0 },
             },
             rotationDegrees: 90,
           },
@@ -332,11 +335,25 @@ function renderCanvas({
   >(),
   onViewportChange = vi.fn<(viewport: { offsetX: number; zoom: number }) => void>(),
   onZoomCommit = vi.fn<(frameId: string, delta: number) => void>(),
+  onTransformCommit = vi.fn<
+    (
+      frameId: string,
+      deltaPanX: number,
+      deltaPanY: number,
+      deltaZoom: number,
+    ) => void
+  >(),
 }: {
   compositionPlan?: CompositionPlan;
   onPanCommit?: (frameId: string, deltaX: number, deltaY: number) => void;
   onViewportChange?: (viewport: { offsetX: number; zoom: number }) => void;
   onZoomCommit?: (frameId: string, delta: number) => void;
+  onTransformCommit?: (
+    frameId: string,
+    deltaPanX: number,
+    deltaPanY: number,
+    deltaZoom: number,
+  ) => void;
 } = {}) {
   const view = render(
     <AlbumCanvas
@@ -349,6 +366,7 @@ function renderCanvas({
       onViewportChange={onViewportChange}
       onPanCommit={onPanCommit}
       onZoomCommit={onZoomCommit}
+      onTransformCommit={onTransformCommit}
       onMaterializedChange={() => undefined}
     />,
   );
@@ -358,6 +376,7 @@ function renderCanvas({
     onPanCommit,
     onViewportChange,
     onZoomCommit,
+    onTransformCommit,
   };
 }
 
@@ -581,6 +600,66 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
 
   expect(onPanCommit).toHaveBeenCalledOnce();
   expect(onPanCommit).toHaveBeenCalledWith("frame-001", 1, -1);
+});
+
+test("does not reset an active Pan preview when wheel Zoom starts", async () => {
+  vi.useFakeTimers();
+  const onTransformCommit = vi.fn();
+  const canvas = renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformCommit,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithHandler("pointerdown");
+  const maskedViewport = frame.children.find(
+    (child) => (child as { mask?: unknown }).mask,
+  ) as { children: unknown[] };
+  const photoLayer = maskedViewport.children.find(
+    (child) =>
+      Array.isArray((child as { children?: unknown[] }).children) &&
+      (child as { children: unknown[] }).children.length > 0,
+  ) as {
+    position: { x: number; y: number };
+    scale: { x: number; y: number };
+  };
+
+  frame.emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  const pannedX = photoLayer.position.x;
+  expect(pannedX).toBeGreaterThan(150);
+
+  frame.emit("wheel", {
+    altKey: true,
+    deltaY: -100,
+    preventDefault: vi.fn(),
+  });
+
+  expect(photoLayer.scale.y).toBeGreaterThan(1);
+  expect(photoLayer.position.x).toBeCloseTo(pannedX, 4);
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
+  expect(canvas.onZoomCommit).not.toHaveBeenCalled();
+
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 40, y: 0 },
+  });
+
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit.mock.calls[0][0]).toBe("frame-001");
+  expect(onTransformCommit.mock.calls[0][1]).toBeGreaterThan(0);
+  expect(onTransformCommit.mock.calls[0][2]).toBeCloseTo(0, 6);
+  expect(onTransformCommit.mock.calls[0][3]).toBeCloseTo(0.12, 6);
+  expect(canvas.onPanCommit).not.toHaveBeenCalled();
+  expect(canvas.onZoomCommit).not.toHaveBeenCalled();
 });
 
 test("previews a smooth wheel zoom and commits the sequence once", async () => {

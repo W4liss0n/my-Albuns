@@ -68,7 +68,7 @@ pub struct PhotoPlacementPlan {
     pub pan_origin: VectorUm,
     pub pan_to_center: Matrix2,
     pub center_to_pan: Matrix2,
-    pub center_per_zoom: VectorUm,
+    pub pan_to_center_per_zoom: Matrix2,
     pub size_per_zoom: SizeUm,
 }
 
@@ -229,6 +229,12 @@ pub enum ProjectIntent {
     ZoomPhoto {
         frame_id: String,
         delta: f32,
+    },
+    TransformPhoto {
+        frame_id: String,
+        delta_pan_x: f32,
+        delta_pan_y: f32,
+        delta_zoom: f32,
     },
     FillLeftmostPlaceholder {
         sheet_id: String,
@@ -407,6 +413,26 @@ impl ProjectSession {
                     .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
                 photo.transform.user_zoom =
                     (photo.transform.user_zoom + delta).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
+            }
+            ProjectIntent::TransformPhoto {
+                frame_id,
+                delta_pan_x,
+                delta_pan_y,
+                delta_zoom,
+            } => {
+                let frame = find_frame_mut(&mut self.state.album, &frame_id)
+                    .ok_or_else(|| CoreError::FrameNotFound(frame_id.clone()))?;
+                let photo = frame
+                    .photo
+                    .as_mut()
+                    .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
+
+                photo.transform.pan_x =
+                    (photo.transform.pan_x + delta_pan_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
+                photo.transform.pan_y =
+                    (photo.transform.pan_y + delta_pan_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
+                photo.transform.user_zoom =
+                    (photo.transform.user_zoom + delta_zoom).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
             }
             ProjectIntent::FillLeftmostPlaceholder { sheet_id, media_id } => {
                 let media = self
@@ -667,14 +693,8 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
             height: draw_height_at_fill * current_zoom,
         },
     };
-    let horizontal_zoom_delta = scale_vector(
-        &horizontal_direction,
-        current_pan.x * draw_width_at_fill / 2.0,
-    );
-    let vertical_zoom_delta = scale_vector(
-        &vertical_direction,
-        current_pan.y * draw_height_at_fill / 2.0,
-    );
+    let horizontal_zoom_delta = scale_vector(&horizontal_direction, draw_width_at_fill / 2.0);
+    let vertical_zoom_delta = scale_vector(&vertical_direction, draw_height_at_fill / 2.0);
     let placement = PhotoPlacementPlan {
         current_pan,
         current_zoom,
@@ -690,10 +710,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
         pan_origin,
         pan_to_center,
         center_to_pan,
-        center_per_zoom: VectorUm {
-            x: horizontal_zoom_delta.x + vertical_zoom_delta.x,
-            y: horizontal_zoom_delta.y + vertical_zoom_delta.y,
-        },
+        pan_to_center_per_zoom: matrix_from_columns(&horizontal_zoom_delta, &vertical_zoom_delta),
         size_per_zoom: SizeUm {
             width: draw_width_at_fill,
             height: draw_height_at_fill,
@@ -1049,6 +1066,42 @@ mod tests {
     }
 
     #[test]
+    fn commits_simultaneous_pan_and_zoom_as_one_domain_revision() {
+        let mut session = ProjectCore::open_sample_project(12);
+
+        let transformed = session
+            .apply(ProjectIntent::TransformPhoto {
+                frame_id: "frame-01-a".into(),
+                delta_pan_x: 0.35,
+                delta_pan_y: -0.2,
+                delta_zoom: 0.12,
+            })
+            .expect("the sample photo accepts a combined transform");
+        let transform = &transformed.album.sheets[0].frames[0]
+            .photo
+            .as_ref()
+            .expect("the sample frame has a photo")
+            .transform;
+
+        assert_eq!(transformed.revision, 1);
+        assert_eq!(transform.pan_x, 0.35);
+        assert_eq!(transform.pan_y, -0.2);
+        assert_eq!(transform.user_zoom, 1.12);
+
+        let undone = session
+            .undo()
+            .expect("the combined transform is one Undo action");
+        let restored = &undone.album.sheets[0].frames[0]
+            .photo
+            .as_ref()
+            .expect("the sample frame retains its photo")
+            .transform;
+        assert_eq!(restored.pan_x, 0.0);
+        assert_eq!(restored.pan_y, 0.0);
+        assert_eq!(restored.user_zoom, 1.0);
+    }
+
+    #[test]
     fn undo_and_redo_restore_the_document_without_storing_view_state() {
         let mut session = ProjectCore::open_sample_project(12);
         session
@@ -1203,9 +1256,9 @@ mod tests {
         assert_vector_close(&actual.pan_origin, &expected.pan_origin, case_name);
         assert_matrix_close(&actual.pan_to_center, &expected.pan_to_center, case_name);
         assert_matrix_close(&actual.center_to_pan, &expected.center_to_pan, case_name);
-        assert_vector_close(
-            &actual.center_per_zoom,
-            &expected.center_per_zoom,
+        assert_matrix_close(
+            &actual.pan_to_center_per_zoom,
+            &expected.pan_to_center_per_zoom,
             case_name,
         );
         assert_close(
