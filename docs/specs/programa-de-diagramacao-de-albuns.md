@@ -528,13 +528,14 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Lâmina` oferece `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`, usando a Lâmina mais centralizada como alvo.
 - Os mesmos comandos aparecem no menu de contexto da superfície ou Barra de uma Lâmina e usam o item clicado como alvo explícito. A conversão só é habilitada em uma extremidade válida.
 - Durante o Modo de edição, todos os comandos que adicionam, duplicam, excluem, convertem ou reordenam Lâminas ficam desabilitados; a sequência só pode ser alterada depois de sair com `Esc`.
-- Abaixo do menu, a interface se divide em uma coluna de trabalho à esquerda e um Painel contextual fixo à direita.
+- Abaixo do menu, a interface se divide em uma coluna de trabalho à esquerda e um Painel contextual à direita.
 - A coluna de trabalho contém o Canvas contínuo na parte superior e o Painel de imagens na parte inferior. O Painel de imagens não avança sob o Painel contextual.
 - Um splitter horizontal redimensiona Canvas e Painel de imagens. `Exibir > Painel de imagens` oculta ou restaura o Painel; ocultá-lo entrega a altura disponível ao Canvas.
 - Altura e visibilidade do Painel de imagens são preferências da interface lembradas entre sessões, sem alterar o Projeto ou Undo/Redo.
 - Um splitter vertical separa a coluna de trabalho inteira do Painel contextual e permite ajustar a largura direita sem sobreposição.
 - `Exibir > Painel contextual` oculta ou restaura essa região. Ocultá-lo entrega toda a largura à coluna de trabalho; largura e visibilidade são preferências lembradas entre sessões, sem alterar o Projeto ou Undo/Redo.
 - O Canvas apresenta as Lâminas lado a lado em uma sequência horizontal contínua. Não existe um navegador lateral independente.
+- O Canvas começa diretamente abaixo da barra de menus e comandos, sem uma faixa permanente de título, contagem ou ajuda sobre os gestos.
 - O modelo lógico mantém todas as Lâminas do Álbum e não impõe um máximo arbitrário. A cena detalhada e suas texturas são materializadas somente para a área visível e uma margem de pré-carga adjacente.
 - Ao sair dessa faixa, uma Lâmina conserva seu estado lógico, mas pode liberar recursos gráficos pesados; retornar à faixa reconstrói sua representação sem alterar o Projeto. A política concreta de residência e descarte será calibrada por testes de estresse com Álbuns longos.
 - No modo normal não existe uma Lâmina ativa exclusiva: todas as Lâminas apresentadas são interativas.
@@ -550,13 +551,14 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Se o Painel estava aberto ao entrar no Modo de edição, seu alvo e estado ficam suspensos; ao sair com `Esc`, ele reaparece para a mesma Lâmina com candidatos recalculados. Um Painel anteriormente fechado continua fechado.
 - O Canvas contínuo do modo normal não possui Zoom. O Zoom de visualização existe exclusivamente para a Lâmina isolada no Modo de edição.
 - No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical, somente navegação horizontal.
+- Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou o splitter do Painel de imagens recalcula essa escala sem alterar o Projeto ou criar um estado de Zoom.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.
 - `Alt` + pressionar e iniciar o arraste é consumido como Pan e não seleciona o Frame; `Alt` + roda também preserva a seleção atual.
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
 - Soltar uma Foto usa a Lâmina sob o ponteiro como destino. Selecionar um Frame ou Foto em outra Lâmina transfere a seleção diretamente para aquele elemento.
 - Clicar em uma área vazia limpa a seleção do elemento e retorna ao contexto do Álbum. Clicar na Grade de Lâminas ou usar as setas navega; arrastar uma miniatura da Grade reordena; rolar o Canvas não altera o contexto.
-- A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. É apenas um alvo implícito transitório e não torna as demais Lâminas inativas.
+- A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. Essa referência é recalculada durante a navegação, permanece independente da Lâmina ou do Frame em foco e serve como alvo implícito dos comandos sem destino explícito; não torna as demais Lâminas inativas.
 - O Modo de edição da Lâmina oculta temporariamente as demais, centraliza e amplia a escolhida e reduz o Painel de imagens para aumentar o Canvas.
 - Não existe faixa, rótulo, botão de retorno ou mudança adicional de fundo: o isolamento da única Lâmina e a nova proporção das regiões identificam o modo; `Esc` continua sendo a saída.
 - Cada entrada no Modo de edição inicia em `Ajustar Lâmina`, na maior escala que mantém a Lâmina inteira visível. Sair descarta o Zoom e uma nova entrada volta ao ajuste inicial.

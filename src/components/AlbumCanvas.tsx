@@ -17,6 +17,8 @@ import type {
 import type { ViewportState } from "../state/editorView";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
+  centeredSheetIdInContinuousCanvas,
+  clampContinuousCanvasOffset,
   continuousCanvasScale,
   MICROMETER_TO_CANVAS_PIXEL,
   SHEET_LABEL_HEIGHT_PX,
@@ -52,10 +54,12 @@ interface AlbumCanvasProps {
   composition: CompositionPlan;
   selectedFrameId: string | null;
   focusedSheetId: string;
+  centeredSheetId: string;
   viewport: ViewportState;
   photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
+  onCenteredSheetChange(sheetId: string): void;
   onViewportChange(viewport: ViewportState): void;
   onTransformPreview(preview: PhotoTransformPreview | null): void;
   onPanCommit(frameId: string, deltaX: number, deltaY: number): void;
@@ -69,6 +73,11 @@ interface AlbumCanvasProps {
   onMaterializedChange(count: number): void;
   onAutoScaleChange?(scale: number): void;
 }
+
+type CenteredSheetSynchronization = Pick<
+  AlbumCanvasProps,
+  "centeredSheetId" | "composition" | "onCenteredSheetChange"
+>;
 
 interface PhotoRenderNode {
   frameId: string;
@@ -213,6 +222,24 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       hostRef.current?.clientHeight || app.screen.height,
       sheetHeight,
     );
+    const boundedOffsetX = clampContinuousCanvasOffset(
+      props.composition.sheets,
+      props.viewport.offsetX,
+      canvasScale,
+      app.screen.width,
+    );
+    if (Math.abs(boundedOffsetX - props.viewport.offsetX) > 0.0001) {
+      props.onViewportChange({
+        ...props.viewport,
+        offsetX: boundedOffsetX,
+      });
+    }
+    synchronizeCenteredSheet(
+      props,
+      boundedOffsetX,
+      canvasScale,
+      app.screen.width,
+    );
     if (
       lastAutoScaleRef.current === null ||
       Math.abs(lastAutoScaleRef.current - canvasScale) > 0.0001
@@ -225,7 +252,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       sheetOffsetInCanvasPixels(props.composition.sheets, index),
     );
 
-    const viewportLeft = -props.viewport.offsetX / canvasScale;
+    const viewportLeft = -boundedOffsetX / canvasScale;
     const viewportRight = viewportLeft + app.screen.width / canvasScale;
     const visibleIndexes = props.composition.sheets
       .map((sheet, index) => ({
@@ -252,7 +279,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     props.onMaterializedChange(materialized);
 
     world.position.set(
-      props.viewport.offsetX,
+      boundedOffsetX,
       CANVAS_VERTICAL_MARGIN_PX +
         SHEET_LABEL_HEIGHT_PX * canvasScale,
     );
@@ -649,12 +676,23 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       if (event.altKey) return;
       event.preventDefault();
       if (event.ctrlKey) return;
+      const nextOffset = clampContinuousCanvasOffset(
+        props.composition.sheets,
+        propsRef.current.viewport.offsetX -
+          (event.deltaX || event.deltaY) * 0.9,
+        canvasScale,
+        app.screen.width,
+      );
       propsRef.current.onViewportChange({
         ...propsRef.current.viewport,
-        offsetX:
-          propsRef.current.viewport.offsetX -
-          (event.deltaX || event.deltaY) * 0.9,
+        offsetX: nextOffset,
       });
+      synchronizeCenteredSheet(
+        propsRef.current,
+        nextOffset,
+        canvasScale,
+        app.screen.width,
+      );
     };
     app.canvas.addEventListener("wheel", handleWheel, { passive: false });
 
@@ -665,6 +703,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     };
   }, [
     props.composition,
+    props.centeredSheetId,
     props.focusedSheetId,
     props.onMaterializedChange,
     props.selectedFrameId,
@@ -708,6 +747,26 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       {!ready && <span className="canvas-loading">Iniciando WebGL2…</span>}
     </div>
   );
+}
+
+function synchronizeCenteredSheet(
+  props: CenteredSheetSynchronization,
+  offsetX: number,
+  scale: number,
+  canvasWidth: number,
+) {
+  const centeredSheetId = centeredSheetIdInContinuousCanvas(
+    props.composition.sheets,
+    offsetX,
+    scale,
+    canvasWidth,
+  );
+  if (
+    centeredSheetId &&
+    centeredSheetId !== props.centeredSheetId
+  ) {
+    props.onCenteredSheetChange(centeredSheetId);
+  }
 }
 
 function createPhotoPreviewLayer({

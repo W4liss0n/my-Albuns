@@ -222,6 +222,17 @@ const composition: CompositionPlan = {
   ],
 };
 
+const threeSheetComposition: CompositionPlan = {
+  sheets: [1, 2, 3].map((number) => ({
+    sheetId: `sheet-00${number}`,
+    number,
+    widthUm: 600_000,
+    heightUm: 300_000,
+    hasOverlay: false,
+    frames: [],
+  })),
+};
+
 const horizontalPlacementPlan: PhotoPlacementPlan = {
   currentPan: { x: 0, y: 0 },
   currentZoom: 1,
@@ -351,6 +362,8 @@ const rotatedInteractiveComposition: CompositionPlan = {
 
 function renderCanvas({
   compositionPlan = composition,
+  onFocusSheet = vi.fn<(sheetId: string) => void>(),
+  onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
   onTransformPreview = vi.fn<
     (preview: PhotoTransformPreview | null) => void
   >(),
@@ -369,6 +382,8 @@ function renderCanvas({
   >(),
 }: {
   compositionPlan?: CompositionPlan;
+  onFocusSheet?: (sheetId: string) => void;
+  onCenteredSheetChange?: (sheetId: string) => void;
   onTransformPreview?: (
     preview: PhotoTransformPreview | null,
   ) => void;
@@ -387,9 +402,11 @@ function renderCanvas({
       composition={compositionPlan}
       selectedFrameId={null}
       focusedSheetId="sheet-001"
+      centeredSheetId="sheet-001"
       viewport={{ offsetX: 42, zoom: 0.78 }}
       onSelectFrame={() => undefined}
-      onFocusSheet={() => undefined}
+      onFocusSheet={onFocusSheet}
+      onCenteredSheetChange={onCenteredSheetChange}
       onViewportChange={onViewportChange}
       onTransformPreview={onTransformPreview}
       onPanCommit={onPanCommit}
@@ -401,6 +418,8 @@ function renderCanvas({
 
   return {
     ...view,
+    onFocusSheet,
+    onCenteredSheetChange,
     onTransformPreview,
     onPanCommit,
     onViewportChange,
@@ -496,6 +515,7 @@ test("does not zoom the continuous Canvas outside sheet-editing mode", async () 
   const onViewportChange = vi.fn();
   renderCanvas({ onViewportChange });
   await finishPixiInitialization();
+  onViewportChange.mockClear();
 
   pixiLifecycle.instances[0].canvas.dispatchEvent(
     new WheelEvent("wheel", {
@@ -506,6 +526,49 @@ test("does not zoom the continuous Canvas outside sheet-editing mode", async () 
   );
 
   expect(onViewportChange).not.toHaveBeenCalled();
+});
+
+test("keeps edge sheets centered and tracks the centered sheet while scrolling", async () => {
+  const onCenteredSheetChange = vi.fn();
+  const onViewportChange = vi.fn();
+  renderCanvas({
+    compositionPlan: threeSheetComposition,
+    onCenteredSheetChange,
+    onViewportChange,
+  });
+  await finishPixiInitialization();
+
+  const app = pixiLifecycle.instances[0];
+  const scale = (500 - 2 * 24) / (300 + 24);
+
+  app.canvas.dispatchEvent(
+    new WheelEvent("wheel", {
+      cancelable: true,
+      deltaY: 10_000,
+    }),
+  );
+
+  const lastOffset =
+    onViewportChange.mock.calls[
+      onViewportChange.mock.calls.length - 1
+    ]?.[0].offsetX;
+  expect(lastOffset + 1_604 * scale).toBeCloseTo(600, 4);
+  expect(onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-003");
+  onCenteredSheetChange.mockClear();
+
+  app.canvas.dispatchEvent(
+    new WheelEvent("wheel", {
+      cancelable: true,
+      deltaY: -10_000,
+    }),
+  );
+
+  const firstOffset =
+    onViewportChange.mock.calls[
+      onViewportChange.mock.calls.length - 1
+    ]?.[0].offsetX;
+  expect(firstOffset + 300 * scale).toBeCloseTo(600, 4);
+  expect(onCenteredSheetChange).not.toHaveBeenCalled();
 });
 
 test("recalculates the automatic scale when the Canvas height changes", async () => {

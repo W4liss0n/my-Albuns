@@ -97,6 +97,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 ## Canvas contínuo
 
 - Ocupa a região superior da coluna de trabalho, desde a borda esquerda até o Painel contextual.
+- Começa diretamente abaixo da barra de menus e comandos, sem uma faixa permanente de título, contagem ou ajuda sobre os gestos.
 - Apresenta as Lâminas lado a lado em uma sequência horizontal contínua.
 - Permite percorrer o Álbum sem trocar para uma tela separada por Lâmina.
 - Mantém todas as Lâminas no modelo lógico, sem máximo arbitrário, mas materializa a cena detalhada e suas texturas somente para a área visível e uma margem de pré-carga adjacente.
@@ -114,11 +115,12 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Clicar na Grade de Lâminas ou usar as setas de navegação leva o Canvas até outra Lâmina, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
 - Apenas percorrer o Canvas por rolagem não troca o conteúdo do Painel contextual.
 - A Lâmina cujo centro visual está mais próximo do centro horizontal da área visível é a `Lâmina centralizada no Canvas`.
-- Essa referência não cria uma seleção exclusiva; ela apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro.
+- Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.
 - O Canvas não depende de uma coluna lateral de thumbnails.
 - O modo normal do Canvas contínuo não oferece Zoom.
 - Todas as Lâminas usam a mesma escala automática, calculada para que a altura completa caiba no Canvas com margem visual ao redor.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
+- A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens recalcula a escala automática sem criar estado de Zoom.
 
 A margem exata e a centralização da escala continuam abertas. A largura da pré-carga, a residência de texturas e os gatilhos de descarte serão definidos por testes de estresse com Álbuns longos.

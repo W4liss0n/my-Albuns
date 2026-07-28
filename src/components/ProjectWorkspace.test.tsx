@@ -13,6 +13,7 @@ import { ProjectWorkspace } from "./ProjectWorkspace";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
+    onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -142,6 +143,36 @@ const projection: EditorProjection = {
   },
 };
 
+const twoSheetProjection: EditorProjection = {
+  state: {
+    ...projection.state,
+    album: {
+      ...projection.state.album,
+      sheets: [
+        projection.state.album.sheets[0],
+        {
+          ...projection.state.album.sheets[0],
+          id: "sheet-002",
+          number: 2,
+          role: "final",
+          frames: [],
+        },
+      ],
+    },
+  },
+  composition: {
+    sheets: [
+      projection.composition.sheets[0],
+      {
+        ...projection.composition.sheets[0],
+        sheetId: "sheet-002",
+        number: 2,
+        frames: [],
+      },
+    ],
+  },
+};
+
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
   const promise = new Promise<EditorProjection>((resolver) => {
@@ -170,6 +201,7 @@ beforeEach(() => {
   useEditorView.setState({
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
     viewport: { offsetX: 42, zoom: 0.78 },
   });
 });
@@ -232,6 +264,74 @@ test("uses the documented compact chrome and collapsible contextual sections", (
   expect(
     screen.getByRole("button", { name: "Grade de Lâminas" }),
   ).toBeInTheDocument();
+});
+
+test("resizes both workspace panels with persistent splitters", () => {
+  const firstView = render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(screen.queryByText("Canvas contÃ­nuo")).not.toBeInTheDocument();
+
+  const verticalSplitter = screen.getByRole("separator", {
+    name: "Redimensionar Painel contextual",
+  });
+  const horizontalSplitter = screen.getByRole("separator", {
+    name: "Redimensionar Painel de imagens",
+  });
+  const workspace = verticalSplitter.parentElement!;
+  vi.spyOn(workspace, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    right: 1_200,
+    top: 0,
+    bottom: 800,
+    width: 1_200,
+    height: 800,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+
+  fireEvent.pointerDown(verticalSplitter, { pointerId: 1 });
+  fireEvent.pointerMove(window, { clientX: 850, clientY: 0 });
+  fireEvent.pointerUp(window, { pointerId: 1 });
+
+  fireEvent.pointerDown(horizontalSplitter, { pointerId: 2 });
+  fireEvent.pointerMove(window, { clientX: 0, clientY: 600 });
+  fireEvent.pointerUp(window, { pointerId: 2 });
+
+  expect(workspace.getAttribute("style")).toContain(
+    "--inspector-width: 350px",
+  );
+  expect(workspace.getAttribute("style")).toContain(
+    "--media-panel-height: 200px",
+  );
+  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBe(
+    "350",
+  );
+  expect(localStorage.getItem("myalbuns.workspace.media-panel-height")).toBe(
+    "200",
+  );
+
+  firstView.unmount();
+  render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  expect(
+    screen
+      .getByRole("separator", {
+        name: "Redimensionar Painel contextual",
+      })
+      .parentElement?.getAttribute("style"),
+  ).toContain("--inspector-width: 350px");
 });
 
 test("commits a slider zoom once without flashing a global busy state", async () => {
@@ -346,6 +446,29 @@ test("discards a live Canvas value when its commit fails", async () => {
     "Falha simulada",
   );
   expect(slider).toHaveValue("100");
+});
+
+test("uses the Canvas-centered sheet for a media double click", () => {
+  const apply = vi.fn(async () => twoSheetProjection);
+
+  render(
+    <ProjectWorkspace
+      projection={twoSheetProjection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
+  });
+  fireEvent.doubleClick(screen.getByText("Campo.jpg").closest("button")!);
+
+  expect(apply).toHaveBeenCalledWith({
+    kind: "fillLeftmostPlaceholder",
+    sheetId: "sheet-002",
+    mediaId: "media-002",
+  });
 });
 
 test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {

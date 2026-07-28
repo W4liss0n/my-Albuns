@@ -13,6 +13,10 @@ import {
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
+import {
+  useWorkspacePanelLayout,
+  WorkspacePanelSplitter,
+} from "./workspacePanelLayout";
 
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
@@ -40,9 +44,11 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   const selectedFrameId = useEditorView((state) => state.selectedFrameId);
   const focusedSheetId = useEditorView((state) => state.focusedSheetId);
+  const centeredSheetId = useEditorView((state) => state.centeredSheetId);
   const viewport = useEditorView((state) => state.viewport);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
+  const centerSheet = useEditorView((state) => state.centerSheet);
   const setViewport = useEditorView((state) => state.setViewport);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export function ProjectWorkspace({
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
     useState<PhotoTransformPreview | null>(null);
+  const workspacePanels = useWorkspacePanelLayout();
 
   const selectedFrame = useMemo(
     () =>
@@ -228,7 +235,11 @@ export function ProjectWorkspace({
     selectedCanvasPhotoPreview?.panX ??
     selectedFrame?.photo?.transform.panX ??
     0;
-
+  const implicitSheetId = projection.state.album.sheets.some(
+    (sheet) => sheet.id === centeredSheetId,
+  )
+    ? centeredSheetId
+    : projection.state.album.sheets[0]?.id;
   return (
     <div className="app-shell">
       <header className="titlebar">
@@ -281,25 +292,21 @@ export function ProjectWorkspace({
         </Button>
       </div>
 
-      <div className="workspace-grid">
-        <section className="canvas-section" aria-label="Área de composição">
-          <div className="canvas-heading">
-            <div>
-              <span className="canvas-kicker">Canvas contínuo</span>
-              <strong>
-                {sheetCount} {sheetCount === 1 ? "Lâmina" : "Lâminas"} no Álbum
-              </strong>
-            </div>
-            <div className="canvas-help">
-              <kbd>Alt</kbd> + arrastar: Pan da Foto
-              <span>·</span>
-              <kbd>Alt</kbd> + roda: Zoom da Foto
-            </div>
-          </div>
+      <div
+        className="workspace-grid"
+        ref={workspacePanels.workspaceRef}
+        style={workspacePanels.style}
+      >
+        <section
+          id="continuous-canvas"
+          className="canvas-section"
+          aria-label="Área de composição"
+        >
           <AlbumCanvas
             composition={projection.composition}
             selectedFrameId={selectedFrameId}
             focusedSheetId={focusedSheetId}
+            centeredSheetId={centeredSheetId}
             viewport={viewport}
             photoZoomPreview={
               zoomDraft
@@ -311,6 +318,7 @@ export function ProjectWorkspace({
             }
             onSelectFrame={selectFrame}
             onFocusSheet={focusSheet}
+            onCenteredSheetChange={centerSheet}
             onViewportChange={setViewport}
             onTransformPreview={setCanvasPhotoPreview}
             onPanCommit={(frameId, deltaX, deltaY) =>
@@ -343,7 +351,25 @@ export function ProjectWorkspace({
           />
         </section>
 
-        <aside className="inspector" aria-label="Painel contextual">
+        <WorkspacePanelSplitter
+          panel="media"
+          size={workspacePanels.sizes.media}
+          onResizeStart={workspacePanels.beginResize}
+          onResizeBy={workspacePanels.resizeBy}
+        />
+
+        <WorkspacePanelSplitter
+          panel="inspector"
+          size={workspacePanels.sizes.inspector}
+          onResizeStart={workspacePanels.beginResize}
+          onResizeBy={workspacePanels.resizeBy}
+        />
+
+        <aside
+          id="contextual-panel"
+          className="inspector"
+          aria-label="Painel contextual"
+        >
           <div className="inspector-scroll">
             {selectedFrame ? (
               <>
@@ -507,7 +533,11 @@ export function ProjectWorkspace({
           </div>
         </aside>
 
-        <section className="media-panel" aria-label="Painel de imagens">
+        <section
+          id="media-panel"
+          className="media-panel"
+          aria-label="Painel de imagens"
+        >
           <div className="media-panel-head">
             <div className="media-tabs">
               <button className="active" type="button">
@@ -527,13 +557,15 @@ export function ProjectWorkspace({
                 type="button"
                 key={media.id}
                 onDoubleClick={() =>
-                  void applyWithStatus({
-                    kind: "fillLeftmostPlaceholder",
-                    sheetId: focusedSheetId,
-                    mediaId: media.id,
-                  })
+                  implicitSheetId
+                    ? void applyWithStatus({
+                        kind: "fillLeftmostPlaceholder",
+                        sheetId: implicitSheetId,
+                        mediaId: media.id,
+                      })
+                    : undefined
                 }
-                title="Duplo clique para preencher o placeholder mais à esquerda da Lâmina em foco"
+                title="Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
               >
                 <span
                   className="media-thumb"
@@ -550,7 +582,7 @@ export function ProjectWorkspace({
             <div className="media-tip">
               <kbd>2×</kbd>
               <span>
-                Preenche o placeholder mais à esquerda da Lâmina em foco
+                Preenche o placeholder mais à esquerda da Lâmina centralizada
               </span>
             </div>
           </div>

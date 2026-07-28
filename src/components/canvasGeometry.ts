@@ -30,3 +30,56 @@ export function sheetOffsetInCanvasPixels(
       0,
     );
 }
+
+export function clampContinuousCanvasOffset(
+  sheets: readonly ComposedSheet[],
+  offsetX: number,
+  scale: number,
+  canvasWidth: number,
+): number {
+  if (sheets.length === 0 || scale <= 0) return offsetX;
+
+  const firstCenter = sheetCenterInCanvasPixels(sheets, 0);
+  const lastIndex = sheets.length - 1;
+  const lastCenter = sheetCenterInCanvasPixels(sheets, lastIndex);
+  const viewportCenter = canvasWidth / 2;
+  const maximum = viewportCenter - firstCenter * scale;
+  const minimum = viewportCenter - lastCenter * scale;
+
+  return Math.min(maximum, Math.max(minimum, offsetX));
+}
+
+export function centeredSheetIdInContinuousCanvas(
+  sheets: readonly ComposedSheet[],
+  offsetX: number,
+  scale: number,
+  canvasWidth: number,
+): string | null {
+  if (sheets.length === 0 || scale <= 0) return null;
+
+  const visibleCenter = (canvasWidth / 2 - offsetX) / scale;
+  let closestIndex = 0;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  sheets.forEach((_sheet, index) => {
+    const distance = Math.abs(
+      sheetCenterInCanvasPixels(sheets, index) - visibleCenter,
+    );
+    if (distance < closestDistance) {
+      closestIndex = index;
+      closestDistance = distance;
+    }
+  });
+
+  return sheets[closestIndex].sheetId;
+}
+
+function sheetCenterInCanvasPixels(
+  sheets: readonly ComposedSheet[],
+  index: number,
+): number {
+  return (
+    sheetOffsetInCanvasPixels(sheets, index) +
+    sheets[index].widthUm * MICROMETER_TO_CANVAS_PIXEL / 2
+  );
+}
