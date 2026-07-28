@@ -10,11 +10,19 @@ import { AlbumCanvas } from "./AlbumCanvas";
 
 const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
+    alpha: number;
     children: unknown[];
     handlers: Map<string, (event: unknown) => void>;
+    label: string;
     mask: unknown;
+    pathCommands: Array<{
+      kind: "lineTo" | "moveTo";
+      x: number;
+      y: number;
+    }>;
     position: { x: number; y: number };
     scale: { x: number; y: number };
+    visible: boolean;
     emit(name: string, event: unknown): void;
   }>,
   initOptions: [] as Array<Record<string, unknown>>,
@@ -49,17 +57,25 @@ vi.mock("pixi.js", () => {
   }
 
   class DisplayObject {
+    alpha = 1;
     children: DisplayObject[] = [];
     cursor = "";
     eventMode = "";
     handlers = new Map<string, (event: unknown) => void>();
     hitArea: unknown = null;
+    label = "";
     mask: DisplayObject | null = null;
     parent: DisplayObject | null = null;
+    pathCommands: Array<{
+      kind: "lineTo" | "moveTo";
+      x: number;
+      y: number;
+    }> = [];
     pivot = new Point();
     position = new Point();
     rotation = 0;
     scale = new Point(1, 1);
+    visible = true;
 
     constructor() {
       pixiLifecycle.displays.push(this);
@@ -125,11 +141,13 @@ vi.mock("pixi.js", () => {
       return this;
     }
 
-    lineTo() {
+    lineTo(x: number, y: number) {
+      this.pathCommands.push({ kind: "lineTo", x, y });
       return this;
     }
 
-    moveTo() {
+    moveTo(x: number, y: number) {
+      this.pathCommands.push({ kind: "moveTo", x, y });
       return this;
     }
 
@@ -398,6 +416,14 @@ function displayWithHandler(name: string) {
   return display;
 }
 
+function displayWithLabel(label: string) {
+  const display = pixiLifecycle.displays.find(
+    (candidate) => candidate.label === label,
+  );
+  if (!display) throw new Error(`Pixi display labeled ${label} not found`);
+  return display;
+}
+
 beforeEach(() => {
   pixiLifecycle.displays.length = 0;
   pixiLifecycle.initOptions.length = 0;
@@ -489,6 +515,79 @@ test("recalculates the automatic scale when the Canvas height changes", async ()
   };
 
   expect(world.scale.x).toBeCloseTo((700 - 2 * 24) / (300 + 24), 4);
+});
+
+test("reveals the dimmed Photo overflow and thirds guides only during Pan", async () => {
+  const onPanCommit = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onPanCommit,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithHandler("pointerdown");
+  const outsidePreview = displayWithLabel(
+    "photo-pan-outside-preview",
+  );
+  const insidePreview = displayWithLabel(
+    "photo-pan-inside-preview",
+  );
+  const thirdsGuides = displayWithLabel("photo-pan-thirds-guides");
+  const originalPosition = { ...insidePreview.position };
+
+  expect(outsidePreview.visible).toBe(false);
+  expect(outsidePreview.alpha).toBeGreaterThan(0);
+  expect(outsidePreview.alpha).toBeLessThan(1);
+  expect(insidePreview.alpha).toBe(1);
+  expect(thirdsGuides.visible).toBe(false);
+  expect(thirdsGuides.pathCommands).toEqual([
+    { kind: "moveTo", x: 100, y: 0 },
+    { kind: "lineTo", x: 100, y: 200 },
+    { kind: "moveTo", x: 200, y: 0 },
+    { kind: "lineTo", x: 200, y: 200 },
+    { kind: "moveTo", x: 0, y: 200 / 3 },
+    { kind: "lineTo", x: 300, y: 200 / 3 },
+    { kind: "moveTo", x: 0, y: 400 / 3 },
+    { kind: "lineTo", x: 300, y: 400 / 3 },
+  ]);
+
+  frame.emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+
+  expect(outsidePreview.visible).toBe(true);
+  expect(thirdsGuides.visible).toBe(true);
+
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  expect(outsidePreview.position).toEqual(insidePreview.position);
+
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 0, y: 0 },
+  });
+
+  expect(outsidePreview.visible).toBe(false);
+  expect(thirdsGuides.visible).toBe(false);
+  expect(onPanCommit).not.toHaveBeenCalled();
+
+  frame.emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  pixiLifecycle.instances[0].stage.emit("pointercancel", {});
+
+  expect(outsidePreview.visible).toBe(false);
+  expect(thirdsGuides.visible).toBe(false);
+  expect(insidePreview.position).toEqual(originalPosition);
+  expect(outsidePreview.position).toEqual(originalPosition);
+  expect(onPanCommit).not.toHaveBeenCalled();
 });
 
 test("keeps the photo inside a stationary frame mask throughout pan", async () => {

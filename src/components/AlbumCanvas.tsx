@@ -34,6 +34,7 @@ import {
 
 const PRELOAD_MARGIN = 1;
 const ZOOM_GESTURE_SETTLE_MS = 500;
+const PAN_OUTSIDE_OPACITY = 0.24;
 
 interface PhotoZoomPreview {
   frameId: string;
@@ -64,12 +65,24 @@ interface AlbumCanvasProps {
 interface PhotoRenderNode {
   frameId: string;
   layer: Container;
+  outsideLayer: Container;
+  thirdsGuides: Graphics;
   geometry: PhotoGeometry;
   baseZoom: number;
   baseScaleX: number;
   originalX: number;
   originalY: number;
   pan: Vector2;
+}
+
+interface PhotoPreviewLayerOptions {
+  label: string;
+  drawWidth: number;
+  drawHeight: number;
+  center: Vector2;
+  rotationDegrees: number;
+  mirrorX: boolean;
+  palette: readonly string[];
 }
 
 interface DragGesture {
@@ -311,42 +324,25 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           );
           const drawWidth = geometry.current.size.width;
           const drawHeight = geometry.current.size.height;
-          const photoLayer = new Container();
-          photoLayer.pivot.set(drawWidth / 2, drawHeight / 2);
-          photoLayer.position.set(
-            geometry.current.center.x,
-            geometry.current.center.y,
-          );
-          photoLayer.rotation =
-            (frame.photo.rotationDegrees * Math.PI) / 180;
-          photoLayer.scale.set(frame.photo.mirrorX ? -1 : 1, 1);
-
-          const stripeCount = 12;
-          for (let stripe = 0; stripe < stripeCount; stripe += 1) {
-            const paletteIndex = Math.min(
-              2,
-              Math.floor((stripe / stripeCount) * 3),
-            );
-            const stripeGraphic = new Graphics()
-              .rect(
-                (drawWidth / stripeCount) * stripe,
-                0,
-                drawWidth / stripeCount + 1,
-                drawHeight,
-              )
-              .fill({
-                color: hexToNumber(frame.photo.palette[paletteIndex]),
-              });
-            photoLayer.addChild(stripeGraphic);
-          }
-          const light = new Graphics()
-            .circle(
-              drawWidth * 0.73,
-              drawHeight * 0.28,
-              drawHeight * 0.18,
-            )
-            .fill({ color: 0xfff3d0, alpha: 0.32 });
-          photoLayer.addChild(light);
+          const previewOptions = {
+            drawWidth,
+            drawHeight,
+            center: geometry.current.center,
+            rotationDegrees: frame.photo.rotationDegrees,
+            mirrorX: frame.photo.mirrorX,
+            palette: frame.photo.palette,
+          };
+          const outsidePhotoLayer = createPhotoPreviewLayer({
+            ...previewOptions,
+            label: "photo-pan-outside-preview",
+          });
+          outsidePhotoLayer.alpha = PAN_OUTSIDE_OPACITY;
+          outsidePhotoLayer.eventMode = "none";
+          outsidePhotoLayer.visible = false;
+          const photoLayer = createPhotoPreviewLayer({
+            ...previewOptions,
+            label: "photo-pan-inside-preview",
+          });
 
           const clip = new Graphics()
             .rect(0, 0, frameWidth, frameHeight)
@@ -354,12 +350,23 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           const photoViewport = new Container();
           photoViewport.addChild(photoLayer);
           photoViewport.mask = clip;
-          frameContainer.addChild(photoViewport, clip);
+          const thirdsGuides = createThirdsGuides(
+            frameWidth,
+            frameHeight,
+          );
+          frameContainer.addChild(
+            outsidePhotoLayer,
+            photoViewport,
+            clip,
+            thirdsGuides,
+          );
 
           const baseZoom = frame.photo.placement.currentZoom;
           photoNode = {
             frameId: frame.frameId,
             layer: photoLayer,
+            outsideLayer: outsidePhotoLayer,
+            thirdsGuides,
             geometry,
             baseZoom,
             baseScaleX: frame.photo.mirrorX ? -1 : 1,
@@ -431,6 +438,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
                 activeZoom.gesture.delta
               : photoNode.baseZoom,
           };
+          setPhotoPanAids(photoNode, true);
           frameContainer.cursor = "grabbing";
         });
         frameContainer.on("wheel", (event: FederatedWheelEvent) => {
@@ -539,6 +547,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       if (!gesture) return;
       updatePanPreview(gesture, event.global.x, event.global.y);
       dragRef.current = null;
+      setPhotoPanAids(gesture.node, false);
 
       const deltaX = gesture.currentPan.x - gesture.node.pan.x;
       const deltaY = gesture.currentPan.y - gesture.node.pan.y;
@@ -575,6 +584,21 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     };
     app.stage.on("pointerup", finishDrag);
     app.stage.on("pointerupoutside", finishDrag);
+    app.stage.on("pointercancel", () => {
+      const gesture = dragRef.current;
+      if (!gesture) return;
+      dragRef.current = null;
+      setPhotoPanAids(gesture.node, false);
+      resetPhotoPreview(gesture.node);
+
+      const combinedZoom = zoomGestureRef.current;
+      if (combinedZoom?.gesture.frameId === gesture.frameId) {
+        if (combinedZoom.timer !== null) {
+          window.clearTimeout(combinedZoom.timer);
+        }
+        zoomGestureRef.current = null;
+      }
+    });
 
     const handleWheel = (event: WheelEvent) => {
       if (event.altKey) return;
@@ -641,6 +665,74 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   );
 }
 
+function createPhotoPreviewLayer({
+  label,
+  drawWidth,
+  drawHeight,
+  center,
+  rotationDegrees,
+  mirrorX,
+  palette,
+}: PhotoPreviewLayerOptions) {
+  const photoLayer = new Container();
+  photoLayer.label = label;
+  photoLayer.pivot.set(drawWidth / 2, drawHeight / 2);
+  photoLayer.position.set(center.x, center.y);
+  photoLayer.rotation = (rotationDegrees * Math.PI) / 180;
+  photoLayer.scale.set(mirrorX ? -1 : 1, 1);
+
+  const stripeCount = 12;
+  for (let stripe = 0; stripe < stripeCount; stripe += 1) {
+    const paletteIndex = Math.min(
+      2,
+      Math.floor((stripe / stripeCount) * 3),
+    );
+    const stripeGraphic = new Graphics()
+      .rect(
+        (drawWidth / stripeCount) * stripe,
+        0,
+        drawWidth / stripeCount + 1,
+        drawHeight,
+      )
+      .fill({
+        color: hexToNumber(palette[paletteIndex]),
+      });
+    photoLayer.addChild(stripeGraphic);
+  }
+  const light = new Graphics()
+    .circle(
+      drawWidth * 0.73,
+      drawHeight * 0.28,
+      drawHeight * 0.18,
+    )
+    .fill({ color: 0xfff3d0, alpha: 0.32 });
+  photoLayer.addChild(light);
+
+  return photoLayer;
+}
+
+function createThirdsGuides(frameWidth: number, frameHeight: number) {
+  const guides = new Graphics()
+    .moveTo(frameWidth / 3, 0)
+    .lineTo(frameWidth / 3, frameHeight)
+    .moveTo((frameWidth * 2) / 3, 0)
+    .lineTo((frameWidth * 2) / 3, frameHeight)
+    .moveTo(0, frameHeight / 3)
+    .lineTo(frameWidth, frameHeight / 3)
+    .moveTo(0, (frameHeight * 2) / 3)
+    .lineTo(frameWidth, (frameHeight * 2) / 3)
+    .stroke({ color: 0xffffff, width: 1.2, alpha: 0.88 });
+  guides.label = "photo-pan-thirds-guides";
+  guides.eventMode = "none";
+  guides.visible = false;
+  return guides;
+}
+
+function setPhotoPanAids(node: PhotoRenderNode, visible: boolean) {
+  node.outsideLayer.visible = visible;
+  node.thirdsGuides.visible = visible;
+}
+
 function updatePanPreview(
   gesture: DragGesture,
   pointerX: number,
@@ -659,7 +751,11 @@ function updatePanPreview(
   gesture.currentX = constrained.placement.center.x;
   gesture.currentY = constrained.placement.center.y;
   gesture.currentPan = constrained.pan;
-  gesture.node.layer.position.set(gesture.currentX, gesture.currentY);
+  setPhotoLayersPosition(
+    gesture.node,
+    gesture.currentX,
+    gesture.currentY,
+  );
 }
 
 function applyPhotoZoomPreview(node: PhotoRenderNode, targetZoom: number) {
@@ -673,16 +769,35 @@ function applyPhotoPlacementPreview(
   placement: PhotoPlacement,
 ) {
   const factor = targetZoom / node.baseZoom;
-  node.layer.scale.set(node.baseScaleX * factor, factor);
-  node.layer.position.set(
+  setPhotoLayersScale(node, node.baseScaleX * factor, factor);
+  setPhotoLayersPosition(
+    node,
     placement.center.x,
     placement.center.y,
   );
 }
 
 function resetPhotoPreview(node: PhotoRenderNode) {
-  node.layer.scale.set(node.baseScaleX, 1);
-  node.layer.position.set(node.originalX, node.originalY);
+  setPhotoLayersScale(node, node.baseScaleX, 1);
+  setPhotoLayersPosition(node, node.originalX, node.originalY);
+}
+
+function setPhotoLayersPosition(
+  node: PhotoRenderNode,
+  x: number,
+  y: number,
+) {
+  node.layer.position.set(x, y);
+  node.outsideLayer.position.set(x, y);
+}
+
+function setPhotoLayersScale(
+  node: PhotoRenderNode,
+  x: number,
+  y: number,
+) {
+  node.layer.scale.set(x, y);
+  node.outsideLayer.scale.set(x, y);
 }
 
 function hexToNumber(value: string): number {
