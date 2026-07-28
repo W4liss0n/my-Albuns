@@ -8,7 +8,10 @@ import type {
   ProjectIntent,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
-import { AlbumCanvas } from "./AlbumCanvas";
+import {
+  AlbumCanvas,
+  type PhotoTransformPreview,
+} from "./AlbumCanvas";
 import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
 
 interface ProjectWorkspaceProps {
@@ -47,6 +50,8 @@ export function ProjectWorkspace({
   const [canvasScale, setCanvasScale] = useState(1);
   const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(null);
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
+  const [canvasPhotoPreview, setCanvasPhotoPreview] =
+    useState<PhotoTransformPreview | null>(null);
 
   const selectedFrame = useMemo(
     () =>
@@ -94,6 +99,7 @@ export function ProjectWorkspace({
     try {
       onProjectionChange(await bridge.apply(intent));
     } catch (error: unknown) {
+      setCanvasPhotoPreview(null);
       setMessage(messageFromError(error));
     }
   }
@@ -192,7 +198,14 @@ export function ProjectWorkspace({
     ) {
       setZoomDraft(null);
     }
+    setCanvasPhotoPreview((current) =>
+      current?.frameId === selectedFrameId ? current : null,
+    );
   }, [selectedFrameId]);
+
+  useEffect(() => {
+    setCanvasPhotoPreview(null);
+  }, [projection]);
 
   const sheetCount = projection.state.album.sheets.length;
   const photoCount = projection.state.album.sheets.reduce(
@@ -203,10 +216,18 @@ export function ProjectWorkspace({
 
   const selectedPhotoZoom =
     selectedFrame?.photo?.transform.userZoom ?? 1;
+  const selectedCanvasPhotoPreview =
+    canvasPhotoPreview?.frameId === selectedFrame?.id
+      ? canvasPhotoPreview
+      : null;
   const displayedPhotoZoom =
     zoomDraft && zoomDraft.frameId === selectedFrame?.id
       ? zoomDraft.value
-      : selectedPhotoZoom;
+      : (selectedCanvasPhotoPreview?.zoom ?? selectedPhotoZoom);
+  const displayedPhotoPanX =
+    selectedCanvasPhotoPreview?.panX ??
+    selectedFrame?.photo?.transform.panX ??
+    0;
 
   return (
     <div className="app-shell">
@@ -291,6 +312,7 @@ export function ProjectWorkspace({
             onSelectFrame={selectFrame}
             onFocusSheet={focusSheet}
             onViewportChange={setViewport}
+            onTransformPreview={setCanvasPhotoPreview}
             onPanCommit={(frameId, deltaX, deltaY) =>
               void commitInteraction({
                 kind: "panPhoto",
@@ -343,9 +365,7 @@ export function ProjectWorkspace({
                   />
                   <PropertyRow
                     label="Pan horizontal"
-                    value={`${Math.round(
-                      (selectedFrame.photo?.transform.panX ?? 0) * 100,
-                    )}%`}
+                    value={`${Math.round(displayedPhotoPanX * 100)}%`}
                   />
                   {selectedFrame.photo && selectedComposedPhoto && (
                     <label className="photo-zoom-control">

@@ -8,10 +8,14 @@ import type {
   ProjectBridge,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
+import type { PhotoTransformPreview } from "./AlbumCanvas";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
+    onTransformPreview?(
+      preview: PhotoTransformPreview | null,
+    ): void;
     onZoomCommit(frameId: string, delta: number): void;
     onTransformCommit(
       frameId: string,
@@ -267,6 +271,81 @@ test("commits a slider zoom once without flashing a global busy state", async ()
     pending.resolve(projection);
     await pending.promise;
   });
+});
+
+test("updates the contextual Zoom slider during a Canvas gesture", () => {
+  const apply = vi.fn(async () => projection);
+  useEditorView.setState({ selectedFrameId: "frame-001" });
+
+  render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+  expect(slider).toHaveValue("100");
+
+  act(() => {
+    canvasHarness.props?.onTransformPreview?.({
+      frameId: "frame-001",
+      panX: 0.35,
+      panY: -0.2,
+      zoom: 1.25,
+    });
+  });
+
+  expect(slider).toHaveValue("125");
+  expect(screen.getByText("Pan horizontal").parentElement).toHaveTextContent(
+    "35%",
+  );
+  expect(apply).not.toHaveBeenCalled();
+
+  act(() => {
+    canvasHarness.props?.onTransformPreview?.(null);
+  });
+
+  expect(slider).toHaveValue("100");
+  expect(screen.getByText("Pan horizontal").parentElement).toHaveTextContent(
+    "0%",
+  );
+});
+
+test("discards a live Canvas value when its commit fails", async () => {
+  const apply = vi.fn(async () => {
+    throw new Error("Falha simulada");
+  });
+  useEditorView.setState({ selectedFrameId: "frame-001" });
+
+  render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
+  act(() => {
+    canvasHarness.props?.onTransformPreview?.({
+      frameId: "frame-001",
+      panX: 0,
+      panY: 0,
+      zoom: 1.25,
+    });
+  });
+  expect(slider).toHaveValue("125");
+
+  act(() => {
+    canvasHarness.props?.onZoomCommit("frame-001", 0.25);
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Falha simulada",
+  );
+  expect(slider).toHaveValue("100");
 });
 
 test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {

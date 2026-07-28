@@ -6,7 +6,10 @@ import type {
   CompositionPlan,
   PhotoPlacementPlan,
 } from "../domain/project";
-import { AlbumCanvas } from "./AlbumCanvas";
+import {
+  AlbumCanvas,
+  type PhotoTransformPreview,
+} from "./AlbumCanvas";
 
 const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
@@ -348,6 +351,9 @@ const rotatedInteractiveComposition: CompositionPlan = {
 
 function renderCanvas({
   compositionPlan = composition,
+  onTransformPreview = vi.fn<
+    (preview: PhotoTransformPreview | null) => void
+  >(),
   onPanCommit = vi.fn<
     (frameId: string, deltaX: number, deltaY: number) => void
   >(),
@@ -363,6 +369,9 @@ function renderCanvas({
   >(),
 }: {
   compositionPlan?: CompositionPlan;
+  onTransformPreview?: (
+    preview: PhotoTransformPreview | null,
+  ) => void;
   onPanCommit?: (frameId: string, deltaX: number, deltaY: number) => void;
   onViewportChange?: (viewport: { offsetX: number; zoom: number }) => void;
   onZoomCommit?: (frameId: string, delta: number) => void;
@@ -382,6 +391,7 @@ function renderCanvas({
       onSelectFrame={() => undefined}
       onFocusSheet={() => undefined}
       onViewportChange={onViewportChange}
+      onTransformPreview={onTransformPreview}
       onPanCommit={onPanCommit}
       onZoomCommit={onZoomCommit}
       onTransformCommit={onTransformCommit}
@@ -391,6 +401,7 @@ function renderCanvas({
 
   return {
     ...view,
+    onTransformPreview,
     onPanCommit,
     onViewportChange,
     onZoomCommit,
@@ -519,9 +530,11 @@ test("recalculates the automatic scale when the Canvas height changes", async ()
 
 test("reveals the dimmed Photo overflow and thirds guides only during Pan", async () => {
   const onPanCommit = vi.fn();
+  const onTransformPreview = vi.fn();
   renderCanvas({
     compositionPlan: interactiveComposition,
     onPanCommit,
+    onTransformPreview,
   });
   await finishPixiInitialization();
 
@@ -572,6 +585,7 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
   expect(outsidePreview.visible).toBe(false);
   expect(thirdsGuides.visible).toBe(false);
   expect(onPanCommit).not.toHaveBeenCalled();
+  expect(onTransformPreview).toHaveBeenLastCalledWith(null);
 
   frame.emit("pointerdown", {
     altKey: true,
@@ -588,6 +602,7 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
   expect(insidePreview.position).toEqual(originalPosition);
   expect(outsidePreview.position).toEqual(originalPosition);
   expect(onPanCommit).not.toHaveBeenCalled();
+  expect(onTransformPreview).toHaveBeenLastCalledWith(null);
 });
 
 test("keeps the photo inside a stationary frame mask throughout pan", async () => {
@@ -634,6 +649,40 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
 
   expect(onPanCommit).toHaveBeenCalledOnce();
   expect(onPanCommit).toHaveBeenCalledWith("frame-001", 1, 0);
+});
+
+test("reports the live Photo transform while Pan is moving", async () => {
+  const onTransformPreview = vi.fn();
+  const onPanCommit = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformPreview,
+    onPanCommit,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithHandler("pointerdown");
+  frame.emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+
+  expect(onTransformPreview).toHaveBeenLastCalledWith({
+    frameId: "frame-001",
+    panX: expect.any(Number),
+    panY: 0,
+    zoom: 1,
+  });
+  expect(
+    onTransformPreview.mock.calls[
+      onTransformPreview.mock.calls.length - 1
+    ]?.[0]?.panX,
+  ).toBeGreaterThan(0);
+  expect(onPanCommit).not.toHaveBeenCalled();
 });
 
 test("keeps every frame corner covered while panning a rotated photo", async () => {
@@ -764,9 +813,11 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
 test("previews a smooth wheel zoom and commits the sequence once", async () => {
   vi.useFakeTimers();
   const onZoomCommit = vi.fn();
+  const onTransformPreview = vi.fn();
   renderCanvas({
     compositionPlan: pannedInteractiveComposition,
     onZoomCommit,
+    onTransformPreview,
   });
   await finishPixiInitialization();
 
@@ -797,6 +848,18 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
   wheel();
   expect(photoLayer.scale.y).toBeGreaterThan(1);
   expect(photoLayer.position.x).toBeCloseTo(83.4, 1);
+  expect(onTransformPreview).toHaveBeenLastCalledWith({
+    frameId: "frame-001",
+    panX: -0.9,
+    panY: 0,
+    zoom: expect.any(Number),
+  });
+  expect(
+    onTransformPreview.mock.calls[
+      onTransformPreview.mock.calls.length - 1
+    ]?.[0]?.zoom,
+  ).toBeGreaterThan(1);
+  expect(onZoomCommit).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(300);

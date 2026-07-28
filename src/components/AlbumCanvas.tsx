@@ -41,6 +41,13 @@ interface PhotoZoomPreview {
   value: number;
 }
 
+export interface PhotoTransformPreview {
+  frameId: string;
+  panX: number;
+  panY: number;
+  zoom: number;
+}
+
 interface AlbumCanvasProps {
   composition: CompositionPlan;
   selectedFrameId: string | null;
@@ -50,6 +57,7 @@ interface AlbumCanvasProps {
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
   onViewportChange(viewport: ViewportState): void;
+  onTransformPreview(preview: PhotoTransformPreview | null): void;
   onPanCommit(frameId: string, deltaX: number, deltaY: number): void;
   onZoomCommit(frameId: string, delta: number): void;
   onTransformCommit(
@@ -483,6 +491,13 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
               combined.zoom,
               combined.placement,
             );
+            propsRef.current.onTransformPreview(
+              createTransformPreview(
+                activeDrag.frameId,
+                activeDrag.currentPan,
+                activeDrag.currentZoom,
+              ),
+            );
             zoomGestureRef.current = {
               gesture: transition.gesture,
               timer: null,
@@ -491,6 +506,13 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           }
 
           applyPhotoZoomPreview(photoNode, transition.previewZoom);
+          propsRef.current.onTransformPreview(
+            createTransformPreview(
+              photoNode.frameId,
+              photoNode.pan,
+              transition.previewZoom,
+            ),
+          );
           const timer = window.setTimeout(() => {
             const runtime = zoomGestureRef.current;
             const commit = finishPhotoZoomGesture(
@@ -501,6 +523,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
                 commit.frameId,
                 commit.delta,
               );
+            } else {
+              propsRef.current.onTransformPreview(null);
             }
             zoomGestureRef.current = null;
           }, ZOOM_GESTURE_SETTLE_MS);
@@ -541,6 +565,13 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       const gesture = dragRef.current;
       if (!gesture) return;
       updatePanPreview(gesture, event.global.x, event.global.y);
+      propsRef.current.onTransformPreview(
+        createTransformPreview(
+          gesture.frameId,
+          gesture.currentPan,
+          gesture.currentZoom,
+        ),
+      );
     });
     const finishDrag = (event: FederatedPointerEvent) => {
       const gesture = dragRef.current;
@@ -556,6 +587,10 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       const combinedZoom = zoomGestureRef.current;
       const ownsCombinedZoom =
         combinedZoom?.gesture.frameId === gesture.frameId;
+      const changedPan =
+        Math.abs(deltaX) > 0.0001 ||
+        Math.abs(deltaY) > 0.0001;
+      const changedZoom = Math.abs(deltaZoom) > 0.0001;
 
       if (ownsCombinedZoom) {
         if (combinedZoom.timer !== null) {
@@ -564,17 +599,26 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         zoomGestureRef.current = null;
       }
 
-      if (ownsCombinedZoom && Math.abs(deltaZoom) > 0.0001) {
+      if ((ownsCombinedZoom && changedZoom) || changedPan) {
+        propsRef.current.onTransformPreview(
+          createTransformPreview(
+            gesture.frameId,
+            gesture.currentPan,
+            gesture.currentZoom,
+          ),
+        );
+      } else {
+        propsRef.current.onTransformPreview(null);
+      }
+
+      if (ownsCombinedZoom && changedZoom) {
         propsRef.current.onTransformCommit(
           gesture.frameId,
           deltaX,
           deltaY,
           deltaZoom,
         );
-      } else if (
-        Math.abs(deltaX) > 0.0001 ||
-        Math.abs(deltaY) > 0.0001
-      ) {
+      } else if (changedPan) {
         propsRef.current.onPanCommit(
           gesture.frameId,
           deltaX,
@@ -590,6 +634,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       dragRef.current = null;
       setPhotoPanAids(gesture.node, false);
       resetPhotoPreview(gesture.node);
+      propsRef.current.onTransformPreview(null);
 
       const combinedZoom = zoomGestureRef.current;
       if (combinedZoom?.gesture.frameId === gesture.frameId) {
@@ -709,6 +754,19 @@ function createPhotoPreviewLayer({
   photoLayer.addChild(light);
 
   return photoLayer;
+}
+
+function createTransformPreview(
+  frameId: string,
+  pan: Vector2,
+  zoom: number,
+): PhotoTransformPreview {
+  return {
+    frameId,
+    panX: pan.x,
+    panY: pan.y,
+    zoom,
+  };
 }
 
 function createThirdsGuides(frameWidth: number, frameHeight: number) {

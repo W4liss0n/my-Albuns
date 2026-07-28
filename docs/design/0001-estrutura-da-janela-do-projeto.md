@@ -106,6 +106,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame aplica Pan à Foto contida nele; `Alt` + roda do mouse sobre o Frame altera o Zoom da Foto. Ambos integram a `MediaTransform` persistente da colocação.
 - Para o Pan, o usuário mantém `Alt`, pressiona sobre o Frame e inicia o arraste; o clique modificado é consumido pelo gesto e não seleciona o Frame. `Alt` + roda também preserva a seleção atual.
 - Enquanto o Pan estiver ativo, a porção da Foto fora do Frame aparece temporariamente com opacidade reduzida, a porção interna permanece com opacidade normal e quatro linhas-guia da regra dos terços são exibidas dentro do Frame. Esses auxílios desaparecem ao terminar o gesto e não integram o Projeto, o Histórico ou a Exportação.
+- Durante a prévia contínua de Pan ou Zoom, os valores correspondentes no Painel contextual acompanham imediatamente cada atualização do gesto. A prévia é transitória, volta aos valores confirmados em um cancelamento ou falha e não cria ações intermediárias no Histórico.
 - Esses gestos atuam na Foto sob o ponteiro sem mover ou redimensionar o Frame e sempre respeitam o Preenchimento do Frame.
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
