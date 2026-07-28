@@ -45,3 +45,4 @@
 - 2026-07-28: a revisão externa manteve Tauri/React/Rust como direção principal, mas reabriu a topologia de processos para comparação objetiva neste spike.
 - 2026-07-28: a pesquisa técnica de caminhos está em `docs/research/0004-caminhos-windows-e-unc.md`; ela informa o spike, mas não substitui as fontes normativas deste ticket.
 - 2026-07-28: uma revisão de arquitetura acrescentou quatro critérios. Três decisões novas precisavam de gate próprio — as duas entradas do `ProjectCore`, o `OperationLease` e o critério de reparte entre núcleo e interface — e o critério existente sobre `ProjectSession` não as cobria, porque fala em Projeto "aberto" e o lote não abre nenhum.
+- 2026-07-28: o primeiro corte vertical executável e seus limites estão registrados em `docs/research/0006-evidencias-do-corte-vertical-da-plataforma.md`. Ele valida a fundação mínima, mas não encerra a comparação de topologias nem os demais gates deste spike.

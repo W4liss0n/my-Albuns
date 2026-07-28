@@ -1,0 +1,44 @@
+{
+  "name": "myalbuns",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "setup:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Setup-LocalToolchain.ps1",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalCargo.ps1 test --workspace",
+    "check:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalCargo.ps1 check --workspace",
+    "quality:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-RustQuality.ps1",
+    "sidecar:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Prepare-Sidecar.ps1",
+    "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalTauri.ps1 dev",
+    "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalTauri.ps1 build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "pixi.js": "^8.19.0",
+    "react": "^19.1.0",
+    "react-aria-components": "^1.19.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "jsdom": "^30.0.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "vitest": "^4.1.10"
+  }
+}

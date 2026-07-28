@@ -1,0 +1,8 @@
+.tools/
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/binaries/*.exe
+*.log
+.DS_Store
