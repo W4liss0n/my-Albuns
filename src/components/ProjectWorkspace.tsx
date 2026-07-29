@@ -59,6 +59,7 @@ export function ProjectWorkspace({
     useState<CanvasMetrics | null>(null);
   const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(null);
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
+  const pendingSheetNavigationRef = useRef<string | null>(null);
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
     useState<PhotoTransformPreview | null>(null);
   const workspacePanels = useWorkspacePanelLayout();
@@ -83,25 +84,53 @@ export function ProjectWorkspace({
     setZoomDraftState(next);
   }
 
-  function navigateToSheet(sheetId: string) {
+  function centerCanvasOnSheet(
+    sheetId: string,
+    metrics: CanvasMetrics,
+  ) {
     const sheetIndex = projection.composition.sheets.findIndex(
       (sheet) => sheet.sheetId === sheetId,
     );
-    if (sheetIndex < 0) return;
-
-    focusSheet(sheetId);
-    centerSheet(sheetId);
-    if (!canvasMetrics) return;
+    if (sheetIndex < 0) return false;
 
     setViewport({
-      ...viewport,
+      ...useEditorView.getState().viewport,
       offsetX: centeredSheetOffsetInContinuousCanvas(
         projection.composition.sheets,
         sheetIndex,
-        canvasMetrics.scale,
-        canvasMetrics.width,
+        metrics.scale,
+        metrics.width,
       ),
     });
+    return true;
+  }
+
+  function handleCanvasMetricsChange(metrics: CanvasMetrics) {
+    setCanvasMetrics(metrics);
+    const pendingSheetId = pendingSheetNavigationRef.current;
+    if (
+      pendingSheetId &&
+      centerCanvasOnSheet(pendingSheetId, metrics)
+    ) {
+      pendingSheetNavigationRef.current = null;
+    }
+  }
+
+  function navigateToSheet(sheetId: string) {
+    const sheetExists = projection.composition.sheets.some(
+      (sheet) => sheet.sheetId === sheetId,
+    );
+    if (!sheetExists) return;
+
+    focusSheet(sheetId);
+    centerSheet(sheetId);
+    if (!canvasMetrics) {
+      pendingSheetNavigationRef.current = sheetId;
+      return;
+    }
+
+    pendingSheetNavigationRef.current = null;
+    centerCanvasOnSheet(sheetId, canvasMetrics);
   }
 
   async function runWithGlobalFeedback(
@@ -371,7 +400,7 @@ export function ProjectWorkspace({
               })
             }
             onMaterializedChange={ignoreMaterializedCount}
-            onCanvasMetricsChange={setCanvasMetrics}
+            onCanvasMetricsChange={handleCanvasMetricsChange}
           />
         </section>
 

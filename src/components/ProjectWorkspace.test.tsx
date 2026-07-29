@@ -318,6 +318,30 @@ test("centers a Grade navigation target in the visible Canvas", () => {
   );
 });
 
+test("completes Grade navigation requested before Canvas metrics exist", () => {
+  render(
+    <ProjectWorkspace
+      projection={twoSheetProjection}
+      bridge={bridgeWithApply(async () => twoSheetProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(screen.getByText("02").closest("button")!);
+  expect(useEditorView.getState().viewport.offsetX).toBe(42);
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(24);
+  expect(useEditorView.getState().focusedSheetId).toBe("sheet-002");
+  expect(useEditorView.getState().centeredSheetId).toBe("sheet-002");
+});
+
 test("resizes both workspace panels with persistent splitters", () => {
   const firstView = render(
     <ProjectWorkspace
