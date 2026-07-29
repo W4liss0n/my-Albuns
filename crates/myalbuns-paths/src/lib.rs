@@ -21,6 +21,7 @@ const TEMPORARY_APP_DIRECTORY_NAME: &str = "MyAlbuns2";
 pub enum AppPathsError {
     KnownFoldersUnavailable,
     InvalidProjectNamespace,
+    InvalidStateNamespace,
     InvalidCacheArtifact,
     CacheArtifactOutsideRoot,
     PathNotRepresentable,
@@ -36,6 +37,9 @@ impl Display for AppPathsError {
             }
             Self::InvalidProjectNamespace => {
                 formatter.write_str("a Identidade do Projeto não forma um namespace seguro")
+            }
+            Self::InvalidStateNamespace => {
+                formatter.write_str("a identidade do estado local não forma um namespace seguro")
             }
             Self::InvalidCacheArtifact => {
                 formatter.write_str("a identidade do artefato de Cache é inválida")
@@ -122,7 +126,7 @@ impl AppPaths {
     }
 
     pub fn project_cache(&self, project_namespace: &str) -> Result<CachePathPlan, AppPathsError> {
-        if !valid_project_namespace(project_namespace) {
+        if !valid_namespace_component(project_namespace) {
             return Err(AppPathsError::InvalidProjectNamespace);
         }
         Ok(CachePathPlan {
@@ -198,6 +202,13 @@ impl AppPaths {
         self.local_root.join("State")
     }
 
+    pub fn webview_data_directory(&self, host_namespace: &str) -> Result<PathBuf, AppPathsError> {
+        if !valid_namespace_component(host_namespace) {
+            return Err(AppPathsError::InvalidStateNamespace);
+        }
+        Ok(self.state_dir().join("WebView2").join(host_namespace))
+    }
+
     pub fn logs_dir(&self) -> PathBuf {
         self.local_root.join("Logs")
     }
@@ -223,7 +234,7 @@ impl CachePathPlan {
                 )
             })
             || parent_name != Some("Cache")
-            || !valid_project_namespace(namespace)
+            || !valid_namespace_component(namespace)
         {
             return Err(AppPathsError::InvalidProjectNamespace);
         }
@@ -374,7 +385,7 @@ impl PreparedCacheStorage {
     }
 }
 
-fn valid_project_namespace(value: &str) -> bool {
+fn valid_namespace_component(value: &str) -> bool {
     if value.is_empty()
         || value.len() > 128
         || matches!(value, "." | "..")
@@ -415,7 +426,7 @@ fn valid_project_namespace(value: &str) -> bool {
 }
 
 fn valid_cache_component(value: &str) -> bool {
-    valid_project_namespace(value)
+    valid_namespace_component(value)
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))

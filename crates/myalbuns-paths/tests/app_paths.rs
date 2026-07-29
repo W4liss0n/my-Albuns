@@ -38,7 +38,36 @@ fn exposes_each_data_category_under_its_approved_root() {
         Path::new(r"C:\Local\MyAlbuns2\Recovery")
     );
     assert_eq!(paths.state_dir(), Path::new(r"C:\Local\MyAlbuns2\State"));
+    assert_eq!(
+        paths
+            .webview_data_directory("project-host-01")
+            .expect("the host namespace is safe"),
+        Path::new(r"C:\Local\MyAlbuns2\State\WebView2\project-host-01")
+    );
     assert_eq!(paths.logs_dir(), Path::new(r"C:\Local\MyAlbuns2\Logs"));
+}
+
+#[test]
+fn derives_only_safe_webview_host_namespaces() {
+    let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+
+    for unsafe_namespace in [
+        "",
+        ".",
+        "..",
+        "../escape",
+        r"nested\escape",
+        "C:escape",
+        "álbum",
+        "CON",
+        "trailing.",
+    ] {
+        assert_eq!(
+            paths.webview_data_directory(unsafe_namespace).unwrap_err(),
+            AppPathsError::InvalidStateNamespace,
+            "{unsafe_namespace:?} must not become a WebView data namespace"
+        );
+    }
 }
 
 #[test]

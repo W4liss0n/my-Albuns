@@ -122,6 +122,15 @@ impl TopologySpike {
         1 + usize::from(self.definition.secondary.is_some())
     }
 
+    pub(crate) fn webview_data_namespace(&self) -> &'static str {
+        match (self.definition.label, self.definition.primary.sample) {
+            ("independent", SampleProject::Horizon) => "topology-independent-project-a",
+            ("independent", SampleProject::Aurora) => "topology-independent-project-b",
+            ("multiwindow", _) => "topology-multiwindow",
+            _ => "standard",
+        }
+    }
+
     pub(crate) fn benchmark_window_settings(&self) -> Vec<(&'static str, bool)> {
         self.definition
             .windows()
@@ -201,6 +210,8 @@ mod tests {
 
     #[test]
     fn builds_comparable_independent_and_multiwindow_hosts() {
+        let independent_a = TopologySpike::from_values(Some("independent"), Some("a"))
+            .expect("independent project A is a valid spike configuration");
         let independent_b = TopologySpike::from_values(Some("independent"), Some("b"))
             .expect("independent project B is a valid spike configuration");
         let multiwindow = TopologySpike::from_values(Some("multiwindow"), None)
@@ -245,5 +256,14 @@ mod tests {
             multiwindow.benchmark_window_settings(),
             vec![("main", true), ("project-b", false)]
         );
+        assert_eq!(
+            independent_a.webview_data_namespace(),
+            "topology-independent-project-a"
+        );
+        assert_eq!(
+            independent_b.webview_data_namespace(),
+            "topology-independent-project-b"
+        );
+        assert_eq!(multiwindow.webview_data_namespace(), "topology-multiwindow");
     }
 }

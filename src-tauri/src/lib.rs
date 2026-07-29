@@ -485,10 +485,19 @@ pub fn run() {
         .manage(project_host)
         .manage(topology_benchmark)
         .setup(move |app| {
-            let main_window = app
-                .get_webview_window("main")
-                .ok_or_else(|| std::io::Error::other("a janela principal não foi criada"))?;
-            main_window.set_title(topology.primary_title())?;
+            let app_paths = AppPaths::discover()?;
+            let webview_data_directory =
+                app_paths.webview_data_directory(topology.webview_data_namespace())?;
+            logging::initialize(app, &app_paths);
+            app.manage(app_paths);
+
+            let main_config = app.config().app.windows.first().ok_or_else(|| {
+                std::io::Error::other("a configuração da janela principal não existe")
+            })?;
+            WebviewWindowBuilder::from_config(app, main_config)?
+                .title(topology.primary_title())
+                .data_directory(webview_data_directory.clone())
+                .build()?;
             if let Some(secondary) = topology.secondary_window() {
                 WebviewWindowBuilder::new(
                     app,
@@ -499,12 +508,10 @@ pub fn run() {
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(1080.0, 720.0)
                 .resizable(true)
+                .data_directory(webview_data_directory)
                 .build()?;
             }
 
-            let app_paths = AppPaths::discover()?;
-            logging::initialize(app, &app_paths);
-            app.manage(app_paths);
             tracing::info!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),
@@ -572,5 +579,15 @@ mod tests {
             !production_csp.contains("'unsafe-eval'"),
             "the PixiJS static CSP runtime must not be replaced with unsafe-eval"
         );
+    }
+
+    #[test]
+    fn main_window_is_created_with_the_central_webview_data_directory() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let main_window = &config["app"]["windows"][0];
+
+        assert_eq!(main_window["label"], "main");
+        assert_eq!(main_window["create"], false);
     }
 }
