@@ -18,6 +18,7 @@
     "sidecar:prepare": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Prepare-Sidecar.ps1",
     "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalTauri.ps1 dev",
     "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalTauri.ps1 build",
+    "spike:corpus": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Prepare-TopologyCorpus.ps1",
     "spike:topology": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-TopologySpike.ps1",
     "preview": "vite preview",
     "tauri": "tauri"

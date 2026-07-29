@@ -1,9 +1,27 @@
 use std::path::PathBuf;
 
 use myalbuns_core::RenderSnapshot;
+use myalbuns_paths::CachePathPlan;
 use serde::{Deserialize, Serialize};
 
 pub const IMAGING_PROTOCOL_VERSION: u32 = 1;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "request", rename_all = "camelCase")]
+pub enum ImagingCommand {
+    BuildCache(CacheRequest),
+    ResetCache(CacheResetRequest),
+}
+
+impl ImagingCommand {
+    pub fn build_cache(request: CacheRequest) -> Self {
+        Self::BuildCache(request)
+    }
+
+    pub fn reset_cache(request: CacheResetRequest) -> Self {
+        Self::ResetCache(request)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +48,213 @@ impl ImagingRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheRequest {
+    pub protocol_version: u32,
+    pub request_id: String,
+    pub project_id: String,
+    pub cache_paths: CachePathPlan,
+    pub sources: Vec<CacheMediaSource>,
+    pub max_edge_px: u32,
+}
+
+impl CacheRequest {
+    pub fn new(
+        request_id: impl Into<String>,
+        project_id: impl Into<String>,
+        cache_paths: CachePathPlan,
+        sources: Vec<CacheMediaSource>,
+        max_edge_px: u32,
+    ) -> Result<Self, String> {
+        let request = Self {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: request_id.into(),
+            project_id: project_id.into(),
+            cache_paths,
+            sources,
+            max_edge_px,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.protocol_version != IMAGING_PROTOCOL_VERSION {
+            return Err(format!(
+                "versão de protocolo não suportada: {}",
+                self.protocol_version
+            ));
+        }
+        if self.request_id.trim().is_empty() {
+            return Err("a Identidade da solicitação está vazia".into());
+        }
+        if self.project_id.trim().is_empty() {
+            return Err("a Identidade do Projeto está vazia".into());
+        }
+        if self.sources.is_empty() {
+            return Err("a solicitação de Cache não contém Fotos".into());
+        }
+        if !(1..=4096).contains(&self.max_edge_px) {
+            return Err("a dimensão da representação reduzida é inválida".into());
+        }
+        self.cache_paths
+            .validate()
+            .map_err(|error| error.to_string())?;
+
+        let mut media_ids = std::collections::HashSet::new();
+        for source in &self.sources {
+            source.validate()?;
+            self.cache_paths
+                .preview_file(source.media_id(), "validation")
+                .map_err(|error| error.to_string())?;
+            if !media_ids.insert(source.media_id()) {
+                return Err("a solicitação de Cache contém mídia duplicada".into());
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheMediaSource {
+    media_id: String,
+    source_path: PathBuf,
+    source_bytes: u64,
+    source_sha256: String,
+}
+
+impl CacheMediaSource {
+    pub fn new(
+        media_id: impl Into<String>,
+        source_path: PathBuf,
+        source_bytes: u64,
+        source_sha256: impl Into<String>,
+    ) -> Result<Self, String> {
+        let source = Self {
+            media_id: media_id.into(),
+            source_path,
+            source_bytes,
+            source_sha256: source_sha256.into(),
+        };
+        source.validate()?;
+        Ok(source)
+    }
+
+    pub fn media_id(&self) -> &str {
+        &self.media_id
+    }
+
+    pub fn source_path(&self) -> &std::path::Path {
+        &self.source_path
+    }
+
+    pub fn source_bytes(&self) -> u64 {
+        self.source_bytes
+    }
+
+    pub fn source_sha256(&self) -> &str {
+        &self.source_sha256
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.media_id.is_empty()
+            || self.media_id.len() > 128
+            || !self
+                .media_id
+                .bytes()
+                .all(|value| value.is_ascii_alphanumeric() || matches!(value, b'-' | b'_'))
+        {
+            return Err("a identidade de mídia é inválida".into());
+        }
+        if !self.source_path.is_absolute() {
+            return Err(format!(
+                "o caminho da mídia {} não é absoluto",
+                self.media_id
+            ));
+        }
+        if self.source_bytes == 0 {
+            return Err(format!("a mídia {} está vazia", self.media_id));
+        }
+        if self.source_sha256.len() != 64
+            || !self
+                .source_sha256
+                .bytes()
+                .all(|value| value.is_ascii_hexdigit())
+        {
+            return Err(format!(
+                "o fingerprint da mídia {} é inválido",
+                self.media_id
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheCompletion {
+    pub artifacts: Vec<CacheArtifact>,
+    pub generated_count: usize,
+    pub reused_count: usize,
+    pub source_bytes: u64,
+    pub preview_bytes: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheArtifact {
+    pub media_id: String,
+    pub generation_id: String,
+    pub width_px: u32,
+    pub height_px: u32,
+    pub preview_bytes: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheResetRequest {
+    pub protocol_version: u32,
+    pub request_id: String,
+    pub project_ids: Vec<String>,
+}
+
+impl CacheResetRequest {
+    pub fn new(request_id: impl Into<String>, project_ids: Vec<String>) -> Result<Self, String> {
+        let request = Self {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: request_id.into(),
+            project_ids,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.protocol_version != IMAGING_PROTOCOL_VERSION {
+            return Err(format!(
+                "versão de protocolo não suportada: {}",
+                self.protocol_version
+            ));
+        }
+        if self.request_id.trim().is_empty() {
+            return Err("a Identidade da solicitação está vazia".into());
+        }
+        if self.project_ids.is_empty() {
+            return Err("a limpeza de Cache não contém Projetos".into());
+        }
+        let unique = self
+            .project_ids
+            .iter()
+            .collect::<std::collections::HashSet<_>>();
+        if unique.len() != self.project_ids.len() {
+            return Err("a limpeza de Cache contém Projeto duplicado".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -40,6 +265,14 @@ pub enum ImagingResponse {
         request_id: String,
         width_px: u32,
         height_px: u32,
+    },
+    CacheCompleted {
+        request_id: String,
+        completion: CacheCompletion,
+    },
+    CacheReset {
+        request_id: String,
+        removed_count: usize,
     },
 }
 
@@ -52,6 +285,20 @@ impl ImagingResponse {
         }
     }
 
+    pub fn cache_completed(request_id: impl Into<String>, completion: CacheCompletion) -> Self {
+        Self::CacheCompleted {
+            request_id: request_id.into(),
+            completion,
+        }
+    }
+
+    pub fn cache_reset(request_id: impl Into<String>, removed_count: usize) -> Self {
+        Self::CacheReset {
+            request_id: request_id.into(),
+            removed_count,
+        }
+    }
+
     pub fn completed_dimensions_for(&self, expected_request_id: &str) -> Option<(u32, u32)> {
         match self {
             Self::Completed {
@@ -59,6 +306,26 @@ impl ImagingResponse {
                 width_px,
                 height_px,
             } if request_id == expected_request_id => Some((*width_px, *height_px)),
+            _ => None,
+        }
+    }
+
+    pub fn cache_completed_for(&self, expected_request_id: &str) -> Option<&CacheCompletion> {
+        match self {
+            Self::CacheCompleted {
+                request_id,
+                completion,
+            } if request_id == expected_request_id => Some(completion),
+            _ => None,
+        }
+    }
+
+    pub fn cache_reset_for(&self, expected_request_id: &str) -> Option<usize> {
+        match self {
+            Self::CacheReset {
+                request_id,
+                removed_count,
+            } if request_id == expected_request_id => Some(*removed_count),
             _ => None,
         }
     }

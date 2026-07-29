@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
@@ -48,6 +48,10 @@ const pixiLifecycle = vi.hoisted(() => ({
   }>,
   resizeCallbacks: [] as ResizeObserverCallback[],
   resolveInitializations: [] as Array<() => void>,
+  assetLoads: [] as string[],
+  assetUnloads: [] as string[],
+  resolveAssetLoads: [] as Array<(texture: object) => void>,
+  spriteTextures: [] as unknown[],
 }));
 
 vi.mock("pixi.js", () => {
@@ -185,6 +189,26 @@ vi.mock("pixi.js", () => {
 
   class Text extends DisplayObject {}
 
+  class Sprite extends DisplayObject {
+    height = 0;
+    width = 0;
+    texture: unknown;
+
+    constructor(options: {
+      texture?: unknown;
+      width?: number;
+      height?: number;
+    } = {}) {
+      super();
+      this.texture = options.texture;
+      this.width = options.width ?? 0;
+      this.height = options.height ?? 0;
+      if (this.texture !== undefined) {
+        pixiLifecycle.spriteTextures.push(this.texture);
+      }
+    }
+  }
+
   class Application {
     canvas = document.createElement("canvas");
     destroyCount = 0;
@@ -228,11 +252,24 @@ vi.mock("pixi.js", () => {
 
   return {
     Application,
+    Assets: {
+      load: vi.fn(
+        (url: string) =>
+          new Promise<object>((resolve) => {
+            pixiLifecycle.assetLoads.push(url);
+            pixiLifecycle.resolveAssetLoads.push(resolve);
+          }),
+      ),
+      unload: vi.fn(async (url: string) => {
+        pixiLifecycle.assetUnloads.push(url);
+      }),
+    },
     Container,
     FederatedPointerEvent: class {},
     FederatedWheelEvent: class {},
     Graphics,
     Rectangle: class {},
+    Sprite,
     Text,
   };
 });
@@ -390,6 +427,7 @@ const rotatedInteractiveComposition: CompositionPlan = {
 function renderCanvas({
   projectId = "project-spike-001",
   compositionPlan = composition,
+  mediaPreviewUrls,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
   onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
@@ -403,6 +441,7 @@ function renderCanvas({
 }: {
   projectId?: string;
   compositionPlan?: CompositionPlan;
+  mediaPreviewUrls?: Readonly<Record<string, string>>;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -418,6 +457,7 @@ function renderCanvas({
     <AlbumCanvas
       projectId={projectId}
       composition={compositionPlan}
+      mediaPreviewUrls={mediaPreviewUrls}
       continuousCanvasLayout={createContinuousCanvasLayout(
         compositionPlan.sheets,
       )}
@@ -489,6 +529,10 @@ beforeEach(() => {
   pixiLifecycle.instances.length = 0;
   pixiLifecycle.resizeCallbacks.length = 0;
   pixiLifecycle.resolveInitializations.length = 0;
+  pixiLifecycle.assetLoads.length = 0;
+  pixiLifecycle.assetUnloads.length = 0;
+  pixiLifecycle.resolveAssetLoads.length = 0;
+  pixiLifecycle.spriteTextures.length = 0;
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -657,6 +701,31 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
   expect(pixiLifecycle.instances[0].stage.children[0]).toBe(world);
   expect(world.children[0]).toBe(sheet);
   expect(pixiLifecycle.displays).toHaveLength(displayCount);
+});
+
+test("materializes a reduced Cache preview as the Canvas texture", async () => {
+  const texture = { label: "cache-preview" };
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    mediaPreviewUrls: {
+      "media-001": "asset://localhost/cache/media-001.jpg",
+    },
+  });
+  await finishPixiInitialization();
+
+  expect(pixiLifecycle.assetLoads).toEqual([
+    "asset://localhost/cache/media-001.jpg",
+  ]);
+  expect(pixiLifecycle.spriteTextures).toEqual([]);
+
+  await act(async () => {
+    pixiLifecycle.resolveAssetLoads[0]?.(texture);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await waitFor(() => {
+    expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
+  });
 });
 
 test("reconciles only the composed sheet that changed", async () => {

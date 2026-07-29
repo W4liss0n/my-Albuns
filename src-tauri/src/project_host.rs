@@ -4,18 +4,29 @@ use std::{
 };
 
 use myalbuns_core::{EditorProjection, ProjectIntent, ProjectSession, RenderSnapshot};
+use myalbuns_imaging_protocol::{CacheMediaSource, CacheRequest};
+use myalbuns_paths::CachePathPlan;
 
 pub(crate) struct ProjectHost {
     sessions: HashMap<String, Mutex<ProjectSession>>,
+    media_sources: HashMap<String, Vec<CacheMediaSource>>,
 }
 
 impl ProjectHost {
-    pub(crate) fn new(sessions: impl IntoIterator<Item = (&'static str, ProjectSession)>) -> Self {
+    pub(crate) fn new(
+        projects: impl IntoIterator<Item = (&'static str, ProjectSession, Vec<CacheMediaSource>)>,
+    ) -> Self {
+        let mut sessions = HashMap::new();
+        let mut media_sources = HashMap::new();
+        for (window_label, session, sources) in projects {
+            sessions.insert(window_label.into(), Mutex::new(session));
+            if !sources.is_empty() {
+                media_sources.insert(window_label.into(), sources);
+            }
+        }
         Self {
-            sessions: sessions
-                .into_iter()
-                .map(|(window_label, session)| (window_label.into(), Mutex::new(session)))
-                .collect(),
+            sessions,
+            media_sources,
         }
     }
 
@@ -50,6 +61,27 @@ impl ProjectHost {
         Ok(self.session(window_label)?.render_snapshot())
     }
 
+    pub(crate) fn cache_request(
+        &self,
+        window_label: &str,
+        request_id: String,
+        cache_paths: CachePathPlan,
+        max_edge_px: u32,
+    ) -> Result<Option<CacheRequest>, String> {
+        let Some(sources) = self.media_sources.get(window_label) else {
+            return Ok(None);
+        };
+        let project_id = self.session(window_label)?.state().project_id;
+        CacheRequest::new(
+            request_id,
+            project_id,
+            cache_paths,
+            sources.clone(),
+            max_edge_px,
+        )
+        .map(Some)
+    }
+
     fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
         let session = self.sessions.get(window_label).ok_or_else(|| {
             format!("Não existe uma Sessão do Projeto para a janela {window_label}.")
@@ -69,21 +101,24 @@ fn project(session: &ProjectSession) -> EditorProjection {
 
 #[cfg(test)]
 mod tests {
-    use myalbuns_core::{ProjectCore, ProjectIntent, SampleProject};
+    use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession};
 
     use super::ProjectHost;
+    use crate::sample_project::SampleProject;
+
+    fn sample_session(sample: SampleProject) -> ProjectSession {
+        let source = sample
+            .persisted_source(12)
+            .expect("the sample project serializes");
+        ProjectCore::open_editable_session(&source)
+            .expect("the sample project opens through ProjectCore")
+    }
 
     #[test]
     fn isolates_each_window_project_session() {
         let host = ProjectHost::new([
-            (
-                "project-a",
-                ProjectCore::open_sample_project(12, SampleProject::Horizon),
-            ),
-            (
-                "project-b",
-                ProjectCore::open_sample_project(12, SampleProject::Aurora),
-            ),
+            ("project-a", sample_session(SampleProject::Horizon), vec![]),
+            ("project-b", sample_session(SampleProject::Aurora), vec![]),
         ]);
 
         host.apply(

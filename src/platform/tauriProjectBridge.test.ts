@@ -23,6 +23,22 @@ test("maps the ProjectBridge interface to the desktop commands", async () => {
   await tauriProjectBridge.apply(intent);
   await tauriProjectBridge.undo();
   await tauriProjectBridge.redo();
+  vi.mocked(invoke).mockResolvedValueOnce({
+    previews: [
+      {
+        mediaId: "benchmark-a-001",
+        url: "http://asset.localhost/cache-preview",
+        widthPx: 1200,
+        heightPx: 800,
+      },
+    ],
+    generatedCount: 1,
+    reusedCount: 0,
+    sourceBytes: 24_000_000,
+    previewBytes: 240_000,
+    elapsedMs: 1200,
+  });
+  const previews = await tauriProjectBridge.prepareMediaPreviews();
   await tauriProjectBridge.exportPreview();
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
@@ -33,5 +49,7 @@ test("maps the ProjectBridge interface to the desktop commands", async () => {
   });
   expect(invoke).toHaveBeenNthCalledWith(3, "undo_project");
   expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
-  expect(invoke).toHaveBeenNthCalledWith(5, "export_spike");
+  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews");
+  expect(invoke).toHaveBeenNthCalledWith(6, "export_spike");
+  expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
 });

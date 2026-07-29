@@ -1,10 +1,19 @@
+param(
+    [ValidateSet('debug', 'release')]
+    [string] $Profile = 'debug'
+)
+
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
 
 Push-Location $script:WorkspaceRoot
 try {
-    & $script:CargoExecutable build -p myalbuns-imaging
+    $buildArguments = @('build', '-p', 'myalbuns-imaging')
+    if ($Profile -eq 'release') {
+        $buildArguments += '--release'
+    }
+    & $script:CargoExecutable @buildArguments
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
@@ -18,7 +27,11 @@ try {
     else {
         [System.IO.Path]::GetFullPath((Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR))
     }
-    $source = (Resolve-Path (Join-Path $targetDirectory 'debug\myalbuns-imaging.exe')).Path
+    $source = (
+        Resolve-Path (
+            Join-Path $targetDirectory "$Profile\myalbuns-imaging.exe"
+        )
+    ).Path
     $binaryDirectory = Join-Path $script:WorkspaceRoot 'src-tauri\binaries'
     $destination = Join-Path $binaryDirectory 'myalbuns-imaging-x86_64-pc-windows-msvc.exe'
 

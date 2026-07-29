@@ -1,9 +1,13 @@
-use crate::model::{
-    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, PhotoSnapshot, RectUm,
-    SHEET_HEIGHT_UM, SHEET_WIDTH_UM, SheetRole, SheetSnapshot,
+use myalbuns_core::{
+    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaTransform, PhotoSnapshot,
+    RectUm, SheetRole, SheetSnapshot,
 };
 
+const SHEET_WIDTH_UM: i64 = 600_000;
+const SHEET_HEIGHT_UM: i64 = 300_000;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[allow(dead_code)]
 pub enum SampleProject {
     Horizon,
     Aurora,
@@ -23,12 +27,24 @@ impl SampleProject {
             Self::Aurora => "Álbum Aurora",
         }
     }
+
+    /// Serializes the deterministic fixture used by the executable spike.
+    ///
+    /// Consumers still open it through `ProjectCore`, so fixtures cannot become
+    /// a second session-construction seam.
+    pub fn persisted_source(self, sheet_count: usize) -> Result<String, serde_json::Error> {
+        let state = sample_editor_state(sheet_count, self);
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schemaVersion": 1,
+            "projectId": state.project_id,
+            "projectName": state.project_name,
+            "revision": state.revision,
+            "album": state.album,
+        }))
+    }
 }
 
-pub(crate) fn sample_editor_state(
-    sheet_count: usize,
-    sample_project: SampleProject,
-) -> EditorState {
+fn sample_editor_state(sheet_count: usize, sample_project: SampleProject) -> EditorState {
     let sheet_count = sheet_count.max(2);
     let sheets = (1..=sheet_count)
         .map(|number| sample_sheet(number, sheet_count))
@@ -97,7 +113,14 @@ fn sample_sheet(number: usize, sheet_count: usize) -> SheetSnapshot {
 fn sample_photo(index: usize) -> PhotoSnapshot {
     let catalog = sample_media_catalog();
     let item = &catalog[index % catalog.len()];
-    PhotoSnapshot::from_catalog_item(item)
+    PhotoSnapshot {
+        media_id: item.id.clone(),
+        name: item.name.clone(),
+        source_width_px: 6_000,
+        source_height_px: 4_000,
+        palette: item.palette.clone(),
+        transform: MediaTransform::default(),
+    }
 }
 
 fn sample_media_catalog() -> Vec<MediaCatalogItem> {

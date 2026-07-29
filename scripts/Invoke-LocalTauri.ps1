@@ -10,7 +10,16 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
 
-& (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1')
+$sidecarProfile = if (
+    $Action -eq 'build' -and
+    $TauriArguments -notcontains '--debug'
+) {
+    'release'
+}
+else {
+    'debug'
+}
+& (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1') -Profile $sidecarProfile
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

@@ -2,6 +2,8 @@ param(
     [switch] $SkipBuild,
     [ValidateRange(10, 120)]
     [int] $WindowTimeoutSeconds = 45,
+    [ValidateRange(30, 1800)]
+    [int] $CacheTimeoutSeconds = 900,
     [string] $OutputPath
 )
 
@@ -10,8 +12,10 @@ $ErrorActionPreference = 'Stop'
 Initialize-MyAlbunsToolchain
 
 $targetDirectory = Join-Path $script:WorkspaceRoot '.scratch\topology-spike-target'
-$executablePath = Join-Path $targetDirectory 'debug\myalbuns-desktop.exe'
-$executableRelativePath = '.scratch/topology-spike-target/debug/myalbuns-desktop.exe'
+$executablePath = Join-Path $targetDirectory 'release\myalbuns-desktop.exe'
+$imagingExecutablePath = Join-Path $targetDirectory 'release\myalbuns-imaging.exe'
+$executableRelativePath = '.scratch/topology-spike-target/release/myalbuns-desktop.exe'
+$imagingExecutableRelativePath = '.scratch/topology-spike-target/release/myalbuns-imaging.exe'
 $buildManifestPath = Join-Path $targetDirectory 'topology-build-manifest.json'
 $buildInputPathspecs = @(
     'Cargo.toml',
@@ -32,10 +36,13 @@ $buildInputPathspecs = @(
 )
 $topologyEnvironment = 'MYALBUNS_TOPOLOGY_SPIKE'
 $projectSlotEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT'
+$corpusManifestEnvironment = 'MYALBUNS_TOPOLOGY_CORPUS_MANIFEST'
+$corpusManifestPath = Join-Path $script:WorkspaceRoot '.scratch\topology-corpus\manifest.json'
+$desktopLogDirectory = Join-Path $env:LOCALAPPDATA 'MyAlbuns2\Logs'
 $startedProcessIds = [System.Collections.Generic.List[int]]::new()
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $script:WorkspaceRoot 'docs\research\artifacts\0001-topology-spike-baseline.json'
+    $OutputPath = Join-Path $script:WorkspaceRoot 'docs\research\artifacts\0002-topology-real-images.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
@@ -46,19 +53,20 @@ $reportText = @'
 {
   "notMeasured": [
     "lat\u00eancia de Pan/Zoom",
-    "vaz\u00e3o do Cache",
     "dura\u00e7\u00e3o da Exporta\u00e7\u00e3o",
     "recupera\u00e7\u00e3o persistida",
     "complexidade operacional da IPC"
   ],
-  "notes": [
-    "Baseline preliminar do esqueleto de topologia; isto n\u00e3o encerra o spike.",
-    "A mem\u00f3ria inclui o host e todos os processos descendentes observados.",
+    "notes": [
+      "Carga preliminar com dois \u00c1lbuns reais; isto n\u00e3o encerra o spike.",
+      "O Cache foi reconstru\u00eddo a frio com uma representa\u00e7\u00e3o JPEG de at\u00e9 1600 px por Foto.",
+      "Cada uso valida o SHA-256 da Foto antes de gerar ou reutilizar a representa\u00e7\u00e3o; o corpus completo foi recalculado depois das duas alternativas.",
+      "A mem\u00f3ria inclui o host e todos os processos descendentes observados.",
     "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo.",
     "Os hosts independentes s\u00e3o iniciados em sequ\u00eancia depois que uma tentativa simult\u00e2nea deixou intermitentemente um host sem Janela vis\u00edvel."
   ],
   "summary": {
-    "title": "Baseline preliminar das topologias",
+    "title": "Carga real preliminar das topologias",
     "collected": "Coletado em UTC",
     "raw": "JSON bruto",
     "measure": "Medida",
@@ -73,6 +81,20 @@ $reportText = @'
     "firstHost": "Primeiro host de A identificado",
     "twoWindows": "Duas Janelas identificadas",
     "afterCrash": "Janelas depois da queda for\u00e7ada",
+    "cacheReadyTime": "Duas Janelas com Cache pronto",
+    "cacheWallTime": "Dura\u00e7\u00e3o de parede do Cache frio",
+    "cachePhotos": "Fotos processadas pelo Cache",
+    "cacheThroughput": "Vaz\u00e3o agregada dos originais",
+    "cacheSize": "Representa\u00e7\u00f5es reduzidas",
+    "corpus": "Corpus real",
+    "corpusAlbums": "\u00c1lbuns",
+    "corpusPhotos": "Fotos JPEG",
+    "corpusSourceVolume": "Volume dos originais",
+    "corpusDigest": "Digest do corpus",
+    "corpusIntegrity": "Integridade antes/depois",
+    "corpusIntegrityValue": "confirmada por SHA-256",
+    "previewPolicy": "Pol\u00edtica da representa\u00e7\u00e3o",
+    "previewPolicyValue": "uma pr\u00e9via JPEG por Foto, com aresta m\u00e1xima de {0} px",
     "notApplicable": "n\u00e3o se aplica",
     "otherPreserved": "outra Janela preservada",
     "build": "Build medida",
@@ -83,7 +105,8 @@ $reportText = @'
     "buildInputsDirty": "Entradas da build tinham mudan\u00e7as",
     "buildInputCount": "Arquivos de entrada",
     "buildInputDigest": "Digest das entradas",
-    "executableHash": "Hash do execut\u00e1vel",
+    "executableHash": "Hash do host",
+    "imagingExecutableHash": "Hash do Processador de Imagens",
     "checkoutMatches": "Checkout atual corresponde ao manifesto",
     "yes": "sim",
     "no": "n\u00e3o",
@@ -178,6 +201,37 @@ function Set-ProcessEnvironmentValue {
     )
 }
 
+function Reset-TopologyCache {
+    if (-not (Test-Path -LiteralPath $imagingExecutablePath -PathType Leaf)) {
+        throw "Imaging processor not found at $imagingExecutablePath."
+    }
+    $requestId = "topology-cache-reset-$([DateTime]::UtcNow.Ticks)"
+    $command = [ordered]@{
+        kind = 'resetCache'
+        request = [ordered]@{
+            protocolVersion = 1
+            requestId = $requestId
+            projectIds = @('project-spike-001', 'project-spike-002')
+        }
+    }
+    $responseText = (
+        $command |
+            ConvertTo-Json -Depth 4 -Compress |
+            & $imagingExecutablePath
+    )
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The native imaging processor could not reset the topology Cache.'
+    }
+    $response = $responseText | ConvertFrom-Json
+    if (
+        $response.kind -ne 'cacheReset' -or
+        $response.requestId -ne $requestId -or
+        $response.removedCount -notin @(0, 1, 2)
+    ) {
+        throw 'The native imaging processor returned an invalid Cache reset response.'
+    }
+}
+
 function Get-BuildInputState {
     $relativeFiles = @(
         & git `
@@ -245,6 +299,9 @@ function New-TopologyBuildManifest {
     if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
         throw "Topology spike executable not found at $executablePath."
     }
+    if (-not (Test-Path -LiteralPath $imagingExecutablePath -PathType Leaf)) {
+        throw "Imaging processor not found at $imagingExecutablePath."
+    }
 
     $inputState = Get-BuildInputState
     $workingTreeStatus = @(& git -C $script:WorkspaceRoot status --short)
@@ -263,7 +320,11 @@ function New-TopologyBuildManifest {
         executableSha256 = (
             Get-FileHash -LiteralPath $executablePath -Algorithm SHA256
         ).Hash.ToLowerInvariant()
-        profile = 'debug'
+        imagingExecutable = $imagingExecutableRelativePath
+        imagingExecutableSha256 = (
+            Get-FileHash -LiteralPath $imagingExecutablePath -Algorithm SHA256
+        ).Hash.ToLowerInvariant()
+        profile = 'release'
     }
     $manifestJson = $manifest | ConvertTo-Json -Depth 4
     [System.IO.File]::WriteAllText(
@@ -284,6 +345,9 @@ function Read-TopologyBuildManifest {
     if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
         throw "Topology spike executable not found at $executablePath."
     }
+    if (-not (Test-Path -LiteralPath $imagingExecutablePath -PathType Leaf)) {
+        throw "Imaging processor not found at $imagingExecutablePath."
+    }
 
     $manifest = Get-Content `
         -LiteralPath $buildManifestPath `
@@ -296,6 +360,15 @@ function Read-TopologyBuildManifest {
     if ($executableHash -ne $manifest.executableSha256) {
         throw (
             'Topology executable does not match its build manifest. ' +
+            'Run without -SkipBuild.'
+        )
+    }
+    $imagingExecutableHash = (
+        Get-FileHash -LiteralPath $imagingExecutablePath -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($imagingExecutableHash -ne $manifest.imagingExecutableSha256) {
+        throw (
+            'Imaging processor does not match its build manifest. ' +
             'Run without -SkipBuild.'
         )
     }
@@ -319,8 +392,15 @@ function Start-TopologyProcess {
         $projectSlotEnvironment,
         [System.EnvironmentVariableTarget]::Process
     )
+    $previousCorpusManifest = [System.Environment]::GetEnvironmentVariable(
+        $corpusManifestEnvironment,
+        [System.EnvironmentVariableTarget]::Process
+    )
     try {
         Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $Topology
+        Set-ProcessEnvironmentValue `
+            -Name $corpusManifestEnvironment `
+            -Value $corpusManifestPath
         if ([string]::IsNullOrWhiteSpace($ProjectSlot)) {
             Set-ProcessEnvironmentValue -Name $projectSlotEnvironment -Value $null
         }
@@ -340,6 +420,9 @@ function Start-TopologyProcess {
         Set-ProcessEnvironmentValue `
             -Name $projectSlotEnvironment `
             -Value $previousProjectSlot
+        Set-ProcessEnvironmentValue `
+            -Name $corpusManifestEnvironment `
+            -Value $previousCorpusManifest
     }
 }
 
@@ -419,6 +502,203 @@ function Wait-ForTopologyWindows {
         "Expected $ExpectedCount visible topology windows with marker " +
         "'$ExpectedTitleMarker' within $WindowTimeoutSeconds seconds. " +
         "Observed: $($observedWindows -join '; ')"
+    )
+}
+
+function Get-DesktopLogEventsSince {
+    param([Parameter(Mandatory = $true)][DateTimeOffset] $Since)
+
+    if (-not (Test-Path -LiteralPath $desktopLogDirectory -PathType Container)) {
+        return @()
+    }
+    $events = [System.Collections.Generic.List[object]]::new()
+    foreach ($logFile in Get-ChildItem `
+        -LiteralPath $desktopLogDirectory `
+        -File `
+        -Filter 'myalbuns-desktop.*.jsonl') {
+        $stream = $null
+        $reader = $null
+        try {
+            $stream = [System.IO.File]::Open(
+                $logFile.FullName,
+                [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read,
+                [System.IO.FileShare]::ReadWrite
+            )
+            $reader = [System.IO.StreamReader]::new(
+                $stream,
+                [System.Text.Encoding]::UTF8
+            )
+            while (-not $reader.EndOfStream) {
+                $line = $reader.ReadLine()
+                if ([string]::IsNullOrWhiteSpace($line)) {
+                    continue
+                }
+                try {
+                    $event = $line | ConvertFrom-Json
+                    if (
+                        $null -ne $event.timestamp -and
+                        [DateTimeOffset]::Parse($event.timestamp) -ge $Since
+                    ) {
+                        $events.Add($event)
+                    }
+                }
+                catch {
+                    # A writer may still be completing the last JSONL record.
+                }
+            }
+        }
+        finally {
+            if ($null -ne $reader) {
+                $reader.Dispose()
+            }
+            elseif ($null -ne $stream) {
+                $stream.Dispose()
+            }
+        }
+    }
+    return @($events)
+}
+
+function Wait-ForMediaCache {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int[]] $RootProcessIds,
+        [Parameter(Mandatory = $true)]
+        [int] $ExpectedProjectCount,
+        [Parameter(Mandatory = $true)]
+        [DateTimeOffset] $StartedAt,
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Stopwatch] $TopologyStopwatch
+    )
+
+    $operationPrefixes = @(
+        $RootProcessIds | ForEach-Object { "cache-$($_)-" }
+    )
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds($CacheTimeoutSeconds)
+    while ([DateTimeOffset]::UtcNow -lt $deadline) {
+        foreach ($processId in $RootProcessIds) {
+            if ($null -eq (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+                throw "Topology host $processId exited before its media Cache was ready."
+            }
+        }
+        $cacheEvents = @(Get-DesktopLogEventsSince -Since $StartedAt)
+        $failedEvents = @(
+            $cacheEvents |
+                Where-Object {
+                    $candidate = $_
+                    $candidate.event -eq 'media_cache_failed' -and
+                    $null -ne $candidate.operation_id -and
+                    @(
+                        $operationPrefixes |
+                            Where-Object {
+                                $prefix = $_
+                                $eventOperation = [string]$candidate.operation_id
+                                $eventOperation.StartsWith($prefix)
+                            }
+                    ).Count -gt 0
+                }
+        )
+        if ($failedEvents.Count -gt 0) {
+            $failure = $failedEvents |
+                Sort-Object timestamp |
+                Select-Object -First 1
+            throw (
+                "Media Cache failed for project $($failure.project_id) " +
+                "at stage $($failure.stage)."
+            )
+        }
+        $completionEvents = @(
+            $cacheEvents |
+                Where-Object {
+                    $candidate = $_
+                    $candidate.event -eq 'media_cache_completed' -and
+                    $null -ne $candidate.operation_id -and
+                    @(
+                        $operationPrefixes |
+                            Where-Object {
+                                $prefix = $_
+                                $eventOperation = [string]$candidate.operation_id
+                                $eventOperation.StartsWith($prefix)
+                            }
+                    ).Count -gt 0
+                }
+        )
+        $projectEvents = @(
+            $completionEvents |
+                Group-Object project_id |
+                ForEach-Object {
+                    $_.Group |
+                        Sort-Object timestamp |
+                        Select-Object -First 1
+                }
+        )
+        if ($projectEvents.Count -eq $ExpectedProjectCount) {
+            $completedTimes = @(
+                $projectEvents |
+                    ForEach-Object { [DateTimeOffset]::Parse($_.timestamp) }
+            )
+            $startedTimes = @(
+                $projectEvents |
+                    ForEach-Object {
+                        ([DateTimeOffset]::Parse($_.timestamp)).AddMilliseconds(
+                            -[double]$_.elapsed_ms
+                        )
+                    }
+            )
+            $cacheWallTimeMs = [long](
+                (($completedTimes | Sort-Object | Select-Object -Last 1) -
+                    ($startedTimes | Sort-Object | Select-Object -First 1)
+                ).TotalMilliseconds
+            )
+            $totalSourceBytes = [long](
+                ($projectEvents | Measure-Object source_bytes -Sum).Sum
+            )
+            return [ordered]@{
+                readyElapsedMs = $TopologyStopwatch.ElapsedMilliseconds
+                cacheWallTimeMs = $cacheWallTimeMs
+                projectCount = $projectEvents.Count
+                photoCount = [long](
+                    ($projectEvents | Measure-Object generated_count -Sum).Sum +
+                    ($projectEvents | Measure-Object reused_count -Sum).Sum
+                )
+                generatedCount = [long](
+                    ($projectEvents | Measure-Object generated_count -Sum).Sum
+                )
+                reusedCount = [long](
+                    ($projectEvents | Measure-Object reused_count -Sum).Sum
+                )
+                sourceBytes = $totalSourceBytes
+                previewBytes = [long](
+                    ($projectEvents | Measure-Object preview_bytes -Sum).Sum
+                )
+                sourceBytesPerSecond = if ($cacheWallTimeMs -gt 0) {
+                    [long]($totalSourceBytes / ($cacheWallTimeMs / 1000.0))
+                }
+                else {
+                    $null
+                }
+                projects = @(
+                    $projectEvents |
+                        Sort-Object project_id |
+                        ForEach-Object {
+                            [ordered]@{
+                                projectId = $_.project_id
+                                generatedCount = [long]$_.generated_count
+                                reusedCount = [long]$_.reused_count
+                                sourceBytes = [long]$_.source_bytes
+                                previewBytes = [long]$_.preview_bytes
+                                elapsedMs = [long]$_.elapsed_ms
+                            }
+                        }
+                )
+            }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw (
+        "Expected Cache completion for $ExpectedProjectCount projects within " +
+        "$CacheTimeoutSeconds seconds."
     )
 }
 
@@ -591,7 +871,7 @@ function Write-TopologyMarkdownSummary {
         "# $($summary.title)"
         ''
         "$($summary.collected): ``$($Report.collectedAtUtc)``."
-        "[$($summary.raw)](0001-topology-spike-baseline.json)."
+        "[$($summary.raw)]($([System.IO.Path]::GetFileName($OutputPath)))."
         ''
         "| $($summary.measure) | $($summary.independent) | $($summary.multiwindow) |"
         '|---|---:|---:|'
@@ -603,7 +883,21 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.gpuMemory) | $(Format-Mebibytes $independent.processes.gpuMemory.sharedBytes) MiB | $(Format-Mebibytes $multiwindow.processes.gpuMemory.sharedBytes) MiB |"
         "| $($summary.firstHost) | $($independent.ready.firstHostElapsedMs) ms | $($summary.notApplicable) |"
         "| $($summary.twoWindows) | $($independent.ready.elapsedMs) ms | $($multiwindow.ready.elapsedMs) ms |"
+        "| $($summary.cacheReadyTime) | $($independent.cache.readyElapsedMs) ms | $($multiwindow.cache.readyElapsedMs) ms |"
+        "| $($summary.cacheWallTime) | $($independent.cache.cacheWallTimeMs) ms | $($multiwindow.cache.cacheWallTimeMs) ms |"
+        "| $($summary.cachePhotos) | $($independent.cache.photoCount) | $($multiwindow.cache.photoCount) |"
+        "| $($summary.cacheThroughput) | $(Format-Mebibytes $independent.cache.sourceBytesPerSecond) MiB/s | $(Format-Mebibytes $multiwindow.cache.sourceBytesPerSecond) MiB/s |"
+        "| $($summary.cacheSize) | $(Format-Mebibytes $independent.cache.previewBytes) MiB | $(Format-Mebibytes $multiwindow.cache.previewBytes) MiB |"
         "| $($summary.afterCrash) | $independentAfterCrash | $multiwindowAfterCrash |"
+        ''
+        "## $($summary.corpus)"
+        ''
+        "- $($summary.corpusAlbums): $($Report.corpus.albumCount)"
+        "- $($summary.corpusPhotos): $($Report.corpus.photoCount)"
+        "- $($summary.corpusSourceVolume): $(Format-Mebibytes $Report.corpus.sourceBytes) MiB"
+        "- $($summary.corpusDigest): ``$($Report.corpus.corpusSha256)``"
+        "- $($summary.corpusIntegrity): $($summary.corpusIntegrityValue)"
+        "- $($summary.previewPolicy): $($summary.previewPolicyValue -f $Report.corpus.previewPolicy.maximumEdgePx)"
         ''
         "## $($summary.build)"
         ''
@@ -615,6 +909,7 @@ function Write-TopologyMarkdownSummary {
         "- $($summary.buildInputCount): $($Report.build.buildInputFileCount)"
         "- $($summary.buildInputDigest): ``$($Report.build.buildInputDigestSha256)``"
         "- $($summary.executableHash): ``$($Report.build.executableSha256)``"
+        "- $($summary.imagingExecutableHash): ``$($Report.build.imagingExecutableSha256)``"
         "- $($summary.checkoutMatches): $checkoutMatches"
         ''
         "## $($summary.environment)"
@@ -648,9 +943,19 @@ $previousCargoTarget = [System.Environment]::GetEnvironmentVariable(
 )
 
 try {
+    & (Join-Path $PSScriptRoot 'Prepare-TopologyCorpus.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+    $corpusManifest = Get-Content `
+        -LiteralPath $corpusManifestPath `
+        -Raw `
+        -Encoding utf8 |
+            ConvertFrom-Json
+
     if (-not $SkipBuild) {
         Set-ProcessEnvironmentValue -Name 'CARGO_TARGET_DIR' -Value $targetDirectory
-        & (Join-Path $PSScriptRoot 'Invoke-LocalTauri.ps1') build --debug --no-bundle
+        & (Join-Path $PSScriptRoot 'Invoke-LocalTauri.ps1') build --no-bundle
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
         }
@@ -660,6 +965,8 @@ try {
         $buildManifest = Read-TopologyBuildManifest
     }
 
+    Reset-TopologyCache
+    $independentStartedAt = [DateTimeOffset]::UtcNow
     $independentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $independentA = Start-TopologyProcess -Topology independent -ProjectSlot a
     $independentFirstReady = Wait-ForTopologyWindows `
@@ -674,6 +981,11 @@ try {
         -ExpectedTitleMarker '[Topologia A]' `
         -Stopwatch $independentStopwatch
     $independentReady['firstHostElapsedMs'] = $independentFirstReady.elapsedMs
+    $independentCache = Wait-ForMediaCache `
+        -RootProcessIds @($independentA.Id, $independentB.Id) `
+        -ExpectedProjectCount 2 `
+        -StartedAt $independentStartedAt `
+        -TopologyStopwatch $independentStopwatch
     Start-Sleep -Milliseconds 750
     $independentMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($independentA.Id, $independentB.Id)
@@ -692,6 +1004,8 @@ try {
     Stop-OwnedTopologyProcess -ProcessId $independentB.Id
 
     Start-Sleep -Milliseconds 750
+    Reset-TopologyCache
+    $multiwindowStartedAt = [DateTimeOffset]::UtcNow
     $multiwindowStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $multiwindow = Start-TopologyProcess -Topology multiwindow
     $multiwindowReady = Wait-ForTopologyWindows `
@@ -699,6 +1013,11 @@ try {
         -ExpectedCount 2 `
         -ExpectedTitleMarker '[Topologia B]' `
         -Stopwatch $multiwindowStopwatch
+    $multiwindowCache = Wait-ForMediaCache `
+        -RootProcessIds @($multiwindow.Id) `
+        -ExpectedProjectCount 2 `
+        -StartedAt $multiwindowStartedAt `
+        -TopologyStopwatch $multiwindowStopwatch
     Start-Sleep -Milliseconds 750
     $multiwindowMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($multiwindow.Id)
@@ -715,11 +1034,45 @@ try {
         ).Count
     }
 
+    & (Join-Path $PSScriptRoot 'Prepare-TopologyCorpus.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+    $corpusManifestAfterRuns = Get-Content `
+        -LiteralPath $corpusManifestPath `
+        -Raw `
+        -Encoding utf8 |
+            ConvertFrom-Json
+    if (
+        $corpusManifestAfterRuns.corpusSha256 -ne $corpusManifest.corpusSha256 -or
+        $corpusManifestAfterRuns.totalFiles -ne $corpusManifest.totalFiles -or
+        $corpusManifestAfterRuns.totalBytes -ne $corpusManifest.totalBytes
+    ) {
+        throw 'The real-image corpus changed while the topology spike was running.'
+    }
+
     $currentInputState = Get-BuildInputState
     $report = [ordered]@{
-        schemaVersion = 3
+        schemaVersion = 5
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
+        corpus = [ordered]@{
+            schemaVersion = $corpusManifest.schemaVersion
+            albumCount = $corpusManifest.albums.Count
+            photoCount = $corpusManifest.totalFiles
+            sourceBytes = $corpusManifest.totalBytes
+            corpusSha256 = $corpusManifest.corpusSha256
+            integrity = [ordered]@{
+                verified = $true
+                beforeSha256 = $corpusManifest.corpusSha256
+                afterSha256 = $corpusManifestAfterRuns.corpusSha256
+            }
+            previewPolicy = [ordered]@{
+                representationsPerPhoto = 1
+                format = 'jpeg'
+                maximumEdgePx = 1600
+            }
+        }
         build = [ordered]@{
             manifestVersion = $buildManifest.manifestVersion
             builtAtUtc = $buildManifest.builtAtUtc
@@ -730,6 +1083,8 @@ try {
             buildInputDigestSha256 = $buildManifest.buildInputDigestSha256
             executable = $buildManifest.executable
             executableSha256 = $buildManifest.executableSha256
+            imagingExecutable = $buildManifest.imagingExecutable
+            imagingExecutableSha256 = $buildManifest.imagingExecutableSha256
             profile = $buildManifest.profile
             currentBuildInputsMatchManifest = (
                 $currentInputState.digestSha256 -eq
@@ -739,11 +1094,13 @@ try {
         alternatives = [ordered]@{
             independentHosts = [ordered]@{
                 ready = $independentReady
+                cache = $independentCache
                 processes = $independentMetrics
                 forcedFailure = $independentFailureIsolation
             }
             multiwindowHost = [ordered]@{
                 ready = $multiwindowReady
+                cache = $multiwindowCache
                 processes = $multiwindowMetrics
                 forcedFailure = $multiwindowFailureIsolation
             }

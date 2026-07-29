@@ -90,7 +90,16 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
-        ownedScene = new AlbumCanvasScene(app);
+        ownedScene = new AlbumCanvasScene(app, () => {
+          logger.write({
+            level: "warn",
+            component: "canvas",
+            event: "canvas_texture_load_failed",
+            projectId: props.projectId,
+            instanceId,
+            reason: "asset_load_failed",
+          });
+        });
         sceneRef.current = ownedScene;
         sceneInstanceIdRef.current = instanceId;
         logger.write({

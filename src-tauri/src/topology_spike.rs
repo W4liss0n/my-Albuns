@@ -1,12 +1,18 @@
-use myalbuns_core::{ProjectCore, SampleProject};
+use std::path::Path;
 
-use crate::project_host::ProjectHost;
+use myalbuns_core::ProjectCore;
+
+use crate::{
+    benchmark_corpus::BenchmarkCorpus, project_host::ProjectHost, sample_project::SampleProject,
+};
 
 pub(crate) const TOPOLOGY_ENV: &str = "MYALBUNS_TOPOLOGY_SPIKE";
 pub(crate) const PROJECT_SLOT_ENV: &str = "MYALBUNS_TOPOLOGY_PROJECT";
+pub(crate) const CORPUS_MANIFEST_ENV: &str = "MYALBUNS_TOPOLOGY_CORPUS_MANIFEST";
 
 pub(crate) struct TopologySpike {
     definition: TopologyDefinition,
+    corpus: Option<BenchmarkCorpus>,
 }
 
 struct TopologyDefinition {
@@ -25,10 +31,24 @@ impl TopologySpike {
     pub(crate) fn from_environment() -> Result<Self, String> {
         let mode = std::env::var(TOPOLOGY_ENV).ok();
         let project_slot = std::env::var(PROJECT_SLOT_ENV).ok();
-        Self::from_values(mode.as_deref(), project_slot.as_deref())
+        let corpus_manifest = std::env::var(CORPUS_MANIFEST_ENV).ok();
+        Self::from_values_with_corpus(
+            mode.as_deref(),
+            project_slot.as_deref(),
+            corpus_manifest.as_deref().map(Path::new),
+        )
     }
 
+    #[cfg(test)]
     fn from_values(mode: Option<&str>, project_slot: Option<&str>) -> Result<Self, String> {
+        Self::from_values_with_corpus(mode, project_slot, None)
+    }
+
+    fn from_values_with_corpus(
+        mode: Option<&str>,
+        project_slot: Option<&str>,
+        corpus_manifest: Option<&Path>,
+    ) -> Result<Self, String> {
         let definition = match (mode, project_slot) {
             (None, None) => TopologyDefinition::standard(),
             (None, Some(_)) => {
@@ -52,16 +72,38 @@ impl TopologySpike {
             }
         };
 
-        Ok(Self { definition })
+        if corpus_manifest.is_some() && mode.is_none() {
+            return Err(format!(
+                "{CORPUS_MANIFEST_ENV} só pode ser usado durante o spike de topologia."
+            ));
+        }
+        let corpus = corpus_manifest.map(BenchmarkCorpus::load).transpose()?;
+        Ok(Self { definition, corpus })
     }
 
-    pub(crate) fn project_host(&self) -> ProjectHost {
-        ProjectHost::new(self.definition.windows().map(|window| {
-            (
-                window.label,
-                ProjectCore::open_sample_project(12, window.sample),
-            )
-        }))
+    pub(crate) fn project_host(&self) -> Result<ProjectHost, String> {
+        self.definition
+            .windows()
+            .map(|window| {
+                if let Some(corpus) = &self.corpus {
+                    let album = corpus.album_for(window.sample);
+                    Ok((
+                        window.label,
+                        album.open_session(window.sample, 12)?,
+                        album.cache_sources(),
+                    ))
+                } else {
+                    let source = window
+                        .sample
+                        .persisted_source(12)
+                        .map_err(|error| error.to_string())?;
+                    let session = ProjectCore::open_editable_session(&source)
+                        .map_err(|error| error.to_string())?;
+                    Ok((window.label, session, vec![]))
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()
+            .map(ProjectHost::new)
     }
 
     pub(crate) fn primary_title(&self) -> &str {
@@ -155,6 +197,7 @@ mod tests {
         assert_eq!(
             independent_b
                 .project_host()
+                .expect("the independent host is built")
                 .projection("main")
                 .expect("the independent host owns its main session")
                 .state
@@ -164,6 +207,7 @@ mod tests {
         assert_eq!(
             multiwindow
                 .project_host()
+                .expect("the multiwindow host is built")
                 .projection("main")
                 .expect("the multiwindow host owns project A")
                 .state
@@ -173,6 +217,7 @@ mod tests {
         assert_eq!(
             multiwindow
                 .project_host()
+                .expect("the multiwindow host is built")
                 .projection("project-b")
                 .expect("the multiwindow host owns project B")
                 .state

@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::composition::build_render_snapshot;
 use crate::model::{AlbumSnapshot, CoreError, EditorState, PROJECT_SCHEMA_VERSION, RenderSnapshot};
-use crate::sample_project::{SampleProject, sample_editor_state};
 use crate::session::ProjectSession;
 use crate::validation::validate_album;
 
@@ -30,28 +29,39 @@ pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String
 pub struct ProjectCore;
 
 impl ProjectCore {
-    pub fn open_sample_project(
-        sheet_count: usize,
-        sample_project: SampleProject,
-    ) -> ProjectSession {
-        ProjectSession::from_state(sample_editor_state(sheet_count, sample_project))
+    pub fn open_editable_session(source: &str) -> Result<ProjectSession, CoreError> {
+        let project = parse_persisted_project(source)?;
+        Ok(ProjectSession::from_state(EditorState {
+            project_id: project.project_id,
+            project_name: project.project_name,
+            album: project.album,
+            revision: project.revision,
+            saved_revision: project.revision,
+            dirty: false,
+            can_undo: false,
+            can_redo: false,
+        }))
     }
 
     pub fn load_persisted_revision(source: &str) -> Result<LoadedProjectRevision, CoreError> {
-        let project: PersistedProject = serde_json::from_str(source)
-            .map_err(|error| CoreError::InvalidProject(error.to_string()))?;
-        if project.schema_version != PROJECT_SCHEMA_VERSION {
-            return Err(CoreError::UnsupportedSchema(project.schema_version));
-        }
-        if project.project_id.trim().is_empty() {
-            return Err(CoreError::InvalidProject(
-                "a Identidade do Projeto está vazia".into(),
-            ));
-        }
-        validate_album(&project.album)?;
-
+        let project = parse_persisted_project(source)?;
         Ok(LoadedProjectRevision { project })
     }
+}
+
+fn parse_persisted_project(source: &str) -> Result<PersistedProject, CoreError> {
+    let project: PersistedProject = serde_json::from_str(source)
+        .map_err(|error| CoreError::InvalidProject(error.to_string()))?;
+    if project.schema_version != PROJECT_SCHEMA_VERSION {
+        return Err(CoreError::UnsupportedSchema(project.schema_version));
+    }
+    if project.project_id.trim().is_empty() {
+        return Err(CoreError::InvalidProject(
+            "a Identidade do Projeto está vazia".into(),
+        ));
+    }
+    validate_album(&project.album)?;
+    Ok(project)
 }
 
 pub struct LoadedProjectRevision {

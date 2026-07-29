@@ -13,12 +13,14 @@ import {
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   bridge: ProjectBridge;
+  mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
 }
 
 export function ProjectWorkspace({
   projection,
   bridge,
+  mediaPreviewUrls = {},
   onProjectionChange,
 }: ProjectWorkspaceProps) {
   const controller = useProjectEditorController({
@@ -98,7 +100,10 @@ export function ProjectWorkspace({
           className="canvas-section"
           aria-label="Área de composição"
         >
-          <AlbumCanvas {...controller.canvasProps} />
+          <AlbumCanvas
+            {...controller.canvasProps}
+            mediaPreviewUrls={mediaPreviewUrls}
+          />
         </section>
 
         <WorkspacePanelSplitter
@@ -246,7 +251,10 @@ export function ProjectWorkspace({
                             controller.navigateToSheet(sheet.sheetId)
                           }
                         >
-                          <SheetPreview sheet={sheet} />
+                          <SheetPreview
+                            sheet={sheet}
+                            mediaPreviewUrls={mediaPreviewUrls}
+                          />
                           <span>{String(sheet.number).padStart(2, "0")}</span>
                         </Button>
                       );
@@ -289,7 +297,16 @@ export function ProjectWorkspace({
                   style={{
                     background: `linear-gradient(135deg, ${media.palette[0]}, ${media.palette[1]} 56%, ${media.palette[2]})`,
                   }}
-                />
+                >
+                  {mediaPreviewUrls[media.id] && (
+                    <img
+                      alt=""
+                      draggable="false"
+                      loading="lazy"
+                      src={mediaPreviewUrls[media.id]}
+                    />
+                  )}
+                </span>
                 <span className="media-meta">
                   <strong>{media.name}</strong>
                   <small>{media.usageCount} usos</small>

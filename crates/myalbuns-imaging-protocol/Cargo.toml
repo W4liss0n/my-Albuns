@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 myalbuns-core = { path = "../myalbuns-core" }
+myalbuns-paths = { path = "../myalbuns-paths" }
 serde.workspace = true
 
 [dev-dependencies]

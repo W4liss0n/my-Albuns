@@ -1,10 +1,11 @@
 use serde::Deserialize;
 
 use crate::composition::CompositionCore;
+use crate::sample_project_fixture::SampleProject;
 use crate::{
     AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, PhotoPlacement,
     PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, ProjectSession, RectUm,
-    SampleProject, SheetRole, SheetSnapshot, VectorUm,
+    SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -23,7 +24,15 @@ struct PhotoPlacementCase {
 }
 
 fn horizon_project(sheet_count: usize) -> ProjectSession {
-    ProjectCore::open_sample_project(sheet_count, SampleProject::Horizon)
+    sample_project(SampleProject::Horizon, sheet_count)
+}
+
+fn sample_project(sample: SampleProject, sheet_count: usize) -> ProjectSession {
+    let source = sample
+        .persisted_source(sheet_count)
+        .expect("the sample project serializes");
+    ProjectCore::open_editable_session(&source)
+        .expect("the sample project opens through ProjectCore")
 }
 
 #[test]
@@ -34,9 +43,35 @@ fn opens_a_representative_long_album() {
 }
 
 #[test]
+fn opens_an_editable_session_through_the_project_core_seam() {
+    let mut fixture = horizon_project(12);
+    fixture
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: "frame-01-a".into(),
+            delta_pan_x: 0.25,
+            delta_pan_y: 0.0,
+            delta_zoom: 0.0,
+        })
+        .expect("the fixture can create a persisted revision");
+    let source = fixture
+        .persisted_revision()
+        .expect("the fixture revision serializes");
+
+    let session = ProjectCore::open_editable_session(&source).expect("the persisted project opens");
+    let state = session.state();
+
+    assert_eq!(state.album.sheets.len(), 12);
+    assert_eq!(state.revision, 1);
+    assert_eq!(state.saved_revision, 1);
+    assert!(!state.dirty);
+    assert!(!state.can_undo);
+    assert!(!state.can_redo);
+}
+
+#[test]
 fn keeps_distinct_sample_projects_isolated() {
-    let mut first = ProjectCore::open_sample_project(12, SampleProject::Horizon);
-    let second = ProjectCore::open_sample_project(12, SampleProject::Aurora);
+    let mut first = sample_project(SampleProject::Horizon, 12);
+    let second = sample_project(SampleProject::Aurora, 12);
 
     first
         .apply(ProjectIntent::TransformPhoto {

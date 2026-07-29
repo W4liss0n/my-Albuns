@@ -29,6 +29,7 @@ export interface CanvasMetrics {
 export interface AlbumCanvasProps {
   projectId: string;
   composition: CompositionPlan;
+  mediaPreviewUrls?: Readonly<Record<string, string>>;
   continuousCanvasLayout: ContinuousCanvasLayout;
   selectedFrameId: string | null;
   focusedSheetId: string | null;

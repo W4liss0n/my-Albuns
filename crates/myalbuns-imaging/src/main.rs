@@ -1,16 +1,25 @@
-use std::io::BufRead;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, BufWriter, Cursor, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use image::{ImageFormat, Rgba, RgbaImage};
+use image::{
+    DynamicImage, ImageDecoder, ImageFormat, ImageReader, Rgba, RgbaImage,
+    codecs::jpeg::JpegEncoder,
+};
 use myalbuns_core::{ComposedFrame, RenderSnapshot};
-use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
+use myalbuns_imaging_protocol::{
+    CacheArtifact, CacheCompletion, CacheMediaSource, CacheRequest, CacheResetRequest,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
+};
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
 };
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, PreparedCacheStorage};
+use sha2::{Digest, Sha256};
 
 const PIXELS_PER_MICROMETER: f64 = 0.001;
+const CACHE_REPRESENTATION_VERSION: u32 = 1;
 
 fn main() -> ExitCode {
     let process_role = ProcessRole::Imaging;
@@ -35,7 +44,7 @@ fn main() -> ExitCode {
         protocol_version = IMAGING_PROTOCOL_VERSION,
         event = "imaging_process_started",
     );
-    let exit_code = if run().is_err() {
+    let exit_code = if run(&app_paths).is_err() {
         tracing::error!(
             target: "myalbuns.imaging",
             process_role = process_role.as_str(),
@@ -58,7 +67,7 @@ fn main() -> ExitCode {
     exit_code
 }
 
-fn run() -> Result<(), String> {
+fn run(app_paths: &AppPaths) -> Result<(), String> {
     let mut source = String::new();
     std::io::stdin()
         .lock()
@@ -72,6 +81,12 @@ fn run() -> Result<(), String> {
             );
             format!("não foi possível ler a solicitação: {error}")
         })?;
+    if let Ok(command) = serde_json::from_str(&source) {
+        return match command {
+            ImagingCommand::BuildCache(request) => run_cache(request, app_paths),
+            ImagingCommand::ResetCache(request) => run_cache_reset(request, app_paths),
+        };
+    }
     let request: ImagingRequest = serde_json::from_str(&source).map_err(|error| {
         tracing::error!(
             target: "myalbuns.imaging",
@@ -152,6 +167,332 @@ fn run() -> Result<(), String> {
         height_px,
     );
     Ok(())
+}
+
+fn run_cache_reset(request: CacheResetRequest, app_paths: &AppPaths) -> Result<(), String> {
+    let operation_id = safe_log_identifier(&request.request_id);
+    request.validate()?;
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_count = request.project_ids.len(),
+        event = "cache_reset_started",
+    );
+    let mut removed_count = 0;
+    for project_id in &request.project_ids {
+        let paths = app_paths
+            .project_cache(project_id)
+            .map_err(|error| error.to_string())?;
+        removed_count += usize::from(
+            app_paths
+                .clear_project_cache(&paths)
+                .map_err(|error| error.to_string())?,
+        );
+    }
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_count = request.project_ids.len(),
+        removed_count,
+        event = "cache_reset_completed",
+    );
+    let response = ImagingResponse::cache_reset(request.request_id, removed_count);
+    serde_json::to_writer(std::io::stdout(), &response)
+        .map_err(|error| format!("não foi possível responder: {error}"))
+}
+
+fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> {
+    let operation_id = safe_log_identifier(&request.request_id);
+    let project_id = safe_log_identifier(&request.project_id);
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_id,
+        media_count = request.sources.len(),
+        event = "cache_request_started",
+    );
+    request.validate()?;
+    let completion = build_cache(&request, app_paths).inspect_err(|_| {
+        tracing::error!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "cache_request_failed",
+        );
+    })?;
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_id,
+        generated_count = completion.generated_count,
+        reused_count = completion.reused_count,
+        source_bytes = completion.source_bytes,
+        preview_bytes = completion.preview_bytes,
+        event = "cache_request_completed",
+    );
+    let response = ImagingResponse::cache_completed(request.request_id, completion);
+    serde_json::to_writer(std::io::stdout(), &response)
+        .map_err(|error| format!("não foi possível responder: {error}"))
+}
+
+fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheCompletion, String> {
+    let storage = app_paths
+        .prepare_cache_storage(&request.cache_paths)
+        .map_err(|error| format!("não foi possível preparar o Cache: {error}"))?;
+
+    let mut artifacts = Vec::with_capacity(request.sources.len());
+    let mut generated_count = 0;
+    let mut reused_count = 0;
+    let mut source_bytes = 0_u64;
+    let mut preview_bytes = 0_u64;
+    for source in &request.sources {
+        let verified_bytes = read_verified_source(source)?;
+        source_bytes = source_bytes
+            .checked_add(source.source_bytes())
+            .ok_or_else(|| "o tamanho total das Fotos excedeu o limite".to_string())?;
+        let generation_id = format!(
+            "{}-v{}-{}",
+            source.source_sha256()[..16].to_ascii_lowercase(),
+            CACHE_REPRESENTATION_VERSION,
+            request.max_edge_px
+        );
+        let preview_path = request
+            .cache_paths
+            .preview_file(source.media_id(), &generation_id)
+            .map_err(|error| error.to_string())?;
+        let temporary_path = request
+            .cache_paths
+            .preview_temporary_file(source.media_id(), &generation_id, std::process::id())
+            .map_err(|error| error.to_string())?;
+        let (width_px, height_px, generated) = prepare_preview(
+            &storage,
+            source,
+            &verified_bytes,
+            &preview_path,
+            &temporary_path,
+            request.max_edge_px,
+        )?;
+        if generated {
+            generated_count += 1;
+        } else {
+            reused_count += 1;
+        }
+        let artifact_bytes = storage
+            .open_existing_file(&preview_path)
+            .map_err(|error| format!("representação reduzida indisponível: {error}"))?
+            .ok_or_else(|| "representação reduzida indisponível".to_string())?
+            .metadata()
+            .map_err(|error| format!("representação reduzida indisponível: {error}"))?
+            .len();
+        preview_bytes = preview_bytes
+            .checked_add(artifact_bytes)
+            .ok_or_else(|| "o tamanho total do Cache excedeu o limite".to_string())?;
+        artifacts.push(CacheArtifact {
+            media_id: source.media_id().to_owned(),
+            generation_id,
+            width_px,
+            height_px,
+            preview_bytes: artifact_bytes,
+        });
+    }
+
+    write_cache_metadata(&storage, request, &artifacts)?;
+    Ok(CacheCompletion {
+        artifacts,
+        generated_count,
+        reused_count,
+        source_bytes,
+        preview_bytes,
+    })
+}
+
+fn read_verified_source(source: &CacheMediaSource) -> Result<Vec<u8>, String> {
+    let metadata = fs::metadata(source.source_path()).map_err(|error| {
+        format!(
+            "não foi possível abrir a mídia {}: {error}",
+            source.media_id()
+        )
+    })?;
+    if !metadata.is_file() || metadata.len() != source.source_bytes() {
+        return Err(source_changed_error(source));
+    }
+    let bytes = fs::read(source.source_path())
+        .map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
+    if bytes.len() as u64 != source.source_bytes()
+        || !format!("{:x}", Sha256::digest(&bytes)).eq_ignore_ascii_case(source.source_sha256())
+    {
+        return Err(source_changed_error(source));
+    }
+    Ok(bytes)
+}
+
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let file =
+        File::open(path).map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn verify_source_current(source: &CacheMediaSource) -> Result<(), String> {
+    let metadata = fs::metadata(source.source_path()).map_err(|_| source_changed_error(source))?;
+    if !metadata.is_file()
+        || metadata.len() != source.source_bytes()
+        || !sha256_file(source.source_path())?.eq_ignore_ascii_case(source.source_sha256())
+    {
+        return Err(source_changed_error(source));
+    }
+    Ok(())
+}
+
+fn source_changed_error(source: &CacheMediaSource) -> String {
+    format!(
+        "a mídia {} mudou desde o planejamento do Cache",
+        source.media_id()
+    )
+}
+
+fn prepare_preview(
+    storage: &PreparedCacheStorage,
+    source: &CacheMediaSource,
+    verified_bytes: &[u8],
+    preview_path: &Path,
+    temporary_path: &Path,
+    max_edge_px: u32,
+) -> Result<(u32, u32, bool), String> {
+    if let Some(file) = storage
+        .open_existing_file(preview_path)
+        .map_err(|error| format!("representação reduzida inválida: {error}"))?
+    {
+        let reader = ImageReader::new(BufReader::new(file))
+            .with_guessed_format()
+            .map_err(|error| format!("representação reduzida inválida: {error}"))?;
+        let (width, height) = reader
+            .into_dimensions()
+            .map_err(|error| format!("representação reduzida inválida: {error}"))?;
+        return Ok((width, height, false));
+    }
+
+    let reader = ImageReader::new(Cursor::new(verified_bytes))
+        .with_guessed_format()
+        .map_err(|error| format!("não foi possível inspecionar a Foto: {error}"))?;
+    if reader.format() != Some(ImageFormat::Jpeg) {
+        return Err(format!("a mídia {} não é JPEG", source.media_id()));
+    }
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))?;
+    let orientation = decoder
+        .orientation()
+        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
+    let mut decoded = DynamicImage::from_decoder(decoder)
+        .map_err(|error| format!("não foi possível decodificar a Foto: {error}"))?;
+    decoded.apply_orientation(orientation);
+    let preview = decoded.thumbnail(max_edge_px, max_edge_px).to_rgb8();
+    let write_result = (|| -> Result<(), String> {
+        let file = storage
+            .create_temporary_file(temporary_path)
+            .map_err(|error| format!("não foi possível criar o Cache temporário: {error}"))?;
+        let mut writer = BufWriter::new(file);
+        JpegEncoder::new_with_quality(&mut writer, 84)
+            .encode_image(&preview)
+            .map_err(|error| format!("não foi possível codificar a prévia JPEG: {error}"))?;
+        writer
+            .flush()
+            .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
+        let file = writer
+            .into_inner()
+            .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
+        verify_source_current(source)?;
+        storage
+            .replace_file(temporary_path, preview_path)
+            .map_err(|error| format!("não foi possível publicar a prévia: {error}"))
+    })();
+    if write_result.is_err() {
+        let _ = fs::remove_file(temporary_path);
+    }
+    write_result?;
+    Ok((preview.width(), preview.height(), true))
+}
+
+fn write_cache_metadata(
+    storage: &PreparedCacheStorage,
+    request: &CacheRequest,
+    artifacts: &[CacheArtifact],
+) -> Result<(), String> {
+    let entries = artifacts
+        .iter()
+        .zip(&request.sources)
+        .map(|(artifact, source)| -> Result<serde_json::Value, String> {
+            let artifact_path = request
+                .cache_paths
+                .preview_file(&artifact.media_id, &artifact.generation_id)
+                .map_err(|error| error.to_string())?;
+            let artifact_name = artifact_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| "o nome do artefato de Cache é inválido".to_string())?;
+            Ok(serde_json::json!({
+                "mediaId": artifact.media_id,
+                "generationId": artifact.generation_id,
+                "artifactName": artifact_name,
+                "widthPx": artifact.width_px,
+                "heightPx": artifact.height_px,
+                "previewBytes": artifact.preview_bytes,
+                "sourceBytes": source.source_bytes(),
+                "sourceSha256": source.source_sha256(),
+            }))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let metadata = serde_json::json!({
+        "schemaVersion": 1,
+        "representationVersion": CACHE_REPRESENTATION_VERSION,
+        "projectId": request.project_id,
+        "maxEdgePx": request.max_edge_px,
+        "format": "jpeg",
+        "entries": entries,
+    });
+    let metadata_path = request.cache_paths.metadata_file();
+    let temporary_path = request
+        .cache_paths
+        .metadata_temporary_file(std::process::id());
+    let metadata_bytes = serde_json::to_vec_pretty(&metadata)
+        .map_err(|error| format!("não foi possível serializar o índice: {error}"))?;
+    let mut temporary = storage
+        .create_temporary_file(&temporary_path)
+        .map_err(|error| format!("não foi possível criar o índice temporário: {error}"))?;
+    temporary
+        .write_all(&metadata_bytes)
+        .map_err(|error| format!("não foi possível gravar o índice temporário: {error}"))?;
+    temporary
+        .sync_all()
+        .map_err(|error| format!("não foi possível sincronizar o índice: {error}"))?;
+    drop(temporary);
+    storage
+        .replace_file(&temporary_path, &metadata_path)
+        .map_err(|error| format!("não foi possível publicar o índice: {error}"))
 }
 
 fn render_first_sheet(snapshot: &RenderSnapshot, output_path: &Path) -> Result<(u32, u32), String> {

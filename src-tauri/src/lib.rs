@@ -1,13 +1,20 @@
+mod benchmark_corpus;
 mod logging;
 mod project_host;
+#[path = "../../tests/support/sample_project.rs"]
+mod sample_project;
 mod topology_spike;
 
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use myalbuns_core::{EditorProjection, ExportResult, ProjectIntent};
-use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
+use myalbuns_imaging_protocol::{
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
+};
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
+use serde::Serialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
@@ -16,6 +23,29 @@ use project_host::ProjectHost;
 use topology_spike::TopologySpike;
 
 static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+static CACHE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+const CACHE_PREVIEW_MAX_EDGE_PX: u32 = 1600;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MediaPreviewCatalog {
+    previews: Vec<MediaPreview>,
+    generated_count: usize,
+    reused_count: usize,
+    source_bytes: u64,
+    preview_bytes: u64,
+    elapsed_ms: u128,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MediaPreview {
+    media_id: String,
+    url: String,
+    width_px: u32,
+    height_px: u32,
+}
 
 #[tauri::command]
 fn project_state(
@@ -103,6 +133,108 @@ fn redo_project(
 }
 
 #[tauri::command]
+async fn prepare_media_previews(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+    app_paths: State<'_, AppPaths>,
+    logging: State<'_, LoggingState>,
+) -> Result<Option<MediaPreviewCatalog>, String> {
+    let cache_sequence = CACHE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let request_id = format!("cache-{}-{cache_sequence}", std::process::id());
+    let projection = state.projection(window.label())?;
+    let project_id = projection.state.project_id;
+    let cache_paths = app_paths
+        .project_cache(&project_id)
+        .map_err(|error| error.to_string())?;
+    let Some(request) = state.cache_request(
+        window.label(),
+        request_id.clone(),
+        cache_paths.clone(),
+        CACHE_PREVIEW_MAX_EDGE_PX,
+    )?
+    else {
+        return Ok(None);
+    };
+    let safe_project_id = safe_log_identifier(&project_id);
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        protocol_version = IMAGING_PROTOCOL_VERSION,
+        operation_id = request_id.as_str(),
+        project_id = safe_project_id,
+        window_label = window.label(),
+        media_count = request.sources.len(),
+        event = "media_cache_started",
+    );
+    let started = Instant::now();
+    let mut payload =
+        serde_json::to_vec(&ImagingCommand::build_cache(request)).map_err(|error| {
+            log_media_cache_failure(&request_id, safe_project_id, "serialize_request", None);
+            format!("Não foi possível preparar o Cache: {error}")
+        })?;
+    payload.push(b'\n');
+    let stdout = invoke_imaging_sidecar(&app, &logging, payload, &request_id, safe_project_id)
+        .await
+        .map_err(|failure| {
+            log_media_cache_failure(
+                &request_id,
+                safe_project_id,
+                failure.stage,
+                failure.exit_code,
+            );
+            failure.message
+        })?;
+    let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
+        log_media_cache_failure(&request_id, safe_project_id, "decode_response", None);
+        format!("Resposta inválida do Processador de Imagens: {error}")
+    })?;
+    let completed = response.cache_completed_for(&request_id).ok_or_else(|| {
+        log_media_cache_failure(&request_id, safe_project_id, "validate_response", None);
+        "O Processador devolveu uma resposta de Cache inesperada.".to_string()
+    })?;
+    let catalog = MediaPreviewCatalog {
+        previews: completed
+            .artifacts
+            .iter()
+            .map(|artifact| -> Result<MediaPreview, String> {
+                let preview_path = cache_paths
+                    .preview_file(&artifact.media_id, &artifact.generation_id)
+                    .map_err(|error| error.to_string())?;
+                Ok(MediaPreview {
+                    media_id: artifact.media_id.clone(),
+                    url: app_paths
+                        .cache_asset_url(&preview_path)
+                        .map_err(|error| error.to_string())?,
+                    width_px: artifact.width_px,
+                    height_px: artifact.height_px,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        generated_count: completed.generated_count,
+        reused_count: completed.reused_count,
+        source_bytes: completed.source_bytes,
+        preview_bytes: completed.preview_bytes,
+        elapsed_ms: started.elapsed().as_millis(),
+    };
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        protocol_version = IMAGING_PROTOCOL_VERSION,
+        operation_id = request_id.as_str(),
+        project_id = safe_project_id,
+        window_label = window.label(),
+        generated_count = catalog.generated_count,
+        reused_count = catalog.reused_count,
+        source_bytes = catalog.source_bytes,
+        preview_bytes = catalog.preview_bytes,
+        elapsed_ms = catalog.elapsed_ms,
+        event = "media_cache_completed",
+    );
+    Ok(Some(catalog))
+}
+
+#[tauri::command]
 async fn export_spike(
     app: AppHandle,
     window: WebviewWindow,
@@ -140,54 +272,12 @@ async fn export_spike(
     })?;
     payload.push(b'\n');
 
-    let sidecar = app
-        .shell()
-        .sidecar("myalbuns-imaging")
-        .map_err(|error| {
-            log_export_failure(&request_id, project_id, "resolve_sidecar", None);
-            format!("Processador de Imagens indisponível: {error}")
-        })?
-        .env(LOG_DIRECTORY_ENV, logging.directory());
-    let (mut events, mut child) = sidecar.spawn().map_err(|error| {
-        log_export_failure(&request_id, project_id, "spawn_sidecar", None);
-        format!("Não foi possível iniciar o Processador de Imagens: {error}")
-    })?;
-    child.write(&payload).map_err(|error| {
-        log_export_failure(&request_id, project_id, "write_request", None);
-        format!("Não foi possível enviar o snapshot: {error}")
-    })?;
-
-    let mut stdout = Vec::new();
-    let mut exit_code = None;
-    while let Some(event) = events.recv().await {
-        match event {
-            CommandEvent::Stdout(bytes) => stdout.extend(bytes),
-            CommandEvent::Stderr(bytes) => {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::DesktopHost.as_str(),
-                    protocol_version = IMAGING_PROTOCOL_VERSION,
-                    operation_id = request_id.as_str(),
-                    project_id,
-                    byte_count = bytes.len(),
-                    event = "imaging_stderr_received",
-                );
-            }
-            CommandEvent::Terminated(payload) => {
-                exit_code = payload.code;
-                break;
-            }
-            _ => {}
-        }
-    }
-
-    if exit_code != Some(0) {
-        log_export_failure(&request_id, project_id, "imaging_process", exit_code);
-        return Err(format!(
-            "O Processador de Imagens terminou com o código {:?}.",
-            exit_code
-        ));
-    }
+    let stdout = invoke_imaging_sidecar(&app, &logging, payload, &request_id, project_id)
+        .await
+        .map_err(|failure| {
+            log_export_failure(&request_id, project_id, failure.stage, failure.exit_code);
+            failure.message
+        })?;
     let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
         log_export_failure(&request_id, project_id, "decode_response", None);
         format!("Resposta inválida do Processador de Imagens: {error}")
@@ -208,13 +298,115 @@ async fn export_spike(
     );
 
     Ok(ExportResult {
-        output_path: output_path.to_string_lossy().into_owned(),
+        output_path: output_path
+            .to_str()
+            .ok_or_else(|| {
+                "o caminho da Exportação não pode ser representado pela interface".to_string()
+            })?
+            .to_owned(),
         width_px,
         height_px,
     })
 }
 
+struct ImagingInvocationError {
+    stage: &'static str,
+    exit_code: Option<i32>,
+    message: String,
+}
+
+async fn invoke_imaging_sidecar(
+    app: &AppHandle,
+    logging: &LoggingState,
+    payload: Vec<u8>,
+    operation_id: &str,
+    project_id: Option<&str>,
+) -> Result<Vec<u8>, ImagingInvocationError> {
+    let sidecar = app
+        .shell()
+        .sidecar("myalbuns-imaging")
+        .map_err(|error| ImagingInvocationError {
+            stage: "resolve_sidecar",
+            exit_code: None,
+            message: format!("Processador de Imagens indisponível: {error}"),
+        })?
+        .env(LOG_DIRECTORY_ENV, logging.directory());
+    let (mut events, mut child) = sidecar.spawn().map_err(|error| ImagingInvocationError {
+        stage: "spawn_sidecar",
+        exit_code: None,
+        message: format!("Não foi possível iniciar o Processador de Imagens: {error}"),
+    })?;
+    child
+        .write(&payload)
+        .map_err(|error| ImagingInvocationError {
+            stage: "write_request",
+            exit_code: None,
+            message: format!("Não foi possível enviar a solicitação: {error}"),
+        })?;
+
+    let mut stdout = Vec::new();
+    let mut exit_code = None;
+    while let Some(event) = events.recv().await {
+        match event {
+            CommandEvent::Stdout(bytes) => stdout.extend(bytes),
+            CommandEvent::Stderr(bytes) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    protocol_version = IMAGING_PROTOCOL_VERSION,
+                    operation_id,
+                    project_id,
+                    byte_count = bytes.len(),
+                    event = "imaging_stderr_received",
+                );
+            }
+            CommandEvent::Terminated(payload) => {
+                exit_code = payload.code;
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    if exit_code != Some(0) {
+        return Err(ImagingInvocationError {
+            stage: "imaging_process",
+            exit_code,
+            message: format!(
+                "O Processador de Imagens terminou com o código {:?}.",
+                exit_code
+            ),
+        });
+    }
+    Ok(stdout)
+}
+
 fn log_export_failure(
+    operation_id: &str,
+    project_id: Option<&str>,
+    stage: &str,
+    exit_code: Option<i32>,
+) {
+    log_imaging_failure("export_failed", operation_id, project_id, stage, exit_code);
+}
+
+fn log_media_cache_failure(
+    operation_id: &str,
+    project_id: Option<&str>,
+    stage: &str,
+    exit_code: Option<i32>,
+) {
+    log_imaging_failure(
+        "media_cache_failed",
+        operation_id,
+        project_id,
+        stage,
+        exit_code,
+    );
+}
+
+fn log_imaging_failure(
+    event: &str,
     operation_id: &str,
     project_id: Option<&str>,
     stage: &str,
@@ -228,7 +420,7 @@ fn log_export_failure(
         project_id,
         stage,
         exit_code,
-        event = "export_failed",
+        event,
     );
 }
 
@@ -236,7 +428,9 @@ fn log_export_failure(
 pub fn run() {
     let topology = TopologySpike::from_environment()
         .unwrap_or_else(|error| panic!("configuração inválida do spike de topologia: {error}"));
-    let project_host = topology.project_host();
+    let project_host = topology
+        .project_host()
+        .unwrap_or_else(|error| panic!("corpus inválido do spike de topologia: {error}"));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -278,8 +472,38 @@ pub fn run() {
             apply_project_intent,
             undo_project,
             redo_project,
+            prepare_media_previews,
             export_spike
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o MyAlbuns");
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn tauri_csp_allows_the_scoped_asset_protocol_for_pixi_texture_fetches() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let security = &config["app"]["security"];
+
+        for policy_name in ["csp", "devCsp"] {
+            let policy = security[policy_name]
+                .as_str()
+                .expect("the CSP policy is textual");
+            let connect_sources = policy
+                .split(';')
+                .find(|directive| directive.trim_start().starts_with("connect-src "))
+                .expect("the CSP defines connect-src");
+            assert!(
+                connect_sources
+                    .split_whitespace()
+                    .any(|value| value == "asset:")
+                    && connect_sources
+                        .split_whitespace()
+                        .any(|value| value == "http://asset.localhost"),
+                "{policy_name} must permit the two platform forms used by Tauri asset URLs"
+            );
+        }
+    }
 }

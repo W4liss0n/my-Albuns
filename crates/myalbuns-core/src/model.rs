@@ -3,8 +3,6 @@ use thiserror::Error;
 use ts_rs::TS;
 
 pub(crate) const PROJECT_SCHEMA_VERSION: u32 = 1;
-pub(crate) const SHEET_WIDTH_UM: i64 = 600_000;
-pub(crate) const SHEET_HEIGHT_UM: i64 = 300_000;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;

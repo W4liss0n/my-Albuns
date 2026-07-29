@@ -1,7 +1,6 @@
 mod composition;
 mod model;
 mod project;
-mod sample_project;
 mod session;
 mod validation;
 
@@ -12,8 +11,14 @@ pub use model::{
     RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use project::{LoadedProjectRevision, ProjectCore};
-pub use sample_project::SampleProject;
 pub use session::ProjectSession;
+
+#[cfg(test)]
+extern crate self as myalbuns_core;
+
+#[cfg(test)]
+#[path = "../../../tests/support/sample_project.rs"]
+mod sample_project_fixture;
 
 #[cfg(test)]
 mod tests;

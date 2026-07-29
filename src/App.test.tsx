@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import App from "./App";
@@ -17,6 +17,7 @@ const bridge: ProjectBridge = {
   apply: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
+  prepareMediaPreviews: async () => null,
   exportPreview: async () => ({
     outputPath: "C:\\Temp\\Album-Horizonte_001.png",
     widthPx: 600,
@@ -25,9 +26,11 @@ const bridge: ProjectBridge = {
 };
 
 test("keeps diagnostics available when hardware WebGL2 is unavailable", async () => {
+  const load = vi.fn(async () => projection);
+  const prepareMediaPreviews = vi.fn(async () => null);
   render(
     <App
-      bridge={bridge}
+      bridge={{ ...bridge, load, prepareMediaPreviews }}
       logger={silentLogger}
       graphicsProbe={() => ({
         supported: false,
@@ -46,6 +49,8 @@ test("keeps diagnostics available when hardware WebGL2 is unavailable", async ()
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
   expect(screen.getByText("Diagnóstico gráfico")).toBeInTheDocument();
+  await waitFor(() => expect(load).toHaveBeenCalledOnce());
+  expect(prepareMediaPreviews).not.toHaveBeenCalled();
 });
 
 test("opens the Project in the real workspace when hardware WebGL2 is available", async () => {
@@ -92,4 +97,45 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     ({ event }) => event === "project_load_started",
   );
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
+});
+
+test("prepares real media previews after opening without blocking the Workspace", async () => {
+  const logEvents: LogEvent[] = [];
+  const logger: Logger = {
+    write: (event) => logEvents.push(event),
+  };
+  const prepareMediaPreviews = vi.fn(async () => [
+      {
+        mediaId: "media-001",
+        url: "asset://localhost/cache/media-001.jpg",
+        widthPx: 1200,
+        heightPx: 800,
+      },
+    ]);
+
+  render(
+    <App
+      bridge={{ ...bridge, prepareMediaPreviews }}
+      logger={logger}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+      })}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", { name: "Exportar prova" }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(logEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        component: "media-cache",
+        event: "media_cache_completed",
+        projectId: projection.state.projectId,
+      }),
+    ]),
+  );
 });

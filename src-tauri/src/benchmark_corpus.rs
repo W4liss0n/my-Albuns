@@ -1,0 +1,390 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::{Path, PathBuf},
+};
+
+use myalbuns_core::{MediaCatalogItem, PhotoSnapshot, ProjectCore, ProjectSession};
+use myalbuns_imaging_protocol::CacheMediaSource;
+use serde::Deserialize;
+
+use crate::sample_project::SampleProject;
+
+const CORPUS_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Clone)]
+pub(crate) struct BenchmarkCorpus {
+    first: BenchmarkAlbum,
+    second: BenchmarkAlbum,
+}
+
+#[derive(Clone)]
+pub(crate) struct BenchmarkAlbum {
+    sources: Vec<BenchmarkSource>,
+}
+
+#[derive(Clone)]
+pub(crate) struct BenchmarkSource {
+    cache_source: CacheMediaSource,
+    name: String,
+    source_width_px: u32,
+    source_height_px: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CorpusManifest {
+    schema_version: u32,
+    root: PathBuf,
+    albums: Vec<ManifestAlbum>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManifestAlbum {
+    slot: String,
+    name: String,
+    directory: PathBuf,
+    photos: Vec<ManifestPhoto>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ManifestPhoto {
+    media_id: String,
+    name: String,
+    source_path: PathBuf,
+    source_width_px: u32,
+    source_height_px: u32,
+    source_bytes: u64,
+    source_sha256: String,
+}
+
+impl BenchmarkCorpus {
+    pub(crate) fn load(manifest_path: &Path) -> Result<Self, String> {
+        let manifest: CorpusManifest = serde_json::from_slice(
+            &fs::read(manifest_path)
+                .map_err(|error| format!("Não foi possível ler o manifesto do corpus: {error}"))?,
+        )
+        .map_err(|error| format!("Manifesto do corpus inválido: {error}"))?;
+        if manifest.schema_version != CORPUS_SCHEMA_VERSION {
+            return Err(format!(
+                "Versão do manifesto do corpus não suportada: {}.",
+                manifest.schema_version
+            ));
+        }
+        if manifest.albums.len() != 2 {
+            return Err("O corpus precisa conter exatamente dois Álbuns.".into());
+        }
+
+        let root = canonical_directory(&manifest.root, "raiz do corpus")?;
+        let mut first = None;
+        let mut second = None;
+        for album in manifest.albums {
+            let slot = album.slot.clone();
+            let loaded = BenchmarkAlbum::load(album, &root)?;
+            match slot.as_str() {
+                "a" if first.is_none() => first = Some(loaded),
+                "b" if second.is_none() => second = Some(loaded),
+                "a" | "b" => {
+                    return Err(format!("O slot {slot} aparece mais de uma vez no corpus."));
+                }
+                _ => return Err(format!("Slot de Álbum inválido: {slot}.")),
+            }
+        }
+
+        Ok(Self {
+            first: first.ok_or_else(|| "O corpus não contém o Álbum A.".to_string())?,
+            second: second.ok_or_else(|| "O corpus não contém o Álbum B.".to_string())?,
+        })
+    }
+
+    pub(crate) fn album_for(&self, sample: SampleProject) -> &BenchmarkAlbum {
+        match sample {
+            SampleProject::Horizon => &self.first,
+            SampleProject::Aurora => &self.second,
+        }
+    }
+}
+
+impl BenchmarkAlbum {
+    fn load(album: ManifestAlbum, root: &Path) -> Result<Self, String> {
+        if album.name.trim().is_empty() {
+            return Err("O nome de um Álbum do corpus está vazio.".into());
+        }
+        let directory = canonical_directory(&album.directory, "pasta de Álbum")?;
+        if directory.parent() != Some(root) {
+            return Err(format!(
+                "A pasta do Álbum {} não está diretamente na raiz autorizada.",
+                album.slot
+            ));
+        }
+        if album.photos.is_empty() {
+            return Err(format!("O Álbum {} não contém Fotos.", album.slot));
+        }
+
+        let mut media_ids = HashSet::new();
+        let mut sources = Vec::with_capacity(album.photos.len());
+        for photo in album.photos {
+            if !media_ids.insert(photo.media_id.clone()) {
+                return Err(format!(
+                    "Identificador de mídia duplicado no Álbum {}.",
+                    album.slot
+                ));
+            }
+            if photo.name.trim().is_empty()
+                || photo.source_width_px == 0
+                || photo.source_height_px == 0
+            {
+                return Err(format!(
+                    "Metadados inválidos para a mídia {}.",
+                    photo.media_id
+                ));
+            }
+            let source_path = fs::canonicalize(&photo.source_path).map_err(|error| {
+                format!(
+                    "A mídia {} não pôde ser localizada: {error}",
+                    photo.media_id
+                )
+            })?;
+            if !source_path.starts_with(&directory) || !is_jpeg(&source_path) {
+                return Err(format!(
+                    "A mídia {} está fora da pasta autorizada ou não é JPEG.",
+                    photo.media_id
+                ));
+            }
+            let metadata = fs::metadata(&source_path).map_err(|error| {
+                format!(
+                    "Os metadados da mídia {} estão indisponíveis: {error}",
+                    photo.media_id
+                )
+            })?;
+            if !metadata.is_file() || metadata.len() != photo.source_bytes {
+                return Err(format!(
+                    "O tamanho da mídia {} mudou desde a criação do manifesto.",
+                    photo.media_id
+                ));
+            }
+
+            sources.push(BenchmarkSource {
+                cache_source: CacheMediaSource::new(
+                    photo.media_id,
+                    source_path,
+                    photo.source_bytes,
+                    photo.source_sha256.to_ascii_lowercase(),
+                )
+                .map_err(|error| format!("Fonte inválida no corpus: {error}"))?,
+                name: photo.name,
+                source_width_px: photo.source_width_px,
+                source_height_px: photo.source_height_px,
+            });
+        }
+
+        Ok(Self { sources })
+    }
+
+    pub(crate) fn open_session(
+        &self,
+        sample: SampleProject,
+        sheet_count: usize,
+    ) -> Result<ProjectSession, String> {
+        let template_source = sample
+            .persisted_source(sheet_count)
+            .map_err(|error| error.to_string())?;
+        let template = ProjectCore::open_editable_session(&template_source)
+            .map_err(|error| error.to_string())?;
+        let mut state = template.state();
+        let palettes = state
+            .album
+            .media
+            .iter()
+            .map(|media| media.palette.clone())
+            .collect::<Vec<_>>();
+
+        for (index, frame) in state
+            .album
+            .sheets
+            .iter_mut()
+            .flat_map(|sheet| &mut sheet.frames)
+            .filter(|frame| frame.photo.is_some())
+            .enumerate()
+        {
+            let source = &self.sources[index % self.sources.len()];
+            frame.photo = Some(PhotoSnapshot {
+                media_id: source.cache_source.media_id().to_owned(),
+                name: source.name.clone(),
+                source_width_px: source.source_width_px,
+                source_height_px: source.source_height_px,
+                palette: palettes[index % palettes.len()].clone(),
+                transform: Default::default(),
+            });
+        }
+
+        let usage_counts = state
+            .album
+            .sheets
+            .iter()
+            .flat_map(|sheet| &sheet.frames)
+            .filter_map(|frame| frame.photo.as_ref())
+            .fold(HashMap::<String, usize>::new(), |mut counts, photo| {
+                *counts.entry(photo.media_id.clone()).or_default() += 1;
+                counts
+            });
+        state.album.media = self
+            .sources
+            .iter()
+            .enumerate()
+            .map(|(index, source)| MediaCatalogItem {
+                id: source.cache_source.media_id().to_owned(),
+                name: source.name.clone(),
+                palette: palettes[index % palettes.len()].clone(),
+                usage_count: usage_counts
+                    .get(source.cache_source.media_id())
+                    .copied()
+                    .unwrap_or_default(),
+            })
+            .collect();
+
+        let mut document: serde_json::Value = serde_json::from_str(
+            &template
+                .persisted_revision()
+                .map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| format!("Fixture persistida inválida: {error}"))?;
+        document["album"] = serde_json::to_value(state.album)
+            .map_err(|error| format!("Não foi possível montar o Álbum do corpus: {error}"))?;
+        ProjectCore::open_editable_session(
+            &serde_json::to_string(&document)
+                .map_err(|error| format!("Não foi possível serializar o corpus: {error}"))?,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sources(&self) -> &[BenchmarkSource] {
+        &self.sources
+    }
+
+    pub(crate) fn cache_sources(&self) -> Vec<CacheMediaSource> {
+        self.sources
+            .iter()
+            .map(|source| source.cache_source.clone())
+            .collect()
+    }
+}
+
+impl BenchmarkSource {
+    #[cfg(test)]
+    pub(crate) fn source_path(&self) -> &Path {
+        self.cache_source.source_path()
+    }
+}
+
+fn canonical_directory(path: &Path, description: &str) -> Result<PathBuf, String> {
+    let canonical = fs::canonicalize(path)
+        .map_err(|error| format!("Não foi possível localizar {description}: {error}"))?;
+    if !canonical.is_dir() {
+        return Err(format!("{description} não é uma pasta."));
+    }
+    Ok(canonical)
+}
+
+fn is_jpeg(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("jpg") || extension.eq_ignore_ascii_case("jpeg")
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use serde_json::json;
+
+    use crate::sample_project::SampleProject;
+
+    use super::BenchmarkCorpus;
+
+    #[test]
+    fn loads_two_authorized_albums_as_real_photo_fixtures() {
+        let root = tempfile::tempdir().expect("temporary corpus root");
+        let first_album = root.path().join("album-a");
+        let second_album = root.path().join("album-b");
+        fs::create_dir_all(&first_album).expect("first album exists");
+        fs::create_dir_all(&second_album).expect("second album exists");
+        let first_photo = first_album.join("photo-a.jpg");
+        let second_photo = second_album.join("photo-b.jpg");
+        fs::write(&first_photo, b"jpeg-a").expect("first fixture exists");
+        fs::write(&second_photo, b"jpeg-b").expect("second fixture exists");
+        let manifest_path = root.path().join("manifest.json");
+        fs::write(
+            &manifest_path,
+            serde_json::to_vec_pretty(&json!({
+                "schemaVersion": 1,
+                "root": root.path(),
+                "albums": [
+                    {
+                        "slot": "a",
+                        "name": "album-a",
+                        "directory": first_album,
+                        "photos": [{
+                            "mediaId": "benchmark-a-001",
+                            "name": "photo-a.jpg",
+                            "sourcePath": first_photo,
+                            "sourceWidthPx": 6000,
+                            "sourceHeightPx": 4000,
+                            "sourceBytes": 6,
+                            "sourceSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        }]
+                    },
+                    {
+                        "slot": "b",
+                        "name": "album-b",
+                        "directory": second_album,
+                        "photos": [{
+                            "mediaId": "benchmark-b-001",
+                            "name": "photo-b.jpg",
+                            "sourcePath": second_photo,
+                            "sourceWidthPx": 4000,
+                            "sourceHeightPx": 6000,
+                            "sourceBytes": 6,
+                            "sourceSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                        }]
+                    }
+                ]
+            }))
+            .expect("manifest serializes"),
+        )
+        .expect("manifest is written");
+
+        let corpus = BenchmarkCorpus::load(&manifest_path).expect("valid corpus loads");
+        let horizon = corpus.album_for(SampleProject::Horizon);
+        let aurora = corpus.album_for(SampleProject::Aurora);
+
+        let horizon_state = horizon
+            .open_session(SampleProject::Horizon, 12)
+            .expect("the first corpus album opens through ProjectCore")
+            .state();
+        let aurora_state = aurora
+            .open_session(SampleProject::Aurora, 12)
+            .expect("the second corpus album opens through ProjectCore")
+            .state();
+        assert_eq!(horizon_state.album.media.len(), 1);
+        assert_eq!(horizon_state.album.media[0].id, "benchmark-a-001");
+        assert_eq!(
+            aurora_state.album.sheets[0].frames[0]
+                .photo
+                .as_ref()
+                .expect("the real fixture is placed")
+                .source_height_px,
+            6000
+        );
+        assert_eq!(
+            horizon.sources()[0].source_path(),
+            fs::canonicalize(first_album.join("photo-a.jpg"))
+                .expect("the expected source path canonicalizes")
+        );
+    }
+}

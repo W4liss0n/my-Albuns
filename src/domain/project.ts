@@ -25,10 +25,18 @@ export type { SheetSnapshot } from "./generated/SheetSnapshot";
 export type { SizeUm as Size2 } from "./generated/SizeUm";
 export type { VectorUm as Vector2 } from "./generated/VectorUm";
 
+export interface MediaPreview {
+  mediaId: string;
+  url: string;
+  widthPx: number;
+  heightPx: number;
+}
+
 export interface ProjectBridge {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
+  prepareMediaPreviews(): Promise<readonly MediaPreview[] | null>;
   exportPreview(): Promise<ExportResult>;
 }

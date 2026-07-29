@@ -21,6 +21,7 @@ import { ProjectWorkspace } from "./ProjectWorkspace";
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     continuousCanvasLayout: ContinuousCanvasLayout;
+    mediaPreviewUrls?: Readonly<Record<string, string>>;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
@@ -56,6 +57,7 @@ function bridgeWithApply(apply: ProjectBridge["apply"]): ProjectBridge {
     apply,
     undo: async () => projection,
     redo: async () => projection,
+    prepareMediaPreviews: async () => null,
     exportPreview: async () => ({
       outputPath: "C:\\Temp\\Album-Horizonte_001.png",
       widthPx: 600,
@@ -152,6 +154,29 @@ test("renders each Grade item from its own composed sheet", () => {
     screen.getByRole("img", { name: "Prévia da Lâmina 02" }),
   ).toBeInTheDocument();
   expect(screen.getAllByRole("img")).toHaveLength(2);
+});
+
+test("uses reduced Cache previews in the media panel and Canvas", () => {
+  const mediaPreviewUrls = {
+    "media-001": "asset://localhost/cache/media-001.jpg",
+  };
+  const view = render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(async () => projection)}
+      mediaPreviewUrls={mediaPreviewUrls}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(
+    view.container.querySelector<HTMLImageElement>(
+      '.media-thumb img[src="asset://localhost/cache/media-001.jpg"]',
+    ),
+  ).not.toBeNull();
+  expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
+    mediaPreviewUrls,
+  );
 });
 
 test("centers a Grade navigation target in the visible Canvas", () => {

@@ -6,6 +6,7 @@ import type {
 } from "./application/graphics";
 import {
   createLogInstanceId,
+  logReasonFromError,
   type Logger,
 } from "./application/logging";
 import {
@@ -26,6 +27,9 @@ function App({ bridge, graphicsProbe, logger }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
+    Readonly<Record<string, string>>
+  >({});
 
   useEffect(() => {
     let active = true;
@@ -85,6 +89,58 @@ function App({ bridge, graphicsProbe, logger }: AppProps) {
     });
   }, [graphics, logger]);
 
+  const projectId = projection?.state.projectId;
+  useEffect(() => {
+    setMediaPreviewUrls({});
+    if (!projectId || !graphics.supported) return;
+
+    let active = true;
+    const operationId = createLogInstanceId("media-cache");
+    logger.write({
+      level: "info",
+      component: "media-cache",
+      event: "media_cache_started",
+      operationId,
+      projectId,
+    });
+    bridge
+      .prepareMediaPreviews()
+      .then((previews) => {
+        if (!active) return;
+        if (previews) {
+          setMediaPreviewUrls(
+            Object.fromEntries(
+              previews.map(({ mediaId, url }) => [
+                mediaId,
+                url,
+              ]),
+            ),
+          );
+        }
+        logger.write({
+          level: "info",
+          component: "media-cache",
+          event: "media_cache_completed",
+          operationId,
+          projectId,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        logger.write({
+          level: "warn",
+          component: "media-cache",
+          event: "media_cache_failed",
+          operationId,
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [bridge, graphics.supported, logger, projectId]);
+
   if (!graphics.supported) {
     return <GraphicsUnavailable diagnostic={graphics} />;
   }
@@ -117,6 +173,7 @@ function App({ bridge, graphicsProbe, logger }: AppProps) {
       <ProjectWorkspace
         projection={projection}
         bridge={bridge}
+        mediaPreviewUrls={mediaPreviewUrls}
         onProjectionChange={setProjection}
       />
     </LoggingProvider>

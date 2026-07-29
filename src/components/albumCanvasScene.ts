@@ -5,7 +5,9 @@ import {
   FederatedWheelEvent,
   Graphics,
   Rectangle,
+  Sprite,
   Text,
+  type Texture,
 } from "pixi.js";
 
 import type {
@@ -39,6 +41,7 @@ import {
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
+import { ViewportTexturePool } from "./viewportTexturePool";
 
 const PRELOAD_MARGIN = 1;
 const VIEWPORT_PRELOAD_PX = 700;
@@ -74,6 +77,7 @@ interface PhotoPreviewLayerOptions {
   rotationDegrees: number;
   mirrorX: boolean;
   palette: readonly string[];
+  previewTexture?: Texture;
 }
 
 interface DragGesture {
@@ -110,8 +114,16 @@ export class AlbumCanvasScene {
   private readonly pendingCommitFrames = new Set<string>();
   private externalPreviewFrameId: string | null = null;
   private lastCanvasMetrics: CanvasMetrics | null = null;
+  private readonly previewTextures: ViewportTexturePool;
 
-  constructor(private readonly app: Application) {
+  constructor(
+    private readonly app: Application,
+    onPreviewTextureError: () => void = () => undefined,
+  ) {
+    this.previewTextures = new ViewportTexturePool(
+      this.refreshAfterPreviewTextureChange,
+      onPreviewTextureError,
+    );
     this.world.label = "album-world";
     this.app.stage.addChild(this.world);
     this.app.stage.eventMode = "static";
@@ -138,6 +150,7 @@ export class AlbumCanvasScene {
     const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
+      this.previewTextures.sync([]);
       return;
     }
     const layout = input.continuousCanvasLayout;
@@ -193,13 +206,14 @@ export class AlbumCanvasScene {
       this.handleCanvasWheel,
     );
     this.app.stage.removeAllListeners();
-    this.sheetNodes.clear();
-    this.photoNodes.clear();
+    this.clearMaterializedSheets();
+    this.previewTextures.destroy();
   }
 
   private resetProjectScene() {
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
+    this.previewTextures.sync([]);
     this.lastCanvasMetrics = null;
   }
 
@@ -293,24 +307,41 @@ export class AlbumCanvasScene {
       (visibleIndexes[visibleIndexes.length - 1] ?? 0) +
         PRELOAD_MARGIN,
     );
-    const desiredIds = new Set(
-      sheets
-        .slice(firstVisible, lastVisible + 1)
-        .map((sheet) => sheet.sheetId),
-    );
+    const desiredSheets = sheets.slice(firstVisible, lastVisible + 1);
+    const desiredIds = new Set(desiredSheets.map((sheet) => sheet.sheetId));
+    const desiredPreviewUrls = new Set<string>();
+    const signatures = new Map<string, string>();
+
+    for (const sheet of desiredSheets) {
+      const previewStates = sheet.frames.map((frame) => {
+        if (!frame.photo) return null;
+        const url =
+          this.input?.mediaPreviewUrls?.[frame.photo.mediaId] ?? null;
+        if (url) desiredPreviewUrls.add(url);
+        return url
+          ? [url, this.previewTextures.get(url) !== undefined]
+          : null;
+      });
+      signatures.set(
+        sheet.sheetId,
+        JSON.stringify([sheet, previewStates]),
+      );
+    }
 
     for (const [sheetId, node] of this.sheetNodes) {
-      if (!desiredIds.has(sheetId)) this.removeSheetNode(sheetId, node);
+      if (
+        !desiredIds.has(sheetId) ||
+        node.signature !== signatures.get(sheetId)
+      ) {
+        this.removeSheetNode(sheetId, node);
+      }
     }
+    this.previewTextures.sync(desiredPreviewUrls);
 
     for (let index = firstVisible; index <= lastVisible; index += 1) {
       const sheet = sheets[index];
-      const signature = JSON.stringify(sheet);
+      const signature = signatures.get(sheet.sheetId) ?? "";
       let node = this.sheetNodes.get(sheet.sheetId);
-      if (node && node.signature !== signature) {
-        this.removeSheetNode(sheet.sheetId, node);
-        node = undefined;
-      }
       if (!node) {
         node = this.createSheetNode(sheet, signature);
         this.sheetNodes.set(sheet.sheetId, node);
@@ -435,6 +466,9 @@ export class AlbumCanvasScene {
           rotationDegrees: frame.photo.rotationDegrees,
           mirrorX: frame.photo.mirrorX,
           palette: frame.photo.palette,
+          previewTexture: this.previewTextureFor(
+            frame.photo.mediaId,
+          ),
         };
         const outsidePhotoLayer = createPhotoPreviewLayer({
           ...previewOptions,
@@ -564,6 +598,17 @@ export class AlbumCanvasScene {
       focusOutline,
     };
   }
+
+  private previewTextureFor(mediaId: string) {
+    const url = this.input?.mediaPreviewUrls?.[mediaId];
+    return url ? this.previewTextures.get(url) : undefined;
+  }
+
+  private readonly refreshAfterPreviewTextureChange = () => {
+    if (this.input) {
+      this.update(this.input, this.app.screen.height);
+    }
+  };
 
   private updateDecorations() {
     if (!this.input) return;
@@ -926,6 +971,7 @@ function createPhotoPreviewLayer({
   rotationDegrees,
   mirrorX,
   palette,
+  previewTexture,
 }: PhotoPreviewLayerOptions) {
   const photoLayer = new Container();
   photoLayer.label = label;
@@ -933,6 +979,16 @@ function createPhotoPreviewLayer({
   photoLayer.position.set(center.x, center.y);
   photoLayer.rotation = (rotationDegrees * Math.PI) / 180;
   photoLayer.scale.set(mirrorX ? -1 : 1, 1);
+
+  if (previewTexture) {
+    const sprite = new Sprite({
+      texture: previewTexture,
+      width: drawWidth,
+      height: drawHeight,
+    });
+    photoLayer.addChild(sprite);
+    return photoLayer;
+  }
 
   const photoStyle = SHEET_VISUAL_STYLE.photo;
   for (let stripe = 0; stripe < photoStyle.stripeCount; stripe += 1) {

@@ -13,9 +13,13 @@ import {
 
 interface SheetPreviewProps {
   sheet: ComposedSheet;
+  mediaPreviewUrls?: Readonly<Record<string, string>>;
 }
 
-export function SheetPreview({ sheet }: SheetPreviewProps) {
+export function SheetPreview({
+  sheet,
+  mediaPreviewUrls = {},
+}: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
   const unit = CANVAS_MICROMETERS_PER_PIXEL;
@@ -76,6 +80,11 @@ export function SheetPreview({ sheet }: SheetPreviewProps) {
           clipId={clipId(instanceId, frame, index)}
           frame={frame}
           key={frame.frameId}
+          previewUrl={
+            frame.photo
+              ? mediaPreviewUrls[frame.photo.mediaId]
+              : undefined
+          }
           unit={unit}
         />
       ))}
@@ -111,12 +120,14 @@ export function SheetPreview({ sheet }: SheetPreviewProps) {
 interface FramePreviewProps {
   frame: ComposedFrame;
   clipId: string;
+  previewUrl?: string;
   unit: number;
 }
 
 function FramePreview({
   frame,
   clipId: frameClipId,
+  previewUrl,
   unit,
 }: FramePreviewProps) {
   const { clipRect, photo } = frame;
@@ -126,7 +137,11 @@ function FramePreview({
     <g>
       {photo ? (
         <g clipPath={`url(#${frameClipId})`}>
-          <PhotoPreview photo={photo} unit={unit} />
+          <PhotoPreview
+            photo={photo}
+            previewUrl={previewUrl}
+            unit={unit}
+          />
         </g>
       ) : (
         <g data-preview-placeholder-id={frame.frameId}>
@@ -193,10 +208,15 @@ function FramePreview({
 
 interface PhotoPreviewProps {
   photo: ComposedPhoto;
+  previewUrl?: string;
   unit: number;
 }
 
-function PhotoPreview({ photo, unit }: PhotoPreviewProps) {
+function PhotoPreview({
+  photo,
+  previewUrl,
+  unit,
+}: PhotoPreviewProps) {
   const { drawRect } = photo;
   const photoStyle = SHEET_VISUAL_STYLE.photo;
   const centerX = drawRect.x + drawRect.width / 2;
@@ -213,34 +233,58 @@ function PhotoPreview({ photo, unit }: PhotoPreviewProps) {
       data-preview-photo-id={photo.mediaId}
       transform={transform}
     >
-      {Array.from({ length: photoStyle.stripeCount }, (_, stripe) => {
-        const paletteIndex = photoPaletteIndexForStripe(stripe);
-        const stripeWidth = drawRect.width / photoStyle.stripeCount;
+      {previewUrl ? (
+        <image
+          href={previewUrl}
+          height={drawRect.height}
+          preserveAspectRatio="none"
+          width={drawRect.width}
+          x={drawRect.x}
+          y={drawRect.y}
+        />
+      ) : (
+        <>
+          {Array.from(
+            { length: photoStyle.stripeCount },
+            (_, stripe) => {
+              const paletteIndex =
+                photoPaletteIndexForStripe(stripe);
+              const stripeWidth =
+                drawRect.width / photoStyle.stripeCount;
 
-        return (
-          <rect
-            fill={photo.palette[paletteIndex]}
-            height={drawRect.height}
-            key={stripe}
-            width={stripeWidth + photoStyle.stripeOverlapPx * unit}
-            x={drawRect.x + stripeWidth * stripe}
-            y={drawRect.y}
+              return (
+                <rect
+                  fill={photo.palette[paletteIndex]}
+                  height={drawRect.height}
+                  key={stripe}
+                  width={
+                    stripeWidth +
+                    photoStyle.stripeOverlapPx * unit
+                  }
+                  x={drawRect.x + stripeWidth * stripe}
+                  y={drawRect.y}
+                />
+              );
+            },
+          )}
+          <circle
+            cx={
+              drawRect.x +
+              drawRect.width * photoStyle.lightCenterXRatio
+            }
+            cy={
+              drawRect.y +
+              drawRect.height * photoStyle.lightCenterYRatio
+            }
+            r={
+              drawRect.height *
+              photoStyle.lightRadiusToHeightRatio
+            }
+            fill={photoStyle.lightColor}
+            fillOpacity={photoStyle.lightOpacity}
           />
-        );
-      })}
-      <circle
-        cx={
-          drawRect.x +
-          drawRect.width * photoStyle.lightCenterXRatio
-        }
-        cy={
-          drawRect.y +
-          drawRect.height * photoStyle.lightCenterYRatio
-        }
-        r={drawRect.height * photoStyle.lightRadiusToHeightRatio}
-        fill={photoStyle.lightColor}
-        fillOpacity={photoStyle.lightOpacity}
-      />
+        </>
+      )}
     </g>
   );
 }
