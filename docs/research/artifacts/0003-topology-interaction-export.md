@@ -8,29 +8,29 @@ updated: 2026-07-29
 
 # Interações e Exportação com imagens reais
 
-Coletado em UTC: `2026-07-29T20:53:54.9209603Z`.
+Coletado em UTC: `2026-07-29T22:01:09.7020294Z`.
 [JSON bruto](0003-topology-interaction-export.json).
 
 | Medida | A — hosts independentes | B — host multiwindow |
 |---|---:|---:|
 | Hosts do Projeto | 2 | 1 |
 | Janelas do Projeto | 2 | 2 |
-| Processos na árvore | 9 | 8 |
-| Working set agregado | 1.505,7 MiB | 1.437,8 MiB |
-| Memória privada agregada | 1.098,2 MiB | 1.078,3 MiB |
-| Memória gráfica compartilhada | 644,6 MiB | 640,9 MiB |
-| Primeiro host de A identificado | 1504 ms | não se aplica |
-| Duas Janelas identificadas | 1774 ms | 327 ms |
-| Duas Janelas com Cache pronto | 25409 ms | 24219 ms |
-| Duração de parede do Cache frio | 23714 ms | 23572 ms |
+| Processos na árvore | 14 | 8 |
+| Working set agregado | 1.795,9 MiB | 1.450,9 MiB |
+| Memória privada agregada | 1.250,1 MiB | 1.075,7 MiB |
+| Memória gráfica compartilhada | 651,8 MiB | 625,4 MiB |
+| Duas Janelas identificadas | 1311 ms | 383 ms |
+| Duas Janelas com Cache pronto | 26120 ms | 24500 ms |
+| Dois Canvas com texturas prontos | 26396 ms | 24725 ms |
+| Duração de parede do Cache frio | 24118 ms | 23546 ms |
 | Fotos processadas pelo Cache | 172 | 172 |
-| Vazão agregada dos originais | 59,1 MiB/s | 59,4 MiB/s |
+| Vazão agregada dos originais | 58,1 MiB/s | 59,5 MiB/s |
 | Representações reduzidas | 49,3 MiB | 49,3 MiB |
-| Pan: pior p95 entre Projetos | 7.9 ms | 8 ms |
+| Pan: pior p95 entre Projetos | 18 ms | 12.8 ms |
 | Pan: frames acima de 33 ms | 0 | 0 |
-| Zoom: pior p95 entre Projetos | 8 ms | 8 ms |
+| Zoom: pior p95 entre Projetos | 11.7 ms | 11.9 ms |
 | Zoom: frames acima de 33 ms | 0 | 0 |
-| Exportação: duração | 1113 ms | 1130 ms |
+| Exportação: duração | 1299 ms | 1241 ms |
 | Exportação: dimensões a 300 DPI | 7087 x 3543 px | 7087 x 3543 px |
 | Exportação: volume dos originais | 22,6 MiB | 22,6 MiB |
 | Exportação: tamanho do PNG | 27,0 MiB | 27,0 MiB |
@@ -47,15 +47,15 @@ Coletado em UTC: `2026-07-29T20:53:54.9209603Z`.
 
 ## Build medida
 
-- Commit do código: `2a6559ce8b9ce180df61d1831d3650e1ca15e0ea`
-- Build concluída em UTC: `2026-07-29T20:52:47.0890476Z`
+- Commit do código: `8e8fe84a6d7e78a01b931b8b22853676c61870ce`
+- Build concluída em UTC: `2026-07-29T21:59:57.4874616Z`
 - Perfil: `release`
 - Árvore de trabalho tinha mudanças alheias: sim
 - Entradas da build tinham mudanças: não
-- Arquivos de entrada: 141
-- Digest das entradas: `67b8154bfc49087f6c893aa4fa7c7e2111ad520cfaef472f41a0a33843d956f0`
-- Hash do host: `da607cf69f4420d1fbeb9a4412ff93fcba7030bb607d2402777b64706b6d3c50`
-- Hash do Processador de Imagens: `0c841813100914ad69f8cbd811c81dd08f6114e7065ba3e90be48d270cd64dbd`
+- Arquivos de entrada: 142
+- Digest das entradas: `5aeba9ff6a8d3f644a989d6cdb20377111840b08e49c0a900348ec9c7a703ad6`
+- Hash do host: `73b6f6e01c7e3c064193435a4d2ac5058c3261093e8dadeafb315c5bd0c84e60`
+- Hash do Processador de Imagens: `80bc0781ca59dabb5e016c5a0b671de4beadbddbe8aff0bf1c2f17367255f99f`
 - Checkout atual corresponde ao manifesto: sim
 
 ## Ambiente registrado
@@ -77,5 +77,6 @@ Coletado em UTC: `2026-07-29T20:53:54.9209603Z`.
 - A Exportação mediu a primeira Lâmina do Álbum principal a 300 DPI, lendo e verificando os JPEGs originais.
 - Cada uso valida o tamanho e o SHA-256 da Foto; o corpus completo foi recalculado depois das duas alternativas.
 - A memória inclui o host e todos os processos descendentes observados.
+- A Exportação foi liberada por um segundo gate somente depois dos dois probes de Canvas.
+- Os dois hosts independentes foram iniciados antes da espera pelas Janelas, usando o mesmo marco inicial da alternativa multiwindow.
 - A queda só é forçada depois de validar o caminho do executável do PID alvo.
-- Os hosts independentes são iniciados em sequência depois que uma tentativa simultânea deixou intermitentemente um host sem Janela visível.
