@@ -253,6 +253,7 @@ vi.mock("pixi.js", () => {
   return {
     Application,
     Assets: {
+      setPreferences: vi.fn(),
       load: vi.fn(
         (url: string) =>
           new Promise<object>((resolve) => {

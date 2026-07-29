@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Application } from "pixi.js";
 
+import "../platform/pixiCspRuntime";
 import {
   createLogInstanceId,
   logReasonFromError,

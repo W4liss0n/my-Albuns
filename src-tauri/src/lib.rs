@@ -555,4 +555,18 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn production_csp_keeps_unsafe_eval_disabled_for_the_pixi_static_runtime() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let production_csp = config["app"]["security"]["csp"]
+            .as_str()
+            .expect("the production CSP is textual");
+
+        assert!(
+            !production_csp.contains("'unsafe-eval'"),
+            "the PixiJS static CSP runtime must not be replaced with unsafe-eval"
+        );
+    }
 }
