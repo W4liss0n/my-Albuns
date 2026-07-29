@@ -215,6 +215,7 @@ export class AlbumCanvasScene {
 
   performanceTarget(): CanvasPerformanceTarget | null {
     const input = this.input;
+    if (!this.previewTextures.isSettled()) return null;
     const node = [...this.photoNodes.values()].find(
       (candidate) => candidate.textureBacked,
     );

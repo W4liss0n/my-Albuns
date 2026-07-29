@@ -43,6 +43,15 @@ export class ViewportTexturePool {
     return this.entries.get(url)?.texture;
   }
 
+  isSettled() {
+    for (const entry of this.entries.values()) {
+      if (entry.desired && !entry.texture && !entry.failed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -66,7 +75,10 @@ export class ViewportTexturePool {
         })
         .catch(() => {
           entry.failed = true;
-          if (entry.desired && !this.destroyed) this.onError();
+          if (entry.desired && !this.destroyed) {
+            this.onError();
+            this.onChange();
+          }
         })
         .finally(() => {
           entry.operation = null;

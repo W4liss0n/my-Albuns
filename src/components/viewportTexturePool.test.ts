@@ -7,6 +7,7 @@ const assets = vi.hoisted(() => ({
   pending: [] as Array<{
     url: string;
     resolve(texture: object): void;
+    reject(reason: unknown): void;
   }>,
   unloads: [] as string[],
 }));
@@ -15,9 +16,9 @@ vi.mock("pixi.js", () => ({
   Assets: {
     load: vi.fn(
       (url: string) =>
-        new Promise<object>((resolve) => {
+        new Promise<object>((resolve, reject) => {
           assets.loads.push(url);
-          assets.pending.push({ url, resolve });
+          assets.pending.push({ url, resolve, reject });
         }),
     ),
     unload: vi.fn(async (url: string) => {
@@ -67,4 +68,30 @@ test("does not retain a texture whose sheet left the viewport while loading", as
   });
   expect(pool.get("asset://cache/photo-a.jpg")).toBeUndefined();
   expect(onChange).not.toHaveBeenCalled();
+});
+
+test("settles only after every desired texture has loaded or failed", async () => {
+  const onChange = vi.fn();
+  const onError = vi.fn();
+  const pool = new ViewportTexturePool(onChange, onError);
+
+  expect(pool.isSettled()).toBe(true);
+  pool.sync([
+    "asset://cache/photo-a.jpg",
+    "asset://cache/photo-b.jpg",
+  ]);
+  expect(pool.isSettled()).toBe(false);
+
+  assets.pending[0].resolve({ label: "preview-texture" });
+  await vi.waitFor(() => {
+    expect(pool.get("asset://cache/photo-a.jpg")).toBeDefined();
+  });
+  expect(pool.isSettled()).toBe(false);
+
+  assets.pending[1].reject(new Error("invalid texture"));
+  await vi.waitFor(() => {
+    expect(pool.isSettled()).toBe(true);
+  });
+  expect(onError).toHaveBeenCalledOnce();
+  expect(onChange).toHaveBeenCalledTimes(2);
 });
