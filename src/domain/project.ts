@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-
 import type { EditorProjection } from "./generated/EditorProjection";
 import type { ExportResult } from "./generated/ExportResult";
 import type { ProjectIntent } from "./generated/ProjectIntent";
@@ -34,12 +32,3 @@ export interface ProjectBridge {
   redo(): Promise<EditorProjection>;
   exportPreview(): Promise<ExportResult>;
 }
-
-export const tauriProjectBridge: ProjectBridge = {
-  load: () => invoke<EditorProjection>("project_state"),
-  apply: (intent) =>
-    invoke<EditorProjection>("apply_project_intent", { intent }),
-  undo: () => invoke<EditorProjection>("undo_project"),
-  redo: () => invoke<EditorProjection>("redo_project"),
-  exportPreview: () => invoke<ExportResult>("export_spike"),
-};

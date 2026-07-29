@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  tauriProjectBridge,
   type EditorProjection,
   type ProjectBridge,
 } from "./domain/project";
@@ -13,12 +12,12 @@ import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import "./App.css";
 
 interface AppProps {
-  bridge?: ProjectBridge;
+  bridge: ProjectBridge;
   graphicsProbe?: () => GraphicsDiagnostic;
 }
 
 function App({
-  bridge = tauriProjectBridge,
+  bridge,
   graphicsProbe = probeGraphics,
 }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
