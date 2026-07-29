@@ -33,6 +33,7 @@ const pixiLifecycle = vi.hoisted(() => ({
     canvas: HTMLCanvasElement;
     destroyCount: number;
     initialized: boolean;
+    resizeCount: number;
     screen: { width: number; height: number };
     stage: {
       children: unknown[];
@@ -173,6 +174,8 @@ vi.mock("pixi.js", () => {
     canvas = document.createElement("canvas");
     destroyCount = 0;
     initialized = false;
+    resizeCount = 0;
+    resizeTarget: HTMLElement | null = null;
     screen = { width: 1_200, height: 500 };
     stage = new Container();
 
@@ -182,12 +185,22 @@ vi.mock("pixi.js", () => {
 
     init(options: Record<string, unknown>) {
       pixiLifecycle.initOptions.push(options);
+      this.resizeTarget = options.resizeTo as HTMLElement;
       return new Promise<void>((resolve) => {
         pixiLifecycle.resolveInitializations.push(() => {
           this.initialized = true;
           resolve();
         });
       });
+    }
+
+    resize() {
+      this.resizeCount += 1;
+      if (!this.resizeTarget) return;
+      this.screen.width =
+        this.resizeTarget.clientWidth || this.screen.width;
+      this.screen.height =
+        this.resizeTarget.clientHeight || this.screen.height;
     }
 
     destroy() {
@@ -571,11 +584,15 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
   expect(onCenteredSheetChange).not.toHaveBeenCalled();
 });
 
-test("recalculates the automatic scale when the Canvas height changes", async () => {
+test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
   renderCanvas();
   await finishPixiInitialization();
 
-  pixiLifecycle.instances[0].screen.height = 700;
+  const host = document.querySelector(".canvas-host") as HTMLElement;
+  Object.defineProperty(host, "clientHeight", {
+    configurable: true,
+    value: 700,
+  });
   await act(async () => {
     pixiLifecycle.resizeCallbacks[0]?.(
       [],
@@ -588,6 +605,8 @@ test("recalculates the automatic scale when the Canvas height changes", async ()
     scale: { x: number };
   };
 
+  expect(pixiLifecycle.instances[0].resizeCount).toBe(1);
+  expect(pixiLifecycle.instances[0].screen.height).toBe(700);
   expect(world.scale.x).toBeCloseTo((700 - 2 * 24) / (300 + 24), 4);
 });
 

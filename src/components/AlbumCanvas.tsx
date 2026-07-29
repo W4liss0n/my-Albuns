@@ -199,6 +199,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     if (!host || typeof ResizeObserver === "undefined") return;
 
     const observer = new ResizeObserver(() => {
+      applicationRef.current?.resize();
       setCanvasSizeRevision((revision) => revision + 1);
     });
     observer.observe(host);

@@ -552,7 +552,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O Canvas contínuo do modo normal não possui Zoom. O Zoom de visualização existe exclusivamente para a Lâmina isolada no Modo de edição.
 - No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical, somente navegação horizontal.
 - Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
-- Redimensionar a Janela ou o splitter do Painel de imagens recalcula essa escala sem alterar o Projeto ou criar um estado de Zoom.
+- Redimensionar a Janela ou o splitter do Painel de imagens sincroniza primeiro a superfície do renderizador com a área útil e então recalcula essa escala, mantendo a Lâmina inteira visível sem alterar o Projeto ou criar um estado de Zoom.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.
 - `Alt` + pressionar e iniciar o arraste é consumido como Pan e não seleciona o Frame; `Alt` + roda também preserva a seleção atual.
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
@@ -569,6 +569,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Ajustar Lâmina` é o limite mínimo do Zoom; o limite máximo é calibrado no protótipo conforme nitidez e responsividade.
 - No Modo de edição, gestos diretos selecionam um ou vários Frames e permitem suas operações geométricas; os atalhos diretos de Pan e Zoom da Foto não atuam nesse modo.
 - Nesse modo, o Painel de imagens assume uma altura compacta sem desaparecer. Ao sair, o Canvas contínuo retorna à posição anterior e restaura a altura normal do Painel.
+- As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
+- Painel de imagens e Painel contextual reservam permanentemente a largura potencial de suas barras de rolagem vertical, evitando deslocamento horizontal do conteúdo quando elas aparecem ou desaparecem.
 - Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada e `Esc` retorna ao Canvas contínuo.
 - Dois cliques em uma Foto no Painel de imagens usam a Lâmina centralizada ou, no Modo de edição, a Lâmina isolada. Se houver placeholders, preenchem primeiro o mais à esquerda; sem placeholder, criam um novo Frame conforme as regras do modo.
 - O placeholder do duplo clique é ordenado pela coordenada horizontal da borda esquerda e, em empate, pela coordenada vertical da borda superior, ambas crescentes.

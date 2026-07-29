@@ -121,7 +121,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Todas as Lâminas usam a mesma escala automática, calculada para que a altura completa caiba no Canvas com margem visual ao redor.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
 - A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
-- Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens recalcula a escala automática sem criar estado de Zoom.
+- Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
 
 A margem exata e a centralização da escala continuam abertas. A largura da pré-carga, a residência de texturas e os gatilhos de descarte serão definidos por testes de estresse com Álbuns longos.
 
@@ -300,6 +300,8 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Para Decorativos, um único item sem uso pode ser removido diretamente; um item em uso ou uma seleção múltipla abre uma única confirmação conjunta.
 - Cada remoção confirmada, inclusive em lote, forma uma única ação de Undo/Redo. Nenhuma opção modifica ou exclui os Arquivos originais.
 - Exibe as mídias em uma grade de previews sem substituir o Canvas.
+- A grade começa no canto superior esquerdo, distribui as mídias por colunas e continua em novas linhas conforme a largura disponível. Quando a altura não comporta todas as linhas, somente a rolagem vertical é usada.
+- A área rolável reserva permanentemente a largura potencial da barra de rolagem para que previews e controles não mudem de posição quando ela aparece ou desaparece.
 - O menu de contexto de uma Foto oferece `Abrir no Photoshop`, com o mesmo comando e atalho do Frame preenchido.
 - Dois cliques em uma Foto usam a Lâmina centralizada no Canvas como alvo implícito; no Modo de edição, usam a única Lâmina isolada.
 - Se o alvo implícito possuir placeholders, o duplo clique preenche o mais à esquerda sem alterar sua geometria. Sem placeholder, cria um novo Frame conforme as regras do modo: primeiro Layout compatível no modo normal e Frame centralizado proporcional no Modo de edição.
@@ -340,6 +342,8 @@ Arquivos vinculados usados pelos Projetos abertos são monitorados. Eventos suce
 O estado aberto ou fechado das seções é lembrado separadamente para os contextos do Álbum, de `Design da Lâmina` e de Frame/Foto. Ao retornar a um contexto, sua disposição anterior é restaurada.
 
 Esses estados são preferências da interface reutilizadas entre Projetos e sessões; não pertencem ao Projeto e não participam de Undo/Redo.
+
+A área de rolagem do Painel reserva permanentemente a largura potencial da barra vertical. Expandir ou recolher seções não desloca horizontalmente títulos, controles ou previews quando a barra aparece ou desaparece.
 
 Um splitter vertical separa o Painel contextual da coluna formada conjuntamente por Canvas e Painel de imagens. Arrastá-lo altera a largura do Painel contextual sem permitir que ele cubra ou se sobreponha às duas regiões.
 
