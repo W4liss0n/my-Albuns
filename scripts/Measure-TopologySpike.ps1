@@ -751,6 +751,7 @@ function Open-TopologyProbeGate {
 }
 
 function Convert-CanvasTiming {
+    [OutputType([pscustomobject])]
     param(
         [Parameter(Mandatory = $true)] $Event,
         [Parameter(Mandatory = $true)]
@@ -768,7 +769,7 @@ function Convert-CanvasTiming {
     $maximum = "${Prefix}_max_frame_ms"
     $over16 = "${Prefix}_frames_over16_ms"
     $over33 = "${Prefix}_frames_over33_ms"
-    return [ordered]@{
+    return [pscustomobject][ordered]@{
         sampleCount = [long] $Event.$sampleCount
         durationMs = [double] $Event.$duration
         firstFrameLatencyMs = [double] $Event.$firstFrame
