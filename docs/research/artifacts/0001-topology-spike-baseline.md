@@ -1,6 +1,6 @@
 ---
 status: current
-document: generated-research-artifact
+document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-29
 updated: 2026-07-29
@@ -8,7 +8,7 @@ updated: 2026-07-29
 
 # Baseline preliminar das topologias
 
-Coletado em UTC: `2026-07-29T16:06:11.3511340Z`.
+Coletado em UTC: `2026-07-29T16:15:11.5288986Z`.
 [JSON bruto](0001-topology-spike-baseline.json).
 
 | Medida | A — hosts independentes | B — host multiwindow |
@@ -16,19 +16,24 @@ Coletado em UTC: `2026-07-29T16:06:11.3511340Z`.
 | Hosts do Projeto | 2 | 1 |
 | Janelas do Projeto | 2 | 2 |
 | Processos na árvore | 11 | 9 |
-| Working set agregado | 592,7 MiB | 544,8 MiB |
-| Memória privada agregada | 301,2 MiB | 294,0 MiB |
-| Memória gráfica compartilhada | 89,3 MiB | 88,8 MiB |
-| Primeiro host de A identificado | 2766 ms | não se aplica |
-| Duas Janelas identificadas | 3202 ms | 634 ms |
+| Working set agregado | 591,3 MiB | 543,9 MiB |
+| Memória privada agregada | 302,7 MiB | 289,1 MiB |
+| Memória gráfica compartilhada | 86,4 MiB | 88,8 MiB |
+| Primeiro host de A identificado | 660 ms | não se aplica |
+| Duas Janelas identificadas | 1047 ms | 667 ms |
 | Janelas depois da queda forçada | 1 (outra Janela preservada) | 0 |
 
 ## Build medida
 
-- Commit do código: `0bf3e65a81950c055a842b53ddc3b0724c7aac53`
+- Commit do código: `384463c335e35a546c33e035cfd3863f1b112f1b`
+- Build concluída em UTC: `2026-07-29T16:14:25.2702985Z`
 - Perfil: `debug`
 - Árvore de trabalho tinha mudanças alheias: sim
 - Entradas da build tinham mudanças: não
+- Arquivos de entrada: 128
+- Digest das entradas: `2ba7370d910ba27b8c74c463125c952fbca255f9c91b87b79036459894c204f8`
+- Hash do executável: `49d5a862c3519c7b8b0b0b5fe167dd08b01da4d90ff4558f8c111424e760d043`
+- Checkout atual corresponde ao manifesto: sim
 
 ## Ambiente registrado
 
