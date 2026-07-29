@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::composition::build_render_snapshot;
 use crate::model::{AlbumSnapshot, CoreError, EditorState, PROJECT_SCHEMA_VERSION, RenderSnapshot};
-use crate::sample_project::sample_editor_state;
+use crate::sample_project::{sample_editor_state, sample_editor_state_with_identity};
 use crate::session::ProjectSession;
 use crate::validation::validate_album;
 
@@ -32,6 +32,18 @@ pub struct ProjectCore;
 impl ProjectCore {
     pub fn open_sample_project(sheet_count: usize) -> ProjectSession {
         ProjectSession::from_state(sample_editor_state(sheet_count))
+    }
+
+    pub fn open_sample_project_with_identity(
+        sheet_count: usize,
+        project_id: &str,
+        project_name: &str,
+    ) -> ProjectSession {
+        ProjectSession::from_state(sample_editor_state_with_identity(
+            sheet_count,
+            project_id,
+            project_name,
+        ))
     }
 
     pub fn load_persisted_revision(source: &str) -> Result<LoadedProjectRevision, CoreError> {

@@ -1,6 +1,9 @@
 param(
     [ValidateSet('dev', 'build')]
-    [string] $Action = 'dev'
+    [string] $Action = 'dev',
+
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]] $TauriArguments
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,7 +22,7 @@ if (-not (Test-Path -LiteralPath $tauriCommand)) {
 
 Push-Location $script:WorkspaceRoot
 try {
-    & $tauriCommand $Action
+    & $tauriCommand $Action @TauriArguments
     exit $LASTEXITCODE
 }
 finally {

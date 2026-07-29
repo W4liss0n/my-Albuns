@@ -4,14 +4,22 @@ use crate::model::{
 };
 
 pub(crate) fn sample_editor_state(sheet_count: usize) -> EditorState {
+    sample_editor_state_with_identity(sheet_count, "project-spike-001", "Álbum Horizonte")
+}
+
+pub(crate) fn sample_editor_state_with_identity(
+    sheet_count: usize,
+    project_id: &str,
+    project_name: &str,
+) -> EditorState {
     let sheet_count = sheet_count.max(2);
     let sheets = (1..=sheet_count)
         .map(|number| sample_sheet(number, sheet_count))
         .collect();
 
     EditorState {
-        project_id: "project-spike-001".into(),
-        project_name: "Álbum Horizonte".into(),
+        project_id: project_id.into(),
+        project_name: project_name.into(),
         album: AlbumSnapshot {
             sheets,
             media: sample_media_catalog(),

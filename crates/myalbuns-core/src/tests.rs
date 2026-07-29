@@ -30,6 +30,28 @@ fn opens_a_representative_long_album() {
 }
 
 #[test]
+fn keeps_distinct_sample_projects_isolated() {
+    let mut first =
+        ProjectCore::open_sample_project_with_identity(12, "project-spike-001", "Álbum Horizonte");
+    let second =
+        ProjectCore::open_sample_project_with_identity(12, "project-spike-002", "Álbum Aurora");
+
+    first
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: "frame-01-a".into(),
+            delta_pan_x: 0.25,
+            delta_pan_y: 0.0,
+            delta_zoom: 0.0,
+        })
+        .expect("the first project accepts an isolated pan");
+
+    assert_eq!(first.state().project_id, "project-spike-001");
+    assert_eq!(first.state().revision, 1);
+    assert_eq!(second.state().project_id, "project-spike-002");
+    assert_eq!(second.state().revision, 0);
+}
+
+#[test]
 fn commits_one_domain_revision_for_a_completed_pan_gesture() {
     let mut session = ProjectCore::open_sample_project(12);
 

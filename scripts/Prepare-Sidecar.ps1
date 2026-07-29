@@ -9,7 +9,16 @@ try {
         exit $LASTEXITCODE
     }
 
-    $source = (Resolve-Path (Join-Path $script:WorkspaceRoot 'target\debug\myalbuns-imaging.exe')).Path
+    $targetDirectory = if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
+        Join-Path $script:WorkspaceRoot 'target'
+    }
+    elseif ([System.IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) {
+        [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
+    }
+    else {
+        [System.IO.Path]::GetFullPath((Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR))
+    }
+    $source = (Resolve-Path (Join-Path $targetDirectory 'debug\myalbuns-imaging.exe')).Path
     $binaryDirectory = Join-Path $script:WorkspaceRoot 'src-tauri\binaries'
     $destination = Join-Path $binaryDirectory 'myalbuns-imaging-x86_64-pc-windows-msvc.exe'
 

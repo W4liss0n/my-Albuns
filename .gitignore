@@ -4,5 +4,7 @@ dist/
 target/
 src-tauri/target/
 src-tauri/binaries/*.exe
+.scratch/cargo-target-tests/
+.scratch/topology-spike-target/
 *.log
 .DS_Store
