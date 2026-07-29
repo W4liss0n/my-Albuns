@@ -1,11 +1,11 @@
 use std::path::PathBuf;
 
-use myalbuns_core::ProjectCore;
+use myalbuns_core::{ProjectCore, SampleProject};
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
 
 #[test]
 fn host_and_processor_share_one_serialized_protocol() {
-    let snapshot = ProjectCore::open_sample_project(2).render_snapshot();
+    let snapshot = ProjectCore::open_sample_project(2, SampleProject::Horizon).render_snapshot();
     let request = ImagingRequest::new(
         "render-42",
         PathBuf::from(r"C:\Temp\Album_001.png"),

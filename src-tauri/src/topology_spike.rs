@@ -1,4 +1,4 @@
-use myalbuns_core::{ProjectCore, ProjectSession};
+use myalbuns_core::{ProjectCore, SampleProject};
 
 use crate::project_host::ProjectHost;
 
@@ -7,26 +7,21 @@ pub(crate) const PROJECT_SLOT_ENV: &str = "MYALBUNS_TOPOLOGY_PROJECT";
 
 #[derive(Clone, Copy)]
 pub(crate) struct TopologySpike {
-    mode: TopologyMode,
+    definition: TopologyDefinition,
 }
 
 #[derive(Clone, Copy)]
-enum TopologyMode {
-    Standard,
-    Independent(ProjectSlot),
-    Multiwindow,
+struct TopologyDefinition {
+    label: &'static str,
+    primary: ProjectWindow,
+    secondary: Option<ProjectWindow>,
 }
 
 #[derive(Clone, Copy)]
-enum ProjectSlot {
-    A,
-    B,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct SecondaryWindow {
+pub(crate) struct ProjectWindow {
     pub(crate) label: &'static str,
     pub(crate) title: &'static str,
+    sample: SampleProject,
 }
 
 impl TopologySpike {
@@ -37,17 +32,17 @@ impl TopologySpike {
     }
 
     fn from_values(mode: Option<&str>, project_slot: Option<&str>) -> Result<Self, String> {
-        let mode = match (mode, project_slot) {
-            (None, None) => TopologyMode::Standard,
+        let definition = match (mode, project_slot) {
+            (None, None) => TopologyDefinition::standard(),
             (None, Some(_)) => {
                 return Err(format!(
                     "{PROJECT_SLOT_ENV} só pode ser usado com {TOPOLOGY_ENV}=independent."
                 ));
             }
             (Some("independent"), slot) => {
-                TopologyMode::Independent(ProjectSlot::from_value(slot)?)
+                TopologyDefinition::independent(sample_project_from_value(slot)?)
             }
-            (Some("multiwindow"), None) => TopologyMode::Multiwindow,
+            (Some("multiwindow"), None) => TopologyDefinition::multiwindow(),
             (Some("multiwindow"), Some(_)) => {
                 return Err(format!(
                     "{PROJECT_SLOT_ENV} não se aplica a {TOPOLOGY_ENV}=multiwindow."
@@ -60,76 +55,92 @@ impl TopologySpike {
             }
         };
 
-        Ok(Self { mode })
+        Ok(Self { definition })
     }
 
     pub(crate) fn project_host(self) -> ProjectHost {
-        match self.mode {
-            TopologyMode::Standard => ProjectHost::new([("main", ProjectSlot::A.open_session())]),
-            TopologyMode::Independent(slot) => ProjectHost::new([("main", slot.open_session())]),
-            TopologyMode::Multiwindow => ProjectHost::new([
-                ("main", ProjectSlot::A.open_session()),
-                ("project-b", ProjectSlot::B.open_session()),
-            ]),
-        }
+        ProjectHost::new(self.definition.windows().map(|window| {
+            (
+                window.label,
+                ProjectCore::open_sample_project(12, window.sample),
+            )
+        }))
     }
 
     pub(crate) fn primary_title(self) -> &'static str {
-        match self.mode {
-            TopologyMode::Standard => "MyAlbuns — Álbum Horizonte",
-            TopologyMode::Independent(ProjectSlot::A) => "MyAlbuns — Álbum Horizonte [Topologia A]",
-            TopologyMode::Independent(ProjectSlot::B) => "MyAlbuns — Álbum Aurora [Topologia A]",
-            TopologyMode::Multiwindow => "MyAlbuns — Álbum Horizonte [Topologia B]",
-        }
+        self.definition.primary.title
     }
 
-    pub(crate) fn secondary_window(self) -> Option<SecondaryWindow> {
-        matches!(self.mode, TopologyMode::Multiwindow).then_some(SecondaryWindow {
-            label: "project-b",
-            title: "MyAlbuns — Álbum Aurora [Topologia B]",
-        })
+    pub(crate) fn secondary_window(self) -> Option<ProjectWindow> {
+        self.definition.secondary
     }
 
     pub(crate) fn label(self) -> &'static str {
-        match self.mode {
-            TopologyMode::Standard => "standard",
-            TopologyMode::Independent(_) => "independent",
-            TopologyMode::Multiwindow => "multiwindow",
-        }
+        self.definition.label
     }
 
     pub(crate) fn session_count(self) -> usize {
-        match self.mode {
-            TopologyMode::Multiwindow => 2,
-            TopologyMode::Standard | TopologyMode::Independent(_) => 1,
-        }
+        1 + usize::from(self.definition.secondary.is_some())
     }
 }
 
-impl ProjectSlot {
-    fn from_value(value: Option<&str>) -> Result<Self, String> {
-        match value {
-            None | Some("a") => Ok(Self::A),
-            Some("b") => Ok(Self::B),
-            Some(value) => Err(format!(
-                "Valor inválido em {PROJECT_SLOT_ENV}: {value}. Use a ou b."
-            )),
+impl TopologyDefinition {
+    fn standard() -> Self {
+        Self {
+            label: "standard",
+            primary: ProjectWindow {
+                label: "main",
+                title: "MyAlbuns — Álbum Horizonte",
+                sample: SampleProject::Horizon,
+            },
+            secondary: None,
         }
     }
 
-    fn open_session(self) -> ProjectSession {
-        match self {
-            Self::A => ProjectCore::open_sample_project_with_identity(
-                12,
-                "project-spike-001",
-                "Álbum Horizonte",
-            ),
-            Self::B => ProjectCore::open_sample_project_with_identity(
-                12,
-                "project-spike-002",
-                "Álbum Aurora",
-            ),
+    fn independent(sample: SampleProject) -> Self {
+        let title = match sample {
+            SampleProject::Horizon => "MyAlbuns — Álbum Horizonte [Topologia A]",
+            SampleProject::Aurora => "MyAlbuns — Álbum Aurora [Topologia A]",
+        };
+        Self {
+            label: "independent",
+            primary: ProjectWindow {
+                label: "main",
+                title,
+                sample,
+            },
+            secondary: None,
         }
+    }
+
+    fn multiwindow() -> Self {
+        Self {
+            label: "multiwindow",
+            primary: ProjectWindow {
+                label: "main",
+                title: "MyAlbuns — Álbum Horizonte [Topologia B]",
+                sample: SampleProject::Horizon,
+            },
+            secondary: Some(ProjectWindow {
+                label: "project-b",
+                title: "MyAlbuns — Álbum Aurora [Topologia B]",
+                sample: SampleProject::Aurora,
+            }),
+        }
+    }
+
+    fn windows(self) -> impl Iterator<Item = ProjectWindow> {
+        [Some(self.primary), self.secondary].into_iter().flatten()
+    }
+}
+
+fn sample_project_from_value(value: Option<&str>) -> Result<SampleProject, String> {
+    match value {
+        None | Some("a") => Ok(SampleProject::Horizon),
+        Some("b") => Ok(SampleProject::Aurora),
+        Some(value) => Err(format!(
+            "Valor inválido em {PROJECT_SLOT_ENV}: {value}. Use a ou b."
+        )),
     }
 }
 

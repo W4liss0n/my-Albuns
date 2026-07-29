@@ -12,6 +12,7 @@ pub use model::{
     RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use project::{LoadedProjectRevision, ProjectCore};
+pub use sample_project::SampleProject;
 pub use session::ProjectSession;
 
 #[cfg(test)]

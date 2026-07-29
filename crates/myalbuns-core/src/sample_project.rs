@@ -3,15 +3,20 @@ use crate::model::{
     SHEET_HEIGHT_UM, SHEET_WIDTH_UM, SheetRole, SheetSnapshot,
 };
 
-pub(crate) fn sample_editor_state(sheet_count: usize) -> EditorState {
-    sample_editor_state_with_identity(sheet_count, "project-spike-001", "Álbum Horizonte")
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SampleProject {
+    Horizon,
+    Aurora,
 }
 
-pub(crate) fn sample_editor_state_with_identity(
+pub(crate) fn sample_editor_state(
     sheet_count: usize,
-    project_id: &str,
-    project_name: &str,
+    sample_project: SampleProject,
 ) -> EditorState {
+    let (project_id, project_name) = match sample_project {
+        SampleProject::Horizon => ("project-spike-001", "Álbum Horizonte"),
+        SampleProject::Aurora => ("project-spike-002", "Álbum Aurora"),
+    };
     let sheet_count = sheet_count.max(2);
     let sheets = (1..=sheet_count)
         .map(|number| sample_sheet(number, sheet_count))

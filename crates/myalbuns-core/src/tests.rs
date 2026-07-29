@@ -3,8 +3,8 @@ use serde::Deserialize;
 use crate::composition::CompositionCore;
 use crate::{
     AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, PhotoPlacement,
-    PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, RectUm, SheetRole,
-    SheetSnapshot, VectorUm,
+    PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, ProjectSession, RectUm,
+    SampleProject, SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -22,19 +22,21 @@ struct PhotoPlacementCase {
     expected_plan: PhotoPlacementPlan,
 }
 
+fn horizon_project(sheet_count: usize) -> ProjectSession {
+    ProjectCore::open_sample_project(sheet_count, SampleProject::Horizon)
+}
+
 #[test]
 fn opens_a_representative_long_album() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = horizon_project(12);
 
     assert_eq!(session.state().album.sheets.len(), 12);
 }
 
 #[test]
 fn keeps_distinct_sample_projects_isolated() {
-    let mut first =
-        ProjectCore::open_sample_project_with_identity(12, "project-spike-001", "Álbum Horizonte");
-    let second =
-        ProjectCore::open_sample_project_with_identity(12, "project-spike-002", "Álbum Aurora");
+    let mut first = ProjectCore::open_sample_project(12, SampleProject::Horizon);
+    let second = ProjectCore::open_sample_project(12, SampleProject::Aurora);
 
     first
         .apply(ProjectIntent::TransformPhoto {
@@ -53,7 +55,7 @@ fn keeps_distinct_sample_projects_isolated() {
 
 #[test]
 fn commits_one_domain_revision_for_a_completed_pan_gesture() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
 
     let state = session
         .apply(ProjectIntent::TransformPhoto {
@@ -80,7 +82,7 @@ fn commits_one_domain_revision_for_a_completed_pan_gesture() {
 
 #[test]
 fn commits_simultaneous_pan_and_zoom_as_one_domain_revision() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
 
     let transformed = session
         .apply(ProjectIntent::TransformPhoto {
@@ -116,7 +118,7 @@ fn commits_simultaneous_pan_and_zoom_as_one_domain_revision() {
 
 #[test]
 fn undo_and_redo_restore_the_document_without_storing_view_state() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
     session
         .apply(ProjectIntent::TransformPhoto {
             frame_id: "frame-01-a".into(),
@@ -154,7 +156,7 @@ fn undo_and_redo_restore_the_document_without_storing_view_state() {
 
 #[test]
 fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
     let photo = snapshot.composition.sheets[0].frames[0]
@@ -334,7 +336,7 @@ fn assert_close(actual: f64, expected: f64, case_name: &str) {
 
 #[test]
 fn loads_a_persisted_revision_for_rendering_without_an_editable_session() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
     session
         .apply(ProjectIntent::TransformPhoto {
             frame_id: "frame-01-a".into(),
@@ -356,7 +358,7 @@ fn loads_a_persisted_revision_for_rendering_without_an_editable_session() {
 
 #[test]
 fn the_core_fills_the_leftmost_placeholder_for_a_photo_intent() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
 
     let state = session
         .apply(ProjectIntent::FillLeftmostPlaceholder {
@@ -379,7 +381,7 @@ fn the_core_fills_the_leftmost_placeholder_for_a_photo_intent() {
 
 #[test]
 fn photo_zoom_is_persistent_and_never_goes_below_fill() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = horizon_project(12);
 
     let zoomed = session
         .apply(ProjectIntent::TransformPhoto {
@@ -420,7 +422,7 @@ fn photo_zoom_is_persistent_and_never_goes_below_fill() {
 
 #[test]
 fn composition_plan_orders_frames_by_visual_stack() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = horizon_project(12);
     let mut album = session.state().album;
     album.sheets[0].frames.reverse();
 
@@ -436,7 +438,7 @@ fn composition_plan_orders_frames_by_visual_stack() {
 
 #[test]
 fn persisted_revision_rejects_invalid_media_dimensions() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = horizon_project(12);
     let persisted = session
         .persisted_revision()
         .expect("sample project can be serialized");
@@ -455,7 +457,7 @@ fn persisted_revision_rejects_invalid_media_dimensions() {
 
 #[test]
 fn persisted_revision_rejects_an_album_with_fewer_than_two_sheets() {
-    let session = ProjectCore::open_sample_project(2);
+    let session = horizon_project(2);
     let persisted = session
         .persisted_revision()
         .expect("sample project can be serialized");
@@ -477,7 +479,7 @@ fn persisted_revision_rejects_an_album_with_fewer_than_two_sheets() {
 
 #[test]
 fn render_snapshot_rejects_empty_internal_identifiers() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = horizon_project(12);
     let mut snapshot = session.render_snapshot();
     snapshot.composition.sheets[0].frames[0].frame_id.clear();
 

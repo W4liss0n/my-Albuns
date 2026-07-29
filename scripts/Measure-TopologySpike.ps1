@@ -24,6 +24,56 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 
+$reportText = @'
+{
+  "notMeasured": [
+    "lat\u00eancia de Pan/Zoom",
+    "vaz\u00e3o do Cache",
+    "dura\u00e7\u00e3o da Exporta\u00e7\u00e3o",
+    "recupera\u00e7\u00e3o persistida",
+    "complexidade operacional da IPC"
+  ],
+  "notes": [
+    "Baseline preliminar do esqueleto de topologia; isto n\u00e3o encerra o spike.",
+    "A mem\u00f3ria inclui o host e todos os processos descendentes observados.",
+    "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo.",
+    "Os hosts independentes s\u00e3o iniciados em sequ\u00eancia depois que uma tentativa simult\u00e2nea deixou intermitentemente um host sem Janela vis\u00edvel."
+  ],
+  "summary": {
+    "title": "Baseline preliminar das topologias",
+    "collected": "Coletado em UTC",
+    "raw": "JSON bruto",
+    "measure": "Medida",
+    "independent": "A \u2014 hosts independentes",
+    "multiwindow": "B \u2014 host multiwindow",
+    "hosts": "Hosts do Projeto",
+    "windows": "Janelas do Projeto",
+    "processes": "Processos na \u00e1rvore",
+    "workingSet": "Working set agregado",
+    "privateMemory": "Mem\u00f3ria privada agregada",
+    "gpuMemory": "Mem\u00f3ria gr\u00e1fica compartilhada",
+    "firstHost": "Primeiro host de A identificado",
+    "twoWindows": "Duas Janelas identificadas",
+    "afterCrash": "Janelas depois da queda for\u00e7ada",
+    "notApplicable": "n\u00e3o se aplica",
+    "otherPreserved": "outra Janela preservada",
+    "build": "Build medida",
+    "commit": "Commit do c\u00f3digo",
+    "profile": "Perfil",
+    "workingTreeDirty": "\u00c1rvore de trabalho tinha mudan\u00e7as alheias",
+    "buildInputsDirty": "Entradas da build tinham mudan\u00e7as",
+    "yes": "sim",
+    "no": "n\u00e3o",
+    "environment": "Ambiente registrado",
+    "operatingSystem": "Sistema",
+    "cpu": "Processador",
+    "physicalMemory": "Mem\u00f3ria f\u00edsica",
+    "notMeasured": "Campos ainda n\u00e3o medidos",
+    "notes": "Observa\u00e7\u00f5es"
+  }
+}
+'@ | ConvertFrom-Json
+
 Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -335,6 +385,101 @@ function Get-HardwareInventory {
     }
 }
 
+function Format-Mebibytes {
+    param([Parameter(Mandatory = $true)][long] $Bytes)
+
+    return ($Bytes / 1MB).ToString(
+        'N1',
+        [System.Globalization.CultureInfo]::GetCultureInfo('pt-BR')
+    )
+}
+
+function Write-TopologyMarkdownSummary {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Report,
+        [Parameter(Mandatory = $true)]
+        $Text,
+        [Parameter(Mandatory = $true)]
+        [string] $SummaryPath
+    )
+
+    $summary = $Text.summary
+    $independent = $Report.alternatives.independentHosts
+    $multiwindow = $Report.alternatives.multiwindowHost
+    $collectedDate = ([DateTime] $Report.collectedAtUtc).ToString('yyyy-MM-dd')
+    $yes = $summary.yes
+    $no = $summary.no
+    $workingTreeDirty = if ($Report.build.workingTreeDirty) { $yes } else { $no }
+    $buildInputsDirty = if ($Report.build.buildInputsDirty) { $yes } else { $no }
+    $independentAfterCrash = if (
+        $independent.forcedFailure.otherHostSurvived
+    ) {
+        "$($independent.forcedFailure.remainingWindowCount) ($($summary.otherPreserved))"
+    }
+    else {
+        "$($independent.forcedFailure.remainingWindowCount)"
+    }
+    $multiwindowAfterCrash = "$($multiwindow.forcedFailure.remainingWindowCount)"
+
+    $markdown = @(
+        '---'
+        'status: current'
+        'document: generated-research-artifact'
+        'ticket: 01-plataforma-e-arquitetura'
+        "date: $collectedDate"
+        "updated: $collectedDate"
+        '---'
+        ''
+        "# $($summary.title)"
+        ''
+        "$($summary.collected): ``$($Report.collectedAtUtc)``."
+        "[$($summary.raw)](0001-topology-spike-baseline.json)."
+        ''
+        "| $($summary.measure) | $($summary.independent) | $($summary.multiwindow) |"
+        '|---|---:|---:|'
+        "| $($summary.hosts) | $($independent.processes.hostProcessCount) | $($multiwindow.processes.hostProcessCount) |"
+        "| $($summary.windows) | $($independent.ready.windows.Count) | $($multiwindow.ready.windows.Count) |"
+        "| $($summary.processes) | $($independent.processes.processTreeCount) | $($multiwindow.processes.processTreeCount) |"
+        "| $($summary.workingSet) | $(Format-Mebibytes $independent.processes.workingSetBytes) MiB | $(Format-Mebibytes $multiwindow.processes.workingSetBytes) MiB |"
+        "| $($summary.privateMemory) | $(Format-Mebibytes $independent.processes.privateMemoryBytes) MiB | $(Format-Mebibytes $multiwindow.processes.privateMemoryBytes) MiB |"
+        "| $($summary.gpuMemory) | $(Format-Mebibytes $independent.processes.gpuMemory.sharedBytes) MiB | $(Format-Mebibytes $multiwindow.processes.gpuMemory.sharedBytes) MiB |"
+        "| $($summary.firstHost) | $($independent.ready.firstHostElapsedMs) ms | $($summary.notApplicable) |"
+        "| $($summary.twoWindows) | $($independent.ready.elapsedMs) ms | $($multiwindow.ready.elapsedMs) ms |"
+        "| $($summary.afterCrash) | $independentAfterCrash | $multiwindowAfterCrash |"
+        ''
+        "## $($summary.build)"
+        ''
+        "- $($summary.commit): ``$($Report.build.gitCommit)``"
+        "- $($summary.profile): ``$($Report.build.profile)``"
+        "- $($summary.workingTreeDirty): $workingTreeDirty"
+        "- $($summary.buildInputsDirty): $buildInputsDirty"
+        ''
+        "## $($summary.environment)"
+        ''
+        "- $($summary.operatingSystem): $($Report.hardware.operatingSystem.caption) ``$($Report.hardware.operatingSystem.version)``"
+        "- $($summary.cpu): $($Report.hardware.cpu -join '; ')"
+        "- $($summary.physicalMemory): $(Format-Mebibytes $Report.hardware.totalPhysicalMemoryBytes) MiB"
+        ''
+        "## $($summary.notMeasured)"
+        ''
+    )
+    $markdown += @($Report.notMeasured | ForEach-Object { "- $_" })
+    $markdown += @(
+        ''
+        "## $($summary.notes)"
+        ''
+    )
+    $markdown += @($Report.notes | ForEach-Object { "- $_" })
+
+    [System.IO.File]::WriteAllText(
+        $SummaryPath,
+        ($markdown -join [System.Environment]::NewLine) +
+            [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+}
+
 $previousCargoTarget = [System.Environment]::GetEnvironmentVariable(
     'CARGO_TARGET_DIR',
     [System.EnvironmentVariableTarget]::Process
@@ -408,14 +553,26 @@ try {
     }
 
     $gitCommit = (& git -C $script:WorkspaceRoot rev-parse HEAD).Trim()
-    $gitStatus = @(& git -C $script:WorkspaceRoot status --short)
+    $workingTreeStatus = @(& git -C $script:WorkspaceRoot status --short)
+    $buildInputStatus = @(
+        & git -C $script:WorkspaceRoot status --short -- `
+            Cargo.toml `
+            Cargo.lock `
+            crates `
+            package.json `
+            package-lock.json `
+            scripts `
+            src `
+            src-tauri
+    )
     $report = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         build = [ordered]@{
             gitCommit = $gitCommit
-            dirty = $gitStatus.Count -gt 0
+            workingTreeDirty = $workingTreeStatus.Count -gt 0
+            buildInputsDirty = $buildInputStatus.Count -gt 0
             executable = $executableRelativePath
             profile = 'debug'
         }
@@ -431,19 +588,8 @@ try {
                 forcedFailure = $multiwindowFailureIsolation
             }
         }
-        notMeasured = @(
-            'Pan/Zoom latency',
-            'Cache throughput',
-            'Export duration',
-            'persisted recovery',
-            'operational IPC complexity'
-        )
-        notes = @(
-            'Preliminary topology skeleton baseline; this does not close the spike.',
-            'Memory includes the host and every observed descendant process.',
-            'A crash is forced only after validating the target PID executable path.',
-            'Independent hosts are started sequentially after a simultaneous-start trial intermittently left one host without a visible window.'
-        )
+        notMeasured = @($reportText.notMeasured)
+        notes = @($reportText.notes)
     }
 
     $outputDirectory = Split-Path -Parent $OutputPath
@@ -454,7 +600,13 @@ try {
         $json + [System.Environment]::NewLine,
         [System.Text.UTF8Encoding]::new($false)
     )
+    $summaryPath = [System.IO.Path]::ChangeExtension($OutputPath, '.md')
+    Write-TopologyMarkdownSummary `
+        -Report $report `
+        -Text $reportText `
+        -SummaryPath $summaryPath
     Write-Output "Topology spike report: $OutputPath"
+    Write-Output "Topology spike summary: $summaryPath"
     Write-Output $json
 }
 finally {

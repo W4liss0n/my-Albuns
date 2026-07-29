@@ -2,12 +2,12 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-use myalbuns_core::{ProjectCore, ProjectIntent, RenderSnapshot};
+use myalbuns_core::{ProjectCore, ProjectIntent, RenderSnapshot, SampleProject};
 use myalbuns_imaging_protocol::{ImagingRequest, ImagingResponse};
 
 #[test]
 fn processor_renders_a_png_from_a_validated_snapshot_only() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = ProjectCore::open_sample_project(12, SampleProject::Horizon);
     let snapshot = session.render_snapshot();
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("lamina-001.png");
@@ -31,7 +31,7 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
 
 #[test]
 fn processor_uses_the_composed_media_transform() {
-    let mut session = ProjectCore::open_sample_project(12);
+    let mut session = ProjectCore::open_sample_project(12, SampleProject::Horizon);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let original_path = output_dir.path().join("original.png");
     let transformed_path = output_dir.path().join("transformed.png");
@@ -59,7 +59,7 @@ fn processor_uses_the_composed_media_transform() {
 
 #[test]
 fn processor_rejects_an_invalid_snapshot() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = ProjectCore::open_sample_project(12, SampleProject::Horizon);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("invalid.png");
     let mut snapshot =
@@ -81,7 +81,7 @@ fn processor_rejects_an_invalid_snapshot() {
 
 #[test]
 fn processor_writes_correlated_logs_without_exposing_the_output_path() {
-    let session = ProjectCore::open_sample_project(12);
+    let session = ProjectCore::open_sample_project(12, SampleProject::Horizon);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let output_path = output_dir.path().join("private-album-name.png");
@@ -118,7 +118,8 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
 
 #[test]
 fn processor_redacts_path_shaped_identifiers_and_output_failures() {
-    let mut snapshot = ProjectCore::open_sample_project(12).render_snapshot();
+    let mut snapshot =
+        ProjectCore::open_sample_project(12, SampleProject::Horizon).render_snapshot();
     snapshot.project_id = r"c:\users\person\private-project".into();
     let request_id = r"c:\users\person\private-operation";
     let output_dir = tempfile::tempdir().expect("temporary output directory");

@@ -10,7 +10,7 @@ pub(crate) struct ProjectHost {
 }
 
 impl ProjectHost {
-    pub(crate) fn new<const N: usize>(sessions: [(&str, ProjectSession); N]) -> Self {
+    pub(crate) fn new(sessions: impl IntoIterator<Item = (&'static str, ProjectSession)>) -> Self {
         Self {
             sessions: sessions
                 .into_iter()
@@ -52,7 +52,7 @@ impl ProjectHost {
 
     fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
         let session = self.sessions.get(window_label).ok_or_else(|| {
-            format!("Não existe uma Sessão de Projeto para a janela {window_label}.")
+            format!("Não existe uma Sessão do Projeto para a janela {window_label}.")
         })?;
         session
             .lock()
@@ -69,7 +69,7 @@ fn project(session: &ProjectSession) -> EditorProjection {
 
 #[cfg(test)]
 mod tests {
-    use myalbuns_core::{ProjectCore, ProjectIntent};
+    use myalbuns_core::{ProjectCore, ProjectIntent, SampleProject};
 
     use super::ProjectHost;
 
@@ -78,19 +78,11 @@ mod tests {
         let host = ProjectHost::new([
             (
                 "project-a",
-                ProjectCore::open_sample_project_with_identity(
-                    12,
-                    "project-spike-001",
-                    "Álbum Horizonte",
-                ),
+                ProjectCore::open_sample_project(12, SampleProject::Horizon),
             ),
             (
                 "project-b",
-                ProjectCore::open_sample_project_with_identity(
-                    12,
-                    "project-spike-002",
-                    "Álbum Aurora",
-                ),
+                ProjectCore::open_sample_project(12, SampleProject::Aurora),
             ),
         ]);
 

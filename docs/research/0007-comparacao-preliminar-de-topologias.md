@@ -28,6 +28,8 @@ encerra o ticket 01 e não muda o ADR 0005 para `accepted`.
 
 Os dados brutos estão em
 [0001-topology-spike-baseline.json](artifacts/0001-topology-spike-baseline.json).
+O resumo numérico, gerado da mesma estrutura em cada execução, está em
+[0001-topology-spike-baseline.md](artifacts/0001-topology-spike-baseline.md).
 
 ## Corte implementado
 
@@ -68,8 +70,8 @@ O comando `npm run spike:topology`:
 6. força a queda de um host depois de validar que o PID pertence ao executável
    do ensaio;
 7. repete a coleta com duas Janelas no host multiwindow;
-8. grava hardware, commit, estado da árvore, dados brutos e campos ainda não
-   medidos.
+8. grava hardware, commit, estado da árvore, dados brutos e um resumo Markdown
+   derivado da mesma estrutura.
 
 Os hosts de A são iniciados sequencialmente. Em uma tentativa de início
 simultâneo, um dos dois processos permaneceu vivo sem apresentar Janela dentro
@@ -85,14 +87,10 @@ somente para validar o instrumento nesta rodada.
 
 ## Ambiente
 
-| Item | Valor observado |
-|---|---|
-| Sistema | Windows 11 Pro `10.0.26200` |
-| Processador | Intel Core i5-13450HX |
-| Memória física | 25.439.191.040 bytes |
-| GPU dedicada | NVIDIA GeForce RTX 3050 6GB Laptop GPU |
-| GPU integrada | Intel UHD Graphics |
-| Perfil da build | `debug` |
+Sistema, processador, memória física, adaptadores gráficos, commit e perfil da
+build são registrados pelo instrumento. Os valores da última execução ficam no
+[resumo gerado](artifacts/0001-topology-spike-baseline.md), evitando uma segunda
+cópia manual que possa divergir dos dados brutos.
 
 O contador registrou somente memória gráfica compartilhada e zero bytes
 dedicados para as árvores observadas. Esse resultado não comprova por si só o
@@ -101,24 +99,10 @@ do ticket continua necessária.
 
 ## Resultado bruto resumido
 
-| Medida | A — hosts independentes | B — host multiwindow |
-|---|---:|---:|
-| Hosts de Projeto | 2 | 1 |
-| Janelas de Projeto | 2 | 2 |
-| Processos na árvore | 11 | 9 |
-| Working set agregado | 601,2 MiB | 542,9 MiB |
-| Memória privada agregada | 307,0 MiB | 292,7 MiB |
-| Memória gráfica compartilhada | 85,3 MiB | 88,8 MiB |
-| Primeiro host de A identificado | 578 ms | não se aplica |
-| Duas Janelas identificadas | 971 ms | 549 ms |
-| Outra Janela após queda de um host | preservada | não se aplica |
-| Janelas após queda do host comum | não se aplica | nenhuma |
-
-Nesta amostra, B usou aproximadamente 58,3 MiB menos working set e 14,3 MiB
-menos memória privada, além de dois processos descendentes a menos. A diferença
-de memória gráfica foi pequena e em sentido contrário. Uma única amostra debug,
-sem estabilização prolongada e com ordem fixa não sustenta decisão de
-arquitetura.
+O [resumo gerado](artifacts/0001-topology-spike-baseline.md) é a única tabela
+numérica legível desta coleta e nasce do mesmo objeto que produz o JSON. Uma
+única amostra debug, sem estabilização prolongada e com ordem fixa não sustenta
+decisão de arquitetura.
 
 O resultado de falha é estrutural e já distingue as alternativas: A limita a
 queda ao Projeto cujo host foi encerrado; B compartilha o domínio de falha das
@@ -129,8 +113,9 @@ queda do processo global e queda do Processador de Imagens.
 
 Os testes adicionados verificam duas fronteiras:
 
-- `ProjectCore::open_sample_project_with_identity` abre identidades distintas e
-  uma intenção aplicada ao primeiro Projeto não altera a revisão do segundo;
+- `ProjectCore::open_sample_project` recebe uma fixture tipada, abre identidades
+  distintas e uma intenção aplicada ao primeiro Projeto não altera a revisão do
+  segundo;
 - `ProjectHost` encaminha a intenção pela Janela correta e preserva a sessão da
   outra Janela.
 
@@ -153,9 +138,9 @@ Nova coleta usando a build isolada já existente:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-TopologySpike.ps1 -SkipBuild
 ```
 
-Cada execução substitui o artefato de baseline. A aceitação final deve usar uma
-build identificada por commit limpo, repetir a ordem das alternativas e
-registrar amostras suficientes para reduzir o efeito de aquecimento.
+Cada execução substitui o JSON e seu resumo derivado. A aceitação final deve
+usar uma build cujas entradas estejam limpas, repetir a ordem das alternativas
+e registrar amostras suficientes para reduzir o efeito de aquecimento.
 
 ## Próximo gate
 
