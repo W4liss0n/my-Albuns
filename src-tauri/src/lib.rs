@@ -1,4 +1,5 @@
 mod benchmark_corpus;
+mod imaging_processor;
 mod logging;
 mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
@@ -11,14 +12,14 @@ use std::time::Instant;
 
 use myalbuns_core::{EditorProjection, ExportResult, ProjectIntent};
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse, RenderFailureStage,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
 };
-use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier};
+use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
+use imaging_processor::{InvocationContext, invoke_cache_with_restart, invoke_export_once};
 use logging::{LoggingState, frontend_log};
 use project_host::ProjectHost;
 use topology_benchmark::{
@@ -179,17 +180,27 @@ async fn prepare_media_previews(
             format!("Não foi possível preparar o Cache: {error}")
         })?;
     payload.push(b'\n');
-    let stdout = invoke_imaging_sidecar(&app, &logging, payload, &request_id, safe_project_id)
-        .await
-        .map_err(|failure| {
-            log_media_cache_failure(
-                &request_id,
-                safe_project_id,
-                failure.stage,
-                failure.exit_code,
-            );
-            failure.message
-        })?;
+    let stdout = invoke_cache_with_restart(
+        &app,
+        &logging,
+        &app_paths,
+        &cache_paths,
+        &payload,
+        InvocationContext {
+            operation_id: &request_id,
+            project_id: safe_project_id,
+        },
+    )
+    .await
+    .map_err(|failure| {
+        log_media_cache_failure(
+            &request_id,
+            safe_project_id,
+            failure.stage,
+            failure.exit_code,
+        );
+        failure.message
+    })?;
     let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
         log_media_cache_failure(&request_id, safe_project_id, "decode_response", None);
         format!("Resposta inválida do Processador de Imagens: {error}")
@@ -304,14 +315,27 @@ async fn export_spike(
         format!("Não foi possível preparar o snapshot: {error}")
     })?;
     payload.push(b'\n');
+    let temporary_output_path = request.temporary_output_path().map_err(|error| {
+        log_export_failure(&request_id, project_id, "prepare_output", None);
+        format!("Não foi possível preparar a Exportação temporária: {error}")
+    })?;
 
     let started = Instant::now();
-    let stdout = invoke_imaging_sidecar(&app, &logging, payload, &request_id, project_id)
-        .await
-        .map_err(|failure| {
-            log_export_failure(&request_id, project_id, failure.stage, failure.exit_code);
-            failure.message
-        })?;
+    let stdout = invoke_export_once(
+        &app,
+        &logging,
+        &payload,
+        &temporary_output_path,
+        InvocationContext {
+            operation_id: &request_id,
+            project_id,
+        },
+    )
+    .await
+    .map_err(|failure| {
+        log_export_failure(&request_id, project_id, failure.stage, failure.exit_code);
+        failure.message
+    })?;
     let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
         log_export_failure(&request_id, project_id, "decode_response", None);
         format!("Resposta inválida do Processador de Imagens: {error}")
@@ -350,81 +374,6 @@ async fn export_spike(
         width_px: completed.width_px,
         height_px: completed.height_px,
     })
-}
-
-struct ImagingInvocationError {
-    stage: &'static str,
-    exit_code: Option<i32>,
-    message: String,
-}
-
-async fn invoke_imaging_sidecar(
-    app: &AppHandle,
-    logging: &LoggingState,
-    payload: Vec<u8>,
-    operation_id: &str,
-    project_id: Option<&str>,
-) -> Result<Vec<u8>, ImagingInvocationError> {
-    let sidecar = app
-        .shell()
-        .sidecar("myalbuns-imaging")
-        .map_err(|error| ImagingInvocationError {
-            stage: "resolve_sidecar",
-            exit_code: None,
-            message: format!("Processador de Imagens indisponível: {error}"),
-        })?
-        .env(LOG_DIRECTORY_ENV, logging.directory());
-    let (mut events, mut child) = sidecar.spawn().map_err(|error| ImagingInvocationError {
-        stage: "spawn_sidecar",
-        exit_code: None,
-        message: format!("Não foi possível iniciar o Processador de Imagens: {error}"),
-    })?;
-    child
-        .write(&payload)
-        .map_err(|error| ImagingInvocationError {
-            stage: "write_request",
-            exit_code: None,
-            message: format!("Não foi possível enviar a solicitação: {error}"),
-        })?;
-
-    let mut stdout = Vec::new();
-    let mut exit_code = None;
-    while let Some(event) = events.recv().await {
-        match event {
-            CommandEvent::Stdout(bytes) => stdout.extend(bytes),
-            CommandEvent::Stderr(bytes) => {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::DesktopHost.as_str(),
-                    protocol_version = IMAGING_PROTOCOL_VERSION,
-                    operation_id,
-                    project_id,
-                    byte_count = bytes.len(),
-                    event = "imaging_stderr_received",
-                );
-            }
-            CommandEvent::Terminated(payload) => {
-                exit_code = payload.code;
-                break;
-            }
-            _ => {}
-        }
-    }
-
-    if exit_code != Some(0) {
-        let stage = exit_code
-            .and_then(RenderFailureStage::from_exit_code)
-            .map_or("imaging_process", RenderFailureStage::as_str);
-        return Err(ImagingInvocationError {
-            stage,
-            exit_code,
-            message: format!(
-                "O Processador de Imagens terminou com o código {:?}.",
-                exit_code
-            ),
-        });
-    }
-    Ok(stdout)
 }
 
 fn log_export_failure(

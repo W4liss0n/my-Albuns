@@ -11,8 +11,8 @@ use image::{
 use myalbuns_core::ComposedFrame;
 use myalbuns_imaging_protocol::{
     CacheArtifact, CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
-    RenderFailureStage, RenderSourcePolicy,
+    ImagingCommand, ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
+    RenderCompletion, RenderSourcePolicy,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -24,22 +24,22 @@ const MICROMETERS_PER_INCH: f64 = 25_400.0;
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
 
 struct ProcessFailure {
-    render_stage: Option<RenderFailureStage>,
+    stage: Option<ImagingFailureStage>,
 }
 
 impl From<String> for ProcessFailure {
     fn from(_: String) -> Self {
-        Self { render_stage: None }
+        Self { stage: None }
     }
 }
 
 struct RenderFailure {
-    stage: RenderFailureStage,
+    stage: ImagingFailureStage,
     _message: String,
 }
 
 impl RenderFailure {
-    fn new(stage: RenderFailureStage, message: impl Into<String>) -> Self {
+    fn new(stage: ImagingFailureStage, message: impl Into<String>) -> Self {
         Self {
             stage,
             _message: message.into(),
@@ -49,14 +49,14 @@ impl RenderFailure {
 
 impl From<String> for RenderFailure {
     fn from(message: String) -> Self {
-        Self::new(RenderFailureStage::Composition, message)
+        Self::new(ImagingFailureStage::Composition, message)
     }
 }
 
 impl From<RenderFailure> for ProcessFailure {
     fn from(failure: RenderFailure) -> Self {
         Self {
-            render_stage: Some(failure.stage),
+            stage: Some(failure.stage),
         }
     }
 }
@@ -81,13 +81,14 @@ fn main() -> ExitCode {
     tracing::info!(
         target: "myalbuns.imaging",
         process_role = process_role.as_str(),
+        process_id = std::process::id(),
         protocol_version = IMAGING_PROTOCOL_VERSION,
         event = "imaging_process_started",
     );
     let exit_code = if let Err(failure) = run(&app_paths) {
         let stage = failure
-            .render_stage
-            .map_or("imaging_process", RenderFailureStage::as_str);
+            .stage
+            .map_or("imaging_process", ImagingFailureStage::as_str);
         tracing::error!(
             target: "myalbuns.imaging",
             process_role = process_role.as_str(),
@@ -97,7 +98,7 @@ fn main() -> ExitCode {
         );
         eprintln!("o Processador de Imagens não concluiu a solicitação.");
         failure
-            .render_stage
+            .stage
             .map_or(ExitCode::FAILURE, |stage| ExitCode::from(stage.exit_code()))
     } else {
         tracing::info!(
@@ -132,7 +133,9 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
             ImagingCommand::BuildCache(request) => run_cache(request, app_paths),
             ImagingCommand::ResetCache(request) => run_cache_reset(request, app_paths),
         }
-        .map_err(ProcessFailure::from);
+        .map_err(|_| ProcessFailure {
+            stage: Some(ImagingFailureStage::CacheProcessing),
+        });
     }
     let request: ImagingRequest = serde_json::from_str(&source).map_err(|error| {
         tracing::error!(
@@ -151,6 +154,7 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        process_id = std::process::id(),
         event = "imaging_request_started",
     );
 
@@ -251,6 +255,7 @@ fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> 
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        process_id = std::process::id(),
         media_count = request.sources.len(),
         event = "cache_request_started",
     );
@@ -547,17 +552,20 @@ fn render_request(request: &ImagingRequest) -> Result<RenderCompletion, RenderFa
         draw_overlay(&mut image);
     }
 
-    publish_png_atomically(&image, &request.output_path, &request.request_id)?;
+    let temporary_output_path = request
+        .temporary_output_path()
+        .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputPrepare, error))?;
+    publish_png_atomically(&image, &request.output_path, &temporary_output_path)?;
     let output_bytes = fs::metadata(&request.output_path)
         .map_err(|error| {
             RenderFailure::new(
-                RenderFailureStage::OutputVerify,
+                ImagingFailureStage::OutputVerify,
                 format!("não foi possível verificar a imagem exportada: {error}"),
             )
         })?
         .len();
     let output_sha256 = sha256_file(&request.output_path)
-        .map_err(|error| RenderFailure::new(RenderFailureStage::OutputVerify, error))?;
+        .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputVerify, error))?;
     Ok(RenderCompletion {
         width_px,
         height_px,
@@ -580,19 +588,19 @@ fn load_render_sources(
     let mut source_bytes = 0_u64;
     for source in &request.sources {
         let verified = read_verified_source(source)
-            .map_err(|error| RenderFailure::new(RenderFailureStage::SourceVerification, error))?;
+            .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceVerification, error))?;
         source_bytes = source_bytes
             .checked_add(source.source_bytes())
             .ok_or_else(|| {
                 RenderFailure::new(
-                    RenderFailureStage::SourceVerification,
+                    ImagingFailureStage::SourceVerification,
                     "o tamanho total das fontes excedeu o limite",
                 )
             })?;
         decoded.insert(
             source.media_id().to_owned(),
             decode_jpeg(source.media_id(), &verified)
-                .map_err(|error| RenderFailure::new(RenderFailureStage::SourceDecode, error))?,
+                .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?,
         );
     }
     Ok((decoded, source_bytes))
@@ -620,32 +628,16 @@ fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<RgbaImage, Strin
 fn publish_png_atomically(
     image: &RgbaImage,
     output_path: &Path,
-    request_id: &str,
+    temporary_path: &Path,
 ) -> Result<(), RenderFailure> {
-    let parent = output_path.parent().ok_or_else(|| {
-        RenderFailure::new(
-            RenderFailureStage::OutputPrepare,
-            "o destino da Exportação não possui uma pasta",
-        )
-    })?;
-    let file_name = output_path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| {
-            RenderFailure::new(
-                RenderFailureStage::OutputPrepare,
-                "o nome da Exportação é inválido",
-            )
-        })?;
-    let temporary_path = parent.join(format!(".{file_name}.{request_id}.tmp"));
     let write_result = (|| -> Result<(), RenderFailure> {
         let file = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&temporary_path)
+            .open(temporary_path)
             .map_err(|error| {
                 RenderFailure::new(
-                    RenderFailureStage::OutputPrepare,
+                    ImagingFailureStage::OutputPrepare,
                     format!("não foi possível criar a Exportação temporária: {error}"),
                 )
             })?;
@@ -659,38 +651,38 @@ fn publish_png_atomically(
             )
             .map_err(|error| {
                 RenderFailure::new(
-                    RenderFailureStage::OutputEncode,
+                    ImagingFailureStage::OutputEncode,
                     format!("não foi possível codificar a imagem exportada: {error}"),
                 )
             })?;
         writer.flush().map_err(|error| {
             RenderFailure::new(
-                RenderFailureStage::OutputEncode,
+                ImagingFailureStage::OutputEncode,
                 format!("não foi possível finalizar a imagem exportada: {error}"),
             )
         })?;
         let file = writer.into_inner().map_err(|error| {
             RenderFailure::new(
-                RenderFailureStage::OutputEncode,
+                ImagingFailureStage::OutputEncode,
                 format!("não foi possível finalizar a imagem exportada: {error}"),
             )
         })?;
         file.sync_all().map_err(|error| {
             RenderFailure::new(
-                RenderFailureStage::OutputEncode,
+                ImagingFailureStage::OutputEncode,
                 format!("não foi possível sincronizar a imagem exportada: {error}"),
             )
         })?;
         drop(file);
-        fs::rename(&temporary_path, output_path).map_err(|error| {
+        fs::rename(temporary_path, output_path).map_err(|error| {
             RenderFailure::new(
-                RenderFailureStage::OutputPublish,
+                ImagingFailureStage::OutputPublish,
                 format!("não foi possível publicar a imagem exportada: {error}"),
             )
         })
     })();
     if write_result.is_err() {
-        let _ = fs::remove_file(&temporary_path);
+        let _ = fs::remove_file(temporary_path);
     }
     write_result
 }

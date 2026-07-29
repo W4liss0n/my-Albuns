@@ -250,6 +250,55 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
 }
 
 #[test]
+fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_known_folders(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-recovery")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let published = cache
+        .preview_file("media-01", "generation-01")
+        .expect("the published path is valid");
+    let preview_temporary = cache
+        .preview_temporary_file("media-01", "generation-02", 4242)
+        .expect("the preview temporary path is valid");
+    let metadata = cache.metadata_file();
+    let metadata_temporary = cache.metadata_temporary_file(4242);
+
+    std::fs::write(&published, b"published preview").expect("the published preview is writable");
+    std::fs::write(&metadata, b"{\"schemaVersion\":1}")
+        .expect("the published metadata is writable");
+    for temporary in [&preview_temporary, &metadata_temporary] {
+        let mut file = storage
+            .create_temporary_file(temporary)
+            .expect("the stale temporary is materialized safely");
+        file.write_all(b"incomplete")
+            .expect("the stale temporary is writable");
+    }
+    drop(storage);
+
+    assert_eq!(
+        paths
+            .discard_project_cache_temporaries(&cache)
+            .expect("stale temporaries are discarded safely"),
+        2
+    );
+    assert_eq!(
+        std::fs::read(&published).expect("the published preview remains"),
+        b"published preview"
+    );
+    assert_eq!(
+        std::fs::read(&metadata).expect("the published metadata remains"),
+        b"{\"schemaVersion\":1}"
+    );
+    assert!(!preview_temporary.exists());
+    assert!(!metadata_temporary.exists());
+}
+
+#[test]
 fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let external = tempfile::tempdir().expect("external directory");

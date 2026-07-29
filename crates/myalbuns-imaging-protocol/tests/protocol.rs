@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, RenderFailureStage,
+    ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
 };
 use myalbuns_paths::AppPaths;
 
@@ -13,25 +13,26 @@ mod sample_project;
 use sample_project::SampleProject;
 
 #[test]
-fn render_failure_stages_have_stable_process_exit_codes() {
+fn imaging_failure_stages_have_stable_process_exit_codes() {
     let stages = [
-        RenderFailureStage::SourceVerification,
-        RenderFailureStage::SourceDecode,
-        RenderFailureStage::Composition,
-        RenderFailureStage::OutputPrepare,
-        RenderFailureStage::OutputEncode,
-        RenderFailureStage::OutputPublish,
-        RenderFailureStage::OutputVerify,
+        ImagingFailureStage::CacheProcessing,
+        ImagingFailureStage::SourceVerification,
+        ImagingFailureStage::SourceDecode,
+        ImagingFailureStage::Composition,
+        ImagingFailureStage::OutputPrepare,
+        ImagingFailureStage::OutputEncode,
+        ImagingFailureStage::OutputPublish,
+        ImagingFailureStage::OutputVerify,
     ];
 
     for stage in stages {
         assert_eq!(
-            RenderFailureStage::from_exit_code(stage.exit_code().into()),
+            ImagingFailureStage::from_exit_code(stage.exit_code().into()),
             Some(stage)
         );
         assert!(!stage.as_str().is_empty());
     }
-    assert_eq!(RenderFailureStage::from_exit_code(1), None);
+    assert_eq!(ImagingFailureStage::from_exit_code(1), None);
 }
 
 #[test]
@@ -76,6 +77,12 @@ fn host_and_processor_share_one_serialized_protocol() {
     let decoded_request: ImagingRequest =
         serde_json::from_value(request_json).expect("request decodes");
     assert_eq!(decoded_request, request);
+    assert_eq!(
+        request
+            .temporary_output_path()
+            .expect("the temporary path is derived from validated protocol fields"),
+        PathBuf::from(r"C:\Temp\.Album_001.png.render-42.tmp")
+    );
     assert!(
         ImagingRequest::procedural_fixture(
             r"C:\private\operation",

@@ -194,6 +194,37 @@ impl AppPaths {
         Ok(true)
     }
 
+    pub fn discard_project_cache_temporaries(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<usize, AppPathsError> {
+        if plan.root.parent() != Some(self.cache_dir().as_path()) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        plan.validate()?;
+
+        let local_data_root = self
+            .local_root
+            .parent()
+            .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
+        let local_data = open_directory(local_data_root)?;
+        let Some(application) = open_existing_direct_child(&local_data, &self.local_root)? else {
+            return Ok(0);
+        };
+        let Some(cache) = open_existing_direct_child(&application, &self.cache_dir())? else {
+            return Ok(0);
+        };
+        let Some(project) = open_existing_direct_child(&cache, &plan.root)? else {
+            return Ok(0);
+        };
+
+        let mut removed = discard_matching_files(&project, is_metadata_temporary_name)?;
+        if let Some(media) = open_existing_direct_child(&project, &plan.media_directory())? {
+            removed += discard_matching_files(&media, is_preview_temporary_name)?;
+        }
+        Ok(removed)
+    }
+
     pub fn recovery_dir(&self) -> PathBuf {
         self.local_root.join("Recovery")
     }
@@ -549,6 +580,57 @@ fn clear_cache_files(directory: &DirectoryGuard) -> Result<(), AppPathsError> {
         fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
     }
     Ok(())
+}
+
+fn discard_matching_files(
+    directory: &DirectoryGuard,
+    is_temporary: fn(&std::ffi::OsStr) -> bool,
+) -> Result<usize, AppPathsError> {
+    let mut removed = 0;
+    for entry in
+        fs::read_dir(&directory.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let path = entry.path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if is_reparse_point(&metadata) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        if metadata.is_file() && is_temporary(&entry.file_name()) {
+            fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+fn is_metadata_temporary_name(name: &std::ffi::OsStr) -> bool {
+    name.to_str()
+        .and_then(|name| name.strip_prefix("metadata.json.tmp-"))
+        .is_some_and(is_process_id)
+}
+
+fn is_preview_temporary_name(name: &std::ffi::OsStr) -> bool {
+    let Some((artifact, process_id)) = name.to_str().and_then(|name| name.rsplit_once(".tmp-"))
+    else {
+        return false;
+    };
+    let Some(components) = artifact.strip_suffix(".jpg") else {
+        return false;
+    };
+    let mut components = components.split('.');
+    matches!(
+        (components.next(), components.next(), components.next()),
+        (Some(media_id), Some(generation_id), None)
+            if valid_cache_component(media_id)
+                && valid_cache_component(generation_id)
+                && is_process_id(process_id)
+    )
+}
+
+fn is_process_id(value: &str) -> bool {
+    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn remove_empty_directory(path: &Path) -> Result<(), AppPathsError> {

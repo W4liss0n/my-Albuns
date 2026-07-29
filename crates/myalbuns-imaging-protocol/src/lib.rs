@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 pub const IMAGING_PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RenderFailureStage {
+pub enum ImagingFailureStage {
+    CacheProcessing,
     SourceVerification,
     SourceDecode,
     Composition,
@@ -17,9 +18,10 @@ pub enum RenderFailureStage {
     OutputVerify,
 }
 
-impl RenderFailureStage {
+impl ImagingFailureStage {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::CacheProcessing => "cache_processing",
             Self::SourceVerification => "source_verification",
             Self::SourceDecode => "source_decode",
             Self::Composition => "composition",
@@ -32,6 +34,7 @@ impl RenderFailureStage {
 
     pub const fn exit_code(self) -> u8 {
         match self {
+            Self::CacheProcessing => 27,
             Self::SourceVerification => 20,
             Self::SourceDecode => 21,
             Self::Composition => 22,
@@ -44,6 +47,7 @@ impl RenderFailureStage {
 
     pub const fn from_exit_code(exit_code: i32) -> Option<Self> {
         match exit_code {
+            27 => Some(Self::CacheProcessing),
             20 => Some(Self::SourceVerification),
             21 => Some(Self::SourceDecode),
             22 => Some(Self::Composition),
@@ -186,6 +190,22 @@ impl ImagingRequest {
             RenderSourcePolicy::ProceduralFixture => {}
         }
         Ok(())
+    }
+
+    pub fn temporary_output_path(&self) -> Result<PathBuf, String> {
+        let parent = self
+            .output_path
+            .parent()
+            .ok_or_else(|| "o destino da Exportação não possui uma pasta".to_string())?;
+        let file_name = self
+            .output_path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| "o nome da Exportação é inválido".to_string())?;
+        if !is_safe_identifier(&self.request_id) {
+            return Err("a Identidade da solicitação é inválida".into());
+        }
+        Ok(parent.join(format!(".{file_name}.{}.tmp", self.request_id)))
     }
 }
 

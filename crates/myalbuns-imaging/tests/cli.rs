@@ -1,13 +1,15 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheRequest, CacheResetRequest, ImagingCommand, ImagingRequest, ImagingResponse, MediaSource,
-    RenderFailureStage,
+    CacheRequest, CacheResetRequest, ImagingCommand, ImagingFailureStage, ImagingRequest,
+    ImagingResponse, MediaSource,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan};
 use sha2::{Digest, Sha256};
@@ -121,6 +123,106 @@ fn processor_replaces_an_existing_output_file() {
 }
 
 #[test]
+fn terminated_export_preserves_the_previous_output_until_an_explicit_retry() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let source_path = source_dir.path().join("linked-photo.jpg");
+    RgbImage::from_fn(512, 384, |x, y| {
+        Rgb([
+            x.wrapping_mul(17) as u8,
+            y.wrapping_mul(29) as u8,
+            x.wrapping_add(y).wrapping_mul(11) as u8,
+        ])
+    })
+    .save_with_format(&source_path, ImageFormat::Jpeg)
+    .expect("the linked JPEG fixture is written");
+    let source_bytes = std::fs::read(&source_path).expect("the source is readable");
+    let output_path = output_dir.path().join("recoverable-output.png");
+    let previous_output = b"previous completed export";
+    std::fs::write(&output_path, previous_output).expect("the previous Export is writable");
+    let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
+    let sheet = &mut snapshot.composition.sheets[0];
+    sheet.frames.truncate(1);
+    let sheet_id = sheet.sheet_id.clone();
+    let media_id = sheet.frames[0]
+        .photo
+        .as_ref()
+        .expect("the fixture frame contains a Photo")
+        .media_id
+        .clone();
+    let source = MediaSource::new(
+        media_id,
+        source_path,
+        source_bytes.len() as u64,
+        format!("{:x}", Sha256::digest(&source_bytes)),
+    )
+    .expect("the linked source is valid");
+    let failed_request = ImagingRequest::new(
+        "terminated-export",
+        output_path.clone(),
+        snapshot.clone(),
+        sheet_id.clone(),
+        300,
+        vec![source.clone()],
+    )
+    .expect("the interrupted Export request is valid");
+    let temporary_path = failed_request
+        .temporary_output_path()
+        .expect("the incomplete output path is deterministic");
+
+    let mut failed_process = spawn_render_request(&failed_request, None);
+    wait_for_file_while_running(
+        &mut failed_process,
+        &temporary_path,
+        Duration::from_secs(60),
+    );
+    failed_process
+        .kill()
+        .expect("the imaging processor is terminated during encoding");
+    let failed = failed_process
+        .wait_with_output()
+        .expect("the terminated processor is reaped");
+
+    assert!(!failed.status.success());
+    assert!(
+        serde_json::from_slice::<ImagingResponse>(&failed.stdout)
+            .ok()
+            .and_then(|response| response.completed_for("terminated-export").cloned())
+            .is_none(),
+        "a terminated processor must not announce Export success"
+    );
+    assert_eq!(
+        std::fs::read(&output_path).expect("the previous Export remains readable"),
+        previous_output
+    );
+    assert!(
+        temporary_path.is_file(),
+        "the abrupt process death leaves only its isolated temporary"
+    );
+
+    std::fs::remove_file(&temporary_path)
+        .expect("the owner discards the interrupted attempt before retrying");
+    let retry_request = ImagingRequest::new(
+        "explicit-export-retry",
+        output_path.clone(),
+        snapshot,
+        sheet_id,
+        300,
+        vec![source],
+    )
+    .expect("the explicit retry request is valid");
+    let retried = invoke_render_request(&retry_request, None);
+
+    assert!(
+        retried.status.success(),
+        "the new processor completes the explicit retry: {}",
+        String::from_utf8_lossy(&retried.stderr)
+    );
+    let published = std::fs::read(output_path).expect("the retried Export is readable");
+    assert_eq!(&published[..8], b"\x89PNG\r\n\x1a\n");
+}
+
+#[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
@@ -206,6 +308,98 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         .expect("the reuse response is correlated");
     assert_eq!(reused.generated_count, 0);
     assert_eq!(reused.reused_count, 1);
+}
+
+#[test]
+fn cache_restarts_after_termination_and_discards_the_incomplete_item() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let cache = TestCache::new("crash-recovery");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let source_path = source_dir.path().join("large-photo.jpg");
+    let source = RgbImage::from_fn(4096, 3072, |x, y| {
+        let mixed = x
+            .wrapping_mul(73_856_093)
+            .wrapping_add(y.wrapping_mul(19_349_663));
+        Rgb([
+            mixed as u8,
+            mixed.rotate_left(11) as u8,
+            mixed.rotate_left(23) as u8,
+        ])
+    });
+    source
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .expect("the large JPEG fixture is written");
+    let source_bytes = std::fs::read(&source_path).expect("the source is readable");
+    let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
+    let generation_id = format!("{}-v1-4096", &source_sha256[..16]);
+    let command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-crash-recovery",
+            cache.project_id.clone(),
+            cache.paths.clone(),
+            vec![
+                MediaSource::new(
+                    "large-media",
+                    source_path,
+                    source_bytes.len() as u64,
+                    source_sha256,
+                )
+                .expect("the source is valid"),
+            ],
+            4096,
+        )
+        .expect("the Cache request is valid"),
+    );
+
+    let mut failed_process = spawn_imaging_command(&command, Some(log_dir.path()));
+    let failed_process_id = failed_process.id();
+    let temporary_path = cache
+        .paths
+        .preview_temporary_file("large-media", &generation_id, failed_process_id)
+        .expect("the process-specific temporary path is valid");
+    wait_for_file_while_running(
+        &mut failed_process,
+        &temporary_path,
+        Duration::from_secs(60),
+    );
+    failed_process
+        .kill()
+        .expect("the imaging processor is terminated during Cache generation");
+    let failed = failed_process
+        .wait_with_output()
+        .expect("the terminated processor is reaped");
+
+    assert!(!failed.status.success());
+    assert!(!cache.paths.metadata_file().exists());
+    assert!(temporary_path.is_file());
+    let app_paths = AppPaths::discover().expect("the test can discover LocalAppData");
+    assert_eq!(
+        app_paths
+            .discard_project_cache_temporaries(&cache.paths)
+            .expect("the Cache owner discards stale temporaries"),
+        1
+    );
+    assert!(!temporary_path.exists());
+
+    let restarted_process = spawn_imaging_command(&command, Some(log_dir.path()));
+    let restarted_process_id = restarted_process.id();
+    let restarted = restarted_process
+        .wait_with_output()
+        .expect("the restarted processor exits");
+
+    assert_ne!(restarted_process_id, failed_process_id);
+    assert!(
+        restarted.status.success(),
+        "the restarted processor rebuilds the relevant item: {}",
+        String::from_utf8_lossy(&restarted.stderr)
+    );
+    let response: ImagingResponse =
+        serde_json::from_slice(&restarted.stdout).expect("the restarted response is valid");
+    let completed = response
+        .cache_completed_for("cache-crash-recovery")
+        .expect("the restarted Cache request completes");
+    assert_eq!(completed.generated_count, 1);
+    assert!(cache.paths.metadata_file().is_file());
 }
 
 #[test]
@@ -315,7 +509,7 @@ fn processor_identifies_source_verification_failures() {
 
     assert_eq!(
         result.status.code(),
-        Some(RenderFailureStage::SourceVerification.exit_code().into())
+        Some(ImagingFailureStage::SourceVerification.exit_code().into())
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
 }
@@ -340,7 +534,7 @@ fn processor_identifies_source_decode_failures() {
 
     assert_eq!(
         result.status.code(),
-        Some(RenderFailureStage::SourceDecode.exit_code().into())
+        Some(ImagingFailureStage::SourceDecode.exit_code().into())
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_decode\""));
 }
@@ -386,6 +580,11 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
         !changed.status.success(),
         "a stale generation must not be reused for changed source bytes"
     );
+    assert_eq!(
+        changed.status.code(),
+        Some(ImagingFailureStage::CacheProcessing.exit_code().into())
+    );
+    assert!(read_logs(log_dir.path()).contains("\"stage\":\"cache_processing\""));
 }
 
 #[test]
@@ -520,7 +719,7 @@ fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
     assert!(!result.status.success());
     assert_eq!(
         result.status.code(),
-        Some(RenderFailureStage::OutputPrepare.exit_code().into())
+        Some(ImagingFailureStage::OutputPrepare.exit_code().into())
     );
     let stderr = String::from_utf8_lossy(&result.stderr);
     assert!(stderr.contains("não concluiu a solicitação"));
@@ -646,13 +845,23 @@ fn invoke_real_processor(
 }
 
 fn invoke_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> std::process::Output {
-    invoke_render_payload(
-        serde_json::to_vec(request).expect("request is serializable"),
-        log_dir,
-    )
+    spawn_render_request(request, log_dir)
+        .wait_with_output()
+        .expect("processor exits")
 }
 
 fn invoke_render_payload(mut payload: Vec<u8>, log_dir: Option<&Path>) -> std::process::Output {
+    spawn_render_payload(&mut payload, log_dir)
+        .wait_with_output()
+        .expect("processor exits")
+}
+
+fn spawn_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> Child {
+    let mut payload = serde_json::to_vec(request).expect("request is serializable");
+    spawn_render_payload(&mut payload, log_dir)
+}
+
+fn spawn_render_payload(payload: &mut Vec<u8>, log_dir: Option<&Path>) -> Child {
     let mut command = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
     command
         .stdin(Stdio::piped())
@@ -667,16 +876,21 @@ fn invoke_render_payload(mut payload: Vec<u8>, log_dir: Option<&Path>) -> std::p
         .stdin
         .take()
         .expect("stdin is available")
-        .write_all(&payload)
+        .write_all(payload)
         .expect("request is sent");
-
-    child.wait_with_output().expect("processor exits")
+    child
 }
 
 fn invoke_imaging_command(
     command: &ImagingCommand,
     log_dir: Option<&Path>,
 ) -> std::process::Output {
+    spawn_imaging_command(command, log_dir)
+        .wait_with_output()
+        .expect("processor exits")
+}
+
+fn spawn_imaging_command(command: &ImagingCommand, log_dir: Option<&Path>) -> Child {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
     process
         .stdin(Stdio::piped())
@@ -694,5 +908,26 @@ fn invoke_imaging_command(
         .expect("stdin is available")
         .write_all(&payload)
         .expect("command is sent");
-    child.wait_with_output().expect("processor exits")
+    child
+}
+
+fn wait_for_file_while_running(child: &mut Child, path: &Path, timeout: Duration) {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if path.is_file() {
+            return;
+        }
+        if let Some(status) = child.try_wait().expect("processor state is observable") {
+            panic!(
+                "processor exited with {status} before materializing {}",
+                path.display()
+            );
+        }
+        assert!(
+            Instant::now() < deadline,
+            "processor did not materialize {} within {timeout:?}",
+            path.display()
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
 }
