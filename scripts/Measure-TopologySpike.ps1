@@ -12,8 +12,26 @@ Initialize-MyAlbunsToolchain
 $targetDirectory = Join-Path $script:WorkspaceRoot '.scratch\topology-spike-target'
 $executablePath = Join-Path $targetDirectory 'debug\myalbuns-desktop.exe'
 $executableRelativePath = '.scratch/topology-spike-target/debug/myalbuns-desktop.exe'
+$buildManifestPath = Join-Path $targetDirectory 'topology-build-manifest.json'
+$buildInputPathspecs = @(
+    'Cargo.toml',
+    'Cargo.lock',
+    'crates',
+    'index.html',
+    'package.json',
+    'package-lock.json',
+    'public',
+    'scripts',
+    'src',
+    'src-tauri',
+    'tests',
+    'tsconfig.json',
+    'tsconfig.node.json',
+    'vite.config.ts',
+    'vitest.config.ts'
+)
 $topologyEnvironment = 'MYALBUNS_TOPOLOGY_SPIKE'
-$projectEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT'
+$projectSlotEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT'
 $startedProcessIds = [System.Collections.Generic.List[int]]::new()
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -59,9 +77,14 @@ $reportText = @'
     "otherPreserved": "outra Janela preservada",
     "build": "Build medida",
     "commit": "Commit do c\u00f3digo",
+    "builtAt": "Build conclu\u00edda em UTC",
     "profile": "Perfil",
     "workingTreeDirty": "\u00c1rvore de trabalho tinha mudan\u00e7as alheias",
     "buildInputsDirty": "Entradas da build tinham mudan\u00e7as",
+    "buildInputCount": "Arquivos de entrada",
+    "buildInputDigest": "Digest das entradas",
+    "executableHash": "Hash do execut\u00e1vel",
+    "checkoutMatches": "Checkout atual corresponde ao manifesto",
     "yes": "sim",
     "no": "n\u00e3o",
     "environment": "Ambiente registrado",
@@ -155,30 +178,154 @@ function Set-ProcessEnvironmentValue {
     )
 }
 
+function Get-BuildInputState {
+    $relativeFiles = @(
+        & git `
+            -C $script:WorkspaceRoot `
+            ls-files `
+            --cached `
+            --others `
+            --exclude-standard `
+            -- `
+            @buildInputPathspecs
+    )
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not enumerate topology build inputs with Git.'
+    }
+
+    $inputHashes = @(
+        $relativeFiles |
+            Sort-Object -Unique |
+            ForEach-Object {
+                $relativePath = $_
+                $fullPath = Join-Path $script:WorkspaceRoot $relativePath
+                if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+                    throw "Topology build input no longer exists: $relativePath"
+                }
+                $hash = (
+                    Get-FileHash -LiteralPath $fullPath -Algorithm SHA256
+                ).Hash.ToLowerInvariant()
+                "$relativePath`0$hash"
+            }
+    )
+    $payload = [System.Text.Encoding]::UTF8.GetBytes(
+        $inputHashes -join "`n"
+    )
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = -join (
+            $sha256.ComputeHash($payload) |
+                ForEach-Object { $_.ToString('x2') }
+        )
+    }
+    finally {
+        $sha256.Dispose()
+    }
+
+    $status = @(
+        & git `
+            -C $script:WorkspaceRoot `
+            status `
+            --short `
+            -- `
+            @buildInputPathspecs
+    )
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not inspect topology build input status with Git.'
+    }
+
+    return [ordered]@{
+        fileCount = $inputHashes.Count
+        digestSha256 = $digest
+        dirty = $status.Count -gt 0
+    }
+}
+
+function New-TopologyBuildManifest {
+    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw "Topology spike executable not found at $executablePath."
+    }
+
+    $inputState = Get-BuildInputState
+    $workingTreeStatus = @(& git -C $script:WorkspaceRoot status --short)
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Could not inspect the topology build working tree.'
+    }
+    $manifest = [ordered]@{
+        manifestVersion = 1
+        builtAtUtc = [DateTime]::UtcNow.ToString('o')
+        gitCommit = (& git -C $script:WorkspaceRoot rev-parse HEAD).Trim()
+        workingTreeDirty = $workingTreeStatus.Count -gt 0
+        buildInputsDirty = $inputState.dirty
+        buildInputFileCount = $inputState.fileCount
+        buildInputDigestSha256 = $inputState.digestSha256
+        executable = $executableRelativePath
+        executableSha256 = (
+            Get-FileHash -LiteralPath $executablePath -Algorithm SHA256
+        ).Hash.ToLowerInvariant()
+        profile = 'debug'
+    }
+    $manifestJson = $manifest | ConvertTo-Json -Depth 4
+    [System.IO.File]::WriteAllText(
+        $buildManifestPath,
+        $manifestJson + [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    return $manifest
+}
+
+function Read-TopologyBuildManifest {
+    if (-not (Test-Path -LiteralPath $buildManifestPath -PathType Leaf)) {
+        throw (
+            "Topology build manifest not found at $buildManifestPath. " +
+            'Run without -SkipBuild first.'
+        )
+    }
+    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw "Topology spike executable not found at $executablePath."
+    }
+
+    $manifest = Get-Content `
+        -LiteralPath $buildManifestPath `
+        -Raw `
+        -Encoding utf8 |
+            ConvertFrom-Json
+    $executableHash = (
+        Get-FileHash -LiteralPath $executablePath -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($executableHash -ne $manifest.executableSha256) {
+        throw (
+            'Topology executable does not match its build manifest. ' +
+            'Run without -SkipBuild.'
+        )
+    }
+    return $manifest
+}
+
 function Start-TopologyProcess {
     param(
         [Parameter(Mandatory = $true)]
         [ValidateSet('independent', 'multiwindow')]
         [string] $Topology,
         [ValidateSet('a', 'b')]
-        [string] $Project
+        [string] $ProjectSlot
     )
 
     $previousTopology = [System.Environment]::GetEnvironmentVariable(
         $topologyEnvironment,
         [System.EnvironmentVariableTarget]::Process
     )
-    $previousProject = [System.Environment]::GetEnvironmentVariable(
-        $projectEnvironment,
+    $previousProjectSlot = [System.Environment]::GetEnvironmentVariable(
+        $projectSlotEnvironment,
         [System.EnvironmentVariableTarget]::Process
     )
     try {
         Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $Topology
-        if ([string]::IsNullOrWhiteSpace($Project)) {
-            Set-ProcessEnvironmentValue -Name $projectEnvironment -Value $null
+        if ([string]::IsNullOrWhiteSpace($ProjectSlot)) {
+            Set-ProcessEnvironmentValue -Name $projectSlotEnvironment -Value $null
         }
         else {
-            Set-ProcessEnvironmentValue -Name $projectEnvironment -Value $Project
+            Set-ProcessEnvironmentValue -Name $projectSlotEnvironment -Value $ProjectSlot
         }
 
         $process = Start-Process `
@@ -190,7 +337,9 @@ function Start-TopologyProcess {
     }
     finally {
         Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $previousTopology
-        Set-ProcessEnvironmentValue -Name $projectEnvironment -Value $previousProject
+        Set-ProcessEnvironmentValue `
+            -Name $projectSlotEnvironment `
+            -Value $previousProjectSlot
     }
 }
 
@@ -412,6 +561,14 @@ function Write-TopologyMarkdownSummary {
     $no = $summary.no
     $workingTreeDirty = if ($Report.build.workingTreeDirty) { $yes } else { $no }
     $buildInputsDirty = if ($Report.build.buildInputsDirty) { $yes } else { $no }
+    $checkoutMatches = if (
+        $Report.build.currentBuildInputsMatchManifest
+    ) {
+        $yes
+    }
+    else {
+        $no
+    }
     $independentAfterCrash = if (
         $independent.forcedFailure.otherHostSurvived
     ) {
@@ -425,7 +582,7 @@ function Write-TopologyMarkdownSummary {
     $markdown = @(
         '---'
         'status: current'
-        'document: generated-research-artifact'
+        'document: technical-research'
         'ticket: 01-plataforma-e-arquitetura'
         "date: $collectedDate"
         "updated: $collectedDate"
@@ -451,9 +608,14 @@ function Write-TopologyMarkdownSummary {
         "## $($summary.build)"
         ''
         "- $($summary.commit): ``$($Report.build.gitCommit)``"
+        "- $($summary.builtAt): ``$($Report.build.builtAtUtc)``"
         "- $($summary.profile): ``$($Report.build.profile)``"
         "- $($summary.workingTreeDirty): $workingTreeDirty"
         "- $($summary.buildInputsDirty): $buildInputsDirty"
+        "- $($summary.buildInputCount): $($Report.build.buildInputFileCount)"
+        "- $($summary.buildInputDigest): ``$($Report.build.buildInputDigestSha256)``"
+        "- $($summary.executableHash): ``$($Report.build.executableSha256)``"
+        "- $($summary.checkoutMatches): $checkoutMatches"
         ''
         "## $($summary.environment)"
         ''
@@ -492,19 +654,20 @@ try {
         if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
         }
+        $buildManifest = New-TopologyBuildManifest
     }
-    if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
-        throw "Topology spike executable not found at $executablePath."
+    else {
+        $buildManifest = Read-TopologyBuildManifest
     }
 
     $independentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $independentA = Start-TopologyProcess -Topology independent -Project a
+    $independentA = Start-TopologyProcess -Topology independent -ProjectSlot a
     $independentFirstReady = Wait-ForTopologyWindows `
         -RootProcessIds @($independentA.Id) `
         -ExpectedCount 1 `
         -ExpectedTitleMarker '[Topologia A]' `
         -Stopwatch $independentStopwatch
-    $independentB = Start-TopologyProcess -Topology independent -Project b
+    $independentB = Start-TopologyProcess -Topology independent -ProjectSlot b
     $independentReady = Wait-ForTopologyWindows `
         -RootProcessIds @($independentA.Id, $independentB.Id) `
         -ExpectedCount 2 `
@@ -552,29 +715,26 @@ try {
         ).Count
     }
 
-    $gitCommit = (& git -C $script:WorkspaceRoot rev-parse HEAD).Trim()
-    $workingTreeStatus = @(& git -C $script:WorkspaceRoot status --short)
-    $buildInputStatus = @(
-        & git -C $script:WorkspaceRoot status --short -- `
-            Cargo.toml `
-            Cargo.lock `
-            crates `
-            package.json `
-            package-lock.json `
-            scripts `
-            src `
-            src-tauri
-    )
+    $currentInputState = Get-BuildInputState
     $report = [ordered]@{
-        schemaVersion = 2
+        schemaVersion = 3
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         build = [ordered]@{
-            gitCommit = $gitCommit
-            workingTreeDirty = $workingTreeStatus.Count -gt 0
-            buildInputsDirty = $buildInputStatus.Count -gt 0
-            executable = $executableRelativePath
-            profile = 'debug'
+            manifestVersion = $buildManifest.manifestVersion
+            builtAtUtc = $buildManifest.builtAtUtc
+            gitCommit = $buildManifest.gitCommit
+            workingTreeDirty = $buildManifest.workingTreeDirty
+            buildInputsDirty = $buildManifest.buildInputsDirty
+            buildInputFileCount = $buildManifest.buildInputFileCount
+            buildInputDigestSha256 = $buildManifest.buildInputDigestSha256
+            executable = $buildManifest.executable
+            executableSha256 = $buildManifest.executableSha256
+            profile = $buildManifest.profile
+            currentBuildInputsMatchManifest = (
+                $currentInputState.digestSha256 -eq
+                    $buildManifest.buildInputDigestSha256
+            )
         }
         alternatives = [ordered]@{
             independentHosts = [ordered]@{

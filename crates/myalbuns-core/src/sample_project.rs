@@ -9,22 +9,34 @@ pub enum SampleProject {
     Aurora,
 }
 
+impl SampleProject {
+    pub fn project_id(self) -> &'static str {
+        match self {
+            Self::Horizon => "project-spike-001",
+            Self::Aurora => "project-spike-002",
+        }
+    }
+
+    pub fn project_name(self) -> &'static str {
+        match self {
+            Self::Horizon => "Álbum Horizonte",
+            Self::Aurora => "Álbum Aurora",
+        }
+    }
+}
+
 pub(crate) fn sample_editor_state(
     sheet_count: usize,
     sample_project: SampleProject,
 ) -> EditorState {
-    let (project_id, project_name) = match sample_project {
-        SampleProject::Horizon => ("project-spike-001", "Álbum Horizonte"),
-        SampleProject::Aurora => ("project-spike-002", "Álbum Aurora"),
-    };
     let sheet_count = sheet_count.max(2);
     let sheets = (1..=sheet_count)
         .map(|number| sample_sheet(number, sheet_count))
         .collect();
 
     EditorState {
-        project_id: project_id.into(),
-        project_name: project_name.into(),
+        project_id: sample_project.project_id().into(),
+        project_name: sample_project.project_name().into(),
         album: AlbumSnapshot {
             sheets,
             media: sample_media_catalog(),

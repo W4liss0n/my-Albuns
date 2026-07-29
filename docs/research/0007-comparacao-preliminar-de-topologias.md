@@ -62,15 +62,17 @@ O comando `npm run spike:topology`:
 
 1. prepara o sidecar e cria uma build debug com frontend embutido em um
    diretório isolado;
-2. abre Horizonte e Aurora em dois hosts independentes;
-3. espera títulos que confirmem a configuração de cada Janela;
-4. soma host, WebView2 e demais processos descendentes observados;
-5. coleta working set, memória privada, handles, threads e contadores de memória
+2. grava um manifesto com commit, estado e digest das entradas, hash do
+   executável e instante da build;
+3. abre Horizonte e Aurora em dois hosts independentes;
+4. espera títulos que confirmem a configuração de cada Janela;
+5. soma host, WebView2 e demais processos descendentes observados;
+6. coleta working set, memória privada, handles, threads e contadores de memória
    gráfica por PID;
-6. força a queda de um host depois de validar que o PID pertence ao executável
+7. força a queda de um host depois de validar que o PID pertence ao executável
    do ensaio;
-7. repete a coleta com duas Janelas no host multiwindow;
-8. grava hardware, commit, estado da árvore, dados brutos e um resumo Markdown
+8. repete a coleta com duas Janelas no host multiwindow;
+9. grava hardware, proveniência da build, dados brutos e um resumo Markdown
    derivado da mesma estrutura.
 
 Os hosts de A são iniciados sequencialmente. Em uma tentativa de início
@@ -137,6 +139,10 @@ Nova coleta usando a build isolada já existente:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-TopologySpike.ps1 -SkipBuild
 ```
+
+O modo rápido exige o manifesto criado pela build, verifica novamente o hash do
+executável e atribui a coleta ao commit gravado nesse manifesto, não ao `HEAD`
+que estiver selecionado depois.
 
 Cada execução substitui o JSON e seu resumo derivado. A aceitação final deve
 usar uma build cujas entradas estejam limpas, repetir a ordem das alternativas

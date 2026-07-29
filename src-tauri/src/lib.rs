@@ -252,7 +252,7 @@ pub fn run() {
                     secondary.label,
                     WebviewUrl::App("index.html".into()),
                 )
-                .title(secondary.title)
+                .title(secondary.title.as_str())
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(1080.0, 720.0)
                 .resizable(true)

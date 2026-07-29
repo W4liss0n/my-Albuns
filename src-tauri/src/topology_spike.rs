@@ -5,22 +5,19 @@ use crate::project_host::ProjectHost;
 pub(crate) const TOPOLOGY_ENV: &str = "MYALBUNS_TOPOLOGY_SPIKE";
 pub(crate) const PROJECT_SLOT_ENV: &str = "MYALBUNS_TOPOLOGY_PROJECT";
 
-#[derive(Clone, Copy)]
 pub(crate) struct TopologySpike {
     definition: TopologyDefinition,
 }
 
-#[derive(Clone, Copy)]
 struct TopologyDefinition {
     label: &'static str,
     primary: ProjectWindow,
     secondary: Option<ProjectWindow>,
 }
 
-#[derive(Clone, Copy)]
 pub(crate) struct ProjectWindow {
     pub(crate) label: &'static str,
-    pub(crate) title: &'static str,
+    pub(crate) title: String,
     sample: SampleProject,
 }
 
@@ -58,7 +55,7 @@ impl TopologySpike {
         Ok(Self { definition })
     }
 
-    pub(crate) fn project_host(self) -> ProjectHost {
+    pub(crate) fn project_host(&self) -> ProjectHost {
         ProjectHost::new(self.definition.windows().map(|window| {
             (
                 window.label,
@@ -67,19 +64,19 @@ impl TopologySpike {
         }))
     }
 
-    pub(crate) fn primary_title(self) -> &'static str {
-        self.definition.primary.title
+    pub(crate) fn primary_title(&self) -> &str {
+        &self.definition.primary.title
     }
 
-    pub(crate) fn secondary_window(self) -> Option<ProjectWindow> {
-        self.definition.secondary
+    pub(crate) fn secondary_window(&self) -> Option<&ProjectWindow> {
+        self.definition.secondary.as_ref()
     }
 
-    pub(crate) fn label(self) -> &'static str {
+    pub(crate) fn label(&self) -> &'static str {
         self.definition.label
     }
 
-    pub(crate) fn session_count(self) -> usize {
+    pub(crate) fn session_count(&self) -> usize {
         1 + usize::from(self.definition.secondary.is_some())
     }
 }
@@ -88,27 +85,15 @@ impl TopologyDefinition {
     fn standard() -> Self {
         Self {
             label: "standard",
-            primary: ProjectWindow {
-                label: "main",
-                title: "MyAlbuns — Álbum Horizonte",
-                sample: SampleProject::Horizon,
-            },
+            primary: ProjectWindow::new("main", SampleProject::Horizon, None),
             secondary: None,
         }
     }
 
     fn independent(sample: SampleProject) -> Self {
-        let title = match sample {
-            SampleProject::Horizon => "MyAlbuns — Álbum Horizonte [Topologia A]",
-            SampleProject::Aurora => "MyAlbuns — Álbum Aurora [Topologia A]",
-        };
         Self {
             label: "independent",
-            primary: ProjectWindow {
-                label: "main",
-                title,
-                sample,
-            },
+            primary: ProjectWindow::new("main", sample, Some("Topologia A")),
             secondary: None,
         }
     }
@@ -116,21 +101,33 @@ impl TopologyDefinition {
     fn multiwindow() -> Self {
         Self {
             label: "multiwindow",
-            primary: ProjectWindow {
-                label: "main",
-                title: "MyAlbuns — Álbum Horizonte [Topologia B]",
-                sample: SampleProject::Horizon,
-            },
-            secondary: Some(ProjectWindow {
-                label: "project-b",
-                title: "MyAlbuns — Álbum Aurora [Topologia B]",
-                sample: SampleProject::Aurora,
-            }),
+            primary: ProjectWindow::new("main", SampleProject::Horizon, Some("Topologia B")),
+            secondary: Some(ProjectWindow::new(
+                "project-b",
+                SampleProject::Aurora,
+                Some("Topologia B"),
+            )),
         }
     }
 
-    fn windows(self) -> impl Iterator<Item = ProjectWindow> {
-        [Some(self.primary), self.secondary].into_iter().flatten()
+    fn windows(&self) -> impl Iterator<Item = &ProjectWindow> {
+        std::iter::once(&self.primary).chain(self.secondary.iter())
+    }
+}
+
+impl ProjectWindow {
+    fn new(label: &'static str, sample: SampleProject, topology: Option<&str>) -> Self {
+        let title = match topology {
+            Some(topology) => {
+                format!("MyAlbuns — {} [{topology}]", sample.project_name())
+            }
+            None => format!("MyAlbuns — {}", sample.project_name()),
+        };
+        Self {
+            label,
+            title,
+            sample,
+        }
     }
 }
 
