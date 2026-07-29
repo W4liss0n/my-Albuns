@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
+    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, RenderFailureStage,
 };
 use myalbuns_paths::AppPaths;
 
@@ -11,6 +11,28 @@ use myalbuns_paths::AppPaths;
 mod sample_project;
 
 use sample_project::SampleProject;
+
+#[test]
+fn render_failure_stages_have_stable_process_exit_codes() {
+    let stages = [
+        RenderFailureStage::SourceVerification,
+        RenderFailureStage::SourceDecode,
+        RenderFailureStage::Composition,
+        RenderFailureStage::OutputPrepare,
+        RenderFailureStage::OutputEncode,
+        RenderFailureStage::OutputPublish,
+        RenderFailureStage::OutputVerify,
+    ];
+
+    for stage in stages {
+        assert_eq!(
+            RenderFailureStage::from_exit_code(stage.exit_code().into()),
+            Some(stage)
+        );
+        assert!(!stage.as_str().is_empty());
+    }
+    assert_eq!(RenderFailureStage::from_exit_code(1), None);
+}
 
 #[test]
 fn host_and_processor_share_one_serialized_protocol() {

@@ -14,6 +14,7 @@ import {
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 import type { LogEvent, Logger } from "../application/logging";
+import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import { LoggingProvider } from "./loggingContext";
 
@@ -51,6 +52,7 @@ const pixiLifecycle = vi.hoisted(() => ({
   assetLoads: [] as string[],
   assetUnloads: [] as string[],
   resolveAssetLoads: [] as Array<(texture: object) => void>,
+  rejectAssetLoads: [] as Array<(reason?: unknown) => void>,
   spriteTextures: [] as unknown[],
 }));
 
@@ -217,6 +219,9 @@ vi.mock("pixi.js", () => {
     resizeTarget: HTMLElement | null = null;
     screen = { width: 1_200, height: 500 };
     stage = new Container();
+    ticker = {
+      addOnce: (callback: () => void) => callback(),
+    };
 
     constructor() {
       pixiLifecycle.instances.push(this);
@@ -256,9 +261,10 @@ vi.mock("pixi.js", () => {
       setPreferences: vi.fn(),
       load: vi.fn(
         (url: string) =>
-          new Promise<object>((resolve) => {
+          new Promise<object>((resolve, reject) => {
             pixiLifecycle.assetLoads.push(url);
             pixiLifecycle.resolveAssetLoads.push(resolve);
+            pixiLifecycle.rejectAssetLoads.push(reject);
           }),
       ),
       unload: vi.fn(async (url: string) => {
@@ -272,6 +278,9 @@ vi.mock("pixi.js", () => {
     Rectangle: class {},
     Sprite,
     Text,
+    UPDATE_PRIORITY: {
+      UTILITY: -50,
+    },
   };
 });
 
@@ -429,6 +438,7 @@ function renderCanvas({
   projectId = "project-spike-001",
   compositionPlan = composition,
   mediaPreviewUrls,
+  performanceProbe,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
   onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
@@ -443,6 +453,7 @@ function renderCanvas({
   projectId?: string;
   compositionPlan?: CompositionPlan;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  performanceProbe?: CanvasPerformanceProbeRequest | null;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -459,6 +470,7 @@ function renderCanvas({
       projectId={projectId}
       composition={compositionPlan}
       mediaPreviewUrls={mediaPreviewUrls}
+      performanceProbe={performanceProbe}
       continuousCanvasLayout={createContinuousCanvasLayout(
         compositionPlan.sheets,
       )}
@@ -533,6 +545,7 @@ beforeEach(() => {
   pixiLifecycle.assetLoads.length = 0;
   pixiLifecycle.assetUnloads.length = 0;
   pixiLifecycle.resolveAssetLoads.length = 0;
+  pixiLifecycle.rejectAssetLoads.length = 0;
   pixiLifecycle.spriteTextures.length = 0;
   vi.stubGlobal(
     "ResizeObserver",
@@ -727,6 +740,42 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
   await waitFor(() => {
     expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
   });
+});
+
+test("reports a terminal benchmark failure when every desired texture fails", async () => {
+  const onReady = vi.fn();
+  const onFailed = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    mediaPreviewUrls: {
+      "media-001": "asset://localhost/cache/media-001.jpg",
+    },
+    performanceProbe: {
+      key: "texture-failure-probe",
+      config: {
+        warmupFrames: 1,
+        panFrames: 1,
+        zoomFrames: 1,
+      },
+      onReady,
+      onCompleted: vi.fn(),
+      onFailed,
+    },
+  });
+  await finishPixiInitialization();
+
+  await act(async () => {
+    pixiLifecycle.rejectAssetLoads[0]?.(
+      new Error("preview texture failed"),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  await waitFor(() => {
+    expect(onFailed).toHaveBeenCalledWith("texture_unavailable");
+  });
+  expect(onReady).not.toHaveBeenCalled();
 });
 
 test("reconciles only the composed sheet that changed", async () => {

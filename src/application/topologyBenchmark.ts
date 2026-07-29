@@ -1,8 +1,27 @@
-import type { CanvasPerformanceMeasurement } from "../components/canvasPerformanceProbe";
+export interface FrameTimingSummary {
+  sampleCount: number;
+  durationMs: number;
+  firstFrameLatencyMs: number;
+  meanFrameMs: number;
+  p50FrameMs: number;
+  p95FrameMs: number;
+  p99FrameMs: number;
+  maxFrameMs: number;
+  framesOver16Ms: number;
+  framesOver33Ms: number;
+}
+
+export interface CanvasPerformanceMeasurement {
+  frameId: string;
+  textureBacked: boolean;
+  pan: FrameTimingSummary;
+  zoom: FrameTimingSummary;
+}
 
 export interface TopologyBenchmarkConfig {
   probeKey: string;
   gateOpen: boolean;
+  exportGateOpen: boolean;
   warmupFrames: number;
   panFrames: number;
   zoomFrames: number;
@@ -11,6 +30,7 @@ export interface TopologyBenchmarkConfig {
 
 export interface TopologyBenchmarkBridge {
   loadConfig(): Promise<TopologyBenchmarkConfig | null>;
+  reportCanvasReady(): Promise<void>;
   reportCanvas(
     measurement: CanvasPerformanceMeasurement,
   ): Promise<void>;
@@ -19,6 +39,7 @@ export interface TopologyBenchmarkBridge {
 
 export const disabledTopologyBenchmarkBridge: TopologyBenchmarkBridge = {
   loadConfig: async () => null,
+  reportCanvasReady: async () => undefined,
   reportCanvas: async () => undefined,
   reportFailure: async () => undefined,
 };

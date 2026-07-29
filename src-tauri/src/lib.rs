@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use myalbuns_core::{EditorProjection, ExportResult, ProjectIntent};
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse, RenderFailureStage,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
@@ -23,7 +23,7 @@ use logging::{LoggingState, frontend_log};
 use project_host::ProjectHost;
 use topology_benchmark::{
     TopologyBenchmarkState, report_topology_benchmark_failure, report_topology_canvas_benchmark,
-    topology_benchmark_config,
+    report_topology_canvas_ready, topology_benchmark_config,
 };
 use topology_spike::TopologySpike;
 
@@ -412,8 +412,11 @@ async fn invoke_imaging_sidecar(
     }
 
     if exit_code != Some(0) {
+        let stage = exit_code
+            .and_then(RenderFailureStage::from_exit_code)
+            .map_or("imaging_process", RenderFailureStage::as_str);
         return Err(ImagingInvocationError {
-            stage: "imaging_process",
+            stage,
             exit_code,
             message: format!(
                 "O Processador de Imagens terminou com o código {:?}.",
@@ -521,6 +524,7 @@ pub fn run() {
             prepare_media_previews,
             export_spike,
             topology_benchmark_config,
+            report_topology_canvas_ready,
             report_topology_canvas_benchmark,
             report_topology_benchmark_failure
         ])

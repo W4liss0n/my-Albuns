@@ -1,9 +1,7 @@
 import type { CompositionPlan } from "../domain/project";
+import type { CanvasPerformanceMeasurement } from "../application/topologyBenchmark";
 import type { ViewportState } from "../state/viewport";
-import type {
-  CanvasPerformanceMeasurement,
-  CanvasPerformanceProbeConfig,
-} from "./canvasPerformanceProbe";
+import type { CanvasPerformanceProbeConfig } from "./canvasPerformanceProbe";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 
 export interface PhotoZoomPreview {
@@ -33,6 +31,7 @@ export interface CanvasMetrics {
 export interface CanvasPerformanceProbeRequest {
   key: string;
   config: CanvasPerformanceProbeConfig;
+  onReady(): Promise<void> | void;
   onCompleted(
     measurement: CanvasPerformanceMeasurement,
   ): Promise<void> | void;

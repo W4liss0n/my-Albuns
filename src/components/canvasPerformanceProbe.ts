@@ -1,3 +1,8 @@
+import type {
+  CanvasPerformanceMeasurement,
+  FrameTimingSummary,
+} from "../application/topologyBenchmark";
+
 export interface CanvasPerformanceProbeConfig {
   warmupFrames: number;
   panFrames: number;
@@ -9,40 +14,21 @@ export interface CanvasPerformanceTarget {
   textureBacked: boolean;
   previewPan(amount: number): void;
   previewZoom(amount: number): void;
+  nextRenderedFrame(): Promise<number>;
   reset(): void;
 }
 
+export type CanvasPerformanceTargetState =
+  | { status: "pending" }
+  | { status: "failed"; reason: "texture_unavailable" }
+  | { status: "ready"; target: CanvasPerformanceTarget };
+
 export interface CanvasPerformanceClock {
   now(): number;
-  nextFrame(): Promise<number>;
-}
-
-export interface FrameTimingSummary {
-  sampleCount: number;
-  durationMs: number;
-  firstFrameLatencyMs: number;
-  meanFrameMs: number;
-  p50FrameMs: number;
-  p95FrameMs: number;
-  p99FrameMs: number;
-  maxFrameMs: number;
-  framesOver16Ms: number;
-  framesOver33Ms: number;
-}
-
-export interface CanvasPerformanceMeasurement {
-  frameId: string;
-  textureBacked: boolean;
-  pan: FrameTimingSummary;
-  zoom: FrameTimingSummary;
 }
 
 const browserFrameClock: CanvasPerformanceClock = {
   now: () => performance.now(),
-  nextFrame: () =>
-    new Promise<number>((resolve) => {
-      requestAnimationFrame(resolve);
-    }),
 };
 
 export async function runCanvasPerformanceProbe(
@@ -62,12 +48,13 @@ export async function runCanvasPerformanceProbe(
     for (let index = 0; index < config.warmupFrames; index += 1) {
       throwIfAborted(signal);
       target.previewPan(wave(index, config.warmupFrames));
-      await clock.nextFrame();
+      await target.nextRenderedFrame();
     }
 
     const pan = await measureFrames(
       config.panFrames,
       (index) => target.previewPan(wave(index, config.panFrames)),
+      target,
       clock,
       signal,
     );
@@ -78,6 +65,7 @@ export async function runCanvasPerformanceProbe(
         target.previewZoom(
           0.5 + wave(index, config.zoomFrames) * 0.5,
         ),
+      target,
       clock,
       signal,
     );
@@ -96,15 +84,16 @@ export async function runCanvasPerformanceProbe(
 async function measureFrames(
   sampleCount: number,
   apply: (index: number) => void,
+  target: CanvasPerformanceTarget,
   clock: CanvasPerformanceClock,
   signal?: AbortSignal,
 ) {
   const latencies: number[] = [];
   for (let index = 0; index < sampleCount; index += 1) {
     throwIfAborted(signal);
-    apply(index);
     const requestedAt = clock.now();
-    const presentedAt = await clock.nextFrame();
+    apply(index);
+    const presentedAt = await target.nextRenderedFrame();
     throwIfAborted(signal);
     latencies.push(Math.max(0, presentedAt - requestedAt));
   }

@@ -7,6 +7,7 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
     CacheRequest, CacheResetRequest, ImagingCommand, ImagingRequest, ImagingResponse, MediaSource,
+    RenderFailureStage,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan};
 use sha2::{Digest, Sha256};
@@ -95,6 +96,28 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     assert_eq!((completion.width_px, completion.height_px), (591, 295));
     assert_eq!(completion.dpi, 25);
     assert_eq!(completion.source_count, 0);
+}
+
+#[test]
+fn processor_replaces_an_existing_output_file() {
+    let session = sample_session(SampleProject::Horizon, 2);
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let output_path = output_dir.path().join("existing-output.png");
+    std::fs::write(&output_path, b"previous export").expect("the previous output is writable");
+
+    let result = invoke_processor(
+        session.render_snapshot(),
+        &output_path,
+        "replacement-request",
+    );
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let bytes = std::fs::read(output_path).expect("replacement output is readable");
+    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
 }
 
 #[test]
@@ -268,6 +291,61 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
 }
 
 #[test]
+fn processor_identifies_source_verification_failures() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let source_path = source_dir.path().join("photo.jpg");
+    RgbImage::from_pixel(16, 12, Rgb([24, 96, 180]))
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .expect("the linked JPEG fixture is written");
+    let original = std::fs::read(&source_path).expect("the source is readable");
+    let request = single_photo_render_request(
+        output_dir.path().join("source-verification.png"),
+        "source-verification",
+        &source_path,
+        original.len() as u64,
+        format!("{:x}", Sha256::digest(&original)),
+    );
+    let mut changed = original;
+    changed[0] ^= 0xff;
+    std::fs::write(&source_path, changed).expect("the source is changed after planning");
+
+    let result = invoke_render_request(&request, Some(log_dir.path()));
+
+    assert_eq!(
+        result.status.code(),
+        Some(RenderFailureStage::SourceVerification.exit_code().into())
+    );
+    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
+}
+
+#[test]
+fn processor_identifies_source_decode_failures() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let source_path = source_dir.path().join("invalid.jpg");
+    let bytes = b"this is not a JPEG";
+    std::fs::write(&source_path, bytes).expect("the invalid source is written");
+    let request = single_photo_render_request(
+        output_dir.path().join("source-decode.png"),
+        "source-decode",
+        &source_path,
+        bytes.len() as u64,
+        format!("{:x}", Sha256::digest(bytes)),
+    );
+
+    let result = invoke_render_request(&request, Some(log_dir.path()));
+
+    assert_eq!(
+        result.status.code(),
+        Some(RenderFailureStage::SourceDecode.exit_code().into())
+    );
+    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_decode\""));
+}
+
+#[test]
 fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("integrity");
@@ -412,13 +490,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
         "processor failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let logs = std::fs::read_dir(log_dir.path())
-        .expect("log directory is readable")
-        .map(|entry| {
-            let path = entry.expect("log entry is valid").path();
-            std::fs::read_to_string(path).expect("log file is readable")
-        })
-        .collect::<String>();
+    let logs = read_logs(log_dir.path());
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_request_completed"));
     assert!(logs.contains("\"process_role\":\"imaging\""));
@@ -446,20 +518,19 @@ fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
         invoke_processor_with_log_dir(snapshot, &output_path, request_id, Some(log_dir.path()));
 
     assert!(!result.status.success());
+    assert_eq!(
+        result.status.code(),
+        Some(RenderFailureStage::OutputPrepare.exit_code().into())
+    );
     let stderr = String::from_utf8_lossy(&result.stderr);
     assert!(stderr.contains("não concluiu a solicitação"));
     assert!(!stderr.contains(request_id));
     assert!(!stderr.contains(&output_path.to_string_lossy().into_owned()));
 
-    let logs = std::fs::read_dir(log_dir.path())
-        .expect("log directory is readable")
-        .map(|entry| {
-            let path = entry.expect("log entry is valid").path();
-            std::fs::read_to_string(path).expect("log file is readable")
-        })
-        .collect::<String>();
+    let logs = read_logs(log_dir.path());
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_render_failed"));
+    assert!(logs.contains("\"stage\":\"output_prepare\""));
     assert!(logs.contains(request_id));
     assert!(!logs.contains(r"c:\users\person\private-project"));
     assert!(!logs.contains(&output_path.to_string_lossy().into_owned()));
@@ -472,6 +543,56 @@ fn invoke_processor(
 ) -> std::process::Output {
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     invoke_processor_with_log_dir(snapshot, output_path, request_id, Some(log_dir.path()))
+}
+
+fn single_photo_render_request(
+    output_path: PathBuf,
+    request_id: &str,
+    source_path: &Path,
+    source_bytes: u64,
+    source_sha256: String,
+) -> ImagingRequest {
+    let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
+    let sheet = snapshot
+        .composition
+        .sheets
+        .first_mut()
+        .expect("the fixture contains a sheet");
+    sheet.frames.truncate(1);
+    let media_id = sheet.frames[0]
+        .photo
+        .as_ref()
+        .expect("the fixture frame contains a Photo")
+        .media_id
+        .clone();
+    let sheet_id = sheet.sheet_id.clone();
+    ImagingRequest::new(
+        request_id,
+        output_path,
+        snapshot,
+        sheet_id,
+        25,
+        vec![
+            MediaSource::new(
+                media_id,
+                source_path.to_path_buf(),
+                source_bytes,
+                source_sha256,
+            )
+            .expect("the linked source is valid"),
+        ],
+    )
+    .expect("the linked-original render request is valid")
+}
+
+fn read_logs(log_dir: &Path) -> String {
+    std::fs::read_dir(log_dir)
+        .expect("log directory is readable")
+        .map(|entry| {
+            let path = entry.expect("log entry is valid").path();
+            std::fs::read_to_string(path).expect("log file is readable")
+        })
+        .collect()
 }
 
 fn invoke_processor_with_log_dir(

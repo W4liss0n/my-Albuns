@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { CanvasPerformanceMeasurement } from "../components/canvasPerformanceProbe";
+import type { CanvasPerformanceMeasurement } from "../application/topologyBenchmark";
 import { tauriTopologyBenchmarkBridge } from "./tauriTopologyBenchmarkBridge";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -16,6 +16,7 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
   const config = {
     probeKey: "independent-main",
     gateOpen: true,
+    exportGateOpen: false,
     warmupFrames: 24,
     panFrames: 120,
     zoomFrames: 120,
@@ -54,6 +55,7 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
   await expect(
     tauriTopologyBenchmarkBridge.loadConfig(),
   ).resolves.toEqual(config);
+  await tauriTopologyBenchmarkBridge.reportCanvasReady();
   await tauriTopologyBenchmarkBridge.reportCanvas(measurement);
   await tauriTopologyBenchmarkBridge.reportFailure("probe_failed");
 
@@ -63,11 +65,15 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
   );
   expect(invoke).toHaveBeenNthCalledWith(
     2,
+    "report_topology_canvas_ready",
+  );
+  expect(invoke).toHaveBeenNthCalledWith(
+    3,
     "report_topology_canvas_benchmark",
     { measurement },
   );
   expect(invoke).toHaveBeenNthCalledWith(
-    3,
+    4,
     "report_topology_benchmark_failure",
     { reason: "probe_failed" },
   );

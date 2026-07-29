@@ -10,6 +10,8 @@ export const tauriTopologyBenchmarkBridge: TopologyBenchmarkBridge = {
     invoke<TopologyBenchmarkConfig | null>(
       "topology_benchmark_config",
     ),
+  reportCanvasReady: () =>
+    invoke("report_topology_canvas_ready"),
   reportCanvas: (measurement) =>
     invoke("report_topology_canvas_benchmark", { measurement }),
   reportFailure: (reason) =>

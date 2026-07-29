@@ -7,6 +7,7 @@ import {
   Rectangle,
   Sprite,
   Text,
+  UPDATE_PRIORITY,
   type Texture,
 } from "pixi.js";
 
@@ -21,7 +22,10 @@ import type {
   PhotoTransformDelta,
   PhotoTransformPreview,
 } from "./albumCanvasContract";
-import type { CanvasPerformanceTarget } from "./canvasPerformanceProbe";
+import type {
+  CanvasPerformanceTarget,
+  CanvasPerformanceTargetState,
+} from "./canvasPerformanceProbe";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
@@ -213,19 +217,22 @@ export class AlbumCanvasScene {
     this.previewTextures.destroy();
   }
 
-  performanceTarget(): CanvasPerformanceTarget | null {
+  performanceTarget(): CanvasPerformanceTargetState {
     const input = this.input;
-    if (!this.previewTextures.isSettled()) return null;
+    if (!input || !this.previewTextures.isSettled()) {
+      return { status: "pending" };
+    }
     const node = [...this.photoNodes.values()].find(
       (candidate) => candidate.textureBacked,
     );
-    if (!input || !node) return null;
+    if (!node) {
+      return {
+        status: "failed",
+        reason: "texture_unavailable",
+      };
+    }
     const generation = this.projectGeneration;
-    const preview = (
-      pan: Vector2,
-      zoom: number,
-      placement: PhotoPlacement,
-    ) => {
+    const assertCurrent = () => {
       if (
         generation !== this.projectGeneration ||
         this.photoNodes.get(node.frameId) !== node
@@ -235,16 +242,24 @@ export class AlbumCanvasScene {
           "AbortError",
         );
       }
+    };
+    const preview = (
+      pan: Vector2,
+      zoom: number,
+      placement: PhotoPlacement,
+    ) => {
+      assertCurrent();
       applyPhotoPlacementPreview(node, zoom, placement);
       input.onTransformPreview(
         createTransformPreview(node.frameId, pan, zoom),
       );
     };
 
-    return {
+    const target: CanvasPerformanceTarget = {
       frameId: node.frameId,
-      textureBacked: node.textureBacked,
+      textureBacked: true,
       previewPan: (amount) => {
+        assertCurrent();
         setPhotoPanAids(node, true);
         const amplitude =
           Math.min(
@@ -267,6 +282,7 @@ export class AlbumCanvasScene {
         );
       },
       previewZoom: (amount) => {
+        assertCurrent();
         setPhotoPanAids(node, false);
         const zoomSpan = Math.min(
           0.6,
@@ -277,12 +293,29 @@ export class AlbumCanvasScene {
         );
         preview(node.pan, zoomed.zoom, zoomed.placement);
       },
+      nextRenderedFrame: () => {
+        assertCurrent();
+        return new Promise<number>((resolve) => {
+          this.app.ticker.addOnce(
+            () => resolve(performance.now()),
+            undefined,
+            UPDATE_PRIORITY.UTILITY,
+          );
+        });
+      },
       reset: () => {
+        if (
+          generation !== this.projectGeneration ||
+          this.photoNodes.get(node.frameId) !== node
+        ) {
+          return;
+        }
         setPhotoPanAids(node, false);
         resetPhotoPreview(node);
         input.onTransformPreview(null);
       },
     };
+    return { status: "ready", target };
   }
 
   private resetProjectScene() {

@@ -6,6 +6,56 @@ use serde::{Deserialize, Serialize};
 
 pub const IMAGING_PROTOCOL_VERSION: u32 = 2;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RenderFailureStage {
+    SourceVerification,
+    SourceDecode,
+    Composition,
+    OutputPrepare,
+    OutputEncode,
+    OutputPublish,
+    OutputVerify,
+}
+
+impl RenderFailureStage {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SourceVerification => "source_verification",
+            Self::SourceDecode => "source_decode",
+            Self::Composition => "composition",
+            Self::OutputPrepare => "output_prepare",
+            Self::OutputEncode => "output_encode",
+            Self::OutputPublish => "output_publish",
+            Self::OutputVerify => "output_verify",
+        }
+    }
+
+    pub const fn exit_code(self) -> u8 {
+        match self {
+            Self::SourceVerification => 20,
+            Self::SourceDecode => 21,
+            Self::Composition => 22,
+            Self::OutputPrepare => 23,
+            Self::OutputEncode => 24,
+            Self::OutputPublish => 25,
+            Self::OutputVerify => 26,
+        }
+    }
+
+    pub const fn from_exit_code(exit_code: i32) -> Option<Self> {
+        match exit_code {
+            20 => Some(Self::SourceVerification),
+            21 => Some(Self::SourceDecode),
+            22 => Some(Self::Composition),
+            23 => Some(Self::OutputPrepare),
+            24 => Some(Self::OutputEncode),
+            25 => Some(Self::OutputPublish),
+            26 => Some(Self::OutputVerify),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
 pub enum ImagingCommand {

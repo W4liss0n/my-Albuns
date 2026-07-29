@@ -7,6 +7,7 @@ use tauri::{State, WebviewWindow};
 use crate::{project_host::ProjectHost, topology_spike::TopologySpike};
 
 pub(crate) const PROBE_GATE_ENV: &str = "MYALBUNS_TOPOLOGY_PROBE_GATE";
+pub(crate) const EXPORT_GATE_ENV: &str = "MYALBUNS_TOPOLOGY_EXPORT_GATE";
 const WARMUP_FRAMES: usize = 24;
 const PAN_FRAMES: usize = 120;
 const ZOOM_FRAMES: usize = 120;
@@ -14,6 +15,7 @@ const ZOOM_FRAMES: usize = 120;
 pub(crate) struct TopologyBenchmarkState {
     topology: &'static str,
     gate_path: Option<PathBuf>,
+    export_gate_path: Option<PathBuf>,
     windows: HashMap<&'static str, bool>,
 }
 
@@ -22,6 +24,7 @@ pub(crate) struct TopologyBenchmarkState {
 pub(crate) struct TopologyBenchmarkConfig {
     probe_key: String,
     gate_open: bool,
+    export_gate_open: bool,
     warmup_frames: usize,
     pan_frames: usize,
     zoom_frames: usize,
@@ -55,10 +58,12 @@ struct FrameTimingSummary {
 impl TopologyBenchmarkState {
     pub(crate) fn from_environment(topology: &TopologySpike) -> Result<Self, String> {
         let gate_path = std::env::var_os(PROBE_GATE_ENV).map(PathBuf::from);
+        let export_gate_path = std::env::var_os(EXPORT_GATE_ENV).map(PathBuf::from);
         Self::new(
             topology.label(),
             topology.benchmark_window_settings(),
             gate_path,
+            export_gate_path,
         )
     }
 
@@ -66,27 +71,32 @@ impl TopologyBenchmarkState {
         topology: &'static str,
         windows: Vec<(&'static str, bool)>,
         gate_path: Option<PathBuf>,
+        export_gate_path: Option<PathBuf>,
     ) -> Result<Self, String> {
         if topology == "standard" {
-            if gate_path.is_some() {
-                return Err(format!(
-                    "{PROBE_GATE_ENV} só pode ser usado durante o spike de topologia."
-                ));
+            if gate_path.is_some() || export_gate_path.is_some() {
+                return Err(
+                    "Os gates do benchmark só podem ser usados durante o spike de topologia."
+                        .to_string(),
+                );
             }
             return Ok(Self {
                 topology,
                 gate_path: None,
+                export_gate_path: None,
                 windows: HashMap::new(),
             });
         }
         let gate_path = gate_path.ok_or_else(|| {
             format!("{PROBE_GATE_ENV} é obrigatório durante o spike de topologia.")
         })?;
-        if !gate_path.is_absolute()
-            || gate_path.file_name().is_none()
-            || gate_path.extension().and_then(|value| value.to_str()) != Some("ready")
-        {
-            return Err(format!("{PROBE_GATE_ENV} contém um caminho inválido."));
+        validate_gate_path(&gate_path, PROBE_GATE_ENV)?;
+        let export_gate_path = export_gate_path.ok_or_else(|| {
+            format!("{EXPORT_GATE_ENV} é obrigatório durante o spike de topologia.")
+        })?;
+        validate_gate_path(&export_gate_path, EXPORT_GATE_ENV)?;
+        if gate_path == export_gate_path {
+            return Err("Os gates de Canvas e Exportação precisam ser distintos.".into());
         }
         let windows = windows.into_iter().collect::<HashMap<_, _>>();
         if windows.is_empty() {
@@ -95,6 +105,7 @@ impl TopologyBenchmarkState {
         Ok(Self {
             topology,
             gate_path: Some(gate_path),
+            export_gate_path: Some(export_gate_path),
             windows,
         })
     }
@@ -111,6 +122,10 @@ impl TopologyBenchmarkState {
         Ok(Some(TopologyBenchmarkConfig {
             probe_key: format!("{}-{}-{window_label}", self.topology, std::process::id()),
             gate_open: gate_path.is_file(),
+            export_gate_open: self
+                .export_gate_path
+                .as_ref()
+                .is_some_and(|path| path.is_file()),
             warmup_frames: WARMUP_FRAMES,
             pan_frames: PAN_FRAMES,
             zoom_frames: ZOOM_FRAMES,
@@ -138,6 +153,16 @@ impl TopologyBenchmarkState {
         measurement.pan.validate(config.pan_frames)?;
         measurement.zoom.validate(config.zoom_frames)
     }
+}
+
+fn validate_gate_path(path: &std::path::Path, variable: &str) -> Result<(), String> {
+    if !path.is_absolute()
+        || path.file_name().is_none()
+        || path.extension().and_then(|value| value.to_str()) != Some("ready")
+    {
+        return Err(format!("{variable} contém um caminho inválido."));
+    }
+    Ok(())
 }
 
 impl FrameTimingSummary {
@@ -178,6 +203,31 @@ pub(crate) fn topology_benchmark_config(
     state: State<'_, TopologyBenchmarkState>,
 ) -> Result<Option<TopologyBenchmarkConfig>, String> {
     state.config_for(window.label())
+}
+
+#[tauri::command]
+pub(crate) fn report_topology_canvas_ready(
+    window: WebviewWindow,
+    state: State<'_, TopologyBenchmarkState>,
+    projects: State<'_, ProjectHost>,
+) -> Result<(), String> {
+    let config = state
+        .config_for(window.label())?
+        .ok_or_else(|| "O benchmark do Canvas não está ativo.".to_string())?;
+    if !config.gate_open {
+        return Err("O gate do benchmark do Canvas ainda está fechado.".into());
+    }
+    let project_id = projects.projection(window.label())?.state.project_id;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        process_id = std::process::id(),
+        topology = state.topology,
+        window_label = window.label(),
+        project_id = safe_log_identifier(&project_id),
+        event = "canvas_benchmark_ready",
+    );
+    Ok(())
 }
 
 #[tauri::command]
@@ -279,6 +329,7 @@ mod tests {
             "multiwindow",
             vec![("main", true), ("project-b", false)],
             Some(gate.clone()),
+            Some(directory.path().join("export.ready")),
         )
         .expect("the benchmark state is valid");
 
@@ -296,6 +347,22 @@ mod tests {
                 .expect("main config is valid")
                 .expect("the benchmark is active")
                 .run_export
+        );
+        assert!(
+            !state
+                .config_for("main")
+                .expect("main config is valid")
+                .expect("the benchmark is active")
+                .export_gate_open
+        );
+        std::fs::write(directory.path().join("export.ready"), [])
+            .expect("the runner opens the Export gate");
+        assert!(
+            state
+                .config_for("main")
+                .expect("main config is valid")
+                .expect("the benchmark is active")
+                .export_gate_open
         );
         assert!(
             !state
@@ -318,8 +385,8 @@ mod tests {
 
     #[test]
     fn standard_mode_does_not_expose_the_benchmark() {
-        let state =
-            TopologyBenchmarkState::new("standard", vec![], None).expect("standard mode is valid");
+        let state = TopologyBenchmarkState::new("standard", vec![], None, None)
+            .expect("standard mode is valid");
         assert_eq!(
             state
                 .config_for("main")

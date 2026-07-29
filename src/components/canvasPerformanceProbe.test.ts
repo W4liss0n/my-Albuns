@@ -8,12 +8,17 @@ import {
 
 function clockWithFrameLatencies(
   latencies: readonly number[],
-): CanvasPerformanceClock {
+): {
+  clock: CanvasPerformanceClock;
+  nextRenderedFrame(): Promise<number>;
+} {
   let now = 0;
   let index = 0;
   return {
-    now: () => now,
-    nextFrame: async () => {
+    clock: {
+      now: () => now,
+    },
+    nextRenderedFrame: async () => {
       now += latencies[index] ?? 16;
       index += 1;
       return now;
@@ -25,14 +30,7 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
   const previewPan = vi.fn();
   const previewZoom = vi.fn();
   const reset = vi.fn();
-  const target: CanvasPerformanceTarget = {
-    frameId: "frame-01-a",
-    textureBacked: true,
-    previewPan,
-    previewZoom,
-    reset,
-  };
-  const clock = clockWithFrameLatencies([
+  const renderedFrames = clockWithFrameLatencies([
     16,
     10,
     20,
@@ -41,6 +39,14 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
     16,
     24,
   ]);
+  const target: CanvasPerformanceTarget = {
+    frameId: "frame-01-a",
+    textureBacked: true,
+    previewPan,
+    previewZoom,
+    nextRenderedFrame: renderedFrames.nextRenderedFrame,
+    reset,
+  };
 
   const measurement = await runCanvasPerformanceProbe(
     {
@@ -49,7 +55,7 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
       zoomFrames: 3,
     },
     target,
-    clock,
+    renderedFrames.clock,
   );
 
   expect(previewPan).toHaveBeenCalledTimes(4);
@@ -86,11 +92,19 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
 });
 
 test("refuses to report a Canvas target that is not backed by a real preview texture", async () => {
+  const renderedFrames = clockWithFrameLatencies([
+    16,
+    16,
+    16,
+    16,
+    16,
+  ]);
   const target: CanvasPerformanceTarget = {
     frameId: "frame-01-a",
     textureBacked: false,
     previewPan: vi.fn(),
     previewZoom: vi.fn(),
+    nextRenderedFrame: renderedFrames.nextRenderedFrame,
     reset: vi.fn(),
   };
 
@@ -102,7 +116,43 @@ test("refuses to report a Canvas target that is not backed by a real preview tex
         zoomFrames: 2,
       },
       target,
-      clockWithFrameLatencies([16, 16, 16, 16, 16]),
+      renderedFrames.clock,
     ),
   ).rejects.toThrow("textura real");
+});
+
+test("includes synchronous preview work and waits for the Pixi-rendered frame", async () => {
+  let now = 0;
+  const renderedFrames = [5, 7, 11];
+  let renderedIndex = 0;
+  const target: CanvasPerformanceTarget = {
+    frameId: "frame-01-a",
+    textureBacked: true,
+    previewPan: () => {
+      now += 3;
+    },
+    previewZoom: () => {
+      now += 4;
+    },
+    nextRenderedFrame: async () => {
+      now += renderedFrames[renderedIndex] ?? 0;
+      renderedIndex += 1;
+      return now;
+    },
+    reset: vi.fn(),
+  };
+
+  const measurement = await runCanvasPerformanceProbe(
+    {
+      warmupFrames: 1,
+      panFrames: 1,
+      zoomFrames: 1,
+    },
+    target,
+    { now: () => now },
+  );
+
+  expect(measurement.pan.firstFrameLatencyMs).toBe(10);
+  expect(measurement.zoom.firstFrameLatencyMs).toBe(15);
+  expect(renderedIndex).toBe(3);
 });

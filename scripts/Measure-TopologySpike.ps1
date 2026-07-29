@@ -40,6 +40,7 @@ $topologyEnvironment = 'MYALBUNS_TOPOLOGY_SPIKE'
 $projectSlotEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT'
 $corpusManifestEnvironment = 'MYALBUNS_TOPOLOGY_CORPUS_MANIFEST'
 $probeGateEnvironment = 'MYALBUNS_TOPOLOGY_PROBE_GATE'
+$exportGateEnvironment = 'MYALBUNS_TOPOLOGY_EXPORT_GATE'
 $corpusManifestPath = Join-Path $script:WorkspaceRoot '.scratch\topology-corpus\manifest.json'
 $probeGateDirectory = Join-Path $script:WorkspaceRoot '.scratch\topology-probe-gates'
 $desktopLogDirectory = Join-Path $env:LOCALAPPDATA 'MyAlbuns2\Logs'
@@ -67,8 +68,9 @@ $reportText = @'
     "A Exporta\u00e7\u00e3o mediu a primeira L\u00e2mina do \u00c1lbum principal a 300 DPI, lendo e verificando os JPEGs originais.",
     "Cada uso valida o tamanho e o SHA-256 da Foto; o corpus completo foi recalculado depois das duas alternativas.",
     "A mem\u00f3ria inclui o host e todos os processos descendentes observados.",
-    "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo.",
-    "Os hosts independentes s\u00e3o iniciados em sequ\u00eancia depois que uma tentativa simult\u00e2nea deixou intermitentemente um host sem Janela vis\u00edvel."
+    "A Exporta\u00e7\u00e3o foi liberada por um segundo gate somente depois dos dois probes de Canvas.",
+    "Os dois hosts independentes foram iniciados antes da espera pelas Janelas, usando o mesmo marco inicial da alternativa multiwindow.",
+    "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo."
   ],
   "summary": {
     "title": "Intera\u00e7\u00f5es e Exporta\u00e7\u00e3o com imagens reais",
@@ -83,10 +85,10 @@ $reportText = @'
     "workingSet": "Working set agregado",
     "privateMemory": "Mem\u00f3ria privada agregada",
     "gpuMemory": "Mem\u00f3ria gr\u00e1fica compartilhada",
-    "firstHost": "Primeiro host de A identificado",
     "twoWindows": "Duas Janelas identificadas",
     "afterCrash": "Janelas depois da queda for\u00e7ada",
     "cacheReadyTime": "Duas Janelas com Cache pronto",
+    "canvasReadyTime": "Dois Canvas com texturas prontos",
     "cacheWallTime": "Dura\u00e7\u00e3o de parede do Cache frio",
     "cachePhotos": "Fotos processadas pelo Cache",
     "cacheThroughput": "Vaz\u00e3o agregada dos originais",
@@ -396,7 +398,9 @@ function Start-TopologyProcess {
         [ValidateSet('a', 'b')]
         [string] $ProjectSlot,
         [Parameter(Mandatory = $true)]
-        [string] $ProbeGatePath
+        [string] $ProbeGatePath,
+        [Parameter(Mandatory = $true)]
+        [string] $ExportGatePath
     )
 
     $previousTopology = [System.Environment]::GetEnvironmentVariable(
@@ -415,6 +419,10 @@ function Start-TopologyProcess {
         $probeGateEnvironment,
         [System.EnvironmentVariableTarget]::Process
     )
+    $previousExportGate = [System.Environment]::GetEnvironmentVariable(
+        $exportGateEnvironment,
+        [System.EnvironmentVariableTarget]::Process
+    )
     try {
         Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $Topology
         Set-ProcessEnvironmentValue `
@@ -423,6 +431,9 @@ function Start-TopologyProcess {
         Set-ProcessEnvironmentValue `
             -Name $probeGateEnvironment `
             -Value $ProbeGatePath
+        Set-ProcessEnvironmentValue `
+            -Name $exportGateEnvironment `
+            -Value $ExportGatePath
         if ([string]::IsNullOrWhiteSpace($ProjectSlot)) {
             Set-ProcessEnvironmentValue -Name $projectSlotEnvironment -Value $null
         }
@@ -448,6 +459,9 @@ function Start-TopologyProcess {
         Set-ProcessEnvironmentValue `
             -Name $probeGateEnvironment `
             -Value $previousProbeGate
+        Set-ProcessEnvironmentValue `
+            -Name $exportGateEnvironment `
+            -Value $previousExportGate
     }
 }
 
@@ -830,9 +844,12 @@ function Wait-ForTopologyBenchmark {
         [Parameter(Mandatory = $true)]
         [DateTimeOffset] $StartedAt,
         [Parameter(Mandatory = $true)]
-        [System.Diagnostics.Stopwatch] $TopologyStopwatch
+        [System.Diagnostics.Stopwatch] $TopologyStopwatch,
+        [Parameter(Mandatory = $true)]
+        [string] $ExportGatePath
     )
 
+    $exportGateOpened = $false
     $exportPrefixes = @(
         $RootProcessIds | ForEach-Object { "export-$($_)-" }
     )
@@ -884,6 +901,20 @@ function Wait-ForTopologyBenchmark {
             )
         }
 
+        $canvasReadyEvents = @(
+            $events |
+                Where-Object {
+                    $_.event -eq 'canvas_benchmark_ready' -and
+                    $_.topology -eq $Topology -and
+                    [int]$_.process_id -in $RootProcessIds
+                } |
+                Group-Object project_id |
+                ForEach-Object {
+                    $_.Group |
+                        Sort-Object timestamp |
+                        Select-Object -First 1
+                }
+        )
         $canvasEvents = @(
             $events |
                 Where-Object {
@@ -909,6 +940,15 @@ function Wait-ForTopologyBenchmark {
                 Select-Object -First 1
         )
         if (
+            -not $exportGateOpened -and
+            $canvasReadyEvents.Count -eq $ExpectedProjectCount -and
+            $canvasEvents.Count -eq $ExpectedProjectCount
+        ) {
+            Open-TopologyProbeGate -Path $ExportGatePath
+            $exportGateOpened = $true
+        }
+        if (
+            $canvasReadyEvents.Count -eq $ExpectedProjectCount -and
             $canvasEvents.Count -eq $ExpectedProjectCount -and
             $exportEvent.Count -eq 1
         ) {
@@ -925,14 +965,28 @@ function Wait-ForTopologyBenchmark {
                 throw 'The real-image Export benchmark returned invalid evidence.'
             }
 
+            $readyByProject = @{}
+            foreach ($readyEvent in $canvasReadyEvents) {
+                $readyByProject[[string]$readyEvent.project_id] = $readyEvent
+            }
             $projects = @(
                 $canvasEvents |
                     Sort-Object project_id |
                     ForEach-Object {
+                        $readyEvent = $readyByProject[[string]$_.project_id]
+                        if ($null -eq $readyEvent) {
+                            throw "Canvas readiness is missing for project $($_.project_id)."
+                        }
                         [ordered]@{
                             projectId = $_.project_id
                             processId = [int]$_.process_id
                             windowLabel = $_.window_label
+                            readyElapsedMs = [long][math]::Round(
+                                (
+                                    [DateTimeOffset]::Parse($readyEvent.timestamp) -
+                                    $StartedAt
+                                ).TotalMilliseconds
+                            )
                             frameId = $_.frame_id
                             textureBacked = [bool]$_.texture_backed
                             pan = Convert-CanvasTiming -Event $_ -Prefix pan
@@ -943,9 +997,16 @@ function Wait-ForTopologyBenchmark {
             $panTimings = @($projects | ForEach-Object { $_.pan })
             $zoomTimings = @($projects | ForEach-Object { $_.zoom })
             return [ordered]@{
-                readyElapsedMs = $TopologyStopwatch.ElapsedMilliseconds
+                completedElapsedMs = $TopologyStopwatch.ElapsedMilliseconds
                 canvas = [ordered]@{
                     projectCount = $projects.Count
+                    allProjectsReadyElapsedMs = [long](
+                        (
+                            $projects |
+                                ForEach-Object { [long]$_.readyElapsedMs } |
+                                Measure-Object -Maximum
+                        ).Maximum
+                    )
                     warmupFramesPerProject = 24
                     projects = $projects
                     aggregate = [ordered]@{
@@ -1155,9 +1216,9 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.workingSet) | $(Format-Mebibytes $independent.processes.workingSetBytes) MiB | $(Format-Mebibytes $multiwindow.processes.workingSetBytes) MiB |"
         "| $($summary.privateMemory) | $(Format-Mebibytes $independent.processes.privateMemoryBytes) MiB | $(Format-Mebibytes $multiwindow.processes.privateMemoryBytes) MiB |"
         "| $($summary.gpuMemory) | $(Format-Mebibytes $independent.processes.gpuMemory.sharedBytes) MiB | $(Format-Mebibytes $multiwindow.processes.gpuMemory.sharedBytes) MiB |"
-        "| $($summary.firstHost) | $($independent.ready.firstHostElapsedMs) ms | $($summary.notApplicable) |"
         "| $($summary.twoWindows) | $($independent.ready.elapsedMs) ms | $($multiwindow.ready.elapsedMs) ms |"
         "| $($summary.cacheReadyTime) | $($independent.cache.readyElapsedMs) ms | $($multiwindow.cache.readyElapsedMs) ms |"
+        "| $($summary.canvasReadyTime) | $($independent.interaction.canvas.allProjectsReadyElapsedMs) ms | $($multiwindow.interaction.canvas.allProjectsReadyElapsedMs) ms |"
         "| $($summary.cacheWallTime) | $($independent.cache.cacheWallTimeMs) ms | $($multiwindow.cache.cacheWallTimeMs) ms |"
         "| $($summary.cachePhotos) | $($independent.cache.photoCount) | $($multiwindow.cache.photoCount) |"
         "| $($summary.cacheThroughput) | $(Format-Mebibytes $independent.cache.sourceBytesPerSecond) MiB/s | $(Format-Mebibytes $multiwindow.cache.sourceBytesPerSecond) MiB/s |"
@@ -1254,8 +1315,16 @@ try {
     $multiwindowProbeGate = Join-Path `
         $probeGateDirectory `
         "multiwindow-$runId.ready"
+    $independentExportGate = Join-Path `
+        $probeGateDirectory `
+        "independent-export-$runId.ready"
+    $multiwindowExportGate = Join-Path `
+        $probeGateDirectory `
+        "multiwindow-export-$runId.ready"
     $probeGatePaths.Add($independentProbeGate)
     $probeGatePaths.Add($multiwindowProbeGate)
+    $probeGatePaths.Add($independentExportGate)
+    $probeGatePaths.Add($multiwindowExportGate)
 
     Reset-TopologyCache
     $independentStartedAt = [DateTimeOffset]::UtcNow
@@ -1263,22 +1332,18 @@ try {
     $independentA = Start-TopologyProcess `
         -Topology independent `
         -ProjectSlot a `
-        -ProbeGatePath $independentProbeGate
-    $independentFirstReady = Wait-ForTopologyWindows `
-        -RootProcessIds @($independentA.Id) `
-        -ExpectedCount 1 `
-        -ExpectedTitleMarker '[Topologia A]' `
-        -Stopwatch $independentStopwatch
+        -ProbeGatePath $independentProbeGate `
+        -ExportGatePath $independentExportGate
     $independentB = Start-TopologyProcess `
         -Topology independent `
         -ProjectSlot b `
-        -ProbeGatePath $independentProbeGate
+        -ProbeGatePath $independentProbeGate `
+        -ExportGatePath $independentExportGate
     $independentReady = Wait-ForTopologyWindows `
         -RootProcessIds @($independentA.Id, $independentB.Id) `
         -ExpectedCount 2 `
         -ExpectedTitleMarker '[Topologia A]' `
         -Stopwatch $independentStopwatch
-    $independentReady['firstHostElapsedMs'] = $independentFirstReady.elapsedMs
     $independentCache = Wait-ForMediaCache `
         -RootProcessIds @($independentA.Id, $independentB.Id) `
         -ExpectedProjectCount 2 `
@@ -1290,7 +1355,8 @@ try {
         -ExpectedProjectCount 2 `
         -Topology independent `
         -StartedAt $independentStartedAt `
-        -TopologyStopwatch $independentStopwatch
+        -TopologyStopwatch $independentStopwatch `
+        -ExportGatePath $independentExportGate
     $independentMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($independentA.Id, $independentB.Id)
 
@@ -1313,7 +1379,8 @@ try {
     $multiwindowStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $multiwindow = Start-TopologyProcess `
         -Topology multiwindow `
-        -ProbeGatePath $multiwindowProbeGate
+        -ProbeGatePath $multiwindowProbeGate `
+        -ExportGatePath $multiwindowExportGate
     $multiwindowReady = Wait-ForTopologyWindows `
         -RootProcessIds @($multiwindow.Id) `
         -ExpectedCount 2 `
@@ -1330,7 +1397,8 @@ try {
         -ExpectedProjectCount 2 `
         -Topology multiwindow `
         -StartedAt $multiwindowStartedAt `
-        -TopologyStopwatch $multiwindowStopwatch
+        -TopologyStopwatch $multiwindowStopwatch `
+        -ExportGatePath $multiwindowExportGate
     $multiwindowMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($multiwindow.Id)
 
@@ -1365,7 +1433,7 @@ try {
 
     $currentInputState = Get-BuildInputState
     $report = [ordered]@{
-        schemaVersion = 6
+        schemaVersion = 7
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         corpus = [ordered]@{

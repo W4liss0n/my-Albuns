@@ -185,8 +185,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     const scene = sceneRef.current;
     if (!ready || !request || !scene) return;
     if (performanceRunRef.current?.key === request.key) return;
-    const target = scene.performanceTarget();
-    if (!target) return;
+    const targetState = scene.performanceTarget();
+    if (targetState.status === "pending") return;
 
     performanceRunRef.current?.controller.abort();
     const controller = new AbortController();
@@ -194,6 +194,19 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       key: request.key,
       controller,
     };
+    if (targetState.status === "failed") {
+      logger.write({
+        level: "error",
+        component: "canvas",
+        event: "canvas_performance_probe_failed",
+        projectId: props.projectId,
+        instanceId: sceneInstanceIdRef.current ?? undefined,
+        reason: targetState.reason,
+      });
+      void request.onFailed(targetState.reason);
+      return;
+    }
+    const target = targetState.target;
     logger.write({
       level: "info",
       component: "canvas",
@@ -201,12 +214,15 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       projectId: props.projectId,
       instanceId: sceneInstanceIdRef.current ?? undefined,
     });
-    void runCanvasPerformanceProbe(
-      request.config,
-      target,
-      undefined,
-      controller.signal,
-    )
+    void Promise.resolve(request.onReady())
+      .then(() =>
+        runCanvasPerformanceProbe(
+          request.config,
+          target,
+          undefined,
+          controller.signal,
+        ),
+      )
       .then(async (measurement) => {
         if (
           controller.signal.aborted ||

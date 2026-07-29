@@ -41,6 +41,8 @@ function App({
   const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
     Readonly<Record<string, string>>
   >({});
+  const [mediaPreviewsReady, setMediaPreviewsReady] =
+    useState(false);
 
   useEffect(() => {
     let active = true;
@@ -106,9 +108,11 @@ function App({
       projectId: projectId ?? "",
       projectBridge: bridge,
       topologyBridge: topologyBenchmarkBridge,
+      mediaPreviewsReady,
     });
   useEffect(() => {
     setMediaPreviewUrls({});
+    setMediaPreviewsReady(false);
     if (!projectId || !graphics.supported) return;
 
     let active = true;
@@ -134,6 +138,7 @@ function App({
             ),
           );
         }
+        setMediaPreviewsReady(true);
         logger.write({
           level: "info",
           component: "media-cache",

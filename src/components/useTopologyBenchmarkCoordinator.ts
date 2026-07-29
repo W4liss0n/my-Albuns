@@ -14,12 +14,14 @@ interface TopologyBenchmarkCoordinatorInput {
   projectId: string;
   projectBridge: ProjectBridge;
   topologyBridge: TopologyBenchmarkBridge;
+  mediaPreviewsReady: boolean;
 }
 
 export function useTopologyBenchmarkCoordinator({
   projectId,
   projectBridge,
   topologyBridge,
+  mediaPreviewsReady,
 }: TopologyBenchmarkCoordinatorInput) {
   const [config, setConfig] =
     useState<TopologyBenchmarkConfig | null>(null);
@@ -66,7 +68,7 @@ export function useTopologyBenchmarkCoordinator({
   }, [projectId, topologyBridge]);
 
   return useMemo<CanvasPerformanceProbeRequest | null>(() => {
-    if (!config) return null;
+    if (!config || !mediaPreviewsReady) return null;
     const key = `${projectId}:${config.probeKey}`;
     return {
       key,
@@ -75,18 +77,51 @@ export function useTopologyBenchmarkCoordinator({
         panFrames: config.panFrames,
         zoomFrames: config.zoomFrames,
       },
+      onReady: () => topologyBridge.reportCanvasReady(),
       onCompleted: async (measurement) => {
         if (completedKeysRef.current.has(key)) return;
         completedKeysRef.current.add(key);
         await topologyBridge.reportCanvas(measurement);
         if (config.runExport) {
+          await waitForExportGate(
+            topologyBridge,
+            config.probeKey,
+          );
           await projectBridge.exportPreview();
         }
       },
       onFailed: (reason) =>
         reportFailureSafely(topologyBridge, reason),
     };
-  }, [config, projectBridge, projectId, topologyBridge]);
+  }, [
+    config,
+    mediaPreviewsReady,
+    projectBridge,
+    projectId,
+    topologyBridge,
+  ]);
+}
+
+async function waitForExportGate(
+  bridge: TopologyBenchmarkBridge,
+  probeKey: string,
+) {
+  const deadline = performance.now() + 5 * 60 * 1_000;
+  while (performance.now() < deadline) {
+    const config = await bridge.loadConfig();
+    if (!config || config.probeKey !== probeKey) {
+      throw new Error(
+        "A configuração do benchmark mudou antes da Exportação.",
+      );
+    }
+    if (config.exportGateOpen) return;
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, GATE_POLL_INTERVAL_MS);
+    });
+  }
+  throw new Error(
+    "O gate da Exportação não foi aberto dentro do limite.",
+  );
 }
 
 async function reportFailureSafely(
