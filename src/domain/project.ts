@@ -1,175 +1,31 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export interface RectUm {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import type { EditorProjection } from "./generated/EditorProjection";
+import type { ExportResult } from "./generated/ExportResult";
+import type { ProjectIntent } from "./generated/ProjectIntent";
 
-export interface Vector2 {
-  x: number;
-  y: number;
-}
-
-export interface Size2 {
-  width: number;
-  height: number;
-}
-
-export interface NumberRange {
-  minimum: number;
-  maximum: number;
-}
-
-export interface Matrix2 {
-  xx: number;
-  xy: number;
-  yx: number;
-  yy: number;
-}
-
-export interface PhotoPlacement {
-  center: Vector2;
-  size: Size2;
-}
-
-export interface PhotoPlacementPlan {
-  currentPan: Vector2;
-  currentZoom: number;
-  panRange: NumberRange;
-  zoomRange: NumberRange;
-  current: PhotoPlacement;
-  panOrigin: Vector2;
-  panToCenter: Matrix2;
-  centerToPan: Matrix2;
-  panToCenterPerZoom: Matrix2;
-  sizePerZoom: Size2;
-}
-
-export interface MediaTransform {
-  panX: number;
-  panY: number;
-  userZoom: number;
-  quarterTurns: number;
-  fineRotationDegrees: number;
-  mirrorX: boolean;
-}
-
-export interface PhotoSnapshot {
-  mediaId: string;
-  name: string;
-  sourceWidthPx: number;
-  sourceHeightPx: number;
-  palette: [string, string, string];
-  transform: MediaTransform;
-}
-
-export interface FrameSnapshot {
-  id: string;
-  rect: RectUm;
-  zIndex: number;
-  photo: PhotoSnapshot | null;
-}
-
-export type SheetRole = "initial" | "internal" | "final";
-
-export interface SheetSnapshot {
-  id: string;
-  number: number;
-  role: SheetRole;
-  widthUm: number;
-  heightUm: number;
-  frames: FrameSnapshot[];
-  hasOverlay: boolean;
-}
-
-export interface MediaCatalogItem {
-  id: string;
-  name: string;
-  palette: [string, string, string];
-  usageCount: number;
-}
-
-export interface EditorState {
-  projectId: string;
-  projectName: string;
-  album: {
-    sheets: SheetSnapshot[];
-    media: MediaCatalogItem[];
-  };
-  revision: number;
-  savedRevision: number;
-  dirty: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-export interface ComposedPhoto {
-  mediaId: string;
-  name: string;
-  drawRect: RectUm;
-  placement: PhotoPlacementPlan;
-  rotationDegrees: number;
-  mirrorX: boolean;
-  palette: [string, string, string];
-}
-
-export interface ComposedFrame {
-  frameId: string;
-  clipRect: RectUm;
-  zIndex: number;
-  photo: ComposedPhoto | null;
-}
-
-export interface ComposedSheet {
-  sheetId: string;
-  number: number;
-  widthUm: number;
-  heightUm: number;
-  hasOverlay: boolean;
-  frames: ComposedFrame[];
-}
-
-export interface CompositionPlan {
-  sheets: ComposedSheet[];
-}
-
-export interface EditorProjection {
-  state: EditorState;
-  composition: CompositionPlan;
-}
-
-export type ProjectIntent =
-  | {
-      kind: "panPhoto";
-      frameId: string;
-      deltaX: number;
-      deltaY: number;
-    }
-  | {
-      kind: "fillLeftmostPlaceholder";
-      sheetId: string;
-      mediaId: string;
-    }
-  | {
-      kind: "zoomPhoto";
-      frameId: string;
-      delta: number;
-    }
-  | {
-      kind: "transformPhoto";
-      frameId: string;
-      deltaPanX: number;
-      deltaPanY: number;
-      deltaZoom: number;
-    };
-
-export interface ExportResult {
-  outputPath: string;
-  widthPx: number;
-  heightPx: number;
-}
+export type { AlbumSnapshot } from "./generated/AlbumSnapshot";
+export type { ComposedFrame } from "./generated/ComposedFrame";
+export type { ComposedPhoto } from "./generated/ComposedPhoto";
+export type { ComposedSheet } from "./generated/ComposedSheet";
+export type { CompositionPlan } from "./generated/CompositionPlan";
+export type { EditorProjection } from "./generated/EditorProjection";
+export type { EditorState } from "./generated/EditorState";
+export type { ExportResult } from "./generated/ExportResult";
+export type { FrameSnapshot } from "./generated/FrameSnapshot";
+export type { Matrix2 } from "./generated/Matrix2";
+export type { MediaCatalogItem } from "./generated/MediaCatalogItem";
+export type { MediaTransform } from "./generated/MediaTransform";
+export type { NumberRange } from "./generated/NumberRange";
+export type { PhotoPlacement } from "./generated/PhotoPlacement";
+export type { PhotoPlacementPlan } from "./generated/PhotoPlacementPlan";
+export type { PhotoSnapshot } from "./generated/PhotoSnapshot";
+export type { ProjectIntent } from "./generated/ProjectIntent";
+export type { RectUm } from "./generated/RectUm";
+export type { SheetRole } from "./generated/SheetRole";
+export type { SheetSnapshot } from "./generated/SheetSnapshot";
+export type { SizeUm as Size2 } from "./generated/SizeUm";
+export type { VectorUm as Vector2 } from "./generated/VectorUm";
 
 export interface ProjectBridge {
   load(): Promise<EditorProjection>;

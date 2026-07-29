@@ -1,34 +1,33 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
 import type {
   EditorProjection,
-  PhotoPlacementPlan,
   ProjectBridge,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
-import type { PhotoTransformPreview } from "./AlbumCanvas";
+import {
+  createTwoSheetProjection,
+  representativeProjection,
+} from "../test/projectFixtures";
+import type {
+  CanvasMetrics,
+  PhotoTransformDelta,
+  PhotoTransformPreview,
+} from "./AlbumCanvas";
 import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
-    onCanvasMetricsChange?(metrics: {
-      width: number;
-      scale: number;
-    }): void;
+    onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
-    onZoomCommit(frameId: string, delta: number): void;
     onTransformCommit(
-      frameId: string,
-      deltaPanX: number,
-      deltaPanY: number,
-      deltaZoom: number,
-    ): void;
+      delta: PhotoTransformDelta,
+    ): Promise<boolean>;
   },
 }));
 
@@ -39,144 +38,8 @@ vi.mock("./AlbumCanvas", () => ({
   },
 }));
 
-const projection: EditorProjection = {
-  state: {
-    projectId: "project-spike-001",
-    projectName: "Álbum Horizonte",
-    revision: 25,
-    savedRevision: 0,
-    dirty: true,
-    canUndo: true,
-    canRedo: false,
-    album: {
-      sheets: [
-        {
-          id: "sheet-001",
-          number: 1,
-          role: "initial",
-          widthUm: 600_000,
-          heightUm: 300_000,
-          hasOverlay: false,
-          frames: [
-            {
-              id: "frame-001",
-              rect: {
-                x: 20_000,
-                y: 20_000,
-                width: 280_000,
-                height: 260_000,
-              },
-              zIndex: 0,
-              photo: {
-                mediaId: "media-001",
-                name: "Serra ao amanhecer.jpg",
-                sourceWidthPx: 6_000,
-                sourceHeightPx: 4_000,
-                palette: ["#10202b", "#648493", "#dfa75e"],
-                transform: {
-                  panX: 0,
-                  panY: 0,
-                  userZoom: 1,
-                  quarterTurns: 0,
-                  fineRotationDegrees: 0,
-                  mirrorX: false,
-                },
-              },
-            },
-          ],
-        },
-      ],
-      media: [
-        {
-          id: "media-001",
-          name: "Serra ao amanhecer.jpg",
-          palette: ["#10202b", "#648493", "#dfa75e"],
-          usageCount: 1,
-        },
-        {
-          id: "media-002",
-          name: "Campo.jpg",
-          palette: ["#21372f", "#92a277", "#e5d7b9"],
-          usageCount: 0,
-        },
-        {
-          id: "media-003",
-          name: "Praia.jpg",
-          palette: ["#123e52", "#428596", "#e7bd76"],
-          usageCount: 0,
-        },
-      ],
-    },
-  },
-  composition: {
-    sheets: [
-      {
-        sheetId: "sheet-001",
-        number: 1,
-        widthUm: 600_000,
-        heightUm: 300_000,
-        hasOverlay: false,
-        frames: [
-          {
-            frameId: "frame-001",
-            clipRect: {
-              x: 20_000,
-              y: 20_000,
-              width: 280_000,
-              height: 260_000,
-            },
-            zIndex: 0,
-            photo: {
-              mediaId: "media-001",
-              name: "Serra ao amanhecer.jpg",
-              drawRect: {
-                x: -50_000,
-                y: 20_000,
-                width: 400_000,
-                height: 260_000,
-              },
-              placement: placementFixture.cases[0]
-                .expectedPlan as PhotoPlacementPlan,
-              rotationDegrees: 0,
-              mirrorX: false,
-              palette: ["#10202b", "#648493", "#dfa75e"],
-            },
-          },
-        ],
-      },
-    ],
-  },
-};
-
-const twoSheetProjection: EditorProjection = {
-  state: {
-    ...projection.state,
-    album: {
-      ...projection.state.album,
-      sheets: [
-        projection.state.album.sheets[0],
-        {
-          ...projection.state.album.sheets[0],
-          id: "sheet-002",
-          number: 2,
-          role: "final",
-          frames: [],
-        },
-      ],
-    },
-  },
-  composition: {
-    sheets: [
-      projection.composition.sheets[0],
-      {
-        ...projection.composition.sheets[0],
-        sheetId: "sheet-002",
-        number: 2,
-        frames: [],
-      },
-    ],
-  },
-};
+const projection = representativeProjection;
+const twoSheetProjection = createTwoSheetProjection();
 
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
@@ -204,6 +67,7 @@ beforeEach(() => {
   canvasHarness.props = null;
   localStorage.clear();
   useEditorView.setState({
+    projectId: projection.state.projectId,
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
@@ -436,9 +300,11 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
   expect(apply).toHaveBeenCalledOnce();
   expect(apply).toHaveBeenCalledWith({
-    kind: "zoomPhoto",
+    kind: "transformPhoto",
     frameId: "frame-001",
-    delta: 0.25,
+    deltaPanX: 0,
+    deltaPanY: 0,
+    deltaZoom: 0.25,
   });
   expect(screen.queryByText("Aplicando alteração")).not.toBeInTheDocument();
   expect(exportButton).toBeEnabled();
@@ -514,14 +380,86 @@ test("discards a live Canvas value when its commit fails", async () => {
   });
   expect(slider).toHaveValue("125");
 
-  act(() => {
-    canvasHarness.props?.onZoomCommit("frame-001", 0.25);
+  let accepted = true;
+  await act(async () => {
+    accepted =
+      (await canvasHarness.props?.onTransformCommit({
+        frameId: "frame-001",
+        deltaPanX: 0,
+        deltaPanY: 0,
+        deltaZoom: 0.25,
+      })) ?? true;
   });
 
+  expect(accepted).toBe(false);
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Falha simulada",
   );
   expect(slider).toHaveValue("100");
+});
+
+test("does not let an old Project completion clear a new slider draft", async () => {
+  const pending = deferredProjection();
+  const oldApply = vi.fn(() => pending.promise);
+  const otherProject = {
+    ...projection,
+    state: {
+      ...projection.state,
+      projectId: "project-spike-002",
+    },
+  };
+  const newApply = vi.fn(async () => otherProject);
+  const onProjectionChange = vi.fn();
+  const oldBridge = bridgeWithApply(oldApply);
+  const newBridge = bridgeWithApply(newApply);
+  useEditorView.setState({ selectedFrameId: "frame-001" });
+
+  const view = render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={oldBridge}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  const oldSlider = screen.getByRole("slider", {
+    name: "Zoom da Foto",
+  });
+  fireEvent.pointerDown(oldSlider);
+  fireEvent.change(oldSlider, { target: { value: "125" } });
+  fireEvent.pointerUp(oldSlider);
+  expect(oldApply).toHaveBeenCalledOnce();
+
+  view.rerender(
+    <ProjectWorkspace
+      projection={otherProject}
+      bridge={newBridge}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  act(() => useEditorView.setState({ selectedFrameId: "frame-001" }));
+  const newSlider = screen.getByRole("slider", {
+    name: "Zoom da Foto",
+  });
+  fireEvent.pointerDown(newSlider);
+  fireEvent.change(newSlider, { target: { value: "130" } });
+  expect(newSlider).toHaveValue("130");
+
+  await act(async () => {
+    pending.resolve(projection);
+    await pending.promise;
+  });
+
+  expect(newSlider).toHaveValue("130");
+  expect(onProjectionChange).not.toHaveBeenCalled();
+
+  fireEvent.pointerUp(newSlider);
+  expect(newApply).toHaveBeenCalledWith({
+    kind: "transformPhoto",
+    frameId: "frame-001",
+    deltaPanX: 0,
+    deltaPanY: 0,
+    deltaZoom: 0.3,
+  });
 });
 
 test("uses the Canvas-centered sheet for a media double click", () => {
@@ -558,12 +496,12 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
     />,
   );
 
-  canvasHarness.props?.onTransformCommit(
-    "frame-001",
-    0.35,
-    -0.2,
-    0.12,
-  );
+  canvasHarness.props?.onTransformCommit({
+    frameId: "frame-001",
+    deltaPanX: 0.35,
+    deltaPanY: -0.2,
+    deltaZoom: 0.12,
+  });
 
   expect(apply).toHaveBeenCalledOnce();
   expect(apply).toHaveBeenCalledWith({
@@ -573,4 +511,108 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
     deltaPanY: -0.2,
     deltaZoom: 0.12,
   });
+});
+
+test("serializes Project mutations so projections cannot arrive out of order", async () => {
+  const first = deferredProjection();
+  const second = deferredProjection();
+  const apply = vi
+    .fn<ProjectBridge["apply"]>()
+    .mockImplementationOnce(() => first.promise)
+    .mockImplementationOnce(() => second.promise);
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  canvasHarness.props?.onTransformCommit({
+    frameId: "frame-001",
+    deltaPanX: 0.1,
+    deltaPanY: 0,
+    deltaZoom: 0,
+  });
+  canvasHarness.props?.onTransformCommit({
+    frameId: "frame-001",
+    deltaPanX: 0.2,
+    deltaPanY: 0,
+    deltaZoom: 0,
+  });
+
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(apply).toHaveBeenCalledOnce();
+
+  const firstProjection = {
+    ...projection,
+    state: { ...projection.state, revision: 26 },
+  };
+  await act(async () => {
+    first.resolve(firstProjection);
+    await first.promise;
+  });
+
+  expect(onProjectionChange).toHaveBeenLastCalledWith(firstProjection);
+  expect(apply).toHaveBeenCalledTimes(2);
+
+  const secondProjection = {
+    ...projection,
+    state: { ...projection.state, revision: 27 },
+  };
+  await act(async () => {
+    second.resolve(secondProjection);
+    await second.promise;
+  });
+
+  expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
+});
+
+test("ignores a pending mutation result after the Workspace changes Project", async () => {
+  const pending = deferredProjection();
+  const apply = vi.fn(() => pending.promise);
+  const onProjectionChange = vi.fn();
+  const view = render(
+    <ProjectWorkspace
+      projection={projection}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  canvasHarness.props?.onTransformCommit({
+    frameId: "frame-001",
+    deltaPanX: 0.1,
+    deltaPanY: 0,
+    deltaZoom: 0,
+  });
+  const otherProject = {
+    ...projection,
+    state: {
+      ...projection.state,
+      projectId: "project-spike-002",
+    },
+  };
+  view.rerender(
+    <ProjectWorkspace
+      projection={otherProject}
+      bridge={bridgeWithApply(apply)}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  await act(async () => {
+    pending.resolve({
+      ...projection,
+      state: { ...projection.state, revision: 26 },
+    });
+    await pending.promise;
+  });
+
+  expect(onProjectionChange).not.toHaveBeenCalled();
+  expect(useEditorView.getState().projectId).toBe("project-spike-002");
 });

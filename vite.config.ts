@@ -14,6 +14,23 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  build: {
+    chunkSizeWarningLimit: 550,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          pixi: ["pixi.js"],
+          react: [
+            "react",
+            "react-dom",
+            "react-aria-components",
+            "zustand",
+          ],
+          tauri: ["@tauri-apps/api"],
+        },
+      },
+    },
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: devPort,

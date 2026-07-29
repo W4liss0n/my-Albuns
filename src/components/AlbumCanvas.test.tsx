@@ -9,6 +9,7 @@ import type {
 import {
   AlbumCanvas,
   type CanvasMetrics,
+  type PhotoTransformDelta,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 
@@ -132,6 +133,15 @@ vi.mock("pixi.js", () => {
       const removed = this.children;
       this.children = [];
       return removed;
+    }
+
+    removeChild(...children: DisplayObject[]) {
+      children.forEach((child) => {
+        const index = this.children.indexOf(child);
+        if (index >= 0) this.children.splice(index, 1);
+        child.parent = null;
+      });
+      return children[0];
     }
   }
 
@@ -375,6 +385,7 @@ const rotatedInteractiveComposition: CompositionPlan = {
 };
 
 function renderCanvas({
+  projectId = "project-spike-001",
   compositionPlan = composition,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
@@ -382,20 +393,12 @@ function renderCanvas({
   onTransformPreview = vi.fn<
     (preview: PhotoTransformPreview | null) => void
   >(),
-  onPanCommit = vi.fn<
-    (frameId: string, deltaX: number, deltaY: number) => void
-  >(),
   onViewportChange = vi.fn<(viewport: { offsetX: number; zoom: number }) => void>(),
-  onZoomCommit = vi.fn<(frameId: string, delta: number) => void>(),
-  onTransformCommit = vi.fn<
-    (
-      frameId: string,
-      deltaPanX: number,
-      deltaPanY: number,
-      deltaZoom: number,
-    ) => void
-  >(),
+  onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  ),
 }: {
+  projectId?: string;
   compositionPlan?: CompositionPlan;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
@@ -403,18 +406,14 @@ function renderCanvas({
   onTransformPreview?: (
     preview: PhotoTransformPreview | null,
   ) => void;
-  onPanCommit?: (frameId: string, deltaX: number, deltaY: number) => void;
   onViewportChange?: (viewport: { offsetX: number; zoom: number }) => void;
-  onZoomCommit?: (frameId: string, delta: number) => void;
   onTransformCommit?: (
-    frameId: string,
-    deltaPanX: number,
-    deltaPanY: number,
-    deltaZoom: number,
-  ) => void;
+    delta: PhotoTransformDelta,
+  ) => Promise<boolean>;
 } = {}) {
   const view = render(
     <AlbumCanvas
+      projectId={projectId}
       composition={compositionPlan}
       selectedFrameId={null}
       focusedSheetId="sheet-001"
@@ -425,10 +424,7 @@ function renderCanvas({
       onCenteredSheetChange={onCenteredSheetChange}
       onViewportChange={onViewportChange}
       onTransformPreview={onTransformPreview}
-      onPanCommit={onPanCommit}
-      onZoomCommit={onZoomCommit}
       onTransformCommit={onTransformCommit}
-      onMaterializedChange={() => undefined}
       onCanvasMetricsChange={onCanvasMetricsChange}
     />,
   );
@@ -439,9 +435,7 @@ function renderCanvas({
     onFocusSheet,
     onCenteredSheetChange,
     onTransformPreview,
-    onPanCommit,
     onViewportChange,
-    onZoomCommit,
     onTransformCommit,
   };
 }
@@ -461,6 +455,17 @@ function displayWithHandler(name: string) {
     candidate.handlers.has(name),
   );
   if (!display) throw new Error(`Pixi display with ${name} handler not found`);
+  return display;
+}
+
+function latestDisplayWithHandler(name: string) {
+  const displays = pixiLifecycle.displays.filter((candidate) =>
+    candidate.handlers.has(name),
+  );
+  const display = displays[displays.length - 1];
+  if (!display) {
+    throw new Error(`Pixi display with ${name} handler not found`);
+  }
   return display;
 }
 
@@ -527,6 +532,112 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
     autoDensity: true,
     resolution: window.devicePixelRatio,
   });
+});
+
+test("keeps the materialized Pixi scene stable across view-only updates", async () => {
+  const callbacks = {
+    onSelectFrame: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const canvas = (
+    selectedFrameId: string | null,
+    offsetX: number,
+  ) => (
+    <AlbumCanvas
+      projectId="project-spike-001"
+      composition={interactiveComposition}
+      selectedFrameId={selectedFrameId}
+      focusedSheetId="sheet-001"
+      centeredSheetId="sheet-001"
+      viewport={{ offsetX, zoom: 1 }}
+      {...callbacks}
+    />
+  );
+
+  const view = render(canvas(null, 42));
+  await finishPixiInitialization();
+  const world = pixiLifecycle.instances[0].stage.children[0] as {
+    children: unknown[];
+  };
+  const sheet = world.children[0];
+  const displayCount = pixiLifecycle.displays.length;
+
+  view.rerender(canvas("frame-001", 35));
+
+  expect(pixiLifecycle.instances[0].stage.children[0]).toBe(world);
+  expect(world.children[0]).toBe(sheet);
+  expect(pixiLifecycle.displays).toHaveLength(displayCount);
+});
+
+test("reconciles only the composed sheet that changed", async () => {
+  const canvasProps = {
+    projectId: "project-spike-001",
+    selectedFrameId: null,
+    focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
+    viewport: { offsetX: 42, zoom: 1 },
+    onSelectFrame: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const view = render(
+    <AlbumCanvas
+      composition={threeSheetComposition}
+      {...canvasProps}
+    />,
+  );
+  await finishPixiInitialization();
+
+  const world = pixiLifecycle.instances[0].stage.children[0] as {
+    children: Array<{ position: { x: number } }>;
+  };
+  const originalSheets = [...world.children].sort(
+    (first, second) => first.position.x - second.position.x,
+  );
+  const changedComposition: CompositionPlan = {
+    sheets: threeSheetComposition.sheets.map((sheet, index) =>
+      index === 1
+        ? {
+            ...sheet,
+            frames: [
+              {
+                frameId: "frame-002",
+                clipRect: {
+                  x: 20_000,
+                  y: 20_000,
+                  width: 200_000,
+                  height: 200_000,
+                },
+                zIndex: 0,
+                photo: null,
+              },
+            ],
+          }
+        : sheet,
+    ),
+  };
+
+  view.rerender(
+    <AlbumCanvas
+      composition={changedComposition}
+      {...canvasProps}
+    />,
+  );
+
+  const reconciledSheets = [...world.children].sort(
+    (first, second) => first.position.x - second.position.x,
+  );
+  expect(pixiLifecycle.instances).toHaveLength(1);
+  expect(reconciledSheets[0]).toBe(originalSheets[0]);
+  expect(reconciledSheets[1]).not.toBe(originalSheets[1]);
+  expect(reconciledSheets[2]).toBe(originalSheets[2]);
 });
 
 test("does not zoom the continuous Canvas outside sheet-editing mode", async () => {
@@ -626,11 +737,13 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
 });
 
 test("reveals the dimmed Photo overflow and thirds guides only during Pan", async () => {
-  const onPanCommit = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
   const onTransformPreview = vi.fn();
   renderCanvas({
     compositionPlan: interactiveComposition,
-    onPanCommit,
+    onTransformCommit,
     onTransformPreview,
   });
   await finishPixiInitialization();
@@ -681,7 +794,7 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
 
   expect(outsidePreview.visible).toBe(false);
   expect(thirdsGuides.visible).toBe(false);
-  expect(onPanCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
   expect(onTransformPreview).toHaveBeenLastCalledWith(null);
 
   frame.emit("pointerdown", {
@@ -698,15 +811,17 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
   expect(thirdsGuides.visible).toBe(false);
   expect(insidePreview.position).toEqual(originalPosition);
   expect(outsidePreview.position).toEqual(originalPosition);
-  expect(onPanCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
   expect(onTransformPreview).toHaveBeenLastCalledWith(null);
 });
 
 test("keeps the photo inside a stationary frame mask throughout pan", async () => {
-  const onPanCommit = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
   renderCanvas({
     compositionPlan: interactiveComposition,
-    onPanCommit,
+    onTransformCommit,
   });
   await finishPixiInitialization();
 
@@ -744,17 +859,24 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
     global: { x: 1_000, y: 0 },
   });
 
-  expect(onPanCommit).toHaveBeenCalledOnce();
-  expect(onPanCommit).toHaveBeenCalledWith("frame-001", 1, 0);
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit).toHaveBeenCalledWith({
+    frameId: "frame-001",
+    deltaPanX: 1,
+    deltaPanY: 0,
+    deltaZoom: 0,
+  });
 });
 
 test("reports the live Photo transform while Pan is moving", async () => {
   const onTransformPreview = vi.fn();
-  const onPanCommit = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
   renderCanvas({
     compositionPlan: interactiveComposition,
     onTransformPreview,
-    onPanCommit,
+    onTransformCommit,
   });
   await finishPixiInitialization();
 
@@ -779,14 +901,16 @@ test("reports the live Photo transform while Pan is moving", async () => {
       onTransformPreview.mock.calls.length - 1
     ]?.[0]?.panX,
   ).toBeGreaterThan(0);
-  expect(onPanCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
 });
 
 test("keeps every frame corner covered while panning a rotated photo", async () => {
-  const onPanCommit = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
   renderCanvas({
     compositionPlan: rotatedInteractiveComposition,
-    onPanCommit,
+    onTransformCommit,
   });
   await finishPixiInitialization();
 
@@ -843,14 +967,21 @@ test("keeps every frame corner covered while panning a rotated photo", async () 
     global: { x: 10_000, y: 10_000 },
   });
 
-  expect(onPanCommit).toHaveBeenCalledOnce();
-  expect(onPanCommit).toHaveBeenCalledWith("frame-001", 1, -1);
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit).toHaveBeenCalledWith({
+    frameId: "frame-001",
+    deltaPanX: 1,
+    deltaPanY: -1,
+    deltaZoom: 0,
+  });
 });
 
 test("does not reset an active Pan preview when wheel Zoom starts", async () => {
   vi.useFakeTimers();
-  const onTransformCommit = vi.fn();
-  const canvas = renderCanvas({
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  renderCanvas({
     compositionPlan: interactiveComposition,
     onTransformCommit,
   });
@@ -892,28 +1023,32 @@ test("does not reset an active Pan preview when wheel Zoom starts", async () => 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(600);
   });
-  expect(canvas.onZoomCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
 
   pixiLifecycle.instances[0].stage.emit("pointerup", {
     global: { x: 40, y: 0 },
   });
 
   expect(onTransformCommit).toHaveBeenCalledOnce();
-  expect(onTransformCommit.mock.calls[0][0]).toBe("frame-001");
-  expect(onTransformCommit.mock.calls[0][1]).toBeGreaterThan(0);
-  expect(onTransformCommit.mock.calls[0][2]).toBeCloseTo(0, 6);
-  expect(onTransformCommit.mock.calls[0][3]).toBeCloseTo(0.12, 6);
-  expect(canvas.onPanCommit).not.toHaveBeenCalled();
-  expect(canvas.onZoomCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit.mock.calls[0][0]).toMatchObject({
+    frameId: "frame-001",
+    deltaPanY: 0,
+    deltaZoom: expect.closeTo(0.12, 6),
+  });
+  expect(
+    onTransformCommit.mock.calls[0][0].deltaPanX,
+  ).toBeGreaterThan(0);
 });
 
 test("previews a smooth wheel zoom and commits the sequence once", async () => {
   vi.useFakeTimers();
-  const onZoomCommit = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
   const onTransformPreview = vi.fn();
   renderCanvas({
     compositionPlan: pannedInteractiveComposition,
-    onZoomCommit,
+    onTransformCommit,
     onTransformPreview,
   });
   await finishPixiInitialization();
@@ -956,7 +1091,7 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
       onTransformPreview.mock.calls.length - 1
     ]?.[0]?.zoom,
   ).toBeGreaterThan(1);
-  expect(onZoomCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(300);
@@ -967,13 +1102,140 @@ test("previews a smooth wheel zoom and commits the sequence once", async () => {
   });
   wheel();
 
-  expect(onZoomCommit).not.toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
 
   await act(async () => {
     await vi.advanceTimersByTimeAsync(500);
   });
 
-  expect(onZoomCommit).toHaveBeenCalledOnce();
-  expect(onZoomCommit.mock.calls[0][0]).toBe("frame-001");
-  expect(onZoomCommit.mock.calls[0][1]).toBeGreaterThan(0);
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(onTransformCommit.mock.calls[0][0]).toMatchObject({
+    frameId: "frame-001",
+    deltaPanX: 0,
+    deltaPanY: 0,
+  });
+  expect(
+    onTransformCommit.mock.calls[0][0].deltaZoom,
+  ).toBeGreaterThan(0);
+});
+
+test("rolls the Pixi preview back when the Project rejects a transform", async () => {
+  let resolveCommit!: (accepted: boolean) => void;
+  const commitResult = new Promise<boolean>((resolve) => {
+    resolveCommit = resolve;
+  });
+  const onTransformCommit = vi.fn(
+    (_delta: PhotoTransformDelta) => commitResult,
+  );
+  const onTransformPreview = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformCommit,
+    onTransformPreview,
+  });
+  await finishPixiInitialization();
+
+  const frame = displayWithHandler("pointerdown");
+  const insidePreview = displayWithLabel(
+    "photo-pan-inside-preview",
+  );
+  const originalPosition = { ...insidePreview.position };
+
+  frame.emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 40, y: 0 },
+  });
+
+  expect(onTransformCommit).toHaveBeenCalledOnce();
+  expect(insidePreview.position.x).toBeGreaterThan(
+    originalPosition.x,
+  );
+
+  await act(async () => {
+    resolveCommit(false);
+    await commitResult;
+  });
+
+  expect(insidePreview.position).toEqual(originalPosition);
+  expect(onTransformPreview).toHaveBeenLastCalledWith(null);
+});
+
+test("cancels pending Pan and Zoom gestures when the Project changes", async () => {
+  vi.useFakeTimers();
+  const commitA = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  const commitB = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  const commitC = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  const commonProps = {
+    composition: interactiveComposition,
+    selectedFrameId: null,
+    focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
+    viewport: { offsetX: 42, zoom: 1 },
+    onSelectFrame: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+  };
+  const canvas = (
+    projectId: string,
+    onTransformCommit: (
+      delta: PhotoTransformDelta,
+    ) => Promise<boolean>,
+  ) => (
+    <AlbumCanvas
+      {...commonProps}
+      projectId={projectId}
+      onTransformCommit={onTransformCommit}
+    />
+  );
+
+  const view = render(canvas("project-a", commitA));
+  await finishPixiInitialization();
+  const world = pixiLifecycle.instances[0].stage.children[0] as {
+    children: unknown[];
+  };
+  const sheetA = world.children[0];
+
+  displayWithHandler("wheel").emit("wheel", {
+    altKey: true,
+    deltaY: -100,
+    preventDefault: vi.fn(),
+  });
+  view.rerender(canvas("project-b", commitB));
+  const sheetB = world.children[0];
+
+  expect(sheetB).not.toBe(sheetA);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
+  expect(commitA).not.toHaveBeenCalled();
+  expect(commitB).not.toHaveBeenCalled();
+
+  latestDisplayWithHandler("pointerdown").emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  view.rerender(canvas("project-c", commitC));
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 40, y: 0 },
+  });
+
+  expect(world.children[0]).not.toBe(sheetB);
+  expect(commitB).not.toHaveBeenCalled();
+  expect(commitC).not.toHaveBeenCalled();
 });

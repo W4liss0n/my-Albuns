@@ -1,20 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "react-aria-components";
 
-import type {
-  EditorProjection,
-  ExportResult,
-  ProjectBridge,
-  ProjectIntent,
-} from "../domain/project";
-import { useEditorView } from "../state/editorView";
-import {
-  AlbumCanvas,
-  type CanvasMetrics,
-  type PhotoTransformPreview,
-} from "./AlbumCanvas";
-import { centeredSheetOffsetInContinuousCanvas } from "./canvasGeometry";
+import type { EditorProjection, ProjectBridge } from "../domain/project";
+import { AlbumCanvas } from "./AlbumCanvas";
 import { SheetPreview } from "./SheetPreview";
+import { useProjectEditorController } from "./useProjectEditorController";
 import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
@@ -26,273 +16,30 @@ interface ProjectWorkspaceProps {
   onProjectionChange(projection: EditorProjection): void;
 }
 
-interface ZoomDraft {
-  frameId: string;
-  startValue: number;
-  value: number;
-  committing: boolean;
-}
-
-const ignoreMaterializedCount = () => undefined;
-
-function messageFromError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function ProjectWorkspace({
   projection,
   bridge,
   onProjectionChange,
 }: ProjectWorkspaceProps) {
-  const selectedFrameId = useEditorView((state) => state.selectedFrameId);
-  const focusedSheetId = useEditorView((state) => state.focusedSheetId);
-  const centeredSheetId = useEditorView((state) => state.centeredSheetId);
-  const viewport = useEditorView((state) => state.viewport);
-  const selectFrame = useEditorView((state) => state.selectFrame);
-  const focusSheet = useEditorView((state) => state.focusSheet);
-  const centerSheet = useEditorView((state) => state.centerSheet);
-  const setViewport = useEditorView((state) => state.setViewport);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
-  const [canvasMetrics, setCanvasMetrics] =
-    useState<CanvasMetrics | null>(null);
-  const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(null);
-  const zoomDraftRef = useRef<ZoomDraft | null>(null);
-  const pendingSheetNavigationRef = useRef<string | null>(null);
-  const [canvasPhotoPreview, setCanvasPhotoPreview] =
-    useState<PhotoTransformPreview | null>(null);
-  const workspacePanels = useWorkspacePanelLayout();
-
-  const selectedFrame = useMemo(
-    () =>
-      projection.state.album.sheets
-        .flatMap((sheet) => sheet.frames)
-        .find((frame) => frame.id === selectedFrameId) ?? null,
-    [projection.state.album.sheets, selectedFrameId],
-  );
-  const selectedComposedPhoto = useMemo(
-    () =>
-      projection.composition.sheets
-        .flatMap((sheet) => sheet.frames)
-        .find((frame) => frame.frameId === selectedFrameId)?.photo ?? null,
-    [projection.composition.sheets, selectedFrameId],
-  );
-
-  function setZoomDraft(next: ZoomDraft | null) {
-    zoomDraftRef.current = next;
-    setZoomDraftState(next);
-  }
-
-  function centerCanvasOnSheet(
-    sheetId: string,
-    metrics: CanvasMetrics,
-  ) {
-    const sheetIndex = projection.composition.sheets.findIndex(
-      (sheet) => sheet.sheetId === sheetId,
-    );
-    if (sheetIndex < 0) return false;
-
-    setViewport({
-      ...useEditorView.getState().viewport,
-      offsetX: centeredSheetOffsetInContinuousCanvas(
-        projection.composition.sheets,
-        sheetIndex,
-        metrics.scale,
-        metrics.width,
-      ),
-    });
-    return true;
-  }
-
-  function handleCanvasMetricsChange(metrics: CanvasMetrics) {
-    setCanvasMetrics(metrics);
-    const pendingSheetId = pendingSheetNavigationRef.current;
-    if (
-      pendingSheetId &&
-      centerCanvasOnSheet(pendingSheetId, metrics)
-    ) {
-      pendingSheetNavigationRef.current = null;
-    }
-  }
-
-  function navigateToSheet(sheetId: string) {
-    const sheetExists = projection.composition.sheets.some(
-      (sheet) => sheet.sheetId === sheetId,
-    );
-    if (!sheetExists) return;
-
-    focusSheet(sheetId);
-    centerSheet(sheetId);
-    if (!canvasMetrics) {
-      pendingSheetNavigationRef.current = sheetId;
-      return;
-    }
-
-    pendingSheetNavigationRef.current = null;
-    centerCanvasOnSheet(sheetId, canvasMetrics);
-  }
-
-  async function runWithGlobalFeedback(
-    label: string,
-    operation: () => Promise<EditorProjection>,
-  ) {
-    setBusy(label);
-    setMessage(null);
-    try {
-      onProjectionChange(await operation());
-    } catch (error: unknown) {
-      setMessage(messageFromError(error));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  function applyWithStatus(intent: ProjectIntent) {
-    return runWithGlobalFeedback("Aplicando alteração", () =>
-      bridge.apply(intent),
-    );
-  }
-
-  async function commitInteraction(intent: ProjectIntent) {
-    setMessage(null);
-    try {
-      onProjectionChange(await bridge.apply(intent));
-    } catch (error: unknown) {
-      setCanvasPhotoPreview(null);
-      setMessage(messageFromError(error));
-    }
-  }
-
-  async function exportPreview() {
-    setBusy("Exportando");
-    setMessage(null);
-    try {
-      const result = await bridge.exportPreview();
-      setExportResult(result);
-    } catch (error: unknown) {
-      setMessage(messageFromError(error));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  function beginZoomGesture(frameId: string, currentValue: number) {
-    const currentDraft = zoomDraftRef.current;
-    if (
-      currentDraft?.frameId === frameId &&
-      !currentDraft.committing
-    ) {
-      return;
-    }
-    setZoomDraft({
-      frameId,
-      startValue: currentValue,
-      value: currentValue,
-      committing: false,
-    });
-  }
-
-  function updateZoomGesture(
-    frameId: string,
-    currentValue: number,
-    nextValue: number,
-  ) {
-    const currentDraft = zoomDraftRef.current;
-    const draft =
-      currentDraft?.frameId === frameId && !currentDraft.committing
-        ? currentDraft
-        : {
-            frameId,
-            startValue: currentValue,
-            value: currentValue,
-            committing: false,
-          };
-    setZoomDraft({
-      ...draft,
-      value: nextValue,
-    });
-  }
-
-  async function finishZoomGesture(frameId: string) {
-    const draft = zoomDraftRef.current;
-    if (!draft || draft.frameId !== frameId || draft.committing) return;
-
-    const delta = Number((draft.value - draft.startValue).toFixed(4));
-    if (Math.abs(delta) < 0.0001) {
-      setZoomDraft(null);
-      return;
-    }
-
-    setZoomDraft({ ...draft, committing: true });
-    await commitInteraction({
-      kind: "zoomPhoto",
-      frameId,
-      delta,
-    });
-    if (zoomDraftRef.current?.frameId === frameId) {
-      setZoomDraft(null);
-    }
-  }
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey) return;
-      if (event.key.toLocaleLowerCase() === "z" && projection.state.canUndo) {
-        event.preventDefault();
-        void runWithGlobalFeedback("Desfazendo", bridge.undo);
-      }
-      if (event.key.toLocaleLowerCase() === "y" && projection.state.canRedo) {
-        event.preventDefault();
-        void runWithGlobalFeedback("Refazendo", bridge.redo);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+  const controller = useProjectEditorController({
+    projection,
+    bridge,
+    onProjectionChange,
   });
+  const workspacePanels = useWorkspacePanelLayout();
+  const {
+    busy,
+    message,
+    exportResult,
+    selectedFrame,
+    selectedComposedPhoto,
+    displayedPhotoZoom,
+    displayedPhotoPanX,
+    sheetCount,
+    photoCount,
+  } = controller;
+  const focusedSheetId = controller.canvasProps.focusedSheetId;
 
-  useEffect(() => {
-    if (
-      zoomDraftRef.current &&
-      zoomDraftRef.current.frameId !== selectedFrameId
-    ) {
-      setZoomDraft(null);
-    }
-    setCanvasPhotoPreview((current) =>
-      current?.frameId === selectedFrameId ? current : null,
-    );
-  }, [selectedFrameId]);
-
-  useEffect(() => {
-    setCanvasPhotoPreview(null);
-  }, [projection]);
-
-  const sheetCount = projection.state.album.sheets.length;
-  const photoCount = projection.state.album.sheets.reduce(
-    (count, sheet) =>
-      count + sheet.frames.filter((frame) => frame.photo).length,
-    0,
-  );
-
-  const selectedPhotoZoom =
-    selectedFrame?.photo?.transform.userZoom ?? 1;
-  const selectedCanvasPhotoPreview =
-    canvasPhotoPreview?.frameId === selectedFrame?.id
-      ? canvasPhotoPreview
-      : null;
-  const displayedPhotoZoom =
-    zoomDraft && zoomDraft.frameId === selectedFrame?.id
-      ? zoomDraft.value
-      : (selectedCanvasPhotoPreview?.zoom ?? selectedPhotoZoom);
-  const displayedPhotoPanX =
-    selectedCanvasPhotoPreview?.panX ??
-    selectedFrame?.photo?.transform.panX ??
-    0;
-  const implicitSheetId = projection.state.album.sheets.some(
-    (sheet) => sheet.id === centeredSheetId,
-  )
-    ? centeredSheetId
-    : projection.state.album.sheets[0]?.id;
   return (
     <div className="app-shell">
       <header className="titlebar">
@@ -312,9 +59,7 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Desfazer"
             isDisabled={!projection.state.canUndo || Boolean(busy)}
-            onPress={() =>
-              void runWithGlobalFeedback("Desfazendo", bridge.undo)
-            }
+            onPress={controller.undo}
           >
             ↶
           </Button>
@@ -322,9 +67,7 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Refazer"
             isDisabled={!projection.state.canRedo || Boolean(busy)}
-            onPress={() =>
-              void runWithGlobalFeedback("Refazendo", bridge.redo)
-            }
+            onPress={controller.redo}
           >
             ↷
           </Button>
@@ -337,7 +80,7 @@ export function ProjectWorkspace({
         <div className="command-spacer" />
         <Button
           className="primary-command"
-          onPress={() => void exportPreview()}
+          onPress={controller.exportPreview}
           isDisabled={Boolean(busy)}
         >
           <span aria-hidden="true">⇧</span>
@@ -355,53 +98,7 @@ export function ProjectWorkspace({
           className="canvas-section"
           aria-label="Área de composição"
         >
-          <AlbumCanvas
-            composition={projection.composition}
-            selectedFrameId={selectedFrameId}
-            focusedSheetId={focusedSheetId}
-            centeredSheetId={centeredSheetId}
-            viewport={viewport}
-            photoZoomPreview={
-              zoomDraft
-                ? {
-                    frameId: zoomDraft.frameId,
-                    value: zoomDraft.value,
-                  }
-                : null
-            }
-            onSelectFrame={selectFrame}
-            onFocusSheet={focusSheet}
-            onCenteredSheetChange={centerSheet}
-            onViewportChange={setViewport}
-            onTransformPreview={setCanvasPhotoPreview}
-            onPanCommit={(frameId, deltaX, deltaY) =>
-              void commitInteraction({
-                kind: "panPhoto",
-                frameId,
-                deltaX,
-                deltaY,
-              })
-            }
-            onZoomCommit={(frameId, delta) =>
-              void commitInteraction({ kind: "zoomPhoto", frameId, delta })
-            }
-            onTransformCommit={(
-              frameId,
-              deltaPanX,
-              deltaPanY,
-              deltaZoom,
-            ) =>
-              void commitInteraction({
-                kind: "transformPhoto",
-                frameId,
-                deltaPanX,
-                deltaPanY,
-                deltaZoom,
-              })
-            }
-            onMaterializedChange={ignoreMaterializedCount}
-            onCanvasMetricsChange={handleCanvasMetricsChange}
-          />
+          <AlbumCanvas {...controller.canvasProps} />
         </section>
 
         <WorkspacePanelSplitter
@@ -467,23 +164,14 @@ export function ProjectWorkspace({
                         }
                         step="1"
                         value={Math.round(displayedPhotoZoom * 100)}
-                        disabled={Boolean(zoomDraft?.committing)}
-                        onPointerDown={() =>
-                          beginZoomGesture(
-                            selectedFrame.id,
-                            selectedPhotoZoom,
-                          )
-                        }
+                        disabled={controller.zoomCommitting}
+                        onPointerDown={controller.beginZoomGesture}
                         onChange={(event) =>
-                          updateZoomGesture(
-                            selectedFrame.id,
-                            selectedPhotoZoom,
+                          controller.updateZoomGesture(
                             Number(event.currentTarget.value) / 100,
                           )
                         }
-                        onPointerUp={() =>
-                          void finishZoomGesture(selectedFrame.id)
-                        }
+                        onPointerUp={controller.finishZoomGesture}
                         onKeyDown={(event) => {
                           if (
                             [
@@ -497,10 +185,7 @@ export function ProjectWorkspace({
                               "PageDown",
                             ].includes(event.key)
                           ) {
-                            beginZoomGesture(
-                              selectedFrame.id,
-                              selectedPhotoZoom,
-                            );
+                            controller.beginZoomGesture();
                           }
                         }}
                         onKeyUp={(event) => {
@@ -516,12 +201,10 @@ export function ProjectWorkspace({
                               "PageDown",
                             ].includes(event.key)
                           ) {
-                            void finishZoomGesture(selectedFrame.id);
+                            void controller.finishZoomGesture();
                           }
                         }}
-                        onBlur={() =>
-                          void finishZoomGesture(selectedFrame.id)
-                        }
+                        onBlur={controller.finishZoomGesture}
                       />
                     </label>
                   )}
@@ -559,7 +242,9 @@ export function ProjectWorkspace({
                               ? "sheet-tile active"
                               : "sheet-tile"
                           }
-                          onPress={() => navigateToSheet(sheet.sheetId)}
+                          onPress={() =>
+                            controller.navigateToSheet(sheet.sheetId)
+                          }
                         >
                           <SheetPreview sheet={sheet} />
                           <span>{String(sheet.number).padStart(2, "0")}</span>
@@ -596,15 +281,7 @@ export function ProjectWorkspace({
                 className="media-card"
                 type="button"
                 key={media.id}
-                onDoubleClick={() =>
-                  implicitSheetId
-                    ? void applyWithStatus({
-                        kind: "fillLeftmostPlaceholder",
-                        sheetId: implicitSheetId,
-                        mediaId: media.id,
-                      })
-                    : undefined
-                }
+                onDoubleClick={() => controller.fillMedia(media.id)}
                 title="Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
               >
                 <span
@@ -654,10 +331,7 @@ export function ProjectWorkspace({
             <button
               type="button"
               aria-label="Fechar mensagem"
-              onClick={() => {
-                setMessage(null);
-                setExportResult(null);
-              }}
+              onClick={controller.dismissFeedback}
             >
               ×
             </button>

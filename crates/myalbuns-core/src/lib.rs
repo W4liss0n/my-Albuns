@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use ts_rs::TS;
 
 pub const PROJECT_SCHEMA_VERSION: u32 = 1;
 pub const SHEET_WIDTH_UM: i64 = 600_000;
@@ -11,7 +12,7 @@ pub const PHOTO_PAN_MAX: f32 = 1.0;
 pub const PHOTO_ZOOM_MIN: f32 = 1.0;
 pub const PHOTO_ZOOM_MAX: f32 = 4.0;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct RectUm {
     pub x: i64,
@@ -20,28 +21,28 @@ pub struct RectUm {
     pub height: i64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct VectorUm {
     pub x: f64,
     pub y: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SizeUm {
     pub width: f64,
     pub height: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct NumberRange {
     pub minimum: f64,
     pub maximum: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct Matrix2 {
     pub xx: f64,
@@ -50,14 +51,14 @@ pub struct Matrix2 {
     pub yy: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoPlacement {
     pub center: VectorUm,
     pub size: SizeUm,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoPlacementPlan {
     pub current_pan: VectorUm,
@@ -72,7 +73,7 @@ pub struct PhotoPlacementPlan {
     pub size_per_zoom: SizeUm,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaTransform {
     pub pan_x: f32,
@@ -96,7 +97,7 @@ impl Default for MediaTransform {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoSnapshot {
     pub media_id: String,
@@ -107,7 +108,7 @@ pub struct PhotoSnapshot {
     pub transform: MediaTransform,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct FrameSnapshot {
     pub id: String,
@@ -116,7 +117,7 @@ pub struct FrameSnapshot {
     pub photo: Option<PhotoSnapshot>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum SheetRole {
     Initial,
@@ -124,7 +125,7 @@ pub enum SheetRole {
     Final,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
     pub id: String,
@@ -136,7 +137,7 @@ pub struct SheetSnapshot {
     pub has_overlay: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCatalogItem {
     pub id: String,
@@ -145,14 +146,14 @@ pub struct MediaCatalogItem {
     pub usage_count: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct AlbumSnapshot {
     pub sheets: Vec<SheetSnapshot>,
     pub media: Vec<MediaCatalogItem>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorState {
     pub project_id: String,
@@ -165,7 +166,7 @@ pub struct EditorState {
     pub can_redo: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedPhoto {
     pub media_id: String,
@@ -177,7 +178,7 @@ pub struct ComposedPhoto {
     pub palette: [String; 3],
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedFrame {
     pub frame_id: String,
@@ -186,7 +187,7 @@ pub struct ComposedFrame {
     pub photo: Option<ComposedPhoto>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedSheet {
     pub sheet_id: String,
@@ -197,10 +198,25 @@ pub struct ComposedSheet {
     pub frames: Vec<ComposedFrame>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct CompositionPlan {
     pub sheets: Vec<ComposedSheet>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorProjection {
+    pub state: EditorState,
+    pub composition: CompositionPlan,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportResult {
+    pub output_path: String,
+    pub width_px: u32,
+    pub height_px: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -214,22 +230,14 @@ pub struct RenderSnapshot {
     pub composition: CompositionPlan,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
+#[ts(tag = "kind")]
 pub enum ProjectIntent {
-    PanPhoto {
-        frame_id: String,
-        delta_x: f32,
-        delta_y: f32,
-    },
-    ZoomPhoto {
-        frame_id: String,
-        delta: f32,
-    },
     TransformPhoto {
         frame_id: String,
         delta_pan_x: f32,
@@ -387,33 +395,6 @@ impl ProjectSession {
         };
 
         match intent {
-            ProjectIntent::PanPhoto {
-                frame_id,
-                delta_x,
-                delta_y,
-            } => {
-                let frame = find_frame_mut(&mut self.state.album, &frame_id)
-                    .ok_or_else(|| CoreError::FrameNotFound(frame_id.clone()))?;
-                let photo = frame
-                    .photo
-                    .as_mut()
-                    .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
-
-                photo.transform.pan_x =
-                    (photo.transform.pan_x + delta_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
-                photo.transform.pan_y =
-                    (photo.transform.pan_y + delta_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX);
-            }
-            ProjectIntent::ZoomPhoto { frame_id, delta } => {
-                let frame = find_frame_mut(&mut self.state.album, &frame_id)
-                    .ok_or_else(|| CoreError::FrameNotFound(frame_id.clone()))?;
-                let photo = frame
-                    .photo
-                    .as_mut()
-                    .ok_or_else(|| CoreError::FrameHasNoPhoto(frame_id.clone()))?;
-                photo.transform.user_zoom =
-                    (photo.transform.user_zoom + delta).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
-            }
             ProjectIntent::TransformPhoto {
                 frame_id,
                 delta_pan_x,
@@ -1044,10 +1025,11 @@ mod tests {
         let mut session = ProjectCore::open_sample_project(12);
 
         let state = session
-            .apply(ProjectIntent::PanPhoto {
+            .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),
-                delta_x: 0.25,
-                delta_y: -0.10,
+                delta_pan_x: 0.25,
+                delta_pan_y: -0.10,
+                delta_zoom: 0.0,
             })
             .expect("the sample frame accepts a pan gesture");
 
@@ -1105,10 +1087,11 @@ mod tests {
     fn undo_and_redo_restore_the_document_without_storing_view_state() {
         let mut session = ProjectCore::open_sample_project(12);
         session
-            .apply(ProjectIntent::PanPhoto {
+            .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),
-                delta_x: 0.40,
-                delta_y: 0.20,
+                delta_pan_x: 0.40,
+                delta_pan_y: 0.20,
+                delta_zoom: 0.0,
             })
             .expect("pan is valid");
 
@@ -1302,10 +1285,11 @@ mod tests {
     fn loads_a_persisted_revision_for_rendering_without_an_editable_session() {
         let mut session = ProjectCore::open_sample_project(12);
         session
-            .apply(ProjectIntent::PanPhoto {
+            .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),
-                delta_x: -0.35,
-                delta_y: 0.0,
+                delta_pan_x: -0.35,
+                delta_pan_y: 0.0,
+                delta_zoom: 0.0,
             })
             .expect("pan is valid");
         let persisted = session
@@ -1347,9 +1331,11 @@ mod tests {
         let mut session = ProjectCore::open_sample_project(12);
 
         let zoomed = session
-            .apply(ProjectIntent::ZoomPhoto {
+            .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),
-                delta: 0.35,
+                delta_pan_x: 0.0,
+                delta_pan_y: 0.0,
+                delta_zoom: 0.35,
             })
             .expect("the sample photo accepts zoom");
         assert_eq!(
@@ -1363,9 +1349,11 @@ mod tests {
         );
 
         let reset = session
-            .apply(ProjectIntent::ZoomPhoto {
+            .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),
-                delta: -2.0,
+                delta_pan_x: 0.0,
+                delta_pan_y: 0.0,
+                delta_zoom: -2.0,
             })
             .expect("zoom is clamped to fill");
         assert_eq!(

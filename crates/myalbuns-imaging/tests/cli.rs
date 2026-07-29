@@ -45,18 +45,13 @@ fn processor_uses_the_composed_media_transform() {
     assert!(original.status.success());
 
     session
-        .apply(ProjectIntent::PanPhoto {
+        .apply(ProjectIntent::TransformPhoto {
             frame_id: "frame-01-a".into(),
-            delta_x: 0.65,
-            delta_y: -0.25,
+            delta_pan_x: 0.65,
+            delta_pan_y: -0.25,
+            delta_zoom: 0.4,
         })
-        .expect("pan is valid");
-    session
-        .apply(ProjectIntent::ZoomPhoto {
-            frame_id: "frame-01-a".into(),
-            delta: 0.4,
-        })
-        .expect("zoom is valid");
+        .expect("the Photo transform is valid");
     let transformed = invoke_processor(
         snapshot_value(session.render_snapshot()),
         &transformed_path,

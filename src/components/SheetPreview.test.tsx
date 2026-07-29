@@ -108,3 +108,51 @@ test("renders the composed geometry and visual layers of each sheet", () => {
     secondPreview.querySelector("[data-preview-overlay]"),
   ).toBeInTheDocument();
 });
+
+test("preserves the canonical visual stack supplied by CompositionCore", () => {
+  const canonicalStack: ComposedSheet = {
+    ...placeholderSheet,
+    frames: [
+      {
+        ...placeholderSheet.frames[0],
+        frameId: "frame-top",
+        zIndex: 8,
+      },
+      {
+        ...placeholderSheet.frames[0],
+        frameId: "frame-bottom",
+        zIndex: 1,
+      },
+    ],
+  };
+
+  render(<SheetPreview sheet={canonicalStack} />);
+
+  const preview = screen.getByRole("img", {
+    name: "Prévia da Lâmina 02",
+  });
+  expect(
+    Array.from(
+      preview.querySelectorAll("[data-preview-frame-id]"),
+      (frame) => frame.getAttribute("data-preview-frame-id"),
+    ),
+  ).toEqual(["frame-top", "frame-bottom"]);
+});
+
+test("keeps preview strokes aligned with Canvas units at other sheet heights", () => {
+  render(
+    <SheetPreview
+      sheet={{
+        ...placeholderSheet,
+        heightUm: 450_000,
+      }}
+    />,
+  );
+
+  const preview = screen.getByRole("img", {
+    name: "Prévia da Lâmina 02",
+  });
+  expect(
+    preview.querySelector('[data-preview-frame-id="frame-002"]'),
+  ).toHaveAttribute("stroke-width", "1000");
+});

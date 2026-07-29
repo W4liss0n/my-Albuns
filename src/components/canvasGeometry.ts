@@ -1,6 +1,8 @@
 import type { ComposedSheet } from "../domain/project";
 
-export const MICROMETER_TO_CANVAS_PIXEL = 0.001;
+export const CANVAS_MICROMETERS_PER_PIXEL = 1_000;
+export const MICROMETER_TO_CANVAS_PIXEL =
+  1 / CANVAS_MICROMETERS_PER_PIXEL;
 export const SHEET_GAP_PX = 52;
 export const SHEET_LABEL_HEIGHT_PX = 24;
 export const CANVAS_VERTICAL_MARGIN_PX = 24;

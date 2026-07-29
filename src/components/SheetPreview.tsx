@@ -5,6 +5,7 @@ import type {
   ComposedPhoto,
   ComposedSheet,
 } from "../domain/project";
+import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
@@ -17,11 +18,9 @@ interface SheetPreviewProps {
 export function SheetPreview({ sheet }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
-  const unit = sheet.heightUm / 300;
+  const unit = CANVAS_MICROMETERS_PER_PIXEL;
   const surfaceStyle = SHEET_VISUAL_STYLE.surface;
-  const frames = [...sheet.frames].sort(
-    (first, second) => first.zIndex - second.zIndex,
-  );
+  const frames = sheet.frames;
 
   return (
     <svg

@@ -2,26 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { expect, test } from "vitest";
 
 import App from "./App";
-import type { EditorProjection, ProjectBridge } from "./domain/project";
+import type { ProjectBridge } from "./domain/project";
+import { createEmptyProjection } from "./test/projectFixtures";
 
-const projection: EditorProjection = {
-  state: {
-    projectId: "project-spike-001",
-    projectName: "Álbum Horizonte",
-    revision: 0,
-    savedRevision: 0,
-    dirty: false,
-    canUndo: false,
-    canRedo: false,
-    album: {
-      sheets: [],
-      media: [],
-    },
-  },
-  composition: {
-    sheets: [],
-  },
-};
+const projection = createEmptyProjection();
 
 const bridge: ProjectBridge = {
   load: async () => projection,

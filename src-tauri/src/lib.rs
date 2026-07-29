@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use myalbuns_core::{
-    CompositionPlan, EditorState, ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot,
+    EditorProjection, ExportResult, ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot,
 };
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -9,21 +9,6 @@ use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
 struct AppState {
     session: Mutex<ProjectSession>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct EditorProjection {
-    state: EditorState,
-    composition: CompositionPlan,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ExportResult {
-    output_path: String,
-    width_px: u32,
-    height_px: u32,
 }
 
 #[derive(Serialize)]
