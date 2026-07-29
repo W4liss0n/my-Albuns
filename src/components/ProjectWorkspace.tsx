@@ -3,6 +3,7 @@ import { Button } from "react-aria-components";
 
 import type { EditorProjection, ProjectBridge } from "../domain/project";
 import { AlbumCanvas } from "./AlbumCanvas";
+import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { SheetPreview } from "./SheetPreview";
 import { useProjectEditorController } from "./useProjectEditorController";
 import {
@@ -13,6 +14,7 @@ import {
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   bridge: ProjectBridge;
+  canvasPerformanceProbe?: CanvasPerformanceProbeRequest | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
 }
@@ -20,6 +22,7 @@ interface ProjectWorkspaceProps {
 export function ProjectWorkspace({
   projection,
   bridge,
+  canvasPerformanceProbe = null,
   mediaPreviewUrls = {},
   onProjectionChange,
 }: ProjectWorkspaceProps) {
@@ -102,6 +105,7 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
+            performanceProbe={canvasPerformanceProbe}
             mediaPreviewUrls={mediaPreviewUrls}
           />
         </section>

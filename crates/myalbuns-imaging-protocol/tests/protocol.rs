@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    CacheCompletion, CacheMediaSource, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingRequest, ImagingResponse,
+    CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
+    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
 };
 use myalbuns_paths::AppPaths;
 
@@ -24,26 +24,73 @@ fn host_and_processor_share_one_serialized_protocol() {
         "render-42",
         PathBuf::from(r"C:\Temp\Album_001.png"),
         snapshot,
-    );
+        "lamina-01",
+        300,
+        vec![
+            MediaSource::new(
+                "media-costa",
+                PathBuf::from(r"C:\Photos\costa.jpg"),
+                1024,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("the first native source is valid"),
+            MediaSource::new(
+                "media-campo",
+                PathBuf::from(r"C:\Photos\campo.jpg"),
+                2048,
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            )
+            .expect("the second native source is valid"),
+        ],
+    )
+    .expect("the render request is valid");
 
     let request_json = serde_json::to_value(&request).expect("request serializes");
     assert_eq!(request_json["protocolVersion"], IMAGING_PROTOCOL_VERSION);
     assert_eq!(request_json["requestId"], "render-42");
+    assert_eq!(request_json["sheetId"], "lamina-01");
+    assert_eq!(request_json["dpi"], 300);
+    assert_eq!(request_json["sources"][0]["mediaId"], "media-costa");
     let decoded_request: ImagingRequest =
         serde_json::from_value(request_json).expect("request decodes");
     assert_eq!(decoded_request, request);
+    assert!(
+        ImagingRequest::procedural_fixture(
+            r"C:\private\operation",
+            PathBuf::from(r"C:\Temp\invalid.png"),
+            request.snapshot.clone(),
+            "lamina-01",
+            25,
+        )
+        .is_err(),
+        "request identifiers cannot become temporary-file path fragments"
+    );
 
-    let response = ImagingResponse::completed("render-42", 600, 300);
+    let response = ImagingResponse::completed(
+        "render-42",
+        RenderCompletion {
+            width_px: 7087,
+            height_px: 3543,
+            dpi: 300,
+            source_count: 2,
+            source_bytes: 3072,
+            output_bytes: 4096,
+            output_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+                .into(),
+        },
+    );
     let response_json = serde_json::to_value(&response).expect("response serializes");
     assert_eq!(response_json["kind"], "completed");
     assert_eq!(response_json["requestId"], "render-42");
 
     let decoded: ImagingResponse = serde_json::from_value(response_json).expect("response decodes");
     assert_eq!(
-        decoded.completed_dimensions_for("render-42"),
-        Some((600, 300))
+        decoded
+            .completed_for("render-42")
+            .map(|completion| (completion.width_px, completion.height_px)),
+        Some((7087, 3543))
     );
-    assert_eq!(decoded.completed_dimensions_for("another"), None);
+    assert_eq!(decoded.completed_for("another"), None);
 }
 
 #[test]
@@ -60,7 +107,7 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
             "project-42",
             cache_paths,
             vec![
-                CacheMediaSource::new(
+                MediaSource::new(
                     "media-42",
                     PathBuf::from(r"C:\Photos\photo.jpg"),
                     1024,

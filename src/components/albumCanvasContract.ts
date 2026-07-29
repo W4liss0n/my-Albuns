@@ -1,5 +1,9 @@
 import type { CompositionPlan } from "../domain/project";
 import type { ViewportState } from "../state/viewport";
+import type {
+  CanvasPerformanceMeasurement,
+  CanvasPerformanceProbeConfig,
+} from "./canvasPerformanceProbe";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 
 export interface PhotoZoomPreview {
@@ -26,6 +30,15 @@ export interface CanvasMetrics {
   scale: number;
 }
 
+export interface CanvasPerformanceProbeRequest {
+  key: string;
+  config: CanvasPerformanceProbeConfig;
+  onCompleted(
+    measurement: CanvasPerformanceMeasurement,
+  ): Promise<void> | void;
+  onFailed(reason: string): Promise<void> | void;
+}
+
 export interface AlbumCanvasProps {
   projectId: string;
   composition: CompositionPlan;
@@ -36,6 +49,7 @@ export interface AlbumCanvasProps {
   centeredSheetId: string | null;
   viewport: ViewportState;
   photoZoomPreview?: PhotoZoomPreview | null;
+  performanceProbe?: CanvasPerformanceProbeRequest | null;
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
   onCenteredSheetChange(sheetId: string): void;

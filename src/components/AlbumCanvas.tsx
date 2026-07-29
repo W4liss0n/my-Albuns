@@ -7,6 +7,7 @@ import {
 } from "../application/logging";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
+import { runCanvasPerformanceProbe } from "./canvasPerformanceProbe";
 import { useLogger } from "./loggingContext";
 
 export type {
@@ -23,7 +24,12 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
   const materializedSceneRef = useRef<AlbumCanvasScene | null>(null);
+  const performanceRunRef = useRef<{
+    key: string;
+    controller: AbortController;
+  } | null>(null);
   const [ready, setReady] = useState(false);
+  const [, setPreviewTextureRevision] = useState(0);
   const hasSheets = props.composition.sheets.length > 0;
 
   useEffect(() => {
@@ -90,16 +96,20 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
-        ownedScene = new AlbumCanvasScene(app, () => {
-          logger.write({
-            level: "warn",
-            component: "canvas",
-            event: "canvas_texture_load_failed",
-            projectId: props.projectId,
-            instanceId,
-            reason: "asset_load_failed",
-          });
-        });
+        ownedScene = new AlbumCanvasScene(
+          app,
+          () => {
+            logger.write({
+              level: "warn",
+              component: "canvas",
+              event: "canvas_texture_load_failed",
+              projectId: props.projectId,
+              instanceId,
+              reason: "asset_load_failed",
+            });
+          },
+          () => setPreviewTextureRevision((current) => current + 1),
+        );
         sceneRef.current = ownedScene;
         sceneInstanceIdRef.current = instanceId;
         logger.write({
@@ -130,6 +140,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     return () => {
       disposed = true;
       setReady(false);
+      performanceRunRef.current?.controller.abort();
+      performanceRunRef.current = null;
       destroyInitializedApp("effect_cleanup");
     };
   }, [hasSheets, logger]);
@@ -165,6 +177,69 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         sheetCount: props.composition.sheets.length,
       });
     }
+  });
+
+  useEffect(() => {
+    const request = props.performanceProbe;
+    const scene = sceneRef.current;
+    if (!ready || !request || !scene) return;
+    if (performanceRunRef.current?.key === request.key) return;
+    const target = scene.performanceTarget();
+    if (!target) return;
+
+    performanceRunRef.current?.controller.abort();
+    const controller = new AbortController();
+    performanceRunRef.current = {
+      key: request.key,
+      controller,
+    };
+    logger.write({
+      level: "info",
+      component: "canvas",
+      event: "canvas_performance_probe_started",
+      projectId: props.projectId,
+      instanceId: sceneInstanceIdRef.current ?? undefined,
+    });
+    void runCanvasPerformanceProbe(
+      request.config,
+      target,
+      undefined,
+      controller.signal,
+    )
+      .then(async (measurement) => {
+        if (
+          controller.signal.aborted ||
+          performanceRunRef.current?.controller !== controller
+        ) {
+          return;
+        }
+        await request.onCompleted(measurement);
+        logger.write({
+          level: "info",
+          component: "canvas",
+          event: "canvas_performance_probe_completed",
+          projectId: props.projectId,
+          instanceId: sceneInstanceIdRef.current ?? undefined,
+        });
+      })
+      .catch(async (error: unknown) => {
+        if (
+          controller.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+        const reason = logReasonFromError(error);
+        logger.write({
+          level: "error",
+          component: "canvas",
+          event: "canvas_performance_probe_failed",
+          projectId: props.projectId,
+          instanceId: sceneInstanceIdRef.current ?? undefined,
+          reason,
+        });
+        await request.onFailed(reason);
+      });
   });
 
   if (!hasSheets) {

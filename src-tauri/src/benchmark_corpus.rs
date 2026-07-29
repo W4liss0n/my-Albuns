@@ -5,7 +5,7 @@ use std::{
 };
 
 use myalbuns_core::{MediaCatalogItem, PhotoSnapshot, ProjectCore, ProjectSession};
-use myalbuns_imaging_protocol::CacheMediaSource;
+use myalbuns_imaging_protocol::MediaSource;
 use serde::Deserialize;
 
 use crate::sample_project::SampleProject;
@@ -25,7 +25,7 @@ pub(crate) struct BenchmarkAlbum {
 
 #[derive(Clone)]
 pub(crate) struct BenchmarkSource {
-    cache_source: CacheMediaSource,
+    media_source: MediaSource,
     name: String,
     source_width_px: u32,
     source_height_px: u32,
@@ -167,7 +167,7 @@ impl BenchmarkAlbum {
             }
 
             sources.push(BenchmarkSource {
-                cache_source: CacheMediaSource::new(
+                media_source: MediaSource::new(
                     photo.media_id,
                     source_path,
                     photo.source_bytes,
@@ -211,7 +211,7 @@ impl BenchmarkAlbum {
         {
             let source = &self.sources[index % self.sources.len()];
             frame.photo = Some(PhotoSnapshot {
-                media_id: source.cache_source.media_id().to_owned(),
+                media_id: source.media_source.media_id().to_owned(),
                 name: source.name.clone(),
                 source_width_px: source.source_width_px,
                 source_height_px: source.source_height_px,
@@ -235,11 +235,11 @@ impl BenchmarkAlbum {
             .iter()
             .enumerate()
             .map(|(index, source)| MediaCatalogItem {
-                id: source.cache_source.media_id().to_owned(),
+                id: source.media_source.media_id().to_owned(),
                 name: source.name.clone(),
                 palette: palettes[index % palettes.len()].clone(),
                 usage_count: usage_counts
-                    .get(source.cache_source.media_id())
+                    .get(source.media_source.media_id())
                     .copied()
                     .unwrap_or_default(),
             })
@@ -265,10 +265,10 @@ impl BenchmarkAlbum {
         &self.sources
     }
 
-    pub(crate) fn cache_sources(&self) -> Vec<CacheMediaSource> {
+    pub(crate) fn media_sources(&self) -> Vec<MediaSource> {
         self.sources
             .iter()
-            .map(|source| source.cache_source.clone())
+            .map(|source| source.media_source.clone())
             .collect()
     }
 }
@@ -276,7 +276,7 @@ impl BenchmarkAlbum {
 impl BenchmarkSource {
     #[cfg(test)]
     pub(crate) fn source_path(&self) -> &Path {
-        self.cache_source.source_path()
+        self.media_source.source_path()
     }
 }
 

@@ -90,7 +90,7 @@ impl TopologySpike {
                     Ok((
                         window.label,
                         album.open_session(window.sample, 12)?,
-                        album.cache_sources(),
+                        album.media_sources(),
                     ))
                 } else {
                     let source = window
@@ -120,6 +120,18 @@ impl TopologySpike {
 
     pub(crate) fn session_count(&self) -> usize {
         1 + usize::from(self.definition.secondary.is_some())
+    }
+
+    pub(crate) fn benchmark_window_settings(&self) -> Vec<(&'static str, bool)> {
+        self.definition
+            .windows()
+            .map(|window| {
+                (
+                    window.label,
+                    matches!(window.sample, SampleProject::Horizon),
+                )
+            })
+            .collect()
     }
 }
 
@@ -223,6 +235,15 @@ mod tests {
                 .state
                 .project_id,
             "project-spike-002"
+        );
+
+        assert_eq!(
+            independent_b.benchmark_window_settings(),
+            vec![("main", false)]
+        );
+        assert_eq!(
+            multiwindow.benchmark_window_settings(),
+            vec![("main", true), ("project-b", false)]
         );
     }
 }

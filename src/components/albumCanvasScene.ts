@@ -21,6 +21,7 @@ import type {
   PhotoTransformDelta,
   PhotoTransformPreview,
 } from "./albumCanvasContract";
+import type { CanvasPerformanceTarget } from "./canvasPerformanceProbe";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
@@ -59,6 +60,7 @@ interface PhotoRenderNode {
   originalX: number;
   originalY: number;
   pan: Vector2;
+  textureBacked: boolean;
 }
 
 interface SheetRenderNode {
@@ -119,6 +121,7 @@ export class AlbumCanvasScene {
   constructor(
     private readonly app: Application,
     onPreviewTextureError: () => void = () => undefined,
+    private readonly onPreviewTextureChange: () => void = () => undefined,
   ) {
     this.previewTextures = new ViewportTexturePool(
       this.refreshAfterPreviewTextureChange,
@@ -208,6 +211,77 @@ export class AlbumCanvasScene {
     this.app.stage.removeAllListeners();
     this.clearMaterializedSheets();
     this.previewTextures.destroy();
+  }
+
+  performanceTarget(): CanvasPerformanceTarget | null {
+    const input = this.input;
+    const node = [...this.photoNodes.values()].find(
+      (candidate) => candidate.textureBacked,
+    );
+    if (!input || !node) return null;
+    const generation = this.projectGeneration;
+    const preview = (
+      pan: Vector2,
+      zoom: number,
+      placement: PhotoPlacement,
+    ) => {
+      if (
+        generation !== this.projectGeneration ||
+        this.photoNodes.get(node.frameId) !== node
+      ) {
+        throw new DOMException(
+          "O alvo do probe do Canvas deixou de existir.",
+          "AbortError",
+        );
+      }
+      applyPhotoPlacementPreview(node, zoom, placement);
+      input.onTransformPreview(
+        createTransformPreview(node.frameId, pan, zoom),
+      );
+    };
+
+    return {
+      frameId: node.frameId,
+      textureBacked: node.textureBacked,
+      previewPan: (amount) => {
+        setPhotoPanAids(node, true);
+        const amplitude =
+          Math.min(
+            node.geometry.current.size.width,
+            node.geometry.current.size.height,
+          ) * 0.18;
+        const constrained = node.geometry.constrain(
+          {
+            x: node.geometry.current.center.x + amplitude * amount,
+            y:
+              node.geometry.current.center.y +
+              amplitude * amount * 0.45,
+          },
+          node.baseZoom,
+        );
+        preview(
+          constrained.pan,
+          constrained.zoom,
+          constrained.placement,
+        );
+      },
+      previewZoom: (amount) => {
+        setPhotoPanAids(node, false);
+        const zoomSpan = Math.min(
+          0.6,
+          node.geometry.zoomRange.maximum - node.baseZoom,
+        );
+        const zoomed = node.geometry.zoom(
+          node.baseZoom + zoomSpan * amount,
+        );
+        preview(node.pan, zoomed.zoom, zoomed.placement);
+      },
+      reset: () => {
+        setPhotoPanAids(node, false);
+        resetPhotoPreview(node);
+        input.onTransformPreview(null);
+      },
+    };
   }
 
   private resetProjectScene() {
@@ -510,6 +584,7 @@ export class AlbumCanvasScene {
           originalX: photoLayer.x,
           originalY: photoLayer.y,
           pan: frame.photo.placement.currentPan,
+          textureBacked: previewOptions.previewTexture !== undefined,
         };
         this.photoNodes.set(frame.frameId, photoNode);
       } else {
@@ -608,6 +683,7 @@ export class AlbumCanvasScene {
     if (this.input) {
       this.update(this.input, this.app.screen.height);
     }
+    this.onPreviewTextureChange();
   };
 
   private updateDecorations() {

@@ -1,16 +1,18 @@
-use std::fs::{self, File};
+use std::collections::HashMap;
+use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, BufWriter, Cursor, Read, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
 use image::{
-    DynamicImage, ImageDecoder, ImageFormat, ImageReader, Rgba, RgbaImage,
-    codecs::jpeg::JpegEncoder,
+    DynamicImage, ExtendedColorType, ImageDecoder, ImageEncoder, ImageFormat, ImageReader, Rgba,
+    RgbaImage, codecs::jpeg::JpegEncoder, codecs::png::PngEncoder,
 };
-use myalbuns_core::{ComposedFrame, RenderSnapshot};
+use myalbuns_core::ComposedFrame;
 use myalbuns_imaging_protocol::{
-    CacheArtifact, CacheCompletion, CacheMediaSource, CacheRequest, CacheResetRequest,
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
+    CacheArtifact, CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
+    ImagingCommand, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
+    RenderSourcePolicy,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -18,7 +20,7 @@ use myalbuns_logging::{
 use myalbuns_paths::{AppPaths, PreparedCacheStorage};
 use sha2::{Digest, Sha256};
 
-const PIXELS_PER_MICROMETER: f64 = 0.001;
+const MICROMETERS_PER_INCH: f64 = 25_400.0;
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
 
 fn main() -> ExitCode {
@@ -107,44 +109,29 @@ fn run(app_paths: &AppPaths) -> Result<(), String> {
         event = "imaging_request_started",
     );
 
-    if request.protocol_version != IMAGING_PROTOCOL_VERSION {
+    request.validate().map_err(|error| {
         tracing::warn!(
             target: "myalbuns.imaging",
             process_role = ProcessRole::Imaging.as_str(),
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
-            event = "imaging_protocol_rejected",
+            event = "imaging_request_rejected",
         );
-        return Err(format!(
-            "versão de protocolo não suportada: {}",
-            request.protocol_version
-        ));
-    }
-    request.snapshot.validate().map_err(|error| {
-        tracing::warn!(
-            target: "myalbuns.imaging",
-            process_role = ProcessRole::Imaging.as_str(),
-            protocol_version = request.protocol_version,
-            operation_id,
-            project_id,
-            event = "imaging_snapshot_rejected",
-        );
-        format!("snapshot inválido: {error}")
+        error
     })?;
 
-    let (width_px, height_px) = render_first_sheet(&request.snapshot, &request.output_path)
-        .inspect_err(|_| {
-            tracing::error!(
-                target: "myalbuns.imaging",
-                process_role = ProcessRole::Imaging.as_str(),
-                protocol_version = request.protocol_version,
-                operation_id,
-                project_id,
-                event = "imaging_render_failed",
-            );
-        })?;
-    let response = ImagingResponse::completed(request.request_id.clone(), width_px, height_px);
+    let completion = render_request(&request).inspect_err(|_| {
+        tracing::error!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "imaging_render_failed",
+        );
+    })?;
+    let response = ImagingResponse::completed(request.request_id.clone(), completion.clone());
     serde_json::to_writer(std::io::stdout(), &response).map_err(|error| {
         tracing::error!(
             target: "myalbuns.imaging",
@@ -163,8 +150,13 @@ fn run(app_paths: &AppPaths) -> Result<(), String> {
         operation_id,
         project_id,
         event = "imaging_request_completed",
-        width_px,
-        height_px,
+        width_px = completion.width_px,
+        height_px = completion.height_px,
+        dpi = completion.dpi,
+        source_count = completion.source_count,
+        source_bytes = completion.source_bytes,
+        output_bytes = completion.output_bytes,
+        output_sha256 = completion.output_sha256.as_str(),
     );
     Ok(())
 }
@@ -316,7 +308,7 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
     })
 }
 
-fn read_verified_source(source: &CacheMediaSource) -> Result<Vec<u8>, String> {
+fn read_verified_source(source: &MediaSource) -> Result<Vec<u8>, String> {
     let metadata = fs::metadata(source.source_path()).map_err(|error| {
         format!(
             "não foi possível abrir a mídia {}: {error}",
@@ -354,7 +346,7 @@ fn sha256_file(path: &Path) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn verify_source_current(source: &CacheMediaSource) -> Result<(), String> {
+fn verify_source_current(source: &MediaSource) -> Result<(), String> {
     let metadata = fs::metadata(source.source_path()).map_err(|_| source_changed_error(source))?;
     if !metadata.is_file()
         || metadata.len() != source.source_bytes()
@@ -365,7 +357,7 @@ fn verify_source_current(source: &CacheMediaSource) -> Result<(), String> {
     Ok(())
 }
 
-fn source_changed_error(source: &CacheMediaSource) -> String {
+fn source_changed_error(source: &MediaSource) -> String {
     format!(
         "a mídia {} mudou desde o planejamento do Cache",
         source.media_id()
@@ -374,7 +366,7 @@ fn source_changed_error(source: &CacheMediaSource) -> String {
 
 fn prepare_preview(
     storage: &PreparedCacheStorage,
-    source: &CacheMediaSource,
+    source: &MediaSource,
     verified_bytes: &[u8],
     preview_path: &Path,
     temporary_path: &Path,
@@ -393,22 +385,9 @@ fn prepare_preview(
         return Ok((width, height, false));
     }
 
-    let reader = ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a Foto: {error}"))?;
-    if reader.format() != Some(ImageFormat::Jpeg) {
-        return Err(format!("a mídia {} não é JPEG", source.media_id()));
-    }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))?;
-    let orientation = decoder
-        .orientation()
-        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
-    let mut decoded = DynamicImage::from_decoder(decoder)
-        .map_err(|error| format!("não foi possível decodificar a Foto: {error}"))?;
-    decoded.apply_orientation(orientation);
-    let preview = decoded.thumbnail(max_edge_px, max_edge_px).to_rgb8();
+    let preview = DynamicImage::ImageRgba8(decode_jpeg(source.media_id(), verified_bytes)?)
+        .thumbnail(max_edge_px, max_edge_px)
+        .to_rgb8();
     let write_result = (|| -> Result<(), String> {
         let file = storage
             .create_temporary_file(temporary_path)
@@ -495,44 +474,173 @@ fn write_cache_metadata(
         .map_err(|error| format!("não foi possível publicar o índice: {error}"))
 }
 
-fn render_first_sheet(snapshot: &RenderSnapshot, output_path: &Path) -> Result<(u32, u32), String> {
-    let sheet = snapshot
+fn render_request(request: &ImagingRequest) -> Result<RenderCompletion, String> {
+    let sheet = request
+        .snapshot
         .composition
         .sheets
-        .first()
-        .ok_or_else(|| "o snapshot não contém Lâminas".to_string())?;
-    let width_px = to_pixels(sheet.width_um).max(1);
-    let height_px = to_pixels(sheet.height_um).max(1);
+        .iter()
+        .find(|sheet| sheet.sheet_id == request.sheet_id)
+        .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
+    let pixels_per_micrometer = request.dpi as f64 / MICROMETERS_PER_INCH;
+    let width_px = to_pixels(sheet.width_um, pixels_per_micrometer).max(1);
+    let height_px = to_pixels(sheet.height_um, pixels_per_micrometer).max(1);
+    let (sources, source_bytes) = load_render_sources(request)?;
     let mut image = RgbaImage::from_pixel(width_px, height_px, Rgba([239, 232, 218, 255]));
 
     for frame in &sheet.frames {
-        draw_frame(&mut image, frame);
+        draw_frame(
+            &mut image,
+            frame,
+            pixels_per_micrometer,
+            request.source_policy,
+            &sources,
+        )?;
     }
     draw_vertical_line(&mut image, width_px / 2, Rgba([129, 112, 91, 90]));
     if sheet.has_overlay {
         draw_overlay(&mut image);
     }
 
-    image
-        .save_with_format(output_path, ImageFormat::Png)
-        .map_err(|_| "não foi possível gravar a imagem exportada.".to_string())?;
-    Ok((width_px, height_px))
+    publish_png_atomically(&image, &request.output_path, &request.request_id)?;
+    let output_bytes = fs::metadata(&request.output_path)
+        .map_err(|error| format!("não foi possível verificar a imagem exportada: {error}"))?
+        .len();
+    let output_sha256 = sha256_file(&request.output_path)?;
+    Ok(RenderCompletion {
+        width_px,
+        height_px,
+        dpi: request.dpi,
+        source_count: sources.len(),
+        source_bytes,
+        output_bytes,
+        output_sha256,
+    })
 }
 
-fn draw_frame(image: &mut RgbaImage, frame: &ComposedFrame) {
-    let left = to_pixels_signed(frame.clip_rect.x).max(0) as u32;
-    let top = to_pixels_signed(frame.clip_rect.y).max(0) as u32;
-    let right = to_pixels_signed(frame.clip_rect.x + frame.clip_rect.width).max(0) as u32;
-    let bottom = to_pixels_signed(frame.clip_rect.y + frame.clip_rect.height).max(0) as u32;
+fn load_render_sources(
+    request: &ImagingRequest,
+) -> Result<(HashMap<String, RgbaImage>, u64), String> {
+    if request.source_policy == RenderSourcePolicy::ProceduralFixture {
+        return Ok((HashMap::new(), 0));
+    }
+
+    let mut decoded = HashMap::with_capacity(request.sources.len());
+    let mut source_bytes = 0_u64;
+    for source in &request.sources {
+        let verified = read_verified_source(source)?;
+        source_bytes = source_bytes
+            .checked_add(source.source_bytes())
+            .ok_or_else(|| "o tamanho total das fontes excedeu o limite".to_string())?;
+        decoded.insert(
+            source.media_id().to_owned(),
+            decode_jpeg(source.media_id(), &verified)?,
+        );
+    }
+    Ok((decoded, source_bytes))
+}
+
+fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<RgbaImage, String> {
+    let reader = ImageReader::new(Cursor::new(verified_bytes))
+        .with_guessed_format()
+        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
+    if reader.format() != Some(ImageFormat::Jpeg) {
+        return Err(format!("a mídia {media_id} não é JPEG"));
+    }
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))?;
+    let orientation = decoder
+        .orientation()
+        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
+    let mut decoded = DynamicImage::from_decoder(decoder)
+        .map_err(|error| format!("não foi possível decodificar a Foto: {error}"))?;
+    decoded.apply_orientation(orientation);
+    Ok(decoded.to_rgba8())
+}
+
+fn publish_png_atomically(
+    image: &RgbaImage,
+    output_path: &Path,
+    request_id: &str,
+) -> Result<(), String> {
+    let parent = output_path
+        .parent()
+        .ok_or_else(|| "o destino da Exportação não possui uma pasta".to_string())?;
+    let file_name = output_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "o nome da Exportação é inválido".to_string())?;
+    let temporary_path = parent.join(format!(".{file_name}.{request_id}.tmp"));
+    let write_result = (|| -> Result<(), String> {
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary_path)
+            .map_err(|error| format!("não foi possível criar a Exportação temporária: {error}"))?;
+        let mut writer = BufWriter::new(file);
+        PngEncoder::new(&mut writer)
+            .write_image(
+                image.as_raw(),
+                image.width(),
+                image.height(),
+                ExtendedColorType::Rgba8,
+            )
+            .map_err(|error| format!("não foi possível codificar a imagem exportada: {error}"))?;
+        writer
+            .flush()
+            .map_err(|error| format!("não foi possível finalizar a imagem exportada: {error}"))?;
+        let file = writer
+            .into_inner()
+            .map_err(|error| format!("não foi possível finalizar a imagem exportada: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("não foi possível sincronizar a imagem exportada: {error}"))?;
+        drop(file);
+        fs::rename(&temporary_path, output_path)
+            .map_err(|error| format!("não foi possível publicar a imagem exportada: {error}"))
+    })();
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temporary_path);
+    }
+    write_result
+}
+
+fn draw_frame(
+    image: &mut RgbaImage,
+    frame: &ComposedFrame,
+    pixels_per_micrometer: f64,
+    source_policy: RenderSourcePolicy,
+    sources: &HashMap<String, RgbaImage>,
+) -> Result<(), String> {
+    let left = to_pixels_signed(frame.clip_rect.x, pixels_per_micrometer).max(0) as u32;
+    let top = to_pixels_signed(frame.clip_rect.y, pixels_per_micrometer).max(0) as u32;
+    let right = to_pixels_signed(
+        frame.clip_rect.x + frame.clip_rect.width,
+        pixels_per_micrometer,
+    )
+    .max(0) as u32;
+    let bottom = to_pixels_signed(
+        frame.clip_rect.y + frame.clip_rect.height,
+        pixels_per_micrometer,
+    )
+    .max(0) as u32;
     let right = right.min(image.width());
     let bottom = bottom.min(image.height());
 
     if let Some(photo) = &frame.photo {
         let colors = photo.palette.each_ref().map(|value| parse_hex_color(value));
-        let draw_left = to_pixels_precise(photo.draw_rect.x);
-        let draw_top = to_pixels_precise(photo.draw_rect.y);
-        let draw_width = to_pixels_precise(photo.draw_rect.width).max(1.0);
-        let draw_height = to_pixels_precise(photo.draw_rect.height).max(1.0);
+        let linked_source = match source_policy {
+            RenderSourcePolicy::LinkedOriginals => {
+                Some(sources.get(&photo.media_id).ok_or_else(|| {
+                    format!("a fonte da mídia {} não foi carregada", photo.media_id)
+                })?)
+            }
+            RenderSourcePolicy::ProceduralFixture => None,
+        };
+        let draw_left = to_pixels_precise(photo.draw_rect.x, pixels_per_micrometer);
+        let draw_top = to_pixels_precise(photo.draw_rect.y, pixels_per_micrometer);
+        let draw_width = to_pixels_precise(photo.draw_rect.width, pixels_per_micrometer).max(1.0);
+        let draw_height = to_pixels_precise(photo.draw_rect.height, pixels_per_micrometer).max(1.0);
         let draw_center_x = draw_left + draw_width / 2.0;
         let draw_center_y = draw_top + draw_height / 2.0;
         let radians = (photo.rotation_degrees as f64).to_radians();
@@ -550,8 +658,12 @@ fn draw_frame(image: &mut RgbaImage, frame: &ComposedFrame) {
                 }
                 let horizontal = (source_x + 0.5).clamp(0.0, 1.0) as f32;
                 let vertical = (source_y + 0.5).clamp(0.0, 1.0) as f32;
-                let horizon = blend(colors[0], colors[1], horizontal);
-                let pixel = blend(horizon, colors[2], (vertical * 0.42).min(1.0));
+                let pixel = if let Some(source) = linked_source {
+                    sample_bilinear(source, horizontal, vertical)
+                } else {
+                    let horizon = blend(colors[0], colors[1], horizontal);
+                    blend(horizon, colors[2], (vertical * 0.42).min(1.0))
+                };
                 image.put_pixel(x, y, pixel);
             }
         }
@@ -560,6 +672,21 @@ fn draw_frame(image: &mut RgbaImage, frame: &ComposedFrame) {
     }
 
     stroke_rect(image, left, top, right, bottom, Rgba([255, 255, 255, 220]));
+    Ok(())
+}
+
+fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8> {
+    let x = horizontal.clamp(0.0, 1.0) * image.width().saturating_sub(1) as f32;
+    let y = vertical.clamp(0.0, 1.0) * image.height().saturating_sub(1) as f32;
+    let x0 = x.floor() as u32;
+    let y0 = y.floor() as u32;
+    let x1 = (x0 + 1).min(image.width() - 1);
+    let y1 = (y0 + 1).min(image.height() - 1);
+    let x_amount = x - x0 as f32;
+    let y_amount = y - y0 as f32;
+    let top = blend(*image.get_pixel(x0, y0), *image.get_pixel(x1, y0), x_amount);
+    let bottom = blend(*image.get_pixel(x0, y1), *image.get_pixel(x1, y1), x_amount);
+    blend(top, bottom, y_amount)
 }
 
 fn draw_overlay(image: &mut RgbaImage) {
@@ -645,14 +772,14 @@ fn parse_hex_color(value: &str) -> Rgba<u8> {
     Rgba([red, green, blue, 255])
 }
 
-fn to_pixels(value_um: i64) -> u32 {
-    (value_um as f64 * PIXELS_PER_MICROMETER).round().max(0.0) as u32
+fn to_pixels(value_um: i64, pixels_per_micrometer: f64) -> u32 {
+    (value_um as f64 * pixels_per_micrometer).round().max(0.0) as u32
 }
 
-fn to_pixels_signed(value_um: i64) -> i64 {
-    (value_um as f64 * PIXELS_PER_MICROMETER).round() as i64
+fn to_pixels_signed(value_um: i64, pixels_per_micrometer: f64) -> i64 {
+    (value_um as f64 * pixels_per_micrometer).round() as i64
 }
 
-fn to_pixels_precise(value_um: i64) -> f64 {
-    value_um as f64 * PIXELS_PER_MICROMETER
+fn to_pixels_precise(value_um: i64, pixels_per_micrometer: f64) -> f64 {
+    value_um as f64 * pixels_per_micrometer
 }

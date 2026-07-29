@@ -3,6 +3,7 @@ mod logging;
 mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
+mod topology_benchmark;
 mod topology_spike;
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -20,6 +21,10 @@ use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
 use logging::{LoggingState, frontend_log};
 use project_host::ProjectHost;
+use topology_benchmark::{
+    TopologyBenchmarkState, report_topology_benchmark_failure, report_topology_canvas_benchmark,
+    topology_benchmark_config,
+};
 use topology_spike::TopologySpike;
 
 static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
@@ -242,7 +247,7 @@ async fn export_spike(
     logging: State<'_, LoggingState>,
 ) -> Result<ExportResult, String> {
     let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let request_id = format!("export-{export_sequence}");
+    let request_id = format!("export-{}-{export_sequence}", std::process::id());
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -260,7 +265,35 @@ async fn export_spike(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()
     ));
-    let request = ImagingRequest::new(request_id.clone(), output_path.clone(), snapshot);
+    let sheet_id = snapshot
+        .composition
+        .sheets
+        .first()
+        .ok_or_else(|| "O snapshot não contém Lâminas.".to_string())?
+        .sheet_id
+        .clone();
+    let sources = state.export_sources(window.label(), &snapshot, &sheet_id)?;
+    let request = match sources {
+        Some(sources) => ImagingRequest::new(
+            request_id.clone(),
+            output_path.clone(),
+            snapshot,
+            sheet_id,
+            300,
+            sources,
+        ),
+        None => ImagingRequest::procedural_fixture(
+            request_id.clone(),
+            output_path.clone(),
+            snapshot,
+            sheet_id,
+            25,
+        ),
+    }
+    .map_err(|error| {
+        log_export_failure(&request_id, None, "plan_request", None);
+        format!("Não foi possível planejar a Exportação: {error}")
+    })?;
     let project_id = safe_log_identifier(&request.snapshot.project_id);
     std::fs::create_dir_all(&output_dir).map_err(|error| {
         log_export_failure(&request_id, project_id, "prepare_output", None);
@@ -272,6 +305,7 @@ async fn export_spike(
     })?;
     payload.push(b'\n');
 
+    let started = Instant::now();
     let stdout = invoke_imaging_sidecar(&app, &logging, payload, &request_id, project_id)
         .await
         .map_err(|failure| {
@@ -282,18 +316,27 @@ async fn export_spike(
         log_export_failure(&request_id, project_id, "decode_response", None);
         format!("Resposta inválida do Processador de Imagens: {error}")
     })?;
-    let Some((width_px, height_px)) = response.completed_dimensions_for(&request_id) else {
+    let Some(completed) = response.completed_for(&request_id) else {
         log_export_failure(&request_id, project_id, "validate_response", None);
         return Err("O Processador de Imagens devolveu uma resposta inesperada.".into());
     };
+    let elapsed_ms = started.elapsed().as_millis();
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         protocol_version = IMAGING_PROTOCOL_VERSION,
         operation_id = request_id.as_str(),
+        process_id = std::process::id(),
         project_id,
-        width_px,
-        height_px,
+        window_label = window.label(),
+        width_px = completed.width_px,
+        height_px = completed.height_px,
+        dpi = completed.dpi,
+        source_count = completed.source_count,
+        source_bytes = completed.source_bytes,
+        output_bytes = completed.output_bytes,
+        output_sha256 = completed.output_sha256.as_str(),
+        elapsed_ms,
         event = "export_completed",
     );
 
@@ -304,8 +347,8 @@ async fn export_spike(
                 "o caminho da Exportação não pode ser representado pela interface".to_string()
             })?
             .to_owned(),
-        width_px,
-        height_px,
+        width_px: completed.width_px,
+        height_px: completed.height_px,
     })
 }
 
@@ -431,10 +474,13 @@ pub fn run() {
     let project_host = topology
         .project_host()
         .unwrap_or_else(|error| panic!("corpus inválido do spike de topologia: {error}"));
+    let topology_benchmark = TopologyBenchmarkState::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("benchmark de topologia inválido: {error}"));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
+        .manage(topology_benchmark)
         .setup(move |app| {
             let main_window = app
                 .get_webview_window("main")
@@ -473,7 +519,10 @@ pub fn run() {
             undo_project,
             redo_project,
             prepare_media_previews,
-            export_spike
+            export_spike,
+            topology_benchmark_config,
+            report_topology_canvas_benchmark,
+            report_topology_benchmark_failure
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o MyAlbuns");

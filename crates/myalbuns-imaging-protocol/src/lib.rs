@@ -4,7 +4,7 @@ use myalbuns_core::RenderSnapshot;
 use myalbuns_paths::CachePathPlan;
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 1;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 2;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
@@ -30,6 +30,10 @@ pub struct ImagingRequest {
     pub request_id: String,
     pub output_path: PathBuf,
     pub snapshot: RenderSnapshot,
+    pub sheet_id: String,
+    pub dpi: u32,
+    pub sources: Vec<MediaSource>,
+    pub source_policy: RenderSourcePolicy,
 }
 
 impl ImagingRequest {
@@ -37,14 +41,117 @@ impl ImagingRequest {
         request_id: impl Into<String>,
         output_path: PathBuf,
         snapshot: RenderSnapshot,
-    ) -> Self {
-        Self {
+        sheet_id: impl Into<String>,
+        dpi: u32,
+        sources: Vec<MediaSource>,
+    ) -> Result<Self, String> {
+        let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
             request_id: request_id.into(),
             output_path,
             snapshot,
-        }
+            sheet_id: sheet_id.into(),
+            dpi,
+            sources,
+            source_policy: RenderSourcePolicy::LinkedOriginals,
+        };
+        request.validate()?;
+        Ok(request)
     }
+
+    pub fn procedural_fixture(
+        request_id: impl Into<String>,
+        output_path: PathBuf,
+        snapshot: RenderSnapshot,
+        sheet_id: impl Into<String>,
+        dpi: u32,
+    ) -> Result<Self, String> {
+        let request = Self {
+            protocol_version: IMAGING_PROTOCOL_VERSION,
+            request_id: request_id.into(),
+            output_path,
+            snapshot,
+            sheet_id: sheet_id.into(),
+            dpi,
+            sources: vec![],
+            source_policy: RenderSourcePolicy::ProceduralFixture,
+        };
+        request.validate()?;
+        Ok(request)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.protocol_version != IMAGING_PROTOCOL_VERSION {
+            return Err(format!(
+                "versão de protocolo não suportada: {}",
+                self.protocol_version
+            ));
+        }
+        if !is_safe_identifier(&self.request_id) {
+            return Err("a Identidade da solicitação é inválida".into());
+        }
+        if !self.output_path.is_absolute() {
+            return Err("o caminho da saída não é absoluto".into());
+        }
+        if !(1..=1200).contains(&self.dpi) {
+            return Err("a resolução da Exportação é inválida".into());
+        }
+        self.snapshot
+            .validate()
+            .map_err(|error| format!("snapshot inválido: {error}"))?;
+        let sheet = self
+            .snapshot
+            .composition
+            .sheets
+            .iter()
+            .find(|sheet| sheet.sheet_id == self.sheet_id)
+            .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
+        let required_media = sheet
+            .frames
+            .iter()
+            .filter_map(|frame| frame.photo.as_ref())
+            .map(|photo| photo.media_id.as_str())
+            .collect::<std::collections::HashSet<_>>();
+        if required_media.is_empty() {
+            return Err("a Lâmina solicitada não contém Fotos".into());
+        }
+        match self.source_policy {
+            RenderSourcePolicy::LinkedOriginals => {
+                let mut supplied_media = std::collections::HashSet::new();
+                for source in &self.sources {
+                    source.validate()?;
+                    if !supplied_media.insert(source.media_id()) {
+                        return Err("a Exportação contém mídia duplicada".into());
+                    }
+                }
+                if supplied_media != required_media {
+                    return Err(
+                        "as fontes da Exportação não correspondem às Fotos da Lâmina".into(),
+                    );
+                }
+            }
+            RenderSourcePolicy::ProceduralFixture if !self.sources.is_empty() => {
+                return Err("a prova procedural não aceita fontes nativas".into());
+            }
+            RenderSourcePolicy::ProceduralFixture => {}
+        }
+        Ok(())
+    }
+}
+
+fn is_safe_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value
+            .bytes()
+            .all(|value| value.is_ascii_alphanumeric() || matches!(value, b'-' | b'_'))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RenderSourcePolicy {
+    LinkedOriginals,
+    ProceduralFixture,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -54,7 +161,7 @@ pub struct CacheRequest {
     pub request_id: String,
     pub project_id: String,
     pub cache_paths: CachePathPlan,
-    pub sources: Vec<CacheMediaSource>,
+    pub sources: Vec<MediaSource>,
     pub max_edge_px: u32,
 }
 
@@ -63,7 +170,7 @@ impl CacheRequest {
         request_id: impl Into<String>,
         project_id: impl Into<String>,
         cache_paths: CachePathPlan,
-        sources: Vec<CacheMediaSource>,
+        sources: Vec<MediaSource>,
         max_edge_px: u32,
     ) -> Result<Self, String> {
         let request = Self {
@@ -117,14 +224,14 @@ impl CacheRequest {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CacheMediaSource {
+pub struct MediaSource {
     media_id: String,
     source_path: PathBuf,
     source_bytes: u64,
     source_sha256: String,
 }
 
-impl CacheMediaSource {
+impl MediaSource {
     pub fn new(
         media_id: impl Into<String>,
         source_path: PathBuf,
@@ -203,6 +310,18 @@ pub struct CacheCompletion {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RenderCompletion {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub dpi: u32,
+    pub source_count: usize,
+    pub source_bytes: u64,
+    pub output_bytes: u64,
+    pub output_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CacheArtifact {
     pub media_id: String,
     pub generation_id: String,
@@ -263,8 +382,7 @@ impl CacheResetRequest {
 pub enum ImagingResponse {
     Completed {
         request_id: String,
-        width_px: u32,
-        height_px: u32,
+        completion: RenderCompletion,
     },
     CacheCompleted {
         request_id: String,
@@ -277,11 +395,10 @@ pub enum ImagingResponse {
 }
 
 impl ImagingResponse {
-    pub fn completed(request_id: impl Into<String>, width_px: u32, height_px: u32) -> Self {
+    pub fn completed(request_id: impl Into<String>, completion: RenderCompletion) -> Self {
         Self::Completed {
             request_id: request_id.into(),
-            width_px,
-            height_px,
+            completion,
         }
     }
 
@@ -299,13 +416,12 @@ impl ImagingResponse {
         }
     }
 
-    pub fn completed_dimensions_for(&self, expected_request_id: &str) -> Option<(u32, u32)> {
+    pub fn completed_for(&self, expected_request_id: &str) -> Option<&RenderCompletion> {
         match self {
             Self::Completed {
                 request_id,
-                width_px,
-                height_px,
-            } if request_id == expected_request_id => Some((*width_px, *height_px)),
+                completion,
+            } if request_id == expected_request_id => Some(completion),
             _ => None,
         }
     }

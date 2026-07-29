@@ -1,20 +1,20 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{Mutex, MutexGuard},
 };
 
 use myalbuns_core::{EditorProjection, ProjectIntent, ProjectSession, RenderSnapshot};
-use myalbuns_imaging_protocol::{CacheMediaSource, CacheRequest};
+use myalbuns_imaging_protocol::{CacheRequest, MediaSource};
 use myalbuns_paths::CachePathPlan;
 
 pub(crate) struct ProjectHost {
     sessions: HashMap<String, Mutex<ProjectSession>>,
-    media_sources: HashMap<String, Vec<CacheMediaSource>>,
+    media_sources: HashMap<String, Vec<MediaSource>>,
 }
 
 impl ProjectHost {
     pub(crate) fn new(
-        projects: impl IntoIterator<Item = (&'static str, ProjectSession, Vec<CacheMediaSource>)>,
+        projects: impl IntoIterator<Item = (&'static str, ProjectSession, Vec<MediaSource>)>,
     ) -> Self {
         let mut sessions = HashMap::new();
         let mut media_sources = HashMap::new();
@@ -82,6 +82,46 @@ impl ProjectHost {
         .map(Some)
     }
 
+    pub(crate) fn export_sources(
+        &self,
+        window_label: &str,
+        snapshot: &RenderSnapshot,
+        sheet_id: &str,
+    ) -> Result<Option<Vec<MediaSource>>, String> {
+        let Some(available_sources) = self.media_sources.get(window_label) else {
+            return Ok(None);
+        };
+        let sheet = snapshot
+            .composition
+            .sheets
+            .iter()
+            .find(|sheet| sheet.sheet_id == sheet_id)
+            .ok_or_else(|| "A Lâmina solicitada não existe no snapshot.".to_string())?;
+        let required_media = sheet
+            .frames
+            .iter()
+            .filter_map(|frame| frame.photo.as_ref())
+            .map(|photo| photo.media_id.as_str())
+            .collect::<BTreeSet<_>>();
+        let sources_by_media = available_sources
+            .iter()
+            .map(|source| (source.media_id(), source))
+            .collect::<HashMap<_, _>>();
+        required_media
+            .into_iter()
+            .map(|media_id| {
+                sources_by_media
+                    .get(media_id)
+                    .cloned()
+                    .cloned()
+                    .ok_or_else(|| {
+                        format!("A fonte original da mídia {media_id} não está disponível.")
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some)
+    }
+
     fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
         let session = self.sessions.get(window_label).ok_or_else(|| {
             format!("Não existe uma Sessão do Projeto para a janela {window_label}.")
@@ -101,7 +141,10 @@ fn project(session: &ProjectSession) -> EditorProjection {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession};
+    use myalbuns_imaging_protocol::MediaSource;
 
     use super::ProjectHost;
     use crate::sample_project::SampleProject;
@@ -145,6 +188,43 @@ mod tests {
                 .state
                 .revision,
             0
+        );
+    }
+
+    #[test]
+    fn selects_only_the_originals_used_by_the_requested_sheet() {
+        let session = sample_session(SampleProject::Horizon);
+        let snapshot = session.render_snapshot();
+        let source = |media_id: &str| {
+            MediaSource::new(
+                media_id,
+                PathBuf::from(format!(r"C:\Photos\{media_id}.jpg")),
+                1024,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            .expect("the source is valid")
+        };
+        let host = ProjectHost::new([(
+            "main",
+            session,
+            vec![
+                source("media-campo"),
+                source("media-costa"),
+                source("unused-media"),
+            ],
+        )]);
+
+        let sources = host
+            .export_sources("main", &snapshot, "lamina-01")
+            .expect("the export source plan is valid")
+            .expect("the project has linked originals");
+
+        assert_eq!(
+            sources
+                .iter()
+                .map(MediaSource::media_id)
+                .collect::<Vec<_>>(),
+            ["media-campo", "media-costa"]
         );
     }
 }

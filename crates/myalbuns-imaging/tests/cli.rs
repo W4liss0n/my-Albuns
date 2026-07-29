@@ -6,8 +6,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheMediaSource, CacheRequest, CacheResetRequest, ImagingCommand, ImagingRequest,
-    ImagingResponse,
+    CacheRequest, CacheResetRequest, ImagingCommand, ImagingRequest, ImagingResponse, MediaSource,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan};
 use sha2::{Digest, Sha256};
@@ -90,10 +89,12 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
     let response: ImagingResponse =
         serde_json::from_slice(&result.stdout).expect("response is valid JSON");
-    assert_eq!(
-        response.completed_dimensions_for("request-001"),
-        Some((600, 300))
-    );
+    let completion = response
+        .completed_for("request-001")
+        .expect("the response is correlated");
+    assert_eq!((completion.width_px, completion.height_px), (591, 295));
+    assert_eq!(completion.dpi, 25);
+    assert_eq!(completion.source_count, 0);
 }
 
 #[test]
@@ -121,7 +122,7 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
             cache.project_id.clone(),
             cache_paths.clone(),
             vec![
-                CacheMediaSource::new(
+                MediaSource::new(
                     "benchmark-a-001",
                     source_path,
                     source_bytes,
@@ -185,6 +186,88 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
 }
 
 #[test]
+fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let source_path = source_dir.path().join("photo.jpg");
+    let output_path = output_dir.path().join("real-sheet.png");
+    let mut source = RgbImage::new(40, 20);
+    for (x, _, pixel) in source.enumerate_pixels_mut() {
+        *pixel = if x < 20 {
+            Rgb([240, 16, 16])
+        } else {
+            Rgb([16, 32, 240])
+        };
+    }
+    source
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .expect("the linked JPEG is written");
+    let source_bytes = std::fs::read(&source_path).expect("the source is readable");
+    let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
+    let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
+    let sheet = &mut snapshot.composition.sheets[0];
+    sheet.width_um = 25_400;
+    sheet.height_um = 12_700;
+    sheet.frames.truncate(1);
+    let frame = &mut sheet.frames[0];
+    frame.clip_rect.x = 0;
+    frame.clip_rect.y = 0;
+    frame.clip_rect.width = sheet.width_um;
+    frame.clip_rect.height = sheet.height_um;
+    let photo = frame.photo.as_mut().expect("the fixture frame has a Photo");
+    photo.draw_rect = frame.clip_rect.clone();
+    photo.rotation_degrees = 0.0;
+    photo.mirror_x = false;
+    let source = MediaSource::new(
+        photo.media_id.clone(),
+        source_path,
+        source_bytes.len() as u64,
+        source_sha256,
+    )
+    .expect("the linked source is valid");
+
+    let result = invoke_real_processor(
+        snapshot,
+        &output_path,
+        "real-request-001",
+        100,
+        vec![source],
+    );
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let response: ImagingResponse =
+        serde_json::from_slice(&result.stdout).expect("response is valid JSON");
+    let completion = response
+        .completed_for("real-request-001")
+        .expect("the response is correlated");
+    assert_eq!((completion.width_px, completion.height_px), (100, 50));
+    assert_eq!(completion.dpi, 100);
+    assert_eq!(completion.source_count, 1);
+    assert_eq!(completion.source_bytes, source_bytes.len() as u64);
+    assert_eq!(
+        completion.output_sha256,
+        format!(
+            "{:x}",
+            Sha256::digest(std::fs::read(&output_path).expect("output is readable"))
+        )
+    );
+    let rendered = image::open(&output_path)
+        .expect("the output decodes")
+        .to_rgb8();
+    let left = rendered.get_pixel(10, 25);
+    let right = rendered.get_pixel(90, 25);
+    assert!(left[0] > left[2] * 3, "the left source half remains red");
+    assert!(
+        right[2] > right[0] * 3,
+        "the right source half remains blue"
+    );
+}
+
+#[test]
 fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("integrity");
@@ -202,7 +285,7 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
             cache.project_id.clone(),
             cache_paths,
             vec![
-                CacheMediaSource::new(
+                MediaSource::new(
                     "benchmark-a-001",
                     source_path.clone(),
                     original.len() as u64,
@@ -288,13 +371,18 @@ fn processor_rejects_an_invalid_snapshot() {
     let session = sample_session(SampleProject::Horizon, 12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("invalid.png");
-    let mut snapshot =
-        serde_json::to_value(session.render_snapshot()).expect("snapshot is serializable");
-    snapshot["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
-    let snapshot: RenderSnapshot =
-        serde_json::from_value(snapshot).expect("modified snapshot retains its shape");
+    let snapshot = session.render_snapshot();
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let request =
+        ImagingRequest::procedural_fixture("invalid", output_path.clone(), snapshot, sheet_id, 25)
+            .expect("the baseline request is valid");
+    let mut request = serde_json::to_value(request).expect("request is serializable");
+    request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
 
-    let result = invoke_processor(snapshot, &output_path, "invalid");
+    let result = invoke_render_payload(
+        serde_json::to_vec(&request).expect("modified request is serializable"),
+        None,
+    );
 
     assert!(!result.status.success());
     assert!(!output_path.exists());
@@ -334,7 +422,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_request_completed"));
     assert!(logs.contains("\"process_role\":\"imaging\""));
-    assert!(logs.contains("\"protocol_version\":1"));
+    assert!(logs.contains("\"protocol_version\":2"));
     assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
     assert!(
         !logs.contains(&output_path.to_string_lossy().into_owned()),
@@ -343,10 +431,10 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
 }
 
 #[test]
-fn processor_redacts_path_shaped_identifiers_and_output_failures() {
+fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
     let mut snapshot = sample_session(SampleProject::Horizon, 12).render_snapshot();
     snapshot.project_id = r"c:\users\person\private-project".into();
-    let request_id = r"c:\users\person\private-operation";
+    let request_id = "private-operation";
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let output_path = output_dir
@@ -372,7 +460,7 @@ fn processor_redacts_path_shaped_identifiers_and_output_failures() {
         .collect::<String>();
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_render_failed"));
-    assert!(!logs.contains(request_id));
+    assert!(logs.contains(request_id));
     assert!(!logs.contains(r"c:\users\person\private-project"));
     assert!(!logs.contains(&output_path.to_string_lossy().into_owned()));
 }
@@ -392,7 +480,58 @@ fn invoke_processor_with_log_dir(
     request_id: &str,
     log_dir: Option<&Path>,
 ) -> std::process::Output {
-    let request = ImagingRequest::new(request_id, output_path.to_path_buf(), snapshot);
+    let sheet_id = snapshot
+        .composition
+        .sheets
+        .first()
+        .expect("the fixture contains a sheet")
+        .sheet_id
+        .clone();
+    let request = ImagingRequest::procedural_fixture(
+        request_id,
+        output_path.to_path_buf(),
+        snapshot,
+        sheet_id,
+        25,
+    )
+    .expect("the procedural render request is valid");
+    invoke_render_request(&request, log_dir)
+}
+
+fn invoke_real_processor(
+    snapshot: RenderSnapshot,
+    output_path: &Path,
+    request_id: &str,
+    dpi: u32,
+    sources: Vec<MediaSource>,
+) -> std::process::Output {
+    let sheet_id = snapshot
+        .composition
+        .sheets
+        .first()
+        .expect("the fixture contains a sheet")
+        .sheet_id
+        .clone();
+    let request = ImagingRequest::new(
+        request_id,
+        output_path.to_path_buf(),
+        snapshot,
+        sheet_id,
+        dpi,
+        sources,
+    )
+    .expect("the linked-original render request is valid");
+    invoke_render_request(&request, None)
+}
+
+fn invoke_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> std::process::Output {
+    invoke_render_payload(
+        serde_json::to_vec(request).expect("request is serializable"),
+        log_dir,
+    )
+}
+
+fn invoke_render_payload(mut payload: Vec<u8>, log_dir: Option<&Path>) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
     command
         .stdin(Stdio::piped())
@@ -402,7 +541,6 @@ fn invoke_processor_with_log_dir(
         command.env("MYALBUNS_LOG_DIR", log_dir);
     }
     let mut child = command.spawn().expect("processor starts");
-    let mut payload = serde_json::to_vec(&request).expect("request is serializable");
     payload.push(b'\n');
     child
         .stdin

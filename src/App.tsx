@@ -13,17 +13,28 @@ import {
   type EditorProjection,
   type ProjectBridge,
 } from "./domain/project";
+import {
+  disabledTopologyBenchmarkBridge,
+  type TopologyBenchmarkBridge,
+} from "./application/topologyBenchmark";
 import { LoggingProvider } from "./components/loggingContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { useTopologyBenchmarkCoordinator } from "./components/useTopologyBenchmarkCoordinator";
 import "./App.css";
 
 interface AppProps {
   bridge: ProjectBridge;
+  topologyBenchmarkBridge?: TopologyBenchmarkBridge;
   graphicsProbe: GraphicsProbe;
   logger: Logger;
 }
 
-function App({ bridge, graphicsProbe, logger }: AppProps) {
+function App({
+  bridge,
+  topologyBenchmarkBridge = disabledTopologyBenchmarkBridge,
+  graphicsProbe,
+  logger,
+}: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,6 +101,12 @@ function App({ bridge, graphicsProbe, logger }: AppProps) {
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId;
+  const canvasPerformanceProbe =
+    useTopologyBenchmarkCoordinator({
+      projectId: projectId ?? "",
+      projectBridge: bridge,
+      topologyBridge: topologyBenchmarkBridge,
+    });
   useEffect(() => {
     setMediaPreviewUrls({});
     if (!projectId || !graphics.supported) return;
@@ -173,6 +190,7 @@ function App({ bridge, graphicsProbe, logger }: AppProps) {
       <ProjectWorkspace
         projection={projection}
         bridge={bridge}
+        canvasPerformanceProbe={canvasPerformanceProbe}
         mediaPreviewUrls={mediaPreviewUrls}
         onProjectionChange={setProjection}
       />
