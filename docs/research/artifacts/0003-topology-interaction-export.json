@@ -1,0 +1,514 @@
+{
+    "schemaVersion":  6,
+    "collectedAtUtc":  "2026-07-29T20:53:54.9209603Z",
+    "hardware":  {
+                     "operatingSystem":  {
+                                             "caption":  "Microsoft Windows 11 Pro",
+                                             "version":  "10.0.26200",
+                                             "buildNumber":  "26200"
+                                         },
+                     "cpu":  [
+                                 "13th Gen Intel(R) Core(TM) i5-13450HX"
+                             ],
+                     "totalPhysicalMemoryBytes":  25439191040,
+                     "gpu":  [
+                                 {
+                                     "name":  "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+                                     "adapterRamBytes":  4293918720,
+                                     "driverVersion":  "32.0.15.8195"
+                                 },
+                                 {
+                                     "name":  "Intel(R) UHD Graphics",
+                                     "adapterRamBytes":  2147479552,
+                                     "driverVersion":  "32.0.101.7077"
+                                 }
+                             ]
+                 },
+    "corpus":  {
+                   "schemaVersion":  1,
+                   "albumCount":  2,
+                   "photoCount":  172,
+                   "sourceBytes":  1469034192,
+                   "corpusSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc",
+                   "integrity":  {
+                                     "verified":  true,
+                                     "beforeSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc",
+                                     "afterSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc"
+                                 },
+                   "previewPolicy":  {
+                                         "representationsPerPhoto":  1,
+                                         "format":  "jpeg",
+                                         "maximumEdgePx":  1600
+                                     }
+               },
+    "build":  {
+                  "manifestVersion":  1,
+                  "builtAtUtc":  "2026-07-29T20:52:47.0890476Z",
+                  "gitCommit":  "2a6559ce8b9ce180df61d1831d3650e1ca15e0ea",
+                  "workingTreeDirty":  true,
+                  "buildInputsDirty":  false,
+                  "buildInputFileCount":  141,
+                  "buildInputDigestSha256":  "67b8154bfc49087f6c893aa4fa7c7e2111ad520cfaef472f41a0a33843d956f0",
+                  "executable":  ".scratch/topology-spike-target/release/myalbuns-desktop.exe",
+                  "executableSha256":  "da607cf69f4420d1fbeb9a4412ff93fcba7030bb607d2402777b64706b6d3c50",
+                  "imagingExecutable":  ".scratch/topology-spike-target/release/myalbuns-imaging.exe",
+                  "imagingExecutableSha256":  "0c841813100914ad69f8cbd811c81dd08f6114e7065ba3e90be48d270cd64dbd",
+                  "profile":  "release",
+                  "currentBuildInputsMatchManifest":  true
+              },
+    "alternatives":  {
+                         "independentHosts":  {
+                                                  "ready":  {
+                                                                "elapsedMs":  1774,
+                                                                "windows":  [
+                                                                                {
+                                                                                    "processId":  9792,
+                                                                                    "title":  "MyAlbuns — Álbum Horizonte [Topologia A]"
+                                                                                },
+                                                                                {
+                                                                                    "processId":  24248,
+                                                                                    "title":  "MyAlbuns — Álbum Aurora [Topologia A]"
+                                                                                }
+                                                                            ],
+                                                                "firstHostElapsedMs":  1504
+                                                            },
+                                                  "cache":  {
+                                                                "readyElapsedMs":  25409,
+                                                                "cacheWallTimeMs":  23714,
+                                                                "projectCount":  2,
+                                                                "photoCount":  172,
+                                                                "generatedCount":  172,
+                                                                "reusedCount":  0,
+                                                                "sourceBytes":  1469034192,
+                                                                "previewBytes":  51662817,
+                                                                "sourceBytesPerSecond":  61947971,
+                                                                "projects":  [
+                                                                                 {
+                                                                                     "projectId":  "project-spike-001",
+                                                                                     "generatedCount":  88,
+                                                                                     "reusedCount":  0,
+                                                                                     "sourceBytes":  679049811,
+                                                                                     "previewBytes":  26875663,
+                                                                                     "elapsedMs":  19912
+                                                                                 },
+                                                                                 {
+                                                                                     "projectId":  "project-spike-002",
+                                                                                     "generatedCount":  84,
+                                                                                     "reusedCount":  0,
+                                                                                     "sourceBytes":  789984381,
+                                                                                     "previewBytes":  24787154,
+                                                                                     "elapsedMs":  23490
+                                                                                 }
+                                                                             ]
+                                                            },
+                                                  "interaction":  {
+                                                                      "readyElapsedMs":  28985,
+                                                                      "canvas":  {
+                                                                                     "projectCount":  2,
+                                                                                     "warmupFramesPerProject":  24,
+                                                                                     "projects":  [
+                                                                                                      {
+                                                                                                          "projectId":  "project-spike-001",
+                                                                                                          "processId":  9792,
+                                                                                                          "windowLabel":  "main",
+                                                                                                          "frameId":  "frame-01-a",
+                                                                                                          "textureBacked":  true,
+                                                                                                          "pan":  {
+                                                                                                                      "sampleCount":  120,
+                                                                                                                      "durationMs":  908.1,
+                                                                                                                      "firstFrameLatencyMs":  7.6,
+                                                                                                                      "meanFrameMs":  7.567,
+                                                                                                                      "p50FrameMs":  7.6,
+                                                                                                                      "p95FrameMs":  7.8,
+                                                                                                                      "p99FrameMs":  7.9,
+                                                                                                                      "maxFrameMs":  7.9,
+                                                                                                                      "framesOver16Ms":  0,
+                                                                                                                      "framesOver33Ms":  0
+                                                                                                                  },
+                                                                                                          "zoom":  {
+                                                                                                                       "sampleCount":  120,
+                                                                                                                       "durationMs":  906.4,
+                                                                                                                       "firstFrameLatencyMs":  7.2,
+                                                                                                                       "meanFrameMs":  7.553,
+                                                                                                                       "p50FrameMs":  7.6,
+                                                                                                                       "p95FrameMs":  7.8,
+                                                                                                                       "p99FrameMs":  7.9,
+                                                                                                                       "maxFrameMs":  7.9,
+                                                                                                                       "framesOver16Ms":  0,
+                                                                                                                       "framesOver33Ms":  0
+                                                                                                                   }
+                                                                                                      },
+                                                                                                      {
+                                                                                                          "projectId":  "project-spike-002",
+                                                                                                          "processId":  24248,
+                                                                                                          "windowLabel":  "main",
+                                                                                                          "frameId":  "frame-03-a",
+                                                                                                          "textureBacked":  true,
+                                                                                                          "pan":  {
+                                                                                                                      "sampleCount":  120,
+                                                                                                                      "durationMs":  931.2,
+                                                                                                                      "firstFrameLatencyMs":  7.8,
+                                                                                                                      "meanFrameMs":  7.76,
+                                                                                                                      "p50FrameMs":  7.8,
+                                                                                                                      "p95FrameMs":  7.9,
+                                                                                                                      "p99FrameMs":  8,
+                                                                                                                      "maxFrameMs":  8,
+                                                                                                                      "framesOver16Ms":  0,
+                                                                                                                      "framesOver33Ms":  0
+                                                                                                                  },
+                                                                                                          "zoom":  {
+                                                                                                                       "sampleCount":  120,
+                                                                                                                       "durationMs":  931.2,
+                                                                                                                       "firstFrameLatencyMs":  7.5,
+                                                                                                                       "meanFrameMs":  7.76,
+                                                                                                                       "p50FrameMs":  7.8,
+                                                                                                                       "p95FrameMs":  8,
+                                                                                                                       "p99FrameMs":  8.1,
+                                                                                                                       "maxFrameMs":  8.1,
+                                                                                                                       "framesOver16Ms":  0,
+                                                                                                                       "framesOver33Ms":  0
+                                                                                                                   }
+                                                                                                      }
+                                                                                                  ],
+                                                                                     "aggregate":  {
+                                                                                                       "pan":  {
+                                                                                                                   "sampleCount":  240,
+                                                                                                                   "weightedMeanFrameMs":  7.6634999999999991,
+                                                                                                                   "worstProjectP95FrameMs":  7.9,
+                                                                                                                   "worstProjectP99FrameMs":  8,
+                                                                                                                   "worstProjectMaxFrameMs":  8,
+                                                                                                                   "framesOver16Ms":  0,
+                                                                                                                   "framesOver33Ms":  0
+                                                                                                               },
+                                                                                                       "zoom":  {
+                                                                                                                    "sampleCount":  240,
+                                                                                                                    "weightedMeanFrameMs":  7.6564999999999994,
+                                                                                                                    "worstProjectP95FrameMs":  8,
+                                                                                                                    "worstProjectP99FrameMs":  8.1,
+                                                                                                                    "worstProjectMaxFrameMs":  8.1,
+                                                                                                                    "framesOver16Ms":  0,
+                                                                                                                    "framesOver33Ms":  0
+                                                                                                                }
+                                                                                                   }
+                                                                                 },
+                                                                      "export":  {
+                                                                                     "projectId":  "project-spike-001",
+                                                                                     "processId":  9792,
+                                                                                     "windowLabel":  "main",
+                                                                                     "elapsedMs":  1113,
+                                                                                     "widthPx":  7087,
+                                                                                     "heightPx":  3543,
+                                                                                     "dpi":  300,
+                                                                                     "sourceCount":  2,
+                                                                                     "sourceBytes":  23727488,
+                                                                                     "outputBytes":  28325124,
+                                                                                     "outputSha256":  "e2a0d05bde9ffdac7e1e5ec62732e66158a2d02f12f24745bf671fb299ab26de"
+                                                                                 }
+                                                                  },
+                                                  "processes":  {
+                                                                    "hostProcessCount":  2,
+                                                                    "processTreeCount":  9,
+                                                                    "workingSetBytes":  1578835968,
+                                                                    "privateMemoryBytes":  1151524864,
+                                                                    "handleCount":  4502,
+                                                                    "threadCount":  232,
+                                                                    "processTree":  [
+                                                                                        {
+                                                                                            "processId":  3144,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  10391552,
+                                                                                            "privateMemoryBytes":  2613248
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  9792,
+                                                                                            "name":  "myalbuns-desktop",
+                                                                                            "workingSetBytes":  35233792,
+                                                                                            "privateMemoryBytes":  11362304
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  11588,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  229900288,
+                                                                                            "privateMemoryBytes":  137723904
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  18384,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  837701632,
+                                                                                            "privateMemoryBytes":  772669440
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  19580,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  43343872,
+                                                                                            "privateMemoryBytes":  16142336
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  21812,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  230678528,
+                                                                                            "privateMemoryBytes":  142086144
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  22244,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  20426752,
+                                                                                            "privateMemoryBytes":  9449472
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  24248,
+                                                                                            "name":  "myalbuns-desktop",
+                                                                                            "workingSetBytes":  34754560,
+                                                                                            "privateMemoryBytes":  11034624
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  26560,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  136404992,
+                                                                                            "privateMemoryBytes":  48443392
+                                                                                        }
+                                                                                    ],
+                                                                    "gpuMemory":  {
+                                                                                      "available":  true,
+                                                                                      "dedicatedBytes":  0,
+                                                                                      "sharedBytes":  675860480
+                                                                                  }
+                                                                },
+                                                  "forcedFailure":  {
+                                                                        "forcedHostProcessId":  9792,
+                                                                        "otherHostSurvived":  true,
+                                                                        "remainingWindowCount":  1
+                                                                    }
+                                              },
+                         "multiwindowHost":  {
+                                                 "ready":  {
+                                                               "elapsedMs":  327,
+                                                               "windows":  [
+                                                                               {
+                                                                                   "processId":  22744,
+                                                                                   "title":  "MyAlbuns — Álbum Horizonte [Topologia B]"
+                                                                               },
+                                                                               {
+                                                                                   "processId":  22744,
+                                                                                   "title":  "MyAlbuns — Álbum Aurora [Topologia B]"
+                                                                               }
+                                                                           ]
+                                                           },
+                                                 "cache":  {
+                                                               "readyElapsedMs":  24219,
+                                                               "cacheWallTimeMs":  23572,
+                                                               "projectCount":  2,
+                                                               "photoCount":  172,
+                                                               "generatedCount":  172,
+                                                               "reusedCount":  0,
+                                                               "sourceBytes":  1469034192,
+                                                               "previewBytes":  51662817,
+                                                               "sourceBytesPerSecond":  62321152,
+                                                               "projects":  [
+                                                                                {
+                                                                                    "projectId":  "project-spike-001",
+                                                                                    "generatedCount":  88,
+                                                                                    "reusedCount":  0,
+                                                                                    "sourceBytes":  679049811,
+                                                                                    "previewBytes":  26875663,
+                                                                                    "elapsedMs":  20726
+                                                                                },
+                                                                                {
+                                                                                    "projectId":  "project-spike-002",
+                                                                                    "generatedCount":  84,
+                                                                                    "reusedCount":  0,
+                                                                                    "sourceBytes":  789984381,
+                                                                                    "previewBytes":  24787154,
+                                                                                    "elapsedMs":  23536
+                                                                                }
+                                                                            ]
+                                                           },
+                                                 "interaction":  {
+                                                                     "readyElapsedMs":  27771,
+                                                                     "canvas":  {
+                                                                                    "projectCount":  2,
+                                                                                    "warmupFramesPerProject":  24,
+                                                                                    "projects":  [
+                                                                                                     {
+                                                                                                         "projectId":  "project-spike-001",
+                                                                                                         "processId":  22744,
+                                                                                                         "windowLabel":  "main",
+                                                                                                         "frameId":  "frame-01-a",
+                                                                                                         "textureBacked":  true,
+                                                                                                         "pan":  {
+                                                                                                                     "sampleCount":  120,
+                                                                                                                     "durationMs":  867.2,
+                                                                                                                     "firstFrameLatencyMs":  7.5,
+                                                                                                                     "meanFrameMs":  7.227,
+                                                                                                                     "p50FrameMs":  7.6,
+                                                                                                                     "p95FrameMs":  8,
+                                                                                                                     "p99FrameMs":  8.2,
+                                                                                                                     "maxFrameMs":  11.1,
+                                                                                                                     "framesOver16Ms":  0,
+                                                                                                                     "framesOver33Ms":  0
+                                                                                                                 },
+                                                                                                         "zoom":  {
+                                                                                                                      "sampleCount":  120,
+                                                                                                                      "durationMs":  931.5,
+                                                                                                                      "firstFrameLatencyMs":  7.7,
+                                                                                                                      "meanFrameMs":  7.762,
+                                                                                                                      "p50FrameMs":  7.8,
+                                                                                                                      "p95FrameMs":  8,
+                                                                                                                      "p99FrameMs":  8.1,
+                                                                                                                      "maxFrameMs":  8.2,
+                                                                                                                      "framesOver16Ms":  0,
+                                                                                                                      "framesOver33Ms":  0
+                                                                                                                  }
+                                                                                                     },
+                                                                                                     {
+                                                                                                         "projectId":  "project-spike-002",
+                                                                                                         "processId":  22744,
+                                                                                                         "windowLabel":  "project-b",
+                                                                                                         "frameId":  "frame-03-a",
+                                                                                                         "textureBacked":  true,
+                                                                                                         "pan":  {
+                                                                                                                     "sampleCount":  120,
+                                                                                                                     "durationMs":  894.3,
+                                                                                                                     "firstFrameLatencyMs":  7.7,
+                                                                                                                     "meanFrameMs":  7.453,
+                                                                                                                     "p50FrameMs":  7.6,
+                                                                                                                     "p95FrameMs":  8,
+                                                                                                                     "p99FrameMs":  8,
+                                                                                                                     "maxFrameMs":  8,
+                                                                                                                     "framesOver16Ms":  0,
+                                                                                                                     "framesOver33Ms":  0
+                                                                                                                 },
+                                                                                                         "zoom":  {
+                                                                                                                      "sampleCount":  120,
+                                                                                                                      "durationMs":  887.8,
+                                                                                                                      "firstFrameLatencyMs":  7.5,
+                                                                                                                      "meanFrameMs":  7.398,
+                                                                                                                      "p50FrameMs":  7.5,
+                                                                                                                      "p95FrameMs":  7.7,
+                                                                                                                      "p99FrameMs":  7.7,
+                                                                                                                      "maxFrameMs":  7.8,
+                                                                                                                      "framesOver16Ms":  0,
+                                                                                                                      "framesOver33Ms":  0
+                                                                                                                  }
+                                                                                                     }
+                                                                                                 ],
+                                                                                    "aggregate":  {
+                                                                                                      "pan":  {
+                                                                                                                  "sampleCount":  240,
+                                                                                                                  "weightedMeanFrameMs":  7.34,
+                                                                                                                  "worstProjectP95FrameMs":  8,
+                                                                                                                  "worstProjectP99FrameMs":  8.2,
+                                                                                                                  "worstProjectMaxFrameMs":  11.1,
+                                                                                                                  "framesOver16Ms":  0,
+                                                                                                                  "framesOver33Ms":  0
+                                                                                                              },
+                                                                                                      "zoom":  {
+                                                                                                                   "sampleCount":  240,
+                                                                                                                   "weightedMeanFrameMs":  7.5799999999999992,
+                                                                                                                   "worstProjectP95FrameMs":  8,
+                                                                                                                   "worstProjectP99FrameMs":  8.1,
+                                                                                                                   "worstProjectMaxFrameMs":  8.2,
+                                                                                                                   "framesOver16Ms":  0,
+                                                                                                                   "framesOver33Ms":  0
+                                                                                                               }
+                                                                                                  }
+                                                                                },
+                                                                     "export":  {
+                                                                                    "projectId":  "project-spike-001",
+                                                                                    "processId":  22744,
+                                                                                    "windowLabel":  "main",
+                                                                                    "elapsedMs":  1130,
+                                                                                    "widthPx":  7087,
+                                                                                    "heightPx":  3543,
+                                                                                    "dpi":  300,
+                                                                                    "sourceCount":  2,
+                                                                                    "sourceBytes":  23727488,
+                                                                                    "outputBytes":  28325124,
+                                                                                    "outputSha256":  "e2a0d05bde9ffdac7e1e5ec62732e66158a2d02f12f24745bf671fb299ab26de"
+                                                                                }
+                                                                 },
+                                                 "processes":  {
+                                                                   "hostProcessCount":  1,
+                                                                   "processTreeCount":  8,
+                                                                   "workingSetBytes":  1507610624,
+                                                                   "privateMemoryBytes":  1130708992,
+                                                                   "handleCount":  4176,
+                                                                   "threadCount":  205,
+                                                                   "processTree":  [
+                                                                                       {
+                                                                                           "processId":  8444,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  799150080,
+                                                                                           "privateMemoryBytes":  759115776
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  12116,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  138194944,
+                                                                                           "privateMemoryBytes":  50659328
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  15828,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  229974016,
+                                                                                           "privateMemoryBytes":  142434304
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  16080,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  230985728,
+                                                                                           "privateMemoryBytes":  137605120
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  19264,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  42917888,
+                                                                                           "privateMemoryBytes":  15695872
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  19564,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  20410368,
+                                                                                           "privateMemoryBytes":  9449472
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  20808,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  10379264,
+                                                                                           "privateMemoryBytes":  2600960
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  22744,
+                                                                                           "name":  "myalbuns-desktop",
+                                                                                           "workingSetBytes":  35598336,
+                                                                                           "privateMemoryBytes":  13148160
+                                                                                       }
+                                                                                   ],
+                                                                   "gpuMemory":  {
+                                                                                     "available":  true,
+                                                                                     "dedicatedBytes":  0,
+                                                                                     "sharedBytes":  672030720
+                                                                                 }
+                                                               },
+                                                 "forcedFailure":  {
+                                                                       "forcedHostProcessId":  22744,
+                                                                       "hostSurvived":  false,
+                                                                       "remainingWindowCount":  0
+                                                                   }
+                                             }
+                     },
+    "notMeasured":  [
+                        "recuperação persistida",
+                        "complexidade operacional da IPC"
+                    ],
+    "notes":  [
+                  "O Cache foi reconstruído a frio com uma representação JPEG de até 1600 px por Foto.",
+                  "Pan e Zoom foram medidos separadamente sobre uma textura real do Cache, depois de 24 frames de aquecimento.",
+                  "As duas Janelas iniciaram o probe pelo mesmo arquivo-gate, somente depois da conclusão do Cache frio.",
+                  "A Exportação mediu a primeira Lâmina do Álbum principal a 300 DPI, lendo e verificando os JPEGs originais.",
+                  "Cada uso valida o tamanho e o SHA-256 da Foto; o corpus completo foi recalculado depois das duas alternativas.",
+                  "A memória inclui o host e todos os processos descendentes observados.",
+                  "A queda só é forçada depois de validar o caminho do executável do PID alvo.",
+                  "Os hosts independentes são iniciados em sequência depois que uma tentativa simultânea deixou intermitentemente um host sem Janela visível."
+              ]
+}
