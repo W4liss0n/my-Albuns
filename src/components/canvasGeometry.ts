@@ -51,12 +51,19 @@ export function clampContinuousCanvasOffset(
 ): number {
   if (sheets.length === 0 || scale <= 0) return offsetX;
 
-  const firstCenter = sheetCenterInCanvasPixels(sheets, 0);
   const lastIndex = sheets.length - 1;
-  const lastCenter = sheetCenterInCanvasPixels(sheets, lastIndex);
-  const viewportCenter = canvasWidth / 2;
-  const maximum = viewportCenter - firstCenter * scale;
-  const minimum = viewportCenter - lastCenter * scale;
+  const maximum = centeredSheetOffsetInContinuousCanvas(
+    sheets,
+    0,
+    scale,
+    canvasWidth,
+  );
+  const minimum = centeredSheetOffsetInContinuousCanvas(
+    sheets,
+    lastIndex,
+    scale,
+    canvasWidth,
+  );
 
   return Math.min(maximum, Math.max(minimum, offsetX));
 }
