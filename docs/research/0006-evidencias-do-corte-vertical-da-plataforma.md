@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-28
-updated: 2026-07-28
+updated: 2026-07-29
 ---
 
 # Evidências do corte vertical da plataforma
@@ -114,21 +114,23 @@ desenvolvimento e de produção estão declaradas separadamente.
 
 ## Verificações automatizadas
 
-| Comando | Resultado em 2026-07-28 |
+| Comando | Resultado em 2026-07-29 |
 |---|---|
-| `npm test` | 3 testes aprovados |
-| `npm run test:rust` | 10 testes do núcleo e 3 testes de integração do processador aprovados |
+| `npm test` | 50 testes aprovados em 10 arquivos |
+| `npm run test:rust` | 14 testes do núcleo, 3 testes de integração do processador e 1 teste do protocolo aprovados |
 | `npm run quality:rust` | `rustfmt` e Clippy aprovados sem avisos |
-| `npm run build` | TypeScript e Vite aprovados; 2.011 módulos transformados |
+| `npm run build` | contratos, TypeScript e Vite aprovados; 2.019 módulos transformados |
 
 Os testes de integração do processador iniciam o binário real, transmitem
 mensagens pelo protocolo, validam a assinatura PNG, confirmam que Pan/Zoom
 alteram os pixels finais e rejeitam um snapshot inválido antes da escrita.
 
-O bundle web produziu um chunk principal de 520,48 kB, ou 164,40 kB comprimido.
-O Vite emitiu aviso por ultrapassar 500 kB. Isso não bloqueia o corte, mas
-carregamento tardio do Canvas e divisão do PixiJS devem ser medidos antes de
-tratar o tamanho como aceitável.
+O bundle web produziu uma entrada principal de 542,50 kB, ou 170,75 kB
+comprimida, além dos chunks internos de renderização carregados pelo PixiJS. O
+Vite emitiu aviso por ultrapassar 500 kB. Uma divisão manual anterior apenas
+pré-carregava os mesmos módulos na abertura e foi removida por não reduzir o
+trabalho inicial. Isso não bloqueia o corte, mas carregamento tardio do Canvas
+deve ser medido antes de tratar o tamanho como aceitável.
 
 ## Falha encontrada e corrigida
 

@@ -5,10 +5,10 @@ use crate::model::{
     RenderSnapshot, SizeUm, VectorUm,
 };
 
-pub struct CompositionCore;
+pub(crate) struct CompositionCore;
 
 impl CompositionCore {
-    pub fn compose(album: &AlbumSnapshot) -> CompositionPlan {
+    pub(crate) fn compose(album: &AlbumSnapshot) -> CompositionPlan {
         CompositionPlan {
             sheets: album
                 .sheets
@@ -100,7 +100,6 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
     let horizontal_offset = scale_vector(&horizontal_direction, horizontal_span / 2.0);
     let vertical_offset = scale_vector(&vertical_direction, vertical_span / 2.0);
     let pan_to_center = matrix_from_columns(&horizontal_offset, &vertical_offset);
-    let center_to_pan = inverse_orthogonal_columns(&horizontal_offset, &vertical_offset);
     let current_offset = apply_matrix(&pan_to_center, &current_pan);
     let current = PhotoPlacement {
         center: VectorUm {
@@ -128,7 +127,6 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
         current: current.clone(),
         pan_origin,
         pan_to_center,
-        center_to_pan,
         pan_to_center_per_zoom: matrix_from_columns(&horizontal_zoom_delta, &vertical_zoom_delta),
         size_per_zoom: SizeUm {
             width: draw_width_at_fill,
@@ -165,25 +163,6 @@ fn matrix_from_columns(horizontal: &VectorUm, vertical: &VectorUm) -> Matrix2 {
         xy: vertical.x,
         yx: horizontal.y,
         yy: vertical.y,
-    }
-}
-
-fn inverse_orthogonal_columns(horizontal: &VectorUm, vertical: &VectorUm) -> Matrix2 {
-    let horizontal_norm = horizontal.x.powi(2) + horizontal.y.powi(2);
-    let vertical_norm = vertical.x.powi(2) + vertical.y.powi(2);
-    Matrix2 {
-        xx: divide_or_zero(horizontal.x, horizontal_norm),
-        xy: divide_or_zero(horizontal.y, horizontal_norm),
-        yx: divide_or_zero(vertical.x, vertical_norm),
-        yy: divide_or_zero(vertical.y, vertical_norm),
-    }
-}
-
-fn divide_or_zero(value: f64, divisor: f64) -> f64 {
-    if divisor <= f64::EPSILON {
-        0.0
-    } else {
-        value / divisor
     }
 }
 

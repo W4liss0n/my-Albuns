@@ -1,25 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 
+import type {
+  GraphicsDiagnostic,
+  GraphicsProbe,
+} from "./application/graphics";
 import {
   type EditorProjection,
   type ProjectBridge,
 } from "./domain/project";
-import {
-  probeGraphics,
-  type GraphicsDiagnostic,
-} from "./platform/graphics";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import "./App.css";
 
 interface AppProps {
   bridge: ProjectBridge;
-  graphicsProbe?: () => GraphicsDiagnostic;
+  graphicsProbe: GraphicsProbe;
 }
 
-function App({
-  bridge,
-  graphicsProbe = probeGraphics,
-}: AppProps) {
+function App({ bridge, graphicsProbe }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

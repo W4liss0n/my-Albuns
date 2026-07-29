@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-pub const PROJECT_SCHEMA_VERSION: u32 = 1;
-pub const SHEET_WIDTH_UM: i64 = 600_000;
-pub const SHEET_HEIGHT_UM: i64 = 300_000;
-pub const PHOTO_PAN_MIN: f32 = -1.0;
-pub const PHOTO_PAN_MAX: f32 = 1.0;
-pub const PHOTO_ZOOM_MIN: f32 = 1.0;
-pub const PHOTO_ZOOM_MAX: f32 = 4.0;
+pub(crate) const PROJECT_SCHEMA_VERSION: u32 = 1;
+pub(crate) const SHEET_WIDTH_UM: i64 = 600_000;
+pub(crate) const SHEET_HEIGHT_UM: i64 = 300_000;
+pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
+pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
+pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
+pub(crate) const PHOTO_ZOOM_MAX: f32 = 4.0;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -66,7 +66,6 @@ pub struct PhotoPlacementPlan {
     pub current: PhotoPlacement,
     pub pan_origin: VectorUm,
     pub pan_to_center: Matrix2,
-    pub center_to_pan: Matrix2,
     pub pan_to_center_per_zoom: Matrix2,
     pub size_per_zoom: SizeUm,
 }

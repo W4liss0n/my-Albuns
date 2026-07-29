@@ -1,9 +1,10 @@
 use serde::Deserialize;
 
+use crate::composition::CompositionCore;
 use crate::{
-    AlbumSnapshot, ComposedPhoto, CompositionCore, FrameSnapshot, Matrix2, MediaTransform,
-    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, RectUm,
-    SheetRole, SheetSnapshot, VectorUm,
+    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, PhotoPlacement,
+    PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, RectUm, SheetRole,
+    SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -267,7 +268,6 @@ fn assert_plan_close(actual: &PhotoPlacementPlan, expected: &PhotoPlacementPlan,
     assert_placement_close(&actual.current, &expected.current, case_name);
     assert_vector_close(&actual.pan_origin, &expected.pan_origin, case_name);
     assert_matrix_close(&actual.pan_to_center, &expected.pan_to_center, case_name);
-    assert_matrix_close(&actual.center_to_pan, &expected.center_to_pan, case_name);
     assert_matrix_close(
         &actual.pan_to_center_per_zoom,
         &expected.pan_to_center_per_zoom,

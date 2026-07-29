@@ -5,4 +5,4 @@ import type { PhotoPlacement } from "./PhotoPlacement";
 import type { SizeUm } from "./SizeUm";
 import type { VectorUm } from "./VectorUm";
 
-export type PhotoPlacementPlan = { currentPan: VectorUm, currentZoom: number, panRange: NumberRange, zoomRange: NumberRange, current: PhotoPlacement, panOrigin: VectorUm, panToCenter: Matrix2, centerToPan: Matrix2, panToCenterPerZoom: Matrix2, sizePerZoom: SizeUm, };
+export type PhotoPlacementPlan = { currentPan: VectorUm, currentZoom: number, panRange: NumberRange, zoomRange: NumberRange, current: PhotoPlacement, panOrigin: VectorUm, panToCenter: Matrix2, panToCenterPerZoom: Matrix2, sizePerZoom: SizeUm, };

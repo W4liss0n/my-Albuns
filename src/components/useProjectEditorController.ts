@@ -17,7 +17,7 @@ import type {
   AlbumCanvasProps,
   CanvasMetrics,
   PhotoTransformPreview,
-} from "./AlbumCanvas";
+} from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 interface ProjectEditorControllerInput {

@@ -7,30 +7,13 @@ const devPort = 1437;
 const hmrPort = 1438;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   plugins: [react()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  build: {
-    chunkSizeWarningLimit: 550,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          pixi: ["pixi.js"],
-          react: [
-            "react",
-            "react-dom",
-            "react-aria-components",
-            "zustand",
-          ],
-          tauri: ["@tauri-apps/api"],
-        },
-      },
-    },
-  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: devPort,

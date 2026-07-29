@@ -136,7 +136,6 @@ function scalePlan(
     current: scalePlacement(plan.current, unitScale),
     panOrigin: scaleVector(plan.panOrigin, unitScale),
     panToCenter: scaleMatrix(plan.panToCenter, unitScale),
-    centerToPan: scaleMatrix(plan.centerToPan, 1 / unitScale),
     panToCenterPerZoom: scaleMatrix(
       plan.panToCenterPerZoom,
       unitScale,

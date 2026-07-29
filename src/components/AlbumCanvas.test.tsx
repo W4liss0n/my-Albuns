@@ -274,7 +274,6 @@ const horizontalPlacementPlan: PhotoPlacementPlan = {
     yx: 0,
     yy: 0,
   },
-  centerToPan: { xx: 0.00002, xy: 0, yx: 0, yy: 0 },
   panToCenterPerZoom: {
     xx: 200_000,
     xy: 0,

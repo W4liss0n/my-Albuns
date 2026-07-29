@@ -1,8 +1,4 @@
-export interface GraphicsDiagnostic {
-  supported: boolean;
-  renderer: string;
-  reason: string;
-}
+import type { GraphicsDiagnostic } from "../application/graphics";
 
 const SOFTWARE_RENDERERS = [
   "swiftshader",
