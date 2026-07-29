@@ -1167,7 +1167,7 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.zoomP95) | $($independent.interaction.canvas.aggregate.zoom.worstProjectP95FrameMs) ms | $($multiwindow.interaction.canvas.aggregate.zoom.worstProjectP95FrameMs) ms |"
         "| $($summary.zoomOver33) | $($independent.interaction.canvas.aggregate.zoom.framesOver33Ms) | $($multiwindow.interaction.canvas.aggregate.zoom.framesOver33Ms) |"
         "| $($summary.exportDuration) | $($independent.interaction.export.elapsedMs) ms | $($multiwindow.interaction.export.elapsedMs) ms |"
-        "| $($summary.exportDimensions) | $($independent.interaction.export.widthPx) × $($independent.interaction.export.heightPx) px | $($multiwindow.interaction.export.widthPx) × $($multiwindow.interaction.export.heightPx) px |"
+        "| $($summary.exportDimensions) | $($independent.interaction.export.widthPx) x $($independent.interaction.export.heightPx) px | $($multiwindow.interaction.export.widthPx) x $($multiwindow.interaction.export.heightPx) px |"
         "| $($summary.exportSources) | $(Format-Mebibytes $independent.interaction.export.sourceBytes) MiB | $(Format-Mebibytes $multiwindow.interaction.export.sourceBytes) MiB |"
         "| $($summary.exportOutput) | $(Format-Mebibytes $independent.interaction.export.outputBytes) MiB | $(Format-Mebibytes $multiwindow.interaction.export.outputBytes) MiB |"
         "| $($summary.afterCrash) | $independentAfterCrash | $multiwindowAfterCrash |"
