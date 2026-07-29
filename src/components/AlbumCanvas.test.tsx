@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -516,6 +517,48 @@ test("waits for PixiJS initialization before destroying an abandoned Canvas", as
   await finishPixiInitialization();
 
   expect(pixiLifecycle.instances[0].destroyCount).toBe(1);
+});
+
+test("does not let an abandoned StrictMode initialization destroy the active Canvas", async () => {
+  const view = render(
+    <StrictMode>
+      <AlbumCanvas
+        projectId="project-spike-001"
+        composition={composition}
+        continuousCanvasLayout={createContinuousCanvasLayout(
+          composition.sheets,
+        )}
+        selectedFrameId={null}
+        focusedSheetId="sheet-001"
+        centeredSheetId="sheet-001"
+        viewport={{ offsetX: 42, zoom: 0.78 }}
+        onSelectFrame={() => undefined}
+        onFocusSheet={() => undefined}
+        onCenteredSheetChange={() => undefined}
+        onViewportChange={() => undefined}
+        onTransformPreview={() => undefined}
+        onTransformCommit={async () => true}
+      />
+    </StrictMode>,
+  );
+
+  expect(pixiLifecycle.instances).toHaveLength(2);
+
+  await act(async () => {
+    pixiLifecycle.resolveInitializations[1]?.();
+    await Promise.resolve();
+    pixiLifecycle.resolveInitializations[0]?.();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(pixiLifecycle.instances[0].destroyCount).toBe(1);
+  expect(pixiLifecycle.instances[1].destroyCount).toBe(0);
+  expect(pixiLifecycle.instances[1].stage.children).toHaveLength(1);
+  const activeWorld = pixiLifecycle.instances[1].stage
+    .children[0] as { children: unknown[] };
+  expect(activeWorld.children).toHaveLength(1);
+  expect(view.container.querySelectorAll("canvas")).toHaveLength(1);
 });
 
 test("fits the complete sheet to the continuous Canvas at device resolution", async () => {

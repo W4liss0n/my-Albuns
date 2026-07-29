@@ -23,12 +23,16 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     let disposed = false;
     let initialized = false;
     let destroyed = false;
+    let ownedScene: AlbumCanvasScene | null = null;
     const app = new Application();
     const destroyInitializedApp = () => {
       if (!initialized || destroyed) return;
       destroyed = true;
-      sceneRef.current?.destroy();
-      sceneRef.current = null;
+      ownedScene?.destroy();
+      if (sceneRef.current === ownedScene) {
+        sceneRef.current = null;
+      }
+      ownedScene = null;
       app.destroy(true, { children: true });
     };
 
@@ -56,7 +60,8 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         );
         app.canvas.tabIndex = 0;
         hostRef.current.appendChild(app.canvas);
-        sceneRef.current = new AlbumCanvasScene(app);
+        ownedScene = new AlbumCanvasScene(app);
+        sceneRef.current = ownedScene;
         setReady(true);
       })
       .catch((error: unknown) => {
