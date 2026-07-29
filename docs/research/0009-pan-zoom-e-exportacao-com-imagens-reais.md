@@ -150,9 +150,13 @@ hosts de A são iniciados antes de qualquer espera.
 O estado do alvo também passou a distinguir `pending`, `ready` e falha terminal
 de textura, evitando converter uma falha real em timeout. O Processador de
 Imagens devolve estágios seguros e tipados para verificação da fonte,
-decodificação, composição, preparação, codificação, publicação e verificação
-da saída. Testes cobrem fonte alterada, JPEG inválido, destino indisponível e
-substituição de uma Exportação existente.
+decodificação, composição, preparação, codificação e verificação da saída
+preparada. Desde o gate de recuperação, Publicação e substituição do nome final
+pertencem ao `ExportPipeline` do host e ocorrem somente depois da verificação;
+os detalhes estão em
+[Recuperação do Processador de Imagens](0010-recuperacao-do-processador-de-imagens.md).
+Testes cobrem fonte alterada, JPEG inválido, destino indisponível, preparação
+incompatível e preservação de uma Exportação anterior.
 
 Ao executar os dois hosts de A simultaneamente, o ensaio ainda encontrou uma
 colisão no diretório padrão de dados do WebView2: os dois processos iniciavam,
