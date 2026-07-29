@@ -109,7 +109,7 @@ fn run(app_paths: &AppPaths) -> Result<(), String> {
         event = "imaging_request_started",
     );
 
-    request.validate().map_err(|error| {
+    request.validate().inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.imaging",
             process_role = ProcessRole::Imaging.as_str(),
@@ -118,7 +118,6 @@ fn run(app_paths: &AppPaths) -> Result<(), String> {
             project_id,
             event = "imaging_request_rejected",
         );
-        error
     })?;
 
     let completion = render_request(&request).inspect_err(|_| {
