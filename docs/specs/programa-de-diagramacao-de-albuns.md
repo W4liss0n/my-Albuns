@@ -88,7 +88,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que o Modo de edição isole e amplie uma Lâmina, para concentrar a manipulação detalhada nela.
 1. Como pessoa diagramadora, quero que o Painel de imagens fique temporariamente menor nesse modo, para aumentar o Canvas sem perder acesso às mídias.
 1. Como pessoa diagramadora, quero retornar ao mesmo ponto e à mesma altura anterior do painel ao sair, para continuar a navegação sem reorganizar a interface.
-1. Como pessoa diagramadora, quero uma Grade de Lâminas no Painel contextual, para obter uma visão geral, saltar rapidamente e reordenar a sequência por miniaturas.
+1. Como pessoa diagramadora, quero uma Grade de Lâminas no Painel contextual cujas miniaturas representem a composição atual de cada Lâmina, para obter uma visão geral fiel, saltar rapidamente e reordenar a sequência.
 1. Como pessoa diagramadora, quero o Painel de imagens abaixo do Canvas e ocupando toda a largura restante até o Painel contextual, para manter mídias próximas da composição.
 1. Como pessoa diagramadora, quero redimensionar ou ocultar o Painel de imagens, para priorizar mídias ou ampliar o Canvas conforme a tarefa.
 1. Como pessoa diagramadora, quero redimensionar o Painel contextual por um divisor vertical, para equilibrar ferramentas e área de composição.
@@ -558,6 +558,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
 - Soltar uma Foto usa a Lâmina sob o ponteiro como destino. Selecionar um Frame ou Foto em outra Lâmina transfere a seleção diretamente para aquele elemento.
 - Clicar em uma área vazia limpa a seleção do elemento e retorna ao contexto do Álbum. Clicar na Grade de Lâminas ou usar as setas navega; arrastar uma miniatura da Grade reordena; rolar o Canvas não altera o contexto.
+- Cada miniatura da Grade deriva da mesma `ComposedSheet` usada pelo Canvas e representa proporção, Frames em sua ordem, Fotos com recorte e transformação, placeholders e Overlay; não existe uma miniatura padrão independente da composição.
 - A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. Essa referência é recalculada durante a navegação, permanece independente da Lâmina ou do Frame em foco e serve como alvo implícito dos comandos sem destino explícito; não torna as demais Lâminas inativas.
 - O Modo de edição da Lâmina oculta temporariamente as demais, centraliza e amplia a escolhida e reduz o Painel de imagens para aumentar o Canvas.
 - Não existe faixa, rótulo, botão de retorno ou mudança adicional de fundo: o isolamento da única Lâmina e a nova proporção das regiões identificam o modo; `Esc` continua sendo a saída.

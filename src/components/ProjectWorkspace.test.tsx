@@ -266,6 +266,92 @@ test("uses the documented compact chrome and collapsible contextual sections", (
   ).toBeInTheDocument();
 });
 
+test("renders each Grade item from its own composed sheet", () => {
+  const gradeProjection: EditorProjection = {
+    ...twoSheetProjection,
+    composition: {
+      sheets: [
+        {
+          ...twoSheetProjection.composition.sheets[0],
+          frames: [
+            {
+              ...twoSheetProjection.composition.sheets[0].frames[0],
+              photo: {
+                ...twoSheetProjection.composition.sheets[0].frames[0].photo!,
+                rotationDegrees: 12,
+                mirrorX: true,
+              },
+            },
+          ],
+        },
+        {
+          ...twoSheetProjection.composition.sheets[1],
+          hasOverlay: true,
+          frames: [
+            {
+              frameId: "frame-002",
+              clipRect: {
+                x: 320_000,
+                y: 40_000,
+                width: 250_000,
+                height: 220_000,
+              },
+              zIndex: 0,
+              photo: null,
+            },
+          ],
+        },
+      ],
+    },
+  };
+
+  render(
+    <ProjectWorkspace
+      projection={gradeProjection}
+      bridge={bridgeWithApply(async () => gradeProjection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const firstPreview = screen.getByRole("img", {
+    name: "Prévia da Lâmina 01",
+  });
+  const secondPreview = screen.getByRole("img", {
+    name: "Prévia da Lâmina 02",
+  });
+
+  expect(
+    firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
+  ).toHaveAttribute("x", "20000");
+  expect(
+    firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
+  ).toHaveAttribute("width", "280000");
+  expect(
+    firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
+  ).toBeInTheDocument();
+  expect(
+    firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
+  ).toHaveAttribute(
+    "transform",
+    expect.stringContaining("rotate(12) scale(-1 1)"),
+  );
+  expect(
+    firstPreview.querySelector('[fill="#10202b"]'),
+  ).toBeInTheDocument();
+  expect(
+    secondPreview.querySelector("[data-preview-photo-id]"),
+  ).not.toBeInTheDocument();
+  expect(
+    secondPreview.querySelector('[data-preview-placeholder-id="frame-002"]'),
+  ).toBeInTheDocument();
+  expect(
+    secondPreview.querySelector('[data-preview-frame-id="frame-002"]'),
+  ).toHaveAttribute("x", "320000");
+  expect(
+    secondPreview.querySelector("[data-preview-overlay]"),
+  ).toBeInTheDocument();
+});
+
 test("resizes both workspace panels with persistent splitters", () => {
   const firstView = render(
     <ProjectWorkspace

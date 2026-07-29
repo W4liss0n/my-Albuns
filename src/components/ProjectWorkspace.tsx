@@ -13,6 +13,7 @@ import {
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
+import { SheetPreview } from "./SheetPreview";
 import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
@@ -497,31 +498,28 @@ export function ProjectWorkspace({
                   defaultOpen
                 >
                   <div className="sheet-grid">
-                    {projection.state.album.sheets.map((sheet, index) => {
+                    {projection.composition.sheets.map((sheet, index) => {
                       const sheetOffset = sheetOffsetInCanvasPixels(
                         projection.composition.sheets,
                         index,
                       );
                       return (
                         <Button
-                          key={sheet.id}
+                          key={sheet.sheetId}
                           className={
-                            sheet.id === focusedSheetId
+                            sheet.sheetId === focusedSheetId
                               ? "sheet-tile active"
                               : "sheet-tile"
                           }
                           onPress={() => {
-                            focusSheet(sheet.id);
+                            focusSheet(sheet.sheetId);
                             setViewport({
                               ...viewport,
                               offsetX: 42 - sheetOffset * canvasScale,
                             });
                           }}
                         >
-                          <span className="sheet-miniature">
-                            <i />
-                            <i />
-                          </span>
+                          <SheetPreview sheet={sheet} />
                           <span>{String(sheet.number).padStart(2, "0")}</span>
                         </Button>
                       );

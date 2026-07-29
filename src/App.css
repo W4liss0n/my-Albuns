@@ -527,6 +527,7 @@ kbd {
 
 .sheet-tile {
   display: grid;
+  min-width: 0;
   padding: 8px;
   border: 1px solid rgb(255 255 255 / 7%);
   border-radius: 8px;
@@ -542,19 +543,13 @@ kbd {
   background: rgb(201 154 93 / 8%);
 }
 
-.sheet-miniature {
-  display: grid;
+.sheet-preview {
+  display: block;
   width: 100%;
-  aspect-ratio: 2 / 1;
-  padding: 4px;
+  height: auto;
   border-radius: 2px;
-  background: #ddd7ca;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px;
-}
-
-.sheet-miniature i {
-  background: #667984;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .media-panel {

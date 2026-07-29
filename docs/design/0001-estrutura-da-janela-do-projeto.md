@@ -359,6 +359,8 @@ No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada, o Pain
 
 `Grade de Lâminas` mostra previews compactos de todo o Álbum, serve como navegação rápida e também permite reordenar a sequência.
 
+Cada preview é uma representação vetorial da `ComposedSheet` correspondente na projeção atual do Editor, nunca uma miniatura genérica. Ela preserva proporção, superfície, linha central, geometria e ordem dos Frames, recorte e transformação das Fotos, placeholders e Overlay. Uma nova projeção produzida pelo domínio atualiza Canvas e Grade a partir da mesma composição; o destaque de navegação permanece uma camada da interface externa à preview.
+
 Um clique sem ultrapassar o limiar de arraste centraliza a Lâmina correspondente no Canvas. Ao arrastar uma miniatura, sua célula vira um espaço reservado, um fantasma da miniatura acompanha o ponteiro e as células intermediárias se deslocam na ordem linear do Álbum. Soltar confirma a mesma operação de inserção e Undo/Redo usada no Canvas; `Esc`, soltura inválida e posições que interiorizariam uma Página única restauram a grade original.
 
 Nas bordas superior e inferior da área visível da Grade, o arraste inicia rolagem vertical automática do contêiner. A velocidade cresce com a proximidade da borda e as células continuam se reorganizando durante a rolagem.
