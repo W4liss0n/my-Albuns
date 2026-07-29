@@ -1,0 +1,306 @@
+{
+    "schemaVersion":  5,
+    "collectedAtUtc":  "2026-07-29T19:15:16.5860323Z",
+    "hardware":  {
+                     "operatingSystem":  {
+                                             "caption":  "Microsoft Windows 11 Pro",
+                                             "version":  "10.0.26200",
+                                             "buildNumber":  "26200"
+                                         },
+                     "cpu":  [
+                                 "13th Gen Intel(R) Core(TM) i5-13450HX"
+                             ],
+                     "totalPhysicalMemoryBytes":  25439191040,
+                     "gpu":  [
+                                 {
+                                     "name":  "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+                                     "adapterRamBytes":  4293918720,
+                                     "driverVersion":  "32.0.15.8195"
+                                 },
+                                 {
+                                     "name":  "Intel(R) UHD Graphics",
+                                     "adapterRamBytes":  2147479552,
+                                     "driverVersion":  "32.0.101.7077"
+                                 }
+                             ]
+                 },
+    "corpus":  {
+                   "schemaVersion":  1,
+                   "albumCount":  2,
+                   "photoCount":  172,
+                   "sourceBytes":  1469034192,
+                   "corpusSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc",
+                   "integrity":  {
+                                     "verified":  true,
+                                     "beforeSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc",
+                                     "afterSha256":  "4da593ff7d12f861a8b3aba74249726e70131468a68af7a7d06200f5340871cc"
+                                 },
+                   "previewPolicy":  {
+                                         "representationsPerPhoto":  1,
+                                         "format":  "jpeg",
+                                         "maximumEdgePx":  1600
+                                     }
+               },
+    "build":  {
+                  "manifestVersion":  1,
+                  "builtAtUtc":  "2026-07-29T19:13:54.8393105Z",
+                  "gitCommit":  "56f95ca5421dfeca667517944d7b9ba186486cd0",
+                  "workingTreeDirty":  true,
+                  "buildInputsDirty":  false,
+                  "buildInputFileCount":  132,
+                  "buildInputDigestSha256":  "e3b1c016989bdae7aa4405989916025166b85718089471632419bba6a3926ca4",
+                  "executable":  ".scratch/topology-spike-target/release/myalbuns-desktop.exe",
+                  "executableSha256":  "a29a79086f407e3c1fb5f34b0623e4b8d080727ecadec0f8cda1635c386cebd5",
+                  "imagingExecutable":  ".scratch/topology-spike-target/release/myalbuns-imaging.exe",
+                  "imagingExecutableSha256":  "7fdeb9903ac18464ead5d8e90a415a0e4e8fe8ac57adc7a1773fc776afa52999",
+                  "profile":  "release",
+                  "currentBuildInputsMatchManifest":  true
+              },
+    "alternatives":  {
+                         "independentHosts":  {
+                                                  "ready":  {
+                                                                "elapsedMs":  1818,
+                                                                "windows":  [
+                                                                                {
+                                                                                    "processId":  23100,
+                                                                                    "title":  "MyAlbuns — Álbum Aurora [Topologia A]"
+                                                                                },
+                                                                                {
+                                                                                    "processId":  25416,
+                                                                                    "title":  "MyAlbuns — Álbum Horizonte [Topologia A]"
+                                                                                }
+                                                                            ],
+                                                                "firstHostElapsedMs":  1603
+                                                            },
+                                                  "cache":  {
+                                                                "readyElapsedMs":  45324,
+                                                                "cacheWallTimeMs":  43408,
+                                                                "projectCount":  2,
+                                                                "photoCount":  172,
+                                                                "generatedCount":  172,
+                                                                "reusedCount":  0,
+                                                                "sourceBytes":  1469034192,
+                                                                "previewBytes":  51662817,
+                                                                "sourceBytesPerSecond":  33842476,
+                                                                "projects":  [
+                                                                                 {
+                                                                                     "projectId":  "project-spike-001",
+                                                                                     "generatedCount":  88,
+                                                                                     "reusedCount":  0,
+                                                                                     "sourceBytes":  679049811,
+                                                                                     "previewBytes":  26875663,
+                                                                                     "elapsedMs":  33583
+                                                                                 },
+                                                                                 {
+                                                                                     "projectId":  "project-spike-002",
+                                                                                     "generatedCount":  84,
+                                                                                     "reusedCount":  0,
+                                                                                     "sourceBytes":  789984381,
+                                                                                     "previewBytes":  24787154,
+                                                                                     "elapsedMs":  43094
+                                                                                 }
+                                                                             ]
+                                                            },
+                                                  "processes":  {
+                                                                    "hostProcessCount":  2,
+                                                                    "processTreeCount":  9,
+                                                                    "workingSetBytes":  1176141824,
+                                                                    "privateMemoryBytes":  755011584,
+                                                                    "handleCount":  4453,
+                                                                    "threadCount":  226,
+                                                                    "processTree":  [
+                                                                                        {
+                                                                                            "processId":  3904,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  144609280,
+                                                                                            "privateMemoryBytes":  63578112
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  5880,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  20434944,
+                                                                                            "privateMemoryBytes":  9469952
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  6504,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  557314048,
+                                                                                            "privateMemoryBytes":  514494464
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  7268,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  43032576,
+                                                                                            "privateMemoryBytes":  15736832
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  23100,
+                                                                                            "name":  "myalbuns-desktop",
+                                                                                            "workingSetBytes":  32436224,
+                                                                                            "privateMemoryBytes":  10747904
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  23528,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  139501568,
+                                                                                            "privateMemoryBytes":  50315264
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  23920,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  19345408,
+                                                                                            "privateMemoryBytes":  3547136
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  25416,
+                                                                                            "name":  "myalbuns-desktop",
+                                                                                            "workingSetBytes":  32727040,
+                                                                                            "privateMemoryBytes":  11063296
+                                                                                        },
+                                                                                        {
+                                                                                            "processId":  25820,
+                                                                                            "name":  "msedgewebview2",
+                                                                                            "workingSetBytes":  186740736,
+                                                                                            "privateMemoryBytes":  76058624
+                                                                                        }
+                                                                                    ],
+                                                                    "gpuMemory":  {
+                                                                                      "available":  true,
+                                                                                      "dedicatedBytes":  0,
+                                                                                      "sharedBytes":  464588800
+                                                                                  }
+                                                                },
+                                                  "forcedFailure":  {
+                                                                        "forcedHostProcessId":  25416,
+                                                                        "otherHostSurvived":  true,
+                                                                        "remainingWindowCount":  1
+                                                                    }
+                                              },
+                         "multiwindowHost":  {
+                                                 "ready":  {
+                                                               "elapsedMs":  399,
+                                                               "windows":  [
+                                                                               {
+                                                                                   "processId":  6332,
+                                                                                   "title":  "MyAlbuns — Álbum Aurora [Topologia B]"
+                                                                               },
+                                                                               {
+                                                                                   "processId":  6332,
+                                                                                   "title":  "MyAlbuns — Álbum Horizonte [Topologia B]"
+                                                                               }
+                                                                           ]
+                                                           },
+                                                 "cache":  {
+                                                               "readyElapsedMs":  22846,
+                                                               "cacheWallTimeMs":  22201,
+                                                               "projectCount":  2,
+                                                               "photoCount":  172,
+                                                               "generatedCount":  172,
+                                                               "reusedCount":  0,
+                                                               "sourceBytes":  1469034192,
+                                                               "previewBytes":  51662817,
+                                                               "sourceBytesPerSecond":  66169731,
+                                                               "projects":  [
+                                                                                {
+                                                                                    "projectId":  "project-spike-001",
+                                                                                    "generatedCount":  88,
+                                                                                    "reusedCount":  0,
+                                                                                    "sourceBytes":  679049811,
+                                                                                    "previewBytes":  26875663,
+                                                                                    "elapsedMs":  19668
+                                                                                },
+                                                                                {
+                                                                                    "projectId":  "project-spike-002",
+                                                                                    "generatedCount":  84,
+                                                                                    "reusedCount":  0,
+                                                                                    "sourceBytes":  789984381,
+                                                                                    "previewBytes":  24787154,
+                                                                                    "elapsedMs":  22166
+                                                                                }
+                                                                            ]
+                                                           },
+                                                 "processes":  {
+                                                                   "hostProcessCount":  1,
+                                                                   "processTreeCount":  8,
+                                                                   "workingSetBytes":  1119662080,
+                                                                   "privateMemoryBytes":  743436288,
+                                                                   "handleCount":  4099,
+                                                                   "threadCount":  196,
+                                                                   "processTree":  [
+                                                                                       {
+                                                                                           "processId":  2672,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  10399744,
+                                                                                           "privateMemoryBytes":  2609152
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  6332,
+                                                                                           "name":  "myalbuns-desktop",
+                                                                                           "workingSetBytes":  32997376,
+                                                                                           "privateMemoryBytes":  11345920
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  8968,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  20500480,
+                                                                                           "privateMemoryBytes":  9560064
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  18044,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  187260928,
+                                                                                           "privateMemoryBytes":  78209024
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  23868,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  142409728,
+                                                                                           "privateMemoryBytes":  51986432
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  24780,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  138735616,
+                                                                                           "privateMemoryBytes":  70778880
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  25988,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  43278336,
+                                                                                           "privateMemoryBytes":  16072704
+                                                                                       },
+                                                                                       {
+                                                                                           "processId":  26076,
+                                                                                           "name":  "msedgewebview2",
+                                                                                           "workingSetBytes":  544079872,
+                                                                                           "privateMemoryBytes":  502874112
+                                                                                       }
+                                                                                   ],
+                                                                   "gpuMemory":  {
+                                                                                     "available":  true,
+                                                                                     "dedicatedBytes":  0,
+                                                                                     "sharedBytes":  313704448
+                                                                                 }
+                                                               },
+                                                 "forcedFailure":  {
+                                                                       "forcedHostProcessId":  6332,
+                                                                       "hostSurvived":  false,
+                                                                       "remainingWindowCount":  0
+                                                                   }
+                                             }
+                     },
+    "notMeasured":  [
+                        "latência de Pan/Zoom",
+                        "duração da Exportação",
+                        "recuperação persistida",
+                        "complexidade operacional da IPC"
+                    ],
+    "notes":  [
+                  "Carga preliminar com dois Álbuns reais; isto não encerra o spike.",
+                  "O Cache foi reconstruído a frio com uma representação JPEG de até 1600 px por Foto.",
+                  "Cada uso valida o SHA-256 da Foto antes de gerar ou reutilizar a representação; o corpus completo foi recalculado depois das duas alternativas.",
+                  "A memória inclui o host e todos os processos descendentes observados.",
+                  "A queda só é forçada depois de validar o caminho do executável do PID alvo.",
+                  "Os hosts independentes são iniciados em sequência depois que uma tentativa simultânea deixou intermitentemente um host sem Janela visível."
+              ]
+}

@@ -1,5 +1,5 @@
 ---
-status: current
+status: historical
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-29
@@ -21,10 +21,12 @@ Projetos de amostra **Álbum Horizonte** e **Álbum Aurora**:
 - a queda forçada de um host de A preservou a outra Janela;
 - a queda do host de B encerrou as duas Janelas.
 
-Esta é uma medição intermediária do esqueleto de hospedagem. Ela ainda não
-exercita o cenário completo de Pan/Zoom, Cache, Exportação, recuperação e
-falhas do Processador de Imagens. Portanto, não escolhe uma topologia, não
-encerra o ticket 01 e não muda o ADR 0005 para `accepted`.
+Esta é a primeira medição, hoje histórica, do esqueleto de hospedagem. Ela não
+exercitou Pan/Zoom, Cache, Exportação, recuperação nem falhas do Processador de
+Imagens. A rodada posterior com Cache e 172 Fotos reais está em
+[0008-cache-com-imagens-reais.md](0008-cache-com-imagens-reais.md). Nenhuma das
+duas escolhe uma topologia, encerra o ticket 01 ou muda o ADR 0005 para
+`accepted`.
 
 Os dados brutos estão em
 [0001-topology-spike-baseline.json](artifacts/0001-topology-spike-baseline.json).
@@ -52,27 +54,29 @@ mutável compartilhado entre os Projetos. Os comandos Tauri recebem a
 - a capability continua restrita a `core:default` e aos dois rótulos conhecidos,
   sem acesso genérico ao shell ou ao sistema de arquivos.
 
-O Processador de Imagens ainda é iniciado somente quando a Exportação de prova
-é solicitada. O isolamento e o ciclo de vida desse processo em cada topologia
-continuam pendentes.
+Na revisão que produziu esta primeira coleta, o Processador de Imagens era
+iniciado somente para a Exportação de prova. O corte atual também o usa para
+construir o Cache ao abrir o Projeto, mantendo uma instância e um namespace por
+Projeto. A Exportação continua recebendo um snapshot imutável e não usa a
+representação reduzida.
 
 ## Método
 
-O comando `npm run spike:topology`:
+O relatório `0001` foi produzido por uma revisão anterior do instrumento, que:
 
-1. prepara o sidecar e cria uma build debug com frontend embutido em um
+1. preparava o sidecar e criava uma build debug com frontend embutido em um
    diretório isolado;
-2. grava um manifesto com commit, estado e digest das entradas, hash do
+2. gravava um manifesto com commit, estado e digest das entradas, hash do
    executável e instante da build;
-3. abre Horizonte e Aurora em dois hosts independentes;
-4. espera títulos que confirmem a configuração de cada Janela;
-5. soma host, WebView2 e demais processos descendentes observados;
-6. coleta working set, memória privada, handles, threads e contadores de memória
+3. abria Horizonte e Aurora em dois hosts independentes;
+4. esperava títulos que confirmassem a configuração de cada Janela;
+5. somava host, WebView2 e demais processos descendentes observados;
+6. coletava working set, memória privada, handles, threads e contadores de memória
    gráfica por PID;
-7. força a queda de um host depois de validar que o PID pertence ao executável
+7. forçava a queda de um host depois de validar que o PID pertencia ao executável
    do ensaio;
-8. repete a coleta com duas Janelas no host multiwindow;
-9. grava hardware, proveniência da build, dados brutos e um resumo Markdown
+8. repetia a coleta com duas Janelas no host multiwindow;
+9. gravava hardware, proveniência da build, dados brutos e um resumo Markdown
    derivado da mesma estrutura.
 
 Os hosts de A são iniciados sequencialmente. Em uma tentativa de início
@@ -115,9 +119,10 @@ queda do processo global e queda do Processador de Imagens.
 
 Os testes adicionados verificam duas fronteiras:
 
-- `ProjectCore::open_sample_project` recebe uma fixture tipada, abre identidades
-  distintas e uma intenção aplicada ao primeiro Projeto não altera a revisão do
-  segundo;
+- o scaffolding privado serializa duas fixtures determinísticas e
+  `ProjectCore::open_editable_session` abre ambas pela mesma entrada usada por
+  um documento persistido; uma intenção aplicada ao primeiro Projeto não
+  altera a revisão do segundo;
 - `ProjectHost` encaminha a intenção pela Janela correta e preserva a sessão da
   outra Janela.
 
@@ -128,7 +133,9 @@ criativo.
 
 ## Repetição
 
-Build e medição completas:
+A instrumentação atual supersede esta coleta: usa build `release`, valida
+também o hash do Processador de Imagens e gera o relatório `0002` com o corpus
+real:
 
 ```powershell
 npm run spike:topology
@@ -140,18 +147,20 @@ Nova coleta usando a build isolada já existente:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-TopologySpike.ps1 -SkipBuild
 ```
 
-O modo rápido exige o manifesto criado pela build, verifica novamente o hash do
-executável e atribui a coleta ao commit gravado nesse manifesto, não ao `HEAD`
-que estiver selecionado depois.
+O modo rápido exige o manifesto criado pela build, verifica novamente os hashes
+do host e do Processador de Imagens e atribui a coleta ao commit gravado nesse
+manifesto, não ao `HEAD` que estiver selecionado depois.
 
-Cada execução substitui o JSON e seu resumo derivado. A aceitação final deve
-usar uma build cujas entradas estejam limpas, repetir a ordem das alternativas
-e registrar amostras suficientes para reduzir o efeito de aquecimento.
+Cada execução atual substitui o JSON `0002` e seu resumo derivado. Os artefatos
+`0001` preservam esta primeira coleta e não são mais sobrescritos. A aceitação
+final deve usar uma build cujas entradas estejam limpas, alternar a ordem das
+alternativas e registrar amostras suficientes para reduzir o efeito de
+aquecimento.
 
 ## Próximo gate
 
 A próxima rodada deve automatizar exatamente as mesmas operações de Pan/Zoom e
 Exportação nos dois Projetos, registrar prontidão real do Canvas, medir
-latências e Processadores de Imagens e repetir as amostras alternando a ordem.
-Depois disso entram Cache, recuperação e as demais injeções de falha previstas
-no ticket 01.
+latências e o ciclo de vida dos Processadores de Imagens e repetir as amostras
+alternando a ordem. Depois disso entram recuperação e as demais injeções de
+falha previstas no ticket 01.
