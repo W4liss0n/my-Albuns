@@ -14,11 +14,11 @@ import type {
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import type {
+  AlbumCanvasProps,
   CanvasMetrics,
   PhotoTransformPreview,
 } from "./AlbumCanvas";
-import type { AlbumCanvasSceneInput } from "./albumCanvasScene";
-import { centeredSheetOffsetInContinuousCanvas } from "./canvasGeometry";
+import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 interface ProjectEditorControllerInput {
   projection: EditorProjection;
@@ -132,6 +132,11 @@ export function useProjectEditorController({
       null,
     [projection.composition.sheets, selectedFrameId],
   );
+  const canvasLayout = useMemo(
+    () =>
+      createContinuousCanvasLayout(projection.composition.sheets),
+    [projection.composition.sheets],
+  );
 
   function setZoomDraft(next: ZoomDraft | null) {
     zoomDraftRef.current = next;
@@ -151,19 +156,16 @@ export function useProjectEditorController({
     sheetId: string,
     metrics: CanvasMetrics,
   ) {
-    const sheetIndex = projection.composition.sheets.findIndex(
-      (sheet) => sheet.sheetId === sheetId,
+    const offsetX = canvasLayout.centeredOffset(
+      sheetId,
+      metrics.scale,
+      metrics.width,
     );
-    if (sheetIndex < 0) return false;
+    if (offsetX === null) return false;
 
     setViewport({
       ...useEditorView.getState().viewport,
-      offsetX: centeredSheetOffsetInContinuousCanvas(
-        projection.composition.sheets,
-        sheetIndex,
-        metrics.scale,
-        metrics.width,
-      ),
+      offsetX,
     });
     return true;
   }
@@ -431,9 +433,10 @@ export function useProjectEditorController({
     ? centeredSheetId
     : projection.state.album.sheets[0]?.id;
 
-  const canvasProps: AlbumCanvasSceneInput = {
+  const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     composition: projection.composition,
+    continuousCanvasLayout: canvasLayout,
     selectedFrameId,
     focusedSheetId,
     centeredSheetId,

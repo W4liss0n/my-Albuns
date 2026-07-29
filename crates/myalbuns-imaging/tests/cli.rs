@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use myalbuns_core::{ProjectCore, ProjectIntent, RenderSnapshot};
+use myalbuns_imaging_protocol::{ImagingRequest, ImagingResponse};
 
 #[test]
 fn processor_renders_a_png_from_a_validated_snapshot_only() {
@@ -10,11 +11,7 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     let snapshot = session.render_snapshot();
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("lamina-001.png");
-    let result = invoke_processor(
-        serde_json::to_value(snapshot).expect("snapshot is serializable"),
-        &output_path,
-        "request-001",
-    );
+    let result = invoke_processor(snapshot, &output_path, "request-001");
 
     assert!(
         result.status.success(),
@@ -24,10 +21,12 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     assert!(output_path.exists());
     let bytes = std::fs::read(output_path).expect("rendered output is readable");
     assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
-    let response: serde_json::Value =
+    let response: ImagingResponse =
         serde_json::from_slice(&result.stdout).expect("response is valid JSON");
-    assert_eq!(response["requestId"], "request-001");
-    assert_eq!(response["kind"], "completed");
+    assert_eq!(
+        response.completed_dimensions_for("request-001"),
+        Some((600, 300))
+    );
 }
 
 #[test]
@@ -37,11 +36,7 @@ fn processor_uses_the_composed_media_transform() {
     let original_path = output_dir.path().join("original.png");
     let transformed_path = output_dir.path().join("transformed.png");
 
-    let original = invoke_processor(
-        snapshot_value(session.render_snapshot()),
-        &original_path,
-        "original",
-    );
+    let original = invoke_processor(session.render_snapshot(), &original_path, "original");
     assert!(original.status.success());
 
     session
@@ -52,11 +47,7 @@ fn processor_uses_the_composed_media_transform() {
             delta_zoom: 0.4,
         })
         .expect("the Photo transform is valid");
-    let transformed = invoke_processor(
-        snapshot_value(session.render_snapshot()),
-        &transformed_path,
-        "transformed",
-    );
+    let transformed = invoke_processor(session.render_snapshot(), &transformed_path, "transformed");
     assert!(transformed.status.success());
 
     assert_ne!(
@@ -71,8 +62,11 @@ fn processor_rejects_an_invalid_snapshot() {
     let session = ProjectCore::open_sample_project(12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("invalid.png");
-    let mut snapshot = snapshot_value(session.render_snapshot());
+    let mut snapshot =
+        serde_json::to_value(session.render_snapshot()).expect("snapshot is serializable");
     snapshot["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
+    let snapshot: RenderSnapshot =
+        serde_json::from_value(snapshot).expect("modified snapshot retains its shape");
 
     let result = invoke_processor(snapshot, &output_path, "invalid");
 
@@ -85,21 +79,12 @@ fn processor_rejects_an_invalid_snapshot() {
     );
 }
 
-fn snapshot_value(snapshot: RenderSnapshot) -> serde_json::Value {
-    serde_json::to_value(snapshot).expect("snapshot is serializable")
-}
-
 fn invoke_processor(
-    snapshot: serde_json::Value,
+    snapshot: RenderSnapshot,
     output_path: &Path,
     request_id: &str,
 ) -> std::process::Output {
-    let request = serde_json::json!({
-        "protocolVersion": 1,
-        "requestId": request_id,
-        "outputPath": output_path,
-        "snapshot": snapshot,
-    });
+    let request = ImagingRequest::new(request_id, output_path.to_path_buf(), snapshot);
     let mut child = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

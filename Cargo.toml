@@ -1,8 +1,9 @@
 [workspace]
 members = [
-  "crates/myalbuns-core",
-  "crates/myalbuns-imaging",
-  "src-tauri",
+    "crates/myalbuns-core",
+    "crates/myalbuns-imaging-protocol",
+    "crates/myalbuns-imaging",
+    "src-tauri",
 ]
 resolver = "2"
 

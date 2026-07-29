@@ -1,32 +1,12 @@
 use std::sync::Mutex;
 
-use myalbuns_core::{
-    EditorProjection, ExportResult, ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot,
-};
-use serde::Serialize;
+use myalbuns_core::{EditorProjection, ExportResult, ProjectCore, ProjectIntent, ProjectSession};
+use myalbuns_imaging_protocol::{ImagingRequest, ImagingResponse};
 use tauri::{AppHandle, State};
 use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
 struct AppState {
     session: Mutex<ProjectSession>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ImagingRequest<'a> {
-    protocol_version: u32,
-    request_id: &'a str,
-    output_path: &'a std::path::Path,
-    snapshot: &'a RenderSnapshot,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ImagingResponse {
-    kind: String,
-    request_id: String,
-    width_px: u32,
-    height_px: u32,
 }
 
 #[tauri::command]
@@ -86,12 +66,7 @@ async fn export_spike(app: AppHandle, state: State<'_, AppState>) -> Result<Expo
         .map_err(|error| format!("Não foi possível preparar a Exportação: {error}"))?;
     let output_path = output_dir.join("Album-Horizonte_001.png");
     let request_id = format!("export-revision-{}", snapshot.revision);
-    let request = ImagingRequest {
-        protocol_version: 1,
-        request_id: &request_id,
-        output_path: &output_path,
-        snapshot: &snapshot,
-    };
+    let request = ImagingRequest::new(request_id.clone(), output_path.clone(), snapshot);
     let mut payload = serde_json::to_vec(&request)
         .map_err(|error| format!("Não foi possível preparar o snapshot: {error}"))?;
     payload.push(b'\n');
@@ -131,14 +106,14 @@ async fn export_spike(app: AppHandle, state: State<'_, AppState>) -> Result<Expo
     }
     let response: ImagingResponse = serde_json::from_slice(&stdout)
         .map_err(|error| format!("Resposta inválida do Processador de Imagens: {error}"))?;
-    if response.kind != "completed" || response.request_id != request_id {
+    let Some((width_px, height_px)) = response.completed_dimensions_for(&request_id) else {
         return Err("O Processador de Imagens devolveu uma resposta inesperada.".into());
-    }
+    };
 
     Ok(ExportResult {
         output_path: output_path.to_string_lossy().into_owned(),
-        width_px: response.width_px,
-        height_px: response.height_px,
+        width_px,
+        height_px,
     })
 }
 

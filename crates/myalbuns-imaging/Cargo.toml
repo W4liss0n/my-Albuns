@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 myalbuns-core = { path = "../myalbuns-core" }
-serde.workspace = true
+myalbuns-imaging-protocol = { path = "../myalbuns-imaging-protocol" }
 serde_json.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
 

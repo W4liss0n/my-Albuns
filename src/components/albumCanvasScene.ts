@@ -10,19 +10,21 @@ import {
 
 import type {
   ComposedSheet,
-  CompositionPlan,
   PhotoPlacement,
   Vector2,
 } from "../domain/project";
-import type { ViewportState } from "../state/editorView";
+import type {
+  AlbumCanvasProps,
+  CanvasMetrics,
+  PhotoTransformDelta,
+  PhotoTransformPreview,
+} from "./albumCanvasContract";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
-  centeredSheetIdInContinuousCanvas,
-  clampContinuousCanvasOffset,
   continuousCanvasScale,
+  type ContinuousCanvasLayout,
   MICROMETER_TO_CANVAS_PIXEL,
   SHEET_LABEL_HEIGHT_PX,
-  sheetOffsetInCanvasPixels,
 } from "./canvasGeometry";
 import {
   createPhotoGeometry,
@@ -42,47 +44,6 @@ const PRELOAD_MARGIN = 1;
 const VIEWPORT_PRELOAD_PX = 700;
 const ZOOM_GESTURE_SETTLE_MS = 500;
 const PAN_OUTSIDE_OPACITY = 0.24;
-
-export interface PhotoZoomPreview {
-  frameId: string;
-  value: number;
-}
-
-export interface PhotoTransformPreview {
-  frameId: string;
-  panX: number;
-  panY: number;
-  zoom: number;
-}
-
-export interface PhotoTransformDelta {
-  frameId: string;
-  deltaPanX: number;
-  deltaPanY: number;
-  deltaZoom: number;
-}
-
-export interface CanvasMetrics {
-  width: number;
-  scale: number;
-}
-
-export interface AlbumCanvasSceneInput {
-  projectId: string;
-  composition: CompositionPlan;
-  selectedFrameId: string | null;
-  focusedSheetId: string | null;
-  centeredSheetId: string | null;
-  viewport: ViewportState;
-  photoZoomPreview?: PhotoZoomPreview | null;
-  onSelectFrame(frameId: string | null): void;
-  onFocusSheet(sheetId: string): void;
-  onCenteredSheetChange(sheetId: string): void;
-  onViewportChange(viewport: ViewportState): void;
-  onTransformPreview(preview: PhotoTransformPreview | null): void;
-  onTransformCommit(delta: PhotoTransformDelta): Promise<boolean>;
-  onCanvasMetricsChange?(metrics: CanvasMetrics): void;
-}
 
 interface PhotoRenderNode {
   frameId: string;
@@ -140,7 +101,7 @@ export class AlbumCanvasScene {
   private readonly world = new Container();
   private readonly sheetNodes = new Map<string, SheetRenderNode>();
   private readonly photoNodes = new Map<string, PhotoRenderNode>();
-  private input: AlbumCanvasSceneInput | null = null;
+  private input: AlbumCanvasProps | null = null;
   private projectId: string | null = null;
   private projectGeneration = 0;
   private canvasScale = 1;
@@ -166,18 +127,20 @@ export class AlbumCanvasScene {
     });
   }
 
-  update(input: AlbumCanvasSceneInput, hostHeight: number) {
+  update(input: AlbumCanvasProps, hostHeight: number) {
     if (this.projectId !== input.projectId) {
       this.resetProjectScene();
       this.projectId = input.projectId;
       this.projectGeneration += 1;
     }
     this.input = input;
-    const firstSheet = input.composition.sheets[0];
+    const sheets = input.composition.sheets;
+    const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
       return;
     }
+    const layout = input.continuousCanvasLayout;
 
     const sheetHeight =
       firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
@@ -186,8 +149,7 @@ export class AlbumCanvasScene {
       sheetHeight,
     );
     this.canvasScale = scale;
-    const boundedOffsetX = clampContinuousCanvasOffset(
-      input.composition.sheets,
+    const boundedOffsetX = layout.clampOffset(
       input.viewport.offsetX,
       scale,
       this.app.screen.width,
@@ -199,7 +161,7 @@ export class AlbumCanvasScene {
       });
     }
 
-    this.synchronizeCenteredSheet(boundedOffsetX, scale);
+    this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
@@ -214,7 +176,7 @@ export class AlbumCanvasScene {
       this.app.screen.height,
     );
 
-    this.reconcileMaterializedSheets(boundedOffsetX, scale);
+    this.reconcileMaterializedSheets(layout, boundedOffsetX, scale);
     this.updateDecorations();
     this.applyExternalPhotoZoomPreview();
   }
@@ -269,10 +231,13 @@ export class AlbumCanvasScene {
     this.pendingCommitFrames.clear();
   }
 
-  private synchronizeCenteredSheet(offsetX: number, scale: number) {
+  private synchronizeCenteredSheet(
+    layout: ContinuousCanvasLayout,
+    offsetX: number,
+    scale: number,
+  ) {
     if (!this.input) return;
-    const centeredSheetId = centeredSheetIdInContinuousCanvas(
-      this.input.composition.sheets,
+    const centeredSheetId = layout.centeredSheetId(
       offsetX,
       scale,
       this.app.screen.width,
@@ -303,25 +268,16 @@ export class AlbumCanvasScene {
   }
 
   private reconcileMaterializedSheets(
+    layout: ContinuousCanvasLayout,
     boundedOffsetX: number,
     scale: number,
   ) {
     if (!this.input) return;
     const sheets = this.input.composition.sheets;
-    const sheetOffsets = sheets.map((_, index) =>
-      sheetOffsetInCanvasPixels(sheets, index),
-    );
     const viewportLeft = -boundedOffsetX / scale;
     const viewportRight =
       viewportLeft + this.app.screen.width / scale;
-    const visibleIndexes = sheets
-      .map((sheet, index) => ({
-        index,
-        left: sheetOffsets[index],
-        right:
-          sheetOffsets[index] +
-          sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL,
-      }))
+    const visibleIndexes = layout.entries
       .filter(
         ({ left, right }) =>
           right >= viewportLeft - VIEWPORT_PRELOAD_PX &&
@@ -360,7 +316,7 @@ export class AlbumCanvasScene {
         this.sheetNodes.set(sheet.sheetId, node);
         this.world.addChild(node.container);
       }
-      node.container.position.set(sheetOffsets[index], 0);
+      node.container.position.set(layout.entries[index].left, 0);
     }
   }
 
@@ -921,8 +877,8 @@ export class AlbumCanvasScene {
     if (!this.input || event.altKey) return;
     event.preventDefault();
     if (event.ctrlKey) return;
-    const nextOffset = clampContinuousCanvasOffset(
-      this.input.composition.sheets,
+    const layout = this.input.continuousCanvasLayout;
+    const nextOffset = layout.clampOffset(
       this.input.viewport.offsetX -
         (event.deltaX || event.deltaY) * 0.9,
       this.canvasScale,
@@ -932,7 +888,11 @@ export class AlbumCanvasScene {
       ...this.input.viewport,
       offsetX: nextOffset,
     });
-    this.synchronizeCenteredSheet(nextOffset, this.canvasScale);
+    this.synchronizeCenteredSheet(
+      layout,
+      nextOffset,
+      this.canvasScale,
+    );
   };
 
   private applyExternalPhotoZoomPreview() {

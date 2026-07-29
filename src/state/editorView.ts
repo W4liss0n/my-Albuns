@@ -1,9 +1,8 @@
 import { create } from "zustand";
 
-export interface ViewportState {
-  offsetX: number;
-  zoom: number;
-}
+import type { ViewportState } from "./viewport";
+
+export type { ViewportState } from "./viewport";
 
 interface EditorViewState {
   projectId: string | null;

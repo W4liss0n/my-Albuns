@@ -1830,7 +1830,7 @@ name = "myalbuns-desktop"
 version = "0.1.0"
 dependencies = [
  "myalbuns-core",
- "serde",
+ "myalbuns-imaging-protocol",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -1843,9 +1843,18 @@ version = "0.1.0"
 dependencies = [
  "image",
  "myalbuns-core",
- "serde",
+ "myalbuns-imaging-protocol",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "myalbuns-imaging-protocol"
+version = "0.1.0"
+dependencies = [
+ "myalbuns-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

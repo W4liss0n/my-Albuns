@@ -1,0 +1,12 @@
+[package]
+name = "myalbuns-imaging-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+myalbuns-core = { path = "../myalbuns-core" }
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

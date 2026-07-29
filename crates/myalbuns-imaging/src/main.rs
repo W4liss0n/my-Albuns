@@ -1,30 +1,11 @@
 use std::io::BufRead;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use image::{ImageFormat, Rgba, RgbaImage};
 use myalbuns_core::{ComposedFrame, RenderSnapshot};
-use serde::{Deserialize, Serialize};
+use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
 
-const PROTOCOL_VERSION: u32 = 1;
 const PIXELS_PER_MICROMETER: f64 = 0.001;
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct RenderRequest {
-    protocol_version: u32,
-    request_id: String,
-    output_path: PathBuf,
-    snapshot: RenderSnapshot,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RenderResponse {
-    kind: &'static str,
-    request_id: String,
-    width_px: u32,
-    height_px: u32,
-}
 
 fn main() {
     if let Err(error) = run() {
@@ -39,10 +20,10 @@ fn run() -> Result<(), String> {
         .lock()
         .read_line(&mut source)
         .map_err(|error| format!("não foi possível ler a solicitação: {error}"))?;
-    let request: RenderRequest = serde_json::from_str(&source)
+    let request: ImagingRequest = serde_json::from_str(&source)
         .map_err(|error| format!("solicitação de renderização inválida: {error}"))?;
 
-    if request.protocol_version != PROTOCOL_VERSION {
+    if request.protocol_version != IMAGING_PROTOCOL_VERSION {
         return Err(format!(
             "versão de protocolo não suportada: {}",
             request.protocol_version
@@ -54,12 +35,7 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("snapshot inválido: {error}"))?;
 
     let (width_px, height_px) = render_first_sheet(&request.snapshot, &request.output_path)?;
-    let response = RenderResponse {
-        kind: "completed",
-        request_id: request.request_id,
-        width_px,
-        height_px,
-    };
+    let response = ImagingResponse::completed(request.request_id, width_px, height_px);
     serde_json::to_writer(std::io::stdout(), &response)
         .map_err(|error| format!("não foi possível responder: {error}"))
 }

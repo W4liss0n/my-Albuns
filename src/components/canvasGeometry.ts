@@ -18,89 +18,87 @@ export function continuousCanvasScale(
   return availableHeight / (sheetHeight + SHEET_LABEL_HEIGHT_PX);
 }
 
-export function sheetOffsetInCanvasPixels(
-  sheets: readonly ComposedSheet[],
-  index: number,
-): number {
-  return sheets
-    .slice(0, index)
-    .reduce(
-      (offset, sheet) =>
-        offset +
-        sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL +
-        SHEET_GAP_PX,
-      0,
-    );
+export interface ContinuousCanvasEntry {
+  sheetId: string;
+  index: number;
+  left: number;
+  width: number;
+  center: number;
+  right: number;
 }
 
-export function centeredSheetOffsetInContinuousCanvas(
-  sheets: readonly ComposedSheet[],
-  index: number,
-  scale: number,
-  canvasWidth: number,
-): number {
-  return (
-    canvasWidth / 2 -
-    sheetCenterInCanvasPixels(sheets, index) * scale
-  );
+export interface ContinuousCanvasLayout {
+  readonly entries: readonly ContinuousCanvasEntry[];
+  centeredOffset(
+    sheetId: string,
+    scale: number,
+    canvasWidth: number,
+  ): number | null;
+  clampOffset(
+    offsetX: number,
+    scale: number,
+    canvasWidth: number,
+  ): number;
+  centeredSheetId(
+    offsetX: number,
+    scale: number,
+    canvasWidth: number,
+  ): string | null;
 }
 
-export function clampContinuousCanvasOffset(
+export function createContinuousCanvasLayout(
   sheets: readonly ComposedSheet[],
-  offsetX: number,
-  scale: number,
-  canvasWidth: number,
-): number {
-  if (sheets.length === 0 || scale <= 0) return offsetX;
-
-  const lastIndex = sheets.length - 1;
-  const maximum = centeredSheetOffsetInContinuousCanvas(
-    sheets,
-    0,
-    scale,
-    canvasWidth,
-  );
-  const minimum = centeredSheetOffsetInContinuousCanvas(
-    sheets,
-    lastIndex,
-    scale,
-    canvasWidth,
-  );
-
-  return Math.min(maximum, Math.max(minimum, offsetX));
-}
-
-export function centeredSheetIdInContinuousCanvas(
-  sheets: readonly ComposedSheet[],
-  offsetX: number,
-  scale: number,
-  canvasWidth: number,
-): string | null {
-  if (sheets.length === 0 || scale <= 0) return null;
-
-  const visibleCenter = (canvasWidth / 2 - offsetX) / scale;
-  let closestIndex = 0;
-  let closestDistance = Number.POSITIVE_INFINITY;
-
-  sheets.forEach((_sheet, index) => {
-    const distance = Math.abs(
-      sheetCenterInCanvasPixels(sheets, index) - visibleCenter,
-    );
-    if (distance < closestDistance) {
-      closestIndex = index;
-      closestDistance = distance;
-    }
+): ContinuousCanvasLayout {
+  let nextLeft = 0;
+  const entries = sheets.map((sheet, index) => {
+    const width =
+      sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+    const entry: ContinuousCanvasEntry = {
+      sheetId: sheet.sheetId,
+      index,
+      left: nextLeft,
+      width,
+      center: nextLeft + width / 2,
+      right: nextLeft + width,
+    };
+    nextLeft += width + SHEET_GAP_PX;
+    return entry;
   });
-
-  return sheets[closestIndex].sheetId;
-}
-
-function sheetCenterInCanvasPixels(
-  sheets: readonly ComposedSheet[],
-  index: number,
-): number {
-  return (
-    sheetOffsetInCanvasPixels(sheets, index) +
-    sheets[index].widthUm * MICROMETER_TO_CANVAS_PIXEL / 2
+  const entriesBySheetId = new Map(
+    entries.map((entry) => [entry.sheetId, entry]),
   );
+
+  return {
+    entries,
+    centeredOffset(sheetId, scale, canvasWidth) {
+      const entry = entriesBySheetId.get(sheetId);
+      return entry
+        ? canvasWidth / 2 - entry.center * scale
+        : null;
+    },
+    clampOffset(offsetX, scale, canvasWidth) {
+      const first = entries[0];
+      const last = entries[entries.length - 1];
+      if (!first || !last || scale <= 0) return offsetX;
+
+      const maximum = canvasWidth / 2 - first.center * scale;
+      const minimum = canvasWidth / 2 - last.center * scale;
+      return Math.min(maximum, Math.max(minimum, offsetX));
+    },
+    centeredSheetId(offsetX, scale, canvasWidth) {
+      if (entries.length === 0 || scale <= 0) return null;
+
+      const visibleCenter = (canvasWidth / 2 - offsetX) / scale;
+      let closest = entries[0];
+      let closestDistance = Number.POSITIVE_INFINITY;
+      for (const entry of entries) {
+        const distance = Math.abs(entry.center - visibleCenter);
+        if (distance < closestDistance) {
+          closest = entry;
+          closestDistance = distance;
+        }
+      }
+      return closest.sheetId;
+    },
+  };
 }

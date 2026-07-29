@@ -15,11 +15,12 @@ import type {
   PhotoTransformDelta,
   PhotoTransformPreview,
 } from "./AlbumCanvas";
-import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
+import type { ContinuousCanvasLayout } from "./canvasGeometry";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
+    continuousCanvasLayout: ContinuousCanvasLayout;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
@@ -170,13 +171,8 @@ test("centers a Grade navigation target in the visible Canvas", () => {
   });
   fireEvent.click(screen.getByText("02").closest("button")!);
 
-  const targetSheet = twoSheetProjection.composition.sheets[1];
   const targetCenter =
-    sheetOffsetInCanvasPixels(
-      twoSheetProjection.composition.sheets,
-      1,
-    ) +
-    targetSheet.widthUm / 1_000 / 2;
+    canvasHarness.props!.continuousCanvasLayout.entries[1].center;
   expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
     1_000 / 2 - targetCenter * 0.5,
   );

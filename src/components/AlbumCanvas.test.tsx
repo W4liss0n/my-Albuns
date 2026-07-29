@@ -12,6 +12,7 @@ import {
   type PhotoTransformDelta,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
+import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
@@ -415,6 +416,9 @@ function renderCanvas({
     <AlbumCanvas
       projectId={projectId}
       composition={compositionPlan}
+      continuousCanvasLayout={createContinuousCanvasLayout(
+        compositionPlan.sheets,
+      )}
       selectedFrameId={null}
       focusedSheetId="sheet-001"
       centeredSheetId="sheet-001"
@@ -543,6 +547,9 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
     onTransformPreview: vi.fn(),
     onTransformCommit: vi.fn(async () => true),
   };
+  const layout = createContinuousCanvasLayout(
+    interactiveComposition.sheets,
+  );
   const canvas = (
     selectedFrameId: string | null,
     offsetX: number,
@@ -550,6 +557,7 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
     <AlbumCanvas
       projectId="project-spike-001"
       composition={interactiveComposition}
+      continuousCanvasLayout={layout}
       selectedFrameId={selectedFrameId}
       focusedSheetId="sheet-001"
       centeredSheetId="sheet-001"
@@ -590,6 +598,9 @@ test("reconciles only the composed sheet that changed", async () => {
   const view = render(
     <AlbumCanvas
       composition={threeSheetComposition}
+      continuousCanvasLayout={createContinuousCanvasLayout(
+        threeSheetComposition.sheets,
+      )}
       {...canvasProps}
     />,
   );
@@ -627,6 +638,9 @@ test("reconciles only the composed sheet that changed", async () => {
   view.rerender(
     <AlbumCanvas
       composition={changedComposition}
+      continuousCanvasLayout={createContinuousCanvasLayout(
+        changedComposition.sheets,
+      )}
       {...canvasProps}
     />,
   );
@@ -1177,6 +1191,9 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
   );
   const commonProps = {
     composition: interactiveComposition,
+    continuousCanvasLayout: createContinuousCanvasLayout(
+      interactiveComposition.sheets,
+    ),
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",

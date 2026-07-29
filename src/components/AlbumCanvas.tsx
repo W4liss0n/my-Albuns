@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Application } from "pixi.js";
 
-import {
-  AlbumCanvasScene,
-  type AlbumCanvasSceneInput,
-} from "./albumCanvasScene";
+import { AlbumCanvasScene } from "./albumCanvasScene";
+import type { AlbumCanvasProps } from "./albumCanvasContract";
 
 export type {
+  AlbumCanvasProps,
   CanvasMetrics,
   PhotoTransformDelta,
   PhotoTransformPreview,
-} from "./albumCanvasScene";
-
-type AlbumCanvasProps = AlbumCanvasSceneInput;
+  PhotoZoomPreview,
+} from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);

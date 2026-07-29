@@ -1,11 +1,7 @@
 import { expect, test } from "vitest";
 
 import type { CompositionPlan } from "../domain/project";
-import {
-  centeredSheetOffsetInContinuousCanvas,
-  centeredSheetIdInContinuousCanvas,
-  clampContinuousCanvasOffset,
-} from "./canvasGeometry";
+import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 const threeSheets: CompositionPlan["sheets"] = [
   {
@@ -35,67 +31,55 @@ const threeSheets: CompositionPlan["sheets"] = [
 ];
 
 test("limits continuous Canvas movement at the edge sheet centers", () => {
-  expect(
-    clampContinuousCanvasOffset(threeSheets, 999, 0.5, 1_000),
-  ).toBe(350);
-  expect(
-    clampContinuousCanvasOffset(threeSheets, -999, 0.5, 1_000),
-  ).toBe(-302);
-  expect(
-    clampContinuousCanvasOffset(threeSheets, 24, 0.5, 1_000),
-  ).toBe(24);
+  const layout = createContinuousCanvasLayout(threeSheets);
+
+  expect(layout.clampOffset(999, 0.5, 1_000)).toBe(350);
+  expect(layout.clampOffset(-999, 0.5, 1_000)).toBe(-302);
+  expect(layout.clampOffset(24, 0.5, 1_000)).toBe(24);
 });
 
 test("identifies the sheet nearest the visible Canvas center", () => {
-  expect(
-    centeredSheetIdInContinuousCanvas(
-      threeSheets,
-      350,
-      0.5,
-      1_000,
-    ),
-  ).toBe("sheet-001");
-  expect(
-    centeredSheetIdInContinuousCanvas(
-      threeSheets,
-      24,
-      0.5,
-      1_000,
-    ),
-  ).toBe("sheet-002");
-  expect(
-    centeredSheetIdInContinuousCanvas(
-      threeSheets,
-      -302,
-      0.5,
-      1_000,
-    ),
-  ).toBe("sheet-003");
+  const layout = createContinuousCanvasLayout(threeSheets);
+
+  expect(layout.centeredSheetId(350, 0.5, 1_000)).toBe(
+    "sheet-001",
+  );
+  expect(layout.centeredSheetId(24, 0.5, 1_000)).toBe(
+    "sheet-002",
+  );
+  expect(layout.centeredSheetId(-302, 0.5, 1_000)).toBe(
+    "sheet-003",
+  );
 });
 
 test("calculates the offset that centers any navigation target", () => {
-  expect(
-    centeredSheetOffsetInContinuousCanvas(
-      threeSheets,
-      0,
-      0.5,
-      1_000,
-    ),
-  ).toBe(350);
-  expect(
-    centeredSheetOffsetInContinuousCanvas(
-      threeSheets,
-      1,
-      0.5,
-      1_000,
-    ),
-  ).toBe(24);
-  expect(
-    centeredSheetOffsetInContinuousCanvas(
-      threeSheets,
-      2,
-      0.5,
-      1_000,
-    ),
-  ).toBe(-302);
+  const layout = createContinuousCanvasLayout(threeSheets);
+
+  expect(layout.centeredOffset("sheet-001", 0.5, 1_000)).toBe(350);
+  expect(layout.centeredOffset("sheet-002", 0.5, 1_000)).toBe(24);
+  expect(layout.centeredOffset("sheet-003", 0.5, 1_000)).toBe(
+    -302,
+  );
+  expect(layout.centeredOffset("missing", 0.5, 1_000)).toBeNull();
+});
+
+test("measures sheet geometry once and reuses it", () => {
+  let widthReads = 0;
+  const measuredSheets: CompositionPlan["sheets"] = threeSheets.map(
+    (sheet) => ({
+      ...sheet,
+      get widthUm() {
+        widthReads += 1;
+        return sheet.widthUm;
+      },
+    }),
+  );
+
+  const layout = createContinuousCanvasLayout(measuredSheets);
+  expect(widthReads).toBe(threeSheets.length);
+
+  layout.clampOffset(999, 0.5, 1_000);
+  layout.centeredSheetId(24, 0.5, 1_000);
+  layout.centeredOffset("sheet-003", 0.5, 1_000);
+  expect(widthReads).toBe(threeSheets.length);
 });
