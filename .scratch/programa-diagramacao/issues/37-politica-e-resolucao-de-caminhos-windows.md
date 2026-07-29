@@ -35,3 +35,4 @@
 
 - 2026-07-28: a pesquisa não normativa que sustenta as escolhas substituíveis está em `docs/research/0004-caminhos-windows-e-unc.md`.
 - 2026-07-28: apesar da numeração aditiva, este é um ticket de fundação e deve ser executado logo depois do ticket 01, antes dos tickets 02 e 04 que o declaram como bloqueador.
+- 2026-07-29: a fundação de `AppPaths` usa temporariamente `MyAlbuns2` nas duas Known Folders para isolar os dados da versão anterior. O critério permanece com `MyAlbuns` como destino final e só pode ser encerrado depois da remoção explícita do sufixo e da definição da migração aplicável.

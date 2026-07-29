@@ -1,9 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
-use myalbuns_logging::{
-    LoggingGuard, ProcessRole, configured_log_directory, init_local_logging, safe_log_identifier,
-};
+use myalbuns_logging::{LoggingGuard, ProcessRole, init_local_logging, safe_log_identifier};
+use myalbuns_paths::AppPaths;
 use serde::Deserialize;
 use tauri::{App, Manager, Runtime};
 
@@ -115,11 +114,8 @@ pub(crate) fn frontend_log(event: FrontendLogEvent) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn initialize<R: Runtime>(app: &mut App<R>) {
-    let log_directory = app
-        .path()
-        .app_log_dir()
-        .unwrap_or_else(|_| configured_log_directory());
+pub(crate) fn initialize<R: Runtime>(app: &mut App<R>, app_paths: &AppPaths) {
+    let log_directory = app_paths.logs_dir();
     let guard = match init_local_logging(&log_directory, ProcessRole::DesktopHost) {
         Ok(guard) => Some(guard),
         Err(error) => {

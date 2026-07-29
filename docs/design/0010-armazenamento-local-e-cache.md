@@ -17,6 +17,15 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 
 ## Raízes do aplicativo
 
+> **Namespace transitório de desenvolvimento (2026-07-29):** enquanto a
+> nova geração do programa não estiver concluída, a implementação usa
+> `MyAlbuns2` nas duas raízes (`%APPDATA%\MyAlbuns2` e
+> `%LOCALAPPDATA%\MyAlbuns2`). Essa separação impede que o desenvolvimento
+> leia, sobrescreva ou misture automaticamente os dados da versão anterior,
+> que permanecem em `MyAlbuns`. A árvore normativa abaixo continua sendo o
+> destino final; a remoção do sufixo `2` e qualquer migração de dados exigem
+> uma alteração explícita antes da distribuição final.
+
 ```text
 %APPDATA%\MyAlbuns\
 ├── settings.json

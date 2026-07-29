@@ -117,7 +117,7 @@ desenvolvimento e de produção estão declaradas separadamente.
 | Comando | Resultado em 2026-07-29 |
 |---|---|
 | `npm test` | 53 testes aprovados em 11 arquivos |
-| `npm run test:rust` | 26 testes aprovados: 14 do núcleo, 3 do host, 5 do processador, 1 do protocolo e 3 da infraestrutura de logs |
+| `npm run test:rust` | 30 testes aprovados: 14 do núcleo, 3 do host, 5 do processador, 1 do protocolo, 4 da infraestrutura de logs e 3 de `AppPaths` |
 | `npm run quality:rust` | `rustfmt` e Clippy aprovados sem avisos |
 | `npm run build` | contratos, TypeScript e Vite aprovados; 2.022 módulos transformados |
 
@@ -159,11 +159,16 @@ Processador de Imagens, e falhas de gravação não repetem o destino no stderr.
 Cada Exportação produz um evento terminal `export_completed` ou `export_failed`
 com a fase da falha.
 
-Os arquivos ficam em
-`%LOCALAPPDATA%\com.myalbuns.desktop\logs`, separados pelos prefixos
+Os arquivos ficam no namespace transitório
+`%LOCALAPPDATA%\MyAlbuns2\Logs`, separados pelos prefixos
 `myalbuns-desktop` e `myalbuns-imaging`, com retenção máxima de sete arquivos
 por processo. A fila de escrita local não descarta eventos. `MYALBUNS_LOG`
 permite ajustar o filtro para diagnóstico, e não existe telemetria remota.
+`AppPaths` descobre as Known Folders uma vez em cada processo, e o host envia
+ao Processador de Imagens o mesmo diretório exato. O sufixo `2` evita misturar
+os dados desta geração com a versão anterior e será removido somente na
+finalização do programa, conforme
+[Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md).
 
 Uma abertura real registrou a sequência `application_started`,
 `project_load_completed`, `canvas_initialization_completed` e
@@ -200,8 +205,9 @@ Ainda faltam, no mínimo:
 - injetar quedas do processo principal, host de Projeto e processador;
 - validar `OperationGate`, `OperationLease`, pausa, cancelamento e liberação
   após falhas;
-- provar `AppPaths`, `RootBindingPlan` e identidades físicas em caminhos
-  locais, UNC, unidade mapeada e caminhos verbatim;
+- ampliar a prova inicial de `AppPaths` com `RootBindingPlan`,
+  `OperationPathContext` e identidades físicas em caminhos locais, UNC,
+  unidade mapeada e caminhos verbatim;
 - exportar com staging local e UNC;
 - gerar o instalador `win-x64` e executar o teste em máquina limpa.
 

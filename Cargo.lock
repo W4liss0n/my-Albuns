@@ -555,6 +555,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "directories"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
 name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1847,6 +1856,7 @@ dependencies = [
  "myalbuns-core",
  "myalbuns-imaging-protocol",
  "myalbuns-logging",
+ "myalbuns-paths",
  "serde",
  "serde_json",
  "tauri",
@@ -1863,6 +1873,7 @@ dependencies = [
  "myalbuns-core",
  "myalbuns-imaging-protocol",
  "myalbuns-logging",
+ "myalbuns-paths",
  "serde_json",
  "tempfile",
  "tracing",
@@ -1881,8 +1892,17 @@ dependencies = [
 name = "myalbuns-logging"
 version = "0.1.0"
 dependencies = [
+ "myalbuns-paths",
+ "tempfile",
  "tracing-appender",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "myalbuns-paths"
+version = "0.1.0"
+dependencies = [
+ "directories",
 ]
 
 [[package]]

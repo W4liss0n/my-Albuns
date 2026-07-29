@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use myalbuns_paths::AppPaths;
 use tracing_appender::{
     non_blocking::{NonBlockingBuilder, WorkerGuard},
     rolling::{Builder, Rotation},
@@ -99,18 +100,16 @@ pub fn init_local_logging(
     })
 }
 
-pub fn configured_log_directory() -> PathBuf {
+/// Resolve o diretório enviado pelo host ao Processador de Imagens.
+///
+/// O host usa `AppPaths::logs_dir()` diretamente e define este override ao
+/// iniciar o sidecar. A descoberta local é somente o fallback para uma
+/// execução independente do Processador.
+pub fn sidecar_log_directory(app_paths: &AppPaths) -> PathBuf {
     std::env::var_os(LOG_DIRECTORY_ENV)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("LOCALAPPDATA").map(|directory| {
-                PathBuf::from(directory)
-                    .join("com.myalbuns.desktop")
-                    .join("logs")
-            })
-        })
-        .unwrap_or_else(|| std::env::temp_dir().join("MyAlbuns").join("logs"))
+        .unwrap_or_else(|| app_paths.logs_dir())
 }
 
 pub fn safe_log_identifier(value: &str) -> Option<&str> {
@@ -124,7 +123,11 @@ pub fn safe_log_identifier(value: &str) -> Option<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{LOG_DIRECTORY_ENV, ProcessRole, configured_log_directory, safe_log_identifier};
+    use std::path::Path;
+
+    use myalbuns_paths::AppPaths;
+
+    use super::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier, sidecar_log_directory};
 
     #[test]
     fn process_roles_have_stable_distinct_log_identities() {
@@ -137,9 +140,15 @@ mod tests {
     }
 
     #[test]
-    fn configured_directory_has_a_safe_fallback() {
+    fn sidecar_directory_defaults_to_the_central_application_paths() {
         if std::env::var_os(LOG_DIRECTORY_ENV).is_none() {
-            assert!(configured_log_directory().ends_with("logs"));
+            let app_paths =
+                AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+
+            assert_eq!(
+                sidecar_log_directory(&app_paths),
+                Path::new(r"C:\Local\MyAlbuns2\Logs")
+            );
         }
     }
 

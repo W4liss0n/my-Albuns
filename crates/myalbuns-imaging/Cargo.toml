@@ -8,6 +8,7 @@ license.workspace = true
 myalbuns-core = { path = "../myalbuns-core" }
 myalbuns-imaging-protocol = { path = "../myalbuns-imaging-protocol" }
 myalbuns-logging = { path = "../myalbuns-logging" }
+myalbuns-paths = { path = "../myalbuns-paths" }
 serde_json.workspace = true
 tracing.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }

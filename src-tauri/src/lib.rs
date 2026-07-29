@@ -8,7 +8,8 @@ use std::sync::{
 use myalbuns_core::{EditorProjection, ExportResult, ProjectCore, ProjectIntent, ProjectSession};
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole, safe_log_identifier};
-use tauri::{AppHandle, State};
+use myalbuns_paths::AppPaths;
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
 use logging::{LoggingState, frontend_log};
@@ -251,7 +252,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            logging::initialize(app);
+            let app_paths = AppPaths::discover()?;
+            logging::initialize(app, &app_paths);
+            app.manage(app_paths);
             Ok(())
         })
         .manage(AppState {

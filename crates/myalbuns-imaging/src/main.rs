@@ -1,19 +1,28 @@
 use std::io::BufRead;
 use std::path::Path;
+use std::process::ExitCode;
 
 use image::{ImageFormat, Rgba, RgbaImage};
 use myalbuns_core::{ComposedFrame, RenderSnapshot};
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
 use myalbuns_logging::{
-    ProcessRole, configured_log_directory, init_local_logging, safe_log_identifier,
+    ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
 };
+use myalbuns_paths::AppPaths;
 
 const PIXELS_PER_MICROMETER: f64 = 0.001;
 
-fn main() {
+fn main() -> ExitCode {
     let process_role = ProcessRole::Imaging;
-    let log_directory = configured_log_directory();
-    let _logging_guard = match init_local_logging(&log_directory, process_role) {
+    let app_paths = match AppPaths::discover() {
+        Ok(app_paths) => app_paths,
+        Err(error) => {
+            eprintln!("pastas de dados do aplicativo indisponíveis: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let log_directory = sidecar_log_directory(&app_paths);
+    let logging_guard = match init_local_logging(&log_directory, process_role) {
         Ok(guard) => Some(guard),
         Err(error) => {
             eprintln!("logging indisponível: {error}");
@@ -26,7 +35,7 @@ fn main() {
         protocol_version = IMAGING_PROTOCOL_VERSION,
         event = "imaging_process_started",
     );
-    if run().is_err() {
+    let exit_code = if run().is_err() {
         tracing::error!(
             target: "myalbuns.imaging",
             process_role = process_role.as_str(),
@@ -34,15 +43,19 @@ fn main() {
             event = "imaging_process_failed",
         );
         eprintln!("o Processador de Imagens não concluiu a solicitação.");
-        std::process::exit(1);
-    }
-    tracing::info!(
-        target: "myalbuns.imaging",
-        process_role = process_role.as_str(),
-        protocol_version = IMAGING_PROTOCOL_VERSION,
-        event = "imaging_process_stopped",
-        success = true,
-    );
+        ExitCode::FAILURE
+    } else {
+        tracing::info!(
+            target: "myalbuns.imaging",
+            process_role = process_role.as_str(),
+            protocol_version = IMAGING_PROTOCOL_VERSION,
+            event = "imaging_process_stopped",
+            success = true,
+        );
+        ExitCode::SUCCESS
+    };
+    drop(logging_guard);
+    exit_code
 }
 
 fn run() -> Result<(), String> {
