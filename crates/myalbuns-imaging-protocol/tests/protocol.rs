@@ -21,7 +21,6 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
         ImagingFailureStage::Composition,
         ImagingFailureStage::OutputPrepare,
         ImagingFailureStage::OutputEncode,
-        ImagingFailureStage::OutputPublish,
         ImagingFailureStage::OutputVerify,
     ];
 
@@ -33,6 +32,11 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
         assert!(!stage.as_str().is_empty());
     }
     assert_eq!(ImagingFailureStage::from_exit_code(1), None);
+    assert_eq!(
+        ImagingFailureStage::from_exit_code(25),
+        None,
+        "publication belongs to the host ExportPipeline"
+    );
 }
 
 #[test]
@@ -45,7 +49,7 @@ fn host_and_processor_share_one_serialized_protocol() {
         .render_snapshot();
     let request = ImagingRequest::new(
         "render-42",
-        PathBuf::from(r"C:\Temp\Album_001.png"),
+        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png"),
         snapshot,
         "lamina-01",
         300,
@@ -71,28 +75,26 @@ fn host_and_processor_share_one_serialized_protocol() {
     let request_json = serde_json::to_value(&request).expect("request serializes");
     assert_eq!(request_json["protocolVersion"], IMAGING_PROTOCOL_VERSION);
     assert_eq!(request_json["requestId"], "render-42");
+    assert_eq!(
+        request_json["preparedOutputPath"],
+        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png"
+    );
     assert_eq!(request_json["sheetId"], "lamina-01");
     assert_eq!(request_json["dpi"], 300);
     assert_eq!(request_json["sources"][0]["mediaId"], "media-costa");
     let decoded_request: ImagingRequest =
         serde_json::from_value(request_json).expect("request decodes");
     assert_eq!(decoded_request, request);
-    assert_eq!(
-        request
-            .temporary_output_path()
-            .expect("the temporary path is derived from validated protocol fields"),
-        PathBuf::from(r"C:\Temp\.Album_001.png.render-42.tmp")
-    );
     assert!(
         ImagingRequest::procedural_fixture(
             r"C:\private\operation",
-            PathBuf::from(r"C:\Temp\invalid.png"),
+            PathBuf::from(r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.png"),
             request.snapshot.clone(),
             "lamina-01",
             25,
         )
         .is_err(),
-        "request identifiers cannot become temporary-file path fragments"
+        "request identifiers remain safe correlation values"
     );
 
     let response = ImagingResponse::completed(

@@ -23,10 +23,13 @@ pub enum AppPathsError {
     InvalidProjectNamespace,
     InvalidStateNamespace,
     InvalidCacheArtifact,
+    InvalidExportPath,
     CacheArtifactOutsideRoot,
     PathNotRepresentable,
     CacheStorageUnavailable,
     CacheStorageOutsideRoot,
+    ExportStorageUnavailable,
+    ExportStorageOutsideDestination,
 }
 
 impl Display for AppPathsError {
@@ -44,6 +47,7 @@ impl Display for AppPathsError {
             Self::InvalidCacheArtifact => {
                 formatter.write_str("a identidade do artefato de Cache é inválida")
             }
+            Self::InvalidExportPath => formatter.write_str("o caminho da Exportação é inválido"),
             Self::CacheArtifactOutsideRoot => {
                 formatter.write_str("o artefato não pertence à raiz autorizada do Cache")
             }
@@ -55,6 +59,12 @@ impl Display for AppPathsError {
             }
             Self::CacheStorageOutsideRoot => {
                 formatter.write_str("a estrutura física do Cache escapou da raiz autorizada")
+            }
+            Self::ExportStorageUnavailable => {
+                formatter.write_str("a preparação da Exportação está indisponível")
+            }
+            Self::ExportStorageOutsideDestination => {
+                formatter.write_str("a preparação da Exportação escapou do Destino autorizado")
             }
         }
     }
@@ -73,6 +83,13 @@ pub struct CachePathPlan {
     root: PathBuf,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExportPathPlan {
+    output_path: PathBuf,
+    preparation_directory: PathBuf,
+    prepared_output_path: PathBuf,
+}
+
 /// Keeps the validated Cache directory chain open while artifacts are written.
 ///
 /// On Windows the handles deny directory replacement, so a reparse point
@@ -80,6 +97,14 @@ pub struct CachePathPlan {
 #[derive(Debug)]
 pub struct PreparedCacheStorage {
     _directories: Vec<DirectoryGuard>,
+}
+
+/// Keeps the Export destination and its operation-specific preparation open.
+#[derive(Debug)]
+pub struct PreparedExportStorage {
+    destination: DirectoryGuard,
+    preparation: DirectoryGuard,
+    plan: ExportPathPlan,
 }
 
 #[derive(Debug)]
@@ -168,28 +193,12 @@ impl AppPaths {
     }
 
     pub fn clear_project_cache(&self, plan: &CachePathPlan) -> Result<bool, AppPathsError> {
-        if plan.root.parent() != Some(self.cache_dir().as_path()) {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
-        }
-        plan.validate()?;
-
-        let local_data_root = self
-            .local_root
-            .parent()
-            .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
-        let local_data = open_directory(local_data_root)?;
-        let Some(application) = open_existing_direct_child(&local_data, &self.local_root)? else {
-            return Ok(false);
-        };
-        let Some(cache) = open_existing_direct_child(&application, &self.cache_dir())? else {
-            return Ok(false);
-        };
-        let Some(project) = open_existing_direct_child(&cache, &plan.root)? else {
+        let Some(project_cache) = self.open_existing_project_cache(plan)? else {
             return Ok(false);
         };
 
-        clear_project_directory(&project)?;
-        drop(project);
+        clear_project_directory(project_cache.project())?;
+        drop(project_cache);
         remove_empty_directory(&plan.root)?;
         Ok(true)
     }
@@ -197,7 +206,28 @@ impl AppPaths {
     pub fn discard_project_cache_temporaries(
         &self,
         plan: &CachePathPlan,
+        process_id: u32,
     ) -> Result<usize, AppPathsError> {
+        let Some(project_cache) = self.open_existing_project_cache(plan)? else {
+            return Ok(0);
+        };
+
+        let project = project_cache.project();
+        let mut removed = discard_matching_files(project, |name| {
+            is_metadata_temporary_name_for(name, process_id)
+        })?;
+        if let Some(media) = open_existing_direct_child(project, &plan.media_directory())? {
+            removed += discard_matching_files(&media, |name| {
+                is_preview_temporary_name_for(name, process_id)
+            })?;
+        }
+        Ok(removed)
+    }
+
+    fn open_existing_project_cache(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<ExistingProjectCache>, AppPathsError> {
         if plan.root.parent() != Some(self.cache_dir().as_path()) {
             return Err(AppPathsError::CacheStorageOutsideRoot);
         }
@@ -207,22 +237,17 @@ impl AppPaths {
             .local_root
             .parent()
             .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
-        let local_data = open_directory(local_data_root)?;
-        let Some(application) = open_existing_direct_child(&local_data, &self.local_root)? else {
-            return Ok(0);
-        };
-        let Some(cache) = open_existing_direct_child(&application, &self.cache_dir())? else {
-            return Ok(0);
-        };
-        let Some(project) = open_existing_direct_child(&cache, &plan.root)? else {
-            return Ok(0);
-        };
-
-        let mut removed = discard_matching_files(&project, is_metadata_temporary_name)?;
-        if let Some(media) = open_existing_direct_child(&project, &plan.media_directory())? {
-            removed += discard_matching_files(&media, is_preview_temporary_name)?;
+        let mut directories = vec![open_directory(local_data_root)?];
+        for path in [&self.local_root, &self.cache_dir(), &plan.root] {
+            let parent = directories
+                .last()
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            let Some(directory) = open_existing_direct_child(parent, path)? else {
+                return Ok(None);
+            };
+            directories.push(directory);
         }
-        Ok(removed)
+        Ok(Some(ExistingProjectCache { directories }))
     }
 
     pub fn recovery_dir(&self) -> PathBuf {
@@ -242,6 +267,76 @@ impl AppPaths {
 
     pub fn logs_dir(&self) -> PathBuf {
         self.local_root.join("Logs")
+    }
+}
+
+#[derive(Debug)]
+struct ExistingProjectCache {
+    directories: Vec<DirectoryGuard>,
+}
+
+impl ExistingProjectCache {
+    fn project(&self) -> &DirectoryGuard {
+        self.directories
+            .last()
+            .expect("an existing project Cache always contains its project directory")
+    }
+}
+
+impl ExportPathPlan {
+    pub fn new(output_path: PathBuf, operation_id: &str) -> Result<Self, AppPathsError> {
+        if !output_path.is_absolute()
+            || output_path.components().any(|component| {
+                matches!(
+                    component,
+                    std::path::Component::CurDir | std::path::Component::ParentDir
+                )
+            })
+            || !valid_cache_component(operation_id)
+        {
+            return Err(AppPathsError::InvalidExportPath);
+        }
+        let destination = output_path
+            .parent()
+            .ok_or(AppPathsError::InvalidExportPath)?;
+        let output_name = output_path
+            .file_name()
+            .ok_or(AppPathsError::InvalidExportPath)?;
+        let preparation_directory =
+            destination.join(format!(".myalbuns-export-{operation_id}.tmp"));
+        let prepared_output_path = preparation_directory.join(output_name);
+        Ok(Self {
+            output_path,
+            preparation_directory,
+            prepared_output_path,
+        })
+    }
+
+    pub fn output_path(&self) -> &Path {
+        &self.output_path
+    }
+
+    pub fn preparation_directory(&self) -> &Path {
+        &self.preparation_directory
+    }
+
+    pub fn prepared_output_path(&self) -> &Path {
+        &self.prepared_output_path
+    }
+
+    pub fn prepare(&self) -> Result<PreparedExportStorage, AppPathsError> {
+        let destination_path = self
+            .output_path
+            .parent()
+            .ok_or(AppPathsError::InvalidExportPath)?;
+        let destination = open_directory(destination_path).map_err(export_storage_error)?;
+        let preparation =
+            create_unique_export_directory(&destination, &self.preparation_directory)?;
+        Ok(PreparedExportStorage {
+            destination,
+            preparation,
+            plan: self.clone(),
+        })
     }
 }
 
@@ -341,6 +436,62 @@ impl CachePathPlan {
 
     pub fn metadata_temporary_file(&self, process_id: u32) -> PathBuf {
         self.root.join(format!("metadata.json.tmp-{process_id}"))
+    }
+}
+
+impl PreparedExportStorage {
+    pub fn publish(self) -> Result<(), AppPathsError> {
+        let validation = (|| {
+            let prepared =
+                open_export_file(&self.preparation, &self.plan.prepared_output_path, false)?
+                    .ok_or(AppPathsError::ExportStorageUnavailable)?;
+            drop(prepared);
+            if let Some(existing) =
+                open_export_file(&self.destination, &self.plan.output_path, true)?
+            {
+                drop(existing);
+            }
+            Ok(())
+        })();
+        if let Err(error) = validation {
+            let _ = self.discard();
+            return Err(error);
+        }
+
+        if fs::rename(&self.plan.prepared_output_path, &self.plan.output_path).is_err() {
+            let _ = self.discard();
+            return Err(AppPathsError::ExportStorageUnavailable);
+        }
+        let preparation_directory = self.plan.preparation_directory.clone();
+        drop(self);
+        // Uma pasta vazia remanescente é órfã descartável e não desfaz a Publicação.
+        let _ = fs::remove_dir(preparation_directory);
+        Ok(())
+    }
+
+    pub fn discard(self) -> Result<bool, AppPathsError> {
+        let mut removed = false;
+        for entry in fs::read_dir(&self.preparation.logical_path)
+            .map_err(|_| AppPathsError::ExportStorageUnavailable)?
+        {
+            let entry = entry.map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+            let path = entry.path();
+            if path != self.plan.prepared_output_path {
+                return Err(AppPathsError::ExportStorageOutsideDestination);
+            }
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+            if is_reparse_point(&metadata) || !metadata.is_file() {
+                return Err(AppPathsError::ExportStorageOutsideDestination);
+            }
+            fs::remove_file(path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+            removed = true;
+        }
+        let preparation_directory = self.plan.preparation_directory.clone();
+        drop(self);
+        fs::remove_dir(preparation_directory)
+            .map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+        Ok(removed)
     }
 }
 
@@ -582,10 +733,13 @@ fn clear_cache_files(directory: &DirectoryGuard) -> Result<(), AppPathsError> {
     Ok(())
 }
 
-fn discard_matching_files(
+fn discard_matching_files<F>(
     directory: &DirectoryGuard,
-    is_temporary: fn(&std::ffi::OsStr) -> bool,
-) -> Result<usize, AppPathsError> {
+    is_temporary: F,
+) -> Result<usize, AppPathsError>
+where
+    F: Fn(&std::ffi::OsStr) -> bool,
+{
     let mut removed = 0;
     for entry in
         fs::read_dir(&directory.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
@@ -605,13 +759,14 @@ fn discard_matching_files(
     Ok(removed)
 }
 
-fn is_metadata_temporary_name(name: &std::ffi::OsStr) -> bool {
+fn is_metadata_temporary_name_for(name: &std::ffi::OsStr, process_id: u32) -> bool {
     name.to_str()
         .and_then(|name| name.strip_prefix("metadata.json.tmp-"))
-        .is_some_and(is_process_id)
+        .and_then(|value| value.parse::<u32>().ok())
+        == Some(process_id)
 }
 
-fn is_preview_temporary_name(name: &std::ffi::OsStr) -> bool {
+fn is_preview_temporary_name_for(name: &std::ffi::OsStr, expected_process_id: u32) -> bool {
     let Some((artifact, process_id)) = name.to_str().and_then(|name| name.rsplit_once(".tmp-"))
     else {
         return false;
@@ -625,12 +780,65 @@ fn is_preview_temporary_name(name: &std::ffi::OsStr) -> bool {
         (Some(media_id), Some(generation_id), None)
             if valid_cache_component(media_id)
                 && valid_cache_component(generation_id)
-                && is_process_id(process_id)
+                && process_id.parse::<u32>().ok() == Some(expected_process_id)
     )
 }
 
-fn is_process_id(value: &str) -> bool {
-    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+fn create_unique_export_directory(
+    destination: &DirectoryGuard,
+    preparation_path: &Path,
+) -> Result<DirectoryGuard, AppPathsError> {
+    if preparation_path.parent() != Some(destination.logical_path.as_path()) {
+        return Err(AppPathsError::ExportStorageOutsideDestination);
+    }
+    fs::create_dir(preparation_path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+    let metadata = fs::symlink_metadata(preparation_path)
+        .map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+    if is_reparse_point(&metadata) || !metadata.is_dir() {
+        return Err(AppPathsError::ExportStorageOutsideDestination);
+    }
+    let preparation = open_directory(preparation_path).map_err(export_storage_error)?;
+    let expected_name = preparation_path
+        .file_name()
+        .ok_or(AppPathsError::ExportStorageOutsideDestination)?;
+    if !is_direct_physical_child(
+        &destination.physical_path,
+        &preparation.physical_path,
+        expected_name,
+    ) {
+        return Err(AppPathsError::ExportStorageOutsideDestination);
+    }
+    Ok(preparation)
+}
+
+fn open_export_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+    allow_absent: bool,
+) -> Result<Option<File>, AppPathsError> {
+    if path.parent() != Some(parent.logical_path.as_path()) {
+        return Err(AppPathsError::ExportStorageOutsideDestination);
+    }
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if allow_absent && error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(None);
+        }
+        Err(_) => return Err(AppPathsError::ExportStorageUnavailable),
+    };
+    if is_reparse_point(&metadata) || !metadata.is_file() {
+        return Err(AppPathsError::ExportStorageOutsideDestination);
+    }
+    let file = File::open(path).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+    validate_open_file(parent, path, &file).map_err(export_storage_error)?;
+    Ok(Some(file))
+}
+
+fn export_storage_error(error: AppPathsError) -> AppPathsError {
+    match error {
+        AppPathsError::CacheStorageOutsideRoot => AppPathsError::ExportStorageOutsideDestination,
+        _ => AppPathsError::ExportStorageUnavailable,
+    }
 }
 
 fn remove_empty_directory(path: &Path) -> Result<(), AppPathsError> {

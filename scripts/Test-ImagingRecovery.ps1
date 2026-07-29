@@ -38,12 +38,12 @@ $checks = @(
         )
     },
     [ordered]@{
-        name = 'host-recovery-policy'
+        name = 'host-recovery-lifecycle'
         arguments = @(
             'test',
             '-p',
             'myalbuns-desktop',
-            'imaging_processor::tests'
+            '--lib'
         )
     },
     [ordered]@{
@@ -70,9 +70,42 @@ $checks = @(
     }
 )
 
+$scratchRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot '.scratch')
+)
+$evidenceDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path `
+        $scratchRoot `
+        "imaging-recovery-evidence-$PID-$([DateTime]::UtcNow.Ticks)")
+)
+$evidenceParent = [System.IO.Path]::GetDirectoryName($evidenceDirectory)
+if (-not [string]::Equals(
+        $evidenceParent,
+        $scratchRoot,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The recovery evidence directory escaped the workspace scratch root.'
+}
+
+New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
+$evidenceEnvironmentName = 'MYALBUNS_RECOVERY_EVIDENCE_DIR'
+$previousEvidenceDirectory = [System.Environment]::GetEnvironmentVariable(
+    $evidenceEnvironmentName,
+    [System.EnvironmentVariableTarget]::Process
+)
+[System.Environment]::SetEnvironmentVariable(
+    $evidenceEnvironmentName,
+    $evidenceDirectory,
+    [System.EnvironmentVariableTarget]::Process
+)
+
 $results = [System.Collections.Generic.List[object]]::new()
-Push-Location $script:WorkspaceRoot
+$cacheEvidence = $null
+$exportEvidence = $null
+$locationWasPushed = $false
 try {
+    Push-Location $script:WorkspaceRoot
+    $locationWasPushed = $true
     foreach ($check in $checks) {
         $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
         & $script:CargoExecutable @($check.arguments)
@@ -87,9 +120,64 @@ try {
             elapsedMs = $stopwatch.ElapsedMilliseconds
         })
     }
+
+    $cacheEvidencePath = Join-Path $evidenceDirectory 'cache.json'
+    $exportEvidencePath = Join-Path $evidenceDirectory 'export.json'
+    if (-not (Test-Path -LiteralPath $cacheEvidencePath -PathType Leaf)) {
+        throw 'The real Cache crash test did not produce evidence.'
+    }
+    if (-not (Test-Path -LiteralPath $exportEvidencePath -PathType Leaf)) {
+        throw 'The real Export crash test did not produce evidence.'
+    }
+    $cacheEvidence = Get-Content -LiteralPath $cacheEvidencePath -Raw | ConvertFrom-Json
+    $exportEvidence = Get-Content -LiteralPath $exportEvidencePath -Raw | ConvertFrom-Json
+
+    if ($cacheEvidence.failedProcessId -eq $cacheEvidence.restartedProcessId `
+            -or -not $cacheEvidence.temporaryObservedAfterFailure `
+            -or $cacheEvidence.removedTemporaryCount -lt 1 `
+            -or $cacheEvidence.temporaryExistedAfterCleanup `
+            -or $cacheEvidence.metadataExistedAfterFailure `
+            -or -not $cacheEvidence.metadataExistedAfterRestart `
+            -or $cacheEvidence.generatedCountAfterRestart -lt 1) {
+        throw 'The observed Cache recovery evidence does not satisfy the gate.'
+    }
+    if ($exportEvidence.failedProcessId -eq $exportEvidence.retryProcessId `
+            -or $exportEvidence.sourcePolicy -ne 'linkedOriginals' `
+            -or $exportEvidence.processCountBeforeExplicitRetry -ne 1 `
+            -or $exportEvidence.successResponseBeforeExplicitRetry `
+            -or -not $exportEvidence.partialPreparationObserved `
+            -or $exportEvidence.previousOutputSha256BeforeFailure `
+                -ne $exportEvidence.previousOutputSha256AfterFailure `
+            -or $exportEvidence.projectSha256BeforeFailure `
+                -ne $exportEvidence.projectSha256AfterFailure `
+            -or $exportEvidence.finalOutputSha256AfterExplicitRetry `
+                -eq $exportEvidence.previousOutputSha256BeforeFailure) {
+        throw 'The observed Export recovery evidence does not satisfy the gate.'
+    }
 }
 finally {
-    Pop-Location
+    if ($locationWasPushed) {
+        Pop-Location
+    }
+    [System.Environment]::SetEnvironmentVariable(
+        $evidenceEnvironmentName,
+        $previousEvidenceDirectory,
+        [System.EnvironmentVariableTarget]::Process
+    )
+    if (Test-Path -LiteralPath $evidenceDirectory) {
+        $verifiedEvidenceDirectory = [System.IO.Path]::GetFullPath($evidenceDirectory)
+        $verifiedEvidenceParent = [System.IO.Path]::GetDirectoryName(
+            $verifiedEvidenceDirectory
+        )
+        if (-not [string]::Equals(
+                $verifiedEvidenceParent,
+                $scratchRoot,
+                [System.StringComparison]::OrdinalIgnoreCase
+            )) {
+            throw 'Refusing to remove an unverified recovery evidence directory.'
+        }
+        Remove-Item -LiteralPath $verifiedEvidenceDirectory -Recurse -Force
+    }
 }
 
 $sourceStatus = @(
@@ -115,21 +203,8 @@ $report = [ordered]@{
     }
     checks = @($results)
     evidence = [ordered]@{
-        cache = [ordered]@{
-            processWasTerminatedAfterTemporaryCreation = $true
-            staleTemporaryWasDiscarded = $true
-            restartedProcessHadDistinctId = $true
-            relevantRequestCompletedAfterRestart = $true
-            publishedMetadataAppearedOnlyAfterCompletion = $true
-        }
-        export = [ordered]@{
-            linkedOriginalWasUsed = $true
-            processWasTerminatedAfterTemporaryCreation = $true
-            previousPublishedOutputWasPreserved = $true
-            incompleteAttemptDidNotReturnSuccess = $true
-            automaticRetryWasRejected = $true
-            explicitRetryCompletedInANewProcess = $true
-        }
+        cache = $cacheEvidence
+        export = $exportEvidence
     }
 }
 $json = $report | ConvertTo-Json -Depth 6

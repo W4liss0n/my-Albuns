@@ -1,7 +1,7 @@
 use std::{io::Write, path::Path};
 
 use directories::BaseDirs;
-use myalbuns_paths::{AppPaths, AppPathsError};
+use myalbuns_paths::{AppPaths, AppPathsError, ExportPathPlan};
 
 #[test]
 fn derives_temporary_application_roots_from_known_folders() {
@@ -173,6 +173,98 @@ fn discovers_roaming_and_local_roots_from_the_operating_system() {
 }
 
 #[test]
+fn derives_a_unique_export_preparation_inside_the_destination() {
+    let destination = tempfile::tempdir().expect("temporary Export destination");
+    let output = destination.path().join("Álbum 01.png");
+
+    let plan =
+        ExportPathPlan::new(output.clone(), "export-42").expect("the Export path plan is valid");
+
+    assert_eq!(plan.output_path(), output);
+    assert_eq!(
+        plan.preparation_directory(),
+        destination.path().join(".myalbuns-export-export-42.tmp")
+    );
+    assert_eq!(
+        plan.prepared_output_path(),
+        destination
+            .path()
+            .join(".myalbuns-export-export-42.tmp")
+            .join("Álbum 01.png")
+    );
+}
+
+#[test]
+fn discarding_an_export_preparation_preserves_the_previous_output() {
+    let destination = tempfile::tempdir().expect("temporary Export destination");
+    let output = destination.path().join("Álbum 01.png");
+    std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+    let plan =
+        ExportPathPlan::new(output.clone(), "export-failed").expect("the Export plan is valid");
+    let preparation = plan
+        .prepare()
+        .expect("the Export preparation is reserved safely");
+    std::fs::write(plan.prepared_output_path(), b"incomplete export")
+        .expect("the processor can write its preparation");
+
+    assert!(
+        preparation
+            .discard()
+            .expect("the exact Export preparation is discarded")
+    );
+    assert_eq!(
+        std::fs::read(output).expect("the previous Export remains readable"),
+        b"previous export"
+    );
+    assert!(!plan.preparation_directory().exists());
+}
+
+#[test]
+fn publishing_a_verified_preparation_replaces_the_previous_output() {
+    let destination = tempfile::tempdir().expect("temporary Export destination");
+    let output = destination.path().join("Álbum 01.png");
+    std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+    let plan =
+        ExportPathPlan::new(output.clone(), "export-success").expect("the Export plan is valid");
+    let preparation = plan
+        .prepare()
+        .expect("the Export preparation is reserved safely");
+    std::fs::write(plan.prepared_output_path(), b"verified export")
+        .expect("the verified preparation is writable");
+
+    preparation
+        .publish()
+        .expect("the verified preparation is published");
+
+    assert_eq!(
+        std::fs::read(output).expect("the published Export is readable"),
+        b"verified export"
+    );
+    assert!(!plan.preparation_directory().exists());
+}
+
+#[test]
+fn a_publication_failure_discards_only_its_preparation() {
+    let destination = tempfile::tempdir().expect("temporary Export destination");
+    let output = destination.path().join("Album.png");
+    std::fs::create_dir(&output).expect("the conflicting final target is a directory");
+    let plan =
+        ExportPathPlan::new(output.clone(), "export-conflict").expect("the Export plan is valid");
+    let preparation = plan
+        .prepare()
+        .expect("the Export preparation is reserved safely");
+    std::fs::write(plan.prepared_output_path(), b"verified export")
+        .expect("the verified preparation is writable");
+
+    assert_eq!(
+        preparation.publish().unwrap_err(),
+        AppPathsError::ExportStorageOutsideDestination
+    );
+    assert!(output.is_dir());
+    assert!(!plan.preparation_directory().exists());
+}
+
+#[test]
 fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let paths = AppPaths::from_known_folders(root.path(), root.path());
@@ -265,13 +357,20 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
     let preview_temporary = cache
         .preview_temporary_file("media-01", "generation-02", 4242)
         .expect("the preview temporary path is valid");
+    let other_process_temporary = cache
+        .preview_temporary_file("media-01", "generation-03", 4343)
+        .expect("the other process temporary path is valid");
     let metadata = cache.metadata_file();
     let metadata_temporary = cache.metadata_temporary_file(4242);
 
     std::fs::write(&published, b"published preview").expect("the published preview is writable");
     std::fs::write(&metadata, b"{\"schemaVersion\":1}")
         .expect("the published metadata is writable");
-    for temporary in [&preview_temporary, &metadata_temporary] {
+    for temporary in [
+        &preview_temporary,
+        &other_process_temporary,
+        &metadata_temporary,
+    ] {
         let mut file = storage
             .create_temporary_file(temporary)
             .expect("the stale temporary is materialized safely");
@@ -282,7 +381,7 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
 
     assert_eq!(
         paths
-            .discard_project_cache_temporaries(&cache)
+            .discard_project_cache_temporaries(&cache, 4242)
             .expect("stale temporaries are discarded safely"),
         2
     );
@@ -296,6 +395,11 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
     );
     assert!(!preview_temporary.exists());
     assert!(!metadata_temporary.exists());
+    assert_eq!(
+        std::fs::read(other_process_temporary)
+            .expect("another process temporary remains untouched"),
+        b"incomplete"
+    );
 }
 
 #[test]

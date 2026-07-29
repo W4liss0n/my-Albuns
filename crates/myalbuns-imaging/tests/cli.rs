@@ -9,9 +9,9 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
     CacheRequest, CacheResetRequest, ImagingCommand, ImagingFailureStage, ImagingRequest,
-    ImagingResponse, MediaSource,
+    ImagingResponse, MediaSource, RenderSourcePolicy,
 };
-use myalbuns_paths::{AppPaths, CachePathPlan};
+use myalbuns_paths::{AppPaths, CachePathPlan, ExportPathPlan};
 use sha2::{Digest, Sha256};
 
 #[path = "../../../tests/support/sample_project.rs"]
@@ -20,6 +20,7 @@ mod sample_project;
 use sample_project::SampleProject;
 
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
+const RECOVERY_EVIDENCE_DIRECTORY_ENV: &str = "MYALBUNS_RECOVERY_EVIDENCE_DIR";
 
 struct TestCache {
     paths: CachePathPlan,
@@ -101,7 +102,7 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
 }
 
 #[test]
-fn processor_replaces_an_existing_output_file() {
+fn processor_never_replaces_an_existing_preparation() {
     let session = sample_session(SampleProject::Horizon, 2);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("existing-output.png");
@@ -113,13 +114,14 @@ fn processor_replaces_an_existing_output_file() {
         "replacement-request",
     );
 
-    assert!(
-        result.status.success(),
-        "processor failed: {}",
-        String::from_utf8_lossy(&result.stderr)
+    assert_eq!(
+        result.status.code(),
+        Some(ImagingFailureStage::OutputPrepare.exit_code().into())
     );
-    let bytes = std::fs::read(output_path).expect("replacement output is readable");
-    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    assert_eq!(
+        std::fs::read(output_path).expect("the existing preparation remains readable"),
+        b"previous export"
+    );
 }
 
 #[test]
@@ -139,8 +141,22 @@ fn terminated_export_preserves_the_previous_output_until_an_explicit_retry() {
     let source_bytes = std::fs::read(&source_path).expect("the source is readable");
     let output_path = output_dir.path().join("recoverable-output.png");
     let previous_output = b"previous completed export";
+    let previous_output_sha256 = format!("{:x}", Sha256::digest(previous_output));
     std::fs::write(&output_path, previous_output).expect("the previous Export is writable");
-    let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
+    let failed_plan = ExportPathPlan::new(output_path.clone(), "terminated-export")
+        .expect("the interrupted Export path plan is valid");
+    let failed_preparation = failed_plan
+        .prepare()
+        .expect("the interrupted Export preparation is reserved");
+    let session = sample_session(SampleProject::Horizon, 2);
+    let project_revision_before_failure = session
+        .persisted_revision()
+        .expect("the Project revision serializes before the failure");
+    let project_sha256_before_failure = format!(
+        "{:x}",
+        Sha256::digest(project_revision_before_failure.as_bytes())
+    );
+    let mut snapshot = session.render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.frames.truncate(1);
     let sheet_id = sheet.sheet_id.clone();
@@ -159,18 +175,23 @@ fn terminated_export_preserves_the_previous_output_until_an_explicit_retry() {
     .expect("the linked source is valid");
     let failed_request = ImagingRequest::new(
         "terminated-export",
-        output_path.clone(),
+        failed_plan.prepared_output_path().to_path_buf(),
         snapshot.clone(),
         sheet_id.clone(),
         300,
         vec![source.clone()],
     )
     .expect("the interrupted Export request is valid");
-    let temporary_path = failed_request
-        .temporary_output_path()
-        .expect("the incomplete output path is deterministic");
+    let source_policy = match failed_request.source_policy {
+        RenderSourcePolicy::LinkedOriginals => "linkedOriginals",
+        RenderSourcePolicy::ProceduralFixture => "proceduralFixture",
+    };
+    let temporary_path = failed_plan.prepared_output_path().to_path_buf();
 
+    let mut spawned_process_count = 0_u8;
     let mut failed_process = spawn_render_request(&failed_request, None);
+    spawned_process_count += 1;
+    let failed_process_id = failed_process.id();
     wait_for_file_while_running(
         &mut failed_process,
         &temporary_path,
@@ -184,42 +205,97 @@ fn terminated_export_preserves_the_previous_output_until_an_explicit_retry() {
         .expect("the terminated processor is reaped");
 
     assert!(!failed.status.success());
+    let success_response_before_retry = serde_json::from_slice::<ImagingResponse>(&failed.stdout)
+        .ok()
+        .and_then(|response| response.completed_for("terminated-export").cloned())
+        .is_some();
     assert!(
-        serde_json::from_slice::<ImagingResponse>(&failed.stdout)
-            .ok()
-            .and_then(|response| response.completed_for("terminated-export").cloned())
-            .is_none(),
+        !success_response_before_retry,
         "a terminated processor must not announce Export success"
     );
-    assert_eq!(
-        std::fs::read(&output_path).expect("the previous Export remains readable"),
-        previous_output
+    let output_after_failure =
+        std::fs::read(&output_path).expect("the previous Export remains readable");
+    let output_sha256_after_failure = format!("{:x}", Sha256::digest(&output_after_failure));
+    assert_eq!(output_after_failure, previous_output);
+    let project_revision_after_failure = session
+        .persisted_revision()
+        .expect("the Project revision serializes after the failure");
+    let project_sha256_after_failure = format!(
+        "{:x}",
+        Sha256::digest(project_revision_after_failure.as_bytes())
     );
+    assert_eq!(
+        project_sha256_after_failure, project_sha256_before_failure,
+        "the failed Export cannot mutate the Project session"
+    );
+    let partial_preparation_observed = temporary_path.is_file();
     assert!(
-        temporary_path.is_file(),
+        partial_preparation_observed,
         "the abrupt process death leaves only its isolated temporary"
     );
 
-    std::fs::remove_file(&temporary_path)
-        .expect("the owner discards the interrupted attempt before retrying");
+    assert!(
+        failed_preparation
+            .discard()
+            .expect("the owner discards the interrupted attempt before retrying")
+    );
+    let process_count_before_explicit_retry = spawned_process_count;
+    let retry_plan = ExportPathPlan::new(output_path.clone(), "explicit-export-retry")
+        .expect("the retry Export path plan is valid");
+    let retry_preparation = retry_plan
+        .prepare()
+        .expect("the retry Export preparation is reserved");
     let retry_request = ImagingRequest::new(
         "explicit-export-retry",
-        output_path.clone(),
+        retry_plan.prepared_output_path().to_path_buf(),
         snapshot,
         sheet_id,
         300,
         vec![source],
     )
     .expect("the explicit retry request is valid");
-    let retried = invoke_render_request(&retry_request, None);
+    let retry_process = spawn_render_request(&retry_request, None);
+    spawned_process_count += 1;
+    let retry_process_id = retry_process.id();
+    let retried = retry_process
+        .wait_with_output()
+        .expect("the explicit retry processor exits");
 
+    assert_ne!(retry_process_id, failed_process_id);
+    assert_eq!(spawned_process_count, 2);
     assert!(
         retried.status.success(),
         "the new processor completes the explicit retry: {}",
         String::from_utf8_lossy(&retried.stderr)
     );
+    let retried_response: ImagingResponse =
+        serde_json::from_slice(&retried.stdout).expect("the retry response is valid JSON");
+    assert!(
+        retried_response
+            .completed_for("explicit-export-retry")
+            .is_some()
+    );
+    retry_preparation
+        .publish()
+        .expect("the verified explicit retry is published by the owner");
     let published = std::fs::read(output_path).expect("the retried Export is readable");
     assert_eq!(&published[..8], b"\x89PNG\r\n\x1a\n");
+    write_recovery_evidence(
+        "export",
+        serde_json::json!({
+            "sourcePolicy": source_policy,
+            "failedProcessId": failed_process_id,
+            "retryProcessId": retry_process_id,
+            "processCountBeforeExplicitRetry": process_count_before_explicit_retry,
+            "successResponseBeforeExplicitRetry": success_response_before_retry,
+            "partialPreparationObserved": partial_preparation_observed,
+            "previousOutputSha256BeforeFailure": previous_output_sha256,
+            "previousOutputSha256AfterFailure": output_sha256_after_failure,
+            "projectSha256BeforeFailure": project_sha256_before_failure,
+            "projectSha256AfterFailure": project_sha256_after_failure,
+            "finalOutputSha256AfterExplicitRetry": format!("{:x}", Sha256::digest(&published)),
+        }),
+    );
 }
 
 #[test]
@@ -370,15 +446,15 @@ fn cache_restarts_after_termination_and_discards_the_incomplete_item() {
         .expect("the terminated processor is reaped");
 
     assert!(!failed.status.success());
-    assert!(!cache.paths.metadata_file().exists());
-    assert!(temporary_path.is_file());
+    let metadata_existed_after_failure = cache.paths.metadata_file().exists();
+    let temporary_observed_after_failure = temporary_path.is_file();
+    assert!(!metadata_existed_after_failure);
+    assert!(temporary_observed_after_failure);
     let app_paths = AppPaths::discover().expect("the test can discover LocalAppData");
-    assert_eq!(
-        app_paths
-            .discard_project_cache_temporaries(&cache.paths)
-            .expect("the Cache owner discards stale temporaries"),
-        1
-    );
+    let removed_temporary_count = app_paths
+        .discard_project_cache_temporaries(&cache.paths, failed_process_id)
+        .expect("the Cache owner discards stale temporaries");
+    assert_eq!(removed_temporary_count, 1);
     assert!(!temporary_path.exists());
 
     let restarted_process = spawn_imaging_command(&command, Some(log_dir.path()));
@@ -400,6 +476,19 @@ fn cache_restarts_after_termination_and_discards_the_incomplete_item() {
         .expect("the restarted Cache request completes");
     assert_eq!(completed.generated_count, 1);
     assert!(cache.paths.metadata_file().is_file());
+    write_recovery_evidence(
+        "cache",
+        serde_json::json!({
+            "failedProcessId": failed_process_id,
+            "restartedProcessId": restarted_process_id,
+            "temporaryObservedAfterFailure": temporary_observed_after_failure,
+            "removedTemporaryCount": removed_temporary_count,
+            "temporaryExistedAfterCleanup": temporary_path.exists(),
+            "metadataExistedAfterFailure": metadata_existed_after_failure,
+            "metadataExistedAfterRestart": cache.paths.metadata_file().is_file(),
+            "generatedCountAfterRestart": completed.generated_count,
+        }),
+    );
 }
 
 #[test]
@@ -693,7 +782,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_request_completed"));
     assert!(logs.contains("\"process_role\":\"imaging\""));
-    assert!(logs.contains("\"protocol_version\":2"));
+    assert!(logs.contains("\"protocol_version\":3"));
     assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
     assert!(
         !logs.contains(&output_path.to_string_lossy().into_owned()),
@@ -930,4 +1019,16 @@ fn wait_for_file_while_running(child: &mut Child, path: &Path, timeout: Duration
         );
         thread::sleep(Duration::from_millis(5));
     }
+}
+
+fn write_recovery_evidence(name: &str, evidence: serde_json::Value) {
+    let Some(directory) = std::env::var_os(RECOVERY_EVIDENCE_DIRECTORY_ENV) else {
+        return;
+    };
+    let directory = PathBuf::from(directory);
+    std::fs::create_dir_all(&directory).expect("the recovery evidence directory is writable");
+    let path = directory.join(format!("{name}.json"));
+    let bytes =
+        serde_json::to_vec_pretty(&evidence).expect("the recovery evidence is serializable");
+    std::fs::write(path, bytes).expect("the recovery evidence is writable");
 }

@@ -4,7 +4,7 @@ use myalbuns_core::RenderSnapshot;
 use myalbuns_paths::CachePathPlan;
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 2;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -14,7 +14,6 @@ pub enum ImagingFailureStage {
     Composition,
     OutputPrepare,
     OutputEncode,
-    OutputPublish,
     OutputVerify,
 }
 
@@ -27,7 +26,6 @@ impl ImagingFailureStage {
             Self::Composition => "composition",
             Self::OutputPrepare => "output_prepare",
             Self::OutputEncode => "output_encode",
-            Self::OutputPublish => "output_publish",
             Self::OutputVerify => "output_verify",
         }
     }
@@ -40,7 +38,6 @@ impl ImagingFailureStage {
             Self::Composition => 22,
             Self::OutputPrepare => 23,
             Self::OutputEncode => 24,
-            Self::OutputPublish => 25,
             Self::OutputVerify => 26,
         }
     }
@@ -53,7 +50,6 @@ impl ImagingFailureStage {
             22 => Some(Self::Composition),
             23 => Some(Self::OutputPrepare),
             24 => Some(Self::OutputEncode),
-            25 => Some(Self::OutputPublish),
             26 => Some(Self::OutputVerify),
             _ => None,
         }
@@ -82,7 +78,7 @@ impl ImagingCommand {
 pub struct ImagingRequest {
     pub protocol_version: u32,
     pub request_id: String,
-    pub output_path: PathBuf,
+    pub prepared_output_path: PathBuf,
     pub snapshot: RenderSnapshot,
     pub sheet_id: String,
     pub dpi: u32,
@@ -93,7 +89,7 @@ pub struct ImagingRequest {
 impl ImagingRequest {
     pub fn new(
         request_id: impl Into<String>,
-        output_path: PathBuf,
+        prepared_output_path: PathBuf,
         snapshot: RenderSnapshot,
         sheet_id: impl Into<String>,
         dpi: u32,
@@ -102,7 +98,7 @@ impl ImagingRequest {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
             request_id: request_id.into(),
-            output_path,
+            prepared_output_path,
             snapshot,
             sheet_id: sheet_id.into(),
             dpi,
@@ -115,7 +111,7 @@ impl ImagingRequest {
 
     pub fn procedural_fixture(
         request_id: impl Into<String>,
-        output_path: PathBuf,
+        prepared_output_path: PathBuf,
         snapshot: RenderSnapshot,
         sheet_id: impl Into<String>,
         dpi: u32,
@@ -123,7 +119,7 @@ impl ImagingRequest {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
             request_id: request_id.into(),
-            output_path,
+            prepared_output_path,
             snapshot,
             sheet_id: sheet_id.into(),
             dpi,
@@ -144,8 +140,8 @@ impl ImagingRequest {
         if !is_safe_identifier(&self.request_id) {
             return Err("a Identidade da solicitação é inválida".into());
         }
-        if !self.output_path.is_absolute() {
-            return Err("o caminho da saída não é absoluto".into());
+        if !self.prepared_output_path.is_absolute() {
+            return Err("o caminho da preparação não é absoluto".into());
         }
         if !(1..=1200).contains(&self.dpi) {
             return Err("a resolução da Exportação é inválida".into());
@@ -190,22 +186,6 @@ impl ImagingRequest {
             RenderSourcePolicy::ProceduralFixture => {}
         }
         Ok(())
-    }
-
-    pub fn temporary_output_path(&self) -> Result<PathBuf, String> {
-        let parent = self
-            .output_path
-            .parent()
-            .ok_or_else(|| "o destino da Exportação não possui uma pasta".to_string())?;
-        let file_name = self
-            .output_path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| "o nome da Exportação é inválido".to_string())?;
-        if !is_safe_identifier(&self.request_id) {
-            return Err("a Identidade da solicitação é inválida".into());
-        }
-        Ok(parent.join(format!(".{file_name}.{}.tmp", self.request_id)))
     }
 }
 

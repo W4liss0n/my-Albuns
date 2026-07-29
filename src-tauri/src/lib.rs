@@ -1,4 +1,6 @@
 mod benchmark_corpus;
+mod cache_engine;
+mod export_pipeline;
 mod imaging_processor;
 mod logging;
 mod project_host;
@@ -15,11 +17,11 @@ use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, ExportPathPlan};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use imaging_processor::{InvocationContext, invoke_cache_with_restart, invoke_export_once};
+use imaging_processor::InvocationContext;
 use logging::{LoggingState, frontend_log};
 use project_host::ProjectHost;
 use topology_benchmark::{
@@ -180,7 +182,7 @@ async fn prepare_media_previews(
             format!("Não foi possível preparar o Cache: {error}")
         })?;
     payload.push(b'\n');
-    let stdout = invoke_cache_with_restart(
+    let stdout = cache_engine::execute(
         &app,
         &logging,
         &app_paths,
@@ -196,7 +198,7 @@ async fn prepare_media_previews(
         log_media_cache_failure(
             &request_id,
             safe_project_id,
-            failure.stage,
+            failure.stage.as_str(),
             failure.exit_code,
         );
         failure.message
@@ -276,6 +278,14 @@ async fn export_spike(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()
     ));
+    std::fs::create_dir_all(&output_dir).map_err(|error| {
+        log_export_failure(&request_id, None, "prepare_output", None);
+        format!("Não foi possível preparar a Exportação: {error}")
+    })?;
+    let path_plan = ExportPathPlan::new(output_path.clone(), &request_id).map_err(|error| {
+        log_export_failure(&request_id, None, "prepare_output", None);
+        format!("Não foi possível planejar o Destino da Exportação: {error}")
+    })?;
     let sheet_id = snapshot
         .composition
         .sheets
@@ -287,7 +297,7 @@ async fn export_spike(
     let request = match sources {
         Some(sources) => ImagingRequest::new(
             request_id.clone(),
-            output_path.clone(),
+            path_plan.prepared_output_path().to_path_buf(),
             snapshot,
             sheet_id,
             300,
@@ -295,7 +305,7 @@ async fn export_spike(
         ),
         None => ImagingRequest::procedural_fixture(
             request_id.clone(),
-            output_path.clone(),
+            path_plan.prepared_output_path().to_path_buf(),
             snapshot,
             sheet_id,
             25,
@@ -306,26 +316,13 @@ async fn export_spike(
         format!("Não foi possível planejar a Exportação: {error}")
     })?;
     let project_id = safe_log_identifier(&request.snapshot.project_id);
-    std::fs::create_dir_all(&output_dir).map_err(|error| {
-        log_export_failure(&request_id, project_id, "prepare_output", None);
-        format!("Não foi possível preparar a Exportação: {error}")
-    })?;
-    let mut payload = serde_json::to_vec(&request).map_err(|error| {
-        log_export_failure(&request_id, project_id, "serialize_snapshot", None);
-        format!("Não foi possível preparar o snapshot: {error}")
-    })?;
-    payload.push(b'\n');
-    let temporary_output_path = request.temporary_output_path().map_err(|error| {
-        log_export_failure(&request_id, project_id, "prepare_output", None);
-        format!("Não foi possível preparar a Exportação temporária: {error}")
-    })?;
 
     let started = Instant::now();
-    let stdout = invoke_export_once(
+    let completed = export_pipeline::execute(
         &app,
         &logging,
-        &payload,
-        &temporary_output_path,
+        &path_plan,
+        &request,
         InvocationContext {
             operation_id: &request_id,
             project_id,
@@ -333,17 +330,14 @@ async fn export_spike(
     )
     .await
     .map_err(|failure| {
-        log_export_failure(&request_id, project_id, failure.stage, failure.exit_code);
+        log_export_failure(
+            &request_id,
+            project_id,
+            failure.stage.as_str(),
+            failure.exit_code,
+        );
         failure.message
     })?;
-    let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
-        log_export_failure(&request_id, project_id, "decode_response", None);
-        format!("Resposta inválida do Processador de Imagens: {error}")
-    })?;
-    let Some(completed) = response.completed_for(&request_id) else {
-        log_export_failure(&request_id, project_id, "validate_response", None);
-        return Err("O Processador de Imagens devolveu uma resposta inesperada.".into());
-    };
     let elapsed_ms = started.elapsed().as_millis();
     tracing::info!(
         target: "myalbuns.desktop",

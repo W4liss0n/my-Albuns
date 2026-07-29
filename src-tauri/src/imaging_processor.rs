@@ -1,8 +1,5 @@
-use std::path::Path;
-
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingFailureStage};
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
-use myalbuns_paths::{AppPaths, CachePathPlan};
 use tauri::AppHandle;
 use tauri_plugin_shell::{ShellExt, process::CommandEvent};
 
@@ -23,22 +20,52 @@ impl ImagingOperation {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum InvocationFailureStage {
+    ResolveSidecar,
+    SpawnSidecar,
+    WriteRequest,
+    ReadResponse,
+    ImagingProcess,
+    CacheRecoveryCleanup,
+    Processor(ImagingFailureStage),
+}
+
+impl InvocationFailureStage {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::ResolveSidecar => "resolve_sidecar",
+            Self::SpawnSidecar => "spawn_sidecar",
+            Self::WriteRequest => "write_request",
+            Self::ReadResponse => "read_response",
+            Self::ImagingProcess => "imaging_process",
+            Self::CacheRecoveryCleanup => "cache_recovery_cleanup",
+            Self::Processor(stage) => stage.as_str(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct InvocationFailure {
-    pub(crate) stage: &'static str,
+    pub(crate) stage: InvocationFailureStage,
     pub(crate) exit_code: Option<i32>,
+    pub(crate) process_id: Option<u32>,
     pub(crate) message: String,
     termination_observed: bool,
 }
 
 impl InvocationFailure {
-    fn terminated(exit_code: Option<i32>) -> Self {
+    fn terminated(process_id: u32, exit_code: Option<i32>) -> Self {
         let stage = exit_code
             .and_then(ImagingFailureStage::from_exit_code)
-            .map_or("imaging_process", ImagingFailureStage::as_str);
+            .map_or(
+                InvocationFailureStage::ImagingProcess,
+                InvocationFailureStage::Processor,
+            );
         Self {
             stage,
             exit_code,
+            process_id: Some(process_id),
             message: format!(
                 "O Processador de Imagens terminou com o código {:?}.",
                 exit_code
@@ -47,30 +74,32 @@ impl InvocationFailure {
         }
     }
 
-    fn is_unexpected_termination(&self) -> bool {
+    pub(crate) fn is_unexpected_termination(&self) -> bool {
         self.termination_observed
             && self
                 .exit_code
                 .and_then(ImagingFailureStage::from_exit_code)
                 .is_none()
     }
-}
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RecoveryAction {
-    Restart,
-    Fail,
-}
+    pub(crate) fn cache_recovery_cleanup(failed: &Self, message: impl Into<String>) -> Self {
+        Self {
+            stage: InvocationFailureStage::CacheRecoveryCleanup,
+            exit_code: failed.exit_code,
+            process_id: failed.process_id,
+            message: message.into(),
+            termination_observed: false,
+        }
+    }
 
-fn recovery_action(
-    operation: ImagingOperation,
-    attempt: u8,
-    failure: &InvocationFailure,
-) -> RecoveryAction {
-    if operation == ImagingOperation::Cache && attempt == 1 && failure.is_unexpected_termination() {
-        RecoveryAction::Restart
-    } else {
-        RecoveryAction::Fail
+    #[cfg(test)]
+    pub(crate) fn unexpected_termination(process_id: u32) -> Self {
+        Self::terminated(process_id, Some(-1))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn deterministic(stage: ImagingFailureStage, process_id: u32) -> Self {
+        Self::terminated(process_id, Some(stage.exit_code().into()))
     }
 }
 
@@ -80,140 +109,7 @@ pub(crate) struct InvocationContext<'a> {
     pub(crate) project_id: Option<&'a str>,
 }
 
-pub(crate) async fn invoke_cache_with_restart(
-    app: &AppHandle,
-    logging: &LoggingState,
-    app_paths: &AppPaths,
-    cache_paths: &CachePathPlan,
-    payload: &[u8],
-    context: InvocationContext<'_>,
-) -> Result<Vec<u8>, InvocationFailure> {
-    let mut attempt = 1;
-    loop {
-        match invoke_once(
-            app,
-            logging,
-            payload,
-            context,
-            ImagingOperation::Cache,
-            attempt,
-        )
-        .await
-        {
-            Ok(stdout) => {
-                if attempt > 1 {
-                    tracing::info!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        protocol_version = IMAGING_PROTOCOL_VERSION,
-                        operation_id = context.operation_id,
-                        project_id = context.project_id,
-                        attempts = attempt,
-                        event = "imaging_processor_restart_completed",
-                    );
-                }
-                return Ok(stdout);
-            }
-            Err(failure)
-                if recovery_action(ImagingOperation::Cache, attempt, &failure)
-                    == RecoveryAction::Restart =>
-            {
-                let removed_temporary_count = app_paths
-                    .discard_project_cache_temporaries(cache_paths)
-                    .map_err(|error| InvocationFailure {
-                        stage: "cache_recovery_cleanup",
-                        exit_code: failure.exit_code,
-                        message: format!(
-                            "Não foi possível descartar o item incompleto do Cache: {error}"
-                        ),
-                        termination_observed: false,
-                    })?;
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::DesktopHost.as_str(),
-                    protocol_version = IMAGING_PROTOCOL_VERSION,
-                    operation_id = context.operation_id,
-                    project_id = context.project_id,
-                    failed_attempt = attempt,
-                    exit_code = failure.exit_code,
-                    removed_temporary_count,
-                    event = "imaging_processor_restart_started",
-                );
-                attempt += 1;
-            }
-            Err(failure) => {
-                if attempt > 1 && failure.is_unexpected_termination() {
-                    tracing::error!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        protocol_version = IMAGING_PROTOCOL_VERSION,
-                        operation_id = context.operation_id,
-                        project_id = context.project_id,
-                        attempts = attempt,
-                        exit_code = failure.exit_code,
-                        event = "imaging_processor_restart_exhausted",
-                    );
-                }
-                return Err(failure);
-            }
-        }
-    }
-}
-
-pub(crate) async fn invoke_export_once(
-    app: &AppHandle,
-    logging: &LoggingState,
-    payload: &[u8],
-    temporary_output_path: &Path,
-    context: InvocationContext<'_>,
-) -> Result<Vec<u8>, InvocationFailure> {
-    match invoke_once(app, logging, payload, context, ImagingOperation::Export, 1).await {
-        Ok(stdout) => Ok(stdout),
-        Err(failure) => {
-            match discard_incomplete_export(temporary_output_path) {
-                Ok(removed) => tracing::warn!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::DesktopHost.as_str(),
-                    protocol_version = IMAGING_PROTOCOL_VERSION,
-                    operation_id = context.operation_id,
-                    project_id = context.project_id,
-                    removed,
-                    event = "incomplete_export_discarded",
-                ),
-                Err(error) => tracing::error!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::DesktopHost.as_str(),
-                    protocol_version = IMAGING_PROTOCOL_VERSION,
-                    operation_id = context.operation_id,
-                    project_id = context.project_id,
-                    event = "incomplete_export_cleanup_failed",
-                    reason = error.as_str(),
-                ),
-            }
-            Err(failure)
-        }
-    }
-}
-
-fn discard_incomplete_export(path: &Path) -> Result<bool, String> {
-    let metadata = match std::fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => {
-            return Err(format!(
-                "não foi possível inspecionar o temporário da Exportação: {error}"
-            ));
-        }
-    };
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err("o temporário da Exportação não é um arquivo regular".into());
-    }
-    std::fs::remove_file(path)
-        .map_err(|error| format!("não foi possível remover a Exportação incompleta: {error}"))?;
-    Ok(true)
-}
-
-async fn invoke_once(
+pub(crate) async fn invoke_once(
     app: &AppHandle,
     logging: &LoggingState,
     payload: &[u8],
@@ -225,15 +121,17 @@ async fn invoke_once(
         .shell()
         .sidecar("myalbuns-imaging")
         .map_err(|error| InvocationFailure {
-            stage: "resolve_sidecar",
+            stage: InvocationFailureStage::ResolveSidecar,
             exit_code: None,
+            process_id: None,
             message: format!("Processador de Imagens indisponível: {error}"),
             termination_observed: false,
         })?
         .env(LOG_DIRECTORY_ENV, logging.directory());
     let (mut events, mut child) = sidecar.spawn().map_err(|error| InvocationFailure {
-        stage: "spawn_sidecar",
+        stage: InvocationFailureStage::SpawnSidecar,
         exit_code: None,
+        process_id: None,
         message: format!("Não foi possível iniciar o Processador de Imagens: {error}"),
         termination_observed: false,
     })?;
@@ -252,8 +150,9 @@ async fn invoke_once(
     if let Err(error) = child.write(payload) {
         let _ = child.kill();
         return Err(InvocationFailure {
-            stage: "write_request",
+            stage: InvocationFailureStage::WriteRequest,
             exit_code: None,
+            process_id: Some(imaging_process_id),
             message: format!("Não foi possível enviar a solicitação: {error}"),
             termination_observed: false,
         });
@@ -287,79 +186,35 @@ async fn invoke_once(
 
     if let Some(error) = stream_error {
         return Err(InvocationFailure {
-            stage: "read_response",
+            stage: InvocationFailureStage::ReadResponse,
             exit_code,
+            process_id: Some(imaging_process_id),
             message: format!("Não foi possível receber a resposta do Processador: {error}"),
             termination_observed: exit_code.is_some(),
         });
     }
     if exit_code != Some(0) {
-        return Err(InvocationFailure::terminated(exit_code));
+        return Err(InvocationFailure::terminated(imaging_process_id, exit_code));
     }
     Ok(stdout)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        ImagingOperation, InvocationFailure, RecoveryAction, discard_incomplete_export,
-        recovery_action,
-    };
+    use myalbuns_imaging_protocol::ImagingFailureStage;
+
+    use super::{InvocationFailure, InvocationFailureStage};
 
     #[test]
-    fn cache_restarts_once_only_after_an_unexpected_termination() {
-        let crash = InvocationFailure::terminated(Some(-1));
+    fn processor_exit_codes_remain_typed_at_the_host_boundary() {
+        let failure = InvocationFailure::deterministic(ImagingFailureStage::SourceDecode, 4242);
 
         assert_eq!(
-            recovery_action(ImagingOperation::Cache, 1, &crash),
-            RecoveryAction::Restart
+            failure.stage,
+            InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode)
         );
-        assert_eq!(
-            recovery_action(ImagingOperation::Cache, 2, &crash),
-            RecoveryAction::Fail
-        );
-    }
-
-    #[test]
-    fn deterministic_cache_failures_are_not_retried() {
-        let failure = InvocationFailure::terminated(Some(
-            myalbuns_imaging_protocol::ImagingFailureStage::CacheProcessing
-                .exit_code()
-                .into(),
-        ));
-
-        assert_eq!(
-            recovery_action(ImagingOperation::Cache, 1, &failure),
-            RecoveryAction::Fail
-        );
-    }
-
-    #[test]
-    fn export_never_restarts_automatically() {
-        let crash = InvocationFailure::terminated(Some(-1));
-
-        assert_eq!(
-            recovery_action(ImagingOperation::Export, 1, &crash),
-            RecoveryAction::Fail
-        );
-    }
-
-    #[test]
-    fn export_failure_cleanup_preserves_the_previous_published_output() {
-        let directory = tempfile::tempdir().expect("temporary Export destination");
-        let published = directory.path().join("Album_001.png");
-        let temporary = directory.path().join(".Album_001.png.export-01.tmp");
-        std::fs::write(&published, b"previous export").expect("the previous Export is writable");
-        std::fs::write(&temporary, b"incomplete export")
-            .expect("the incomplete Export is writable");
-
-        assert!(
-            discard_incomplete_export(&temporary).expect("the exact incomplete file is discarded")
-        );
-        assert_eq!(
-            std::fs::read(published).expect("the previous Export remains"),
-            b"previous export"
-        );
-        assert!(!temporary.exists());
+        assert_eq!(failure.stage.as_str(), "source_decode");
+        assert_eq!(failure.process_id, Some(4242));
+        assert!(!failure.is_unexpected_termination());
     }
 }

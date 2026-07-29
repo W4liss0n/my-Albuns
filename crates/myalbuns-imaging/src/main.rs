@@ -552,20 +552,7 @@ fn render_request(request: &ImagingRequest) -> Result<RenderCompletion, RenderFa
         draw_overlay(&mut image);
     }
 
-    let temporary_output_path = request
-        .temporary_output_path()
-        .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputPrepare, error))?;
-    publish_png_atomically(&image, &request.output_path, &temporary_output_path)?;
-    let output_bytes = fs::metadata(&request.output_path)
-        .map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureStage::OutputVerify,
-                format!("não foi possível verificar a imagem exportada: {error}"),
-            )
-        })?
-        .len();
-    let output_sha256 = sha256_file(&request.output_path)
-        .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputVerify, error))?;
+    let (output_bytes, output_sha256) = write_verified_png(&image, &request.prepared_output_path)?;
     Ok(RenderCompletion {
         width_px,
         height_px,
@@ -625,22 +612,23 @@ fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<RgbaImage, Strin
     Ok(decoded.to_rgba8())
 }
 
-fn publish_png_atomically(
+fn write_verified_png(
     image: &RgbaImage,
-    output_path: &Path,
-    temporary_path: &Path,
-) -> Result<(), RenderFailure> {
-    let write_result = (|| -> Result<(), RenderFailure> {
+    prepared_output_path: &Path,
+) -> Result<(u64, String), RenderFailure> {
+    let mut created = false;
+    let write_result = (|| -> Result<(u64, String), RenderFailure> {
         let file = OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(temporary_path)
+            .open(prepared_output_path)
             .map_err(|error| {
                 RenderFailure::new(
                     ImagingFailureStage::OutputPrepare,
-                    format!("não foi possível criar a Exportação temporária: {error}"),
+                    format!("não foi possível criar a preparação da Exportação: {error}"),
                 )
             })?;
+        created = true;
         let mut writer = BufWriter::new(file);
         PngEncoder::new(&mut writer)
             .write_image(
@@ -674,15 +662,20 @@ fn publish_png_atomically(
             )
         })?;
         drop(file);
-        fs::rename(temporary_path, output_path).map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureStage::OutputPublish,
-                format!("não foi possível publicar a imagem exportada: {error}"),
-            )
-        })
+        let output_bytes = fs::metadata(prepared_output_path)
+            .map_err(|error| {
+                RenderFailure::new(
+                    ImagingFailureStage::OutputVerify,
+                    format!("não foi possível verificar a imagem preparada: {error}"),
+                )
+            })?
+            .len();
+        let output_sha256 = sha256_file(prepared_output_path)
+            .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputVerify, error))?;
+        Ok((output_bytes, output_sha256))
     })();
-    if write_result.is_err() {
-        let _ = fs::remove_file(temporary_path);
+    if write_result.is_err() && created {
+        let _ = fs::remove_file(prepared_output_path);
     }
     write_result
 }
