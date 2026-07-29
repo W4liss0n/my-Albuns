@@ -116,16 +116,16 @@ desenvolvimento e de produção estão declaradas separadamente.
 
 | Comando | Resultado em 2026-07-29 |
 |---|---|
-| `npm test` | 50 testes aprovados em 10 arquivos |
-| `npm run test:rust` | 14 testes do núcleo, 3 testes de integração do processador e 1 teste do protocolo aprovados |
+| `npm test` | 53 testes aprovados em 11 arquivos |
+| `npm run test:rust` | 26 testes aprovados: 14 do núcleo, 3 do host, 5 do processador, 1 do protocolo e 3 da infraestrutura de logs |
 | `npm run quality:rust` | `rustfmt` e Clippy aprovados sem avisos |
-| `npm run build` | contratos, TypeScript e Vite aprovados; 2.019 módulos transformados |
+| `npm run build` | contratos, TypeScript e Vite aprovados; 2.022 módulos transformados |
 
 Os testes de integração do processador iniciam o binário real, transmitem
 mensagens pelo protocolo, validam a assinatura PNG, confirmam que Pan/Zoom
 alteram os pixels finais e rejeitam um snapshot inválido antes da escrita.
 
-O bundle web produziu uma entrada principal de 542,50 kB, ou 170,75 kB
+O bundle web produziu uma entrada principal de 544,72 kB, ou 171,39 kB
 comprimida, além dos chunks internos de renderização carregados pelo PixiJS. O
 Vite emitiu aviso por ultrapassar 500 kB. Uma divisão manual anterior apenas
 pré-carregava os mesmos módulos na abertura e foi removida por não reduzir o
@@ -140,8 +140,37 @@ o efeito antes de `Application.init()` terminar, e a limpeza chamava
 `this._cancelResize is not a function`.
 
 A integração agora só destrói uma aplicação PixiJS depois de sua inicialização
-e garante uma única destruição. Um teste de regressão desmonta o Canvas com a
-inicialização ainda pendente, conclui a promessa e verifica a limpeza segura.
+e garante uma única destruição. Um teste de regressão conclui fora de ordem as
+duas inicializações produzidas pelo modo estrito e verifica que a montagem
+abandonada não destrói a cena ativa.
+
+## Observabilidade local
+
+O host Tauri, o frontend e o Processador de Imagens agora emitem eventos
+estruturados correlacionáveis. Os processos Rust gravam JSONL diário com
+`process_role`, `protocol_version`, `operation_id` e IDs opacos quando
+aplicáveis. O frontend usa um contrato estreito, encaminhado por um único
+comando Tauri; mensagens livres, caminhos completos e conteúdo do Álbum não
+fazem parte desse contrato.
+
+IDs usados para correlação aceitam somente o formato opaco delimitado pela
+infraestrutura. Valores em formato de caminho são omitidos, inclusive no
+Processador de Imagens, e falhas de gravação não repetem o destino no stderr.
+Cada Exportação produz um evento terminal `export_completed` ou `export_failed`
+com a fase da falha.
+
+Os arquivos ficam em
+`%LOCALAPPDATA%\com.myalbuns.desktop\logs`, separados pelos prefixos
+`myalbuns-desktop` e `myalbuns-imaging`, com retenção máxima de sete arquivos
+por processo. A fila de escrita local não descarta eventos. `MYALBUNS_LOG`
+permite ajustar o filtro para diagnóstico, e não existe telemetria remota.
+
+Uma abertura real registrou a sequência `application_started`,
+`project_load_completed`, `canvas_initialization_completed` e
+`canvas_scene_materialized`. No modo estrito, cada tentativa do PixiJS recebeu
+um `instance_id`: o log distinguiu a montagem abandonada da que materializou a
+cena. Esse encadeamento torna diretamente observável a classe de falha que
+antes resultava apenas em uma janela vazia.
 
 ## Comandos de reprodução
 

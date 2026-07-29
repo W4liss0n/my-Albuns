@@ -31,6 +31,7 @@ test("selects concrete platform adapters only at the composition root", () => {
   const adapterPaths = [
     ["platform", "tauriProjectBridge"].join("/"),
     ["platform", "graphics"].join("/"),
+    ["platform", "tauriLogger"].join("/"),
   ];
   const offenders = findOffenders(
     (path, source) =>

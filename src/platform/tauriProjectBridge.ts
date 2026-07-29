@@ -7,7 +7,8 @@ import type {
 } from "../domain/project";
 
 export const tauriProjectBridge: ProjectBridge = {
-  load: () => invoke<EditorProjection>("project_state"),
+  load: (operationId) =>
+    invoke<EditorProjection>("project_state", { operationId }),
   apply: (intent) =>
     invoke<EditorProjection>("apply_project_intent", { intent }),
   undo: () => invoke<EditorProjection>("undo_project"),

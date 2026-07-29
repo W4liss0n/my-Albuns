@@ -19,13 +19,15 @@ test("maps the ProjectBridge interface to the desktop commands", async () => {
     mediaId: "media-campo",
   };
 
-  await tauriProjectBridge.load();
+  await tauriProjectBridge.load("project-load-1");
   await tauriProjectBridge.apply(intent);
   await tauriProjectBridge.undo();
   await tauriProjectBridge.redo();
   await tauriProjectBridge.exportPreview();
 
-  expect(invoke).toHaveBeenNthCalledWith(1, "project_state");
+  expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
+    operationId: "project-load-1",
+  });
   expect(invoke).toHaveBeenNthCalledWith(2, "apply_project_intent", {
     intent,
   });

@@ -13,7 +13,9 @@ import {
   type PhotoTransformDelta,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
+import type { LogEvent, Logger } from "../application/logging";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { LoggingProvider } from "./loggingContext";
 
 const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
@@ -520,25 +522,31 @@ test("waits for PixiJS initialization before destroying an abandoned Canvas", as
 });
 
 test("does not let an abandoned StrictMode initialization destroy the active Canvas", async () => {
+  const logEvents: LogEvent[] = [];
+  const logger: Logger = {
+    write: (event) => logEvents.push(event),
+  };
   const view = render(
     <StrictMode>
-      <AlbumCanvas
-        projectId="project-spike-001"
-        composition={composition}
-        continuousCanvasLayout={createContinuousCanvasLayout(
-          composition.sheets,
-        )}
-        selectedFrameId={null}
-        focusedSheetId="sheet-001"
-        centeredSheetId="sheet-001"
-        viewport={{ offsetX: 42, zoom: 0.78 }}
-        onSelectFrame={() => undefined}
-        onFocusSheet={() => undefined}
-        onCenteredSheetChange={() => undefined}
-        onViewportChange={() => undefined}
-        onTransformPreview={() => undefined}
-        onTransformCommit={async () => true}
-      />
+      <LoggingProvider logger={logger}>
+        <AlbumCanvas
+          projectId="project-spike-001"
+          composition={composition}
+          continuousCanvasLayout={createContinuousCanvasLayout(
+            composition.sheets,
+          )}
+          selectedFrameId={null}
+          focusedSheetId="sheet-001"
+          centeredSheetId="sheet-001"
+          viewport={{ offsetX: 42, zoom: 0.78 }}
+          onSelectFrame={() => undefined}
+          onFocusSheet={() => undefined}
+          onCenteredSheetChange={() => undefined}
+          onViewportChange={() => undefined}
+          onTransformPreview={() => undefined}
+          onTransformCommit={async () => true}
+        />
+      </LoggingProvider>
     </StrictMode>,
   );
 
@@ -559,6 +567,34 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
     .children[0] as { children: unknown[] };
   expect(activeWorld.children).toHaveLength(1);
   expect(view.container.querySelectorAll("canvas")).toHaveLength(1);
+
+  const initializationStarts = logEvents.filter(
+    ({ event }) => event === "canvas_initialization_started",
+  );
+  const initializationCompleted = logEvents.find(
+    ({ event }) => event === "canvas_initialization_completed",
+  );
+  const initializationAbandoned = logEvents.find(
+    ({ event }) => event === "canvas_initialization_abandoned",
+  );
+  const sceneMaterialized = logEvents.find(
+    ({ event }) => event === "canvas_scene_materialized",
+  );
+
+  expect(initializationStarts).toHaveLength(2);
+  expect(initializationStarts[0].instanceId).not.toBe(
+    initializationStarts[1].instanceId,
+  );
+  expect(initializationCompleted?.instanceId).toBe(
+    initializationStarts[1].instanceId,
+  );
+  expect(initializationAbandoned?.instanceId).toBe(
+    initializationStarts[0].instanceId,
+  );
+  expect(sceneMaterialized?.instanceId).toBe(
+    initializationCompleted?.instanceId,
+  );
+  expect(sceneMaterialized?.projectId).toBe("project-spike-001");
 });
 
 test("fits the complete sheet to the continuous Canvas at device resolution", async () => {

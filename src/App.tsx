@@ -5,31 +5,61 @@ import type {
   GraphicsProbe,
 } from "./application/graphics";
 import {
+  createLogInstanceId,
+  type Logger,
+} from "./application/logging";
+import {
   type EditorProjection,
   type ProjectBridge,
 } from "./domain/project";
+import { LoggingProvider } from "./components/loggingContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import "./App.css";
 
 interface AppProps {
   bridge: ProjectBridge;
   graphicsProbe: GraphicsProbe;
+  logger: Logger;
 }
 
-function App({ bridge, graphicsProbe }: AppProps) {
+function App({ bridge, graphicsProbe, logger }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    const operationId = createLogInstanceId("project-load");
+    logger.write({
+      level: "info",
+      component: "application",
+      event: "project_load_started",
+      operationId,
+    });
     bridge
-      .load()
+      .load(operationId)
       .then((value) => {
-        if (active) setProjection(value);
+        if (active) {
+          logger.write({
+            level: "info",
+            component: "application",
+            event: "project_load_completed",
+            operationId,
+            projectId: value.state.projectId,
+            sheetCount: value.composition.sheets.length,
+          });
+          setProjection(value);
+        }
       })
       .catch((error: unknown) => {
         if (active) {
+          logger.write({
+            level: "error",
+            component: "application",
+            event: "project_load_failed",
+            operationId,
+            reason: "bridge_error",
+          });
           setLoadError(
             error instanceof Error
               ? error.message
@@ -40,7 +70,20 @@ function App({ bridge, graphicsProbe }: AppProps) {
     return () => {
       active = false;
     };
-  }, [bridge]);
+  }, [bridge, logger]);
+
+  useEffect(() => {
+    logger.write({
+      level: graphics.supported ? "info" : "warn",
+      component: "graphics",
+      event: graphics.supported
+        ? "graphics_probe_succeeded"
+        : "graphics_probe_failed",
+      reason: graphics.supported
+        ? undefined
+        : "hardware_acceleration_unavailable",
+    });
+  }, [graphics, logger]);
 
   if (!graphics.supported) {
     return <GraphicsUnavailable diagnostic={graphics} />;
@@ -70,11 +113,13 @@ function App({ bridge, graphicsProbe }: AppProps) {
   }
 
   return (
-    <ProjectWorkspace
-      projection={projection}
-      bridge={bridge}
-      onProjectionChange={setProjection}
-    />
+    <LoggingProvider logger={logger}>
+      <ProjectWorkspace
+        projection={projection}
+        bridge={bridge}
+        onProjectionChange={setProjection}
+      />
+    </LoggingProvider>
   );
 }
 

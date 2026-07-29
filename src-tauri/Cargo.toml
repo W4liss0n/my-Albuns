@@ -18,4 +18,7 @@ tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
 myalbuns-core = { path = "../crates/myalbuns-core" }
 myalbuns-imaging-protocol = { path = "../crates/myalbuns-imaging-protocol" }
+myalbuns-logging = { path = "../crates/myalbuns-logging" }
+serde.workspace = true
 serde_json.workspace = true
+tracing.workspace = true

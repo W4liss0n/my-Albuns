@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Application } from "pixi.js";
 
+import {
+  createLogInstanceId,
+  logReasonFromError,
+} from "../application/logging";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
+import { useLogger } from "./loggingContext";
 
 export type {
   AlbumCanvasProps,
@@ -13,8 +18,11 @@ export type {
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
+  const logger = useLogger();
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
+  const sceneInstanceIdRef = useRef<string | null>(null);
+  const materializedSceneRef = useRef<AlbumCanvasScene | null>(null);
   const [ready, setReady] = useState(false);
   const hasSheets = props.composition.sheets.length > 0;
 
@@ -24,16 +32,38 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     let initialized = false;
     let destroyed = false;
     let ownedScene: AlbumCanvasScene | null = null;
+    const instanceId = createLogInstanceId("canvas");
     const app = new Application();
-    const destroyInitializedApp = () => {
+    logger.write({
+      level: "debug",
+      component: "canvas",
+      event: "canvas_initialization_started",
+      projectId: props.projectId,
+      instanceId,
+      sheetCount: props.composition.sheets.length,
+    });
+    const destroyInitializedApp = (reason: string) => {
       if (!initialized || destroyed) return;
       destroyed = true;
+      const hadScene = ownedScene !== null;
       ownedScene?.destroy();
       if (sceneRef.current === ownedScene) {
         sceneRef.current = null;
+        sceneInstanceIdRef.current = null;
+        materializedSceneRef.current = null;
       }
       ownedScene = null;
       app.destroy(true, { children: true });
+      logger.write({
+        level: "debug",
+        component: "canvas",
+        event: hadScene
+          ? "canvas_scene_disposed"
+          : "canvas_initialization_abandoned",
+        projectId: props.projectId,
+        instanceId,
+        reason,
+      });
     };
 
     void app
@@ -50,7 +80,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       .then(() => {
         initialized = true;
         if (disposed || !hostRef.current) {
-          destroyInitializedApp();
+          destroyInitializedApp("effect_disposed");
           return;
         }
         app.canvas.className = "pixi-canvas";
@@ -62,20 +92,38 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         hostRef.current.appendChild(app.canvas);
         ownedScene = new AlbumCanvasScene(app);
         sceneRef.current = ownedScene;
+        sceneInstanceIdRef.current = instanceId;
+        logger.write({
+          level: "info",
+          component: "canvas",
+          event: "canvas_initialization_completed",
+          projectId: props.projectId,
+          instanceId,
+          width: app.screen.width,
+          height: app.screen.height,
+          sheetCount: props.composition.sheets.length,
+        });
         setReady(true);
       })
       .catch((error: unknown) => {
         if (!disposed) {
-          console.error("Não foi possível iniciar o Canvas PixiJS.", error);
+          logger.write({
+            level: "error",
+            component: "canvas",
+            event: "canvas_initialization_failed",
+            projectId: props.projectId,
+            instanceId,
+            reason: logReasonFromError(error),
+          });
         }
       });
 
     return () => {
       disposed = true;
       setReady(false);
-      destroyInitializedApp();
+      destroyInitializedApp("effect_cleanup");
     };
-  }, [hasSheets]);
+  }, [hasSheets, logger]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -95,6 +143,19 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     const host = hostRef.current;
     if (!ready || !scene || !host) return;
     scene.update(props, host.clientHeight);
+    if (materializedSceneRef.current !== scene) {
+      materializedSceneRef.current = scene;
+      logger.write({
+        level: "info",
+        component: "canvas",
+        event: "canvas_scene_materialized",
+        projectId: props.projectId,
+        instanceId: sceneInstanceIdRef.current ?? undefined,
+        width: host.clientWidth,
+        height: host.clientHeight,
+        sheetCount: props.composition.sheets.length,
+      });
+    }
   });
 
   if (!hasSheets) {

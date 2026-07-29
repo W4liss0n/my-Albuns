@@ -4,14 +4,45 @@ use std::path::Path;
 use image::{ImageFormat, Rgba, RgbaImage};
 use myalbuns_core::{ComposedFrame, RenderSnapshot};
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse};
+use myalbuns_logging::{
+    ProcessRole, configured_log_directory, init_local_logging, safe_log_identifier,
+};
 
 const PIXELS_PER_MICROMETER: f64 = 0.001;
 
 fn main() {
-    if let Err(error) = run() {
-        eprintln!("{error}");
+    let process_role = ProcessRole::Imaging;
+    let log_directory = configured_log_directory();
+    let _logging_guard = match init_local_logging(&log_directory, process_role) {
+        Ok(guard) => Some(guard),
+        Err(error) => {
+            eprintln!("logging indisponível: {error}");
+            None
+        }
+    };
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = process_role.as_str(),
+        protocol_version = IMAGING_PROTOCOL_VERSION,
+        event = "imaging_process_started",
+    );
+    if run().is_err() {
+        tracing::error!(
+            target: "myalbuns.imaging",
+            process_role = process_role.as_str(),
+            protocol_version = IMAGING_PROTOCOL_VERSION,
+            event = "imaging_process_failed",
+        );
+        eprintln!("o Processador de Imagens não concluiu a solicitação.");
         std::process::exit(1);
     }
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = process_role.as_str(),
+        protocol_version = IMAGING_PROTOCOL_VERSION,
+        event = "imaging_process_stopped",
+        success = true,
+    );
 }
 
 fn run() -> Result<(), String> {
@@ -19,25 +50,95 @@ fn run() -> Result<(), String> {
     std::io::stdin()
         .lock()
         .read_line(&mut source)
-        .map_err(|error| format!("não foi possível ler a solicitação: {error}"))?;
-    let request: ImagingRequest = serde_json::from_str(&source)
-        .map_err(|error| format!("solicitação de renderização inválida: {error}"))?;
+        .map_err(|error| {
+            tracing::error!(
+                target: "myalbuns.imaging",
+                process_role = ProcessRole::Imaging.as_str(),
+                protocol_version = IMAGING_PROTOCOL_VERSION,
+                event = "imaging_request_read_failed",
+            );
+            format!("não foi possível ler a solicitação: {error}")
+        })?;
+    let request: ImagingRequest = serde_json::from_str(&source).map_err(|error| {
+        tracing::error!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = IMAGING_PROTOCOL_VERSION,
+            event = "imaging_request_decode_failed",
+        );
+        format!("solicitação de renderização inválida: {error}")
+    })?;
+    let operation_id = safe_log_identifier(&request.request_id);
+    let project_id = safe_log_identifier(&request.snapshot.project_id);
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_id,
+        event = "imaging_request_started",
+    );
 
     if request.protocol_version != IMAGING_PROTOCOL_VERSION {
+        tracing::warn!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "imaging_protocol_rejected",
+        );
         return Err(format!(
             "versão de protocolo não suportada: {}",
             request.protocol_version
         ));
     }
-    request
-        .snapshot
-        .validate()
-        .map_err(|error| format!("snapshot inválido: {error}"))?;
+    request.snapshot.validate().map_err(|error| {
+        tracing::warn!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "imaging_snapshot_rejected",
+        );
+        format!("snapshot inválido: {error}")
+    })?;
 
-    let (width_px, height_px) = render_first_sheet(&request.snapshot, &request.output_path)?;
-    let response = ImagingResponse::completed(request.request_id, width_px, height_px);
-    serde_json::to_writer(std::io::stdout(), &response)
-        .map_err(|error| format!("não foi possível responder: {error}"))
+    let (width_px, height_px) = render_first_sheet(&request.snapshot, &request.output_path)
+        .inspect_err(|_| {
+            tracing::error!(
+                target: "myalbuns.imaging",
+                process_role = ProcessRole::Imaging.as_str(),
+                protocol_version = request.protocol_version,
+                operation_id,
+                project_id,
+                event = "imaging_render_failed",
+            );
+        })?;
+    let response = ImagingResponse::completed(request.request_id.clone(), width_px, height_px);
+    serde_json::to_writer(std::io::stdout(), &response).map_err(|error| {
+        tracing::error!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "imaging_response_write_failed",
+        );
+        format!("não foi possível responder: {error}")
+    })?;
+    tracing::info!(
+        target: "myalbuns.imaging",
+        process_role = ProcessRole::Imaging.as_str(),
+        protocol_version = request.protocol_version,
+        operation_id,
+        project_id,
+        event = "imaging_request_completed",
+        width_px,
+        height_px,
+    );
+    Ok(())
 }
 
 fn render_first_sheet(snapshot: &RenderSnapshot, output_path: &Path) -> Result<(u32, u32), String> {
@@ -60,7 +161,7 @@ fn render_first_sheet(snapshot: &RenderSnapshot, output_path: &Path) -> Result<(
 
     image
         .save_with_format(output_path, ImageFormat::Png)
-        .map_err(|error| format!("não foi possível gravar {}: {error}", output_path.display()))?;
+        .map_err(|_| "não foi possível gravar a imagem exportada.".to_string())?;
     Ok((width_px, height_px))
 }
 

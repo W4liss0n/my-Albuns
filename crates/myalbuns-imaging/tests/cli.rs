@@ -73,10 +73,82 @@ fn processor_rejects_an_invalid_snapshot() {
     assert!(!result.status.success());
     assert!(!output_path.exists());
     assert!(
-        String::from_utf8_lossy(&result.stderr).contains("snapshot inválido"),
+        String::from_utf8_lossy(&result.stderr).contains("não concluiu a solicitação"),
         "unexpected stderr: {}",
         String::from_utf8_lossy(&result.stderr)
     );
+}
+
+#[test]
+fn processor_writes_correlated_logs_without_exposing_the_output_path() {
+    let session = ProjectCore::open_sample_project(12);
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let output_path = output_dir.path().join("private-album-name.png");
+
+    let result = invoke_processor_with_log_dir(
+        session.render_snapshot(),
+        &output_path,
+        "logged-request-001",
+        Some(log_dir.path()),
+    );
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let logs = std::fs::read_dir(log_dir.path())
+        .expect("log directory is readable")
+        .map(|entry| {
+            let path = entry.expect("log entry is valid").path();
+            std::fs::read_to_string(path).expect("log file is readable")
+        })
+        .collect::<String>();
+    assert!(logs.contains("imaging_request_started"));
+    assert!(logs.contains("imaging_request_completed"));
+    assert!(logs.contains("\"process_role\":\"imaging\""));
+    assert!(logs.contains("\"protocol_version\":1"));
+    assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
+    assert!(
+        !logs.contains(&output_path.to_string_lossy().into_owned()),
+        "the output path must not be written to logs"
+    );
+}
+
+#[test]
+fn processor_redacts_path_shaped_identifiers_and_output_failures() {
+    let mut snapshot = ProjectCore::open_sample_project(12).render_snapshot();
+    snapshot.project_id = r"c:\users\person\private-project".into();
+    let request_id = r"c:\users\person\private-operation";
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let output_path = output_dir
+        .path()
+        .join("missing-parent")
+        .join("private-album-name.png");
+
+    let result =
+        invoke_processor_with_log_dir(snapshot, &output_path, request_id, Some(log_dir.path()));
+
+    assert!(!result.status.success());
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    assert!(stderr.contains("não concluiu a solicitação"));
+    assert!(!stderr.contains(request_id));
+    assert!(!stderr.contains(&output_path.to_string_lossy().into_owned()));
+
+    let logs = std::fs::read_dir(log_dir.path())
+        .expect("log directory is readable")
+        .map(|entry| {
+            let path = entry.expect("log entry is valid").path();
+            std::fs::read_to_string(path).expect("log file is readable")
+        })
+        .collect::<String>();
+    assert!(logs.contains("imaging_request_started"));
+    assert!(logs.contains("imaging_render_failed"));
+    assert!(!logs.contains(request_id));
+    assert!(!logs.contains(r"c:\users\person\private-project"));
+    assert!(!logs.contains(&output_path.to_string_lossy().into_owned()));
 }
 
 fn invoke_processor(
@@ -84,13 +156,26 @@ fn invoke_processor(
     output_path: &Path,
     request_id: &str,
 ) -> std::process::Output {
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    invoke_processor_with_log_dir(snapshot, output_path, request_id, Some(log_dir.path()))
+}
+
+fn invoke_processor_with_log_dir(
+    snapshot: RenderSnapshot,
+    output_path: &Path,
+    request_id: &str,
+    log_dir: Option<&Path>,
+) -> std::process::Output {
     let request = ImagingRequest::new(request_id, output_path.to_path_buf(), snapshot);
-    let mut child = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
+    command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("processor starts");
+        .stderr(Stdio::piped());
+    if let Some(log_dir) = log_dir {
+        command.env("MYALBUNS_LOG_DIR", log_dir);
+    }
+    let mut child = command.spawn().expect("processor starts");
     let mut payload = serde_json::to_vec(&request).expect("request is serializable");
     payload.push(b'\n');
     child

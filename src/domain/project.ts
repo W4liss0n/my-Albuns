@@ -26,7 +26,7 @@ export type { SizeUm as Size2 } from "./generated/SizeUm";
 export type { VectorUm as Vector2 } from "./generated/VectorUm";
 
 export interface ProjectBridge {
-  load(): Promise<EditorProjection>;
+  load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
