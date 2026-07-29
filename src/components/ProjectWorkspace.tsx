@@ -10,9 +10,10 @@ import type {
 import { useEditorView } from "../state/editorView";
 import {
   AlbumCanvas,
+  type CanvasMetrics,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
-import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
+import { centeredSheetOffsetInContinuousCanvas } from "./canvasGeometry";
 import { SheetPreview } from "./SheetPreview";
 import {
   useWorkspacePanelLayout,
@@ -54,7 +55,8 @@ export function ProjectWorkspace({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
-  const [canvasScale, setCanvasScale] = useState(1);
+  const [canvasMetrics, setCanvasMetrics] =
+    useState<CanvasMetrics | null>(null);
   const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(null);
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
@@ -79,6 +81,27 @@ export function ProjectWorkspace({
   function setZoomDraft(next: ZoomDraft | null) {
     zoomDraftRef.current = next;
     setZoomDraftState(next);
+  }
+
+  function navigateToSheet(sheetId: string) {
+    const sheetIndex = projection.composition.sheets.findIndex(
+      (sheet) => sheet.sheetId === sheetId,
+    );
+    if (sheetIndex < 0) return;
+
+    focusSheet(sheetId);
+    centerSheet(sheetId);
+    if (!canvasMetrics) return;
+
+    setViewport({
+      ...viewport,
+      offsetX: centeredSheetOffsetInContinuousCanvas(
+        projection.composition.sheets,
+        sheetIndex,
+        canvasMetrics.scale,
+        canvasMetrics.width,
+      ),
+    });
   }
 
   async function runWithGlobalFeedback(
@@ -348,7 +371,7 @@ export function ProjectWorkspace({
               })
             }
             onMaterializedChange={ignoreMaterializedCount}
-            onAutoScaleChange={setCanvasScale}
+            onCanvasMetricsChange={setCanvasMetrics}
           />
         </section>
 
@@ -498,11 +521,7 @@ export function ProjectWorkspace({
                   defaultOpen
                 >
                   <div className="sheet-grid">
-                    {projection.composition.sheets.map((sheet, index) => {
-                      const sheetOffset = sheetOffsetInCanvasPixels(
-                        projection.composition.sheets,
-                        index,
-                      );
+                    {projection.composition.sheets.map((sheet) => {
                       return (
                         <Button
                           key={sheet.sheetId}
@@ -511,13 +530,7 @@ export function ProjectWorkspace({
                               ? "sheet-tile active"
                               : "sheet-tile"
                           }
-                          onPress={() => {
-                            focusSheet(sheet.sheetId);
-                            setViewport({
-                              ...viewport,
-                              offsetX: 42 - sheetOffset * canvasScale,
-                            });
-                          }}
+                          onPress={() => navigateToSheet(sheet.sheetId)}
                         >
                           <SheetPreview sheet={sheet} />
                           <span>{String(sheet.number).padStart(2, "0")}</span>

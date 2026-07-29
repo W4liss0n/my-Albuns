@@ -8,6 +8,7 @@ import type {
 } from "../domain/project";
 import {
   AlbumCanvas,
+  type CanvasMetrics,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 
@@ -375,6 +376,7 @@ const rotatedInteractiveComposition: CompositionPlan = {
 
 function renderCanvas({
   compositionPlan = composition,
+  onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
   onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
   onTransformPreview = vi.fn<
@@ -395,6 +397,7 @@ function renderCanvas({
   >(),
 }: {
   compositionPlan?: CompositionPlan;
+  onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
   onTransformPreview?: (
@@ -426,11 +429,13 @@ function renderCanvas({
       onZoomCommit={onZoomCommit}
       onTransformCommit={onTransformCommit}
       onMaterializedChange={() => undefined}
+      onCanvasMetricsChange={onCanvasMetricsChange}
     />,
   );
 
   return {
     ...view,
+    onCanvasMetricsChange,
     onFocusSheet,
     onCenteredSheetChange,
     onTransformPreview,
@@ -585,10 +590,15 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
 });
 
 test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
-  renderCanvas();
+  const onCanvasMetricsChange = vi.fn();
+  renderCanvas({ onCanvasMetricsChange });
   await finishPixiInitialization();
 
   const host = document.querySelector(".canvas-host") as HTMLElement;
+  Object.defineProperty(host, "clientWidth", {
+    configurable: true,
+    value: 900,
+  });
   Object.defineProperty(host, "clientHeight", {
     configurable: true,
     value: 700,
@@ -606,8 +616,13 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
   };
 
   expect(pixiLifecycle.instances[0].resizeCount).toBe(1);
+  expect(pixiLifecycle.instances[0].screen.width).toBe(900);
   expect(pixiLifecycle.instances[0].screen.height).toBe(700);
   expect(world.scale.x).toBeCloseTo((700 - 2 * 24) / (300 + 24), 4);
+  expect(onCanvasMetricsChange).toHaveBeenLastCalledWith({
+    width: 900,
+    scale: (700 - 2 * 24) / (300 + 24),
+  });
 });
 
 test("reveals the dimmed Photo overflow and thirds guides only during Pan", async () => {

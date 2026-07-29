@@ -31,6 +31,18 @@ export function sheetOffsetInCanvasPixels(
     );
 }
 
+export function centeredSheetOffsetInContinuousCanvas(
+  sheets: readonly ComposedSheet[],
+  index: number,
+  scale: number,
+  canvasWidth: number,
+): number {
+  return (
+    canvasWidth / 2 -
+    sheetCenterInCanvasPixels(sheets, index) * scale
+  );
+}
+
 export function clampContinuousCanvasOffset(
   sheets: readonly ComposedSheet[],
   offsetX: number,

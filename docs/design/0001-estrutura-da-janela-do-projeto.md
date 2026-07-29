@@ -112,7 +112,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
 - Clicar em uma área vazia remove a seleção do elemento e retorna ao contexto geral do Álbum, sem desativar nenhuma Lâmina.
-- Clicar na Grade de Lâminas ou usar as setas de navegação leva o Canvas até outra Lâmina, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
+- Clicar na Grade de Lâminas, usar as setas de navegação ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
 - Apenas percorrer o Canvas por rolagem não troca o conteúdo do Painel contextual.
 - A Lâmina cujo centro visual está mais próximo do centro horizontal da área visível é a `Lâmina centralizada no Canvas`.
 - Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.

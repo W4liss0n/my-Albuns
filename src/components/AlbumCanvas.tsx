@@ -33,6 +33,10 @@ import {
   finishPhotoZoomGesture,
   type PhotoZoomGesture,
 } from "./photoZoomGesture";
+import {
+  photoPaletteIndexForStripe,
+  SHEET_VISUAL_STYLE,
+} from "./sheetVisualStyle";
 
 const PRELOAD_MARGIN = 1;
 const ZOOM_GESTURE_SETTLE_MS = 500;
@@ -48,6 +52,11 @@ export interface PhotoTransformPreview {
   panX: number;
   panY: number;
   zoom: number;
+}
+
+export interface CanvasMetrics {
+  width: number;
+  scale: number;
 }
 
 interface AlbumCanvasProps {
@@ -71,7 +80,7 @@ interface AlbumCanvasProps {
     deltaZoom: number,
   ): void;
   onMaterializedChange(count: number): void;
-  onAutoScaleChange?(scale: number): void;
+  onCanvasMetricsChange?(metrics: CanvasMetrics): void;
 }
 
 type CenteredSheetSynchronization = Pick<
@@ -128,7 +137,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const zoomGestureRef = useRef<ZoomGestureRuntime | null>(null);
   const photoNodesRef = useRef(new Map<string, PhotoRenderNode>());
   const externalPreviewFrameRef = useRef<string | null>(null);
-  const lastAutoScaleRef = useRef<number | null>(null);
+  const lastCanvasMetricsRef = useRef<CanvasMetrics | null>(null);
   const propsRef = useRef(props);
   const [ready, setReady] = useState(false);
   const [canvasSizeRevision, setCanvasSizeRevision] = useState(0);
@@ -241,12 +250,20 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       canvasScale,
       app.screen.width,
     );
+    const canvasMetrics = {
+      width: app.screen.width,
+      scale: canvasScale,
+    };
+    const previousCanvasMetrics = lastCanvasMetricsRef.current;
     if (
-      lastAutoScaleRef.current === null ||
-      Math.abs(lastAutoScaleRef.current - canvasScale) > 0.0001
+      previousCanvasMetrics === null ||
+      Math.abs(previousCanvasMetrics.width - canvasMetrics.width) >
+        0.0001 ||
+      Math.abs(previousCanvasMetrics.scale - canvasMetrics.scale) >
+        0.0001
     ) {
-      lastAutoScaleRef.current = canvasScale;
-      props.onAutoScaleChange?.(canvasScale);
+      lastCanvasMetricsRef.current = canvasMetrics;
+      props.onCanvasMetricsChange?.(canvasMetrics);
     }
 
     const sheetOffsets = props.composition.sheets.map((_, index) =>
@@ -308,9 +325,21 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         .roundRect(8, 12, width, height, 4)
         .fill({ color: 0x121820, alpha: 0.2 });
       const surface = new Graphics()
-        .roundRect(0, 0, width, height, 3)
-        .fill({ color: 0xf1ece2 })
-        .stroke({ color: 0xffffff, width: 1, alpha: 0.65 });
+        .roundRect(
+          0,
+          0,
+          width,
+          height,
+          SHEET_VISUAL_STYLE.surface.cornerRadiusPx,
+        )
+        .fill({
+          color: hexToNumber(SHEET_VISUAL_STYLE.surface.fill),
+        })
+        .stroke({
+          color: hexToNumber(SHEET_VISUAL_STYLE.surface.outline),
+          width: SHEET_VISUAL_STYLE.surface.outlineWidthPx,
+          alpha: SHEET_VISUAL_STYLE.surface.outlineOpacity,
+        });
       sheetContainer.addChild(shadow, surface);
 
       const label = new Text({
@@ -329,7 +358,11 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       const centerLine = new Graphics()
         .moveTo(width / 2, 0)
         .lineTo(width / 2, height)
-        .stroke({ color: 0x887b6c, width: 1, alpha: 0.32 });
+        .stroke({
+          color: hexToNumber(SHEET_VISUAL_STYLE.centerLine.color),
+          width: SHEET_VISUAL_STYLE.centerLine.widthPx,
+          alpha: SHEET_VISUAL_STYLE.centerLine.opacity,
+        });
       sheetContainer.addChild(centerLine);
 
       for (const frame of sheet.frames) {
@@ -420,14 +453,48 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         } else {
           const placeholder = new Graphics()
             .rect(0, 0, frameWidth, frameHeight)
-            .fill({ color: 0xded8cc })
-            .stroke({ color: 0xb9b1a4, width: 1, alpha: 0.8 });
+            .fill({
+              color: hexToNumber(
+                SHEET_VISUAL_STYLE.placeholder.fill,
+              ),
+            })
+            .stroke({
+              color: hexToNumber(
+                SHEET_VISUAL_STYLE.placeholder.outline,
+              ),
+              width:
+                SHEET_VISUAL_STYLE.placeholder.outlineWidthPx,
+              alpha:
+                SHEET_VISUAL_STYLE.placeholder.outlineOpacity,
+            });
           const cross = new Graphics()
-            .moveTo(frameWidth / 2 - 12, frameHeight / 2)
-            .lineTo(frameWidth / 2 + 12, frameHeight / 2)
-            .moveTo(frameWidth / 2, frameHeight / 2 - 12)
-            .lineTo(frameWidth / 2, frameHeight / 2 + 12)
-            .stroke({ color: 0x948b7e, width: 1.4, alpha: 0.75 });
+            .moveTo(
+              frameWidth / 2 -
+                SHEET_VISUAL_STYLE.placeholder.crossHalfLengthPx,
+              frameHeight / 2,
+            )
+            .lineTo(
+              frameWidth / 2 +
+                SHEET_VISUAL_STYLE.placeholder.crossHalfLengthPx,
+              frameHeight / 2,
+            )
+            .moveTo(
+              frameWidth / 2,
+              frameHeight / 2 -
+                SHEET_VISUAL_STYLE.placeholder.crossHalfLengthPx,
+            )
+            .lineTo(
+              frameWidth / 2,
+              frameHeight / 2 +
+                SHEET_VISUAL_STYLE.placeholder.crossHalfLengthPx,
+            )
+            .stroke({
+              color: hexToNumber(
+                SHEET_VISUAL_STYLE.placeholder.crossColor,
+              ),
+              width: SHEET_VISUAL_STYLE.placeholder.crossWidthPx,
+              alpha: SHEET_VISUAL_STYLE.placeholder.crossOpacity,
+            });
           frameContainer.addChild(placeholder, cross);
         }
 
@@ -435,9 +502,17 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           .rect(0, 0, frameWidth, frameHeight)
           .stroke({
             color:
-              props.selectedFrameId === frame.frameId ? 0xb8874f : 0xffffff,
-            width: props.selectedFrameId === frame.frameId ? 3 : 1,
-            alpha: props.selectedFrameId === frame.frameId ? 1 : 0.72,
+              props.selectedFrameId === frame.frameId
+                ? 0xb8874f
+                : hexToNumber(SHEET_VISUAL_STYLE.frame.outline),
+            width:
+              props.selectedFrameId === frame.frameId
+                ? 3
+                : SHEET_VISUAL_STYLE.frame.outlineWidthPx,
+            alpha:
+              props.selectedFrameId === frame.frameId
+                ? 1
+                : SHEET_VISUAL_STYLE.frame.outlineOpacity,
           });
         frameContainer.addChild(outline);
 
@@ -565,9 +640,20 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       }
 
       if (sheet.hasOverlay) {
+        const overlayStyle = SHEET_VISUAL_STYLE.overlay;
         const overlay = new Graphics()
-          .roundRect(8, 8, width - 16, height - 16, 2)
-          .stroke({ color: 0xd4b279, width: 2, alpha: 0.45 });
+          .roundRect(
+            overlayStyle.insetPx,
+            overlayStyle.insetPx,
+            width - overlayStyle.insetPx * 2,
+            height - overlayStyle.insetPx * 2,
+            overlayStyle.cornerRadiusPx,
+          )
+          .stroke({
+            color: hexToNumber(overlayStyle.outline),
+            width: overlayStyle.outlineWidthPx,
+            alpha: overlayStyle.outlineOpacity,
+          });
         overlay.eventMode = "none";
         sheetContainer.addChild(overlay);
       }
@@ -786,17 +872,15 @@ function createPhotoPreviewLayer({
   photoLayer.rotation = (rotationDegrees * Math.PI) / 180;
   photoLayer.scale.set(mirrorX ? -1 : 1, 1);
 
-  const stripeCount = 12;
+  const photoStyle = SHEET_VISUAL_STYLE.photo;
+  const stripeCount = photoStyle.stripeCount;
   for (let stripe = 0; stripe < stripeCount; stripe += 1) {
-    const paletteIndex = Math.min(
-      2,
-      Math.floor((stripe / stripeCount) * 3),
-    );
+    const paletteIndex = photoPaletteIndexForStripe(stripe);
     const stripeGraphic = new Graphics()
       .rect(
         (drawWidth / stripeCount) * stripe,
         0,
-        drawWidth / stripeCount + 1,
+        drawWidth / stripeCount + photoStyle.stripeOverlapPx,
         drawHeight,
       )
       .fill({
@@ -806,11 +890,14 @@ function createPhotoPreviewLayer({
   }
   const light = new Graphics()
     .circle(
-      drawWidth * 0.73,
-      drawHeight * 0.28,
-      drawHeight * 0.18,
+      drawWidth * photoStyle.lightCenterXRatio,
+      drawHeight * photoStyle.lightCenterYRatio,
+      drawHeight * photoStyle.lightRadiusToHeightRatio,
     )
-    .fill({ color: 0xfff3d0, alpha: 0.32 });
+    .fill({
+      color: hexToNumber(photoStyle.lightColor),
+      alpha: photoStyle.lightOpacity,
+    });
   photoLayer.addChild(light);
 
   return photoLayer;

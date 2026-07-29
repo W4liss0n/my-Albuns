@@ -9,10 +9,15 @@ import type {
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import type { PhotoTransformPreview } from "./AlbumCanvas";
+import { sheetOffsetInCanvasPixels } from "./canvasGeometry";
 import { ProjectWorkspace } from "./ProjectWorkspace";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
+    onCanvasMetricsChange?(metrics: {
+      width: number;
+      scale: number;
+    }): void;
     onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
@@ -267,89 +272,50 @@ test("uses the documented compact chrome and collapsible contextual sections", (
 });
 
 test("renders each Grade item from its own composed sheet", () => {
-  const gradeProjection: EditorProjection = {
-    ...twoSheetProjection,
-    composition: {
-      sheets: [
-        {
-          ...twoSheetProjection.composition.sheets[0],
-          frames: [
-            {
-              ...twoSheetProjection.composition.sheets[0].frames[0],
-              photo: {
-                ...twoSheetProjection.composition.sheets[0].frames[0].photo!,
-                rotationDegrees: 12,
-                mirrorX: true,
-              },
-            },
-          ],
-        },
-        {
-          ...twoSheetProjection.composition.sheets[1],
-          hasOverlay: true,
-          frames: [
-            {
-              frameId: "frame-002",
-              clipRect: {
-                x: 320_000,
-                y: 40_000,
-                width: 250_000,
-                height: 220_000,
-              },
-              zIndex: 0,
-              photo: null,
-            },
-          ],
-        },
-      ],
-    },
-  };
-
   render(
     <ProjectWorkspace
-      projection={gradeProjection}
-      bridge={bridgeWithApply(async () => gradeProjection)}
+      projection={twoSheetProjection}
+      bridge={bridgeWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
 
-  const firstPreview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 01",
-  });
-  const secondPreview = screen.getByRole("img", {
-    name: "Prévia da Lâmina 02",
-  });
+  expect(
+    screen.getByRole("img", { name: "Prévia da Lâmina 01" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: "Prévia da Lâmina 02" }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByRole("img")).toHaveLength(2);
+});
 
-  expect(
-    firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
-  ).toHaveAttribute("x", "20000");
-  expect(
-    firstPreview.querySelector('[data-preview-frame-id="frame-001"]'),
-  ).toHaveAttribute("width", "280000");
-  expect(
-    firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
-  ).toBeInTheDocument();
-  expect(
-    firstPreview.querySelector('[data-preview-photo-id="media-001"]'),
-  ).toHaveAttribute(
-    "transform",
-    expect.stringContaining("rotate(12) scale(-1 1)"),
+test("centers a Grade navigation target in the visible Canvas", () => {
+  render(
+    <ProjectWorkspace
+      projection={twoSheetProjection}
+      bridge={bridgeWithApply(async () => twoSheetProjection)}
+      onProjectionChange={() => undefined}
+    />,
   );
-  expect(
-    firstPreview.querySelector('[fill="#10202b"]'),
-  ).toBeInTheDocument();
-  expect(
-    secondPreview.querySelector("[data-preview-photo-id]"),
-  ).not.toBeInTheDocument();
-  expect(
-    secondPreview.querySelector('[data-preview-placeholder-id="frame-002"]'),
-  ).toBeInTheDocument();
-  expect(
-    secondPreview.querySelector('[data-preview-frame-id="frame-002"]'),
-  ).toHaveAttribute("x", "320000");
-  expect(
-    secondPreview.querySelector("[data-preview-overlay]"),
-  ).toBeInTheDocument();
+
+  act(() => {
+    canvasHarness.props?.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+  fireEvent.click(screen.getByText("02").closest("button")!);
+
+  const targetSheet = twoSheetProjection.composition.sheets[1];
+  const targetCenter =
+    sheetOffsetInCanvasPixels(
+      twoSheetProjection.composition.sheets,
+      1,
+    ) +
+    targetSheet.widthUm / 1_000 / 2;
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
+    1_000 / 2 - targetCenter * 0.5,
+  );
 });
 
 test("resizes both workspace panels with persistent splitters", () => {

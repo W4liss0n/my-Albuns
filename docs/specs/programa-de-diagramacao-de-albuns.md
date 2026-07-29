@@ -558,6 +558,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
 - Soltar uma Foto usa a Lâmina sob o ponteiro como destino. Selecionar um Frame ou Foto em outra Lâmina transfere a seleção diretamente para aquele elemento.
 - Clicar em uma área vazia limpa a seleção do elemento e retorna ao contexto do Álbum. Clicar na Grade de Lâminas ou usar as setas navega; arrastar uma miniatura da Grade reordena; rolar o Canvas não altera o contexto.
+- Toda ação explícita de navegação para uma Lâmina, inclusive Grade e setas, alinha o centro visual da Lâmina de destino ao centro horizontal da área útil do Canvas; não a alinha à borda esquerda.
 - Cada miniatura da Grade deriva da mesma `ComposedSheet` usada pelo Canvas e representa proporção, Frames em sua ordem, Fotos com recorte e transformação, placeholders e Overlay; não existe uma miniatura padrão independente da composição.
 - A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. Essa referência é recalculada durante a navegação, permanece independente da Lâmina ou do Frame em foco e serve como alvo implícito dos comandos sem destino explícito; não torna as demais Lâminas inativas.
 - O Modo de edição da Lâmina oculta temporariamente as demais, centraliza e amplia a escolhida e reduz o Painel de imagens para aumentar o Canvas.

@@ -5,17 +5,20 @@ import type {
   ComposedPhoto,
   ComposedSheet,
 } from "../domain/project";
+import {
+  photoPaletteIndexForStripe,
+  SHEET_VISUAL_STYLE,
+} from "./sheetVisualStyle";
 
 interface SheetPreviewProps {
   sheet: ComposedSheet;
 }
 
-const PHOTO_STRIPE_COUNT = 12;
-
 export function SheetPreview({ sheet }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const label = `Prévia da Lâmina ${String(sheet.number).padStart(2, "0")}`;
   const unit = sheet.heightUm / 300;
+  const surfaceStyle = SHEET_VISUAL_STYLE.surface;
   const frames = [...sheet.frames].sort(
     (first, second) => first.zIndex - second.zIndex,
   );
@@ -53,20 +56,20 @@ export function SheetPreview({ sheet }: SheetPreviewProps) {
         y="0"
         width={sheet.widthUm}
         height={sheet.heightUm}
-        rx={3 * unit}
-        fill="#f1ece2"
-        stroke="#ffffff"
-        strokeOpacity="0.65"
-        strokeWidth={unit}
+        rx={surfaceStyle.cornerRadiusPx * unit}
+        fill={surfaceStyle.fill}
+        stroke={surfaceStyle.outline}
+        strokeOpacity={surfaceStyle.outlineOpacity}
+        strokeWidth={surfaceStyle.outlineWidthPx * unit}
       />
       <line
         x1={sheet.widthUm / 2}
         y1="0"
         x2={sheet.widthUm / 2}
         y2={sheet.heightUm}
-        stroke="#887b6c"
-        strokeOpacity="0.32"
-        strokeWidth={unit}
+        stroke={SHEET_VISUAL_STYLE.centerLine.color}
+        strokeOpacity={SHEET_VISUAL_STYLE.centerLine.opacity}
+        strokeWidth={SHEET_VISUAL_STYLE.centerLine.widthPx * unit}
       />
 
       {frames.map((frame, index) => (
@@ -81,15 +84,25 @@ export function SheetPreview({ sheet }: SheetPreviewProps) {
       {sheet.hasOverlay && (
         <rect
           data-preview-overlay=""
-          x={8 * unit}
-          y={8 * unit}
-          width={Math.max(0, sheet.widthUm - 16 * unit)}
-          height={Math.max(0, sheet.heightUm - 16 * unit)}
-          rx={2 * unit}
+          x={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
+          y={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
+          width={Math.max(
+            0,
+            sheet.widthUm -
+              SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
+          )}
+          height={Math.max(
+            0,
+            sheet.heightUm -
+              SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
+          )}
+          rx={SHEET_VISUAL_STYLE.overlay.cornerRadiusPx * unit}
           fill="none"
-          stroke="#d4b279"
-          strokeOpacity="0.45"
-          strokeWidth={2 * unit}
+          stroke={SHEET_VISUAL_STYLE.overlay.outline}
+          strokeOpacity={SHEET_VISUAL_STYLE.overlay.outlineOpacity}
+          strokeWidth={
+            SHEET_VISUAL_STYLE.overlay.outlineWidthPx * unit
+          }
         />
       )}
     </svg>
@@ -108,6 +121,7 @@ function FramePreview({
   unit,
 }: FramePreviewProps) {
   const { clipRect, photo } = frame;
+  const placeholderStyle = SHEET_VISUAL_STYLE.placeholder;
 
   return (
     <g>
@@ -122,28 +136,44 @@ function FramePreview({
             y={clipRect.y}
             width={clipRect.width}
             height={clipRect.height}
-            fill="#ded8cc"
-            stroke="#b9b1a4"
-            strokeOpacity="0.8"
-            strokeWidth={unit}
+            fill={placeholderStyle.fill}
+            stroke={placeholderStyle.outline}
+            strokeOpacity={placeholderStyle.outlineOpacity}
+            strokeWidth={placeholderStyle.outlineWidthPx * unit}
           />
           <line
-            x1={clipRect.x + clipRect.width / 2 - 12 * unit}
+            x1={
+              clipRect.x +
+              clipRect.width / 2 -
+              placeholderStyle.crossHalfLengthPx * unit
+            }
             y1={clipRect.y + clipRect.height / 2}
-            x2={clipRect.x + clipRect.width / 2 + 12 * unit}
+            x2={
+              clipRect.x +
+              clipRect.width / 2 +
+              placeholderStyle.crossHalfLengthPx * unit
+            }
             y2={clipRect.y + clipRect.height / 2}
-            stroke="#948b7e"
-            strokeOpacity="0.75"
-            strokeWidth={1.4 * unit}
+            stroke={placeholderStyle.crossColor}
+            strokeOpacity={placeholderStyle.crossOpacity}
+            strokeWidth={placeholderStyle.crossWidthPx * unit}
           />
           <line
             x1={clipRect.x + clipRect.width / 2}
-            y1={clipRect.y + clipRect.height / 2 - 12 * unit}
+            y1={
+              clipRect.y +
+              clipRect.height / 2 -
+              placeholderStyle.crossHalfLengthPx * unit
+            }
             x2={clipRect.x + clipRect.width / 2}
-            y2={clipRect.y + clipRect.height / 2 + 12 * unit}
-            stroke="#948b7e"
-            strokeOpacity="0.75"
-            strokeWidth={1.4 * unit}
+            y2={
+              clipRect.y +
+              clipRect.height / 2 +
+              placeholderStyle.crossHalfLengthPx * unit
+            }
+            stroke={placeholderStyle.crossColor}
+            strokeOpacity={placeholderStyle.crossOpacity}
+            strokeWidth={placeholderStyle.crossWidthPx * unit}
           />
         </g>
       )}
@@ -154,9 +184,9 @@ function FramePreview({
         width={clipRect.width}
         height={clipRect.height}
         fill="none"
-        stroke="#ffffff"
-        strokeOpacity="0.86"
-        strokeWidth={unit}
+        stroke={SHEET_VISUAL_STYLE.frame.outline}
+        strokeOpacity={SHEET_VISUAL_STYLE.frame.outlineOpacity}
+        strokeWidth={SHEET_VISUAL_STYLE.frame.outlineWidthPx * unit}
       />
     </g>
   );
@@ -169,6 +199,7 @@ interface PhotoPreviewProps {
 
 function PhotoPreview({ photo, unit }: PhotoPreviewProps) {
   const { drawRect } = photo;
+  const photoStyle = SHEET_VISUAL_STYLE.photo;
   const centerX = drawRect.x + drawRect.width / 2;
   const centerY = drawRect.y + drawRect.height / 2;
   const transform = [
@@ -183,30 +214,33 @@ function PhotoPreview({ photo, unit }: PhotoPreviewProps) {
       data-preview-photo-id={photo.mediaId}
       transform={transform}
     >
-      {Array.from({ length: PHOTO_STRIPE_COUNT }, (_, stripe) => {
-        const paletteIndex = Math.min(
-          2,
-          Math.floor((stripe / PHOTO_STRIPE_COUNT) * 3),
-        );
-        const stripeWidth = drawRect.width / PHOTO_STRIPE_COUNT;
+      {Array.from({ length: photoStyle.stripeCount }, (_, stripe) => {
+        const paletteIndex = photoPaletteIndexForStripe(stripe);
+        const stripeWidth = drawRect.width / photoStyle.stripeCount;
 
         return (
           <rect
             fill={photo.palette[paletteIndex]}
             height={drawRect.height}
             key={stripe}
-            width={stripeWidth + unit}
+            width={stripeWidth + photoStyle.stripeOverlapPx * unit}
             x={drawRect.x + stripeWidth * stripe}
             y={drawRect.y}
           />
         );
       })}
       <circle
-        cx={drawRect.x + drawRect.width * 0.73}
-        cy={drawRect.y + drawRect.height * 0.28}
-        r={drawRect.height * 0.18}
-        fill="#fff3d0"
-        fillOpacity="0.32"
+        cx={
+          drawRect.x +
+          drawRect.width * photoStyle.lightCenterXRatio
+        }
+        cy={
+          drawRect.y +
+          drawRect.height * photoStyle.lightCenterYRatio
+        }
+        r={drawRect.height * photoStyle.lightRadiusToHeightRatio}
+        fill={photoStyle.lightColor}
+        fillOpacity={photoStyle.lightOpacity}
       />
     </g>
   );

@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 
 import type { CompositionPlan } from "../domain/project";
 import {
+  centeredSheetOffsetInContinuousCanvas,
   centeredSheetIdInContinuousCanvas,
   clampContinuousCanvasOffset,
 } from "./canvasGeometry";
@@ -70,4 +71,31 @@ test("identifies the sheet nearest the visible Canvas center", () => {
       1_000,
     ),
   ).toBe("sheet-003");
+});
+
+test("calculates the offset that centers any navigation target", () => {
+  expect(
+    centeredSheetOffsetInContinuousCanvas(
+      threeSheets,
+      0,
+      0.5,
+      1_000,
+    ),
+  ).toBe(350);
+  expect(
+    centeredSheetOffsetInContinuousCanvas(
+      threeSheets,
+      1,
+      0.5,
+      1_000,
+    ),
+  ).toBe(24);
+  expect(
+    centeredSheetOffsetInContinuousCanvas(
+      threeSheets,
+      2,
+      0.5,
+      1_000,
+    ),
+  ).toBe(-302);
 });
