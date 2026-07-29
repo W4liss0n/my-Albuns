@@ -371,6 +371,25 @@ const interactiveComposition: CompositionPlan = {
   ],
 };
 
+const twoPhotoComposition: CompositionPlan = {
+  sheets: [1, 2].map((number) => ({
+    ...interactiveComposition.sheets[0],
+    sheetId: `sheet-00${number}`,
+    number,
+    frames: [
+      {
+        ...interactiveComposition.sheets[0].frames[0],
+        frameId: `frame-00${number}`,
+        photo: {
+          ...interactiveComposition.sheets[0].frames[0].photo!,
+          mediaId: `media-00${number}`,
+          name: `Foto ${number}.jpg`,
+        },
+      },
+    ],
+  })),
+};
+
 const pannedInteractiveComposition: CompositionPlan = {
   sheets: [
     {
@@ -739,6 +758,47 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
   });
   await waitFor(() => {
     expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
+  });
+});
+
+test("selects the first composed benchmark Frame regardless of texture completion order", async () => {
+  const onCompleted = vi.fn();
+  renderCanvas({
+    compositionPlan: twoPhotoComposition,
+    mediaPreviewUrls: {
+      "media-001": "asset://localhost/cache/media-001.jpg",
+      "media-002": "asset://localhost/cache/media-002.jpg",
+    },
+    performanceProbe: {
+      key: "deterministic-target-probe",
+      config: {
+        warmupFrames: 1,
+        panFrames: 1,
+        zoomFrames: 1,
+      },
+      onReady: vi.fn(),
+      onCompleted,
+      onFailed: vi.fn(),
+    },
+  });
+  await finishPixiInitialization();
+
+  await act(async () => {
+    pixiLifecycle.resolveAssetLoads[1]?.({ label: "second-texture" });
+    await Promise.resolve();
+    await Promise.resolve();
+    pixiLifecycle.resolveAssetLoads[0]?.({ label: "first-texture" });
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  await waitFor(() => {
+    expect(onCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        frameId: "frame-001",
+        textureBacked: true,
+      }),
+    );
   });
 });
 

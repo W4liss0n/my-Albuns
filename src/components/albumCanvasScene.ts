@@ -222,9 +222,17 @@ export class AlbumCanvasScene {
     if (!input || !this.previewTextures.isSettled()) {
       return { status: "pending" };
     }
-    const node = [...this.photoNodes.values()].find(
-      (candidate) => candidate.textureBacked,
-    );
+    let node: PhotoRenderNode | undefined;
+    for (const sheet of input.composition.sheets) {
+      for (const frame of sheet.frames) {
+        const candidate = this.photoNodes.get(frame.frameId);
+        if (candidate?.textureBacked) {
+          node = candidate;
+          break;
+        }
+      }
+      if (node) break;
+    }
     if (!node) {
       return {
         status: "failed",

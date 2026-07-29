@@ -832,6 +832,32 @@ function Measure-CanvasTimingAggregate {
     }
 }
 
+function Assert-ComparableCanvasTargets {
+    param(
+        [Parameter(Mandatory = $true)] $Independent,
+        [Parameter(Mandatory = $true)] $Multiwindow
+    )
+
+    $independentFrames = @{}
+    foreach ($project in $Independent.canvas.projects) {
+        $independentFrames[[string]$project.projectId] = [string]$project.frameId
+    }
+    foreach ($project in $Multiwindow.canvas.projects) {
+        $projectId = [string]$project.projectId
+        $independentFrame = $independentFrames[$projectId]
+        if (
+            [string]::IsNullOrWhiteSpace($independentFrame) -or
+            $independentFrame -ne [string]$project.frameId
+        ) {
+            throw (
+                "Canvas target mismatch for project ${projectId}: " +
+                "independent=${independentFrame}, " +
+                "multiwindow=$($project.frameId)."
+            )
+        }
+    }
+}
+
 function Wait-ForTopologyBenchmark {
     param(
         [Parameter(Mandatory = $true)]
@@ -1399,6 +1425,9 @@ try {
         -StartedAt $multiwindowStartedAt `
         -TopologyStopwatch $multiwindowStopwatch `
         -ExportGatePath $multiwindowExportGate
+    Assert-ComparableCanvasTargets `
+        -Independent $independentInteraction `
+        -Multiwindow $multiwindowInteraction
     $multiwindowMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($multiwindow.Id)
 
