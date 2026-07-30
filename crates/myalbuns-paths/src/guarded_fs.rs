@@ -7,7 +7,7 @@ use crate::AppPathsError;
 
 #[derive(Debug)]
 pub(crate) struct DirectoryGuard {
-    pub(crate) _handle: File,
+    pub(crate) containment_handle: File,
     pub(crate) logical_path: PathBuf,
     pub(crate) physical_path: PathBuf,
 }
@@ -16,9 +16,7 @@ pub(crate) fn ensure_direct_child(
     parent: &DirectoryGuard,
     child_path: &Path,
 ) -> Result<DirectoryGuard, AppPathsError> {
-    if child_path.parent() != Some(parent.logical_path.as_path()) {
-        return Err(AppPathsError::CacheStorageOutsideRoot);
-    }
+    validate_child_location(parent, child_path)?;
     match fs::create_dir(child_path) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
@@ -26,10 +24,40 @@ pub(crate) fn ensure_direct_child(
     }
     let metadata =
         fs::symlink_metadata(child_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-    if is_reparse_point(&metadata) || !metadata.is_dir() {
+    open_validated_direct_child(parent, child_path, &metadata)
+}
+
+pub(crate) fn open_existing_direct_child(
+    parent: &DirectoryGuard,
+    child_path: &Path,
+) -> Result<Option<DirectoryGuard>, AppPathsError> {
+    validate_child_location(parent, child_path)?;
+    let metadata = match fs::symlink_metadata(child_path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+    };
+    open_validated_direct_child(parent, child_path, &metadata).map(Some)
+}
+
+fn validate_child_location(
+    parent: &DirectoryGuard,
+    child_path: &Path,
+) -> Result<(), AppPathsError> {
+    if child_path.parent() != Some(parent.logical_path.as_path()) {
         return Err(AppPathsError::CacheStorageOutsideRoot);
     }
+    Ok(())
+}
 
+fn open_validated_direct_child(
+    parent: &DirectoryGuard,
+    child_path: &Path,
+    metadata: &fs::Metadata,
+) -> Result<DirectoryGuard, AppPathsError> {
+    if is_reparse_point(metadata) || !metadata.is_dir() {
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
     let child = open_directory(child_path)?;
     let expected_name = child_path
         .file_name()
@@ -38,31 +66,6 @@ pub(crate) fn ensure_direct_child(
         return Err(AppPathsError::CacheStorageOutsideRoot);
     }
     Ok(child)
-}
-
-pub(crate) fn open_existing_direct_child(
-    parent: &DirectoryGuard,
-    child_path: &Path,
-) -> Result<Option<DirectoryGuard>, AppPathsError> {
-    if child_path.parent() != Some(parent.logical_path.as_path()) {
-        return Err(AppPathsError::CacheStorageOutsideRoot);
-    }
-    let metadata = match fs::symlink_metadata(child_path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
-    };
-    if is_reparse_point(&metadata) || !metadata.is_dir() {
-        return Err(AppPathsError::CacheStorageOutsideRoot);
-    }
-    let child = open_directory(child_path)?;
-    let expected_name = child_path
-        .file_name()
-        .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
-    if !is_direct_physical_child(&parent.physical_path, &child.physical_path, expected_name) {
-        return Err(AppPathsError::CacheStorageOutsideRoot);
-    }
-    Ok(Some(child))
 }
 
 pub(crate) fn remove_empty_directory(path: &Path) -> Result<(), AppPathsError> {
@@ -103,6 +106,14 @@ pub(crate) fn validate_open_file(
     logical_path: &Path,
     file: &File,
 ) -> Result<(), AppPathsError> {
+    if !parent
+        .containment_handle
+        .metadata()
+        .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+        .is_dir()
+    {
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
     if !file
         .metadata()
         .map_err(|_| AppPathsError::CacheStorageUnavailable)?
@@ -152,7 +163,7 @@ pub(crate) fn open_directory(path: &Path) -> Result<DirectoryGuard, AppPathsErro
     let physical_path = physical_path_from_file(&handle, path)?;
 
     Ok(DirectoryGuard {
-        _handle: handle,
+        containment_handle: handle,
         logical_path: path.to_path_buf(),
         physical_path,
     })
@@ -204,7 +215,7 @@ pub(crate) fn open_directory(path: &Path) -> Result<DirectoryGuard, AppPathsErro
     let physical_path =
         fs::canonicalize(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
     Ok(DirectoryGuard {
-        _handle: handle,
+        containment_handle: handle,
         logical_path: path.to_path_buf(),
         physical_path,
     })

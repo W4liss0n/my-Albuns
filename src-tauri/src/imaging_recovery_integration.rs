@@ -261,20 +261,48 @@ fn real_processor_recovery_flows_through_production_modules() {
             vec![source.clone()],
             4096,
         );
+        let generation_id = format!(
+            "{}-v1-4096",
+            source.source_sha256()[..16].to_ascii_lowercase()
+        );
+        let foreign_process_id = u32::MAX - 7;
+        let foreign_temporary = cache_paths
+            .preview_temporary_file(source.media_id(), &generation_id, foreign_process_id)
+            .expect("the foreign temporary path is valid");
+        let cache_storage = app_paths
+            .prepare_cache_storage(&cache_paths)
+            .expect("the recovery Cache storage is prepared");
+        let mut foreign_file = cache_storage
+            .create_temporary_file(&foreign_temporary)
+            .expect("the foreign temporary is created");
+        foreign_file
+            .write_all(b"foreign process")
+            .expect("the foreign temporary is writable");
+        drop(foreign_file);
+        drop(cache_storage);
         let cache_context = InvocationContext::new(cache_request_id, Some(project_id.clone()));
         let mut cache_transport =
             RealProcessTransport::new(executable.clone(), log_directory.clone(), CrashNext::Cache);
 
-        let cache_completion =
+        let cache_execution =
             cache_engine::execute(&mut cache_transport, &app_paths, cache_work, &cache_context)
                 .await
                 .expect("CacheEngine restarts the real sidecar once");
+        let cache_recovery = cache_execution
+            .recovery
+            .expect("the successful Cache records its recovery");
+        let cache_completion = cache_execution.completion;
 
         assert_eq!(cache_transport.process_ids.len(), 2);
         assert_ne!(
             cache_transport.process_ids[0],
             cache_transport.process_ids[1]
         );
+        assert_eq!(
+            cache_recovery.failed_process_id,
+            cache_transport.process_ids[0]
+        );
+        assert_eq!(cache_recovery.removed_temporary_count, 1);
         assert!(cache_transport.partial_preparation_observed);
         assert!(!cache_transport.cache_metadata_existed_after_failure);
         let artifact = &cache_completion.artifacts[0];
@@ -286,6 +314,10 @@ fn real_processor_recovery_flows_through_production_modules() {
             )
             .expect("the failed temporary path is valid");
         assert!(!failed_temporary.exists());
+        assert!(
+            foreign_temporary.is_file(),
+            "cleanup preserves another process temporary"
+        );
         assert!(cache_paths.metadata_file().is_file());
 
         write_evidence(
@@ -294,8 +326,9 @@ fn real_processor_recovery_flows_through_production_modules() {
                 "failedProcessId": cache_transport.process_ids[0],
                 "restartedProcessId": cache_transport.process_ids[1],
                 "temporaryObservedAfterFailure": cache_transport.partial_preparation_observed,
-                "removedTemporaryCount": usize::from(!failed_temporary.exists()),
+                "removedTemporaryCount": cache_recovery.removed_temporary_count,
                 "temporaryExistedAfterCleanup": failed_temporary.exists(),
+                "foreignTemporarySurvivedCleanup": foreign_temporary.is_file(),
                 "metadataExistedAfterFailure":
                     cache_transport.cache_metadata_existed_after_failure,
                 "metadataExistedAfterRestart": cache_paths.metadata_file().is_file(),

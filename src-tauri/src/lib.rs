@@ -180,7 +180,7 @@ async fn prepare_media_previews(
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), safe_project_id);
     let mut transport = TauriImagingTransport::new(&app, &logging);
-    let completed = cache_engine::execute(&mut transport, &app_paths, work, &context)
+    let execution = cache_engine::execute(&mut transport, &app_paths, work, &context)
         .await
         .map_err(|failure| {
             log_media_cache_failure(
@@ -191,6 +191,13 @@ async fn prepare_media_previews(
             );
             failure.message
         })?;
+    let recovered_process_id = execution
+        .recovery
+        .map(|recovery| recovery.failed_process_id);
+    let removed_recovery_temporary_count = execution
+        .recovery
+        .map_or(0, |recovery| recovery.removed_temporary_count);
+    let completed = execution.completion;
     let catalog = MediaPreviewCatalog {
         previews: completed
             .artifacts
@@ -226,6 +233,8 @@ async fn prepare_media_previews(
         reused_count = catalog.reused_count,
         source_bytes = catalog.source_bytes,
         preview_bytes = catalog.preview_bytes,
+        recovered_process_id,
+        removed_recovery_temporary_count,
         elapsed_ms = catalog.elapsed_ms,
         event = "media_cache_completed",
     );

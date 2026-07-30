@@ -63,6 +63,34 @@ pub(crate) struct InvocationFailure {
     termination_observed: bool,
 }
 
+#[derive(Debug)]
+pub(crate) struct OperationFailure<Stage> {
+    pub(crate) stage: Stage,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) message: String,
+}
+
+impl<Stage> OperationFailure<Stage> {
+    pub(crate) fn new(stage: Stage, message: impl Into<String>) -> Self {
+        Self {
+            stage,
+            exit_code: None,
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn from_invocation(
+        failure: InvocationFailure,
+        map_stage: impl FnOnce(InvocationFailureStage) -> Stage,
+    ) -> Self {
+        Self {
+            stage: map_stage(failure.stage),
+            exit_code: failure.exit_code,
+            message: failure.message,
+        }
+    }
+}
+
 impl InvocationFailure {
     pub(crate) fn at_stage(
         stage: InvocationFailureStage,
@@ -301,7 +329,7 @@ pub(crate) fn complete_invocation(
 mod tests {
     use myalbuns_imaging_protocol::ImagingFailureStage;
 
-    use super::{InvocationFailure, InvocationFailureStage};
+    use super::{InvocationFailure, InvocationFailureStage, complete_invocation};
 
     #[test]
     fn processor_exit_codes_remain_typed_at_the_host_boundary() {
@@ -314,5 +342,24 @@ mod tests {
         assert_eq!(failure.stage.as_str(), "source_decode");
         assert_eq!(failure.process_id, Some(4242));
         assert!(!failure.is_unexpected_termination());
+    }
+
+    #[test]
+    fn collected_process_status_uses_the_same_recovery_classification_for_every_adapter() {
+        let unexpected =
+            complete_invocation(4242, Some(1), b"").expect_err("an abrupt exit is a failure");
+        assert!(unexpected.is_unexpected_termination());
+
+        let deterministic = complete_invocation(
+            4343,
+            Some(ImagingFailureStage::SourceDecode.exit_code().into()),
+            b"",
+        )
+        .expect_err("a typed processor exit is a failure");
+        assert!(!deterministic.is_unexpected_termination());
+        assert_eq!(
+            deterministic.stage,
+            InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode)
+        );
     }
 }

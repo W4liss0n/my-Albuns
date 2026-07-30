@@ -138,6 +138,7 @@ try {
             -or -not $cacheEvidence.temporaryObservedAfterFailure `
             -or $cacheEvidence.removedTemporaryCount -lt 1 `
             -or $cacheEvidence.temporaryExistedAfterCleanup `
+            -or -not $cacheEvidence.foreignTemporarySurvivedCleanup `
             -or $cacheEvidence.metadataExistedAfterFailure `
             -or -not $cacheEvidence.metadataExistedAfterRestart `
             -or $cacheEvidence.generatedCountAfterRestart -lt 1) {

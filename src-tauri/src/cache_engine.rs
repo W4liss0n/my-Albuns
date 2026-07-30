@@ -9,7 +9,7 @@ use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
 
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
-    InvocationFailureStage,
+    InvocationFailureStage, OperationFailure,
 };
 
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
@@ -62,29 +62,18 @@ impl CacheFailureStage {
     }
 }
 
+pub(crate) type CacheFailure = OperationFailure<CacheFailureStage>;
+
 #[derive(Debug)]
-pub(crate) struct CacheFailure {
-    pub(crate) stage: CacheFailureStage,
-    pub(crate) exit_code: Option<i32>,
-    pub(crate) message: String,
+pub(crate) struct CacheExecution {
+    pub(crate) completion: CacheCompletion,
+    pub(crate) recovery: Option<CacheRecovery>,
 }
 
-impl CacheFailure {
-    fn new(stage: CacheFailureStage, message: impl Into<String>) -> Self {
-        Self {
-            stage,
-            exit_code: None,
-            message: message.into(),
-        }
-    }
-
-    fn processor(failure: InvocationFailure) -> Self {
-        Self {
-            stage: CacheFailureStage::Processor(failure.stage),
-            exit_code: failure.exit_code,
-            message: failure.message,
-        }
-    }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CacheRecovery {
+    pub(crate) failed_process_id: u32,
+    pub(crate) removed_temporary_count: usize,
 }
 
 pub(crate) async fn execute<T: ImagingTransport>(
@@ -92,12 +81,15 @@ pub(crate) async fn execute<T: ImagingTransport>(
     app_paths: &AppPaths,
     work: CacheWork,
     context: &InvocationContext,
-) -> Result<CacheCompletion, CacheFailure> {
+) -> Result<CacheExecution, CacheFailure> {
     let request = plan_request(&work)?;
     let command = ImagingCommand::build_cache(request.clone());
-    let response = invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context)
-        .await
-        .map_err(CacheFailure::processor)?;
+    let (response, recovery) =
+        invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context)
+            .await
+            .map_err(|failure| {
+                CacheFailure::from_invocation(failure, CacheFailureStage::Processor)
+            })?;
     let completion = response
         .cache_completed_for(&work.request_id)
         .cloned()
@@ -117,7 +109,10 @@ pub(crate) async fn execute<T: ImagingTransport>(
         })?;
     verify_completion(&storage, &request, &completion)?;
     write_cache_metadata(&storage, &request, &completion.artifacts)?;
-    Ok(completion)
+    Ok(CacheExecution {
+        completion,
+        recovery,
+    })
 }
 
 fn plan_request(work: &CacheWork) -> Result<CacheRequest, CacheFailure> {
@@ -162,8 +157,9 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     cache_paths: &CachePathPlan,
     command: &ImagingCommand,
     context: &InvocationContext,
-) -> Result<ImagingResponse, InvocationFailure> {
+) -> Result<(ImagingResponse, Option<CacheRecovery>), InvocationFailure> {
     let mut attempt = 1_u8;
+    let mut recovery = None;
     loop {
         match transport
             .invoke(command, context, ImagingOperation::Cache, attempt)
@@ -181,7 +177,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                         event = "imaging_processor_restart_completed",
                     );
                 }
-                return Ok(response);
+                return Ok((response, recovery));
             }
             Err(failure) if failure.is_unexpected_termination() => {
                 let Some(failed_process_id) = failure.process_id else {
@@ -198,6 +194,10 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                         )
                     })?;
                 if attempt == 1 {
+                    recovery = Some(CacheRecovery {
+                        failed_process_id,
+                        removed_temporary_count,
+                    });
                     tracing::warn!(
                         target: "myalbuns.desktop",
                         process_role = ProcessRole::DesktopHost.as_str(),
@@ -523,11 +523,18 @@ mod tests {
                 attempts: Vec::new(),
             };
 
-            let completion = execute(&mut transport, &app_paths, work.clone(), &context)
+            let execution = execute(&mut transport, &app_paths, work.clone(), &context)
                 .await
                 .expect("the Cache completes after one restart");
 
-            assert_eq!(completion.generated_count, 1);
+            assert_eq!(execution.completion.generated_count, 1);
+            assert_eq!(
+                execution.recovery,
+                Some(super::CacheRecovery {
+                    failed_process_id: 4242,
+                    removed_temporary_count: 0,
+                })
+            );
             assert_eq!(transport.attempts, [1, 2]);
             assert!(work.cache_paths.metadata_file().is_file());
         });

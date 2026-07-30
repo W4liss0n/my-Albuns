@@ -13,8 +13,7 @@ use myalbuns_paths::{ExportPathPlan, PreparedExportStorage};
 use sha2::{Digest, Sha256};
 
 use crate::imaging_processor::{
-    ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
-    InvocationFailureStage,
+    ImagingOperation, ImagingTransport, InvocationContext, InvocationFailureStage, OperationFailure,
 };
 
 #[derive(Debug)]
@@ -53,30 +52,7 @@ impl ExportFailureStage {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct ExportFailure {
-    pub(crate) stage: ExportFailureStage,
-    pub(crate) exit_code: Option<i32>,
-    pub(crate) message: String,
-}
-
-impl ExportFailure {
-    fn new(stage: ExportFailureStage, message: impl Into<String>) -> Self {
-        Self {
-            stage,
-            exit_code: None,
-            message: message.into(),
-        }
-    }
-
-    fn processor(failure: InvocationFailure) -> Self {
-        Self {
-            stage: ExportFailureStage::Processor(failure.stage),
-            exit_code: failure.exit_code,
-            message: failure.message,
-        }
-    }
-}
+pub(crate) type ExportFailure = OperationFailure<ExportFailureStage>;
 
 pub(crate) fn plan(
     request_id: impl Into<String>,
@@ -161,7 +137,10 @@ pub(crate) async fn execute<T: ImagingTransport>(
         Ok(response) => response,
         Err(failure) => {
             discard_failed_preparation(preparation, context);
-            return Err(ExportFailure::processor(failure));
+            return Err(ExportFailure::from_invocation(
+                failure,
+                ExportFailureStage::Processor,
+            ));
         }
     };
     let Some(completion) = response.completed_for(&plan.request.request_id).cloned() else {
