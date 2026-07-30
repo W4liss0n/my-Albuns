@@ -90,7 +90,7 @@ function Invoke-TopologyGlobalStatus {
         if (-not $connect.Wait($TimeoutMilliseconds)) {
             throw "Timed out connecting to global endpoint $Endpoint."
         }
-        $connect.GetAwaiter().GetResult()
+        [void] $connect.GetAwaiter().GetResult()
         $stream = $client.GetStream()
         $stream.ReadTimeout = $TimeoutMilliseconds
         $stream.WriteTimeout = $TimeoutMilliseconds
