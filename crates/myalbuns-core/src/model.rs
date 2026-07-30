@@ -309,4 +309,6 @@ pub enum CoreError {
     InvalidSnapshot(String),
     #[error("Versão de documento não suportada: {0}")]
     UnsupportedSchema(u32),
+    #[error("A revisão salva confirmada ({confirmed}) não corresponde à revisão atual ({current})")]
+    SavedRevisionMismatch { current: u64, confirmed: u64 },
 }

@@ -1,4 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -13,7 +19,16 @@ import type {
   MediaPreviewPort,
   ProjectSessionPort,
 } from "./application/projectPorts";
-import { createEmptyProjection } from "./test/projectFixtures";
+import type { TopologyFaultProbeBridge } from "./application/topologyFaultProbe";
+import type { EditorProjection } from "./domain/project";
+import {
+  createEmptyProjection,
+  representativeProjection,
+} from "./test/projectFixtures";
+
+vi.mock("./components/AlbumCanvas", () => ({
+  AlbumCanvas: () => <div data-testid="album-canvas" />,
+}));
 
 const projection = createEmptyProjection();
 
@@ -199,3 +214,145 @@ test("prepares real media previews after opening without blocking the Workspace"
     ]),
   );
 });
+
+test("serializes fault-probe and editor changes through one Project queue", async () => {
+  const canonical = withLeadingPlaceholder(representativeProjection);
+  const appliedProbe = withRevision(canonical, 26, true);
+  const savedProbe = {
+    ...withRevision(appliedProbe, 26, false),
+    state: {
+      ...appliedProbe.state,
+      savedRevision: 26,
+      dirty: false,
+    },
+  };
+  const appliedEditor = withRevision(savedProbe, 27, true);
+  let releaseCanonical!: (projection: EditorProjection) => void;
+  const canonicalPending = new Promise<EditorProjection>((resolve) => {
+    releaseCanonical = resolve;
+  });
+  const load = vi
+    .fn<ProjectSessionPort["load"]>()
+    .mockResolvedValueOnce(canonical)
+    .mockImplementationOnce(() => canonicalPending);
+  const apply = vi
+    .fn<ProjectSessionPort["apply"]>()
+    .mockResolvedValueOnce(appliedProbe)
+    .mockResolvedValueOnce(appliedEditor);
+  const topologyFaultProbeBridge: TopologyFaultProbeBridge = {
+    enabled: true,
+    loadConfig: vi.fn(async () => ({
+      enabled: true,
+      config: {
+        probeId: "shared-project-queue",
+        expectedGlobalAvailable: true,
+      },
+    })),
+    persistAndReport: vi.fn(async () => ({
+      projection: savedProbe,
+      probeId: "shared-project-queue",
+      previousRevision: 25,
+      persistedRevision: 26,
+      bytes: 4_096,
+      sha256: "7f83b1657ff1fc53b92dc18148a1d65dfa13514d",
+      globalAvailable: true,
+      globalProcessId: 1_234,
+      globalRoundTripMs: 1.5,
+    })),
+    reportFailure: vi.fn(),
+  };
+
+  render(
+    <App
+      exportPort={exportPort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectSessionPort={{
+        ...projectSessionPort,
+        load,
+        apply,
+      }}
+      topologyFaultProbeBridge={topologyFaultProbeBridge}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", { name: "Exportar prova" }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+
+  fireEvent.doubleClick(
+    screen.getByText("Serra ao amanhecer.jpg").closest("button")!,
+  );
+  expect(apply).not.toHaveBeenCalled();
+
+  await act(async () => {
+    releaseCanonical(canonical);
+    await canonicalPending;
+  });
+
+  await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
+  expect(apply).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ kind: "transformPhoto" }),
+  );
+  expect(apply).toHaveBeenNthCalledWith(2, {
+    kind: "fillLeftmostPlaceholder",
+    sheetId: "sheet-001",
+    mediaId: "media-001",
+  });
+});
+
+function withLeadingPlaceholder(
+  source: EditorProjection,
+): EditorProjection {
+  const firstSheet = source.state.album.sheets[0];
+  return {
+    ...source,
+    state: {
+      ...source.state,
+      album: {
+        ...source.state.album,
+        sheets: [
+          {
+            ...firstSheet,
+            frames: [
+              {
+                ...firstSheet.frames[0],
+                id: "placeholder-001",
+                photo: null,
+              },
+              ...firstSheet.frames,
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
+
+function withRevision(
+  source: EditorProjection,
+  revision: number,
+  dirty: boolean,
+): EditorProjection {
+  return {
+    ...source,
+    state: {
+      ...source.state,
+      revision,
+      dirty,
+    },
+  };
+}

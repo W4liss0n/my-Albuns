@@ -11,6 +11,7 @@ import {
   tauriProjectSessionPort,
 } from "./platform/tauriProjectPorts";
 import { tauriTopologyBenchmarkBridge } from "./platform/tauriTopologyBenchmarkBridge";
+import { tauriTopologyFaultProbeBridge } from "./platform/tauriTopologyFaultProbeBridge";
 import { tauriLogger } from "./platform/tauriLogger";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
@@ -20,6 +21,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       mediaPreviewPort={tauriMediaPreviewPort}
       projectSessionPort={tauriProjectSessionPort}
       topologyBenchmarkBridge={tauriTopologyBenchmarkBridge}
+      topologyFaultProbeBridge={tauriTopologyFaultProbeBridge}
       graphicsProbe={probeGraphics}
       canvasGraphicsDiagnosticProbe={probeCanvasGraphics}
       logger={tauriLogger}

@@ -10,6 +10,13 @@ pub(crate) struct ProjectHost {
     projects: HashMap<String, HostedProject>,
 }
 
+pub(crate) struct ProjectRevisionForPersistence {
+    pub(crate) project_id: String,
+    pub(crate) previous_revision: u64,
+    pub(crate) persisted_revision: u64,
+    pub(crate) source: String,
+}
+
 struct HostedProject {
     session: Mutex<ProjectSession>,
     media_sources: Vec<MediaSource>,
@@ -58,6 +65,51 @@ impl ProjectHost {
     pub(crate) fn redo(&self, window_label: &str) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.redo();
+        Ok(session.projection())
+    }
+
+    pub(crate) fn revision_for_persistence(
+        &self,
+        window_label: &str,
+        previous_revision: u64,
+        expected_revision: u64,
+    ) -> Result<ProjectRevisionForPersistence, String> {
+        if previous_revision.checked_add(1) != Some(expected_revision) {
+            return Err(
+                "O probe exige exatamente uma nova revisão documental antes do Salvamento."
+                    .to_string(),
+            );
+        }
+        let session = self.session(window_label)?;
+        let state = session.state();
+        if state.saved_revision != previous_revision
+            || state.revision != expected_revision
+            || !state.dirty
+        {
+            return Err(
+                "A Sessão do Projeto não corresponde às revisões esperadas pelo probe.".to_string(),
+            );
+        }
+        let source = session
+            .persisted_revision()
+            .map_err(|error| error.to_string())?;
+        Ok(ProjectRevisionForPersistence {
+            project_id: state.project_id,
+            previous_revision,
+            persisted_revision: expected_revision,
+            source,
+        })
+    }
+
+    pub(crate) fn confirm_persisted_revision(
+        &self,
+        window_label: &str,
+        revision: u64,
+    ) -> Result<EditorProjection, String> {
+        let mut session = self.session(window_label)?;
+        session
+            .confirm_saved_revision(revision)
+            .map_err(|error| error.to_string())?;
         Ok(session.projection())
     }
 
@@ -173,6 +225,61 @@ mod tests {
                 .revision,
             0
         );
+    }
+
+    #[test]
+    fn exposes_a_revision_for_verified_persistence_before_confirming_it_as_saved() {
+        let host = ProjectHost::new([("main", sample_session(SampleProject::Horizon), vec![])]);
+        host.apply(
+            "main",
+            ProjectIntent::TransformPhoto {
+                frame_id: "frame-01-a".into(),
+                delta_pan_x: 0.25,
+                delta_pan_y: 0.0,
+                delta_zoom: 0.0,
+            },
+        )
+        .expect("the session accepts the documentary action");
+
+        let pending = host
+            .revision_for_persistence("main", 0, 1)
+            .expect("the expected one-revision transition can be persisted");
+        assert_eq!(pending.project_id, "project-spike-001");
+        assert_eq!(pending.previous_revision, 0);
+        assert_eq!(pending.persisted_revision, 1);
+        assert!(pending.source.contains("\"revision\": 1"));
+        assert!(
+            host.projection("main")
+                .expect("the session remains available")
+                .state
+                .dirty,
+            "serializing alone cannot announce a successful Save"
+        );
+
+        let projection = host
+            .confirm_persisted_revision("main", 1)
+            .expect("the verified revision can be confirmed");
+        assert_eq!(projection.state.saved_revision, 1);
+        assert!(!projection.state.dirty);
+    }
+
+    #[test]
+    fn rejects_a_fault_probe_that_skips_or_replays_a_document_revision() {
+        let host = ProjectHost::new([("main", sample_session(SampleProject::Horizon), vec![])]);
+        host.apply(
+            "main",
+            ProjectIntent::TransformPhoto {
+                frame_id: "frame-01-a".into(),
+                delta_pan_x: 0.25,
+                delta_pan_y: 0.0,
+                delta_zoom: 0.0,
+            },
+        )
+        .expect("the session accepts the documentary action");
+
+        assert!(host.revision_for_persistence("main", 0, 2).is_err());
+        assert!(host.revision_for_persistence("main", 1, 1).is_err());
+        assert!(host.revision_for_persistence("main", 1, 2).is_err());
     }
 
     #[test]

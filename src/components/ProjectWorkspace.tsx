@@ -1,10 +1,7 @@
 import { useState } from "react";
 import { Button } from "react-aria-components";
 
-import type {
-  ExportPort,
-  ProjectSessionPort,
-} from "../application/projectPorts";
+import type { ExportPort } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import {
@@ -15,6 +12,7 @@ import { AlbumCanvas } from "./AlbumCanvas";
 import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { SheetPreview } from "./SheetPreview";
 import { useProjectEditorController } from "./useProjectEditorController";
+import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
@@ -23,7 +21,7 @@ import {
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   exportPort: ExportPort;
-  projectSessionPort: ProjectSessionPort;
+  runProjectMutation: ProjectMutationRunner;
   canvasPerformanceProbe?: CanvasPerformanceProbeRequest | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
@@ -33,7 +31,7 @@ interface ProjectWorkspaceProps {
 export function ProjectWorkspace({
   projection,
   exportPort,
-  projectSessionPort,
+  runProjectMutation,
   canvasPerformanceProbe = null,
   mediaPreviewUrls = {},
   onProjectionChange,
@@ -42,7 +40,7 @@ export function ProjectWorkspace({
   const controller = useProjectEditorController({
     projection,
     exportPort,
-    projectSessionPort,
+    runProjectMutation,
     onProjectionChange,
   });
   const workspacePanels = useWorkspacePanelLayout();

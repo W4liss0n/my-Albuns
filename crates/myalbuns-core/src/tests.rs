@@ -229,6 +229,39 @@ fn commits_one_domain_revision_for_a_completed_pan_gesture() {
 }
 
 #[test]
+fn confirms_only_the_current_revision_as_saved() {
+    let mut session = horizon_project(12);
+    session
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: "frame-01-a".into(),
+            delta_pan_x: 0.25,
+            delta_pan_y: 0.0,
+            delta_zoom: 0.0,
+        })
+        .expect("the sample frame accepts a persisted change");
+
+    let error = session
+        .confirm_saved_revision(0)
+        .expect_err("an older persisted revision cannot clean the current session");
+    assert_eq!(
+        error,
+        crate::CoreError::SavedRevisionMismatch {
+            current: 1,
+            confirmed: 0,
+        }
+    );
+    assert!(session.state().dirty);
+    assert_eq!(session.state().saved_revision, 0);
+
+    let confirmed = session
+        .confirm_saved_revision(1)
+        .expect("the current persisted revision can be confirmed");
+    assert_eq!(confirmed.saved_revision, 1);
+    assert!(!confirmed.dirty);
+    assert!(confirmed.can_undo);
+}
+
+#[test]
 fn commits_simultaneous_pan_and_zoom_as_one_domain_revision() {
     let mut session = horizon_project(12);
 

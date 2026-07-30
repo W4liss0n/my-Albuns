@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
@@ -18,7 +19,8 @@ import type {
   PhotoTransformPreview,
 } from "./AlbumCanvas";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
-import { ProjectWorkspace } from "./ProjectWorkspace";
+import { ProjectWorkspace as ProjectWorkspaceView } from "./ProjectWorkspace";
+import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
@@ -120,6 +122,31 @@ function projectSessionPortWithApply(
     undo: async () => projection,
     redo: async () => projection,
   };
+}
+
+type TestProjectWorkspaceProps = Omit<
+  ComponentProps<typeof ProjectWorkspaceView>,
+  "runProjectMutation"
+> & {
+  projectSessionPort: ProjectSessionPort;
+};
+
+function ProjectWorkspace({
+  projectSessionPort,
+  projection,
+  ...props
+}: TestProjectWorkspaceProps) {
+  const runProjectMutation = useProjectMutationRunner(
+    projection.state.projectId,
+    projectSessionPort,
+  );
+  return (
+    <ProjectWorkspaceView
+      {...props}
+      projection={projection}
+      runProjectMutation={runProjectMutation}
+    />
+  );
 }
 
 beforeEach(() => {

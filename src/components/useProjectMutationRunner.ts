@@ -8,9 +8,13 @@ export type ProjectMutationOutcome =
   | { status: "failed"; error: unknown }
   | { status: "obsolete" };
 
-type ProjectMutationOperation = (
+export type ProjectMutationOperation = (
   port: ProjectSessionPort,
 ) => Promise<EditorProjection>;
+
+export type ProjectMutationRunner = (
+  operation: ProjectMutationOperation,
+) => Promise<ProjectMutationOutcome>;
 
 interface ProjectMutationContext {
   port: ProjectSessionPort;
@@ -22,7 +26,7 @@ interface ProjectMutationContext {
 export function useProjectMutationRunner(
   projectId: string,
   port: ProjectSessionPort,
-) {
+): ProjectMutationRunner {
   const context = useMemo(
     () => createContext(port),
     [port, projectId],

@@ -10,6 +10,7 @@ import type {
 import { useEditorView } from "../state/editorView";
 import { representativeProjection } from "../test/projectFixtures";
 import { useProjectEditorController } from "./useProjectEditorController";
+import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 
 function projectSessionPort(): ProjectSessionPort {
   return {
@@ -17,6 +18,21 @@ function projectSessionPort(): ProjectSessionPort {
     apply: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,
+  };
+}
+
+function projectMutationRunner(
+  port: ProjectSessionPort,
+): ProjectMutationRunner {
+  return async (operation) => {
+    try {
+      return {
+        status: "completed",
+        projection: await operation(port),
+      };
+    } catch (error: unknown) {
+      return { status: "failed", error };
+    }
   };
 }
 
@@ -51,6 +67,7 @@ test("keeps an Export result when a concurrent context render is abandoned", asy
     })),
   };
   const sessionPort = projectSessionPort();
+  const runProjectMutation = projectMutationRunner(sessionPort);
   const suspended = new Promise<never>(() => undefined);
   let controller!: ReturnType<typeof useProjectEditorController>;
   let beginSuspendedRender!: () => void;
@@ -64,7 +81,7 @@ test("keeps an Export result when a concurrent context render is abandoned", asy
       exportPort: useUncommittedContext
         ? uncommittedExportPort
         : committedExportPort,
-      projectSessionPort: sessionPort,
+      runProjectMutation,
       onProjectionChange: () => undefined,
     });
     beginSuspendedRender = () => {
@@ -111,6 +128,7 @@ test("clears feedback and ignores an Export result after a committed Project cha
     })),
   };
   const sessionPort = projectSessionPort();
+  const runProjectMutation = projectMutationRunner(sessionPort);
   const secondProjection = {
     ...representativeProjection,
     state: {
@@ -129,7 +147,7 @@ test("clears feedback and ignores an Export result after a committed Project cha
       useProjectEditorController({
         projection,
         exportPort,
-        projectSessionPort: sessionPort,
+        runProjectMutation,
         onProjectionChange: () => undefined,
       }),
     {
@@ -161,4 +179,43 @@ test("clears feedback and ignores an Export result after a committed Project cha
   expect(view.result.current.busy).toBeNull();
   expect(view.result.current.exportResult).toBeNull();
   expect(secondExportPort.exportPreview).not.toHaveBeenCalled();
+});
+
+test("routes editor changes through the shared Project mutation runner", async () => {
+  const port = projectSessionPort();
+  const apply = vi.spyOn(port, "apply");
+  const runProjectMutation = vi.fn<ProjectMutationRunner>(
+    async (operation) => ({
+      status: "completed",
+      projection: await operation(port),
+    }),
+  );
+  const view = renderHook(() =>
+    useProjectEditorController({
+      projection: representativeProjection,
+      exportPort: {
+        exportPreview: vi.fn(),
+      },
+      runProjectMutation,
+      onProjectionChange: vi.fn(),
+    }),
+  );
+
+  await act(async () => {
+    await view.result.current.canvasProps.onTransformCommit({
+      frameId: "frame-001",
+      deltaPanX: 0.1,
+      deltaPanY: 0,
+      deltaZoom: 0,
+    });
+  });
+
+  expect(runProjectMutation).toHaveBeenCalledOnce();
+  expect(apply).toHaveBeenCalledWith({
+    kind: "transformPhoto",
+    frameId: "frame-001",
+    deltaPanX: 0.1,
+    deltaPanY: 0,
+    deltaZoom: 0,
+  });
 });

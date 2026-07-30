@@ -15,6 +15,7 @@ const MAX_LOG_FILES: usize = 7;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProcessRole {
     DesktopHost,
+    GlobalShell,
     Imaging,
 }
 
@@ -22,6 +23,7 @@ impl ProcessRole {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DesktopHost => "desktop_host",
+            Self::GlobalShell => "global_shell",
             Self::Imaging => "imaging",
         }
     }
@@ -29,6 +31,7 @@ impl ProcessRole {
     const fn file_prefix(self) -> &'static str {
         match self {
             Self::DesktopHost => "myalbuns-desktop",
+            Self::GlobalShell => "myalbuns-global",
             Self::Imaging => "myalbuns-imaging",
         }
     }
@@ -132,9 +135,14 @@ mod tests {
     #[test]
     fn process_roles_have_stable_distinct_log_identities() {
         assert_eq!(ProcessRole::DesktopHost.as_str(), "desktop_host");
+        assert_eq!(ProcessRole::GlobalShell.as_str(), "global_shell");
         assert_eq!(ProcessRole::Imaging.as_str(), "imaging");
         assert_ne!(
             ProcessRole::DesktopHost.file_prefix(),
+            ProcessRole::GlobalShell.file_prefix()
+        );
+        assert_ne!(
+            ProcessRole::GlobalShell.file_prefix(),
             ProcessRole::Imaging.file_prefix()
         );
     }

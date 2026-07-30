@@ -9,7 +9,6 @@ import {
 import type {
   ExportPort,
   ExportResult,
-  ProjectSessionPort,
 } from "../application/projectPorts";
 import type {
   EditorProjection,
@@ -22,12 +21,15 @@ import type {
   PhotoTransformPreview,
 } from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
-import { useProjectMutationRunner } from "./useProjectMutationRunner";
+import type {
+  ProjectMutationOperation,
+  ProjectMutationRunner,
+} from "./useProjectMutationRunner";
 
 interface ProjectEditorControllerInput {
   projection: EditorProjection;
   exportPort: ExportPort;
-  projectSessionPort: ProjectSessionPort;
+  runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
 }
 
@@ -56,7 +58,7 @@ function messageFromError(error: unknown) {
 export function useProjectEditorController({
   projection,
   exportPort,
-  projectSessionPort,
+  runProjectMutation,
   onProjectionChange,
 }: ProjectEditorControllerInput) {
   const selectedFrameId = useEditorView(
@@ -87,10 +89,6 @@ export function useProjectEditorController({
   );
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
   const pendingSheetNavigationRef = useRef<string | null>(null);
-  const runProjectMutation = useProjectMutationRunner(
-    projection.state.projectId,
-    projectSessionPort,
-  );
   const feedbackTokenRef = useRef(0);
   const exportContext = useMemo<ExportContext>(
     () => ({
@@ -152,7 +150,7 @@ export function useProjectEditorController({
     setExportResult(null);
     setZoomDraft(null);
     setCanvasPhotoPreview(null);
-  }, [exportPort, projectSessionPort, projection.state.projectId]);
+  }, [exportPort, runProjectMutation, projection.state.projectId]);
 
   function centerCanvasOnSheet(
     sheetId: string,
@@ -202,9 +200,7 @@ export function useProjectEditorController({
 
   async function runWithGlobalFeedback(
     label: string,
-    operation: (
-      port: ProjectSessionPort,
-    ) => Promise<EditorProjection>,
+    operation: ProjectMutationOperation,
   ) {
     const feedbackToken = feedbackTokenRef.current + 1;
     feedbackTokenRef.current = feedbackToken;

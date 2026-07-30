@@ -12,6 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
+. (Join-Path $PSScriptRoot 'Topology-FailureProbe.ps1')
 
 $targetDirectory = Join-Path $script:WorkspaceRoot '.scratch\topology-spike-target'
 $executablePath = Join-Path $targetDirectory 'release\myalbuns-desktop.exe'
@@ -38,9 +39,16 @@ $buildInputPathspecs = @(
 )
 $topologyEnvironment = 'MYALBUNS_TOPOLOGY_SPIKE'
 $projectSlotEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT'
+$topologyRunIdEnvironment = 'MYALBUNS_TOPOLOGY_RUN_ID'
+$processRoleEnvironment = 'MYALBUNS_PROCESS_ROLE'
+$globalEndpointEnvironment = 'MYALBUNS_GLOBAL_SPIKE_ENDPOINT'
 $corpusManifestEnvironment = 'MYALBUNS_TOPOLOGY_CORPUS_MANIFEST'
 $probeGateEnvironment = 'MYALBUNS_TOPOLOGY_PROBE_GATE'
 $exportGateEnvironment = 'MYALBUNS_TOPOLOGY_EXPORT_GATE'
+$faultGateEnvironment = 'MYALBUNS_TOPOLOGY_FAULT_GATE'
+$faultOutputRootEnvironment = 'MYALBUNS_TOPOLOGY_FAULT_OUTPUT_ROOT'
+$projectASourceEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT_A_SOURCE'
+$projectBSourceEnvironment = 'MYALBUNS_TOPOLOGY_PROJECT_B_SOURCE'
 $graphicsContextLossMechanism = 'webgl_lose_context'
 $graphicsTestedMediaId = 'decorative-overlay'
 $graphicsTestedTextureWidthPx = 1600
@@ -53,7 +61,9 @@ $startedProcessIds = [System.Collections.Generic.List[int]]::new()
 $probeGatePaths = [System.Collections.Generic.List[string]]::new()
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $script:WorkspaceRoot 'docs\research\artifacts\0006-webgl2-graphics-gate.json'
+    $OutputPath = Join-Path `
+        $script:WorkspaceRoot `
+        'docs\research\artifacts\0007-process-failure-gate.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
@@ -63,10 +73,9 @@ $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 $reportText = @'
 {
   "notMeasured": [
-    "recupera\u00e7\u00e3o persistida",
-    "complexidade operacional da IPC",
     "aloca\u00e7\u00e3o sint\u00e9tica em MAX_TEXTURE_SIZE ao quadrado ou indu\u00e7\u00e3o de OOM",
-    "pico temporal de mem\u00f3ria gr\u00e1fica e or\u00e7amento global do driver"
+    "pico temporal de mem\u00f3ria gr\u00e1fica e or\u00e7amento global do driver",
+    "checkpoint autom\u00e1tico de altera\u00e7\u00f5es ainda n\u00e3o salvas e restaura\u00e7\u00e3o de gesto em andamento"
   ],
   "notes": [
     "O Cache foi reconstru\u00eddo a frio com uma representa\u00e7\u00e3o de at\u00e9 1600 px por m\u00eddia: JPEG para Fotos opacas e PNG para o Decorativo transparente.",
@@ -82,10 +91,14 @@ $reportText = @'
     "O snapshot de mem\u00f3ria gr\u00e1fica do Windows foi capturado depois de todos os probes de Canvas e antes de liberar a Exporta\u00e7\u00e3o; ele n\u00e3o representa um pico.",
     "A Exporta\u00e7\u00e3o foi liberada por um segundo gate somente depois dos dois probes de Canvas e desse snapshot gr\u00e1fico.",
     "Os dois hosts independentes foram iniciados antes da espera pelas Janelas, usando o mesmo marco inicial da alternativa multiwindow.",
-    "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo."
+    "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo.",
+    "O gate de falhas aplica uma inten\u00e7\u00e3o real, persiste atomicamente, rel\u00ea pelo n\u00facleo e s\u00f3 ent\u00e3o confirma a revis\u00e3o como salva.",
+    "A recupera\u00e7\u00e3o do host reabre apenas a \u00faltima revis\u00e3o explicitamente salva; recupera\u00e7\u00e3o de altera\u00e7\u00f5es n\u00e3o salvas permanece fora deste gate.",
+    "A IPC \u00e9 descrita por limites, rela\u00e7\u00f5es e contagens m\u00ednimas observ\u00e1veis; nenhum escore sint\u00e9tico de complexidade foi inventado.",
+    "A evid\u00eancia do Processador de Imagens \u00e9 validada e referenciada pelo artefato 0004, sem duplicar seu mecanismo de queda neste runner."
   ],
   "summary": {
-    "title": "WebGL2: recupera\u00e7\u00e3o, limites e press\u00e3o gr\u00e1fica observada",
+    "title": "Falhas controladas e isolamento das topologias de processo",
     "collected": "Coletado em UTC",
     "raw": "JSON bruto",
     "measure": "Medida",
@@ -441,31 +454,47 @@ function Start-TopologyProcess {
         [Parameter(Mandatory = $true)]
         [string] $ProbeGatePath,
         [Parameter(Mandatory = $true)]
-        [string] $ExportGatePath
+        [string] $ExportGatePath,
+        [Parameter(Mandatory = $true)]
+        [string] $RunId,
+        [Parameter(Mandatory = $true)]
+        [System.Net.IPEndPoint] $GlobalEndpoint,
+        [Parameter(Mandatory = $true)]
+        [string] $FaultGatePath,
+        [Parameter(Mandatory = $true)]
+        [string] $FaultOutputRoot,
+        [string] $ProjectASource,
+        [string] $ProjectBSource
     )
 
-    $previousTopology = [System.Environment]::GetEnvironmentVariable(
+    $environmentNames = @(
+        $processRoleEnvironment,
         $topologyEnvironment,
-        [System.EnvironmentVariableTarget]::Process
-    )
-    $previousProjectSlot = [System.Environment]::GetEnvironmentVariable(
         $projectSlotEnvironment,
-        [System.EnvironmentVariableTarget]::Process
-    )
-    $previousCorpusManifest = [System.Environment]::GetEnvironmentVariable(
+        $topologyRunIdEnvironment,
+        $globalEndpointEnvironment,
         $corpusManifestEnvironment,
-        [System.EnvironmentVariableTarget]::Process
-    )
-    $previousProbeGate = [System.Environment]::GetEnvironmentVariable(
         $probeGateEnvironment,
-        [System.EnvironmentVariableTarget]::Process
-    )
-    $previousExportGate = [System.Environment]::GetEnvironmentVariable(
         $exportGateEnvironment,
-        [System.EnvironmentVariableTarget]::Process
+        $faultGateEnvironment,
+        $faultOutputRootEnvironment,
+        $projectASourceEnvironment,
+        $projectBSourceEnvironment
     )
+    $previousValues = @{}
+    foreach ($name in $environmentNames) {
+        $previousValues[$name] = [System.Environment]::GetEnvironmentVariable(
+            $name,
+            [System.EnvironmentVariableTarget]::Process
+        )
+    }
     try {
+        Set-ProcessEnvironmentValue -Name $processRoleEnvironment -Value $null
         Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $Topology
+        Set-ProcessEnvironmentValue -Name $topologyRunIdEnvironment -Value $RunId
+        Set-ProcessEnvironmentValue `
+            -Name $globalEndpointEnvironment `
+            -Value $GlobalEndpoint.ToString()
         Set-ProcessEnvironmentValue `
             -Name $corpusManifestEnvironment `
             -Value $corpusManifestPath
@@ -475,6 +504,18 @@ function Start-TopologyProcess {
         Set-ProcessEnvironmentValue `
             -Name $exportGateEnvironment `
             -Value $ExportGatePath
+        Set-ProcessEnvironmentValue `
+            -Name $faultGateEnvironment `
+            -Value $FaultGatePath
+        Set-ProcessEnvironmentValue `
+            -Name $faultOutputRootEnvironment `
+            -Value $FaultOutputRoot
+        Set-ProcessEnvironmentValue `
+            -Name $projectASourceEnvironment `
+            -Value $ProjectASource
+        Set-ProcessEnvironmentValue `
+            -Name $projectBSourceEnvironment `
+            -Value $ProjectBSource
         if ([string]::IsNullOrWhiteSpace($ProjectSlot)) {
             Set-ProcessEnvironmentValue -Name $projectSlotEnvironment -Value $null
         }
@@ -490,19 +531,11 @@ function Start-TopologyProcess {
         return $process
     }
     finally {
-        Set-ProcessEnvironmentValue -Name $topologyEnvironment -Value $previousTopology
-        Set-ProcessEnvironmentValue `
-            -Name $projectSlotEnvironment `
-            -Value $previousProjectSlot
-        Set-ProcessEnvironmentValue `
-            -Name $corpusManifestEnvironment `
-            -Value $previousCorpusManifest
-        Set-ProcessEnvironmentValue `
-            -Name $probeGateEnvironment `
-            -Value $previousProbeGate
-        Set-ProcessEnvironmentValue `
-            -Name $exportGateEnvironment `
-            -Value $previousExportGate
+        foreach ($name in $environmentNames) {
+            Set-ProcessEnvironmentValue `
+                -Name $name `
+                -Value $previousValues[$name]
+        }
     }
 }
 
@@ -527,11 +560,21 @@ function Stop-OwnedTopologyProcess {
 
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if ($null -eq $process) {
+        [void] $startedProcessIds.Remove($ProcessId)
         return
     }
-    Assert-OwnedTopologyProcess -ProcessId $ProcessId
-    Stop-Process -Id $ProcessId -Force
-    Wait-Process -Id $ProcessId -Timeout 10 -ErrorAction SilentlyContinue
+    try {
+        Assert-OwnedTopologyProcess -ProcessId $ProcessId
+        Stop-Process -Id $ProcessId -Force
+        Wait-Process -Id $ProcessId -Timeout 10 -ErrorAction SilentlyContinue
+    }
+    finally {
+        if ($null -eq (
+            Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+        )) {
+            [void] $startedProcessIds.Remove($ProcessId)
+        }
+    }
 }
 
 function Wait-ForTopologyWindows {
@@ -585,8 +628,18 @@ function Wait-ForTopologyWindows {
     )
 }
 
-function Get-DesktopLogEventsSince {
-    param([Parameter(Mandatory = $true)][DateTimeOffset] $Since)
+function Get-MyAlbunsLogEventsSince {
+    param(
+        [Parameter(Mandatory = $true)]
+        [DateTimeOffset] $Since,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'myalbuns-desktop.*.jsonl',
+            'myalbuns-global.*.jsonl',
+            'myalbuns-imaging.*.jsonl'
+        )]
+        [string] $FileFilter
+    )
 
     if (-not (Test-Path -LiteralPath $desktopLogDirectory -PathType Container)) {
         return @()
@@ -595,7 +648,7 @@ function Get-DesktopLogEventsSince {
     foreach ($logFile in Get-ChildItem `
         -LiteralPath $desktopLogDirectory `
         -File `
-        -Filter 'myalbuns-desktop.*.jsonl') {
+        -Filter $FileFilter) {
         $stream = $null
         $reader = $null
         try {
@@ -638,6 +691,26 @@ function Get-DesktopLogEventsSince {
         }
     }
     return @($events)
+}
+
+function Get-DesktopLogEventsSince {
+    param([Parameter(Mandatory = $true)][DateTimeOffset] $Since)
+
+    return @(
+        Get-MyAlbunsLogEventsSince `
+            -Since $Since `
+            -FileFilter 'myalbuns-desktop.*.jsonl'
+    )
+}
+
+function Get-GlobalLogEventsSince {
+    param([Parameter(Mandatory = $true)][DateTimeOffset] $Since)
+
+    return @(
+        Get-MyAlbunsLogEventsSince `
+            -Since $Since `
+            -FileFilter 'myalbuns-global.*.jsonl'
+    )
 }
 
 function Wait-ForMediaCache {
@@ -1734,14 +1807,35 @@ function Write-TopologyMarkdownSummary {
         $no
     }
     $independentAfterCrash = if (
-        $independent.forcedFailure.otherHostSurvived
+        $independent.forcedFailure.projectHost.otherHostSurvived
     ) {
-        "$($independent.forcedFailure.remainingWindowCount) ($($summary.otherPreserved))"
+        (
+            "$($independent.forcedFailure.projectHost.remainingWindowCount) " +
+            "($($summary.otherPreserved))"
+        )
     }
     else {
-        "$($independent.forcedFailure.remainingWindowCount)"
+        "$($independent.forcedFailure.projectHost.remainingWindowCount)"
     }
-    $multiwindowAfterCrash = "$($multiwindow.forcedFailure.remainingWindowCount)"
+    $multiwindowAfterCrash = (
+        "$($multiwindow.forcedFailure.projectHost.remainingWindowCount)"
+    )
+    $independentGlobalRestarted = if (
+        $independent.forcedFailure.globalProcess.explicitRestart.pidChanged
+    ) { $yes } else { $no }
+    $multiwindowGlobalRestarted = if (
+        $multiwindow.forcedFailure.globalProcess.explicitRestart.pidChanged
+    ) { $yes } else { $no }
+    $independentHostRestart = $independent.forcedFailure.projectHost.explicitRestart
+    $multiwindowHostRestart = $multiwindow.forcedFailure.projectHost.explicitRestart
+    $independentReopenedProjectCount = $independentHostRestart.reopen.observedProjects
+    $multiwindowReopenedProjectCount = $multiwindowHostRestart.reopen.observedProjects
+    $independentHostReopened = if (
+        $independentReopenedProjectCount -eq 1
+    ) { $yes } else { $no }
+    $multiwindowHostReopened = if (
+        $multiwindowReopenedProjectCount -eq 2
+    ) { $yes } else { $no }
 
     $markdown = @(
         '---'
@@ -1799,6 +1893,33 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.exportOutput) | $(Format-Mebibytes $independent.interaction.export.outputBytes) MiB | $(Format-Mebibytes $multiwindow.interaction.export.outputBytes) MiB |"
         "| $($summary.afterCrash) | $independentAfterCrash | $multiwindowAfterCrash |"
         ''
+        '## Falhas controladas'
+        ''
+        '| Evidência | A — hosts independentes | B — host multiwindow |'
+        '|---|---:|---:|'
+        "| Janelas próprias do processo global leve | $($independent.forcedFailure.globalProcess.initial.visibleWindowCount) | $($multiwindow.forcedFailure.globalProcess.initial.visibleWindowCount) |"
+        "| Working set do processo global leve | $(Format-Mebibytes $independent.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB | $(Format-Mebibytes $multiwindow.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB |"
+        "| Janelas preservadas com o processo global indisponível | $($independent.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) | $($multiwindow.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) |"
+        "| Projetos editados, salvos e relidos com o global indisponível | $($independent.forcedFailure.globalProcess.offlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.offlineContinuity.observedCompletions) |"
+        "| Reinício global explícito trocou o PID | $independentGlobalRestarted | $multiwindowGlobalRestarted |"
+        "| Projetos editados, salvos e relidos após o reinício global | $($independent.forcedFailure.globalProcess.onlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.onlineContinuity.observedCompletions) |"
+        "| Janelas depois da queda do host | $independentAfterCrash | $multiwindowAfterCrash |"
+        "| Última revisão salva reaberta após reinício explícito do host | $independentHostReopened | $multiwindowHostReopened |"
+        "| Relações host → global interrompidas pela queda global | $($independent.forcedFailure.ipc.linksInterruptedByGlobalCrash) | $($multiwindow.forcedFailure.ipc.linksInterruptedByGlobalCrash) |"
+        "| Comandos mínimos ao host por probe de Projeto | $($independent.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) |"
+        "| Interações correlacionadas mínimas, incluindo status global | $($independent.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) |"
+        "| Eventos de falha do probe | $($independent.forcedFailure.logs.projectHosts.continuityFailureEvents) | $($multiwindow.forcedFailure.logs.projectHosts.continuityFailureEvents) |"
+        ''
+        'Os quatro comandos mínimos por probe são `topology_fault_probe_config`, `project_state`, `apply_project_intent` e `persist_topology_fault_probe`. A quinta interação é o status tipado do host para o processo global. Polls adicionais não são estimados.'
+        ''
+        '## Processador de Imagens'
+        ''
+        "- Artefato validado: ``$($Report.failureGate.imagingProcessor.artifact)``."
+        "- SHA-256: ``$($Report.failureGate.imagingProcessor.artifactSha256)``."
+        "- Cache recuperou após um reinício explícito: $($Report.failureGate.imagingProcessor.cacheRecoveredAfterOneExplicitRestart)."
+        "- Exportação falhou com segurança até o retry explícito: $($Report.failureGate.imagingProcessor.exportFailedSafelyUntilExplicitRetry)."
+        "- Mesmo commit da build topológica: $($Report.failureGate.imagingProcessor.sameGitCommitAsTopologyBuild)."
+        ''
         "## $($summary.corpus)"
         ''
         "- $($summary.corpusAlbums): $($Report.corpus.albumCount)"
@@ -1851,6 +1972,7 @@ $previousCargoTarget = [System.Environment]::GetEnvironmentVariable(
     'CARGO_TARGET_DIR',
     [System.EnvironmentVariableTarget]::Process
 )
+$failureScratchRoot = $null
 
 try {
     & (Join-Path $PSScriptRoot 'Prepare-TopologyCorpus.ps1')
@@ -1876,6 +1998,21 @@ try {
     }
 
     $runId = "$PID-$([DateTime]::UtcNow.Ticks)"
+    $failureScratchRoot = Join-Path `
+        (Join-Path $script:WorkspaceRoot '.scratch') `
+        "topology-failure-$runId"
+    $independentFaultOutputRoot = Join-Path `
+        $failureScratchRoot `
+        'independent'
+    $multiwindowFaultOutputRoot = Join-Path `
+        $failureScratchRoot `
+        'multiwindow'
+    New-Item `
+        -ItemType Directory `
+        -Force `
+        -Path $independentFaultOutputRoot, $multiwindowFaultOutputRoot |
+            Out-Null
+
     $independentProbeGate = Join-Path `
         $probeGateDirectory `
         "independent-$runId.ready"
@@ -1888,24 +2025,76 @@ try {
     $multiwindowExportGate = Join-Path `
         $probeGateDirectory `
         "multiwindow-export-$runId.ready"
+    $independentFaultGate = Join-Path `
+        $probeGateDirectory `
+        "independent-fault-$runId.json"
+    $multiwindowFaultGate = Join-Path `
+        $probeGateDirectory `
+        "multiwindow-fault-$runId.json"
     $probeGatePaths.Add($independentProbeGate)
     $probeGatePaths.Add($multiwindowProbeGate)
     $probeGatePaths.Add($independentExportGate)
     $probeGatePaths.Add($multiwindowExportGate)
+    $probeGatePaths.Add($independentFaultGate)
+    $probeGatePaths.Add($multiwindowFaultGate)
+
+    $imagingRecovery = Read-ValidatedImagingRecoveryArtifact `
+        -Path (
+            Join-Path `
+                $script:WorkspaceRoot `
+                'docs\research\artifacts\0004-imaging-recovery.json'
+        ) `
+        -TopologyBuildCommit $buildManifest.gitCommit
 
     Reset-TopologyCache
     $independentStartedAt = [DateTimeOffset]::UtcNow
     $independentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $independentEndpoint = Get-AvailableTopologyEndpoint
+    $independentGlobal = Start-TopologyGlobalProcess `
+        -Topology independent `
+        -RunId $runId `
+        -Endpoint $independentEndpoint
+    $independentGlobalStatus = Wait-ForTopologyGlobalStatus `
+        -Process $independentGlobal `
+        -Topology independent `
+        -Endpoint $independentEndpoint `
+        -RunId $runId `
+        -ProbeId 'independent-global-initial'
+    $independentGlobalSingleton = Confirm-TopologyGlobalSingleton `
+        -Topology independent `
+        -RunId $runId `
+        -Endpoint $independentEndpoint `
+        -OwnerProcessId $independentGlobal.Id `
+        -ProbeId 'independent-singleton-initial'
+    $independentGlobalMetrics = Measure-TopologyProcesses `
+        -RootProcessIds @($independentGlobal.Id)
+    $independentGlobalWindowCount = (
+        [MyAlbunsWindowProbe]::VisibleWindowsFor(
+            @($independentGlobal.Id)
+        ).Count
+    )
+    if ($independentGlobalWindowCount -ne 0) {
+        throw 'The lightweight global role unexpectedly owns a visible window.'
+    }
+
     $independentA = Start-TopologyProcess `
         -Topology independent `
         -ProjectSlot a `
         -ProbeGatePath $independentProbeGate `
-        -ExportGatePath $independentExportGate
+        -ExportGatePath $independentExportGate `
+        -RunId $runId `
+        -GlobalEndpoint $independentEndpoint `
+        -FaultGatePath $independentFaultGate `
+        -FaultOutputRoot $independentFaultOutputRoot
     $independentB = Start-TopologyProcess `
         -Topology independent `
         -ProjectSlot b `
         -ProbeGatePath $independentProbeGate `
-        -ExportGatePath $independentExportGate
+        -ExportGatePath $independentExportGate `
+        -RunId $runId `
+        -GlobalEndpoint $independentEndpoint `
+        -FaultGatePath $independentFaultGate `
+        -FaultOutputRoot $independentFaultOutputRoot
     $independentReady = Wait-ForTopologyWindows `
         -RootProcessIds @($independentA.Id, $independentB.Id) `
         -ExpectedCount 2 `
@@ -1927,27 +2116,268 @@ try {
     $independentMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($independentA.Id, $independentB.Id)
 
-    Stop-OwnedTopologyProcess -ProcessId $independentA.Id
+    $independentGlobalCrash = Invoke-TopologyProcessCrash `
+        -ProcessId $independentGlobal.Id `
+        -Role 'global_shell'
     Start-Sleep -Milliseconds 750
-    $independentFailureIsolation = [ordered]@{
-        forcedHostProcessId = $independentA.Id
-        otherHostSurvived = $null -ne (
-            Get-Process -Id $independentB.Id -ErrorAction SilentlyContinue
-        )
-        remainingWindowCount = [MyAlbunsWindowProbe]::VisibleWindowsFor(
-            @($independentB.Id)
-        ).Count
+    $independentGlobalUnavailable = Confirm-TopologyGlobalUnavailable `
+        -Endpoint $independentEndpoint `
+        -RunId $runId `
+        -ProbeId 'independent-global-down-runner'
+    $independentProcessesWhileGlobalUnavailable = (
+        Assert-TopologyExecutableProcessSet `
+            -ExpectedProcessIds @($independentA.Id, $independentB.Id) `
+            -Context 'Independent process set after the global crash'
+    )
+    $independentWindowsWhileGlobalUnavailable = Assert-TopologyWindowCount `
+        -RootProcessIds @($independentA.Id, $independentB.Id) `
+        -ExpectedCount 2 `
+        -Context 'Independent hosts after the global crash'
+    $independentOfflineProbe = Invoke-TopologyContinuityProbe `
+        -Topology independent `
+        -RunId $runId `
+        -ProbeId 'independent-global-down' `
+        -ExpectedGlobalAvailable $false `
+        -RootProcessIds @($independentA.Id, $independentB.Id) `
+        -ExpectedProjectCount 2 `
+        -GatePath $independentFaultGate `
+        -OutputRoot $independentFaultOutputRoot `
+        -TopologyStartedAt $independentStartedAt
+
+    $independentRestartedGlobal = Start-TopologyGlobalProcess `
+        -Topology independent `
+        -RunId $runId `
+        -Endpoint $independentEndpoint
+    $independentRestartedGlobalStatus = Wait-ForTopologyGlobalStatus `
+        -Process $independentRestartedGlobal `
+        -Topology independent `
+        -Endpoint $independentEndpoint `
+        -RunId $runId `
+        -ProbeId 'independent-global-restarted'
+    $independentRestartedSingleton = Confirm-TopologyGlobalSingleton `
+        -Topology independent `
+        -RunId $runId `
+        -Endpoint $independentEndpoint `
+        -OwnerProcessId $independentRestartedGlobal.Id `
+        -ProbeId 'independent-singleton-restarted'
+    $independentOnlineProbe = Invoke-TopologyContinuityProbe `
+        -Topology independent `
+        -RunId $runId `
+        -ProbeId 'independent-global-restored' `
+        -ExpectedGlobalAvailable $true `
+        -RootProcessIds @($independentA.Id, $independentB.Id) `
+        -ExpectedProjectCount 2 `
+        -GatePath $independentFaultGate `
+        -OutputRoot $independentFaultOutputRoot `
+        -TopologyStartedAt $independentStartedAt
+    Assert-TopologyProbeGlobalOwner `
+        -Probe $independentOnlineProbe `
+        -ExpectedProcessId $independentRestartedGlobal.Id
+
+    $independentHostCrash = Invoke-TopologyProcessCrash `
+        -ProcessId $independentA.Id `
+        -Role 'project_host_a'
+    Start-Sleep -Milliseconds 750
+    $independentSurvivingWindows = Assert-TopologyWindowCount `
+        -RootProcessIds @($independentB.Id) `
+        -ExpectedCount 1 `
+        -Context 'Independent peer after one Project host crash'
+    $independentProcessesAfterHostCrash = (
+        Assert-TopologyExecutableProcessSet `
+            -ExpectedProcessIds @(
+                $independentB.Id,
+                $independentRestartedGlobal.Id
+            ) `
+            -Context 'Independent process set after one host crash'
+    )
+    $independentSurvivorProbe = Invoke-TopologyContinuityProbe `
+        -Topology independent `
+        -RunId $runId `
+        -ProbeId 'independent-peer-host-down' `
+        -ExpectedGlobalAvailable $true `
+        -RootProcessIds @($independentB.Id) `
+        -ExpectedProjectCount 1 `
+        -GatePath $independentFaultGate `
+        -OutputRoot $independentFaultOutputRoot `
+        -TopologyStartedAt $independentStartedAt
+    Assert-TopologyProbeGlobalOwner `
+        -Probe $independentSurvivorProbe `
+        -ExpectedProcessId $independentRestartedGlobal.Id
+
+    $independentProjectA = Get-TopologyProbeProject `
+        -Probe $independentOnlineProbe `
+        -ProjectId 'project-spike-001'
+    $independentProjectASource = Get-TopologyProbeSource `
+        -Probe $independentOnlineProbe `
+        -ProjectId 'project-spike-001'
+    Remove-TopologyFaultGate -Path $independentProbeGate
+    Remove-TopologyFaultGate -Path $independentExportGate
+    $independentHostRestartStartedAt = [DateTimeOffset]::UtcNow
+    $independentHostRestartStopwatch = (
+        [System.Diagnostics.Stopwatch]::StartNew()
+    )
+    $independentRestartedA = Start-TopologyProcess `
+        -Topology independent `
+        -ProjectSlot a `
+        -ProbeGatePath $independentProbeGate `
+        -ExportGatePath $independentExportGate `
+        -RunId $runId `
+        -GlobalEndpoint $independentEndpoint `
+        -FaultGatePath $independentFaultGate `
+        -FaultOutputRoot $independentFaultOutputRoot `
+        -ProjectASource $independentProjectASource
+    $independentRestartedWindows = Wait-ForTopologyWindows `
+        -RootProcessIds @($independentRestartedA.Id, $independentB.Id) `
+        -ExpectedCount 2 `
+        -ExpectedTitleMarker '[Topologia A]' `
+        -Stopwatch $independentHostRestartStopwatch
+    $independentRestartedCache = Wait-ForMediaCache `
+        -RootProcessIds @($independentRestartedA.Id) `
+        -ExpectedProjectCount 1 `
+        -StartedAt $independentHostRestartStartedAt `
+        -TopologyStopwatch $independentHostRestartStopwatch
+    $independentReopen = Wait-ForTopologyProjectReopen `
+        -Topology independent `
+        -RunId $runId `
+        -ExpectedProjects @($independentProjectA) `
+        -RootProcessIds @($independentRestartedA.Id) `
+        -StartedAt $independentHostRestartStartedAt
+    $independentGlobalAfterHostRestart = Invoke-TopologyGlobalStatus `
+        -Endpoint $independentEndpoint `
+        -RunId $runId `
+        -ProbeId 'independent-after-host-restart'
+    if (
+        $independentGlobalAfterHostRestart.processId -ne
+            $independentRestartedGlobal.Id
+    ) {
+        throw 'The independent host restart changed the global owner.'
     }
+    $independentLogQuality = Wait-ForTopologyFailureLogQuality `
+        -Topology independent `
+        -RunId $runId `
+        -StartedAt $independentStartedAt `
+        -ExpectedHostStreamCount 3 `
+        -ExpectedCompletionCount 5 `
+        -ExpectedReopenCount 1
+    $independentFailureIsolation = [ordered]@{
+        globalProcess = [ordered]@{
+            initial = [ordered]@{
+                processId = $independentGlobal.Id
+                status = $independentGlobalStatus
+                singleton = $independentGlobalSingleton
+                visibleWindowCount = $independentGlobalWindowCount
+                processes = $independentGlobalMetrics
+            }
+            termination = $independentGlobalCrash
+            unavailableBeforeExplicitRestart = $independentGlobalUnavailable
+            noAutomaticRestartObserved = (
+                $independentProcessesWhileGlobalUnavailable.
+                    unexpectedProcessIds.Count -eq 0
+            )
+            processSetWhileUnavailable = (
+                $independentProcessesWhileGlobalUnavailable
+            )
+            windowsWhileUnavailable = (
+                $independentWindowsWhileGlobalUnavailable
+            )
+            offlineContinuity = (
+                Select-TopologyProbeReport -Probe $independentOfflineProbe
+            )
+            explicitRestart = [ordered]@{
+                previousProcessId = $independentGlobal.Id
+                processId = $independentRestartedGlobal.Id
+                pidChanged = (
+                    $independentGlobal.Id -ne $independentRestartedGlobal.Id
+                )
+                status = $independentRestartedGlobalStatus
+                singleton = $independentRestartedSingleton
+            }
+            onlineContinuity = (
+                Select-TopologyProbeReport -Probe $independentOnlineProbe
+            )
+        }
+        projectHost = [ordered]@{
+            termination = $independentHostCrash
+            forcedHostProcessId = $independentA.Id
+            hostSurvived = $false
+            otherHostSurvived = $null -ne (
+                Get-Process `
+                    -Id $independentB.Id `
+                    -ErrorAction SilentlyContinue
+            )
+            noAutomaticRestartObserved = $null -eq (
+                Get-Process `
+                    -Id $independentA.Id `
+                    -ErrorAction SilentlyContinue
+            )
+            processSetAfterCrash = $independentProcessesAfterHostCrash
+            remainingWindowCount = (
+                $independentSurvivingWindows.observedCount
+            )
+            survivorContinuity = (
+                Select-TopologyProbeReport -Probe $independentSurvivorProbe
+            )
+            explicitRestart = [ordered]@{
+                previousProcessId = $independentA.Id
+                processId = $independentRestartedA.Id
+                pidChanged = (
+                    $independentA.Id -ne $independentRestartedA.Id
+                )
+                ready = $independentRestartedWindows
+                cacheReady = $independentRestartedCache
+                reopen = $independentReopen
+                globalStatus = $independentGlobalAfterHostRestart
+            }
+        }
+        ipc = New-TopologyIpcEvidence `
+            -Topology independent `
+            -SuccessfulProjectProbeCount 5
+        logs = $independentLogQuality
+    }
+    Stop-OwnedTopologyProcess -ProcessId $independentRestartedA.Id
     Stop-OwnedTopologyProcess -ProcessId $independentB.Id
+    Stop-OwnedTopologyProcess -ProcessId $independentRestartedGlobal.Id
 
     Start-Sleep -Milliseconds 750
     Reset-TopologyCache
     $multiwindowStartedAt = [DateTimeOffset]::UtcNow
     $multiwindowStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $multiwindowEndpoint = Get-AvailableTopologyEndpoint
+    $multiwindowGlobal = Start-TopologyGlobalProcess `
+        -Topology multiwindow `
+        -RunId $runId `
+        -Endpoint $multiwindowEndpoint
+    $multiwindowGlobalStatus = Wait-ForTopologyGlobalStatus `
+        -Process $multiwindowGlobal `
+        -Topology multiwindow `
+        -Endpoint $multiwindowEndpoint `
+        -RunId $runId `
+        -ProbeId 'multiwindow-global-initial'
+    $multiwindowGlobalSingleton = Confirm-TopologyGlobalSingleton `
+        -Topology multiwindow `
+        -RunId $runId `
+        -Endpoint $multiwindowEndpoint `
+        -OwnerProcessId $multiwindowGlobal.Id `
+        -ProbeId 'multiwindow-singleton-initial'
+    $multiwindowGlobalMetrics = Measure-TopologyProcesses `
+        -RootProcessIds @($multiwindowGlobal.Id)
+    $multiwindowGlobalWindowCount = (
+        [MyAlbunsWindowProbe]::VisibleWindowsFor(
+            @($multiwindowGlobal.Id)
+        ).Count
+    )
+    if ($multiwindowGlobalWindowCount -ne 0) {
+        throw 'The lightweight global role unexpectedly owns a visible window.'
+    }
+
     $multiwindow = Start-TopologyProcess `
         -Topology multiwindow `
         -ProbeGatePath $multiwindowProbeGate `
-        -ExportGatePath $multiwindowExportGate
+        -ExportGatePath $multiwindowExportGate `
+        -RunId $runId `
+        -GlobalEndpoint $multiwindowEndpoint `
+        -FaultGatePath $multiwindowFaultGate `
+        -FaultOutputRoot $multiwindowFaultOutputRoot
     $multiwindowReady = Wait-ForTopologyWindows `
         -RootProcessIds @($multiwindow.Id) `
         -ExpectedCount 2 `
@@ -1972,17 +2402,207 @@ try {
     $multiwindowMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($multiwindow.Id)
 
-    Stop-OwnedTopologyProcess -ProcessId $multiwindow.Id
+    $multiwindowGlobalCrash = Invoke-TopologyProcessCrash `
+        -ProcessId $multiwindowGlobal.Id `
+        -Role 'global_shell'
     Start-Sleep -Milliseconds 750
-    $multiwindowFailureIsolation = [ordered]@{
-        forcedHostProcessId = $multiwindow.Id
-        hostSurvived = $null -ne (
-            Get-Process -Id $multiwindow.Id -ErrorAction SilentlyContinue
-        )
-        remainingWindowCount = [MyAlbunsWindowProbe]::VisibleWindowsFor(
-            @($multiwindow.Id)
-        ).Count
+    $multiwindowGlobalUnavailable = Confirm-TopologyGlobalUnavailable `
+        -Endpoint $multiwindowEndpoint `
+        -RunId $runId `
+        -ProbeId 'multiwindow-global-down-runner'
+    $multiwindowProcessesWhileGlobalUnavailable = (
+        Assert-TopologyExecutableProcessSet `
+            -ExpectedProcessIds @($multiwindow.Id) `
+            -Context 'Multiwindow process set after the global crash'
+    )
+    $multiwindowWindowsWhileGlobalUnavailable = Assert-TopologyWindowCount `
+        -RootProcessIds @($multiwindow.Id) `
+        -ExpectedCount 2 `
+        -Context 'Multiwindow host after the global crash'
+    $multiwindowOfflineProbe = Invoke-TopologyContinuityProbe `
+        -Topology multiwindow `
+        -RunId $runId `
+        -ProbeId 'multiwindow-global-down' `
+        -ExpectedGlobalAvailable $false `
+        -RootProcessIds @($multiwindow.Id) `
+        -ExpectedProjectCount 2 `
+        -GatePath $multiwindowFaultGate `
+        -OutputRoot $multiwindowFaultOutputRoot `
+        -TopologyStartedAt $multiwindowStartedAt
+
+    $multiwindowRestartedGlobal = Start-TopologyGlobalProcess `
+        -Topology multiwindow `
+        -RunId $runId `
+        -Endpoint $multiwindowEndpoint
+    $multiwindowRestartedGlobalStatus = Wait-ForTopologyGlobalStatus `
+        -Process $multiwindowRestartedGlobal `
+        -Topology multiwindow `
+        -Endpoint $multiwindowEndpoint `
+        -RunId $runId `
+        -ProbeId 'multiwindow-global-restarted'
+    $multiwindowRestartedSingleton = Confirm-TopologyGlobalSingleton `
+        -Topology multiwindow `
+        -RunId $runId `
+        -Endpoint $multiwindowEndpoint `
+        -OwnerProcessId $multiwindowRestartedGlobal.Id `
+        -ProbeId 'multiwindow-singleton-restarted'
+    $multiwindowOnlineProbe = Invoke-TopologyContinuityProbe `
+        -Topology multiwindow `
+        -RunId $runId `
+        -ProbeId 'multiwindow-global-restored' `
+        -ExpectedGlobalAvailable $true `
+        -RootProcessIds @($multiwindow.Id) `
+        -ExpectedProjectCount 2 `
+        -GatePath $multiwindowFaultGate `
+        -OutputRoot $multiwindowFaultOutputRoot `
+        -TopologyStartedAt $multiwindowStartedAt
+    Assert-TopologyProbeGlobalOwner `
+        -Probe $multiwindowOnlineProbe `
+        -ExpectedProcessId $multiwindowRestartedGlobal.Id
+
+    $multiwindowHostCrash = Invoke-TopologyProcessCrash `
+        -ProcessId $multiwindow.Id `
+        -Role 'project_host_multiwindow'
+    Start-Sleep -Milliseconds 750
+    $multiwindowStoppedWindows = Assert-TopologyWindowCount `
+        -RootProcessIds @($multiwindow.Id) `
+        -ExpectedCount 0 `
+        -Context 'Multiwindow windows after the shared host crash'
+    $multiwindowProcessesAfterHostCrash = (
+        Assert-TopologyExecutableProcessSet `
+            -ExpectedProcessIds @($multiwindowRestartedGlobal.Id) `
+            -Context 'Multiwindow process set after the shared host crash'
+    )
+    $multiwindowProjectA = Get-TopologyProbeProject `
+        -Probe $multiwindowOnlineProbe `
+        -ProjectId 'project-spike-001'
+    $multiwindowProjectB = Get-TopologyProbeProject `
+        -Probe $multiwindowOnlineProbe `
+        -ProjectId 'project-spike-002'
+    $multiwindowProjectASource = Get-TopologyProbeSource `
+        -Probe $multiwindowOnlineProbe `
+        -ProjectId 'project-spike-001'
+    $multiwindowProjectBSource = Get-TopologyProbeSource `
+        -Probe $multiwindowOnlineProbe `
+        -ProjectId 'project-spike-002'
+    Remove-TopologyFaultGate -Path $multiwindowProbeGate
+    Remove-TopologyFaultGate -Path $multiwindowExportGate
+    $multiwindowHostRestartStartedAt = [DateTimeOffset]::UtcNow
+    $multiwindowHostRestartStopwatch = (
+        [System.Diagnostics.Stopwatch]::StartNew()
+    )
+    $multiwindowRestarted = Start-TopologyProcess `
+        -Topology multiwindow `
+        -ProbeGatePath $multiwindowProbeGate `
+        -ExportGatePath $multiwindowExportGate `
+        -RunId $runId `
+        -GlobalEndpoint $multiwindowEndpoint `
+        -FaultGatePath $multiwindowFaultGate `
+        -FaultOutputRoot $multiwindowFaultOutputRoot `
+        -ProjectASource $multiwindowProjectASource `
+        -ProjectBSource $multiwindowProjectBSource
+    $multiwindowRestartedWindows = Wait-ForTopologyWindows `
+        -RootProcessIds @($multiwindowRestarted.Id) `
+        -ExpectedCount 2 `
+        -ExpectedTitleMarker '[Topologia B]' `
+        -Stopwatch $multiwindowHostRestartStopwatch
+    $multiwindowRestartedCache = Wait-ForMediaCache `
+        -RootProcessIds @($multiwindowRestarted.Id) `
+        -ExpectedProjectCount 2 `
+        -StartedAt $multiwindowHostRestartStartedAt `
+        -TopologyStopwatch $multiwindowHostRestartStopwatch
+    $multiwindowReopen = Wait-ForTopologyProjectReopen `
+        -Topology multiwindow `
+        -RunId $runId `
+        -ExpectedProjects @($multiwindowProjectA, $multiwindowProjectB) `
+        -RootProcessIds @($multiwindowRestarted.Id) `
+        -StartedAt $multiwindowHostRestartStartedAt
+    $multiwindowGlobalAfterHostRestart = Invoke-TopologyGlobalStatus `
+        -Endpoint $multiwindowEndpoint `
+        -RunId $runId `
+        -ProbeId 'multiwindow-after-host-restart'
+    if (
+        $multiwindowGlobalAfterHostRestart.processId -ne
+            $multiwindowRestartedGlobal.Id
+    ) {
+        throw 'The multiwindow host restart changed the global owner.'
     }
+    $multiwindowLogQuality = Wait-ForTopologyFailureLogQuality `
+        -Topology multiwindow `
+        -RunId $runId `
+        -StartedAt $multiwindowStartedAt `
+        -ExpectedHostStreamCount 2 `
+        -ExpectedCompletionCount 4 `
+        -ExpectedReopenCount 2
+    $multiwindowFailureIsolation = [ordered]@{
+        globalProcess = [ordered]@{
+            initial = [ordered]@{
+                processId = $multiwindowGlobal.Id
+                status = $multiwindowGlobalStatus
+                singleton = $multiwindowGlobalSingleton
+                visibleWindowCount = $multiwindowGlobalWindowCount
+                processes = $multiwindowGlobalMetrics
+            }
+            termination = $multiwindowGlobalCrash
+            unavailableBeforeExplicitRestart = $multiwindowGlobalUnavailable
+            noAutomaticRestartObserved = (
+                $multiwindowProcessesWhileGlobalUnavailable.
+                    unexpectedProcessIds.Count -eq 0
+            )
+            processSetWhileUnavailable = (
+                $multiwindowProcessesWhileGlobalUnavailable
+            )
+            windowsWhileUnavailable = (
+                $multiwindowWindowsWhileGlobalUnavailable
+            )
+            offlineContinuity = (
+                Select-TopologyProbeReport -Probe $multiwindowOfflineProbe
+            )
+            explicitRestart = [ordered]@{
+                previousProcessId = $multiwindowGlobal.Id
+                processId = $multiwindowRestartedGlobal.Id
+                pidChanged = (
+                    $multiwindowGlobal.Id -ne $multiwindowRestartedGlobal.Id
+                )
+                status = $multiwindowRestartedGlobalStatus
+                singleton = $multiwindowRestartedSingleton
+            }
+            onlineContinuity = (
+                Select-TopologyProbeReport -Probe $multiwindowOnlineProbe
+            )
+        }
+        projectHost = [ordered]@{
+            termination = $multiwindowHostCrash
+            forcedHostProcessId = $multiwindow.Id
+            hostSurvived = $false
+            otherHostSurvived = $false
+            noAutomaticRestartObserved = $null -eq (
+                Get-Process `
+                    -Id $multiwindow.Id `
+                    -ErrorAction SilentlyContinue
+            )
+            processSetAfterCrash = $multiwindowProcessesAfterHostCrash
+            remainingWindowCount = $multiwindowStoppedWindows.observedCount
+            survivorContinuity = $null
+            explicitRestart = [ordered]@{
+                previousProcessId = $multiwindow.Id
+                processId = $multiwindowRestarted.Id
+                pidChanged = (
+                    $multiwindow.Id -ne $multiwindowRestarted.Id
+                )
+                ready = $multiwindowRestartedWindows
+                cacheReady = $multiwindowRestartedCache
+                reopen = $multiwindowReopen
+                globalStatus = $multiwindowGlobalAfterHostRestart
+            }
+        }
+        ipc = New-TopologyIpcEvidence `
+            -Topology multiwindow `
+            -SuccessfulProjectProbeCount 4
+        logs = $multiwindowLogQuality
+    }
+    Stop-OwnedTopologyProcess -ProcessId $multiwindowRestarted.Id
+    Stop-OwnedTopologyProcess -ProcessId $multiwindowRestartedGlobal.Id
 
     & (Join-Path $PSScriptRoot 'Prepare-TopologyCorpus.ps1')
     if ($LASTEXITCODE -ne 0) {
@@ -2006,11 +2626,37 @@ try {
         (
             $corpusManifest.albums |
                 ForEach-Object { $_.photos.Count } |
-                Measure-Object -Sum
+            Measure-Object -Sum
         ).Sum
     )
+    $independentOfflineComplete = (
+        $independentFailureIsolation.globalProcess.offlineContinuity.
+            missingCompletions -eq 0
+    )
+    $independentReopenComplete = (
+        $independentFailureIsolation.projectHost.explicitRestart.
+            reopen.observedProjects -eq 1
+    )
+    $multiwindowOfflineComplete = (
+        $multiwindowFailureIsolation.globalProcess.offlineContinuity.
+            missingCompletions -eq 0
+    )
+    $multiwindowReopenComplete = (
+        $multiwindowFailureIsolation.projectHost.explicitRestart.
+            reopen.observedProjects -eq 2
+    )
+    $failureGatePassed = (
+        $independentOfflineComplete -and
+        $independentReopenComplete -and
+        $multiwindowOfflineComplete -and
+        $multiwindowReopenComplete -and
+        -not $buildManifest.buildInputsDirty -and
+        $currentInputState.digestSha256 -eq
+            $buildManifest.buildInputDigestSha256 -and
+        $imagingRecovery.validated
+    )
     $report = [ordered]@{
-        schemaVersion = 10
+        schemaVersion = 11
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         corpus = [ordered]@{
@@ -2067,13 +2713,17 @@ try {
                 forcedFailure = $multiwindowFailureIsolation
             }
         }
+        failureGate = [ordered]@{
+            passed = $failureGatePassed
+            imagingProcessor = $imagingRecovery
+        }
         notMeasured = @($reportText.notMeasured)
         notes = @($reportText.notes)
     }
 
     $outputDirectory = Split-Path -Parent $OutputPath
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
-    $json = $report | ConvertTo-Json -Depth 10
+    $json = $report | ConvertTo-Json -Depth 16
     [System.IO.File]::WriteAllText(
         $OutputPath,
         $json + [System.Environment]::NewLine,
@@ -2089,7 +2739,7 @@ try {
     Write-Output $json
 }
 finally {
-    foreach ($processId in $startedProcessIds) {
+    foreach ($processId in @($startedProcessIds)) {
         try {
             Stop-OwnedTopologyProcess -ProcessId $processId
         }
@@ -2109,6 +2759,14 @@ finally {
             (Test-Path -LiteralPath $fullGatePath -PathType Leaf)
         ) {
             Remove-Item -LiteralPath $fullGatePath -Force
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($failureScratchRoot)) {
+        try {
+            Remove-TopologyFailureScratchRoot -Path $failureScratchRoot
+        }
+        catch {
+            Write-Warning $_.Exception.Message
         }
     }
     Set-ProcessEnvironmentValue -Name 'CARGO_TARGET_DIR' -Value $previousCargoTarget

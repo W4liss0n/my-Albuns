@@ -142,6 +142,18 @@ impl ProjectSession {
         serialize_persisted_revision(&self.state)
     }
 
+    pub fn confirm_saved_revision(&mut self, revision: u64) -> Result<EditorState, CoreError> {
+        if revision != self.state.revision {
+            return Err(CoreError::SavedRevisionMismatch {
+                current: self.state.revision,
+                confirmed: revision,
+            });
+        }
+        self.state.saved_revision = revision;
+        self.state.dirty = false;
+        Ok(self.state())
+    }
+
     fn refresh_history_flags(&mut self) {
         self.state.can_undo = !self.undo.is_empty();
         self.state.can_redo = !self.redo.is_empty();

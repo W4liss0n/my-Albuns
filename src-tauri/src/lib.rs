@@ -2,6 +2,7 @@ mod benchmark_corpus;
 mod cache_engine;
 mod export_pipeline;
 mod export_probe_commands;
+pub(crate) mod global_process_spike;
 mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
@@ -12,9 +13,10 @@ mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
 mod topology_benchmark;
+mod topology_fault_probe;
 mod topology_spike;
 
-use myalbuns_logging::ProcessRole;
+use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -26,10 +28,22 @@ use topology_benchmark::{
     TopologyBenchmarkState, report_topology_benchmark_failure, report_topology_canvas_benchmark,
     report_topology_canvas_ready, topology_benchmark_config,
 };
+use topology_fault_probe::{
+    TopologyFaultProbeState, persist_topology_fault_probe, report_topology_fault_probe_failure,
+    topology_fault_probe_config,
+};
 use topology_spike::TopologySpike;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if global_process_spike::global_process_requested() {
+        if let Err(error) = global_process_spike::run_global_process_spike_from_environment() {
+            eprintln!("processo global do spike encerrado: {error}");
+            std::process::exit(error.exit_code());
+        }
+        return;
+    }
+
     let topology = TopologySpike::from_environment()
         .unwrap_or_else(|error| panic!("configuração inválida do spike de topologia: {error}"));
     let project_host = topology
@@ -37,11 +51,14 @@ pub fn run() {
         .unwrap_or_else(|error| panic!("corpus inválido do spike de topologia: {error}"));
     let topology_benchmark = TopologyBenchmarkState::from_environment(&topology)
         .unwrap_or_else(|error| panic!("benchmark de topologia inválido: {error}"));
+    let topology_fault_probe = TopologyFaultProbeState::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("probe de falhas de topologia inválido: {error}"));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
         .manage(topology_benchmark)
+        .manage(topology_fault_probe)
         .setup(move |app| {
             let app_paths = AppPaths::discover()?;
             let webview_data_directory =
@@ -70,6 +87,24 @@ pub fn run() {
                 .build()?;
             }
 
+            for window_label in topology.reopened_window_labels() {
+                let projection = app
+                    .state::<project_host::ProjectHost>()
+                    .projection(window_label)
+                    .map_err(std::io::Error::other)?;
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    process_id = std::process::id(),
+                    run_id = topology.run_id(),
+                    topology = topology.label(),
+                    window_label,
+                    project_id = safe_log_identifier(&projection.state.project_id),
+                    revision = projection.state.revision,
+                    event = "topology_project_reopened",
+                );
+            }
+
             tracing::info!(
                 target: "myalbuns.desktop",
                 process_role = ProcessRole::DesktopHost.as_str(),
@@ -91,7 +126,10 @@ pub fn run() {
             topology_benchmark_config,
             report_topology_canvas_ready,
             report_topology_canvas_benchmark,
-            report_topology_benchmark_failure
+            report_topology_benchmark_failure,
+            topology_fault_probe_config,
+            persist_topology_fault_probe,
+            report_topology_fault_probe_failure
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o MyAlbuns");

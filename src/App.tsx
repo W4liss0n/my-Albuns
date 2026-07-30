@@ -19,6 +19,10 @@ import {
   disabledTopologyBenchmarkBridge,
   type TopologyBenchmarkBridge,
 } from "./application/topologyBenchmark";
+import {
+  disabledTopologyFaultProbeBridge,
+  type TopologyFaultProbeBridge,
+} from "./application/topologyFaultProbe";
 import { LoggingProvider } from "./components/loggingContext";
 import {
   CanvasGraphicsDiagnosticProbeProvider,
@@ -27,6 +31,8 @@ import {
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { SafeApplicationShell } from "./components/SafeApplicationShell";
 import { useTopologyBenchmarkCoordinator } from "./components/useTopologyBenchmarkCoordinator";
+import { useTopologyFaultProbe } from "./components/useTopologyFaultProbe";
+import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import "./App.css";
 
 interface AppProps {
@@ -34,6 +40,7 @@ interface AppProps {
   mediaPreviewPort: MediaPreviewPort;
   projectSessionPort: ProjectSessionPort;
   topologyBenchmarkBridge?: TopologyBenchmarkBridge;
+  topologyFaultProbeBridge?: TopologyFaultProbeBridge;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
@@ -44,6 +51,7 @@ function App({
   mediaPreviewPort,
   projectSessionPort,
   topologyBenchmarkBridge = disabledTopologyBenchmarkBridge,
+  topologyFaultProbeBridge = disabledTopologyFaultProbeBridge,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
   logger,
@@ -119,10 +127,20 @@ function App({
     });
   }, [graphics, logger]);
 
-  const projectId = projection?.state.projectId;
+  const projectId = projection?.state.projectId ?? "";
+  const runProjectMutation = useProjectMutationRunner(
+    projectId,
+    projectSessionPort,
+  );
+  useTopologyFaultProbe({
+    projection,
+    runProjectMutation,
+    topologyBridge: topologyFaultProbeBridge,
+    onProjectionChange: setProjection,
+  });
   const canvasPerformanceProbe =
     useTopologyBenchmarkCoordinator({
-      projectId: editorGraphics.supported ? (projectId ?? "") : "",
+      projectId: editorGraphics.supported ? projectId : "",
       exportPort,
       topologyBridge: topologyBenchmarkBridge,
       mediaPreviewsReady,
@@ -215,7 +233,7 @@ function App({
         <ProjectWorkspace
           projection={projection}
           exportPort={exportPort}
-          projectSessionPort={projectSessionPort}
+          runProjectMutation={runProjectMutation}
           canvasPerformanceProbe={canvasPerformanceProbe}
           mediaPreviewUrls={mediaPreviewUrls}
           onProjectionChange={setProjection}
