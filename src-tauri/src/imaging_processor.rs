@@ -48,7 +48,6 @@ pub(crate) enum InvocationFailureStage {
     ImagingProcess,
     Cancelled,
     TerminationUnconfirmed,
-    CacheRecoveryCleanup,
     Processor(ImagingFailureStage),
 }
 
@@ -64,7 +63,6 @@ impl InvocationFailureStage {
             Self::ImagingProcess => "imaging_process",
             Self::Cancelled => "cancelled",
             Self::TerminationUnconfirmed => "termination_unconfirmed",
-            Self::CacheRecoveryCleanup => "cache_recovery_cleanup",
             Self::Processor(stage) => stage.as_str(),
         }
     }
@@ -175,16 +173,6 @@ impl InvocationFailure {
                 .exit_code
                 .and_then(ImagingFailureStage::from_exit_code)
                 .is_none()
-    }
-
-    pub(crate) fn cache_recovery_cleanup(failed: &Self, message: impl Into<String>) -> Self {
-        Self {
-            stage: InvocationFailureStage::CacheRecoveryCleanup,
-            exit_code: failed.exit_code,
-            process_id: failed.process_id,
-            message: message.into(),
-            termination_observed: false,
-        }
     }
 
     #[cfg(test)]

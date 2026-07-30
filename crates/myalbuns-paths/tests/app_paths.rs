@@ -424,20 +424,23 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
         .preview_file("media-01", "generation-01")
         .expect("the published path is valid");
 
-    let mut file = storage
-        .create_temporary_file(&temporary)
-        .expect("the temporary file is created without following aliases");
-    file.write_all(b"preview").expect("the preview is written");
-    file.sync_all().expect("the preview is synchronized");
-    drop(file);
-    storage
-        .replace_file(&temporary, &published)
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("the Cache publication begins without following aliases");
+    publication
+        .write_all(b"preview")
+        .expect("the preview is written");
+    publication
+        .sync()
+        .expect("the preview is synchronized")
+        .publish()
         .expect("the exact temporary file is published");
 
     assert_eq!(
         std::fs::read(&published).expect("the published preview is readable"),
         b"preview"
     );
+    assert!(!temporary.exists());
     drop(storage);
     assert!(
         paths
@@ -450,6 +453,63 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
             .clear_project_cache(&cache)
             .expect("clearing an absent Cache is idempotent")
     );
+}
+
+#[test]
+fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_known_folders(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-incomplete")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let temporary = cache
+        .preview_temporary_file("media-01", "generation-01", 42)
+        .expect("the temporary path is valid");
+    let published = cache
+        .preview_file("media-01", "generation-01")
+        .expect("the published path is valid");
+    std::fs::write(&published, b"previous preview")
+        .expect("the previous Cache artifact is writable");
+
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("the Cache publication begins safely");
+    publication
+        .write_all(b"incomplete preview")
+        .expect("the temporary preview is writable");
+    let synchronized = publication
+        .sync()
+        .expect("the temporary preview is synchronized");
+    drop(synchronized);
+
+    assert!(!temporary.exists());
+    assert_eq!(
+        std::fs::read(published).expect("the previous Cache artifact remains"),
+        b"previous preview"
+    );
+}
+
+#[test]
+fn rejects_using_the_same_cache_path_as_temporary_and_final() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_known_folders(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-same-path")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let published = cache
+        .preview_file("media-01", "generation-01")
+        .expect("the published path is valid");
+
+    assert!(matches!(
+        storage.begin_file_publication(&published, &published),
+        Err(AppPathsError::CacheStorageOutsideRoot)
+    ));
 }
 
 #[test]
@@ -482,11 +542,7 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
         &other_process_temporary,
         &metadata_temporary,
     ] {
-        let mut file = storage
-            .create_temporary_file(temporary)
-            .expect("the stale temporary is materialized safely");
-        file.write_all(b"incomplete")
-            .expect("the stale temporary is writable");
+        std::fs::write(temporary, b"incomplete").expect("the stale temporary is materialized");
     }
     drop(storage);
 

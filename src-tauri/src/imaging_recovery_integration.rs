@@ -285,13 +285,8 @@ fn real_processor_recovery_flows_through_production_modules() {
         let cache_storage = app_paths
             .prepare_cache_storage(&cache_paths)
             .expect("the recovery Cache storage is prepared");
-        let mut foreign_file = cache_storage
-            .create_temporary_file(&foreign_temporary)
-            .expect("the foreign temporary is created");
-        foreign_file
-            .write_all(b"foreign process")
+        std::fs::write(&foreign_temporary, b"foreign process")
             .expect("the foreign temporary is writable");
-        drop(foreign_file);
         drop(cache_storage);
         let cache_context = InvocationContext::new(cache_request_id, Some(project_id.clone()));
         let mut cache_transport =

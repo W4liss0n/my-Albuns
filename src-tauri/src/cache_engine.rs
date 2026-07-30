@@ -89,6 +89,7 @@ impl CacheWork {
 pub(crate) enum CacheFailureStage {
     Plan,
     Processor(InvocationFailureStage),
+    RecoveryCleanup,
     ValidateResponse,
     VerifyArtifacts,
     PublishIndex,
@@ -99,6 +100,7 @@ impl CacheFailureStage {
         match self {
             Self::Plan => "plan_request",
             Self::Processor(stage) => stage.as_str(),
+            Self::RecoveryCleanup => "cache_recovery_cleanup",
             Self::ValidateResponse => "validate_response",
             Self::VerifyArtifacts => "verify_artifacts",
             Self::PublishIndex => "publish_index",
@@ -129,11 +131,7 @@ pub(crate) async fn execute<T: ImagingTransport>(
     let request = plan_request(&work)?;
     let command = ImagingCommand::build_cache(request.clone());
     let (response, recovery) =
-        invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context)
-            .await
-            .map_err(|failure| {
-                CacheFailure::from_invocation(failure, CacheFailureStage::Processor)
-            })?;
+        invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context).await?;
     let completion = response
         .cache_completed_for(&work.request_id)
         .cloned()
@@ -202,7 +200,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     cache_paths: &CachePathPlan,
     command: &ImagingCommand,
     context: &InvocationContext,
-) -> Result<(ImagingResponse, Option<CacheRecovery>), InvocationFailure> {
+) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
     let mut attempt = 1_u8;
     let mut recovery = None;
     loop {
@@ -232,17 +230,16 @@ async fn invoke_with_recovery<T: ImagingTransport>(
             }
             Err(failure) if failure.is_unexpected_termination() => {
                 let Some(failed_process_id) = failure.process_id else {
-                    return Err(failure);
+                    return Err(cache_processor_failure(failure));
                 };
                 let removed_temporary_count = app_paths
                     .discard_project_cache_temporaries(cache_paths, failed_process_id)
-                    .map_err(|error| {
-                        InvocationFailure::cache_recovery_cleanup(
-                            &failure,
-                            format!(
-                                "Não foi possível descartar o item incompleto do Cache: {error}"
-                            ),
-                        )
+                    .map_err(|error| CacheFailure {
+                        stage: CacheFailureStage::RecoveryCleanup,
+                        exit_code: failure.exit_code,
+                        message: format!(
+                            "Não foi possível descartar o item incompleto do Cache: {error}"
+                        ),
                     })?;
                 if attempt == 1 {
                     recovery = Some(CacheRecovery {
@@ -273,12 +270,16 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                         exit_code = failure.exit_code,
                         event = "imaging_processor_restart_exhausted",
                     );
-                    return Err(failure);
+                    return Err(cache_processor_failure(failure));
                 }
             }
-            Err(failure) => return Err(failure),
+            Err(failure) => return Err(cache_processor_failure(failure)),
         }
     }
+}
+
+fn cache_processor_failure(failure: InvocationFailure) -> CacheFailure {
+    CacheFailure::from_invocation(failure, CacheFailureStage::Processor)
 }
 
 fn verify_completion(
@@ -447,47 +448,41 @@ fn write_cache_metadata(
     let temporary_path = request
         .cache_paths
         .metadata_temporary_file(std::process::id());
-    let publish = (|| -> Result<(), CacheFailure> {
-        let metadata_bytes = serde_json::to_vec_pretty(&metadata).map_err(|error| {
+    let metadata_bytes = serde_json::to_vec_pretty(&metadata).map_err(|error| {
+        CacheFailure::new(
+            CacheFailureStage::PublishIndex,
+            format!("Não foi possível serializar o índice: {error}"),
+        )
+    })?;
+    let mut publication = storage
+        .begin_file_publication(&temporary_path, &metadata_path)
+        .map_err(|error| {
             CacheFailure::new(
                 CacheFailureStage::PublishIndex,
-                format!("Não foi possível serializar o índice: {error}"),
+                format!("Não foi possível criar o índice temporário: {error}"),
             )
         })?;
-        let mut temporary = storage
-            .create_temporary_file(&temporary_path)
-            .map_err(|error| {
-                CacheFailure::new(
-                    CacheFailureStage::PublishIndex,
-                    format!("Não foi possível criar o índice temporário: {error}"),
-                )
-            })?;
-        temporary.write_all(&metadata_bytes).map_err(|error| {
-            CacheFailure::new(
-                CacheFailureStage::PublishIndex,
-                format!("Não foi possível gravar o índice temporário: {error}"),
-            )
-        })?;
-        temporary.sync_all().map_err(|error| {
+    publication.write_all(&metadata_bytes).map_err(|error| {
+        CacheFailure::new(
+            CacheFailureStage::PublishIndex,
+            format!("Não foi possível gravar o índice temporário: {error}"),
+        )
+    })?;
+    publication
+        .sync()
+        .map_err(|error| {
             CacheFailure::new(
                 CacheFailureStage::PublishIndex,
                 format!("Não foi possível sincronizar o índice: {error}"),
             )
-        })?;
-        drop(temporary);
-        storage
-            .replace_file(&temporary_path, &metadata_path)
-            .map_err(|error| {
-                CacheFailure::new(
-                    CacheFailureStage::PublishIndex,
-                    format!("Não foi possível publicar o índice: {error}"),
-                )
-            })
-    })();
-    if publish.is_err() {
-        let _ = std::fs::remove_file(&temporary_path);
-    }
-    publish
+        })?
+        .publish()
+        .map_err(|error| {
+            CacheFailure::new(
+                CacheFailureStage::PublishIndex,
+                format!("Não foi possível publicar o índice: {error}"),
+            )
+        })
 }
 
 fn unix_millis(time: SystemTime) -> Option<u64> {
@@ -586,13 +581,14 @@ mod tests {
         let storage = app_paths
             .prepare_cache_storage(&request.cache_paths)
             .expect("cache storage");
-        let mut file = storage
-            .create_temporary_file(&temporary_path)
+        let mut publication = storage
+            .begin_file_publication(&temporary_path, &preview_path)
             .expect("temporary preview");
-        file.write_all(b"preview").expect("preview bytes");
-        drop(file);
-        storage
-            .replace_file(&temporary_path, &preview_path)
+        publication.write_all(b"preview").expect("preview bytes");
+        publication
+            .sync()
+            .expect("synchronized preview")
+            .publish()
             .expect("published preview");
         ImagingResponse::cache_completed(
             request.request_id,
@@ -641,6 +637,33 @@ mod tests {
             );
             assert_eq!(transport.attempts, [1, 2]);
             assert!(work.cache_paths.metadata_file().is_file());
+        });
+    }
+
+    #[test]
+    fn a_cache_recovery_cleanup_failure_stays_owned_by_cache_engine() {
+        tauri::async_runtime::block_on(async {
+            let (_root, app_paths, work, context) = work();
+            std::fs::create_dir_all(
+                work.cache_paths
+                    .root()
+                    .parent()
+                    .expect("the project Cache has a parent"),
+            )
+            .expect("the Cache root is materialized");
+            std::fs::write(work.cache_paths.root(), b"not a Cache directory")
+                .expect("the invalid project Cache is materialized");
+            let mut transport = ScriptedTransport {
+                results: VecDeque::from([Err(InvocationFailure::unexpected_termination(4242))]),
+                attempts: Vec::new(),
+            };
+
+            let failure = execute(&mut transport, &app_paths, work, &context)
+                .await
+                .expect_err("the recovery cleanup failure remains visible");
+
+            assert_eq!(failure.stage, CacheFailureStage::RecoveryCleanup);
+            assert_eq!(transport.attempts, [1]);
         });
     }
 

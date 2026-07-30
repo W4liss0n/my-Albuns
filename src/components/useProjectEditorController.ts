@@ -22,6 +22,7 @@ import type {
   PhotoTransformPreview,
 } from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 interface ProjectEditorControllerInput {
   projection: EditorProjection;
@@ -41,11 +42,6 @@ interface ZoomDraft {
 interface ScopedPhotoTransformPreview {
   projectId: string;
   preview: PhotoTransformPreview;
-}
-
-interface MutationQueue {
-  active: boolean;
-  tail: Promise<void>;
 }
 
 function messageFromError(error: unknown) {
@@ -86,31 +82,24 @@ export function useProjectEditorController({
   );
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
   const pendingSheetNavigationRef = useRef<string | null>(null);
-  const mutationQueueRef = useRef<MutationQueue>({
-    active: false,
-    tail: Promise.resolve(),
-  });
-  const commandContextRef = useRef({
-    exportPort,
+  const runProjectMutation = useProjectMutationRunner(
+    projection.state.projectId,
     projectSessionPort,
+  );
+  const feedbackTokenRef = useRef(0);
+  const exportContextRef = useRef({
+    exportPort,
     projectId: projection.state.projectId,
     generation: 0,
   });
   if (
-    commandContextRef.current.exportPort !== exportPort ||
-    commandContextRef.current.projectSessionPort !==
-      projectSessionPort ||
-    commandContextRef.current.projectId !== projection.state.projectId
+    exportContextRef.current.exportPort !== exportPort ||
+    exportContextRef.current.projectId !== projection.state.projectId
   ) {
-    commandContextRef.current = {
+    exportContextRef.current = {
       exportPort,
-      projectSessionPort,
       projectId: projection.state.projectId,
-      generation: commandContextRef.current.generation + 1,
-    };
-    mutationQueueRef.current = {
-      active: false,
-      tail: Promise.resolve(),
+      generation: exportContextRef.current.generation + 1,
     };
   }
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
@@ -207,90 +196,72 @@ export function useProjectEditorController({
     centerCanvasOnSheet(sheetId, canvasMetrics);
   }
 
-  function enqueueProjectMutation(
-    operation: () => Promise<EditorProjection>,
-  ) {
-    const queue = mutationQueueRef.current;
-    const result = queue.active
-      ? queue.tail.then(operation, operation)
-      : operation();
-    queue.active = true;
-    const settledTail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    queue.tail = settledTail;
-    void settledTail.then(() => {
-      if (queue.tail === settledTail) queue.active = false;
-    });
-    return result;
-  }
-
   async function runWithGlobalFeedback(
     label: string,
-    operation: () => Promise<EditorProjection>,
+    operation: (
+      port: ProjectSessionPort,
+    ) => Promise<EditorProjection>,
   ) {
-    const generation = commandContextRef.current.generation;
+    const feedbackToken = feedbackTokenRef.current + 1;
+    feedbackTokenRef.current = feedbackToken;
     setBusy(label);
     setMessage(null);
-    try {
-      const nextProjection = await enqueueProjectMutation(operation);
-      if (generation === commandContextRef.current.generation) {
-        onProjectionChange(nextProjection);
-      }
-    } catch (error: unknown) {
-      if (generation === commandContextRef.current.generation) {
-        setMessage(messageFromError(error));
-      }
-    } finally {
-      if (generation === commandContextRef.current.generation) {
-        setBusy(null);
-      }
+    const outcome = await runProjectMutation(operation);
+    if (outcome.status === "completed") {
+      onProjectionChange(outcome.projection);
+    } else if (
+      outcome.status === "failed" &&
+      feedbackToken === feedbackTokenRef.current
+    ) {
+      setMessage(messageFromError(outcome.error));
+    }
+    if (feedbackToken === feedbackTokenRef.current) {
+      setBusy(null);
     }
   }
 
   function applyWithStatus(intent: ProjectIntent) {
-    return runWithGlobalFeedback("Aplicando alteração", () =>
-      projectSessionPort.apply(intent),
+    return runWithGlobalFeedback("Aplicando alteração", (port) =>
+      port.apply(intent),
     );
   }
 
   async function commitInteraction(intent: ProjectIntent) {
-    const generation = commandContextRef.current.generation;
     setMessage(null);
-    try {
-      const nextProjection = await enqueueProjectMutation(() =>
-        projectSessionPort.apply(intent),
-      );
-      if (generation === commandContextRef.current.generation) {
-        onProjectionChange(nextProjection);
-        return true;
-      }
-      return false;
-    } catch (error: unknown) {
-      if (generation === commandContextRef.current.generation) {
-        setCanvasPhotoPreview(null);
-        setMessage(messageFromError(error));
-      }
-      return false;
+    const outcome = await runProjectMutation((port) =>
+      port.apply(intent),
+    );
+    if (outcome.status === "completed") {
+      onProjectionChange(outcome.projection);
+      return true;
     }
+    if (outcome.status === "failed") {
+      setCanvasPhotoPreview(null);
+      setMessage(messageFromError(outcome.error));
+    }
+    return false;
   }
 
   async function exportPreview() {
-    const generation = commandContextRef.current.generation;
+    const generation = exportContextRef.current.generation;
+    const feedbackToken = feedbackTokenRef.current + 1;
+    feedbackTokenRef.current = feedbackToken;
     setBusy("Exportando");
     setMessage(null);
     try {
       const result = await exportPort.exportPreview();
-      if (generation === commandContextRef.current.generation) {
+      if (generation === exportContextRef.current.generation) {
         setExportResult(result);
       }
     } catch (error: unknown) {
-      if (generation === commandContextRef.current.generation) {
+      if (
+        generation === exportContextRef.current.generation &&
+        feedbackToken === feedbackTokenRef.current
+      ) {
         setMessage(messageFromError(error));
       }
     } finally {
-      if (generation === commandContextRef.current.generation) {
+      if (feedbackToken === feedbackTokenRef.current) {
         setBusy(null);
       }
     }
@@ -384,8 +355,8 @@ export function useProjectEditorController({
         projection.state.canUndo
       ) {
         event.preventDefault();
-        void runWithGlobalFeedback("Desfazendo", () =>
-          projectSessionPort.undo(),
+        void runWithGlobalFeedback("Desfazendo", (port) =>
+          port.undo(),
         );
       }
       if (
@@ -393,8 +364,8 @@ export function useProjectEditorController({
         projection.state.canRedo
       ) {
         event.preventDefault();
-        void runWithGlobalFeedback("Refazendo", () =>
-          projectSessionPort.redo(),
+        void runWithGlobalFeedback("Refazendo", (port) =>
+          port.redo(),
         );
       }
     };
@@ -506,12 +477,12 @@ export function useProjectEditorController({
     updateZoomGesture,
     finishZoomGesture,
     undo: () =>
-      void runWithGlobalFeedback("Desfazendo", () =>
-        projectSessionPort.undo(),
+      void runWithGlobalFeedback("Desfazendo", (port) =>
+        port.undo(),
       ),
     redo: () =>
-      void runWithGlobalFeedback("Refazendo", () =>
-        projectSessionPort.redo(),
+      void runWithGlobalFeedback("Refazendo", (port) =>
+        port.redo(),
       ),
     exportPreview: () => void exportPreview(),
     fillMedia: (mediaId: string) => {

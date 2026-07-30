@@ -1,5 +1,4 @@
 use std::{
-    fs,
     io::{BufReader, BufWriter, Write},
     path::Path,
 };
@@ -198,31 +197,25 @@ fn prepare_preview(
     let preview = DynamicImage::ImageRgba8(decoded.image)
         .thumbnail(max_edge_px, max_edge_px)
         .to_rgb8();
-    let write_result = (|| -> Result<(), String> {
-        let file = storage
-            .create_temporary_file(temporary_path)
-            .map_err(|error| format!("não foi possível criar o Cache temporário: {error}"))?;
-        let mut writer = BufWriter::new(file);
+    let mut publication = storage
+        .begin_file_publication(temporary_path, preview_path)
+        .map_err(|error| format!("não foi possível criar o Cache temporário: {error}"))?;
+    {
+        let mut writer = BufWriter::new(&mut publication);
         JpegEncoder::new_with_quality(&mut writer, 84)
             .encode_image(&preview)
             .map_err(|error| format!("não foi possível codificar a prévia JPEG: {error}"))?;
         writer
             .flush()
             .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
-        let file = writer
-            .into_inner()
-            .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
-        file.sync_all()
-            .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
-        verify_source_current(source, operational_source)?;
-        storage
-            .replace_file(temporary_path, preview_path)
-            .map_err(|error| format!("não foi possível publicar a prévia: {error}"))
-    })();
-    if write_result.is_err() {
-        let _ = fs::remove_file(temporary_path);
     }
-    write_result?;
+    let publication = publication
+        .sync()
+        .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
+    verify_source_current(source, operational_source)?;
+    publication
+        .publish()
+        .map_err(|error| format!("não foi possível publicar a prévia: {error}"))?;
     Ok((
         preview.width(),
         preview.height(),

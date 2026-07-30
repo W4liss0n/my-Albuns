@@ -6,6 +6,10 @@ import type {
   ProjectSessionPort,
 } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
+import {
+  readInspectorSectionPreference,
+  writeInspectorSectionPreference,
+} from "../state/workspacePreferences";
 import { AlbumCanvas } from "./AlbumCanvas";
 import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { SheetPreview } from "./SheetPreview";
@@ -407,34 +411,6 @@ function InspectorSection({
       {open && <div className="inspector-section-content">{children}</div>}
     </section>
   );
-}
-
-function readInspectorSectionPreference(
-  preferenceKey: string,
-  fallback: boolean,
-) {
-  try {
-    const stored = window.localStorage.getItem(
-      `myalbuns.inspector.${preferenceKey}`,
-    );
-    return stored === null ? fallback : stored === "open";
-  } catch {
-    return fallback;
-  }
-}
-
-function writeInspectorSectionPreference(
-  preferenceKey: string,
-  open: boolean,
-) {
-  try {
-    window.localStorage.setItem(
-      `myalbuns.inspector.${preferenceKey}`,
-      open ? "open" : "closed",
-    );
-  } catch {
-    // The in-memory preference remains usable when storage is unavailable.
-  }
 }
 
 function PropertyRow({ label, value }: { label: string; value: string }) {

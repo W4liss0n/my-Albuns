@@ -1,5 +1,6 @@
 use std::{
     fs::{self, File, OpenOptions},
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -35,6 +36,30 @@ pub struct CachePathPlan {
 #[derive(Debug)]
 pub struct PreparedCacheStorage {
     directories: Vec<DirectoryGuard>,
+}
+
+/// A Cache file that is still being written.
+///
+/// Dropping this value before publication removes only its temporary file.
+pub struct PendingCachePublication<'storage> {
+    storage: &'storage PreparedCacheStorage,
+    final_path: PathBuf,
+    temporary: TemporaryCacheFile,
+}
+
+/// A synchronized Cache file that can be promoted to its final name.
+///
+/// Dropping this value before publication removes only its temporary file.
+pub struct SynchronizedCachePublication<'storage> {
+    storage: &'storage PreparedCacheStorage,
+    final_path: PathBuf,
+    temporary: TemporaryCacheFile,
+}
+
+struct TemporaryCacheFile {
+    path: PathBuf,
+    file: Option<File>,
+    published: bool,
 }
 
 #[derive(Debug)]
@@ -158,7 +183,25 @@ impl CachePathPlan {
 }
 
 impl PreparedCacheStorage {
-    pub fn create_temporary_file(&self, path: &Path) -> Result<File, AppPathsError> {
+    pub fn begin_file_publication<'storage>(
+        &'storage self,
+        temporary_path: &Path,
+        final_path: &Path,
+    ) -> Result<PendingCachePublication<'storage>, AppPathsError> {
+        self.validate_publication_paths(temporary_path, final_path)?;
+        let file = self.create_temporary_file(temporary_path)?;
+        Ok(PendingCachePublication {
+            storage: self,
+            final_path: final_path.to_path_buf(),
+            temporary: TemporaryCacheFile {
+                path: temporary_path.to_path_buf(),
+                file: Some(file),
+                published: false,
+            },
+        })
+    }
+
+    fn create_temporary_file(&self, path: &Path) -> Result<File, AppPathsError> {
         let parent = self.parent_for(path)?;
         match fs::symlink_metadata(path) {
             Ok(metadata) if metadata.file_type().is_dir() => {
@@ -193,12 +236,9 @@ impl PreparedCacheStorage {
         Ok(Some(file))
     }
 
-    pub fn replace_file(&self, temporary: &Path, final_path: &Path) -> Result<(), AppPathsError> {
-        let temporary_parent = self.parent_for(temporary)?;
-        let final_parent = self.parent_for(final_path)?;
-        if temporary_parent.logical_path != final_parent.logical_path {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
-        }
+    fn replace_file(&self, temporary: &Path, final_path: &Path) -> Result<(), AppPathsError> {
+        let (temporary_parent, final_parent) =
+            self.validate_publication_paths(temporary, final_path)?;
 
         let temporary_file =
             File::open(temporary).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
@@ -222,11 +262,82 @@ impl PreparedCacheStorage {
         Ok(())
     }
 
+    fn validate_publication_paths(
+        &self,
+        temporary: &Path,
+        final_path: &Path,
+    ) -> Result<(&DirectoryGuard, &DirectoryGuard), AppPathsError> {
+        if temporary == final_path {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let temporary_parent = self.parent_for(temporary)?;
+        let final_parent = self.parent_for(final_path)?;
+        if temporary_parent.logical_path != final_parent.logical_path {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        Ok((temporary_parent, final_parent))
+    }
+
     fn parent_for(&self, path: &Path) -> Result<&DirectoryGuard, AppPathsError> {
         self.directories
             .iter()
             .find(|directory| path.parent() == Some(directory.logical_path.as_path()))
             .ok_or(AppPathsError::CacheStorageOutsideRoot)
+    }
+}
+
+impl Write for PendingCachePublication<'_> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.temporary.file_mut().write(buffer)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.temporary.file_mut().flush()
+    }
+}
+
+impl<'storage> PendingCachePublication<'storage> {
+    pub fn sync(mut self) -> Result<SynchronizedCachePublication<'storage>, AppPathsError> {
+        self.temporary.sync_and_close()?;
+        Ok(SynchronizedCachePublication {
+            storage: self.storage,
+            final_path: self.final_path,
+            temporary: self.temporary,
+        })
+    }
+}
+
+impl SynchronizedCachePublication<'_> {
+    pub fn publish(mut self) -> Result<(), AppPathsError> {
+        self.storage
+            .replace_file(&self.temporary.path, &self.final_path)?;
+        self.temporary.published = true;
+        Ok(())
+    }
+}
+
+impl TemporaryCacheFile {
+    fn file_mut(&mut self) -> &mut File {
+        self.file
+            .as_mut()
+            .expect("a pending Cache publication always owns its temporary file")
+    }
+
+    fn sync_and_close(&mut self) -> Result<(), AppPathsError> {
+        self.file_mut()
+            .sync_all()
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        drop(self.file.take());
+        Ok(())
+    }
+}
+
+impl Drop for TemporaryCacheFile {
+    fn drop(&mut self) {
+        drop(self.file.take());
+        if !self.published {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 }
 

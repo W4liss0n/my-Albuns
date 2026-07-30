@@ -46,10 +46,12 @@ const twoSheetProjection = createTwoSheetProjection();
 
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
-  const promise = new Promise<EditorProjection>((resolver) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<EditorProjection>((resolver, rejecter) => {
     resolve = resolver;
+    reject = rejecter;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 const exportPort: ExportPort = {
@@ -612,6 +614,50 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   });
 
   expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
+});
+
+test("keeps a completed projection when the following mutation fails", async () => {
+  const first = deferredProjection();
+  const second = deferredProjection();
+  const undo = vi
+    .fn<ProjectSessionPort["undo"]>()
+    .mockImplementationOnce(() => first.promise)
+    .mockImplementationOnce(() => second.promise);
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={{
+        ...projectSessionPortWithApply(async () => projection),
+        undo,
+      }}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+  fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+  expect(undo).toHaveBeenCalledOnce();
+
+  const firstProjection = {
+    ...projection,
+    state: { ...projection.state, revision: 26 },
+  };
+  await act(async () => {
+    first.resolve(firstProjection);
+    await first.promise;
+  });
+  expect(undo).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    second.reject(new Error("segunda mutação falhou"));
+    await second.promise.catch(() => undefined);
+  });
+
+  expect(onProjectionChange).toHaveBeenCalledWith(firstProjection);
+  expect(screen.getByText("segunda mutação falhou")).toBeInTheDocument();
 });
 
 test("ignores a pending mutation result after the Workspace changes Project", async () => {

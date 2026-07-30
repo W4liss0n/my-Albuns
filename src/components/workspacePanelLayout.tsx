@@ -7,6 +7,11 @@ import {
   type KeyboardEvent,
 } from "react";
 
+import {
+  readWorkspacePanelSize,
+  writeWorkspacePanelSize,
+} from "../state/workspacePreferences";
+
 export type WorkspacePanel = "inspector" | "media";
 
 interface WorkspacePanelDefinition {
@@ -20,7 +25,6 @@ interface WorkspacePanelDefinition {
   minimumSize: number;
   minimumWorkAreaSize: number;
   orientation: "horizontal" | "vertical";
-  storageKey: string;
 }
 
 const WORKSPACE_SPLITTER_SIZE = 6;
@@ -41,7 +45,6 @@ const PANEL_DEFINITIONS: Record<
     minimumSize: 220,
     minimumWorkAreaSize: 480,
     orientation: "vertical",
-    storageKey: "myalbuns.workspace.inspector-width",
   },
   media: {
     className: "media-splitter",
@@ -54,7 +57,6 @@ const PANEL_DEFINITIONS: Record<
     minimumSize: 120,
     minimumWorkAreaSize: 240,
     orientation: "horizontal",
-    storageKey: "myalbuns.workspace.media-panel-height",
   },
 };
 
@@ -83,7 +85,7 @@ export function useWorkspacePanelLayout() {
           ? current
           : { ...current, [panel]: next },
       );
-      writePanelSize(panel, next);
+      writeWorkspacePanelSize(panel, next);
     },
     [],
   );
@@ -133,7 +135,7 @@ export function useWorkspacePanelLayout() {
           current[panel] + delta,
           bounds,
         );
-        writePanelSize(panel, next);
+        writeWorkspacePanelSize(panel, next);
         return current[panel] === next
           ? current
           : { ...current, [panel]: next };
@@ -242,25 +244,8 @@ function constrainPanelSize(
 
 function readPanelSize(panel: WorkspacePanel) {
   const definition = PANEL_DEFINITIONS[panel];
-  try {
-    const stored = Number(
-      window.localStorage.getItem(definition.storageKey),
-    );
-    return Number.isFinite(stored) && stored > 0
-      ? constrainPanelSize(panel, stored)
-      : definition.defaultSize;
-  } catch {
-    return definition.defaultSize;
-  }
-}
-
-function writePanelSize(panel: WorkspacePanel, value: number) {
-  try {
-    window.localStorage.setItem(
-      PANEL_DEFINITIONS[panel].storageKey,
-      String(Math.round(value)),
-    );
-  } catch {
-    // The in-memory size remains usable when storage is unavailable.
-  }
+  return constrainPanelSize(
+    panel,
+    readWorkspacePanelSize(panel, definition.defaultSize),
+  );
 }
