@@ -39,6 +39,8 @@ pub(crate) struct TopologyBenchmarkConfig {
 pub(crate) struct CanvasBenchmarkMeasurement {
     frame_id: String,
     texture_backed: bool,
+    decorative_media_id: String,
+    decorative_texture_backed: bool,
     pan: FrameTimingSummary,
     zoom: FrameTimingSummary,
     navigation: CanvasNavigationMeasurement,
@@ -165,6 +167,11 @@ impl TopologyBenchmarkState {
         }
         if !measurement.texture_backed {
             return Err("O probe não usou uma textura real do Cache.".into());
+        }
+        if safe_log_identifier(&measurement.decorative_media_id).is_none()
+            || !measurement.decorative_texture_backed
+        {
+            return Err("O probe não usou o Decorativo transparente real do Cache.".into());
         }
         measurement.pan.validate(config.pan_frames)?;
         measurement.zoom.validate(config.zoom_frames)?;
@@ -293,6 +300,8 @@ pub(crate) fn report_topology_canvas_benchmark(
         project_id = safe_log_identifier(&project_id),
         frame_id = safe_log_identifier(&measurement.frame_id),
         texture_backed = measurement.texture_backed,
+        decorative_media_id = safe_log_identifier(&measurement.decorative_media_id),
+        decorative_texture_backed = measurement.decorative_texture_backed,
         pan_sample_count = measurement.pan.sample_count,
         pan_duration_ms = measurement.pan.duration_ms,
         pan_first_frame_latency_ms = measurement.pan.first_frame_latency_ms,
@@ -448,6 +457,8 @@ mod tests {
         let measurement = CanvasBenchmarkMeasurement {
             frame_id: "frame-01-a".into(),
             texture_backed: true,
+            decorative_media_id: "decorative-overlay".into(),
+            decorative_texture_backed: true,
             pan: timing(PAN_FRAMES),
             zoom: timing(ZOOM_FRAMES),
             navigation: CanvasNavigationMeasurement {

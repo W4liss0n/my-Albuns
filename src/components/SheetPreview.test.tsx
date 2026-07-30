@@ -13,7 +13,7 @@ const photoSheet: ComposedSheet = {
   number: 1,
   widthUm: 600_000,
   heightUm: 300_000,
-  hasOverlay: false,
+  overlay: null,
   frames: [
     {
       frameId: "frame-001",
@@ -48,7 +48,16 @@ const placeholderSheet: ComposedSheet = {
   number: 2,
   widthUm: 600_000,
   heightUm: 300_000,
-  hasOverlay: true,
+  overlay: {
+    mediaId: "decorative-overlay",
+    name: "Overlay translúcido.png",
+    drawRect: {
+      x: 0,
+      y: 0,
+      width: 600_000,
+      height: 300_000,
+    },
+  },
   frames: [
     {
       frameId: "frame-002",
@@ -105,8 +114,31 @@ test("renders the composed geometry and visual layers of each sheet", () => {
     secondPreview.querySelector('[data-preview-frame-id="frame-002"]'),
   ).toHaveAttribute("x", "320000");
   expect(
-    secondPreview.querySelector("[data-preview-overlay]"),
+    secondPreview.querySelector(
+      '[data-preview-overlay-id="decorative-overlay"]',
+    ),
   ).toBeInTheDocument();
+});
+
+test("uses the shared Cache URL for a transparent Decorative Overlay", () => {
+  const previewUrl =
+    "asset://localhost/cache/decorative-overlay.png";
+  render(
+    <SheetPreview
+      sheet={placeholderSheet}
+      mediaPreviewUrls={{
+        "decorative-overlay": previewUrl,
+      }}
+    />,
+  );
+
+  expect(
+    screen
+      .getByRole("img", { name: "Prévia da Lâmina 02" })
+      .querySelector(
+        '[data-preview-overlay-id="decorative-overlay"]',
+      ),
+  ).toHaveAttribute("href", previewUrl);
 });
 
 test("preserves the canonical visual stack supplied by CompositionCore", () => {

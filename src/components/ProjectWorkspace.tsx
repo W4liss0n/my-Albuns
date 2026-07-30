@@ -43,6 +43,9 @@ export function ProjectWorkspace({
     onProjectionChange,
   });
   const workspacePanels = useWorkspacePanelLayout();
+  const [activeMediaKind, setActiveMediaKind] = useState<
+    "photo" | "decorative"
+  >("photo");
   const {
     busy,
     message,
@@ -298,10 +301,22 @@ export function ProjectWorkspace({
         >
           <div className="media-panel-head">
             <div className="media-tabs">
-              <button className="active" type="button">
+              <button
+                className={activeMediaKind === "photo" ? "active" : undefined}
+                type="button"
+                onClick={() => setActiveMediaKind("photo")}
+              >
                 Fotos
               </button>
-              <button type="button">Decorativos</button>
+              <button
+                className={
+                  activeMediaKind === "decorative" ? "active" : undefined
+                }
+                type="button"
+                onClick={() => setActiveMediaKind("decorative")}
+              >
+                Decorativos
+              </button>
             </div>
             <label className="media-search">
               <span aria-hidden="true">⌕</span>
@@ -309,13 +324,23 @@ export function ProjectWorkspace({
             </label>
           </div>
           <div className="media-strip">
-            {projection.state.album.media.map((media) => (
+            {projection.state.album.media
+              .filter((media) => media.kind === activeMediaKind)
+              .map((media) => (
               <button
                 className="media-card"
                 type="button"
                 key={media.id}
-                onDoubleClick={() => controller.fillMedia(media.id)}
-                title="Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                onDoubleClick={
+                  media.kind === "photo"
+                    ? () => controller.fillMedia(media.id)
+                    : undefined
+                }
+                title={
+                  media.kind === "photo"
+                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                    : undefined
+                }
               >
                 <span
                   className="media-thumb"
@@ -337,13 +362,15 @@ export function ProjectWorkspace({
                   <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
                 </span>
               </button>
-            ))}
-            <div className="media-tip">
-              <kbd>2×</kbd>
-              <span>
-                Preenche o placeholder mais à esquerda da Lâmina centralizada
-              </span>
-            </div>
+              ))}
+            {activeMediaKind === "photo" && (
+              <div className="media-tip">
+                <kbd>2×</kbd>
+                <span>
+                  Preenche o placeholder mais à esquerda da Lâmina centralizada
+                </span>
+              </div>
+            )}
           </div>
         </section>
       </div>

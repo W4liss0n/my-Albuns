@@ -291,7 +291,7 @@ const composition: CompositionPlan = {
       number: 1,
       widthUm: 600_000,
       heightUm: 300_000,
-      hasOverlay: false,
+      overlay: null,
       frames: [],
     },
   ],
@@ -303,7 +303,7 @@ const threeSheetComposition: CompositionPlan = {
     number,
     widthUm: 600_000,
     heightUm: 300_000,
-    hasOverlay: false,
+    overlay: null,
     frames: [],
   })),
 };
@@ -340,7 +340,7 @@ const interactiveComposition: CompositionPlan = {
       number: 1,
       widthUm: 600_000,
       heightUm: 300_000,
-      hasOverlay: false,
+      overlay: null,
       frames: [
         {
           frameId: "frame-001",
@@ -742,6 +742,51 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
   });
 });
 
+test("materializes a transparent Decorative from the shared Cache URL", async () => {
+  const previewUrl =
+    "asset://localhost/cache/decorative-overlay.png";
+  const texture = { label: "decorative-cache-preview" };
+  const decorativeComposition: CompositionPlan = {
+    sheets: [
+      {
+        ...composition.sheets[0],
+        overlay: {
+          mediaId: "decorative-overlay",
+          name: "Overlay translúcido.png",
+          drawRect: {
+            x: 0,
+            y: 0,
+            width: composition.sheets[0].widthUm,
+            height: composition.sheets[0].heightUm,
+          },
+        },
+      },
+    ],
+  };
+
+  renderCanvas({
+    compositionPlan: decorativeComposition,
+    mediaPreviewUrls: {
+      "decorative-overlay": previewUrl,
+    },
+  });
+  await finishPixiInitialization();
+
+  expect(pixiLifecycle.assetLoads).toEqual([previewUrl]);
+
+  await act(async () => {
+    pixiLifecycle.resolveAssetLoads[0]?.(texture);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await waitFor(() => {
+    expect(pixiLifecycle.spriteTextures).toEqual([texture]);
+    expect(
+      displayWithLabel("decorative-overlay-decorative-overlay"),
+    ).toBeDefined();
+  });
+});
+
 test("materializes and releases only the viewport margin while navigating a long Album", async () => {
   const longComposition: CompositionPlan = {
     sheets: Array.from({ length: 100 }, (_, index) => {
@@ -750,6 +795,16 @@ test("materializes and releases only the viewport margin while navigating a long
         ...interactiveComposition.sheets[0],
         sheetId: `sheet-${String(number).padStart(3, "0")}`,
         number,
+        overlay: {
+          mediaId: "decorative-overlay",
+          name: "Overlay translúcido.png",
+          drawRect: {
+            x: 0,
+            y: 0,
+            width: 600_000,
+            height: 300_000,
+          },
+        },
         frames: [
           {
             ...interactiveComposition.sheets[0].frames[0],
@@ -765,10 +820,19 @@ test("materializes and releases only the viewport margin while navigating a long
     }),
   };
   const mediaPreviewUrls = Object.fromEntries(
-    longComposition.sheets.map((sheet) => {
-      const mediaId = sheet.frames[0].photo!.mediaId;
-      return [mediaId, `asset://localhost/cache/${mediaId}.jpg`];
-    }),
+    [
+      ...longComposition.sheets.map((sheet) => {
+        const mediaId = sheet.frames[0].photo!.mediaId;
+        return [
+          mediaId,
+          `asset://localhost/cache/${mediaId}.jpg`,
+        ];
+      }),
+      [
+        "decorative-overlay",
+        "asset://localhost/cache/decorative-overlay.png",
+      ],
+    ],
   );
   const callbacks = {
     onSelectFrame: vi.fn(),
@@ -871,6 +935,16 @@ test("measures long Album navigation through the public centering action and ren
         ...interactiveComposition.sheets[0],
         sheetId: `sheet-${String(number).padStart(3, "0")}`,
         number,
+        overlay: {
+          mediaId: "decorative-overlay",
+          name: "Overlay translúcido.png",
+          drawRect: {
+            x: 0,
+            y: 0,
+            width: 600_000,
+            height: 300_000,
+          },
+        },
         frames: [
           {
             ...interactiveComposition.sheets[0].frames[0],
@@ -886,10 +960,19 @@ test("measures long Album navigation through the public centering action and ren
     }),
   };
   const mediaPreviewUrls = Object.fromEntries(
-    longComposition.sheets.map((sheet) => {
-      const mediaId = sheet.frames[0].photo!.mediaId;
-      return [mediaId, `asset://localhost/cache/${mediaId}.jpg`];
-    }),
+    [
+      ...longComposition.sheets.map((sheet) => {
+        const mediaId = sheet.frames[0].photo!.mediaId;
+        return [
+          mediaId,
+          `asset://localhost/cache/${mediaId}.jpg`,
+        ];
+      }),
+      [
+        "decorative-overlay",
+        "asset://localhost/cache/decorative-overlay.png",
+      ],
+    ],
   );
   const layout = createContinuousCanvasLayout(longComposition.sheets);
   const canvasScale = (500 - 2 * 24) / (300 + 24);
@@ -1003,6 +1086,8 @@ test("measures long Album navigation through the public centering action and ren
       expect.objectContaining({
         frameId: "frame-001",
         textureBacked: true,
+        decorativeMediaId: "decorative-overlay",
+        decorativeTextureBacked: true,
         navigation: expect.objectContaining({
           sheetCount: 100,
           cycleCount: 1,

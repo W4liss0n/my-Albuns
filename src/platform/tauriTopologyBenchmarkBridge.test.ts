@@ -26,6 +26,8 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
   const measurement: CanvasPerformanceMeasurement = {
     frameId: "frame-01-a",
     textureBacked: true,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: true,
     pan: {
       sampleCount: 120,
       durationMs: 2000,

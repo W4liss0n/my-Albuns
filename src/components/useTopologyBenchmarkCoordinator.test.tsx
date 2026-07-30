@@ -12,6 +12,8 @@ import { useTopologyBenchmarkCoordinator } from "./useTopologyBenchmarkCoordinat
 const measurement: CanvasPerformanceMeasurement = {
   frameId: "frame-01-a",
   textureBacked: true,
+  decorativeMediaId: "decorative-overlay",
+  decorativeTextureBacked: true,
   pan: {
     sampleCount: 1,
     durationMs: 12,

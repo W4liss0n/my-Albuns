@@ -66,6 +66,13 @@ fn host_and_processor_share_one_serialized_protocol() {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         )
         .expect("the second native source is valid"),
+        MediaSource::new(
+            "decorative-overlay",
+            PathBuf::from(r"C:\Photos\overlay.png"),
+            512,
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        )
+        .expect("the Decorative source is valid"),
     ];
     let mut path_context = OperationPathContext::new();
     path_context

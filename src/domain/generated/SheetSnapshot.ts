@@ -2,4 +2,4 @@
 import type { FrameSnapshot } from "./FrameSnapshot";
 import type { SheetRole } from "./SheetRole";
 
-export type SheetSnapshot = { id: string, number: number, role: SheetRole, widthUm: number, heightUm: number, frames: Array<FrameSnapshot>, hasOverlay: boolean, };
+export type SheetSnapshot = { id: string, number: number, role: SheetRole, widthUm: number, heightUm: number, frames: Array<FrameSnapshot>, overlayMediaId: string | null, };

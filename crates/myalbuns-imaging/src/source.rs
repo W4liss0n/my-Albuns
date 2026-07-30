@@ -14,7 +14,7 @@ pub(crate) struct DecodedJpeg {
     pub(crate) exif_orientation: u8,
 }
 
-pub(crate) struct DecodedCacheSource {
+pub(crate) struct DecodedSource {
     pub(crate) image: RgbaImage,
     pub(crate) exif_orientation: Option<u8>,
 }
@@ -102,14 +102,14 @@ pub(crate) fn cache_source_orientation(
     }
 }
 
-pub(crate) fn decode_cache_source(
+pub(crate) fn decode_source(
     media_id: &str,
     verified_bytes: &[u8],
-) -> Result<DecodedCacheSource, String> {
+) -> Result<DecodedSource, String> {
     match source_format(media_id, verified_bytes)? {
         ImageFormat::Jpeg => {
             let decoded = decode_jpeg(media_id, verified_bytes)?;
-            Ok(DecodedCacheSource {
+            Ok(DecodedSource {
                 image: decoded.image,
                 exif_orientation: Some(decoded.exif_orientation),
             })
@@ -122,7 +122,7 @@ pub(crate) fn decode_cache_source(
                 })?
                 .decode()
                 .map_err(|error| format!("não foi possível decodificar a mídia: {error}"))?;
-            Ok(DecodedCacheSource {
+            Ok(DecodedSource {
                 image: decoded.to_rgba8(),
                 exif_orientation: None,
             })

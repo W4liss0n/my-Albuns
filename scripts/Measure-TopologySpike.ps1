@@ -62,12 +62,12 @@ $reportText = @'
     "complexidade operacional da IPC"
   ],
   "notes": [
-    "O Cache foi reconstru\u00eddo a frio com uma representa\u00e7\u00e3o JPEG de at\u00e9 1600 px por Foto.",
-    "Pan e Zoom foram medidos separadamente sobre uma textura real do Cache, depois de 24 frames de aquecimento.",
+    "O Cache foi reconstru\u00eddo a frio com uma representa\u00e7\u00e3o de at\u00e9 1600 px por m\u00eddia: JPEG para Fotos opacas e PNG para o Decorativo transparente.",
+    "Pan e Zoom foram medidos separadamente sobre uma textura real de Foto, e o mesmo Canvas confirmou a textura PNG real do Decorativo, depois de 24 frames de aquecimento.",
     "A navega\u00e7\u00e3o percorreu 10 vezes a primeira, a 50\u00aa, a 100\u00aa e de volta \u00e0 primeira L\u00e2mina, aguardando a textura real do destino e o frame renderizado pelo PixiJS.",
     "As duas Janelas iniciaram o probe pelo mesmo arquivo-gate, somente depois da conclus\u00e3o do Cache frio.",
-    "A Exporta\u00e7\u00e3o mediu a primeira L\u00e2mina do \u00c1lbum principal a 300 DPI, lendo e verificando os JPEGs originais.",
-    "Cada uso valida o tamanho e o SHA-256 da Foto; o corpus completo foi recalculado depois das duas alternativas.",
+    "A Exporta\u00e7\u00e3o mediu a primeira L\u00e2mina do \u00c1lbum principal a 300 DPI, lendo e verificando as Fotos JPEG e o Decorativo PNG originais.",
+    "Cada uso valida o tamanho e o SHA-256 da m\u00eddia; o corpus completo foi recalculado depois das duas alternativas.",
     "A mem\u00f3ria inclui o host e todos os processos descendentes observados.",
     "A Exporta\u00e7\u00e3o foi liberada por um segundo gate somente depois dos dois probes de Canvas.",
     "Os dois hosts independentes foram iniciados antes da espera pelas Janelas, usando o mesmo marco inicial da alternativa multiwindow.",
@@ -92,6 +92,7 @@ $reportText = @'
     "canvasReadyTime": "Dois Canvas com texturas prontos",
     "cacheWallTime": "Dura\u00e7\u00e3o de parede do Cache frio",
     "cachePhotos": "Fotos processadas pelo Cache",
+    "cacheDecoratives": "Decorativos PNG processados pelo Cache",
     "cacheThroughput": "Vaz\u00e3o agregada dos originais",
     "cacheSize": "Representa\u00e7\u00f5es reduzidas",
     "panP95": "Pan: pior p95 entre Projetos",
@@ -109,12 +110,13 @@ $reportText = @'
     "corpus": "Corpus real",
     "corpusAlbums": "\u00c1lbuns",
     "corpusPhotos": "Fotos JPEG",
+    "corpusDecoratives": "Decorativos PNG",
     "corpusSourceVolume": "Volume dos originais",
     "corpusDigest": "Digest do corpus",
     "corpusIntegrity": "Integridade antes/depois",
     "corpusIntegrityValue": "confirmada por SHA-256",
     "previewPolicy": "Pol\u00edtica da representa\u00e7\u00e3o",
-    "previewPolicyValue": "uma pr\u00e9via JPEG por Foto, com aresta m\u00e1xima de {0} px",
+    "previewPolicyValue": "uma pr\u00e9via por m\u00eddia (JPEG opaco ou PNG transparente), com aresta m\u00e1xima de {0} px",
     "notApplicable": "n\u00e3o se aplica",
     "otherPreserved": "outra Janela preservada",
     "build": "Build medida",
@@ -225,11 +227,20 @@ function Reset-TopologyCache {
     if (-not (Test-Path -LiteralPath $imagingExecutablePath -PathType Leaf)) {
         throw "Imaging processor not found at $imagingExecutablePath."
     }
+    $protocolVersionText = (
+        & $imagingExecutablePath --protocol-version
+    ).Trim()
+    if (
+        $LASTEXITCODE -ne 0 -or
+        $protocolVersionText -notmatch '^[0-9]+$'
+    ) {
+        throw 'The native imaging processor did not report a valid protocol version.'
+    }
     $requestId = "topology-cache-reset-$([DateTime]::UtcNow.Ticks)"
     $command = [ordered]@{
         kind = 'resetCache'
         request = [ordered]@{
-            protocolVersion = 7
+            protocolVersion = [int]$protocolVersionText
             requestId = $requestId
             projectIds = @('project-spike-001', 'project-spike-002')
         }
@@ -680,6 +691,18 @@ function Wait-ForMediaCache {
                 }
         )
         if ($projectEvents.Count -eq $ExpectedProjectCount) {
+            if (
+                @(
+                    $projectEvents |
+                        Where-Object {
+                            [long]$_.decorative_media_count -ne 1 -or
+                            [long]$_.decorative_artifact_count -ne 1 -or
+                            [long]$_.decorative_png_artifact_count -ne 1
+                        }
+                ).Count -gt 0
+            ) {
+                throw 'The Cache did not publish exactly one PNG representation for the Decorative.'
+            }
             $completedTimes = @(
                 $projectEvents |
                     ForEach-Object { [DateTimeOffset]::Parse($_.timestamp) }
@@ -700,14 +723,21 @@ function Wait-ForMediaCache {
             $totalSourceBytes = [long](
                 ($projectEvents | Measure-Object source_bytes -Sum).Sum
             )
+            $mediaCount = [long](
+                ($projectEvents | Measure-Object generated_count -Sum).Sum +
+                ($projectEvents | Measure-Object reused_count -Sum).Sum
+            )
+            $decorativeCount = [long](
+                ($projectEvents |
+                    Measure-Object decorative_artifact_count -Sum).Sum
+            )
             return [ordered]@{
                 readyElapsedMs = $TopologyStopwatch.ElapsedMilliseconds
                 cacheWallTimeMs = $cacheWallTimeMs
                 projectCount = $projectEvents.Count
-                photoCount = [long](
-                    ($projectEvents | Measure-Object generated_count -Sum).Sum +
-                    ($projectEvents | Measure-Object reused_count -Sum).Sum
-                )
+                mediaCount = $mediaCount
+                photoCount = $mediaCount - $decorativeCount
+                decorativeCount = $decorativeCount
                 generatedCount = [long](
                     ($projectEvents | Measure-Object generated_count -Sum).Sum
                 )
@@ -732,6 +762,8 @@ function Wait-ForMediaCache {
                                 projectId = $_.project_id
                                 generatedCount = [long]$_.generated_count
                                 reusedCount = [long]$_.reused_count
+                                decorativeCount = [long]$_.decorative_artifact_count
+                                decorativePngCount = [long]$_.decorative_png_artifact_count
                                 sourceBytes = [long]$_.source_bytes
                                 previewBytes = [long]$_.preview_bytes
                                 elapsedMs = [long]$_.elapsed_ms
@@ -1002,6 +1034,17 @@ function Wait-ForTopologyBenchmark {
                 @(
                     $canvasEvents |
                         Where-Object {
+                            -not $_.decorative_texture_backed -or
+                            $_.decorative_media_id -ne 'decorative-overlay'
+                        }
+                ).Count -gt 0
+            ) {
+                throw 'At least one Canvas probe did not use the real transparent Decorative Cache texture.'
+            }
+            if (
+                @(
+                    $canvasEvents |
+                        Where-Object {
                             [long]$_.navigation_sheet_count -lt 100 -or
                             [long]$_.navigation_cycle_count -ne 10 -or
                             [long]$_.navigation_sample_count -ne 30 -or
@@ -1016,7 +1059,7 @@ function Wait-ForTopologyBenchmark {
             }
             if (
                 [int]$exportEvent[0].dpi -ne 300 -or
-                [long]$exportEvent[0].source_count -lt 1 -or
+                [long]$exportEvent[0].source_count -lt 2 -or
                 [long]$exportEvent[0].source_bytes -lt 1 -or
                 [long]$exportEvent[0].output_bytes -lt 1 -or
                 [string]$exportEvent[0].output_sha256 -notmatch '^[0-9a-f]{64}$'
@@ -1048,6 +1091,8 @@ function Wait-ForTopologyBenchmark {
                             )
                             frameId = $_.frame_id
                             textureBacked = [bool]$_.texture_backed
+                            decorativeMediaId = [string]$_.decorative_media_id
+                            decorativeTextureBacked = [bool]$_.decorative_texture_backed
                             pan = Convert-CanvasTiming -Event $_ -Prefix pan
                             zoom = Convert-CanvasTiming -Event $_ -Prefix zoom
                             navigation = [ordered]@{
@@ -1314,6 +1359,7 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.canvasReadyTime) | $($independent.interaction.canvas.allProjectsReadyElapsedMs) ms | $($multiwindow.interaction.canvas.allProjectsReadyElapsedMs) ms |"
         "| $($summary.cacheWallTime) | $($independent.cache.cacheWallTimeMs) ms | $($multiwindow.cache.cacheWallTimeMs) ms |"
         "| $($summary.cachePhotos) | $($independent.cache.photoCount) | $($multiwindow.cache.photoCount) |"
+        "| $($summary.cacheDecoratives) | $($independent.cache.decorativeCount) | $($multiwindow.cache.decorativeCount) |"
         "| $($summary.cacheThroughput) | $(Format-Mebibytes $independent.cache.sourceBytesPerSecond) MiB/s | $(Format-Mebibytes $multiwindow.cache.sourceBytesPerSecond) MiB/s |"
         "| $($summary.cacheSize) | $(Format-Mebibytes $independent.cache.previewBytes) MiB | $(Format-Mebibytes $multiwindow.cache.previewBytes) MiB |"
         "| $($summary.panP95) | $($independent.interaction.canvas.aggregate.pan.worstProjectP95FrameMs) ms | $($multiwindow.interaction.canvas.aggregate.pan.worstProjectP95FrameMs) ms |"
@@ -1334,6 +1380,7 @@ function Write-TopologyMarkdownSummary {
         ''
         "- $($summary.corpusAlbums): $($Report.corpus.albumCount)"
         "- $($summary.corpusPhotos): $($Report.corpus.photoCount)"
+        "- $($summary.corpusDecoratives): $($Report.corpus.decorativeCount)"
         "- $($summary.corpusSourceVolume): $(Format-Mebibytes $Report.corpus.sourceBytes) MiB"
         "- $($summary.corpusDigest): ``$($Report.corpus.corpusSha256)``"
         "- $($summary.corpusIntegrity): $($summary.corpusIntegrityValue)"
@@ -1532,14 +1579,23 @@ try {
     }
 
     $currentInputState = Get-BuildInputState
+    $corpusPhotoCount = [long](
+        (
+            $corpusManifest.albums |
+                ForEach-Object { $_.photos.Count } |
+                Measure-Object -Sum
+        ).Sum
+    )
     $report = [ordered]@{
-        schemaVersion = 8
+        schemaVersion = 9
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         corpus = [ordered]@{
             schemaVersion = $corpusManifest.schemaVersion
             albumCount = $corpusManifest.albums.Count
-            photoCount = $corpusManifest.totalFiles
+            mediaCount = $corpusManifest.totalFiles
+            photoCount = $corpusPhotoCount
+            decorativeCount = 1
             sourceBytes = $corpusManifest.totalBytes
             corpusSha256 = $corpusManifest.corpusSha256
             integrity = [ordered]@{
@@ -1548,8 +1604,9 @@ try {
                 afterSha256 = $corpusManifestAfterRuns.corpusSha256
             }
             previewPolicy = [ordered]@{
-                representationsPerPhoto = 1
-                format = 'jpeg'
+                representationsPerMedia = 1
+                opaqueFormat = 'jpeg'
+                transparentFormat = 'png'
                 maximumEdgePx = 1600
             }
         }

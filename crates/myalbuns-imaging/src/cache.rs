@@ -16,7 +16,7 @@ use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
 
 use crate::{
     source::{
-        cache_source_orientation, decode_cache_source, read_verified_source, verify_source_current,
+        cache_source_orientation, decode_source, read_verified_source, verify_source_current,
     },
     write_response,
 };
@@ -202,7 +202,7 @@ fn prepare_preview(
         }
     }
 
-    let decoded = decode_cache_source(source.media_id(), verified_bytes)?;
+    let decoded = decode_source(source.media_id(), verified_bytes)?;
     let preview = DynamicImage::ImageRgba8(decoded.image)
         .thumbnail(max_edge_px, max_edge_px)
         .to_rgba8();

@@ -5,10 +5,11 @@ mod session;
 mod validation;
 
 pub use model::{
-    AlbumSnapshot, ComposedFrame, ComposedPhoto, ComposedSheet, CompositionPlan, CoreError,
-    EditorProjection, EditorState, FrameSnapshot, Matrix2, MediaCatalogItem, MediaTransform,
-    MediaUsage, NormalizedPan, NumberRange, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot,
-    ProjectIntent, RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    AlbumSnapshot, ComposedDecorative, ComposedFrame, ComposedPhoto, ComposedSheet,
+    CompositionPlan, CoreError, EditorProjection, EditorState, FrameSnapshot, Matrix2,
+    MediaCatalogItem, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange,
+    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, RectUm, RenderSnapshot,
+    SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use project::{LoadedProjectRevision, ProjectCore};
 pub use session::ProjectSession;

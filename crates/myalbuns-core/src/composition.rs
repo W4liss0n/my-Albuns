@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use crate::model::{
-    AlbumSnapshot, ComposedFrame, ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2,
-    MediaCatalogItem, NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX,
-    PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot,
-    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
+    AlbumSnapshot, ComposedDecorative, ComposedFrame, ComposedPhoto, ComposedSheet,
+    CompositionPlan, Matrix2, MediaCatalogItem, NormalizedPan, NumberRange, PHOTO_PAN_MAX,
+    PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan,
+    PhotoSnapshot, RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
 };
 
 pub(crate) struct CompositionCore;
@@ -48,7 +48,22 @@ impl CompositionCore {
                         number: sheet.number,
                         width_um: sheet.width_um,
                         height_um: sheet.height_um,
-                        has_overlay: sheet.has_overlay,
+                        overlay: sheet.overlay_media_id.as_ref().map(|media_id| {
+                            let media = media_by_id
+                                .get(media_id.as_str())
+                                .copied()
+                                .expect("validated Overlay media reference");
+                            ComposedDecorative {
+                                media_id: media.id.clone(),
+                                name: media.name.clone(),
+                                draw_rect: RectUm {
+                                    x: 0,
+                                    y: 0,
+                                    width: sheet.width_um,
+                                    height: sheet.height_um,
+                                },
+                            }
+                        }),
                         frames,
                     }
                 })

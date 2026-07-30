@@ -261,6 +261,22 @@ export class AlbumCanvasScene {
         reason: "texture_unavailable",
       };
     }
+    const decorative = input.composition.sheets
+      .filter((sheet) => this.sheetNodes.has(sheet.sheetId))
+      .find((sheet) => sheet.overlay)?.overlay;
+    const decorativeUrl = decorative
+      ? input.mediaPreviewUrls?.[decorative.mediaId]
+      : undefined;
+    if (
+      !decorative ||
+      !decorativeUrl ||
+      !this.previewTextures.get(decorativeUrl)
+    ) {
+      return {
+        status: "failed",
+        reason: "decorative_texture_unavailable",
+      };
+    }
     const generation = this.projectGeneration;
     const assertCurrent = () => {
       if (
@@ -288,6 +304,8 @@ export class AlbumCanvasScene {
     const target: CanvasPerformanceTarget = {
       frameId: node.frameId,
       textureBacked: true,
+      decorativeMediaId: decorative.mediaId,
+      decorativeTextureBacked: true,
       previewPan: (amount) => {
         assertCurrent();
         setPhotoPanAids(node, true);
@@ -531,9 +549,19 @@ export class AlbumCanvasScene {
           ? [url, this.previewTextures.get(url) !== undefined]
           : null;
       });
+      const overlayUrl = sheet.overlay
+        ? (this.input?.mediaPreviewUrls?.[sheet.overlay.mediaId] ?? null)
+        : null;
+      if (overlayUrl) desiredPreviewUrls.add(overlayUrl);
+      const overlayPreviewState = overlayUrl
+        ? [
+            overlayUrl,
+            this.previewTextures.get(overlayUrl) !== undefined,
+          ]
+        : null;
       signatures.set(
         sheet.sheetId,
-        JSON.stringify([sheet, previewStates]),
+        JSON.stringify([sheet, previewStates, overlayPreviewState]),
       );
     }
 
@@ -858,23 +886,42 @@ export class AlbumCanvasScene {
       sheetContainer.addChild(frameContainer);
     }
 
-    if (sheet.hasOverlay) {
-      const overlayStyle = SHEET_VISUAL_STYLE.overlay;
-      const overlay = new Graphics()
-        .roundRect(
-          overlayStyle.insetPx,
-          overlayStyle.insetPx,
-          width - overlayStyle.insetPx * 2,
-          height - overlayStyle.insetPx * 2,
-          overlayStyle.cornerRadiusPx,
-        )
-        .stroke({
-          color: hexToNumber(overlayStyle.outline),
-          width: overlayStyle.outlineWidthPx,
-          alpha: overlayStyle.outlineOpacity,
-        });
-      overlay.eventMode = "none";
-      sheetContainer.addChild(overlay);
+    if (sheet.overlay) {
+      const previewTexture = this.previewTextureFor(
+        sheet.overlay.mediaId,
+      );
+      if (previewTexture) {
+        const overlay = new Sprite({ texture: previewTexture });
+        overlay.label = `decorative-overlay-${sheet.overlay.mediaId}`;
+        overlay.position.set(
+          sheet.overlay.drawRect.x * MICROMETER_TO_CANVAS_PIXEL,
+          sheet.overlay.drawRect.y * MICROMETER_TO_CANVAS_PIXEL,
+        );
+        overlay.width =
+          sheet.overlay.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
+        overlay.height =
+          sheet.overlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
+        overlay.eventMode = "none";
+        sheetContainer.addChild(overlay);
+      } else {
+        const overlayStyle = SHEET_VISUAL_STYLE.overlay;
+        const overlay = new Graphics()
+          .roundRect(
+            overlayStyle.insetPx,
+            overlayStyle.insetPx,
+            width - overlayStyle.insetPx * 2,
+            height - overlayStyle.insetPx * 2,
+            overlayStyle.cornerRadiusPx,
+          )
+          .stroke({
+            color: hexToNumber(overlayStyle.outline),
+            width: overlayStyle.outlineWidthPx,
+            alpha: overlayStyle.outlineOpacity,
+          });
+        overlay.label = `decorative-overlay-fallback-${sheet.overlay.mediaId}`;
+        overlay.eventMode = "none";
+        sheetContainer.addChild(overlay);
+      }
     }
 
     const focusOutline = new Graphics()

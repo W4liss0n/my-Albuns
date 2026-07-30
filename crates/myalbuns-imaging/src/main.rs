@@ -37,6 +37,11 @@ impl From<RenderFailure> for ProcessFailure {
 }
 
 fn main() -> ExitCode {
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
+        println!("{IMAGING_PROTOCOL_VERSION}");
+        return ExitCode::SUCCESS;
+    }
+
     let process_role = ProcessRole::Imaging;
     let app_paths = match AppPaths::discover() {
         Ok(app_paths) => app_paths,

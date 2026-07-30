@@ -1,6 +1,6 @@
 use myalbuns_core::{
-    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaTransform, PhotoSnapshot,
-    RectUm, SheetRole, SheetSnapshot,
+    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaKind, MediaTransform,
+    PhotoSnapshot, RectUm, SheetRole, SheetSnapshot,
 };
 
 const SHEET_WIDTH_UM: i64 = 600_000;
@@ -35,7 +35,7 @@ impl SampleProject {
     pub fn persisted_source(self, sheet_count: usize) -> Result<String, serde_json::Error> {
         let state = sample_editor_state(sheet_count, self);
         serde_json::to_string_pretty(&serde_json::json!({
-            "schemaVersion": 2,
+            "schemaVersion": 3,
             "projectId": state.project_id,
             "projectName": state.project_name,
             "revision": state.revision,
@@ -106,13 +106,17 @@ fn sample_sheet(number: usize, sheet_count: usize) -> SheetSnapshot {
                 photo: right_photo,
             },
         ],
-        has_overlay: number.is_multiple_of(3),
+        overlay_media_id: (number == 1).then(|| "decorative-overlay".into()),
     }
 }
 
 fn sample_photo(index: usize) -> PhotoSnapshot {
     let catalog = sample_media_catalog();
-    let item = &catalog[index % catalog.len()];
+    let photos = catalog
+        .iter()
+        .filter(|item| item.kind == MediaKind::Photo)
+        .collect::<Vec<_>>();
+    let item = photos[index % photos.len()];
     PhotoSnapshot {
         media_id: item.id.clone(),
         transform: MediaTransform::default(),
@@ -123,6 +127,7 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
     vec![
         MediaCatalogItem {
             id: "media-serra".into(),
+            kind: MediaKind::Photo,
             name: "Serra ao amanhecer.jpg".into(),
             source_width_px: 6_000,
             source_height_px: 4_000,
@@ -130,6 +135,7 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
         },
         MediaCatalogItem {
             id: "media-costa".into(),
+            kind: MediaKind::Photo,
             name: "Costa dourada.jpg".into(),
             source_width_px: 6_000,
             source_height_px: 4_000,
@@ -137,10 +143,19 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
         },
         MediaCatalogItem {
             id: "media-campo".into(),
+            kind: MediaKind::Photo,
             name: "Campo de inverno.jpg".into(),
             source_width_px: 6_000,
             source_height_px: 4_000,
             palette: ["#26352e".into(), "#8a9a71".into(), "#e7dcc3".into()],
+        },
+        MediaCatalogItem {
+            id: "decorative-overlay".into(),
+            kind: MediaKind::Decorative,
+            name: "Overlay translúcido.png".into(),
+            source_width_px: 2_400,
+            source_height_px: 1_800,
+            palette: ["#17344a".into(), "#88b7c5".into(), "#d4a15e".into()],
         },
     ]
 }

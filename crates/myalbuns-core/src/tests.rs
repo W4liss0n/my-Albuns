@@ -3,9 +3,9 @@ use serde::Deserialize;
 use crate::composition::CompositionCore;
 use crate::sample_project_fixture::SampleProject;
 use crate::{
-    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaCatalogItem, MediaTransform,
-    NormalizedPan, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent,
-    ProjectSession, RectUm, SheetRole, SheetSnapshot, VectorUm,
+    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaCatalogItem, MediaKind,
+    MediaTransform, NormalizedPan, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore,
+    ProjectIntent, ProjectSession, RectUm, SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -54,6 +54,52 @@ fn opens_a_representative_long_album() {
 }
 
 #[test]
+fn projects_a_real_decorative_overlay_from_the_canonical_catalog() {
+    let session = horizon_project(12);
+    let projection = session.projection();
+    let sheet = projection
+        .composition
+        .sheets
+        .iter()
+        .find(|sheet| sheet.overlay.is_some())
+        .expect("the representative Album contains a composed Overlay");
+    let overlay = sheet
+        .overlay
+        .as_ref()
+        .expect("the composed Overlay remains present");
+
+    assert_eq!(overlay.media_id, "decorative-overlay");
+    assert_eq!(overlay.name, "Overlay translúcido.png");
+    assert_eq!(
+        overlay.draw_rect,
+        RectUm {
+            x: 0,
+            y: 0,
+            width: sheet.width_um,
+            height: sheet.height_um,
+        }
+    );
+    assert_eq!(
+        media_usage_count(&projection, "decorative-overlay"),
+        Some(1)
+    );
+    assert_eq!(
+        session.render_snapshot().composition,
+        projection.composition,
+        "Editor and Export must consume the same CompositionPlan"
+    );
+    assert_eq!(
+        sheet
+            .referenced_media_ids()
+            .collect::<std::collections::BTreeSet<_>>(),
+        ["decorative-overlay", "media-campo", "media-costa"]
+            .into_iter()
+            .collect(),
+        "all consumers derive required originals from the ComposedSheet"
+    );
+}
+
+#[test]
 fn opens_an_editable_session_through_the_project_core_seam() {
     let mut fixture = horizon_project(12);
     fixture
@@ -80,23 +126,14 @@ fn opens_an_editable_session_through_the_project_core_seam() {
 }
 
 #[test]
-fn rejects_the_previous_project_schema_after_intrinsic_media_dimensions_became_required() {
+fn rejects_the_previous_project_schema_after_media_categories_became_required() {
     let session = horizon_project(12);
     let persisted = session
         .persisted_revision()
         .expect("the current project can be serialized");
     let mut document: serde_json::Value =
         serde_json::from_str(&persisted).expect("the current project JSON is valid");
-    document["schemaVersion"] = serde_json::json!(1);
-    for media in document["album"]["media"]
-        .as_array_mut()
-        .expect("the sample catalog is an array")
-    {
-        let media = media.as_object_mut().expect("a catalog item is an object");
-        media.remove("sourceWidthPx");
-        media.remove("sourceHeightPx");
-        media.insert("usageCount".into(), serde_json::json!(8));
-    }
+    document["schemaVersion"] = serde_json::json!(2);
 
     let error = ProjectCore::open_editable_session(
         &serde_json::to_string(&document).expect("the old project JSON serializes"),
@@ -104,7 +141,44 @@ fn rejects_the_previous_project_schema_after_intrinsic_media_dimensions_became_r
     .err()
     .expect("the old schema must be rejected explicitly");
 
-    assert_eq!(error, crate::CoreError::UnsupportedSchema(1));
+    assert_eq!(error, crate::CoreError::UnsupportedSchema(2));
+}
+
+#[test]
+fn rejects_media_categories_in_the_wrong_visual_role() {
+    let persisted = horizon_project(12)
+        .persisted_revision()
+        .expect("the representative Project serializes");
+    let mut photo_as_overlay: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the Project JSON is valid");
+    photo_as_overlay["album"]["sheets"][0]["overlayMediaId"] = serde_json::json!("media-serra");
+
+    let error = ProjectCore::open_editable_session(
+        &serde_json::to_string(&photo_as_overlay).expect("the invalid Project serializes"),
+    )
+    .err()
+    .expect("a Photo cannot be used as an Overlay");
+    assert_eq!(
+        error,
+        crate::CoreError::InvalidProject("Overlay referencia uma Foto: media-serra".into())
+    );
+
+    let mut decorative_as_photo: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the Project JSON is valid");
+    decorative_as_photo["album"]["sheets"][0]["frames"][0]["photo"]["mediaId"] =
+        serde_json::json!("decorative-overlay");
+
+    let error = ProjectCore::open_editable_session(
+        &serde_json::to_string(&decorative_as_photo).expect("the invalid Project serializes"),
+    )
+    .err()
+    .expect("a Decorative cannot fill a Frame");
+    assert_eq!(
+        error,
+        crate::CoreError::InvalidProject(
+            "Frame referencia um Decorativo: decorative-overlay".into()
+        )
+    );
 }
 
 #[test]
@@ -233,7 +307,7 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
-    assert_eq!(snapshot.schema_version, 1);
+    assert_eq!(snapshot.schema_version, 2);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo
         .as_ref()
@@ -333,10 +407,11 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PlacementPhoto) -> Co
                     transform: photo.transform.clone(),
                 }),
             }],
-            has_overlay: false,
+            overlay_media_id: None,
         }],
         media: vec![MediaCatalogItem {
             id: photo.media_id.clone(),
+            kind: MediaKind::Photo,
             name: photo.name.clone(),
             source_width_px: photo.source_width_px,
             source_height_px: photo.source_height_px,

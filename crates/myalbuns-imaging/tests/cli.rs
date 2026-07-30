@@ -92,6 +92,23 @@ fn sample_session(sample: SampleProject, sheet_count: usize) -> ProjectSession {
 }
 
 #[test]
+fn processor_advertises_the_protocol_version_used_by_external_runners() {
+    let output = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"))
+        .arg("--protocol-version")
+        .output()
+        .expect("the Processor reports its protocol version");
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout)
+            .expect("the version is UTF-8")
+            .trim(),
+        IMAGING_PROTOCOL_VERSION.to_string()
+    );
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
 fn processor_renders_a_png_from_a_validated_snapshot_only() {
     let session = sample_session(SampleProject::Horizon, 12);
     let snapshot = session.render_snapshot();
@@ -393,6 +410,7 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
     let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
     let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
+    sheet.overlay = None;
     sheet.width_um = 25_400;
     sheet.height_um = 12_700;
     sheet.frames.truncate(1);
@@ -450,6 +468,94 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
     assert!(
         right[2] > right[0] * 3,
         "the right source half remains blue"
+    );
+}
+
+#[test]
+fn processor_composites_a_transparent_decorative_from_its_original_png() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let output_path = output_dir.path().join("decorative-sheet.png");
+    let photo_path = source_dir.path().join("photo.jpg");
+    let decorative_path = source_dir.path().join("overlay.png");
+    RgbImage::from_pixel(40, 20, Rgb([20, 40, 220]))
+        .save_with_format(&photo_path, ImageFormat::Jpeg)
+        .expect("the linked Photo is written");
+    RgbaImage::from_pixel(40, 20, Rgba([220, 20, 20, 128]))
+        .save_with_format(&decorative_path, ImageFormat::Png)
+        .expect("the transparent Decorative is written");
+    let photo_bytes = std::fs::read(&photo_path).expect("the Photo is readable");
+    let decorative_bytes = std::fs::read(&decorative_path).expect("the Decorative is readable");
+
+    let mut snapshot = sample_session(SampleProject::Horizon, 3).render_snapshot();
+    let overlay = snapshot.composition.sheets[0]
+        .overlay
+        .clone()
+        .expect("the representative fixture contains an Overlay");
+    let sheet = &mut snapshot.composition.sheets[0];
+    sheet.width_um = 25_400;
+    sheet.height_um = 12_700;
+    sheet.frames.truncate(1);
+    let (photo_media_id, draw_rect) = {
+        let frame = &mut sheet.frames[0];
+        frame.clip_rect.x = 0;
+        frame.clip_rect.y = 0;
+        frame.clip_rect.width = sheet.width_um;
+        frame.clip_rect.height = sheet.height_um;
+        let photo = frame.photo.as_mut().expect("the fixture Frame has a Photo");
+        photo.draw_rect = frame.clip_rect.clone();
+        photo.rotation_degrees = 0.0;
+        photo.mirror_x = false;
+        (photo.media_id.clone(), frame.clip_rect.clone())
+    };
+    sheet.overlay = Some(myalbuns_core::ComposedDecorative {
+        draw_rect,
+        ..overlay
+    });
+
+    let photo_source = MediaSource::new(
+        photo_media_id,
+        photo_path,
+        photo_bytes.len() as u64,
+        format!("{:x}", Sha256::digest(&photo_bytes)),
+    )
+    .expect("the Photo source is valid");
+    let decorative_source = MediaSource::new(
+        "decorative-overlay",
+        decorative_path.clone(),
+        decorative_bytes.len() as u64,
+        format!("{:x}", Sha256::digest(&decorative_bytes)),
+    )
+    .expect("the Decorative source is valid");
+
+    let result = invoke_real_processor(
+        snapshot,
+        &output_path,
+        "decorative-original-001",
+        100,
+        vec![photo_source, decorative_source],
+    );
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let response = processor_response(&result.stdout);
+    let completion = response
+        .completed_for("decorative-original-001")
+        .expect("the response is correlated");
+    assert_eq!(completion.source_count, 2);
+    let rendered = image::open(output_path)
+        .expect("the output decodes")
+        .to_rgba8();
+    let blended = rendered.get_pixel(25, 25);
+    assert!(blended[0] > 90, "the Overlay contributes red");
+    assert!(blended[2] > 90, "the Photo remains visible through alpha");
+    assert!(blended[1] < 70, "the blend preserves the expected tint");
+    assert_eq!(
+        std::fs::read(decorative_path).expect("the original remains readable"),
+        decorative_bytes
     );
 }
 
@@ -736,6 +842,7 @@ fn single_photo_render_request(
         .sheets
         .first_mut()
         .expect("the fixture contains a sheet");
+    sheet.overlay = None;
     sheet.frames.truncate(1);
     let media_id = sheet.frames[0]
         .photo

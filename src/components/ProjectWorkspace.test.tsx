@@ -43,6 +43,55 @@ vi.mock("./AlbumCanvas", () => ({
 
 const projection = representativeProjection;
 const twoSheetProjection = createTwoSheetProjection();
+const decorativePreviewUrl =
+  "asset://localhost/cache/decorative-overlay.png";
+const decorativeProjection: EditorProjection = {
+  ...projection,
+  state: {
+    ...projection.state,
+    album: {
+      ...projection.state.album,
+      sheets: projection.state.album.sheets.map((sheet, index) => ({
+        ...sheet,
+        overlayMediaId:
+          index === 0 ? "decorative-overlay" : null,
+      })),
+      media: [
+        ...projection.state.album.media,
+        {
+          id: "decorative-overlay",
+          kind: "decorative",
+          name: "Overlay translúcido.png",
+          sourceWidthPx: 2_400,
+          sourceHeightPx: 1_800,
+          palette: ["#17344a", "#88b7c5", "#d4a15e"],
+        },
+      ],
+    },
+  },
+  composition: {
+    sheets: projection.composition.sheets.map((sheet, index) => ({
+      ...sheet,
+      overlay:
+        index === 0
+          ? {
+              mediaId: "decorative-overlay",
+              name: "Overlay translúcido.png",
+              drawRect: {
+                x: 0,
+                y: 0,
+                width: sheet.widthUm,
+                height: sheet.heightUm,
+              },
+            }
+          : null,
+    })),
+  },
+  mediaUsage: [
+    ...projection.mediaUsage,
+    { mediaId: "decorative-overlay", count: 1 },
+  ],
+};
 
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
@@ -186,6 +235,39 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () => {
+  const mediaPreviewUrls = {
+    "decorative-overlay": decorativePreviewUrl,
+  };
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={decorativeProjection}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => decorativeProjection,
+      )}
+      mediaPreviewUrls={mediaPreviewUrls}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
+
+  expect(screen.getByText("Overlay translúcido.png")).toBeInTheDocument();
+  expect(screen.queryByText("Serra ao amanhecer.jpg")).not.toBeInTheDocument();
+  expect(
+    view.container.querySelector<HTMLImageElement>(
+      `.media-thumb img[src="${decorativePreviewUrl}"]`,
+    ),
+  ).not.toBeNull();
+  expect(
+    view.container.querySelector<SVGImageElement>(
+      `[data-preview-overlay-id="decorative-overlay"][href="${decorativePreviewUrl}"]`,
+    ),
+  ).not.toBeNull();
+  expect(canvasHarness.props?.mediaPreviewUrls).toBe(mediaPreviewUrls);
 });
 
 test("renders media usage from the derived Editor projection", () => {

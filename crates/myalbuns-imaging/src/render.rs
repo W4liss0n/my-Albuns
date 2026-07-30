@@ -7,12 +7,12 @@ use std::{
 };
 
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage, codecs::png::PngEncoder};
-use myalbuns_core::ComposedFrame;
+use myalbuns_core::{ComposedDecorative, ComposedFrame};
 use myalbuns_imaging_protocol::{
     ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion, RenderSourcePolicy,
 };
 
-use crate::source::{decode_jpeg, read_verified_source, sha256_file};
+use crate::source::{decode_source, read_verified_source, sha256_file};
 
 const MICROMETERS_PER_INCH: f64 = 25_400.0;
 
@@ -71,8 +71,21 @@ pub(crate) fn render_request(
         )?;
     }
     draw_vertical_line(&mut image, width_px / 2, Rgba([129, 112, 91, 90]));
-    if sheet.has_overlay {
-        draw_overlay(&mut image);
+    if let Some(overlay) = &sheet.overlay {
+        match request.source_policy {
+            RenderSourcePolicy::LinkedOriginals => {
+                let source = sources.get(&overlay.media_id).ok_or_else(|| {
+                    format!(
+                        "a fonte do Decorativo {} não foi carregada",
+                        overlay.media_id
+                    )
+                })?;
+                draw_decorative(&mut image, overlay, pixels_per_micrometer, source);
+            }
+            RenderSourcePolicy::ProceduralFixture => {
+                draw_procedural_overlay(&mut image);
+            }
+        }
     }
 
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
@@ -134,7 +147,7 @@ fn load_render_sources(
             })?;
         decoded.insert(
             source.media_id().to_owned(),
-            decode_jpeg(source.media_id(), &verified)
+            decode_source(source.media_id(), &verified)
                 .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?
                 .image,
         );
@@ -300,7 +313,39 @@ fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8
     blend(top, bottom, y_amount)
 }
 
-fn draw_overlay(image: &mut RgbaImage) {
+fn draw_decorative(
+    image: &mut RgbaImage,
+    decorative: &ComposedDecorative,
+    pixels_per_micrometer: f64,
+    source: &RgbaImage,
+) {
+    let left = to_pixels_signed(decorative.draw_rect.x, pixels_per_micrometer).max(0) as u32;
+    let top = to_pixels_signed(decorative.draw_rect.y, pixels_per_micrometer).max(0) as u32;
+    let right = to_pixels_signed(
+        decorative.draw_rect.x + decorative.draw_rect.width,
+        pixels_per_micrometer,
+    )
+    .max(0) as u32;
+    let bottom = to_pixels_signed(
+        decorative.draw_rect.y + decorative.draw_rect.height,
+        pixels_per_micrometer,
+    )
+    .max(0) as u32;
+    let right = right.min(image.width());
+    let bottom = bottom.min(image.height());
+    let width = right.saturating_sub(left).max(1);
+    let height = bottom.saturating_sub(top).max(1);
+
+    for y in top..bottom {
+        for x in left..right {
+            let horizontal = (x - left) as f32 / width.saturating_sub(1).max(1) as f32;
+            let vertical = (y - top) as f32 / height.saturating_sub(1).max(1) as f32;
+            blend_pixel(image, x, y, sample_bilinear(source, horizontal, vertical));
+        }
+    }
+}
+
+fn draw_procedural_overlay(image: &mut RgbaImage) {
     let band = (image.height() / 18).max(2);
     for y in 0..band {
         let alpha = ((1.0 - y as f32 / band as f32) * 90.0) as u8;
@@ -368,7 +413,7 @@ fn blend(from: Rgba<u8>, to: Rgba<u8>, amount: f32) -> Rgba<u8> {
         (from[0] as f32 + (to[0] as f32 - from[0] as f32) * amount) as u8,
         (from[1] as f32 + (to[1] as f32 - from[1] as f32) * amount) as u8,
         (from[2] as f32 + (to[2] as f32 - from[2] as f32) * amount) as u8,
-        255,
+        (from[3] as f32 + (to[3] as f32 - from[3] as f32) * amount) as u8,
     ])
 }
 

@@ -9,7 +9,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     number: 1,
     widthUm: 600_000,
     heightUm: 300_000,
-    hasOverlay: false,
+    overlay: null,
     frames: [],
   },
   {
@@ -17,7 +17,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     number: 2,
     widthUm: 600_000,
     heightUm: 300_000,
-    hasOverlay: false,
+    overlay: null,
     frames: [],
   },
   {
@@ -25,7 +25,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     number: 3,
     widthUm: 600_000,
     heightUm: 300_000,
-    hasOverlay: false,
+    overlay: null,
     frames: [],
   },
 ];

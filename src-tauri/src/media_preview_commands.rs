@@ -1,10 +1,12 @@
 use std::{
+    collections::HashSet,
     path::Path,
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
 
-use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
+use myalbuns_core::MediaKind;
+use myalbuns_imaging_protocol::{CacheArtifactFormat, IMAGING_PROTOCOL_VERSION};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, OperationPathContext};
 use serde::Serialize;
@@ -38,6 +40,14 @@ pub(crate) async fn prepare_media_previews(
     let cache_sequence = CACHE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("cache-{}-{cache_sequence}", std::process::id());
     let projection = state.projection(window.label())?;
+    let decorative_media_ids = projection
+        .state
+        .album
+        .media
+        .iter()
+        .filter(|media| media.kind == MediaKind::Decorative)
+        .map(|media| media.id.clone())
+        .collect::<HashSet<_>>();
     let project_id = projection.state.project_id;
     let cache_paths = app_paths
         .project_cache(&project_id)
@@ -95,6 +105,19 @@ pub(crate) async fn prepare_media_previews(
         .recovery
         .map_or(0, |recovery| recovery.removed_temporary_count);
     let completed = execution.completion;
+    let decorative_artifact_count = completed
+        .artifacts
+        .iter()
+        .filter(|artifact| decorative_media_ids.contains(&artifact.media_id))
+        .count();
+    let decorative_png_artifact_count = completed
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            decorative_media_ids.contains(&artifact.media_id)
+                && artifact.format == CacheArtifactFormat::Png
+        })
+        .count();
     let previews = completed
         .artifacts
         .iter()
@@ -117,6 +140,9 @@ pub(crate) async fn prepare_media_previews(
         window_label = window.label(),
         generated_count = completed.generated_count,
         reused_count = completed.reused_count,
+        decorative_media_count = decorative_media_ids.len(),
+        decorative_artifact_count,
+        decorative_png_artifact_count,
         source_bytes = completed.source_bytes,
         preview_bytes = completed.preview_bytes,
         recovered_process_id,

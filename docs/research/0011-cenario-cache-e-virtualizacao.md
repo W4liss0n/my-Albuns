@@ -21,9 +21,11 @@ Esta rodada fecha o cenário representativo e avança dois gates da fundação:
 
 Ela não encerra o ticket 01. Perda de contexto WebGL2, pressão de memória
 gráfica, topologia final, permissões, caminhos de rede e coordenação global de
-operações continuam com critérios próprios. O baseline de Cache permanece
-aberto até uma Imagem decorativa atravessar seus consumidores reais. A
-virtualização foi encerrada posteriormente pela medição registrada em
+operações continuam com critérios próprios. Nesta rodada, o baseline de Cache
+permaneceu aberto até uma Imagem decorativa atravessar seus consumidores reais;
+esse gate foi encerrado posteriormente em
+`0013-baseline-de-cache-com-decorativo.md`. A virtualização foi encerrada
+posteriormente pela medição registrada em
 `0012-navegacao-em-album-longo.md`.
 
 ## Cenário representativo
@@ -89,9 +91,10 @@ nome terminado em `.png`. Outro teste confirma que uma origem PNG totalmente
 opaca continua gerando JPEG. Caminhos finais, temporários, limpeza de
 recuperação e URLs de asset cobrem os dois formatos.
 
-O compartilhamento da mesma representação entre Painel, Canvas e Grade está
-provado para Fotos. A Imagem decorativa ainda não atravessa esses consumidores
-no corte atual; portanto, o critério completo do baseline continua aberto.
+O compartilhamento da mesma representação entre Painel, Canvas e Grade foi
+provado para Fotos nesta rodada. A Imagem decorativa ainda não atravessava
+esses consumidores neste corte; a prova complementar e o encerramento do
+baseline estão registrados em `0013-baseline-de-cache-com-decorativo.md`.
 
 A variante PNG alterou o contrato serializado do Processador; por isso o
 protocolo corrente foi incrementado de v6 para v7. Evidências históricas
@@ -138,7 +141,8 @@ encerrado sem introduzir tiles ou outro modelo de cena.
 O cenário representativo está concluído sem antecipar subsistemas posteriores:
 
 - existe um único cenário editorial atravessando as fronteiras reais;
-- o Processador agora preserva transparência na representação única, mas falta
-  exercitar uma Imagem decorativa nos consumidores;
+- o Processador preserva transparência na representação única; a Imagem
+  decorativa que ainda faltava neste corte foi exercitada posteriormente em
+  `0013-baseline-de-cache-com-decorativo.md`;
 - o Álbum lógico não é truncado e o descarte, a reconstrução e a latência da
   navegação longa foram provados pela medição complementar.

@@ -42,6 +42,8 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
   const target: CanvasPerformanceTarget = {
     frameId: "frame-01-a",
     textureBacked: true,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: true,
     previewPan,
     previewZoom,
     nextRenderedFrame: renderedFrames.nextRenderedFrame,
@@ -64,6 +66,8 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
   expect(measurement).toEqual({
     frameId: "frame-01-a",
     textureBacked: true,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: true,
     pan: {
       sampleCount: 3,
       durationMs: 60,
@@ -102,6 +106,8 @@ test("refuses to report a Canvas target that is not backed by a real preview tex
   const target: CanvasPerformanceTarget = {
     frameId: "frame-01-a",
     textureBacked: false,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: true,
     previewPan: vi.fn(),
     previewZoom: vi.fn(),
     nextRenderedFrame: renderedFrames.nextRenderedFrame,
@@ -121,6 +127,32 @@ test("refuses to report a Canvas target that is not backed by a real preview tex
   ).rejects.toThrow("textura real");
 });
 
+test("refuses a benchmark without a real Decorative Cache texture", async () => {
+  const renderedFrames = clockWithFrameLatencies([16, 16, 16]);
+  const target: CanvasPerformanceTarget = {
+    frameId: "frame-01-a",
+    textureBacked: true,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: false,
+    previewPan: vi.fn(),
+    previewZoom: vi.fn(),
+    nextRenderedFrame: renderedFrames.nextRenderedFrame,
+    reset: vi.fn(),
+  };
+
+  await expect(
+    runCanvasPerformanceProbe(
+      {
+        warmupFrames: 1,
+        panFrames: 1,
+        zoomFrames: 1,
+      },
+      target,
+      renderedFrames.clock,
+    ),
+  ).rejects.toThrow("Decorativo");
+});
+
 test("includes synchronous preview work and waits for the Pixi-rendered frame", async () => {
   let now = 0;
   const renderedFrames = [5, 7, 11];
@@ -128,6 +160,8 @@ test("includes synchronous preview work and waits for the Pixi-rendered frame", 
   const target: CanvasPerformanceTarget = {
     frameId: "frame-01-a",
     textureBacked: true,
+    decorativeMediaId: "decorative-overlay",
+    decorativeTextureBacked: true,
     previewPan: () => {
       now += 3;
     },

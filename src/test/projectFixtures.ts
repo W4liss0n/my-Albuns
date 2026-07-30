@@ -21,7 +21,7 @@ export const representativeProjection: EditorProjection = {
           role: "initial",
           widthUm: 600_000,
           heightUm: 300_000,
-          hasOverlay: false,
+          overlayMediaId: null,
           frames: [
             {
               id: "frame-001",
@@ -50,6 +50,7 @@ export const representativeProjection: EditorProjection = {
       media: [
         {
           id: "media-001",
+          kind: "photo",
           name: "Serra ao amanhecer.jpg",
           sourceWidthPx: 6_000,
           sourceHeightPx: 4_000,
@@ -57,6 +58,7 @@ export const representativeProjection: EditorProjection = {
         },
         {
           id: "media-002",
+          kind: "photo",
           name: "Campo.jpg",
           sourceWidthPx: 4_000,
           sourceHeightPx: 6_000,
@@ -64,6 +66,7 @@ export const representativeProjection: EditorProjection = {
         },
         {
           id: "media-003",
+          kind: "photo",
           name: "Praia.jpg",
           sourceWidthPx: 6_000,
           sourceHeightPx: 4_000,
@@ -79,7 +82,7 @@ export const representativeProjection: EditorProjection = {
         number: 1,
         widthUm: 600_000,
         heightUm: 300_000,
-        hasOverlay: false,
+        overlay: null,
         frames: [
           {
             frameId: "frame-001",

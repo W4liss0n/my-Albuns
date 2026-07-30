@@ -12,6 +12,8 @@ export interface CanvasPerformanceProbeConfig {
 export interface CanvasPerformanceTarget {
   frameId: string;
   textureBacked: boolean;
+  decorativeMediaId: string;
+  decorativeTextureBacked: boolean;
   previewPan(amount: number): void;
   previewZoom(amount: number): void;
   nextRenderedFrame(): Promise<number>;
@@ -20,7 +22,12 @@ export interface CanvasPerformanceTarget {
 
 export type CanvasPerformanceTargetState =
   | { status: "pending" }
-  | { status: "failed"; reason: "texture_unavailable" }
+  | {
+      status: "failed";
+      reason:
+        | "texture_unavailable"
+        | "decorative_texture_unavailable";
+    }
   | { status: "ready"; target: CanvasPerformanceTarget };
 
 export interface CanvasPerformanceClock {
@@ -41,6 +48,14 @@ export async function runCanvasPerformanceProbe(
   if (!target.textureBacked) {
     throw new Error(
       "O probe do Canvas exige uma Foto materializada com textura real.",
+    );
+  }
+  if (
+    !target.decorativeTextureBacked ||
+    target.decorativeMediaId.length === 0
+  ) {
+    throw new Error(
+      "O probe do Canvas exige um Decorativo materializado com textura real.",
     );
   }
 
@@ -73,6 +88,8 @@ export async function runCanvasPerformanceProbe(
     return {
       frameId: target.frameId,
       textureBacked: target.textureBacked,
+      decorativeMediaId: target.decorativeMediaId,
+      decorativeTextureBacked: target.decorativeTextureBacked,
       pan,
       zoom,
     };

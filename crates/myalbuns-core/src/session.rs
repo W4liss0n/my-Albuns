@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use crate::composition::{CompositionCore, build_render_snapshot};
 use crate::model::{
     AlbumSnapshot, CompositionPlan, CoreError, EditorProjection, EditorState, FrameSnapshot,
-    MediaUsage, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoSnapshot,
-    ProjectIntent, RenderSnapshot,
+    MediaKind, MediaUsage, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
+    PhotoSnapshot, ProjectIntent, RenderSnapshot,
 };
 use crate::project::serialize_persisted_revision;
 
@@ -65,7 +65,7 @@ impl ProjectSession {
                     .album
                     .media
                     .iter()
-                    .any(|item| item.id == media_id)
+                    .any(|item| item.id == media_id && item.kind == MediaKind::Photo)
                 {
                     return Err(CoreError::MediaNotFound(media_id));
                 }
@@ -158,6 +158,13 @@ fn derive_media_usage(album: &AlbumSnapshot) -> Vec<MediaUsage> {
         .filter_map(|frame| frame.photo.as_ref())
     {
         *counts.entry(photo.media_id.as_str()).or_default() += 1;
+    }
+    for media_id in album
+        .sheets
+        .iter()
+        .filter_map(|sheet| sheet.overlay_media_id.as_deref())
+    {
+        *counts.entry(media_id).or_default() += 1;
     }
 
     album

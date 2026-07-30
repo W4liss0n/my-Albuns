@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 2;
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
+pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 3;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -133,6 +133,13 @@ pub enum SheetRole {
     Final,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaKind {
+    Photo,
+    Decorative,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
@@ -142,13 +149,14 @@ pub struct SheetSnapshot {
     pub width_um: i64,
     pub height_um: i64,
     pub frames: Vec<FrameSnapshot>,
-    pub has_overlay: bool,
+    pub overlay_media_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCatalogItem {
     pub id: String,
+    pub kind: MediaKind,
     pub name: String,
     pub source_width_px: u32,
     pub source_height_px: u32,
@@ -198,13 +206,31 @@ pub struct ComposedFrame {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct ComposedDecorative {
+    pub media_id: String,
+    pub name: String,
+    pub draw_rect: RectUm,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ComposedSheet {
     pub sheet_id: String,
     pub number: usize,
     pub width_um: i64,
     pub height_um: i64,
-    pub has_overlay: bool,
+    pub overlay: Option<ComposedDecorative>,
     pub frames: Vec<ComposedFrame>,
+}
+
+impl ComposedSheet {
+    pub fn referenced_media_ids(&self) -> impl Iterator<Item = &str> {
+        self.frames
+            .iter()
+            .filter_map(|frame| frame.photo.as_ref())
+            .map(|photo| photo.media_id.as_str())
+            .chain(self.overlay.iter().map(|overlay| overlay.media_id.as_str()))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]

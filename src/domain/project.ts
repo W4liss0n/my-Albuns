@@ -1,4 +1,5 @@
 export type { AlbumSnapshot } from "./generated/AlbumSnapshot";
+export type { ComposedDecorative } from "./generated/ComposedDecorative";
 export type { ComposedFrame } from "./generated/ComposedFrame";
 export type { ComposedPhoto } from "./generated/ComposedPhoto";
 export type { ComposedSheet } from "./generated/ComposedSheet";
@@ -8,6 +9,7 @@ export type { EditorState } from "./generated/EditorState";
 export type { FrameSnapshot } from "./generated/FrameSnapshot";
 export type { Matrix2 } from "./generated/Matrix2";
 export type { MediaCatalogItem } from "./generated/MediaCatalogItem";
+export type { MediaKind } from "./generated/MediaKind";
 export type { MediaTransform } from "./generated/MediaTransform";
 export type { MediaUsage } from "./generated/MediaUsage";
 export type { NormalizedPan } from "./generated/NormalizedPan";

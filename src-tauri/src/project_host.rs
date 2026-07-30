@@ -89,12 +89,7 @@ impl ProjectHost {
             .iter()
             .find(|sheet| sheet.sheet_id == sheet_id)
             .ok_or_else(|| "A Lâmina solicitada não existe no snapshot.".to_string())?;
-        let required_media = sheet
-            .frames
-            .iter()
-            .filter_map(|frame| frame.photo.as_ref())
-            .map(|photo| photo.media_id.as_str())
-            .collect::<BTreeSet<_>>();
+        let required_media = sheet.referenced_media_ids().collect::<BTreeSet<_>>();
         let sources_by_media = available_sources
             .iter()
             .map(|source| (source.media_id(), source))
@@ -197,6 +192,7 @@ mod tests {
             "main",
             session,
             vec![
+                source("decorative-overlay"),
                 source("media-campo"),
                 source("media-costa"),
                 source("unused-media"),
@@ -213,7 +209,7 @@ mod tests {
                 .iter()
                 .map(MediaSource::media_id)
                 .collect::<Vec<_>>(),
-            ["media-campo", "media-costa"]
+            ["decorative-overlay", "media-campo", "media-costa"]
         );
     }
 }

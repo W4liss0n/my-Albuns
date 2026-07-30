@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::model::{
-    AlbumSnapshot, CoreError, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot,
+    AlbumSnapshot, CoreError, MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX,
+    PHOTO_ZOOM_MIN, RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot,
 };
 
 pub(crate) fn validate_render_snapshot(snapshot: &RenderSnapshot) -> Result<(), CoreError> {
@@ -42,6 +42,21 @@ pub(crate) fn validate_render_snapshot(snapshot: &RenderSnapshot) -> Result<(), 
             &sheet.sheet_id,
             CoreError::InvalidSnapshot,
         )?;
+        if let Some(overlay) = &sheet.overlay {
+            if overlay.media_id.trim().is_empty() {
+                return Err(CoreError::InvalidSnapshot(
+                    "Identificador de Decorativo vazio".into(),
+                ));
+            }
+            validate_rect_within(
+                &overlay.draw_rect,
+                sheet.width_um,
+                sheet.height_um,
+                "Decorativo composto",
+                &overlay.media_id,
+                CoreError::InvalidSnapshot,
+            )?;
+        }
 
         let mut previous_stack_key: Option<(u32, &str)> = None;
         for frame in &sheet.frames {
@@ -102,11 +117,12 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
         ));
     }
 
-    let mut media_ids = HashSet::new();
+    let mut media_by_id = HashMap::new();
     for media in &album.media {
-        if media.id.trim().is_empty() || !media_ids.insert(media.id.as_str()) {
+        if media.id.trim().is_empty() || media_by_id.insert(media.id.as_str(), media.kind).is_some()
+        {
             return Err(CoreError::InvalidProject(format!(
-                "Identificador de Foto vazio ou duplicado: {}",
+                "Identificador de mídia vazio ou duplicado: {}",
                 media.id
             )));
         }
@@ -135,6 +151,21 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
             &sheet.id,
             CoreError::InvalidProject,
         )?;
+        if let Some(media_id) = &sheet.overlay_media_id {
+            match media_by_id.get(media_id.as_str()) {
+                Some(MediaKind::Decorative) => {}
+                Some(MediaKind::Photo) => {
+                    return Err(CoreError::InvalidProject(format!(
+                        "Overlay referencia uma Foto: {media_id}"
+                    )));
+                }
+                None => {
+                    return Err(CoreError::InvalidProject(format!(
+                        "Decorativo não pertence ao catálogo: {media_id}"
+                    )));
+                }
+            }
+        }
 
         for frame in &sheet.frames {
             if frame.id.trim().is_empty() || !frame_ids.insert(frame.id.as_str()) {
@@ -153,11 +184,20 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
             )?;
 
             if let Some(photo) = &frame.photo {
-                if !media_ids.contains(photo.media_id.as_str()) {
-                    return Err(CoreError::InvalidProject(format!(
-                        "Foto não pertence ao catálogo: {}",
-                        photo.media_id
-                    )));
+                match media_by_id.get(photo.media_id.as_str()) {
+                    Some(MediaKind::Photo) => {}
+                    Some(MediaKind::Decorative) => {
+                        return Err(CoreError::InvalidProject(format!(
+                            "Frame referencia um Decorativo: {}",
+                            photo.media_id
+                        )));
+                    }
+                    None => {
+                        return Err(CoreError::InvalidProject(format!(
+                            "Foto não pertence ao catálogo: {}",
+                            photo.media_id
+                        )));
+                    }
                 }
                 let transform = &photo.transform;
                 if !transform.pan_x.is_finite()

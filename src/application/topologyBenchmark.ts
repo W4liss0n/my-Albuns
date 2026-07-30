@@ -14,6 +14,8 @@ export interface FrameTimingSummary {
 export interface CanvasInteractionPerformanceMeasurement {
   frameId: string;
   textureBacked: boolean;
+  decorativeMediaId: string;
+  decorativeTextureBacked: boolean;
   pan: FrameTimingSummary;
   zoom: FrameTimingSummary;
 }

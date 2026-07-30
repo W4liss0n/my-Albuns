@@ -31,6 +31,45 @@ if ($albums.Count -ne 2) {
 
 Add-Type -AssemblyName System.Drawing
 
+$outputDirectory = Split-Path -Parent $OutputPath
+[System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
+
+function Write-DecorativeFixture {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $bitmap = $null
+    $graphics = $null
+    $pen = $null
+    try {
+        $bitmap = [System.Drawing.Bitmap]::new(
+            2400,
+            1800,
+            [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+        )
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.Clear([System.Drawing.Color]::FromArgb(96, 23, 52, 74))
+        $pen = [System.Drawing.Pen]::new(
+            [System.Drawing.Color]::FromArgb(176, 212, 161, 94),
+            36
+        )
+        $graphics.DrawRectangle($pen, 90, 90, 2220, 1620)
+        $graphics.DrawEllipse($pen, 150, 150, 420, 420)
+        $graphics.DrawEllipse($pen, 1830, 1230, 420, 420)
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally {
+        if ($null -ne $pen) {
+            $pen.Dispose()
+        }
+        if ($null -ne $graphics) {
+            $graphics.Dispose()
+        }
+        if ($null -ne $bitmap) {
+            $bitmap.Dispose()
+        }
+    }
+}
+
 function Get-JpegMetadata {
     param([Parameter(Mandatory = $true)][System.IO.FileInfo] $File)
 
@@ -129,6 +168,29 @@ for ($albumIndex = 0; $albumIndex -lt $albums.Count; $albumIndex += 1) {
     })
 }
 
+$totalPhotos = $totalFiles
+$decorativePath = Join-Path $outputDirectory 'decorative-overlay.png'
+Write-DecorativeFixture -Path $decorativePath
+$decorativeFile = Get-Item -LiteralPath $decorativePath
+$decorativeSha256 = (
+    Get-FileHash -LiteralPath $decorativeFile.FullName -Algorithm SHA256
+).Hash.ToLowerInvariant()
+$decorative = [ordered]@{
+    mediaId = 'decorative-overlay'
+    name = 'Overlay translúcido.png'
+    sourcePath = $decorativeFile.FullName
+    sourceWidthPx = 2400
+    sourceHeightPx = 1800
+    sourceBytes = $decorativeFile.Length
+    sourceSha256 = $decorativeSha256
+}
+$fingerprintRows.Add(
+    "decorative`0decorative-overlay`0$decorativeSha256`0" +
+    "$($decorativeFile.Length)`02400x1800`0rgba"
+)
+$totalFiles += 1
+$totalBytes += $decorativeFile.Length
+
 $fingerprintPayload = [System.Text.Encoding]::UTF8.GetBytes(
     $fingerprintRows -join "`n"
 )
@@ -144,17 +206,16 @@ finally {
 }
 
 $manifest = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     generatedAtUtc = [System.DateTime]::UtcNow.ToString('o')
     root = $rootItem.FullName
     corpusSha256 = $corpusSha256
     totalFiles = $totalFiles
     totalBytes = $totalBytes
+    decorative = $decorative
     albums = $manifestAlbums
 }
 
-$outputDirectory = Split-Path -Parent $OutputPath
-[System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null
 [System.IO.File]::WriteAllText(
     [System.IO.Path]::GetFullPath($OutputPath),
     ($manifest | ConvertTo-Json -Depth 8) + [System.Environment]::NewLine,
@@ -164,7 +225,8 @@ $outputDirectory = Split-Path -Parent $OutputPath
 [pscustomobject]@{
     Manifest = [System.IO.Path]::GetFullPath($OutputPath)
     Albums = $manifestAlbums.Count
-    Photos = $totalFiles
+    Photos = $totalPhotos
+    Decoratives = 1
     TotalMiB = [Math]::Round($totalBytes / 1MB, 1)
     CorpusSha256 = $corpusSha256
 } | Format-List

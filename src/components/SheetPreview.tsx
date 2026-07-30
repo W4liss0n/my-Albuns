@@ -89,30 +89,41 @@ export function SheetPreview({
         />
       ))}
 
-      {sheet.hasOverlay && (
-        <rect
-          data-preview-overlay=""
-          x={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
-          y={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
-          width={Math.max(
-            0,
-            sheet.widthUm -
-              SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
-          )}
-          height={Math.max(
-            0,
-            sheet.heightUm -
-              SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
-          )}
-          rx={SHEET_VISUAL_STYLE.overlay.cornerRadiusPx * unit}
-          fill="none"
-          stroke={SHEET_VISUAL_STYLE.overlay.outline}
-          strokeOpacity={SHEET_VISUAL_STYLE.overlay.outlineOpacity}
-          strokeWidth={
-            SHEET_VISUAL_STYLE.overlay.outlineWidthPx * unit
-          }
-        />
-      )}
+      {sheet.overlay &&
+        (mediaPreviewUrls[sheet.overlay.mediaId] ? (
+          <image
+            data-preview-overlay-id={sheet.overlay.mediaId}
+            href={mediaPreviewUrls[sheet.overlay.mediaId]}
+            x={sheet.overlay.drawRect.x}
+            y={sheet.overlay.drawRect.y}
+            width={sheet.overlay.drawRect.width}
+            height={sheet.overlay.drawRect.height}
+            preserveAspectRatio="none"
+          />
+        ) : (
+          <rect
+            data-preview-overlay-id={sheet.overlay.mediaId}
+            x={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
+            y={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
+            width={Math.max(
+              0,
+              sheet.widthUm -
+                SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
+            )}
+            height={Math.max(
+              0,
+              sheet.heightUm -
+                SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
+            )}
+            rx={SHEET_VISUAL_STYLE.overlay.cornerRadiusPx * unit}
+            fill="none"
+            stroke={SHEET_VISUAL_STYLE.overlay.outline}
+            strokeOpacity={SHEET_VISUAL_STYLE.overlay.outlineOpacity}
+            strokeWidth={
+              SHEET_VISUAL_STYLE.overlay.outlineWidthPx * unit
+            }
+          />
+        ))}
     </svg>
   );
 }

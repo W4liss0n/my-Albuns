@@ -5,7 +5,7 @@ pub use myalbuns_paths::CacheArtifactFormat;
 use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 7;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 8;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -449,13 +449,10 @@ pub fn validate_render_content(
         .find(|sheet| sheet.sheet_id == sheet_id)
         .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
     let required_media = sheet
-        .frames
-        .iter()
-        .filter_map(|frame| frame.photo.as_ref())
-        .map(|photo| photo.media_id.as_str())
+        .referenced_media_ids()
         .collect::<std::collections::HashSet<_>>();
     if required_media.is_empty() {
-        return Err("a Lâmina solicitada não contém Fotos".into());
+        return Err("a Lâmina solicitada não contém mídia".into());
     }
     match source_policy {
         RenderSourcePolicy::LinkedOriginals => {
@@ -467,7 +464,7 @@ pub fn validate_render_content(
                 }
             }
             if supplied_media != required_media {
-                return Err("as fontes da Exportação não correspondem às Fotos da Lâmina".into());
+                return Err("as fontes da Exportação não correspondem às mídias da Lâmina".into());
             }
         }
         RenderSourcePolicy::ProceduralFixture if !sources.is_empty() => {
