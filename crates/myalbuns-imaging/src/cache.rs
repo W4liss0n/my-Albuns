@@ -6,13 +6,14 @@ use std::{
 
 use image::{DynamicImage, ImageReader, codecs::jpeg::JpegEncoder};
 use myalbuns_imaging_protocol::{
-    CacheArtifact, CacheCompletion, CacheRequest, CacheResetRequest, ImagingResponse,
+    CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheRequest, CacheResetRequest,
+    ImagingResponse,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, PreparedCacheStorage};
 
 use crate::{
-    source::{decode_jpeg, read_verified_source, verify_source_current},
+    source::{decode_jpeg, jpeg_orientation, read_verified_source, verify_source_current},
     write_response,
 };
 
@@ -110,7 +111,11 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
     let mut preview_bytes = 0_u64;
     for job in &request.jobs {
         let source = &job.source;
-        let verified_bytes = read_verified_source(source)?;
+        let operational_source = request
+            .root_bindings
+            .resolve(source.source_path())
+            .map_err(|error| format!("não foi possível aplicar o plano de caminhos: {error}"))?;
+        let verified_bytes = read_verified_source(source, &operational_source)?;
         source_bytes = source_bytes
             .checked_add(source.source_bytes())
             .ok_or_else(|| "o tamanho total das Fotos excedeu o limite".to_string())?;
@@ -122,9 +127,10 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
             .cache_paths
             .preview_temporary_file(source.media_id(), &job.generation_id, std::process::id())
             .map_err(|error| error.to_string())?;
-        let (width_px, height_px, generated) = prepare_preview(
+        let (width_px, height_px, generated, exif_orientation) = prepare_preview(
             &storage,
             source,
+            &operational_source,
             &verified_bytes,
             &preview_path,
             &temporary_path,
@@ -151,6 +157,8 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
             width_px,
             height_px,
             preview_bytes: artifact_bytes,
+            format: CacheArtifactFormat::Jpeg,
+            exif_orientation: Some(exif_orientation),
         });
     }
 
@@ -166,11 +174,13 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
 fn prepare_preview(
     storage: &PreparedCacheStorage,
     source: &myalbuns_imaging_protocol::MediaSource,
+    operational_source: &Path,
     verified_bytes: &[u8],
     preview_path: &Path,
     temporary_path: &Path,
     max_edge_px: u32,
-) -> Result<(u32, u32, bool), String> {
+) -> Result<(u32, u32, bool, u8), String> {
+    let exif_orientation = jpeg_orientation(source.media_id(), verified_bytes)?;
     if let Some(file) = storage
         .open_existing_file(preview_path)
         .map_err(|error| format!("representação reduzida inválida: {error}"))?
@@ -181,10 +191,11 @@ fn prepare_preview(
         let (width, height) = reader
             .into_dimensions()
             .map_err(|error| format!("representação reduzida inválida: {error}"))?;
-        return Ok((width, height, false));
+        return Ok((width, height, false, exif_orientation));
     }
 
-    let preview = DynamicImage::ImageRgba8(decode_jpeg(source.media_id(), verified_bytes)?)
+    let decoded = decode_jpeg(source.media_id(), verified_bytes)?;
+    let preview = DynamicImage::ImageRgba8(decoded.image)
         .thumbnail(max_edge_px, max_edge_px)
         .to_rgb8();
     let write_result = (|| -> Result<(), String> {
@@ -203,7 +214,7 @@ fn prepare_preview(
             .map_err(|error| format!("não foi possível finalizar a prévia: {error}"))?;
         file.sync_all()
             .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
-        verify_source_current(source)?;
+        verify_source_current(source, operational_source)?;
         storage
             .replace_file(temporary_path, preview_path)
             .map_err(|error| format!("não foi possível publicar a prévia: {error}"))
@@ -212,5 +223,10 @@ fn prepare_preview(
         let _ = fs::remove_file(temporary_path);
     }
     write_result?;
-    Ok((preview.width(), preview.height(), true))
+    Ok((
+        preview.width(),
+        preview.height(),
+        true,
+        decoded.exif_orientation,
+    ))
 }

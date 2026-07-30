@@ -64,7 +64,16 @@ pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletio
         draw_overlay(&mut image);
     }
 
-    let (output_bytes, output_sha256) = write_verified_png(&image, &request.prepared_output_path)?;
+    let operational_output = request
+        .root_bindings
+        .resolve(&request.prepared_output_path)
+        .map_err(|error| {
+            RenderFailure::new(
+                ImagingFailureStage::OutputPrepare,
+                format!("não foi possível aplicar o plano de caminhos: {error}"),
+            )
+        })?;
+    let (output_bytes, output_sha256) = write_verified_png(&image, &operational_output)?;
     Ok(RenderCompletion {
         width_px,
         height_px,
@@ -86,7 +95,16 @@ fn load_render_sources(
     let mut decoded = HashMap::with_capacity(request.sources.len());
     let mut source_bytes = 0_u64;
     for source in &request.sources {
-        let verified = read_verified_source(source)
+        let operational_source = request
+            .root_bindings
+            .resolve(source.source_path())
+            .map_err(|error| {
+                RenderFailure::new(
+                    ImagingFailureStage::SourceVerification,
+                    format!("não foi possível aplicar o plano de caminhos: {error}"),
+                )
+            })?;
+        let verified = read_verified_source(source, &operational_source)
             .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceVerification, error))?;
         source_bytes = source_bytes
             .checked_add(source.source_bytes())
@@ -99,7 +117,8 @@ fn load_render_sources(
         decoded.insert(
             source.media_id().to_owned(),
             decode_jpeg(source.media_id(), &verified)
-                .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?,
+                .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?
+                .image,
         );
     }
     Ok((decoded, source_bytes))

@@ -46,7 +46,8 @@ A recuperação mantém responsabilidades separadas:
 - `AppPaths` deriva uma pasta única
   `.myalbuns-export-{operation-id}.tmp` dentro do Destino, mantém a cadeia de
   diretórios validada e restringe descarte e publicação à tentativa;
-- `MyAlbuns.Imaging.exe` recebe no protocolo v4 somente o comando tipado e os
+- `MyAlbuns.Imaging.exe` recebe no protocolo v5 somente o comando tipado, o
+  `RootBindingPlan` imutável da tentativa e os
   caminhos preparados. Ele grava, sincroniza, calcula tamanho e SHA-256 e
   responde sem
   conhecer ou promover o nome final;

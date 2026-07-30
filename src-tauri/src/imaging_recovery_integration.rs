@@ -2,6 +2,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::atomic::AtomicBool,
     thread,
     time::{Duration, Instant},
 };
@@ -9,7 +10,7 @@ use std::{
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{ImagingCommand, ImagingResponse, MediaSource, encode_command};
-use myalbuns_paths::{AppPaths, ExportPathPlan};
+use myalbuns_paths::{AppPaths, ExportPathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -30,6 +31,16 @@ enum CrashNext {
     Never,
     Cache,
     Export,
+}
+
+fn root_bindings(paths: &[&Path]) -> RootBindingPlan {
+    let mut context = OperationPathContext::new();
+    for path in paths {
+        context
+            .capture(path)
+            .expect("the recovery operation path is captured");
+    }
+    context.freeze()
 }
 
 struct RealProcessTransport {
@@ -260,6 +271,7 @@ fn real_processor_recovery_flows_through_production_modules() {
             cache_paths.clone(),
             vec![source.clone()],
             4096,
+            root_bindings(&[cache_paths.root(), source.source_path()]),
         );
         let generation_id = format!(
             "{}-v1-4096",
@@ -362,21 +374,33 @@ fn real_processor_recovery_flows_through_production_modules() {
         let failed_path_plan = ExportPathPlan::new(output_path.clone(), failed_request_id)
             .expect("the failed Export path is valid");
         let failed_plan = export_pipeline::plan(
-            failed_request_id,
-            output_path.clone(),
             snapshot.clone(),
-            sheet_id.clone(),
-            300,
-            Some(vec![export_source.clone()]),
+            export_pipeline::ExportOptions::new(
+                failed_request_id,
+                output_path.clone(),
+                sheet_id.clone(),
+                300,
+                Some(vec![export_source.clone()]),
+            ),
         )
         .expect("the failed Export is planned");
+        let failed_bindings = root_bindings(&failed_plan.required_paths());
         let failed_context = InvocationContext::new(failed_request_id, Some(project_id.clone()));
         let mut failed_transport =
             RealProcessTransport::new(executable.clone(), log_directory.clone(), CrashNext::Export);
+        let failed_cancellation = AtomicBool::new(false);
+        let mut failed_progress = |_| {};
 
-        export_pipeline::execute(&mut failed_transport, failed_plan, &failed_context)
-            .await
-            .expect_err("ExportPipeline surfaces the real process failure");
+        export_pipeline::execute(
+            &mut failed_transport,
+            failed_plan,
+            &failed_bindings,
+            &failed_cancellation,
+            &mut failed_progress,
+            &failed_context,
+        )
+        .await
+        .expect_err("ExportPipeline surfaces the real process failure");
 
         assert_eq!(failed_transport.process_ids.len(), 1);
         assert!(failed_transport.partial_preparation_observed);
@@ -393,20 +417,32 @@ fn real_processor_recovery_flows_through_production_modules() {
 
         let retry_request_id = "export-real-retry";
         let retry_plan = export_pipeline::plan(
-            retry_request_id,
-            output_path.clone(),
             snapshot,
-            sheet_id,
-            300,
-            Some(vec![export_source]),
+            export_pipeline::ExportOptions::new(
+                retry_request_id,
+                output_path.clone(),
+                sheet_id,
+                300,
+                Some(vec![export_source]),
+            ),
         )
         .expect("the explicit retry is planned");
+        let retry_bindings = root_bindings(&retry_plan.required_paths());
         let retry_context = InvocationContext::new(retry_request_id, Some(project_id.clone()));
         let mut retry_transport =
             RealProcessTransport::new(executable, log_directory, CrashNext::Never);
-        let published = export_pipeline::execute(&mut retry_transport, retry_plan, &retry_context)
-            .await
-            .expect("the explicit retry is published");
+        let retry_cancellation = AtomicBool::new(false);
+        let mut retry_progress = |_| {};
+        let published = export_pipeline::execute(
+            &mut retry_transport,
+            retry_plan,
+            &retry_bindings,
+            &retry_cancellation,
+            &mut retry_progress,
+            &retry_context,
+        )
+        .await
+        .expect("the explicit retry is published");
         assert_eq!(retry_transport.process_ids.len(), 1);
         assert_ne!(
             failed_transport.process_ids[0],

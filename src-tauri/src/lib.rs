@@ -11,13 +11,13 @@ mod sample_project;
 mod topology_benchmark;
 mod topology_spike;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Instant;
 
 use myalbuns_core::{EditorProjection, ExportResult, ProjectIntent};
 use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, OperationPathContext};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -159,12 +159,22 @@ async fn prepare_media_previews(
     let Some(sources) = state.cache_sources(window.label())? else {
         return Ok(None);
     };
+    let mut path_context = OperationPathContext::new();
+    path_context
+        .capture(cache_paths.root())
+        .map_err(|error| error.to_string())?;
+    for source in &sources {
+        path_context
+            .capture(source.source_path())
+            .map_err(|error| error.to_string())?;
+    }
     let work = CacheWork::new(
         request_id.clone(),
         project_id.clone(),
         cache_paths.clone(),
         sources,
         CACHE_PREVIEW_MAX_EDGE_PX,
+        path_context.freeze(),
     );
     let safe_project_id = safe_log_identifier(&project_id);
     tracing::info!(
@@ -263,6 +273,8 @@ async fn export_spike(
         .inspect_err(|_| log_export_failure(&request_id, None, "session_lock", None))?;
 
     let output_dir = std::env::temp_dir().join("MyAlbuns").join("spike");
+    std::fs::create_dir_all(&output_dir)
+        .map_err(|error| format!("Não foi possível preparar o Destino da Exportação: {error}"))?;
     let output_path = output_dir.join(format!(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()
@@ -278,12 +290,14 @@ async fn export_spike(
     let dpi = if sources.is_some() { 300 } else { 25 };
     let project_id = safe_log_identifier(&snapshot.project_id).map(str::to_owned);
     let plan = export_pipeline::plan(
-        request_id.clone(),
-        output_path,
         snapshot,
-        sheet_id,
-        dpi,
-        sources,
+        export_pipeline::ExportOptions::new(
+            request_id.clone(),
+            output_path,
+            sheet_id,
+            dpi,
+            sources,
+        ),
     )
     .map_err(|failure| {
         log_export_failure(
@@ -294,21 +308,49 @@ async fn export_spike(
         );
         failure.message
     })?;
+    let mut path_context = OperationPathContext::new();
+    for path in plan.required_paths() {
+        path_context
+            .capture(path)
+            .map_err(|error| error.to_string())?;
+    }
+    let root_bindings = path_context.freeze();
 
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let mut transport = TauriImagingTransport::new(&app, &logging);
-    let published = export_pipeline::execute(&mut transport, plan, &context)
-        .await
-        .map_err(|failure| {
-            log_export_failure(
-                &request_id,
-                project_id.as_deref(),
-                failure.stage.as_str(),
-                failure.exit_code,
-            );
-            failure.message
-        })?;
+    let cancellation = AtomicBool::new(false);
+    let mut progress = |progress: export_pipeline::ExportProgress| {
+        tracing::debug!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            protocol_version = IMAGING_PROTOCOL_VERSION,
+            operation_id = request_id.as_str(),
+            project_id = project_id.as_deref(),
+            stage = ?progress.stage,
+            completed_units = progress.completed_units,
+            total_units = progress.total_units,
+            event = "export_progress",
+        );
+    };
+    let published = export_pipeline::execute(
+        &mut transport,
+        plan,
+        &root_bindings,
+        &cancellation,
+        &mut progress,
+        &context,
+    )
+    .await
+    .map_err(|failure| {
+        log_export_failure(
+            &request_id,
+            project_id.as_deref(),
+            failure.stage.as_str(),
+            failure.exit_code,
+        );
+        failure.message
+    })?;
     let completed = published.completion;
     let elapsed_ms = started.elapsed().as_millis();
     tracing::info!(

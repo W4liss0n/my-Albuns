@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use myalbuns_core::RenderSnapshot;
-use myalbuns_paths::CachePathPlan;
+use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 4;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -111,6 +111,7 @@ pub struct ImagingRequest {
     pub dpi: u32,
     pub sources: Vec<MediaSource>,
     pub source_policy: RenderSourcePolicy,
+    pub root_bindings: RootBindingPlan,
 }
 
 impl ImagingRequest {
@@ -121,6 +122,7 @@ impl ImagingRequest {
         sheet_id: impl Into<String>,
         dpi: u32,
         sources: Vec<MediaSource>,
+        root_bindings: RootBindingPlan,
     ) -> Result<Self, String> {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
@@ -131,6 +133,7 @@ impl ImagingRequest {
             dpi,
             sources,
             source_policy: RenderSourcePolicy::LinkedOriginals,
+            root_bindings,
         };
         request.validate()?;
         Ok(request)
@@ -142,6 +145,7 @@ impl ImagingRequest {
         snapshot: RenderSnapshot,
         sheet_id: impl Into<String>,
         dpi: u32,
+        root_bindings: RootBindingPlan,
     ) -> Result<Self, String> {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
@@ -152,6 +156,7 @@ impl ImagingRequest {
             dpi,
             sources: vec![],
             source_policy: RenderSourcePolicy::ProceduralFixture,
+            root_bindings,
         };
         request.validate()?;
         Ok(request)
@@ -169,6 +174,12 @@ impl ImagingRequest {
         }
         if !self.prepared_output_path.is_absolute() {
             return Err("o caminho da preparação não é absoluto".into());
+        }
+        self.root_bindings
+            .validate()
+            .map_err(|error| format!("o plano de raízes é inválido: {error}"))?;
+        if !self.root_bindings.covers(&self.prepared_output_path) {
+            return Err("o caminho da preparação não pertence ao plano de raízes".into());
         }
         if !(1..=1200).contains(&self.dpi) {
             return Err("a resolução da Exportação é inválida".into());
@@ -197,6 +208,12 @@ impl ImagingRequest {
                 let mut supplied_media = std::collections::HashSet::new();
                 for source in &self.sources {
                     source.validate()?;
+                    if !self.root_bindings.covers(source.source_path()) {
+                        return Err(format!(
+                            "a raiz da mídia {} não pertence ao plano da operação",
+                            source.media_id()
+                        ));
+                    }
                     if !supplied_media.insert(source.media_id()) {
                         return Err("a Exportação contém mídia duplicada".into());
                     }
@@ -240,6 +257,7 @@ pub struct CacheRequest {
     pub cache_paths: CachePathPlan,
     pub jobs: Vec<CacheJob>,
     pub max_edge_px: u32,
+    pub root_bindings: RootBindingPlan,
 }
 
 impl CacheRequest {
@@ -249,6 +267,7 @@ impl CacheRequest {
         cache_paths: CachePathPlan,
         jobs: Vec<CacheJob>,
         max_edge_px: u32,
+        root_bindings: RootBindingPlan,
     ) -> Result<Self, String> {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
@@ -257,6 +276,7 @@ impl CacheRequest {
             cache_paths,
             jobs,
             max_edge_px,
+            root_bindings,
         };
         request.validate()?;
         Ok(request)
@@ -284,11 +304,23 @@ impl CacheRequest {
         self.cache_paths
             .validate()
             .map_err(|error| error.to_string())?;
+        self.root_bindings
+            .validate()
+            .map_err(|error| format!("o plano de raízes é inválido: {error}"))?;
+        if !self.root_bindings.covers(self.cache_paths.root()) {
+            return Err("a raiz do Cache não pertence ao plano da operação".into());
+        }
 
         let mut media_ids = std::collections::HashSet::new();
         for job in &self.jobs {
             job.validate()?;
             let source = &job.source;
+            if !self.root_bindings.covers(source.source_path()) {
+                return Err(format!(
+                    "a raiz da mídia {} não pertence ao plano da operação",
+                    source.media_id()
+                ));
+            }
             self.cache_paths
                 .preview_file(source.media_id(), &job.generation_id)
                 .map_err(|error| error.to_string())?;
@@ -435,6 +467,14 @@ pub struct CacheArtifact {
     pub width_px: u32,
     pub height_px: u32,
     pub preview_bytes: u64,
+    pub format: CacheArtifactFormat,
+    pub exif_orientation: Option<u8>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheArtifactFormat {
+    Jpeg,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -9,10 +9,19 @@ use crate::{
     AppPaths, AppPathsError,
     app_paths::{valid_cache_component, valid_namespace_component},
     guarded_fs::{
-        DirectoryGuard, ensure_direct_child, is_reparse_point, open_directory,
+        DirectoryGuard, GuardedFsError, ensure_direct_child, is_reparse_point, open_directory,
         open_existing_direct_child, remove_empty_directory, validate_open_file,
     },
 };
+
+impl From<GuardedFsError> for AppPathsError {
+    fn from(error: GuardedFsError) -> Self {
+        match error {
+            GuardedFsError::Unavailable => Self::CacheStorageUnavailable,
+            GuardedFsError::OutsideRoot => Self::CacheStorageOutsideRoot,
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CachePathPlan {
@@ -70,6 +79,10 @@ impl CachePathPlan {
             return Err(AppPathsError::InvalidProjectNamespace);
         }
         Ok(())
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
     }
 
     pub fn media_directory(&self) -> PathBuf {
@@ -205,7 +218,8 @@ impl PreparedCacheStorage {
         fs::rename(temporary, final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
         let published =
             File::open(final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(final_parent, final_path, &published)
+        validate_open_file(final_parent, final_path, &published)?;
+        Ok(())
     }
 
     fn parent_for(&self, path: &Path) -> Result<&DirectoryGuard, AppPathsError> {

@@ -1,7 +1,8 @@
 use std::{
     fs::File,
     io::{BufReader, Read},
-    path::PathBuf,
+    path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use myalbuns_core::RenderSnapshot;
@@ -9,7 +10,7 @@ use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, MediaSource, RenderCompletion,
 };
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{ExportPathPlan, PreparedExportStorage};
+use myalbuns_paths::{ExportPathPlan, PreparedExportStorage, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
 use crate::imaging_processor::{
@@ -18,9 +19,52 @@ use crate::imaging_processor::{
 
 #[derive(Debug)]
 pub(crate) struct ExportPlan {
+    request_id: String,
     output_path: PathBuf,
     path_plan: ExportPathPlan,
-    request: ImagingRequest,
+    snapshot: RenderSnapshot,
+    sheet_id: String,
+    dpi: u32,
+    sources: Option<Vec<MediaSource>>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct ExportOptions {
+    request_id: String,
+    output_path: PathBuf,
+    sheet_id: String,
+    dpi: u32,
+    sources: Option<Vec<MediaSource>>,
+}
+
+impl ExportOptions {
+    pub(crate) fn new(
+        request_id: impl Into<String>,
+        output_path: PathBuf,
+        sheet_id: impl Into<String>,
+        dpi: u32,
+        sources: Option<Vec<MediaSource>>,
+    ) -> Self {
+        Self {
+            request_id: request_id.into(),
+            output_path,
+            sheet_id: sheet_id.into(),
+            dpi,
+            sources,
+        }
+    }
+}
+
+impl ExportPlan {
+    pub(crate) fn required_paths(&self) -> Vec<&Path> {
+        let mut paths =
+            Vec::with_capacity(self.sources.as_ref().map_or(1, |sources| sources.len() + 1));
+        paths.push(self.output_path.as_path());
+        if let Some(sources) = &self.sources {
+            paths.extend(sources.iter().map(MediaSource::source_path));
+        }
+        paths
+    }
 }
 
 #[derive(Debug)]
@@ -32,6 +76,7 @@ pub(crate) struct PublishedExport {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ExportFailureStage {
     Plan,
+    Cancelled,
     Prepare,
     Processor(InvocationFailureStage),
     ValidateResponse,
@@ -43,6 +88,7 @@ impl ExportFailureStage {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Plan => "plan_request",
+            Self::Cancelled => "cancelled",
             Self::Prepare => "prepare_output",
             Self::Processor(stage) => stage.as_str(),
             Self::ValidateResponse => "validate_response",
@@ -54,34 +100,132 @@ impl ExportFailureStage {
 
 pub(crate) type ExportFailure = OperationFailure<ExportFailureStage>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ExportProgressStage {
+    Preparing,
+    Processing,
+    Verifying,
+    Publishing,
+    Completed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ExportProgress {
+    pub(crate) stage: ExportProgressStage,
+    pub(crate) completed_units: u32,
+    pub(crate) total_units: u32,
+}
+
+impl ExportProgress {
+    const fn at(stage: ExportProgressStage, completed_units: u32) -> Self {
+        Self {
+            stage,
+            completed_units,
+            total_units: 1,
+        }
+    }
+}
+
 pub(crate) fn plan(
-    request_id: impl Into<String>,
-    output_path: PathBuf,
     snapshot: RenderSnapshot,
-    sheet_id: impl Into<String>,
-    dpi: u32,
-    sources: Option<Vec<MediaSource>>,
+    options: ExportOptions,
 ) -> Result<ExportPlan, ExportFailure> {
-    let request_id = request_id.into();
-    let sheet_id = sheet_id.into();
-    let destination = output_path.parent().ok_or_else(|| {
+    let path_plan =
+        ExportPathPlan::new(options.output_path.clone(), &options.request_id).map_err(|error| {
+            ExportFailure::new(
+                ExportFailureStage::Plan,
+                format!("Não foi possível planejar o Destino da Exportação: {error}"),
+            )
+        })?;
+    validate_plan_inputs(&snapshot, &options)?;
+    Ok(ExportPlan {
+        request_id: options.request_id,
+        output_path: options.output_path,
+        path_plan,
+        snapshot,
+        sheet_id: options.sheet_id,
+        dpi: options.dpi,
+        sources: options.sources,
+    })
+}
+
+fn validate_plan_inputs(
+    snapshot: &RenderSnapshot,
+    options: &ExportOptions,
+) -> Result<(), ExportFailure> {
+    snapshot.validate().map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Plan,
-            "O Destino da Exportação é inválido.",
+            format!("Não foi possível planejar a Exportação: snapshot inválido: {error}"),
         )
     })?;
-    std::fs::create_dir_all(destination).map_err(|error| {
-        ExportFailure::new(
-            ExportFailureStage::Prepare,
-            format!("Não foi possível preparar a Exportação: {error}"),
-        )
-    })?;
-    let path_plan = ExportPathPlan::new(output_path.clone(), &request_id).map_err(|error| {
-        ExportFailure::new(
+    if !(1..=1200).contains(&options.dpi) {
+        return Err(ExportFailure::new(
             ExportFailureStage::Plan,
-            format!("Não foi possível planejar o Destino da Exportação: {error}"),
-        )
-    })?;
+            "A resolução da Exportação é inválida.",
+        ));
+    }
+    let required_media = snapshot
+        .composition
+        .sheets
+        .iter()
+        .find(|sheet| sheet.sheet_id == options.sheet_id)
+        .ok_or_else(|| {
+            ExportFailure::new(
+                ExportFailureStage::Plan,
+                "A Lâmina solicitada não existe no snapshot.",
+            )
+        })?
+        .frames
+        .iter()
+        .filter_map(|frame| frame.photo.as_ref())
+        .map(|photo| photo.media_id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    if required_media.is_empty() {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Plan,
+            "A Lâmina solicitada não contém Fotos.",
+        ));
+    }
+    if let Some(sources) = &options.sources {
+        let supplied_media = sources
+            .iter()
+            .map(MediaSource::media_id)
+            .collect::<std::collections::HashSet<_>>();
+        if supplied_media.len() != sources.len() || supplied_media != required_media {
+            return Err(ExportFailure::new(
+                ExportFailureStage::Plan,
+                "As fontes da Exportação não correspondem às Fotos da Lâmina.",
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) async fn execute<T: ImagingTransport>(
+    transport: &mut T,
+    plan: ExportPlan,
+    root_bindings: &RootBindingPlan,
+    cancellation: &AtomicBool,
+    progress: &mut (dyn FnMut(ExportProgress) + Send),
+    context: &InvocationContext,
+) -> Result<PublishedExport, ExportFailure> {
+    ensure_not_cancelled(cancellation)?;
+    let ExportPlan {
+        request_id,
+        output_path,
+        path_plan,
+        snapshot,
+        sheet_id,
+        dpi,
+        sources,
+    } = plan;
+    if context.operation_id != request_id {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Plan,
+            "A correlação da Exportação não corresponde ao plano.",
+        ));
+    }
     let request = match sources {
         Some(sources) => ImagingRequest::new(
             request_id,
@@ -90,6 +234,7 @@ pub(crate) fn plan(
             sheet_id,
             dpi,
             sources,
+            root_bindings.clone(),
         ),
         None => ImagingRequest::procedural_fixture(
             request_id,
@@ -97,6 +242,7 @@ pub(crate) fn plan(
             snapshot,
             sheet_id,
             dpi,
+            root_bindings.clone(),
         ),
     }
     .map_err(|error| {
@@ -105,31 +251,25 @@ pub(crate) fn plan(
             format!("Não foi possível planejar a Exportação: {error}"),
         )
     })?;
-    Ok(ExportPlan {
-        output_path,
-        path_plan,
-        request,
-    })
-}
-
-pub(crate) async fn execute<T: ImagingTransport>(
-    transport: &mut T,
-    plan: ExportPlan,
-    context: &InvocationContext,
-) -> Result<PublishedExport, ExportFailure> {
-    if plan.request.prepared_output_path != plan.path_plan.prepared_output_path() {
+    if request.prepared_output_path != path_plan.prepared_output_path() {
         return Err(ExportFailure::new(
             ExportFailureStage::Prepare,
             "A preparação da Exportação não corresponde ao plano de caminhos.",
         ));
     }
-    let preparation = plan.path_plan.prepare().map_err(|error| {
+    progress(ExportProgress::at(ExportProgressStage::Preparing, 0));
+    let preparation = path_plan.prepare().map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Prepare,
             format!("Não foi possível preparar a Exportação: {error}"),
         )
     })?;
-    let command = ImagingCommand::render(plan.request.clone());
+    if cancellation.load(Ordering::Acquire) {
+        discard_failed_preparation(preparation, context);
+        return Err(cancelled_failure());
+    }
+    progress(ExportProgress::at(ExportProgressStage::Processing, 0));
+    let command = ImagingCommand::render(request.clone());
     let response = match transport
         .invoke(&command, context, ImagingOperation::Export, 1)
         .await
@@ -143,30 +283,53 @@ pub(crate) async fn execute<T: ImagingTransport>(
             ));
         }
     };
-    let Some(completion) = response.completed_for(&plan.request.request_id).cloned() else {
+    if cancellation.load(Ordering::Acquire) {
+        discard_failed_preparation(preparation, context);
+        return Err(cancelled_failure());
+    }
+    let Some(completion) = response.completed_for(&request.request_id).cloned() else {
         discard_failed_preparation(preparation, context);
         return Err(ExportFailure::new(
             ExportFailureStage::ValidateResponse,
             "O Processador de Imagens devolveu uma resposta inesperada.",
         ));
     };
-    if let Err(message) = verify_preparation(&plan.path_plan, &completion) {
+    progress(ExportProgress::at(ExportProgressStage::Verifying, 0));
+    if let Err(message) = verify_preparation(&path_plan, &completion) {
         discard_failed_preparation(preparation, context);
         return Err(ExportFailure::new(
             ExportFailureStage::VerifyPreparation,
             message,
         ));
     }
+    if cancellation.load(Ordering::Acquire) {
+        discard_failed_preparation(preparation, context);
+        return Err(cancelled_failure());
+    }
+    progress(ExportProgress::at(ExportProgressStage::Publishing, 0));
     preparation.publish().map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Publish,
             format!("Não foi possível publicar a Exportação: {error}"),
         )
     })?;
+    progress(ExportProgress::at(ExportProgressStage::Completed, 1));
     Ok(PublishedExport {
-        output_path: plan.output_path,
+        output_path,
         completion,
     })
+}
+
+fn ensure_not_cancelled(cancellation: &AtomicBool) -> Result<(), ExportFailure> {
+    if cancellation.load(Ordering::Acquire) {
+        Err(cancelled_failure())
+    } else {
+        Ok(())
+    }
+}
+
+fn cancelled_failure() -> ExportFailure {
+    ExportFailure::new(ExportFailureStage::Cancelled, "A Exportação foi cancelada.")
 }
 
 fn verify_preparation(
@@ -226,13 +389,19 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: &Invo
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{
+        path::PathBuf,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     use myalbuns_core::ProjectCore;
     use myalbuns_imaging_protocol::{ImagingCommand, ImagingResponse, RenderCompletion};
+    use myalbuns_paths::{OperationPathContext, RootBindingPlan};
     use sha2::{Digest, Sha256};
 
-    use super::{ExportFailureStage, ExportPlan, execute, plan};
+    use super::{
+        ExportFailureStage, ExportOptions, ExportPlan, ExportProgressStage, execute, plan,
+    };
     use crate::{
         imaging_processor::{
             ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
@@ -275,7 +444,35 @@ mod tests {
             .expect("the sample project opens")
             .render_snapshot();
         let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-        plan(request_id, output, snapshot, sheet_id, 25, None).expect("the Export request is valid")
+        plan(
+            snapshot,
+            ExportOptions::new(request_id, output, sheet_id, 25, None),
+        )
+        .expect("the Export request is valid")
+    }
+
+    fn root_bindings(plan: &ExportPlan) -> RootBindingPlan {
+        let mut context = OperationPathContext::new();
+        for path in plan.required_paths() {
+            context
+                .capture(path)
+                .expect("the Export path root is captured");
+        }
+        context.freeze()
+    }
+
+    #[test]
+    fn planning_an_export_does_not_create_its_destination() {
+        let root = tempfile::tempdir().expect("temporary Export root");
+        let destination = root.path().join("not-created").join("nested");
+        let output = destination.join("Album.png");
+
+        let _plan = export_plan(output, "export-pure-plan");
+
+        assert!(
+            !destination.exists(),
+            "planning must remain a pure operation"
+        );
     }
 
     fn context(request_id: &str) -> InvocationContext {
@@ -295,10 +492,20 @@ mod tests {
                 result: Some(Err(InvocationFailure::unexpected_termination(4242))),
                 invocations: 0,
             };
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(false);
+            let mut progress = |_| {};
 
-            let failure = execute(&mut transport, plan, &context("export-failure"))
-                .await
-                .expect_err("the Export failure remains visible");
+            let failure = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &mut progress,
+                &context("export-failure"),
+            )
+            .await
+            .expect_err("the Export failure remains visible");
 
             assert_eq!(
                 failure.stage,
@@ -344,16 +551,37 @@ mod tests {
                 result: Some(Ok(response)),
                 invocations: 0,
             };
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(false);
+            let mut stages = Vec::new();
+            let mut progress = |progress: super::ExportProgress| stages.push(progress.stage);
 
-            let published = execute(&mut transport, plan, &context("export-success"))
-                .await
-                .expect("the verified Export is published");
+            let published = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &mut progress,
+                &context("export-success"),
+            )
+            .await
+            .expect("the verified Export is published");
 
             assert_eq!(published.completion, completion);
             assert_eq!(published.output_path, output);
             assert_eq!(
                 std::fs::read(&published.output_path).expect("the published Export is readable"),
                 b"verified export"
+            );
+            assert_eq!(
+                stages,
+                [
+                    ExportProgressStage::Preparing,
+                    ExportProgressStage::Processing,
+                    ExportProgressStage::Verifying,
+                    ExportProgressStage::Publishing,
+                    ExportProgressStage::Completed,
+                ]
             );
         });
     }
@@ -385,16 +613,63 @@ mod tests {
                 result: Some(Ok(response)),
                 invocations: 0,
             };
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(false);
+            let mut progress = |_| {};
 
-            let failure = execute(&mut transport, plan, &context("export-invalid"))
-                .await
-                .expect_err("the mismatched preparation is rejected");
+            let failure = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &mut progress,
+                &context("export-invalid"),
+            )
+            .await
+            .expect_err("the mismatched preparation is rejected");
 
             assert_eq!(failure.stage, ExportFailureStage::VerifyPreparation);
             assert_eq!(
                 std::fs::read(output).expect("the previous Export remains readable"),
                 b"previous export"
             );
+        });
+    }
+
+    #[test]
+    fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary Export destination");
+            let output = destination.path().join("Album.png");
+            let plan = export_plan(output, "export-cancelled");
+            let preparation_path = plan.path_plan.preparation_directory().to_path_buf();
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(true);
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan.prepared_output_path().to_path_buf(),
+                prepared_bytes: Vec::new(),
+                result: None,
+                invocations: 0,
+            };
+            let mut progress_count = 0;
+            let mut progress = |_| progress_count += 1;
+
+            let failure = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &mut progress,
+                &context("export-cancelled"),
+            )
+            .await
+            .expect_err("the cancelled Export does not start");
+
+            assert_eq!(failure.stage, ExportFailureStage::Cancelled);
+            assert_eq!(transport.invocations, 0);
+            assert_eq!(progress_count, 0);
+            assert!(!preparation_path.exists());
+            assert!(cancellation.load(Ordering::Acquire));
         });
     }
 }

@@ -6,10 +6,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheJob, CacheRequest, CacheResetRequest, ImagingCommand, ImagingFailureStage, ImagingRequest,
-    ImagingResponse, MediaSource,
+    CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
+    ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
 };
-use myalbuns_paths::{AppPaths, CachePathPlan};
+use myalbuns_paths::{AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
 #[path = "../../../tests/support/sample_project.rs"]
@@ -70,6 +70,16 @@ fn cache_job(source: MediaSource, max_edge_px: u32) -> CacheJob {
         source.source_sha256()[..16].to_ascii_lowercase()
     );
     CacheJob::new(source, generation_id).expect("the Cache job is valid")
+}
+
+fn root_bindings(paths: &[&Path]) -> RootBindingPlan {
+    let mut context = OperationPathContext::new();
+    for path in paths {
+        context
+            .capture(path)
+            .expect("the operation path root is captured");
+    }
+    context.freeze()
 }
 
 fn sample_session(sample: SampleProject, sheet_count: usize) -> ProjectSession {
@@ -148,22 +158,22 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();
+    let media_source = MediaSource::new(
+        "benchmark-a-001",
+        source_path,
+        source_bytes,
+        source_sha256.clone(),
+    )
+    .expect("the native source is valid");
+    let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-001",
             cache.project_id.clone(),
             cache_paths.clone(),
-            vec![cache_job(
-                MediaSource::new(
-                    "benchmark-a-001",
-                    source_path,
-                    source_bytes,
-                    source_sha256.clone(),
-                )
-                .expect("the native source is valid"),
-                32,
-            )],
+            vec![cache_job(media_source, 32)],
             32,
+            bindings,
         )
         .expect("the Cache request is valid"),
     );
@@ -362,22 +372,22 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     let original = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original));
     let cache_paths = cache.paths.clone();
+    let media_source = MediaSource::new(
+        "benchmark-a-001",
+        source_path.clone(),
+        original.len() as u64,
+        source_sha256,
+    )
+    .expect("the source is valid");
+    let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-integrity",
             cache.project_id.clone(),
             cache_paths,
-            vec![cache_job(
-                MediaSource::new(
-                    "benchmark-a-001",
-                    source_path.clone(),
-                    original.len() as u64,
-                    source_sha256,
-                )
-                .expect("the source is valid"),
-                32,
-            )],
+            vec![cache_job(media_source, 32)],
             32,
+            bindings,
         )
         .expect("the Cache request is valid"),
     );
@@ -462,9 +472,15 @@ fn processor_rejects_an_invalid_snapshot() {
     let output_path = output_dir.path().join("invalid.png");
     let snapshot = session.render_snapshot();
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-    let request =
-        ImagingRequest::procedural_fixture("invalid", output_path.clone(), snapshot, sheet_id, 25)
-            .expect("the baseline request is valid");
+    let request = ImagingRequest::procedural_fixture(
+        "invalid",
+        output_path.clone(),
+        snapshot,
+        sheet_id,
+        25,
+        root_bindings(&[&output_path]),
+    )
+    .expect("the baseline request is valid");
     let mut request = serde_json::to_value(request).expect("request is serializable");
     request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
 
@@ -509,7 +525,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_request_completed"));
     assert!(logs.contains("\"process_role\":\"imaging\""));
-    assert!(logs.contains("\"protocol_version\":4"));
+    assert!(logs.contains(&format!("\"protocol_version\":{IMAGING_PROTOCOL_VERSION}")));
     assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
     assert!(
         !logs.contains(&output_path.to_string_lossy().into_owned()),
@@ -581,21 +597,22 @@ fn single_photo_render_request(
         .media_id
         .clone();
     let sheet_id = sheet.sheet_id.clone();
+    let source = MediaSource::new(
+        media_id,
+        source_path.to_path_buf(),
+        source_bytes,
+        source_sha256,
+    )
+    .expect("the linked source is valid");
+    let bindings = root_bindings(&[&output_path, source.source_path()]);
     ImagingRequest::new(
         request_id,
         output_path,
         snapshot,
         sheet_id,
         25,
-        vec![
-            MediaSource::new(
-                media_id,
-                source_path.to_path_buf(),
-                source_bytes,
-                source_sha256,
-            )
-            .expect("the linked source is valid"),
-        ],
+        vec![source],
+        bindings,
     )
     .expect("the linked-original render request is valid")
 }
@@ -629,6 +646,7 @@ fn invoke_processor_with_log_dir(
         snapshot,
         sheet_id,
         25,
+        root_bindings(&[output_path]),
     )
     .expect("the procedural render request is valid");
     invoke_render_request(&request, log_dir)
@@ -648,6 +666,11 @@ fn invoke_real_processor(
         .expect("the fixture contains a sheet")
         .sheet_id
         .clone();
+    let mut paths = Vec::with_capacity(sources.len() + 1);
+    paths.push(output_path);
+    paths.extend(sources.iter().map(MediaSource::source_path));
+    let bindings = root_bindings(&paths);
+    drop(paths);
     let request = ImagingRequest::new(
         request_id,
         output_path.to_path_buf(),
@@ -655,6 +678,7 @@ fn invoke_real_processor(
         sheet_id,
         dpi,
         sources,
+        bindings,
     )
     .expect("the linked-original render request is valid");
     invoke_render_request(&request, None)

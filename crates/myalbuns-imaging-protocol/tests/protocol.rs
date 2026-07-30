@@ -6,7 +6,7 @@ use myalbuns_imaging_protocol::{
     ImagingCommand, ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
     RenderCompletion, decode_command, decode_response, encode_command, encode_response,
 };
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 
 #[path = "../../../tests/support/sample_project.rs"]
 mod sample_project;
@@ -48,28 +48,42 @@ fn host_and_processor_share_one_serialized_protocol() {
     let snapshot = ProjectCore::open_editable_session(&source)
         .expect("the sample project opens through ProjectCore")
         .render_snapshot();
+    let prepared_output_path =
+        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png");
+    let sources = vec![
+        MediaSource::new(
+            "media-costa",
+            PathBuf::from(r"C:\Photos\costa.jpg"),
+            1024,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        .expect("the first native source is valid"),
+        MediaSource::new(
+            "media-campo",
+            PathBuf::from(r"C:\Photos\campo.jpg"),
+            2048,
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        )
+        .expect("the second native source is valid"),
+    ];
+    let mut path_context = OperationPathContext::new();
+    path_context
+        .capture(&prepared_output_path)
+        .expect("the output root is captured");
+    for source in &sources {
+        path_context
+            .capture(source.source_path())
+            .expect("the source root is captured");
+    }
+    let root_bindings = path_context.freeze();
     let request = ImagingRequest::new(
         "render-42",
-        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png"),
+        prepared_output_path,
         snapshot,
         "lamina-01",
         300,
-        vec![
-            MediaSource::new(
-                "media-costa",
-                PathBuf::from(r"C:\Photos\costa.jpg"),
-                1024,
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            )
-            .expect("the first native source is valid"),
-            MediaSource::new(
-                "media-campo",
-                PathBuf::from(r"C:\Photos\campo.jpg"),
-                2048,
-                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-            )
-            .expect("the second native source is valid"),
-        ],
+        sources,
+        root_bindings.clone(),
     )
     .expect("the render request is valid");
 
@@ -95,8 +109,18 @@ fn host_and_processor_share_one_serialized_protocol() {
         "media-costa"
     );
     assert_eq!(
+        request_json["request"]["rootBindings"]["bindings"][0]["kind"],
+        "disk"
+    );
+    assert_eq!(
         decode_command(&command_payload).expect("command decodes"),
         command
+    );
+    let mut unbound_request = request.clone();
+    unbound_request.root_bindings = RootBindingPlan::default();
+    assert!(
+        unbound_request.validate().is_err(),
+        "a worker must never resolve a root omitted by the operation owner"
     );
     assert!(
         ImagingRequest::procedural_fixture(
@@ -105,6 +129,7 @@ fn host_and_processor_share_one_serialized_protocol() {
             request.snapshot.clone(),
             "lamina-01",
             25,
+            root_bindings,
         )
         .is_err(),
         "request identifiers remain safe correlation values"
@@ -147,25 +172,30 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
     )
     .project_cache("project-42")
     .expect("the project Cache namespace is safe");
+    let source = MediaSource::new(
+        "media-42",
+        PathBuf::from(r"C:\Photos\photo.jpg"),
+        1024,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    .expect("the native media source is valid");
+    let mut path_context = OperationPathContext::new();
+    path_context
+        .capture(cache_paths.root())
+        .expect("the Cache root is captured");
+    path_context
+        .capture(source.source_path())
+        .expect("the source root is captured");
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-42",
             "project-42",
             cache_paths,
             vec![
-                CacheJob::new(
-                    MediaSource::new(
-                        "media-42",
-                        PathBuf::from(r"C:\Photos\photo.jpg"),
-                        1024,
-                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                    )
-                    .expect("the native media source is valid"),
-                    "aaaaaaaaaaaaaaaa-v1-1600",
-                )
-                .expect("the Cache job is valid"),
+                CacheJob::new(source, "aaaaaaaaaaaaaaaa-v1-1600").expect("the Cache job is valid"),
             ],
             1600,
+            path_context.freeze(),
         )
         .expect("the Cache request is valid"),
     );

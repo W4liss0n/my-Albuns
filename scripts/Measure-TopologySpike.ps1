@@ -224,7 +224,7 @@ function Reset-TopologyCache {
     $command = [ordered]@{
         kind = 'resetCache'
         request = [ordered]@{
-            protocolVersion = 4
+            protocolVersion = 5
             requestId = $requestId
             projectIds = @('project-spike-001', 'project-spike-002')
         }

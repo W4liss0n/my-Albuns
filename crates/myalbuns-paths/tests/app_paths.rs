@@ -1,7 +1,10 @@
-use std::{io::Write, path::Path};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use directories::BaseDirs;
-use myalbuns_paths::{AppPaths, AppPathsError, ExportPathPlan};
+use myalbuns_paths::{AppPaths, AppPathsError, ExportPathPlan, OperationPathContext, PathRootKind};
 
 #[test]
 fn derives_temporary_application_roots_from_known_folders() {
@@ -192,6 +195,114 @@ fn derives_a_unique_export_preparation_inside_the_destination() {
             .join(".myalbuns-export-export-42.tmp")
             .join("Álbum 01.png")
     );
+}
+
+#[cfg(windows)]
+#[test]
+fn rejects_prohibited_windows_export_paths_before_planning() {
+    for path in [
+        r"relative\Album.png",
+        r"C:Album.png",
+        r"\Album.png",
+        r"\\.\C:\Exports\Album.png",
+        r"\\?\GLOBALROOT\Device\HarddiskVolume1\Album.png",
+        r"C:\Exports\Album*.png",
+        r"C:\Exports\Album.png:stream",
+        r"C:\Exports\CON.png",
+        r"C:\Exports\folder.\Album.png",
+    ] {
+        assert_eq!(
+            ExportPathPlan::new(PathBuf::from(path), "export-safe").unwrap_err(),
+            AppPathsError::InvalidExportPath,
+            "{path:?} must be rejected before any filesystem operation"
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn accepts_supported_windows_export_path_forms() {
+    for path in [
+        r"C:\Exports\Album.png",
+        r"\\server\share\Album.png",
+        r"\\?\C:\long\Album.png",
+        r"\\?\UNC\server\share\Album.png",
+    ] {
+        ExportPathPlan::new(PathBuf::from(path), "export-safe")
+            .unwrap_or_else(|error| panic!("{path:?} must be supported: {error}"));
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn freezes_one_binding_per_logical_root_for_an_operation() {
+    let first = Path::new(r"Z:\Álbuns\Casamento\foto-01.jpg");
+    let second = Path::new(r"Z:\Álbuns\Casamento\foto-02.jpg");
+    let network = Path::new(r"\\servidor\acervo\foto-03.jpg");
+    let mut context = OperationPathContext::new();
+
+    context
+        .capture(first)
+        .expect("the mapped-drive source is representable");
+    context
+        .capture(second)
+        .expect("the same logical root reuses its binding");
+    context
+        .capture(network)
+        .expect("the UNC source is representable");
+    let bindings = context.freeze();
+
+    assert_eq!(bindings.bindings().len(), 2);
+    assert_eq!(bindings.bindings()[0].kind(), PathRootKind::Disk);
+    assert_eq!(bindings.bindings()[1].kind(), PathRootKind::Unc);
+    assert_eq!(
+        bindings
+            .resolve(first)
+            .expect("the frozen plan resolves the captured path"),
+        first
+    );
+    assert_eq!(
+        bindings
+            .resolve(Path::new(r"z:\Álbuns\Casamento\foto-04.jpg"))
+            .expect("drive-letter casing does not create another root"),
+        Path::new(r"Z:\Álbuns\Casamento\foto-04.jpg")
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_frozen_binding_plan_refuses_an_uncaptured_root() {
+    let mut context = OperationPathContext::new();
+    context
+        .capture(Path::new(r"C:\Álbuns\foto.jpg"))
+        .expect("the source root is captured");
+    let bindings = context.freeze();
+
+    assert_eq!(
+        bindings
+            .resolve(Path::new(r"D:\Outro\foto.jpg"))
+            .unwrap_err(),
+        AppPathsError::PathRootNotBound
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_mapped_drive_binding_keeps_its_unc_target_for_the_whole_attempt() {
+    let logical = Path::new(r"Z:\Álbuns\Casamento\foto-01.jpg");
+    let mut context = OperationPathContext::new();
+    context
+        .capture_with_binding(logical, Path::new(r"\\servidor\acervo\"))
+        .expect("the platform-resolved mapped-drive binding is captured");
+    let bindings = context.freeze();
+
+    assert_eq!(
+        bindings
+            .resolve(Path::new(r"Z:\Álbuns\Casamento\foto-02.jpg"))
+            .expect("the logical suffix is applied to the frozen UNC root"),
+        Path::new(r"\\servidor\acervo\Álbuns\Casamento\foto-02.jpg")
+    );
+    assert_eq!(bindings.bindings()[0].kind(), PathRootKind::Disk);
 }
 
 #[test]

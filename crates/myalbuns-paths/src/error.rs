@@ -10,6 +10,8 @@ pub enum AppPathsError {
     InvalidStateNamespace,
     InvalidCacheArtifact,
     InvalidExportPath,
+    InvalidOperationPath,
+    PathRootNotBound,
     CacheArtifactOutsideRoot,
     PathNotRepresentable,
     CacheStorageUnavailable,
@@ -34,6 +36,12 @@ impl Display for AppPathsError {
                 formatter.write_str("a identidade do artefato de Cache é inválida")
             }
             Self::InvalidExportPath => formatter.write_str("o caminho da Exportação é inválido"),
+            Self::InvalidOperationPath => {
+                formatter.write_str("o caminho externo da operação é inválido")
+            }
+            Self::PathRootNotBound => {
+                formatter.write_str("a raiz do caminho não pertence ao plano da operação")
+            }
             Self::CacheArtifactOutsideRoot => {
                 formatter.write_str("o artefato não pertence à raiz autorizada do Cache")
             }

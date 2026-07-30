@@ -7,9 +7,10 @@ use crate::{
     AppPathsError,
     app_paths::valid_cache_component,
     guarded_fs::{
-        DirectoryGuard, is_direct_physical_child, is_reparse_point, open_directory,
+        DirectoryGuard, GuardedFsError, is_direct_physical_child, is_reparse_point, open_directory,
         validate_open_file,
     },
+    operation::validate_external_path,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -29,15 +30,7 @@ pub struct PreparedExportStorage {
 
 impl ExportPathPlan {
     pub fn new(output_path: PathBuf, operation_id: &str) -> Result<Self, AppPathsError> {
-        if !output_path.is_absolute()
-            || output_path.components().any(|component| {
-                matches!(
-                    component,
-                    std::path::Component::CurDir | std::path::Component::ParentDir
-                )
-            })
-            || !valid_cache_component(operation_id)
-        {
+        if validate_external_path(&output_path).is_err() || !valid_cache_component(operation_id) {
             return Err(AppPathsError::InvalidExportPath);
         }
         let destination = output_path
@@ -190,9 +183,9 @@ fn open_export_file(
     Ok(Some(file))
 }
 
-fn export_storage_error(error: AppPathsError) -> AppPathsError {
+fn export_storage_error(error: GuardedFsError) -> AppPathsError {
     match error {
-        AppPathsError::CacheStorageOutsideRoot => AppPathsError::ExportStorageOutsideDestination,
-        _ => AppPathsError::ExportStorageUnavailable,
+        GuardedFsError::OutsideRoot => AppPathsError::ExportStorageOutsideDestination,
+        GuardedFsError::Unavailable => AppPathsError::ExportStorageUnavailable,
     }
 }

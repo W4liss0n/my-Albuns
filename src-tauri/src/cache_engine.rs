@@ -1,11 +1,14 @@
-use std::io::Write;
+use std::{
+    io::Write,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use myalbuns_imaging_protocol::{
-    CacheArtifact, CacheCompletion, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingResponse, MediaSource,
+    CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheJob, CacheRequest,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse, MediaSource,
 };
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
+use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan};
 
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
@@ -13,6 +16,8 @@ use crate::imaging_processor::{
 };
 
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
+const CACHE_METADATA_SCHEMA_VERSION: u32 = 2;
+const SOURCE_FINGERPRINT_VERSION: u32 = 1;
 
 #[derive(Clone, Debug)]
 pub(crate) struct CacheWork {
@@ -21,6 +26,7 @@ pub(crate) struct CacheWork {
     pub(crate) cache_paths: CachePathPlan,
     pub(crate) sources: Vec<MediaSource>,
     pub(crate) max_edge_px: u32,
+    pub(crate) root_bindings: RootBindingPlan,
 }
 
 impl CacheWork {
@@ -30,6 +36,7 @@ impl CacheWork {
         cache_paths: CachePathPlan,
         sources: Vec<MediaSource>,
         max_edge_px: u32,
+        root_bindings: RootBindingPlan,
     ) -> Self {
         Self {
             request_id: request_id.into(),
@@ -37,6 +44,7 @@ impl CacheWork {
             cache_paths,
             sources,
             max_edge_px,
+            root_bindings,
         }
     }
 }
@@ -142,6 +150,7 @@ fn plan_request(work: &CacheWork) -> Result<CacheRequest, CacheFailure> {
         work.cache_paths.clone(),
         jobs,
         work.max_edge_px,
+        work.root_bindings.clone(),
     )
     .map_err(|error| {
         CacheFailure::new(
@@ -317,6 +326,28 @@ fn write_cache_metadata(
         .zip(&request.jobs)
         .map(
             |(artifact, job)| -> Result<serde_json::Value, CacheFailure> {
+                let operational_source = request
+                    .root_bindings
+                    .resolve(job.source.source_path())
+                    .map_err(|error| {
+                        CacheFailure::new(
+                            CacheFailureStage::PublishIndex,
+                            format!("O plano de caminhos do original é inválido: {error}"),
+                        )
+                    })?;
+                let source_metadata = std::fs::metadata(&operational_source).map_err(|error| {
+                    CacheFailure::new(
+                        CacheFailureStage::PublishIndex,
+                        format!("Não foi possível inspecionar o original: {error}"),
+                    )
+                })?;
+                if !source_metadata.is_file() || source_metadata.len() != job.source.source_bytes()
+                {
+                    return Err(CacheFailure::new(
+                        CacheFailureStage::PublishIndex,
+                        "O original mudou antes da publicação do índice.",
+                    ));
+                }
                 let artifact_path = request
                     .cache_paths
                     .preview_file(&artifact.media_id, &artifact.generation_id)
@@ -342,18 +373,34 @@ fn write_cache_metadata(
                     "widthPx": artifact.width_px,
                     "heightPx": artifact.height_px,
                     "previewBytes": artifact.preview_bytes,
+                    "format": match artifact.format {
+                        CacheArtifactFormat::Jpeg => "jpeg",
+                    },
+                    "exifOrientation": artifact.exif_orientation,
                     "sourceBytes": job.source.source_bytes(),
-                    "sourceSha256": job.source.source_sha256(),
+                    "sourceCreatedUnixMs": source_metadata.created().ok().and_then(unix_millis),
+                    "sourceModifiedUnixMs": source_metadata.modified().ok().and_then(unix_millis),
+                    "fingerprint": {
+                        "version": SOURCE_FINGERPRINT_VERSION,
+                        "algorithm": "sha256",
+                        "value": job.source.source_sha256(),
+                    },
                 }))
             },
         )
         .collect::<Result<Vec<_>, _>>()?;
+    let last_used_unix_ms = unix_millis(SystemTime::now()).ok_or_else(|| {
+        CacheFailure::new(
+            CacheFailureStage::PublishIndex,
+            "O relógio do sistema não representa o último uso do Cache.",
+        )
+    })?;
     let metadata = serde_json::json!({
-        "schemaVersion": 1,
+        "schemaVersion": CACHE_METADATA_SCHEMA_VERSION,
         "representationVersion": CACHE_REPRESENTATION_VERSION,
         "projectId": request.project_id,
+        "lastUsedUnixMs": last_used_unix_ms,
         "maxEdgePx": request.max_edge_px,
-        "format": "jpeg",
         "entries": entries,
     });
     let metadata_path = request.cache_paths.metadata_file();
@@ -403,15 +450,21 @@ fn write_cache_metadata(
     publish
 }
 
+fn unix_millis(time: SystemTime) -> Option<u64> {
+    time.duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+}
+
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, io::Write, path::PathBuf};
+    use std::{collections::VecDeque, io::Write};
 
     use myalbuns_imaging_protocol::{
-        CacheArtifact, CacheCompletion, ImagingCommand, ImagingFailureStage, ImagingResponse,
-        MediaSource,
+        CacheArtifact, CacheArtifactFormat, CacheCompletion, ImagingCommand, ImagingFailureStage,
+        ImagingResponse, MediaSource,
     };
-    use myalbuns_paths::AppPaths;
+    use myalbuns_paths::{AppPaths, OperationPathContext};
 
     use super::{CacheFailureStage, CacheWork, execute, plan_request};
     use crate::imaging_processor::{
@@ -448,19 +501,26 @@ mod tests {
         let cache_paths = app_paths
             .project_cache("project-test")
             .expect("valid cache plan");
-        let source = MediaSource::new(
-            "media-test",
-            PathBuf::from(r"C:\fixtures\photo.jpg"),
-            1024,
-            "a".repeat(64),
-        )
-        .expect("valid source");
+        let source_directory = root.path().join("sources");
+        std::fs::create_dir(&source_directory).expect("source directory");
+        let source_path = source_directory.join("photo.jpg");
+        std::fs::write(&source_path, vec![0x5a; 1024]).expect("source fixture");
+        let source = MediaSource::new("media-test", source_path, 1024, "a".repeat(64))
+            .expect("valid source");
+        let mut path_context = OperationPathContext::new();
+        path_context
+            .capture(cache_paths.root())
+            .expect("the Cache root is captured");
+        path_context
+            .capture(source.source_path())
+            .expect("the source root is captured");
         let work = CacheWork::new(
             "cache-test",
             "project-test",
             cache_paths,
             vec![source],
             1600,
+            path_context.freeze(),
         );
         let context = InvocationContext::new("cache-test", Some("project-test"));
         (root, app_paths, work, context)
@@ -501,6 +561,8 @@ mod tests {
                     width_px: 10,
                     height_px: 5,
                     preview_bytes: 7,
+                    format: CacheArtifactFormat::Jpeg,
+                    exif_orientation: Some(1),
                 }],
                 generated_count: 1,
                 reused_count: 0,
@@ -537,6 +599,48 @@ mod tests {
             );
             assert_eq!(transport.attempts, [1, 2]);
             assert!(work.cache_paths.metadata_file().is_file());
+        });
+    }
+
+    #[test]
+    fn the_disposable_index_records_all_versioned_validation_evidence() {
+        tauri::async_runtime::block_on(async {
+            let (_root, app_paths, work, context) = work();
+            let response = completed(&work, &app_paths);
+            let mut transport = ScriptedTransport {
+                results: VecDeque::from([Ok(response)]),
+                attempts: Vec::new(),
+            };
+
+            execute(&mut transport, &app_paths, work.clone(), &context)
+                .await
+                .expect("the Cache index is published");
+
+            let metadata: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(work.cache_paths.metadata_file())
+                    .expect("the published index is readable"),
+            )
+            .expect("the published index is JSON");
+            assert_eq!(metadata["schemaVersion"], 2);
+            assert_eq!(metadata["representationVersion"], 1);
+            assert!(metadata["lastUsedUnixMs"].as_u64().is_some());
+            let entry = &metadata["entries"][0];
+            assert_eq!(entry["format"], "jpeg");
+            assert_eq!(entry["exifOrientation"], 1);
+            assert_eq!(entry["sourceBytes"], 1024);
+            assert!(entry["sourceCreatedUnixMs"].as_u64().is_some());
+            assert!(entry["sourceModifiedUnixMs"].as_u64().is_some());
+            assert_eq!(entry["fingerprint"]["version"], 1);
+            assert_eq!(entry["fingerprint"]["algorithm"], "sha256");
+            assert_eq!(entry["fingerprint"]["value"], "a".repeat(64));
+            assert!(
+                entry.get("sourcePath").is_none(),
+                "the disposable index must not persist the original path"
+            );
+            assert!(
+                entry.get("sourceSha256").is_none(),
+                "the fingerprint must not have an unversioned duplicate"
+            );
         });
     }
 
