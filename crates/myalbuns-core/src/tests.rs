@@ -3,9 +3,9 @@ use serde::Deserialize;
 use crate::composition::CompositionCore;
 use crate::sample_project_fixture::SampleProject;
 use crate::{
-    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, PhotoPlacement,
-    PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, ProjectSession, RectUm,
-    SheetRole, SheetSnapshot, VectorUm,
+    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, NormalizedPan,
+    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, ProjectSession,
+    RectUm, SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -302,7 +302,7 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PhotoSnapshot) -> Com
 }
 
 fn assert_plan_close(actual: &PhotoPlacementPlan, expected: &PhotoPlacementPlan, case_name: &str) {
-    assert_vector_close(&actual.current_pan, &expected.current_pan, case_name);
+    assert_pan_close(&actual.current_pan, &expected.current_pan, case_name);
     assert_close(actual.current_zoom, expected.current_zoom, case_name);
     assert_close(
         actual.pan_range.minimum,
@@ -358,6 +358,11 @@ fn assert_placement_close(actual: &PhotoPlacement, expected: &PhotoPlacement, ca
 }
 
 fn assert_vector_close(actual: &VectorUm, expected: &VectorUm, case_name: &str) {
+    assert_close(actual.x, expected.x, case_name);
+    assert_close(actual.y, expected.y, case_name);
+}
+
+fn assert_pan_close(actual: &NormalizedPan, expected: &NormalizedPan, case_name: &str) {
     assert_close(actual.x, expected.x, case_name);
     assert_close(actual.y, expected.y, case_name);
 }

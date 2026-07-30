@@ -7,31 +7,36 @@ use myalbuns_core::{EditorProjection, ProjectIntent, ProjectSession, RenderSnaps
 use myalbuns_imaging_protocol::MediaSource;
 
 pub(crate) struct ProjectHost {
-    sessions: HashMap<String, Mutex<ProjectSession>>,
-    media_sources: HashMap<String, Vec<MediaSource>>,
+    projects: HashMap<String, HostedProject>,
+}
+
+struct HostedProject {
+    session: Mutex<ProjectSession>,
+    media_sources: Vec<MediaSource>,
 }
 
 impl ProjectHost {
     pub(crate) fn new(
         projects: impl IntoIterator<Item = (&'static str, ProjectSession, Vec<MediaSource>)>,
     ) -> Self {
-        let mut sessions = HashMap::new();
-        let mut media_sources = HashMap::new();
+        let mut hosted_projects = HashMap::new();
         for (window_label, session, sources) in projects {
-            sessions.insert(window_label.into(), Mutex::new(session));
-            if !sources.is_empty() {
-                media_sources.insert(window_label.into(), sources);
-            }
+            hosted_projects.insert(
+                window_label.into(),
+                HostedProject {
+                    session: Mutex::new(session),
+                    media_sources: sources,
+                },
+            );
         }
         Self {
-            sessions,
-            media_sources,
+            projects: hosted_projects,
         }
     }
 
     pub(crate) fn projection(&self, window_label: &str) -> Result<EditorProjection, String> {
         let session = self.session(window_label)?;
-        Ok(project(&session))
+        Ok(project_projection(&session))
     }
 
     pub(crate) fn apply(
@@ -41,19 +46,19 @@ impl ProjectHost {
     ) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.apply(intent).map_err(|error| error.to_string())?;
-        Ok(project(&session))
+        Ok(project_projection(&session))
     }
 
     pub(crate) fn undo(&self, window_label: &str) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.undo();
-        Ok(project(&session))
+        Ok(project_projection(&session))
     }
 
     pub(crate) fn redo(&self, window_label: &str) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.redo();
-        Ok(project(&session))
+        Ok(project_projection(&session))
     }
 
     pub(crate) fn render_snapshot(&self, window_label: &str) -> Result<RenderSnapshot, String> {
@@ -64,8 +69,8 @@ impl ProjectHost {
         &self,
         window_label: &str,
     ) -> Result<Option<Vec<MediaSource>>, String> {
-        drop(self.session(window_label)?);
-        Ok(self.media_sources.get(window_label).cloned())
+        let project = self.hosted_project(window_label)?;
+        Ok((!project.media_sources.is_empty()).then(|| project.media_sources.clone()))
     }
 
     pub(crate) fn export_sources(
@@ -74,9 +79,10 @@ impl ProjectHost {
         snapshot: &RenderSnapshot,
         sheet_id: &str,
     ) -> Result<Option<Vec<MediaSource>>, String> {
-        let Some(available_sources) = self.media_sources.get(window_label) else {
+        let available_sources = &self.hosted_project(window_label)?.media_sources;
+        if available_sources.is_empty() {
             return Ok(None);
-        };
+        }
         let sheet = snapshot
             .composition
             .sheets
@@ -108,17 +114,21 @@ impl ProjectHost {
             .map(Some)
     }
 
-    fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
-        let session = self.sessions.get(window_label).ok_or_else(|| {
+    fn hosted_project(&self, window_label: &str) -> Result<&HostedProject, String> {
+        self.projects.get(window_label).ok_or_else(|| {
             format!("Não existe uma Sessão do Projeto para a janela {window_label}.")
-        })?;
-        session
+        })
+    }
+
+    fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
+        self.hosted_project(window_label)?
+            .session
             .lock()
             .map_err(|_| "A Sessão do Projeto ficou indisponível.".to_string())
     }
 }
 
-fn project(session: &ProjectSession) -> EditorProjection {
+fn project_projection(session: &ProjectSession) -> EditorProjection {
     EditorProjection {
         state: session.state(),
         composition: session.composition_plan(),

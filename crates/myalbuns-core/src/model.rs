@@ -26,6 +26,13 @@ pub struct VectorUm {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct NormalizedPan {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct SizeUm {
     pub width: f64,
     pub height: f64,
@@ -57,7 +64,7 @@ pub struct PhotoPlacement {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoPlacementPlan {
-    pub current_pan: VectorUm,
+    pub current_pan: NormalizedPan,
     pub current_zoom: f64,
     pub pan_range: NumberRange,
     pub zoom_range: NumberRange,
@@ -217,14 +224,6 @@ pub struct CompositionPlan {
 pub struct EditorProjection {
     pub state: EditorState,
     pub composition: CompositionPlan,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-pub struct ExportResult {
-    pub output_path: String,
-    pub width_px: u32,
-    pub height_px: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

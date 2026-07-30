@@ -464,7 +464,7 @@ function renderCanvas({
   onTransformPreview = vi.fn<
     (preview: PhotoTransformPreview | null) => void
   >(),
-  onViewportChange = vi.fn<(viewport: { offsetX: number; zoom: number }) => void>(),
+  onViewportChange = vi.fn<(viewport: { offsetX: number }) => void>(),
   onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,
   ),
@@ -479,7 +479,7 @@ function renderCanvas({
   onTransformPreview?: (
     preview: PhotoTransformPreview | null,
   ) => void;
-  onViewportChange?: (viewport: { offsetX: number; zoom: number }) => void;
+  onViewportChange?: (viewport: { offsetX: number }) => void;
   onTransformCommit?: (
     delta: PhotoTransformDelta,
   ) => Promise<boolean>;
@@ -496,7 +496,7 @@ function renderCanvas({
       selectedFrameId={null}
       focusedSheetId="sheet-001"
       centeredSheetId="sheet-001"
-      viewport={{ offsetX: 42, zoom: 0.78 }}
+      viewport={{ offsetX: 42 }}
       onSelectFrame={() => undefined}
       onFocusSheet={onFocusSheet}
       onCenteredSheetChange={onCenteredSheetChange}
@@ -615,7 +615,7 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
           selectedFrameId={null}
           focusedSheetId="sheet-001"
           centeredSheetId="sheet-001"
-          viewport={{ offsetX: 42, zoom: 0.78 }}
+          viewport={{ offsetX: 42 }}
           onSelectFrame={() => undefined}
           onFocusSheet={() => undefined}
           onCenteredSheetChange={() => undefined}
@@ -716,7 +716,7 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
       selectedFrameId={selectedFrameId}
       focusedSheetId="sheet-001"
       centeredSheetId="sheet-001"
-      viewport={{ offsetX, zoom: 1 }}
+      viewport={{ offsetX }}
       {...callbacks}
     />
   );
@@ -844,7 +844,7 @@ test("reconciles only the composed sheet that changed", async () => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
-    viewport: { offsetX: 42, zoom: 1 },
+    viewport: { offsetX: 42 },
     onSelectFrame: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),
@@ -1454,7 +1454,7 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
-    viewport: { offsetX: 42, zoom: 1 },
+    viewport: { offsetX: 42 },
     onSelectFrame: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),

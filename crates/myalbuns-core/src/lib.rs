@@ -6,8 +6,8 @@ mod validation;
 
 pub use model::{
     AlbumSnapshot, ComposedFrame, ComposedPhoto, ComposedSheet, CompositionPlan, CoreError,
-    EditorProjection, EditorState, ExportResult, FrameSnapshot, Matrix2, MediaCatalogItem,
-    MediaTransform, NumberRange, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent,
+    EditorProjection, EditorState, FrameSnapshot, Matrix2, MediaCatalogItem, MediaTransform,
+    NormalizedPan, NumberRange, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent,
     RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use project::{LoadedProjectRevision, ProjectCore};

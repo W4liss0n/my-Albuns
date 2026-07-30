@@ -7,17 +7,25 @@ import {
   type Logger,
   silentLogger,
 } from "./application/logging";
-import type { ProjectBridge } from "./domain/project";
+import type {
+  ExportPort,
+  MediaPreviewPort,
+  ProjectSessionPort,
+} from "./application/projectPorts";
 import { createEmptyProjection } from "./test/projectFixtures";
 
 const projection = createEmptyProjection();
 
-const bridge: ProjectBridge = {
+const projectSessionPort: ProjectSessionPort = {
   load: async () => projection,
   apply: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
+};
+const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
+};
+const exportPort: ExportPort = {
   exportPreview: async () => ({
     outputPath: "C:\\Temp\\Album-Horizonte_001.png",
     widthPx: 600,
@@ -30,7 +38,9 @@ test("keeps diagnostics available when hardware WebGL2 is unavailable", async ()
   const prepareMediaPreviews = vi.fn(async () => null);
   render(
     <App
-      bridge={{ ...bridge, load, prepareMediaPreviews }}
+      exportPort={exportPort}
+      mediaPreviewPort={{ prepareMediaPreviews }}
+      projectSessionPort={{ ...projectSessionPort, load }}
       logger={silentLogger}
       graphicsProbe={() => ({
         supported: false,
@@ -61,7 +71,9 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   const load = vi.fn(async (_operationId: string) => projection);
   render(
     <App
-      bridge={{ ...bridge, load }}
+      exportPort={exportPort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectSessionPort={{ ...projectSessionPort, load }}
       logger={logger}
       graphicsProbe={() => ({
         supported: true,
@@ -108,14 +120,14 @@ test("prepares real media previews after opening without blocking the Workspace"
       {
         mediaId: "media-001",
         url: "asset://localhost/cache/media-001.jpg",
-        widthPx: 1200,
-        heightPx: 800,
       },
     ]);
 
   render(
     <App
-      bridge={{ ...bridge, prepareMediaPreviews }}
+      exportPort={exportPort}
+      mediaPreviewPort={{ prepareMediaPreviews }}
+      projectSessionPort={projectSessionPort}
       logger={logger}
       graphicsProbe={() => ({
         supported: true,

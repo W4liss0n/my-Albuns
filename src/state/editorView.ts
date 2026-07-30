@@ -28,7 +28,6 @@ export const useEditorView = create<EditorViewState>((set) => ({
   centeredSheetId: null,
   viewport: {
     offsetX: 0,
-    zoom: 1,
   },
   selectFrame: (selectedFrameId) => set({ selectedFrameId }),
   focusSheet: (focusedSheetId) => set({ focusedSheetId }),
@@ -43,7 +42,7 @@ export const useEditorView = create<EditorViewState>((set) => ({
           selectedFrameId: null,
           focusedSheetId: firstSheetId,
           centeredSheetId: firstSheetId,
-          viewport: { offsetX: 0, zoom: 1 },
+          viewport: { offsetX: 0 },
         };
       }
 

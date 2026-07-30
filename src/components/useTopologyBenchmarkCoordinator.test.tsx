@@ -6,7 +6,7 @@ import type {
   TopologyBenchmarkBridge,
   TopologyBenchmarkConfig,
 } from "../application/topologyBenchmark";
-import type { ProjectBridge } from "../domain/project";
+import type { ExportPort } from "../application/projectPorts";
 import { useTopologyBenchmarkCoordinator } from "./useTopologyBenchmarkCoordinator";
 
 const measurement: CanvasPerformanceMeasurement = {
@@ -48,15 +48,10 @@ const baseConfig: TopologyBenchmarkConfig = {
   runExport: true,
 };
 
-function projectBridge(
-  exportPreview: ProjectBridge["exportPreview"],
-): ProjectBridge {
+function exportPort(
+  exportPreview: ExportPort["exportPreview"],
+): ExportPort {
   return {
-    load: vi.fn(),
-    apply: vi.fn(),
-    undo: vi.fn(),
-    redo: vi.fn(),
-    prepareMediaPreviews: vi.fn(),
     exportPreview,
   };
 }
@@ -88,7 +83,7 @@ test("waits until every Canvas probe reached the export barrier", async () => {
   const { result } = renderHook(() =>
     useTopologyBenchmarkCoordinator({
       projectId: "project-spike-001",
-      projectBridge: projectBridge(exportPreview),
+      exportPort: exportPort(exportPreview),
       topologyBridge,
       mediaPreviewsReady: true,
     }),
@@ -136,7 +131,7 @@ test("does not expose the probe before media previews are ready", async () => {
   const { result } = renderHook(() =>
     useTopologyBenchmarkCoordinator({
       projectId: "project-spike-001",
-      projectBridge: projectBridge(vi.fn()),
+      exportPort: exportPort(vi.fn()),
       topologyBridge,
       mediaPreviewsReady: false,
     }),

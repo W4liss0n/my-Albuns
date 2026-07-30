@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Application } from "pixi.js";
 
-import "../platform/pixiCspRuntime";
 import {
   createLogInstanceId,
   logReasonFromError,
@@ -10,6 +9,7 @@ import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
 import { runCanvasPerformanceProbe } from "./canvasPerformanceProbe";
 import { useLogger } from "./loggingContext";
+import "./pixiRuntime";
 
 export type {
   AlbumCanvasProps,

@@ -1,6 +1,6 @@
 use crate::model::{
     AlbumSnapshot, ComposedFrame, ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2,
-    NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
+    NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
     PROJECT_SCHEMA_VERSION, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, RectUm,
     RenderSnapshot, SizeUm, VectorUm,
 };
@@ -78,7 +78,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
     let fill_scale = (required_width / source_width).max(required_height / source_height);
     let draw_width_at_fill = source_width * fill_scale;
     let draw_height_at_fill = source_height * fill_scale;
-    let current_pan = VectorUm {
+    let current_pan = NormalizedPan {
         x: photo.transform.pan_x.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
         y: photo.transform.pan_y.clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX) as f64,
     };
@@ -166,7 +166,7 @@ fn matrix_from_columns(horizontal: &VectorUm, vertical: &VectorUm) -> Matrix2 {
     }
 }
 
-fn apply_matrix(matrix: &Matrix2, vector: &VectorUm) -> VectorUm {
+fn apply_matrix(matrix: &Matrix2, vector: &NormalizedPan) -> VectorUm {
     VectorUm {
         x: matrix.xx * vector.x + matrix.xy * vector.y,
         y: matrix.yx * vector.x + matrix.yy * vector.y,

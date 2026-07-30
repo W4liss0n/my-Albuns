@@ -135,6 +135,25 @@ pub(crate) fn initialize<R: Runtime>(app: &mut App<R>, app_paths: &AppPaths) {
     );
 }
 
+pub(crate) fn log_imaging_failure(
+    event: &str,
+    operation_id: &str,
+    project_id: Option<&str>,
+    stage: &str,
+    exit_code: Option<i32>,
+) {
+    tracing::error!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        protocol_version = IMAGING_PROTOCOL_VERSION,
+        operation_id,
+        project_id,
+        stage,
+        exit_code,
+        event,
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::FrontendLogEvent;

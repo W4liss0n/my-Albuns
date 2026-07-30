@@ -8,7 +8,7 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: null,
     centeredSheetId: null,
-    viewport: { offsetX: 0, zoom: 1 },
+    viewport: { offsetX: 0 },
   });
 });
 
@@ -24,7 +24,7 @@ test("initializes transient navigation from the opened Project", () => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
-    viewport: { offsetX: 0, zoom: 1 },
+    viewport: { offsetX: 0 },
   });
 });
 
@@ -38,7 +38,7 @@ test("preserves valid view state in the same Session and prunes stale targets", 
     selectedFrameId: "frame-001",
     focusedSheetId: "sheet-002",
     centeredSheetId: "sheet-002",
-    viewport: { offsetX: -320, zoom: 1 },
+    viewport: { offsetX: -320 },
   });
 
   useEditorView.getState().synchronizeProject(
@@ -52,7 +52,7 @@ test("preserves valid view state in the same Session and prunes stale targets", 
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
-    viewport: { offsetX: -320, zoom: 1 },
+    viewport: { offsetX: -320 },
   });
 });
 
@@ -62,7 +62,7 @@ test("resets transient state when another Project is opened", () => {
     selectedFrameId: "frame-001",
     focusedSheetId: "sheet-002",
     centeredSheetId: "sheet-002",
-    viewport: { offsetX: -320, zoom: 1 },
+    viewport: { offsetX: -320 },
   });
 
   useEditorView.getState().synchronizeProject(
@@ -76,6 +76,6 @@ test("resets transient state when another Project is opened", () => {
     selectedFrameId: null,
     focusedSheetId: "sheet-101",
     centeredSheetId: "sheet-101",
-    viewport: { offsetX: 0, zoom: 1 },
+    viewport: { offsetX: 0 },
   });
 });

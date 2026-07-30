@@ -2,7 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectIntent } from "../domain/project";
-import { tauriProjectBridge } from "./tauriProjectBridge";
+import {
+  tauriExportPort,
+  tauriMediaPreviewPort,
+  tauriProjectSessionPort,
+} from "./tauriProjectPorts";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve(undefined)),
@@ -12,34 +16,25 @@ beforeEach(() => {
   vi.mocked(invoke).mockClear();
 });
 
-test("maps the ProjectBridge interface to the desktop commands", async () => {
+test("maps the Project ports to the desktop commands", async () => {
   const intent: ProjectIntent = {
     kind: "fillLeftmostPlaceholder",
     sheetId: "sheet-002",
     mediaId: "media-campo",
   };
 
-  await tauriProjectBridge.load("project-load-1");
-  await tauriProjectBridge.apply(intent);
-  await tauriProjectBridge.undo();
-  await tauriProjectBridge.redo();
-  vi.mocked(invoke).mockResolvedValueOnce({
-    previews: [
-      {
-        mediaId: "benchmark-a-001",
-        url: "http://asset.localhost/cache-preview",
-        widthPx: 1200,
-        heightPx: 800,
-      },
-    ],
-    generatedCount: 1,
-    reusedCount: 0,
-    sourceBytes: 24_000_000,
-    previewBytes: 240_000,
-    elapsedMs: 1200,
-  });
-  const previews = await tauriProjectBridge.prepareMediaPreviews();
-  await tauriProjectBridge.exportPreview();
+  await tauriProjectSessionPort.load("project-load-1");
+  await tauriProjectSessionPort.apply(intent);
+  await tauriProjectSessionPort.undo();
+  await tauriProjectSessionPort.redo();
+  vi.mocked(invoke).mockResolvedValueOnce([
+    {
+      mediaId: "benchmark-a-001",
+      url: "http://asset.localhost/cache-preview",
+    },
+  ]);
+  const previews = await tauriMediaPreviewPort.prepareMediaPreviews();
+  await tauriExportPort.exportPreview();
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
     operationId: "project-load-1",

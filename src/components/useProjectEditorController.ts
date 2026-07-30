@@ -7,9 +7,12 @@ import {
 } from "react";
 
 import type {
-  EditorProjection,
+  ExportPort,
   ExportResult,
-  ProjectBridge,
+  ProjectSessionPort,
+} from "../application/projectPorts";
+import type {
+  EditorProjection,
   ProjectIntent,
 } from "../domain/project";
 import { useEditorView } from "../state/editorView";
@@ -22,7 +25,8 @@ import { createContinuousCanvasLayout } from "./canvasGeometry";
 
 interface ProjectEditorControllerInput {
   projection: EditorProjection;
-  bridge: ProjectBridge;
+  exportPort: ExportPort;
+  projectSessionPort: ProjectSessionPort;
   onProjectionChange(projection: EditorProjection): void;
 }
 
@@ -50,7 +54,8 @@ function messageFromError(error: unknown) {
 
 export function useProjectEditorController({
   projection,
-  bridge,
+  exportPort,
+  projectSessionPort,
   onProjectionChange,
 }: ProjectEditorControllerInput) {
   const selectedFrameId = useEditorView(
@@ -86,16 +91,20 @@ export function useProjectEditorController({
     tail: Promise.resolve(),
   });
   const commandContextRef = useRef({
-    bridge,
+    exportPort,
+    projectSessionPort,
     projectId: projection.state.projectId,
     generation: 0,
   });
   if (
-    commandContextRef.current.bridge !== bridge ||
+    commandContextRef.current.exportPort !== exportPort ||
+    commandContextRef.current.projectSessionPort !==
+      projectSessionPort ||
     commandContextRef.current.projectId !== projection.state.projectId
   ) {
     commandContextRef.current = {
-      bridge,
+      exportPort,
+      projectSessionPort,
       projectId: projection.state.projectId,
       generation: commandContextRef.current.generation + 1,
     };
@@ -150,7 +159,7 @@ export function useProjectEditorController({
     setExportResult(null);
     setZoomDraft(null);
     setCanvasPhotoPreview(null);
-  }, [bridge, projection.state.projectId]);
+  }, [exportPort, projectSessionPort, projection.state.projectId]);
 
   function centerCanvasOnSheet(
     sheetId: string,
@@ -242,7 +251,7 @@ export function useProjectEditorController({
 
   function applyWithStatus(intent: ProjectIntent) {
     return runWithGlobalFeedback("Aplicando alteração", () =>
-      bridge.apply(intent),
+      projectSessionPort.apply(intent),
     );
   }
 
@@ -251,7 +260,7 @@ export function useProjectEditorController({
     setMessage(null);
     try {
       const nextProjection = await enqueueProjectMutation(() =>
-        bridge.apply(intent),
+        projectSessionPort.apply(intent),
       );
       if (generation === commandContextRef.current.generation) {
         onProjectionChange(nextProjection);
@@ -272,7 +281,7 @@ export function useProjectEditorController({
     setBusy("Exportando");
     setMessage(null);
     try {
-      const result = await bridge.exportPreview();
+      const result = await exportPort.exportPreview();
       if (generation === commandContextRef.current.generation) {
         setExportResult(result);
       }
@@ -375,14 +384,18 @@ export function useProjectEditorController({
         projection.state.canUndo
       ) {
         event.preventDefault();
-        void runWithGlobalFeedback("Desfazendo", () => bridge.undo());
+        void runWithGlobalFeedback("Desfazendo", () =>
+          projectSessionPort.undo(),
+        );
       }
       if (
         event.key.toLocaleLowerCase() === "y" &&
         projection.state.canRedo
       ) {
         event.preventDefault();
-        void runWithGlobalFeedback("Refazendo", () => bridge.redo());
+        void runWithGlobalFeedback("Refazendo", () =>
+          projectSessionPort.redo(),
+        );
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -493,9 +506,13 @@ export function useProjectEditorController({
     updateZoomGesture,
     finishZoomGesture,
     undo: () =>
-      void runWithGlobalFeedback("Desfazendo", () => bridge.undo()),
+      void runWithGlobalFeedback("Desfazendo", () =>
+        projectSessionPort.undo(),
+      ),
     redo: () =>
-      void runWithGlobalFeedback("Refazendo", () => bridge.redo()),
+      void runWithGlobalFeedback("Refazendo", () =>
+        projectSessionPort.redo(),
+      ),
     exportPreview: () => void exportPreview(),
     fillMedia: (mediaId: string) => {
       if (implicitSheetId) {

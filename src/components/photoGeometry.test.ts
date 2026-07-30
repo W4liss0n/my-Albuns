@@ -1,12 +1,20 @@
 import { expect, test } from "vitest";
 
 import placementFixture from "../../tests/fixtures/photo-placement-cases.json";
-import type { PhotoPlacement, PhotoPlacementPlan, Vector2 } from "../domain/project";
-import { createPhotoGeometry } from "./photoGeometry";
+import type {
+  NormalizedPan,
+  PhotoPlacement,
+  PhotoPlacementPlan,
+  VectorUm,
+} from "../domain/project";
+import {
+  createPhotoGeometry,
+  type CanvasPhotoPlacement,
+} from "./photoGeometry";
 
 interface PanPreview {
-  center: Vector2;
-  expectedPan: Vector2;
+  center: VectorUm;
+  expectedPan: NormalizedPan;
   expectedPlacement: PhotoPlacement;
 }
 
@@ -107,7 +115,7 @@ test("constrains Pan against transient Zoom without moving the preview", () => {
 });
 
 function expectPlacementClose(
-  actual: PhotoPlacement,
+  actual: CanvasPhotoPlacement,
   expected: PhotoPlacement,
   caseName: string,
 ) {

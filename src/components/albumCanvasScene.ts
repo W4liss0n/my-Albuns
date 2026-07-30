@@ -13,8 +13,7 @@ import {
 
 import type {
   ComposedSheet,
-  PhotoPlacement,
-  Vector2,
+  NormalizedPan,
 } from "../domain/project";
 import type {
   AlbumCanvasProps,
@@ -35,6 +34,8 @@ import {
 } from "./canvasGeometry";
 import {
   createPhotoGeometry,
+  type CanvasPhotoPlacement,
+  type CanvasPoint,
   type PhotoGeometry,
 } from "./photoGeometry";
 import {
@@ -63,7 +64,7 @@ interface PhotoRenderNode {
   baseScaleX: number;
   originalX: number;
   originalY: number;
-  pan: Vector2;
+  pan: NormalizedPan;
   textureBacked: boolean;
 }
 
@@ -79,7 +80,7 @@ interface PhotoPreviewLayerOptions {
   label: string;
   drawWidth: number;
   drawHeight: number;
-  center: Vector2;
+  center: CanvasPoint;
   rotationDegrees: number;
   mirrorX: boolean;
   palette: readonly string[];
@@ -97,7 +98,7 @@ interface DragGesture {
   originalY: number;
   currentX: number;
   currentY: number;
-  currentPan: Vector2;
+  currentPan: NormalizedPan;
   currentZoom: number;
 }
 
@@ -252,9 +253,9 @@ export class AlbumCanvasScene {
       }
     };
     const preview = (
-      pan: Vector2,
+      pan: NormalizedPan,
       zoom: number,
-      placement: PhotoPlacement,
+      placement: CanvasPhotoPlacement,
     ) => {
       assertCurrent();
       applyPhotoPlacementPreview(node, zoom, placement);
@@ -1184,7 +1185,7 @@ function createPlaceholderCross(
 
 function createTransformPreview(
   frameId: string,
-  pan: Vector2,
+  pan: NormalizedPan,
   zoom: number,
 ): PhotoTransformPreview {
   return {
@@ -1250,7 +1251,7 @@ function applyPhotoZoomPreview(node: PhotoRenderNode, targetZoom: number) {
 function applyPhotoPlacementPreview(
   node: PhotoRenderNode,
   targetZoom: number,
-  placement: PhotoPlacement,
+  placement: CanvasPhotoPlacement,
 ) {
   const factor = targetZoom / node.baseZoom;
   setPhotoLayersScale(node, node.baseScaleX * factor, factor);

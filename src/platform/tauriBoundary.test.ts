@@ -28,15 +28,13 @@ test("keeps Tauri dependencies inside platform adapters", () => {
 });
 
 test("selects concrete platform adapters only at the composition root", () => {
-  const adapterPaths = [
-    ["platform", "tauriProjectBridge"].join("/"),
-    ["platform", "graphics"].join("/"),
-    ["platform", "tauriLogger"].join("/"),
-  ];
+  const platformImport =
+    /(?:from\s+|import\s*)["'][^"']*\/platform\//;
   const offenders = findOffenders(
     (path, source) =>
-      adapterPaths.some((adapterPath) => source.includes(adapterPath)) &&
-      path !== "../main.tsx",
+      path !== "../main.tsx" &&
+      !path.startsWith("../platform/") &&
+      platformImport.test(source),
   );
 
   expect(offenders).toEqual([]);

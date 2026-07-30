@@ -9,10 +9,12 @@ import {
   logReasonFromError,
   type Logger,
 } from "./application/logging";
-import {
-  type EditorProjection,
-  type ProjectBridge,
-} from "./domain/project";
+import type {
+  ExportPort,
+  MediaPreviewPort,
+  ProjectSessionPort,
+} from "./application/projectPorts";
+import type { EditorProjection } from "./domain/project";
 import {
   disabledTopologyBenchmarkBridge,
   type TopologyBenchmarkBridge,
@@ -23,14 +25,18 @@ import { useTopologyBenchmarkCoordinator } from "./components/useTopologyBenchma
 import "./App.css";
 
 interface AppProps {
-  bridge: ProjectBridge;
+  exportPort: ExportPort;
+  mediaPreviewPort: MediaPreviewPort;
+  projectSessionPort: ProjectSessionPort;
   topologyBenchmarkBridge?: TopologyBenchmarkBridge;
   graphicsProbe: GraphicsProbe;
   logger: Logger;
 }
 
 function App({
-  bridge,
+  exportPort,
+  mediaPreviewPort,
+  projectSessionPort,
   topologyBenchmarkBridge = disabledTopologyBenchmarkBridge,
   graphicsProbe,
   logger,
@@ -53,7 +59,7 @@ function App({
       event: "project_load_started",
       operationId,
     });
-    bridge
+    projectSessionPort
       .load(operationId)
       .then((value) => {
         if (active) {
@@ -87,7 +93,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [bridge, logger]);
+  }, [logger, projectSessionPort]);
 
   useEffect(() => {
     logger.write({
@@ -106,7 +112,7 @@ function App({
   const canvasPerformanceProbe =
     useTopologyBenchmarkCoordinator({
       projectId: projectId ?? "",
-      projectBridge: bridge,
+      exportPort,
       topologyBridge: topologyBenchmarkBridge,
       mediaPreviewsReady,
     });
@@ -124,7 +130,7 @@ function App({
       operationId,
       projectId,
     });
-    bridge
+    mediaPreviewPort
       .prepareMediaPreviews()
       .then((previews) => {
         if (!active) return;
@@ -161,7 +167,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [bridge, graphics.supported, logger, projectId]);
+  }, [graphics.supported, logger, mediaPreviewPort, projectId]);
 
   if (!graphics.supported) {
     return <GraphicsUnavailable diagnostic={graphics} />;
@@ -194,7 +200,8 @@ function App({
     <LoggingProvider logger={logger}>
       <ProjectWorkspace
         projection={projection}
-        bridge={bridge}
+        exportPort={exportPort}
+        projectSessionPort={projectSessionPort}
         canvasPerformanceProbe={canvasPerformanceProbe}
         mediaPreviewUrls={mediaPreviewUrls}
         onProjectionChange={setProjection}

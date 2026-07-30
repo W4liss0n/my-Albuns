@@ -1,9 +1,9 @@
 import { UboSystem, loadTextures } from "pixi.js";
 import { describe, expect, it } from "vitest";
 
-import "./pixiCspRuntime";
+import "./pixiRuntime";
 
-describe("PixiJS CSP runtime", () => {
+describe("PixiJS Canvas runtime", () => {
   it("installs the static uniform synchronizers required by the production CSP", () => {
     expect(UboSystem.prototype["_systemCheck"].toString()).not.toContain(
       "unsafeEvalSupported",

@@ -5,21 +5,21 @@ import type {
   TopologyBenchmarkConfig,
 } from "../application/topologyBenchmark";
 import { logReasonFromError } from "../application/logging";
-import type { ProjectBridge } from "../domain/project";
+import type { ExportPort } from "../application/projectPorts";
 import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 
 const GATE_POLL_INTERVAL_MS = 250;
 
 interface TopologyBenchmarkCoordinatorInput {
   projectId: string;
-  projectBridge: ProjectBridge;
+  exportPort: ExportPort;
   topologyBridge: TopologyBenchmarkBridge;
   mediaPreviewsReady: boolean;
 }
 
 export function useTopologyBenchmarkCoordinator({
   projectId,
-  projectBridge,
+  exportPort,
   topologyBridge,
   mediaPreviewsReady,
 }: TopologyBenchmarkCoordinatorInput) {
@@ -87,7 +87,7 @@ export function useTopologyBenchmarkCoordinator({
             topologyBridge,
             config.probeKey,
           );
-          await projectBridge.exportPreview();
+          await exportPort.exportPreview();
         }
       },
       onFailed: (reason) =>
@@ -96,7 +96,7 @@ export function useTopologyBenchmarkCoordinator({
   }, [
     config,
     mediaPreviewsReady,
-    projectBridge,
+    exportPort,
     projectId,
     topologyBridge,
   ]);

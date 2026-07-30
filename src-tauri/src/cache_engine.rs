@@ -9,6 +9,7 @@ use myalbuns_imaging_protocol::{
 };
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan};
+use serde::Serialize;
 
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
@@ -18,6 +19,41 @@ use crate::imaging_processor::{
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 2;
 const SOURCE_FINGERPRINT_VERSION: u32 = 1;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CacheMetadata {
+    schema_version: u32,
+    representation_version: u32,
+    project_id: String,
+    last_used_unix_ms: u64,
+    max_edge_px: u32,
+    entries: Vec<CacheMetadataEntry>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CacheMetadataEntry {
+    media_id: String,
+    generation_id: String,
+    artifact_name: String,
+    width_px: u32,
+    height_px: u32,
+    preview_bytes: u64,
+    format: CacheArtifactFormat,
+    exif_orientation: Option<u8>,
+    source_bytes: u64,
+    source_created_unix_ms: Option<u64>,
+    source_modified_unix_ms: Option<u64>,
+    fingerprint: CacheSourceFingerprint,
+}
+
+#[derive(Serialize)]
+struct CacheSourceFingerprint {
+    version: u32,
+    algorithm: &'static str,
+    value: String,
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct CacheWork {
@@ -331,7 +367,7 @@ fn write_cache_metadata(
         .iter()
         .zip(&request.jobs)
         .map(
-            |(artifact, job)| -> Result<serde_json::Value, CacheFailure> {
+            |(artifact, job)| -> Result<CacheMetadataEntry, CacheFailure> {
                 let operational_source = request
                     .root_bindings
                     .resolve(job.source.source_path())
@@ -372,26 +408,24 @@ fn write_cache_metadata(
                             "O nome do artefato de Cache é inválido.",
                         )
                     })?;
-                Ok(serde_json::json!({
-                    "mediaId": artifact.media_id,
-                    "generationId": artifact.generation_id,
-                    "artifactName": artifact_name,
-                    "widthPx": artifact.width_px,
-                    "heightPx": artifact.height_px,
-                    "previewBytes": artifact.preview_bytes,
-                    "format": match artifact.format {
-                        CacheArtifactFormat::Jpeg => "jpeg",
+                Ok(CacheMetadataEntry {
+                    media_id: artifact.media_id.clone(),
+                    generation_id: artifact.generation_id.clone(),
+                    artifact_name: artifact_name.to_owned(),
+                    width_px: artifact.width_px,
+                    height_px: artifact.height_px,
+                    preview_bytes: artifact.preview_bytes,
+                    format: artifact.format,
+                    exif_orientation: artifact.exif_orientation,
+                    source_bytes: job.source.source_bytes(),
+                    source_created_unix_ms: source_metadata.created().ok().and_then(unix_millis),
+                    source_modified_unix_ms: source_metadata.modified().ok().and_then(unix_millis),
+                    fingerprint: CacheSourceFingerprint {
+                        version: SOURCE_FINGERPRINT_VERSION,
+                        algorithm: "sha256",
+                        value: job.source.source_sha256().to_owned(),
                     },
-                    "exifOrientation": artifact.exif_orientation,
-                    "sourceBytes": job.source.source_bytes(),
-                    "sourceCreatedUnixMs": source_metadata.created().ok().and_then(unix_millis),
-                    "sourceModifiedUnixMs": source_metadata.modified().ok().and_then(unix_millis),
-                    "fingerprint": {
-                        "version": SOURCE_FINGERPRINT_VERSION,
-                        "algorithm": "sha256",
-                        "value": job.source.source_sha256(),
-                    },
-                }))
+                })
             },
         )
         .collect::<Result<Vec<_>, _>>()?;
@@ -401,14 +435,14 @@ fn write_cache_metadata(
             "O relógio do sistema não representa o último uso do Cache.",
         )
     })?;
-    let metadata = serde_json::json!({
-        "schemaVersion": CACHE_METADATA_SCHEMA_VERSION,
-        "representationVersion": CACHE_REPRESENTATION_VERSION,
-        "projectId": request.project_id,
-        "lastUsedUnixMs": last_used_unix_ms,
-        "maxEdgePx": request.max_edge_px,
-        "entries": entries,
-    });
+    let metadata = CacheMetadata {
+        schema_version: CACHE_METADATA_SCHEMA_VERSION,
+        representation_version: CACHE_REPRESENTATION_VERSION,
+        project_id: request.project_id.clone(),
+        last_used_unix_ms,
+        max_edge_px: request.max_edge_px,
+        entries,
+    };
     let metadata_path = request.cache_paths.metadata_file();
     let temporary_path = request
         .cache_paths

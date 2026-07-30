@@ -648,13 +648,7 @@ impl MediaSource {
     }
 
     fn validate(&self) -> Result<(), String> {
-        if self.media_id.is_empty()
-            || self.media_id.len() > 128
-            || !self
-                .media_id
-                .bytes()
-                .all(|value| value.is_ascii_alphanumeric() || matches!(value, b'-' | b'_'))
-        {
+        if !is_safe_identifier(&self.media_id) {
             return Err("a identidade de mídia é inválida".into());
         }
         if !self.source_path.is_absolute() {

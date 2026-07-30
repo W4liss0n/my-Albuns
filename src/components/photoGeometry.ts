@@ -1,29 +1,64 @@
 import type {
   Matrix2,
+  NormalizedPan,
   NumberRange,
   PhotoPlacement,
   PhotoPlacementPlan,
-  Vector2,
+  VectorUm,
 } from "../domain/project";
 
+export interface CanvasPoint {
+  x: number;
+  y: number;
+}
+
+export interface CanvasSize {
+  width: number;
+  height: number;
+}
+
+export interface CanvasPhotoPlacement {
+  center: CanvasPoint;
+  size: CanvasSize;
+}
+
+interface CanvasPanTransform {
+  xx: number;
+  xy: number;
+  yx: number;
+  yy: number;
+}
+
+interface CanvasPhotoPlacementPlan {
+  currentPan: NormalizedPan;
+  currentZoom: number;
+  panRange: NumberRange;
+  zoomRange: NumberRange;
+  current: CanvasPhotoPlacement;
+  panOrigin: CanvasPoint;
+  panToCenter: CanvasPanTransform;
+  panToCenterPerZoom: CanvasPanTransform;
+  sizePerZoom: CanvasSize;
+}
+
 export interface ConstrainedPhotoPlacement {
-  pan: Vector2;
+  pan: NormalizedPan;
   zoom: number;
-  placement: PhotoPlacement;
+  placement: CanvasPhotoPlacement;
 }
 
 export interface ZoomedPhotoPlacement {
   zoom: number;
-  placement: PhotoPlacement;
+  placement: CanvasPhotoPlacement;
 }
 
 export interface PhotoGeometry {
-  current: PhotoPlacement;
+  current: CanvasPhotoPlacement;
   panRange: NumberRange;
   zoomRange: NumberRange;
   zoom(targetZoom: number): ZoomedPhotoPlacement;
   constrain(
-    center: Vector2,
+    center: CanvasPoint,
     targetZoom?: number,
   ): ConstrainedPhotoPlacement;
 }
@@ -43,7 +78,7 @@ export function createPhotoGeometry(
   }
 
   function constrain(
-    center: Vector2,
+    center: CanvasPoint,
     targetZoom = plan.currentZoom,
   ): ConstrainedPhotoPlacement {
     const boundedZoom = clampToRange(targetZoom, plan.zoomRange);
@@ -77,9 +112,9 @@ export function createPhotoGeometry(
   }
 
   function placementAt(
-    pan: Vector2,
+    pan: NormalizedPan,
     boundedZoom: number,
-  ): PhotoPlacement {
+  ): CanvasPhotoPlacement {
     const delta = boundedZoom - plan.currentZoom;
     const centerOffset = applyMatrix(
       panToCenterAtZoom(boundedZoom),
@@ -100,7 +135,9 @@ export function createPhotoGeometry(
     };
   }
 
-  function panToCenterAtZoom(targetZoom: number): Matrix2 {
+  function panToCenterAtZoom(
+    targetZoom: number,
+  ): CanvasPanTransform {
     const delta = targetZoom - plan.currentZoom;
     return {
       xx:
@@ -130,7 +167,7 @@ export function createPhotoGeometry(
 function scalePlan(
   plan: PhotoPlacementPlan,
   unitScale: number,
-): PhotoPlacementPlan {
+): CanvasPhotoPlacementPlan {
   return {
     ...plan,
     current: scalePlacement(plan.current, unitScale),
@@ -150,7 +187,7 @@ function scalePlan(
 function scalePlacement(
   placement: PhotoPlacement,
   unitScale: number,
-): PhotoPlacement {
+): CanvasPhotoPlacement {
   return {
     center: scaleVector(placement.center, unitScale),
     size: {
@@ -160,14 +197,20 @@ function scalePlacement(
   };
 }
 
-function scaleVector(vector: Vector2, unitScale: number): Vector2 {
+function scaleVector(
+  vector: VectorUm,
+  unitScale: number,
+): CanvasPoint {
   return {
     x: vector.x * unitScale,
     y: vector.y * unitScale,
   };
 }
 
-function scaleMatrix(matrix: Matrix2, scale: number): Matrix2 {
+function scaleMatrix(
+  matrix: Matrix2,
+  scale: number,
+): CanvasPanTransform {
   return {
     xx: matrix.xx * scale,
     xy: matrix.xy * scale,
@@ -176,7 +219,10 @@ function scaleMatrix(matrix: Matrix2, scale: number): Matrix2 {
   };
 }
 
-function applyMatrix(matrix: Matrix2, vector: Vector2): Vector2 {
+function applyMatrix(
+  matrix: CanvasPanTransform,
+  vector: NormalizedPan,
+): CanvasPoint {
   return {
     x: matrix.xx * vector.x + matrix.xy * vector.y,
     y: matrix.yx * vector.x + matrix.yy * vector.y,
@@ -184,7 +230,7 @@ function applyMatrix(matrix: Matrix2, vector: Vector2): Vector2 {
 }
 
 function projectPanAxis(
-  offset: Vector2,
+  offset: CanvasPoint,
   axisX: number,
   axisY: number,
   fallback: number,

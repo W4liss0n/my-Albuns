@@ -2,9 +2,10 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
-  EditorProjection,
-  ProjectBridge,
-} from "../domain/project";
+  ExportPort,
+  ProjectSessionPort,
+} from "../application/projectPorts";
+import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import {
   createTwoSheetProjection,
@@ -51,18 +52,22 @@ function deferredProjection() {
   return { promise, resolve };
 }
 
-function bridgeWithApply(apply: ProjectBridge["apply"]): ProjectBridge {
+const exportPort: ExportPort = {
+  exportPreview: async () => ({
+    outputPath: "C:\\Temp\\Album-Horizonte_001.png",
+    widthPx: 600,
+    heightPx: 300,
+  }),
+};
+
+function projectSessionPortWithApply(
+  apply: ProjectSessionPort["apply"],
+): ProjectSessionPort {
   return {
     load: async () => projection,
     apply,
     undo: async () => projection,
     redo: async () => projection,
-    prepareMediaPreviews: async () => null,
-    exportPreview: async () => ({
-      outputPath: "C:\\Temp\\Album-Horizonte_001.png",
-      widthPx: 600,
-      heightPx: 300,
-    }),
   };
 }
 
@@ -74,7 +79,7 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
-    viewport: { offsetX: 42, zoom: 0.78 },
+    viewport: { offsetX: 42 },
   });
 });
 
@@ -82,8 +87,9 @@ test("restores accordion preferences after context changes and remounts", () => 
   const renderWorkspace = () =>
     render(
       <ProjectWorkspace
+        exportPort={exportPort}
         projection={projection}
-        bridge={bridgeWithApply(async () => projection)}
+        projectSessionPort={projectSessionPortWithApply(async () => projection)}
         onProjectionChange={() => undefined}
       />,
     );
@@ -117,8 +123,9 @@ test("restores accordion preferences after context changes and remounts", () => 
 test("uses the documented compact chrome and collapsible contextual sections", () => {
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(async () => projection)}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -141,8 +148,9 @@ test("uses the documented compact chrome and collapsible contextual sections", (
 test("renders each Grade item from its own composed sheet", () => {
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={twoSheetProjection}
-      bridge={bridgeWithApply(async () => twoSheetProjection)}
+      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -162,8 +170,9 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   };
   const view = render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(async () => projection)}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
       mediaPreviewUrls={mediaPreviewUrls}
       onProjectionChange={() => undefined}
     />,
@@ -182,8 +191,9 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
 test("centers a Grade navigation target in the visible Canvas", () => {
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={twoSheetProjection}
-      bridge={bridgeWithApply(async () => twoSheetProjection)}
+      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -206,8 +216,9 @@ test("centers a Grade navigation target in the visible Canvas", () => {
 test("completes Grade navigation requested before Canvas metrics exist", () => {
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={twoSheetProjection}
-      bridge={bridgeWithApply(async () => twoSheetProjection)}
+      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -230,8 +241,9 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
 test("resizes both workspace panels with persistent splitters", () => {
   const firstView = render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(async () => projection)}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -281,8 +293,9 @@ test("resizes both workspace panels with persistent splitters", () => {
   firstView.unmount();
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(async () => projection)}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -302,8 +315,9 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -342,8 +356,9 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -384,8 +399,9 @@ test("discards a live Canvas value when its commit fails", async () => {
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -431,14 +447,15 @@ test("does not let an old Project completion clear a new slider draft", async ()
   };
   const newApply = vi.fn(async () => otherProject);
   const onProjectionChange = vi.fn();
-  const oldBridge = bridgeWithApply(oldApply);
-  const newBridge = bridgeWithApply(newApply);
+  const oldProjectSessionPort = projectSessionPortWithApply(oldApply);
+  const newProjectSessionPort = projectSessionPortWithApply(newApply);
   useEditorView.setState({ selectedFrameId: "frame-001" });
 
   const view = render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={oldBridge}
+      projectSessionPort={oldProjectSessionPort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -452,8 +469,9 @@ test("does not let an old Project completion clear a new slider draft", async ()
 
   view.rerender(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={otherProject}
-      bridge={newBridge}
+      projectSessionPort={newProjectSessionPort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -488,8 +506,9 @@ test("uses the Canvas-centered sheet for a media double click", () => {
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={twoSheetProjection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -511,8 +530,9 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -538,15 +558,16 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   const first = deferredProjection();
   const second = deferredProjection();
   const apply = vi
-    .fn<ProjectBridge["apply"]>()
+    .fn<ProjectSessionPort["apply"]>()
     .mockImplementationOnce(() => first.promise)
     .mockImplementationOnce(() => second.promise);
   const onProjectionChange = vi.fn();
 
   render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -599,8 +620,9 @@ test("ignores a pending mutation result after the Workspace changes Project", as
   const onProjectionChange = vi.fn();
   const view = render(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={projection}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -620,8 +642,9 @@ test("ignores a pending mutation result after the Workspace changes Project", as
   };
   view.rerender(
     <ProjectWorkspace
+      exportPort={exportPort}
       projection={otherProject}
-      bridge={bridgeWithApply(apply)}
+      projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={onProjectionChange}
     />,
   );
