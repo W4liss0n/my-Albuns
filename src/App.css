@@ -125,6 +125,85 @@ input {
   font-size: 0.86rem !important;
 }
 
+.safe-shell {
+  min-height: 530px;
+}
+
+.safe-shell .brand-lockup {
+  margin-bottom: 24px;
+}
+
+.safe-shell-navigation {
+  display: flex;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #dedbd5;
+  gap: 8px;
+}
+
+.safe-shell-navigation button,
+.safe-shell-action {
+  padding: 9px 13px;
+  border: 1px solid #d1ccc4;
+  border-radius: 9px;
+  color: #45515b;
+  background: #f7f5f1;
+  cursor: pointer;
+}
+
+.safe-shell-navigation button[aria-pressed="true"] {
+  border-color: #977245;
+  color: #17212b;
+  background: #eee5d8;
+}
+
+.safe-shell-content {
+  padding-top: 28px;
+}
+
+.safe-shell-action {
+  margin-top: 12px;
+}
+
+.safe-shell-actions,
+.safe-settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.safe-settings-tabs {
+  margin-top: 22px;
+  border-bottom: 1px solid #dedbd5;
+}
+
+.safe-settings-tabs button {
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #69747d;
+  background: transparent;
+  cursor: pointer;
+}
+
+.safe-settings-tabs button[aria-selected="true"] {
+  border-bottom-color: #977245;
+  color: #17212b;
+}
+
+.safe-settings-panel {
+  padding-top: 20px;
+}
+
+.safe-settings-panel h2 {
+  margin: 0 0 12px;
+}
+
+.safe-shell-scope-note {
+  margin-top: 24px !important;
+  color: #69747d !important;
+  font-size: 0.78rem !important;
+}
+
 .loading-mark {
   display: block;
   width: 28px;

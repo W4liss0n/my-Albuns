@@ -26,12 +26,38 @@ export interface CanvasNavigationMeasurement {
   targetSheetIds: [string, string, string];
   maxResidentSheetCount: number;
   maxResidentTextureCount: number;
+  maxResidentTexturePixelCount: number;
   timings: FrameTimingSummary;
+}
+
+export interface CanvasTestedTexture {
+  mediaId: string;
+  widthPx: number;
+  heightPx: number;
+}
+
+export interface CanvasGraphicsMeasurement {
+  webGlVersion: 2;
+  maxTextureSizePx: number;
+  maxRenderbufferSizePx: number;
+  maxTextureImageUnits: number;
+  testedTexture: CanvasTestedTexture;
+  contextRecovery: {
+    mechanism: "webgl_lose_context";
+    contextLost: boolean;
+    contextRestored: boolean;
+    recoveryDurationMs: number;
+    restoredFrameLatencyMs: number;
+    glError: number;
+    textureBacked: boolean;
+    decorativeTextureBacked: boolean;
+  };
 }
 
 export interface CanvasPerformanceMeasurement
   extends CanvasInteractionPerformanceMeasurement {
   navigation: CanvasNavigationMeasurement;
+  graphics: CanvasGraphicsMeasurement;
 }
 
 export interface TopologyBenchmarkConfig {

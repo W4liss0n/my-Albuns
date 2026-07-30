@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import App from "./App";
@@ -32,8 +33,20 @@ const exportPort: ExportPort = {
     heightPx: 300,
   }),
 };
+const canvasGraphicsDiagnosticProbe = () =>
+  ({
+    supported: true,
+    renderer: "NVIDIA GeForce RTX",
+    reason: "WebGL2 acelerado por hardware confirmado.",
+    limits: {
+      maxTextureSizePx: 16_384,
+      maxRenderbufferSizePx: 16_384,
+      maxTextureImageUnits: 16,
+    },
+  }) as const;
 
 test("keeps diagnostics available when hardware WebGL2 is unavailable", async () => {
+  const user = userEvent.setup();
   const load = vi.fn(async () => projection);
   const prepareMediaPreviews = vi.fn(async () => null);
   render(
@@ -42,24 +55,47 @@ test("keeps diagnostics available when hardware WebGL2 is unavailable", async ()
       mediaPreviewPort={{ prepareMediaPreviews }}
       projectSessionPort={{ ...projectSessionPort, load }}
       logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
         supported: false,
+        code: "webgl2_unavailable",
         renderer: "indisponível",
         reason: "WebGL2 acelerado por hardware não foi confirmado.",
+        limits: null,
       })}
     />,
   );
 
   expect(
-    await screen.findByRole("heading", {
-      name: "Editor indisponível neste computador",
-    }),
+    await screen.findByRole("heading", { name: "Boas-vindas" }),
   ).toBeInTheDocument();
   expect(
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
-  expect(screen.getByText("Diagnóstico gráfico")).toBeInTheDocument();
-  await waitFor(() => expect(load).toHaveBeenCalledOnce());
+  expect(
+    screen.getByRole("navigation", { name: "Superfícies globais" }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Configurações" }));
+  expect(
+    screen.getByRole("heading", {
+      name: "Configurações do aplicativo",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("tab", { name: "Desempenho" }),
+  ).toHaveAttribute("aria-selected", "true");
+  await user.click(screen.getByRole("tab", { name: "Photoshop" }));
+  expect(
+    screen.getByRole("heading", { name: "Photoshop" }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Diagnóstico" }));
+  expect(
+    screen.getByRole("heading", { name: "Diagnóstico gráfico" }),
+  ).toBeInTheDocument();
+
+  expect(load).not.toHaveBeenCalled();
   expect(prepareMediaPreviews).not.toHaveBeenCalled();
 });
 
@@ -75,10 +111,16 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
       mediaPreviewPort={mediaPreviewPort}
       projectSessionPort={{ ...projectSessionPort, load }}
       logger={logger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
         reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
       })}
     />,
   );
@@ -129,10 +171,16 @@ test("prepares real media previews after opening without blocking the Workspace"
       mediaPreviewPort={{ prepareMediaPreviews }}
       projectSessionPort={projectSessionPort}
       logger={logger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
         supported: true,
         renderer: "NVIDIA GeForce RTX",
         reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
       })}
     />,
   );

@@ -14,6 +14,7 @@ export interface CanvasNavigationRenderedFrame {
   renderedAt: number;
   residentSheetCount: number;
   residentTextureCount: number;
+  residentTexturePixelCount: number;
 }
 
 export interface CanvasNavigationPerformanceTarget {
@@ -43,6 +44,7 @@ export async function runCanvasNavigationPerformanceProbe(
   const latencies: number[] = [];
   let maxResidentSheetCount = 0;
   let maxResidentTextureCount = 0;
+  let maxResidentTexturePixelCount = 0;
 
   for (let cycle = 0; cycle < config.cycles; cycle += 1) {
     for (const sheetId of route) {
@@ -59,6 +61,10 @@ export async function runCanvasNavigationPerformanceProbe(
         maxResidentTextureCount,
         rendered.residentTextureCount,
       );
+      maxResidentTexturePixelCount = Math.max(
+        maxResidentTexturePixelCount,
+        rendered.residentTexturePixelCount,
+      );
     }
   }
 
@@ -68,6 +74,7 @@ export async function runCanvasNavigationPerformanceProbe(
     targetSheetIds: [firstSheetId, middleSheetId, lastSheetId],
     maxResidentSheetCount,
     maxResidentTextureCount,
+    maxResidentTexturePixelCount,
     timings: summarizeFrameTimings(latencies),
   };
 }

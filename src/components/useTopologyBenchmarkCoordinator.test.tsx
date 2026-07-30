@@ -44,6 +44,7 @@ const measurement: CanvasPerformanceMeasurement = {
     targetSheetIds: ["lamina-01", "lamina-50", "lamina-100"],
     maxResidentSheetCount: 8,
     maxResidentTextureCount: 16,
+    maxResidentTexturePixelCount: 30_720_000,
     timings: {
       sampleCount: 3,
       durationMs: 72,
@@ -55,6 +56,27 @@ const measurement: CanvasPerformanceMeasurement = {
       maxFrameMs: 24,
       framesOver16Ms: 3,
       framesOver33Ms: 0,
+    },
+  },
+  graphics: {
+    webGlVersion: 2,
+    maxTextureSizePx: 16_384,
+    maxRenderbufferSizePx: 16_384,
+    maxTextureImageUnits: 16,
+    testedTexture: {
+      mediaId: "decorative-overlay",
+      widthPx: 1_600,
+      heightPx: 1_200,
+    },
+    contextRecovery: {
+      mechanism: "webgl_lose_context",
+      contextLost: true,
+      contextRestored: true,
+      recoveryDurationMs: 35,
+      restoredFrameLatencyMs: 12,
+      glError: 0,
+      textureBacked: true,
+      decorativeTextureBacked: true,
     },
   },
 };

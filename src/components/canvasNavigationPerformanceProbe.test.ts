@@ -20,6 +20,7 @@ test("measures repeated navigation through the middle, end, and start of a long 
       renderedAt: number;
       residentSheetCount: number;
       residentTextureCount: number;
+      residentTexturePixelCount: number;
     }> => {
       now += latencies[sampleIndex] ?? 16;
       sampleIndex += 1;
@@ -27,6 +28,8 @@ test("measures repeated navigation through the middle, end, and start of a long 
         renderedAt: now,
         residentSheetCount: sampleIndex === 2 ? 8 : 7,
         residentTextureCount: sampleIndex === 5 ? 16 : 14,
+        residentTexturePixelCount:
+          sampleIndex === 4 ? 24_000_000 : 20_000_000,
       };
     },
   );
@@ -55,6 +58,7 @@ test("measures repeated navigation through the middle, end, and start of a long 
     targetSheetIds: ["sheet-001", "sheet-050", "sheet-100"],
     maxResidentSheetCount: 8,
     maxResidentTextureCount: 16,
+    maxResidentTexturePixelCount: 24_000_000,
     timings: {
       sampleCount: 6,
       durationMs: 138,

@@ -13,6 +13,10 @@ const PAN_FRAMES: usize = 120;
 const ZOOM_FRAMES: usize = 120;
 const NAVIGATION_CYCLES: usize = 10;
 const MINIMUM_LONG_ALBUM_SHEETS: usize = 100;
+const CORPUS_DECORATIVE_MEDIA_ID: &str = "decorative-overlay";
+const CORPUS_DECORATIVE_WIDTH_PX: u32 = 1_600;
+const CORPUS_DECORATIVE_HEIGHT_PX: u32 = 1_200;
+const CONTEXT_RECOVERY_MECHANISM: &str = "webgl_lose_context";
 
 pub(crate) struct TopologyBenchmarkState {
     topology: &'static str,
@@ -41,9 +45,42 @@ pub(crate) struct CanvasBenchmarkMeasurement {
     texture_backed: bool,
     decorative_media_id: String,
     decorative_texture_backed: bool,
+    graphics: CanvasGraphicsMeasurement,
     pan: FrameTimingSummary,
     zoom: FrameTimingSummary,
     navigation: CanvasNavigationMeasurement,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CanvasGraphicsMeasurement {
+    web_gl_version: u32,
+    max_texture_size_px: u32,
+    max_renderbuffer_size_px: u32,
+    max_texture_image_units: u32,
+    tested_texture: TestedTextureMeasurement,
+    context_recovery: ContextRecoveryMeasurement,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TestedTextureMeasurement {
+    media_id: String,
+    width_px: u32,
+    height_px: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ContextRecoveryMeasurement {
+    mechanism: String,
+    context_lost: bool,
+    context_restored: bool,
+    recovery_duration_ms: f64,
+    restored_frame_latency_ms: f64,
+    gl_error: u32,
+    texture_backed: bool,
+    decorative_texture_backed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,6 +91,7 @@ struct CanvasNavigationMeasurement {
     target_sheet_ids: [String; 3],
     max_resident_sheet_count: usize,
     max_resident_texture_count: usize,
+    max_resident_texture_pixel_count: u64,
     timings: FrameTimingSummary,
 }
 
@@ -173,6 +211,12 @@ impl TopologyBenchmarkState {
         {
             return Err("O probe não usou o Decorativo transparente real do Cache.".into());
         }
+        measurement.graphics.validate()?;
+        if measurement.decorative_media_id != measurement.graphics.tested_texture.media_id {
+            return Err(
+                "O Decorativo medido não corresponde à textura usada no probe gráfico.".into(),
+            );
+        }
         measurement.pan.validate(config.pan_frames)?;
         measurement.zoom.validate(config.zoom_frames)?;
         measurement.navigation.validate(config.navigation_cycles)
@@ -189,6 +233,57 @@ fn validate_gate_path(path: &std::path::Path, variable: &str) -> Result<(), Stri
     Ok(())
 }
 
+impl CanvasGraphicsMeasurement {
+    fn validate(&self) -> Result<(), String> {
+        if self.web_gl_version != 2 {
+            return Err("O Canvas medido não usou WebGL2.".into());
+        }
+        if self.max_texture_size_px == 0
+            || self.max_renderbuffer_size_px == 0
+            || self.max_texture_image_units == 0
+        {
+            return Err("Os limites gráficos informados pelo WebGL2 são inválidos.".into());
+        }
+        if self.tested_texture.media_id != CORPUS_DECORATIVE_MEDIA_ID
+            || self.tested_texture.width_px != CORPUS_DECORATIVE_WIDTH_PX
+            || self.tested_texture.height_px != CORPUS_DECORATIVE_HEIGHT_PX
+        {
+            return Err("A textura testada não corresponde ao Decorativo real do corpus.".into());
+        }
+        if self.max_texture_size_px
+            < self
+                .tested_texture
+                .width_px
+                .max(self.tested_texture.height_px)
+        {
+            return Err("O limite de textura não cobre o Decorativo testado.".into());
+        }
+        self.context_recovery.validate()
+    }
+}
+
+impl ContextRecoveryMeasurement {
+    fn validate(&self) -> Result<(), String> {
+        if self.mechanism != CONTEXT_RECOVERY_MECHANISM
+            || !self.context_lost
+            || !self.context_restored
+            || self.gl_error != 0
+            || !self.texture_backed
+            || !self.decorative_texture_backed
+        {
+            return Err("A perda e a recuperação do contexto WebGL2 não foram comprovadas.".into());
+        }
+        if !self.recovery_duration_ms.is_finite()
+            || self.recovery_duration_ms < 0.0
+            || !self.restored_frame_latency_ms.is_finite()
+            || self.restored_frame_latency_ms < 0.0
+        {
+            return Err("Os tempos da recuperação do contexto WebGL2 são inválidos.".into());
+        }
+        Ok(())
+    }
+}
+
 impl CanvasNavigationMeasurement {
     fn validate(&self, expected_cycles: usize) -> Result<(), String> {
         if self.sheet_count < MINIMUM_LONG_ALBUM_SHEETS
@@ -196,6 +291,7 @@ impl CanvasNavigationMeasurement {
             || self.max_resident_sheet_count == 0
             || self.max_resident_sheet_count >= self.sheet_count
             || self.max_resident_texture_count == 0
+            || self.max_resident_texture_pixel_count == 0
         {
             return Err("A residência do probe de navegação é inválida.".into());
         }
@@ -302,6 +398,26 @@ pub(crate) fn report_topology_canvas_benchmark(
         texture_backed = measurement.texture_backed,
         decorative_media_id = safe_log_identifier(&measurement.decorative_media_id),
         decorative_texture_backed = measurement.decorative_texture_backed,
+        graphics_webgl_version = measurement.graphics.web_gl_version,
+        graphics_max_texture_size_px = measurement.graphics.max_texture_size_px,
+        graphics_max_renderbuffer_size_px = measurement.graphics.max_renderbuffer_size_px,
+        graphics_max_texture_image_units = measurement.graphics.max_texture_image_units,
+        graphics_tested_media_id =
+            safe_log_identifier(&measurement.graphics.tested_texture.media_id),
+        graphics_tested_texture_width_px = measurement.graphics.tested_texture.width_px,
+        graphics_tested_texture_height_px = measurement.graphics.tested_texture.height_px,
+        graphics_context_loss_mechanism =
+            safe_log_identifier(&measurement.graphics.context_recovery.mechanism),
+        graphics_context_lost = measurement.graphics.context_recovery.context_lost,
+        graphics_context_restored = measurement.graphics.context_recovery.context_restored,
+        graphics_recovery_duration_ms =
+            measurement.graphics.context_recovery.recovery_duration_ms,
+        graphics_restored_frame_latency_ms =
+            measurement.graphics.context_recovery.restored_frame_latency_ms,
+        graphics_gl_error = measurement.graphics.context_recovery.gl_error,
+        graphics_texture_backed = measurement.graphics.context_recovery.texture_backed,
+        graphics_decorative_texture_backed =
+            measurement.graphics.context_recovery.decorative_texture_backed,
         pan_sample_count = measurement.pan.sample_count,
         pan_duration_ms = measurement.pan.duration_ms,
         pan_first_frame_latency_ms = measurement.pan.first_frame_latency_ms,
@@ -329,6 +445,8 @@ pub(crate) fn report_topology_canvas_benchmark(
         navigation_last_sheet_id = safe_log_identifier(&measurement.navigation.target_sheet_ids[2]),
         navigation_max_resident_sheet_count = measurement.navigation.max_resident_sheet_count,
         navigation_max_resident_texture_count = measurement.navigation.max_resident_texture_count,
+        navigation_max_resident_texture_pixel_count =
+            measurement.navigation.max_resident_texture_pixel_count,
         navigation_sample_count = measurement.navigation.timings.sample_count,
         navigation_duration_ms = measurement.navigation.timings.duration_ms,
         navigation_first_frame_latency_ms = measurement.navigation.timings.first_frame_latency_ms,
@@ -376,7 +494,8 @@ pub(crate) fn report_topology_benchmark_failure(
 #[cfg(test)]
 mod tests {
     use super::{
-        CanvasBenchmarkMeasurement, CanvasNavigationMeasurement, FrameTimingSummary,
+        CanvasBenchmarkMeasurement, CanvasGraphicsMeasurement, CanvasNavigationMeasurement,
+        ContextRecoveryMeasurement, FrameTimingSummary, TestedTextureMeasurement,
         TopologyBenchmarkState,
     };
 
@@ -393,6 +512,55 @@ mod tests {
             frames_over16_ms: 30,
             frames_over33_ms: 0,
         }
+    }
+
+    fn valid_measurement() -> CanvasBenchmarkMeasurement {
+        CanvasBenchmarkMeasurement {
+            frame_id: "frame-01-a".into(),
+            texture_backed: true,
+            decorative_media_id: "decorative-overlay".into(),
+            decorative_texture_backed: true,
+            graphics: CanvasGraphicsMeasurement {
+                web_gl_version: 2,
+                max_texture_size_px: 16_384,
+                max_renderbuffer_size_px: 16_384,
+                max_texture_image_units: 16,
+                tested_texture: TestedTextureMeasurement {
+                    media_id: "decorative-overlay".into(),
+                    width_px: 1_600,
+                    height_px: 1_200,
+                },
+                context_recovery: ContextRecoveryMeasurement {
+                    mechanism: "webgl_lose_context".into(),
+                    context_lost: true,
+                    context_restored: true,
+                    recovery_duration_ms: 125.0,
+                    restored_frame_latency_ms: 16.7,
+                    gl_error: 0,
+                    texture_backed: true,
+                    decorative_texture_backed: true,
+                },
+            },
+            pan: timing(PAN_FRAMES),
+            zoom: timing(ZOOM_FRAMES),
+            navigation: CanvasNavigationMeasurement {
+                sheet_count: 100,
+                cycle_count: NAVIGATION_CYCLES,
+                target_sheet_ids: ["lamina-01".into(), "lamina-50".into(), "lamina-100".into()],
+                max_resident_sheet_count: 8,
+                max_resident_texture_count: 16,
+                max_resident_texture_pixel_count: 26_880_000,
+                timings: timing(NAVIGATION_CYCLES * 3),
+            },
+        }
+    }
+
+    fn invalid_measurement(
+        mutate: impl FnOnce(&mut CanvasBenchmarkMeasurement),
+    ) -> CanvasBenchmarkMeasurement {
+        let mut measurement = valid_measurement();
+        mutate(&mut measurement);
+        measurement
     }
 
     #[test]
@@ -454,25 +622,138 @@ mod tests {
                 .run_export
         );
 
-        let measurement = CanvasBenchmarkMeasurement {
-            frame_id: "frame-01-a".into(),
-            texture_backed: true,
-            decorative_media_id: "decorative-overlay".into(),
-            decorative_texture_backed: true,
-            pan: timing(PAN_FRAMES),
-            zoom: timing(ZOOM_FRAMES),
-            navigation: CanvasNavigationMeasurement {
-                sheet_count: 100,
-                cycle_count: NAVIGATION_CYCLES,
-                target_sheet_ids: ["lamina-01".into(), "lamina-50".into(), "lamina-100".into()],
-                max_resident_sheet_count: 8,
-                max_resident_texture_count: 16,
-                timings: timing(NAVIGATION_CYCLES * 3),
-            },
-        };
+        let measurement = valid_measurement();
         state
             .validate_measurement("main", &measurement)
             .expect("a correlated texture-backed measurement is valid");
+    }
+
+    #[test]
+    fn rejects_graphics_evidence_that_did_not_prove_the_real_webgl2_recovery_gate() {
+        let directory = tempfile::tempdir().expect("temporary gate directory");
+        let gate = directory.path().join("probe.ready");
+        std::fs::write(&gate, []).expect("the runner opens the gate");
+        let state = TopologyBenchmarkState::new(
+            "multiwindow",
+            vec![("main", true)],
+            Some(gate),
+            Some(directory.path().join("export.ready")),
+        )
+        .expect("the benchmark state is valid");
+
+        let invalid_measurements = [
+            (
+                "WebGL1 fallback",
+                invalid_measurement(|value| value.graphics.web_gl_version = 1),
+            ),
+            (
+                "missing maximum texture size",
+                invalid_measurement(|value| value.graphics.max_texture_size_px = 0),
+            ),
+            (
+                "missing maximum renderbuffer size",
+                invalid_measurement(|value| value.graphics.max_renderbuffer_size_px = 0),
+            ),
+            (
+                "missing texture image units",
+                invalid_measurement(|value| value.graphics.max_texture_image_units = 0),
+            ),
+            (
+                "advertised texture limit below tested texture",
+                invalid_measurement(|value| value.graphics.max_texture_size_px = 1_599),
+            ),
+            (
+                "different Decorative",
+                invalid_measurement(|value| {
+                    value.graphics.tested_texture.media_id = "decorative-other".into();
+                }),
+            ),
+            (
+                "Decorative identity does not match the tested texture",
+                invalid_measurement(|value| {
+                    value.decorative_media_id = "decorative-other".into();
+                }),
+            ),
+            (
+                "different tested width",
+                invalid_measurement(|value| value.graphics.tested_texture.width_px = 1_599),
+            ),
+            (
+                "different tested height",
+                invalid_measurement(|value| value.graphics.tested_texture.height_px = 1_199),
+            ),
+            (
+                "different recovery mechanism",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.mechanism = "synthetic_reset".into();
+                }),
+            ),
+            (
+                "context loss not observed",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.context_lost = false;
+                }),
+            ),
+            (
+                "context restoration not observed",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.context_restored = false;
+                }),
+            ),
+            (
+                "negative recovery duration",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.recovery_duration_ms = -1.0;
+                }),
+            ),
+            (
+                "non-finite recovery duration",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.recovery_duration_ms = f64::NAN;
+                }),
+            ),
+            (
+                "negative restored frame latency",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.restored_frame_latency_ms = -1.0;
+                }),
+            ),
+            (
+                "non-finite restored frame latency",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.restored_frame_latency_ms = f64::INFINITY;
+                }),
+            ),
+            (
+                "WebGL error after restoration",
+                invalid_measurement(|value| value.graphics.context_recovery.gl_error = 1),
+            ),
+            (
+                "Photo texture not restored",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.texture_backed = false;
+                }),
+            ),
+            (
+                "Decorative texture not restored",
+                invalid_measurement(|value| {
+                    value.graphics.context_recovery.decorative_texture_backed = false;
+                }),
+            ),
+            (
+                "no resident texture pixels",
+                invalid_measurement(|value| {
+                    value.navigation.max_resident_texture_pixel_count = 0;
+                }),
+            ),
+        ];
+
+        for (case, measurement) in invalid_measurements {
+            assert!(
+                state.validate_measurement("main", &measurement).is_err(),
+                "invalid graphics evidence was accepted: {case}"
+            );
+        }
     }
 
     #[test]

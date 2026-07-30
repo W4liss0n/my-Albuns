@@ -8,14 +8,21 @@ import type {
   PhotoPlacementPlan,
 } from "../domain/project";
 import {
-  AlbumCanvas,
+  AlbumCanvas as ProductionAlbumCanvas,
+  type AlbumCanvasProps,
   type CanvasMetrics,
   type PhotoTransformDelta,
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 import type { LogEvent, Logger } from "../application/logging";
+import { silentLogger } from "../application/logging";
+import type { GraphicsDiagnostic } from "../application/graphics";
 import type { BoundCanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import {
+  CanvasGraphicsDiagnosticProbeProvider,
+  type CanvasGraphicsDiagnosticProbe,
+} from "./canvasGraphicsDiagnosticProbeContext";
 import { LoggingProvider } from "./loggingContext";
 
 const pixiLifecycle = vi.hoisted(() => ({
@@ -55,6 +62,86 @@ const pixiLifecycle = vi.hoisted(() => ({
   rejectAssetLoads: [] as Array<(reason?: unknown) => void>,
   spriteTextures: [] as unknown[],
 }));
+
+const webGlConstants = {
+  MAX_TEXTURE_SIZE: 0x0d33,
+  MAX_RENDERBUFFER_SIZE: 0x84e8,
+  MAX_TEXTURE_IMAGE_UNITS: 0x8872,
+};
+
+let activeWebGlCanvas: HTMLCanvasElement | null = null;
+let webGlLost = false;
+const webGlContext = {
+  ...webGlConstants,
+  getExtension(name: string) {
+    if (name === "WEBGL_debug_renderer_info") {
+      return { UNMASKED_RENDERER_WEBGL: 0x9246 };
+    }
+    if (name === "WEBGL_lose_context") {
+      return {
+        loseContext() {
+          webGlLost = true;
+          activeWebGlCanvas?.dispatchEvent(
+            new Event("webglcontextlost", { cancelable: true }),
+          );
+        },
+        restoreContext() {
+          webGlLost = false;
+          activeWebGlCanvas?.dispatchEvent(
+            new Event("webglcontextrestored"),
+          );
+        },
+      };
+    }
+    return null;
+  },
+  getParameter(parameter: number) {
+    if (parameter === 0x9246) return "ANGLE (NVIDIA GeForce RTX 3050)";
+    if (
+      parameter === webGlConstants.MAX_TEXTURE_SIZE ||
+      parameter === webGlConstants.MAX_RENDERBUFFER_SIZE
+    ) {
+      return 16_384;
+    }
+    if (parameter === webGlConstants.MAX_TEXTURE_IMAGE_UNITS) return 16;
+    return null;
+  },
+  isContextLost() {
+    return webGlLost;
+  },
+  finish() {},
+  getError() {
+    return 0;
+  },
+} as unknown as WebGL2RenderingContext;
+
+const availableCanvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe =
+  () => ({
+    supported: true,
+    renderer: "ANGLE (NVIDIA GeForce RTX 3050)",
+    reason: "WebGL2 acelerado por hardware confirmado.",
+    limits: {
+      maxTextureSizePx: 16_384,
+      maxRenderbufferSizePx: 16_384,
+      maxTextureImageUnits: 16,
+    },
+  });
+
+function AlbumCanvas({
+  canvasGraphicsDiagnosticProbe =
+    availableCanvasGraphicsDiagnosticProbe,
+  ...props
+}: AlbumCanvasProps & {
+  canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
+}) {
+  return (
+    <CanvasGraphicsDiagnosticProbeProvider
+      probe={canvasGraphicsDiagnosticProbe}
+    >
+      <ProductionAlbumCanvas {...props} />
+    </CanvasGraphicsDiagnosticProbeProvider>
+  );
+}
 
 vi.mock("pixi.js", () => {
   class Point {
@@ -449,6 +536,9 @@ function renderCanvas({
   onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,
   ),
+  onGraphicsUnavailable,
+  canvasGraphicsDiagnosticProbe,
+  logger = silentLogger,
 }: {
   projectId?: string;
   compositionPlan?: CompositionPlan;
@@ -464,28 +554,37 @@ function renderCanvas({
   onTransformCommit?: (
     delta: PhotoTransformDelta,
   ) => Promise<boolean>;
+  onGraphicsUnavailable?: (diagnostic: GraphicsDiagnostic) => void;
+  canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
+  logger?: Logger;
 } = {}) {
   const view = render(
-    <AlbumCanvas
-      projectId={projectId}
-      composition={compositionPlan}
-      mediaPreviewUrls={mediaPreviewUrls}
-      performanceProbe={performanceProbe}
-      continuousCanvasLayout={createContinuousCanvasLayout(
-        compositionPlan.sheets,
-      )}
-      selectedFrameId={null}
-      focusedSheetId="sheet-001"
-      centeredSheetId="sheet-001"
-      viewport={{ offsetX: 42 }}
-      onSelectFrame={() => undefined}
-      onFocusSheet={onFocusSheet}
-      onCenteredSheetChange={onCenteredSheetChange}
-      onViewportChange={onViewportChange}
-      onTransformPreview={onTransformPreview}
-      onTransformCommit={onTransformCommit}
-      onCanvasMetricsChange={onCanvasMetricsChange}
-    />,
+    <LoggingProvider logger={logger}>
+      <AlbumCanvas
+        canvasGraphicsDiagnosticProbe={
+          canvasGraphicsDiagnosticProbe
+        }
+        projectId={projectId}
+        composition={compositionPlan}
+        mediaPreviewUrls={mediaPreviewUrls}
+        performanceProbe={performanceProbe}
+        continuousCanvasLayout={createContinuousCanvasLayout(
+          compositionPlan.sheets,
+        )}
+        selectedFrameId={null}
+        focusedSheetId="sheet-001"
+        centeredSheetId="sheet-001"
+        viewport={{ offsetX: 42 }}
+        onSelectFrame={() => undefined}
+        onFocusSheet={onFocusSheet}
+        onCenteredSheetChange={onCenteredSheetChange}
+        onViewportChange={onViewportChange}
+        onTransformPreview={onTransformPreview}
+        onTransformCommit={onTransformCommit}
+        onCanvasMetricsChange={onCanvasMetricsChange}
+        onGraphicsUnavailable={onGraphicsUnavailable}
+      />
+    </LoggingProvider>,
   );
 
   return {
@@ -547,6 +646,8 @@ beforeEach(() => {
   pixiLifecycle.resolveAssetLoads.length = 0;
   pixiLifecycle.rejectAssetLoads.length = 0;
   pixiLifecycle.spriteTextures.length = 0;
+  activeWebGlCanvas = null;
+  webGlLost = false;
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -561,11 +662,22 @@ beforeEach(() => {
       unobserve() {}
     },
   );
+  vi.spyOn(
+    HTMLCanvasElement.prototype,
+    "getContext",
+  ).mockImplementation(function (
+    this: HTMLCanvasElement,
+    contextId: string,
+  ) {
+    activeWebGlCanvas = this;
+    return contextId === "webgl2" ? webGlContext : null;
+  } as typeof HTMLCanvasElement.prototype.getContext);
 });
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 test("waits for PixiJS initialization before destroying an abandoned Canvas", async () => {
@@ -577,6 +689,116 @@ test("waits for PixiJS initialization before destroying an abandoned Canvas", as
   await finishPixiInitialization();
 
   expect(pixiLifecycle.instances[0].destroyCount).toBe(1);
+});
+
+test("reports when the actual Pixi Canvas diagnostic rejects WebGL2", async () => {
+  const onGraphicsUnavailable = vi.fn();
+  const canvasGraphicsDiagnosticProbe =
+    vi.fn<CanvasGraphicsDiagnosticProbe>(() => ({
+      supported: false,
+      code: "webgl2_unavailable",
+      renderer: "indisponível",
+      reason: "O Canvas real não disponibilizou WebGL2.",
+      limits: null,
+    }));
+  const view = renderCanvas({
+    onGraphicsUnavailable,
+    canvasGraphicsDiagnosticProbe,
+  });
+
+  await finishPixiInitialization();
+
+  await waitFor(() => {
+    expect(onGraphicsUnavailable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        supported: false,
+        code: "webgl2_unavailable",
+      }),
+    );
+  });
+  expect(await view.findByRole("alert")).toHaveTextContent(
+    "O editor gráfico está indisponível.",
+  );
+  expect(canvasGraphicsDiagnosticProbe).toHaveBeenCalledWith(
+    pixiLifecycle.instances[0].canvas,
+  );
+});
+
+test("blocks the Canvas while WebGL2 is lost and resumes the same Canvas after restoration", async () => {
+  const logEvents: LogEvent[] = [];
+  const view = renderCanvas({
+    logger: {
+      write: (event) => logEvents.push(event),
+    },
+  });
+  await finishPixiInitialization();
+  const canvas = view.getByLabelText(
+    /Canvas contínuo do Álbum/,
+  ) as HTMLCanvasElement;
+  const contextLost = new Event("webglcontextlost", {
+    cancelable: true,
+  });
+
+  act(() => {
+    canvas.dispatchEvent(contextLost);
+  });
+
+  expect(contextLost.defaultPrevented).toBe(true);
+  expect(view.getByRole("status")).toHaveTextContent(
+    "Restaurando o contexto gráfico",
+  );
+  expect(view.onTransformPreview).toHaveBeenCalledWith(null);
+  expect(logEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        component: "canvas",
+        event: "canvas_context_lost",
+      }),
+    ]),
+  );
+
+  act(() => {
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+  });
+
+  await waitFor(() =>
+    expect(view.queryByRole("status")).not.toBeInTheDocument(),
+  );
+  expect(
+    view.getByLabelText(/Canvas contínuo do Álbum/),
+  ).toBe(canvas);
+  expect(logEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        component: "canvas",
+        event: "canvas_context_restored",
+      }),
+    ]),
+  );
+});
+
+test("reports a fatal diagnostic when a lost context is not restored", async () => {
+  vi.useFakeTimers();
+  const onGraphicsUnavailable = vi.fn();
+  const view = renderCanvas({ onGraphicsUnavailable });
+  await finishPixiInitialization();
+  const canvas = view.getByLabelText(/Canvas contínuo do Álbum/);
+
+  act(() => {
+    canvas.dispatchEvent(
+      new Event("webglcontextlost", { cancelable: true }),
+    );
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10_000);
+  });
+
+  expect(onGraphicsUnavailable).toHaveBeenCalledWith(
+    expect.objectContaining({
+      supported: false,
+      code: "context_restore_failed",
+    }),
+  );
 });
 
 test("does not let an abandoned StrictMode initialization destroy the active Canvas", async () => {
@@ -1026,12 +1248,21 @@ test("measures long Album navigation through the public centering action and ren
   }
 
   let settledLoadCount = 0;
+  const navigationTexture = (index: number, label: string) => ({
+    label,
+    source: pixiLifecycle.assetLoads[index]?.endsWith(".png")
+      ? { pixelWidth: 1_600, pixelHeight: 1_200 }
+      : { pixelWidth: 1_600, pixelHeight: 1_067 },
+  });
   const settleNewTextures = async () => {
     await act(async () => {
       while (settledLoadCount < pixiLifecycle.resolveAssetLoads.length) {
-        pixiLifecycle.resolveAssetLoads[settledLoadCount]?.({
-          label: `navigation-texture-${settledLoadCount}`,
-        });
+        pixiLifecycle.resolveAssetLoads[settledLoadCount]?.(
+          navigationTexture(
+            settledLoadCount,
+            `navigation-texture-${settledLoadCount}`,
+          ),
+        );
         settledLoadCount += 1;
       }
       await Promise.resolve();
@@ -1042,14 +1273,14 @@ test("measures long Album navigation through the public centering action and ren
   render(<NavigationHarness />);
   await finishPixiInitialization();
   await act(async () => {
-    pixiLifecycle.resolveAssetLoads[1]?.({
-      label: "second-texture-first",
-    });
+    pixiLifecycle.resolveAssetLoads[1]?.(
+      navigationTexture(1, "second-texture-first"),
+    );
     await Promise.resolve();
     await Promise.resolve();
-    pixiLifecycle.resolveAssetLoads[0]?.({
-      label: "first-texture-second",
-    });
+    pixiLifecycle.resolveAssetLoads[0]?.(
+      navigationTexture(0, "first-texture-second"),
+    );
     await Promise.resolve();
     await Promise.resolve();
     for (
@@ -1057,9 +1288,12 @@ test("measures long Album navigation through the public centering action and ren
       settledLoadCount < pixiLifecycle.resolveAssetLoads.length;
       settledLoadCount += 1
     ) {
-      pixiLifecycle.resolveAssetLoads[settledLoadCount]?.({
-        label: `navigation-texture-${settledLoadCount}`,
-      });
+      pixiLifecycle.resolveAssetLoads[settledLoadCount]?.(
+        navigationTexture(
+          settledLoadCount,
+          `navigation-texture-${settledLoadCount}`,
+        ),
+      );
     }
     await Promise.resolve();
     await Promise.resolve();
@@ -1092,12 +1326,34 @@ test("measures long Album navigation through the public centering action and ren
           sheetCount: 100,
           cycleCount: 1,
           targetSheetIds: ["sheet-001", "sheet-050", "sheet-100"],
-          maxResidentSheetCount: expect.any(Number),
-          maxResidentTextureCount: expect.any(Number),
+          maxResidentSheetCount: 7,
+          maxResidentTextureCount: 8,
+          maxResidentTexturePixelCount: 13_870_400,
           timings: expect.objectContaining({
             sampleCount: 3,
           }),
         }),
+        graphics: {
+          webGlVersion: 2,
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+          testedTexture: {
+            mediaId: "decorative-overlay",
+            widthPx: 1_600,
+            heightPx: 1_200,
+          },
+          contextRecovery: {
+            mechanism: "webgl_lose_context",
+            contextLost: true,
+            contextRestored: true,
+            recoveryDurationMs: expect.any(Number),
+            restoredFrameLatencyMs: expect.any(Number),
+            glError: 0,
+            textureBacked: true,
+            decorativeTextureBacked: true,
+          },
+        },
       }),
     );
   });

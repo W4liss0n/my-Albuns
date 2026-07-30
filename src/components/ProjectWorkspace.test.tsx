@@ -5,6 +5,7 @@ import type {
   ExportPort,
   ProjectSessionPort,
 } from "../application/projectPorts";
+import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import {
@@ -31,6 +32,7 @@ const canvasHarness = vi.hoisted(() => ({
     onTransformCommit(
       delta: PhotoTransformDelta,
     ): Promise<boolean>;
+    onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
   },
 }));
 
@@ -130,6 +132,32 @@ beforeEach(() => {
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
   });
+});
+
+test("forwards a fatal Canvas graphics diagnostic without interpreting it", () => {
+  const onGraphicsUnavailable = vi.fn();
+  const diagnostic: GraphicsDiagnostic = {
+    supported: false,
+    code: "webgl2_unavailable",
+    renderer: "indisponível",
+    reason: "O Canvas real não possui WebGL2.",
+    limits: null,
+  };
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+      onGraphicsUnavailable={onGraphicsUnavailable}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onGraphicsUnavailable?.(diagnostic);
+  });
+
+  expect(onGraphicsUnavailable).toHaveBeenCalledWith(diagnostic);
 });
 
 test("restores accordion preferences after context changes and remounts", () => {

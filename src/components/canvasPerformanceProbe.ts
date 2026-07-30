@@ -1,5 +1,6 @@
 import type {
   CanvasInteractionPerformanceMeasurement,
+  CanvasTestedTexture,
   FrameTimingSummary,
 } from "../application/topologyBenchmark";
 
@@ -14,6 +15,7 @@ export interface CanvasPerformanceTarget {
   textureBacked: boolean;
   decorativeMediaId: string;
   decorativeTextureBacked: boolean;
+  testedTexture: CanvasTestedTexture;
   previewPan(amount: number): void;
   previewZoom(amount: number): void;
   nextRenderedFrame(): Promise<number>;

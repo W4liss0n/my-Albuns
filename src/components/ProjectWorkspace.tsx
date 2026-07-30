@@ -5,6 +5,7 @@ import type {
   ExportPort,
   ProjectSessionPort,
 } from "../application/projectPorts";
+import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import {
   readInspectorSectionPreference,
@@ -26,6 +27,7 @@ interface ProjectWorkspaceProps {
   canvasPerformanceProbe?: CanvasPerformanceProbeRequest | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
+  onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }
 
 export function ProjectWorkspace({
@@ -35,6 +37,7 @@ export function ProjectWorkspace({
   canvasPerformanceProbe = null,
   mediaPreviewUrls = {},
   onProjectionChange,
+  onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const controller = useProjectEditorController({
     projection,
@@ -131,6 +134,7 @@ export function ProjectWorkspace({
                 : null
             }
             mediaPreviewUrls={mediaPreviewUrls}
+            onGraphicsUnavailable={onGraphicsUnavailable}
           />
         </section>
 

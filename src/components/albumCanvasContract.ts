@@ -1,4 +1,5 @@
 import type { CompositionPlan } from "../domain/project";
+import type { GraphicsDiagnostic } from "../application/graphics";
 import type { CanvasPerformanceMeasurement } from "../application/topologyBenchmark";
 import type { ViewportState } from "../state/viewport";
 import type { CanvasPerformanceProbeConfig } from "./canvasPerformanceProbe";
@@ -63,4 +64,5 @@ export interface AlbumCanvasProps {
   onTransformPreview(preview: PhotoTransformPreview | null): void;
   onTransformCommit(delta: PhotoTransformDelta): Promise<boolean>;
   onCanvasMetricsChange?(metrics: CanvasMetrics): void;
+  onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }

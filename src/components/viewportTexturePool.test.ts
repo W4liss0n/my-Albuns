@@ -95,3 +95,33 @@ test("settles only after every desired texture has loaded or failed", async () =
   expect(onError).toHaveBeenCalledOnce();
   expect(onChange).toHaveBeenCalledTimes(2);
 });
+
+test("reports loaded texture count and only exact valid source pixels", async () => {
+  const pool = new ViewportTexturePool(vi.fn());
+  pool.sync([
+    "asset://cache/photo-a.jpg",
+    "asset://cache/photo-b.jpg",
+    "asset://cache/photo-c.jpg",
+  ]);
+
+  assets.pending[0].resolve({
+    source: { pixelWidth: 1_600, pixelHeight: 1_200 },
+  });
+  assets.pending[1].resolve({
+    source: { pixelWidth: Number.NaN, pixelHeight: 800 },
+  });
+  assets.pending[2].resolve({ label: "source-metadata-unavailable" });
+
+  await vi.waitFor(() => {
+    expect(pool.residency()).toEqual({
+      count: 3,
+      pixelCount: 1_920_000,
+    });
+  });
+  expect(pool.textureSize("asset://cache/photo-a.jpg")).toEqual({
+    widthPx: 1_600,
+    heightPx: 1_200,
+  });
+  expect(pool.textureSize("asset://cache/photo-b.jpg")).toBeNull();
+  expect(pool.textureSize("asset://cache/photo-c.jpg")).toBeNull();
+});

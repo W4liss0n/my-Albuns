@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { probeGraphics } from "./platform/graphics";
+import {
+  probeCanvasGraphics,
+  probeGraphics,
+} from "./platform/graphics";
 import {
   tauriExportPort,
   tauriMediaPreviewPort,
@@ -18,6 +21,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       projectSessionPort={tauriProjectSessionPort}
       topologyBenchmarkBridge={tauriTopologyBenchmarkBridge}
       graphicsProbe={probeGraphics}
+      canvasGraphicsDiagnosticProbe={probeCanvasGraphics}
       logger={tauriLogger}
     />
   </React.StrictMode>,

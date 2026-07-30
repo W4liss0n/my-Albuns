@@ -58,6 +58,7 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
       targetSheetIds: ["lamina-01", "lamina-50", "lamina-100"],
       maxResidentSheetCount: 8,
       maxResidentTextureCount: 16,
+      maxResidentTexturePixelCount: 30_720_000,
       timings: {
         sampleCount: 30,
         durationMs: 900,
@@ -69,6 +70,27 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
         maxFrameMs: 50,
         framesOver16Ms: 24,
         framesOver33Ms: 5,
+      },
+    },
+    graphics: {
+      webGlVersion: 2,
+      maxTextureSizePx: 16_384,
+      maxRenderbufferSizePx: 16_384,
+      maxTextureImageUnits: 16,
+      testedTexture: {
+        mediaId: "decorative-overlay",
+        widthPx: 1_600,
+        heightPx: 1_200,
+      },
+      contextRecovery: {
+        mechanism: "webgl_lose_context",
+        contextLost: true,
+        contextRestored: true,
+        recoveryDurationMs: 42,
+        restoredFrameLatencyMs: 14,
+        glError: 0,
+        textureBacked: true,
+        decorativeTextureBacked: true,
       },
     },
   };

@@ -239,6 +239,17 @@ export class AlbumCanvasScene {
     this.previewTextures.destroy();
   }
 
+  suspendForContextLoss() {
+    this.rejectNavigationProbe(
+      new DOMException(
+        "O contexto gráfico foi perdido durante o probe de navegação.",
+        "AbortError",
+      ),
+    );
+    this.resetTransientInteractions();
+    this.input?.onTransformPreview(null);
+  }
+
   performanceTarget(): CanvasPerformanceTargetState {
     const input = this.input;
     if (!input || !this.previewTextures.isSettled()) {
@@ -267,10 +278,17 @@ export class AlbumCanvasScene {
     const decorativeUrl = decorative
       ? input.mediaPreviewUrls?.[decorative.mediaId]
       : undefined;
+    const decorativeTexture = decorativeUrl
+      ? this.previewTextures.get(decorativeUrl)
+      : undefined;
+    const decorativeTextureSize = decorativeUrl
+      ? this.previewTextures.textureSize(decorativeUrl)
+      : null;
     if (
       !decorative ||
       !decorativeUrl ||
-      !this.previewTextures.get(decorativeUrl)
+      !decorativeTexture ||
+      !decorativeTextureSize
     ) {
       return {
         status: "failed",
@@ -306,6 +324,10 @@ export class AlbumCanvasScene {
       textureBacked: true,
       decorativeMediaId: decorative.mediaId,
       decorativeTextureBacked: true,
+      testedTexture: {
+        mediaId: decorative.mediaId,
+        ...decorativeTextureSize,
+      },
       previewPan: (amount) => {
         assertCurrent();
         setPhotoPanAids(node, true);
@@ -644,9 +666,11 @@ export class AlbumCanvasScene {
       return;
     }
 
+    const textureResidency = this.previewTextures.residency();
     const renderedFrame = {
       residentSheetCount: this.sheetNodes.size,
-      residentTextureCount: this.previewTextures.loadedCount(),
+      residentTextureCount: textureResidency.count,
+      residentTexturePixelCount: textureResidency.pixelCount,
     };
     this.pendingNavigationProbe = null;
     if (pending.signal && pending.abortHandler) {

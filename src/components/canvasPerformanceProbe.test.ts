@@ -44,6 +44,11 @@ test("measures Pan and Zoom frame latency through one texture-backed Canvas targ
     textureBacked: true,
     decorativeMediaId: "decorative-overlay",
     decorativeTextureBacked: true,
+    testedTexture: {
+      mediaId: "decorative-overlay",
+      widthPx: 1_600,
+      heightPx: 1_200,
+    },
     previewPan,
     previewZoom,
     nextRenderedFrame: renderedFrames.nextRenderedFrame,
@@ -108,6 +113,11 @@ test("refuses to report a Canvas target that is not backed by a real preview tex
     textureBacked: false,
     decorativeMediaId: "decorative-overlay",
     decorativeTextureBacked: true,
+    testedTexture: {
+      mediaId: "decorative-overlay",
+      widthPx: 1_600,
+      heightPx: 1_200,
+    },
     previewPan: vi.fn(),
     previewZoom: vi.fn(),
     nextRenderedFrame: renderedFrames.nextRenderedFrame,
@@ -134,6 +144,11 @@ test("refuses a benchmark without a real Decorative Cache texture", async () => 
     textureBacked: true,
     decorativeMediaId: "decorative-overlay",
     decorativeTextureBacked: false,
+    testedTexture: {
+      mediaId: "decorative-overlay",
+      widthPx: 1_600,
+      heightPx: 1_200,
+    },
     previewPan: vi.fn(),
     previewZoom: vi.fn(),
     nextRenderedFrame: renderedFrames.nextRenderedFrame,
@@ -162,6 +177,11 @@ test("includes synchronous preview work and waits for the Pixi-rendered frame", 
     textureBacked: true,
     decorativeMediaId: "decorative-overlay",
     decorativeTextureBacked: true,
+    testedTexture: {
+      mediaId: "decorative-overlay",
+      widthPx: 1_600,
+      heightPx: 1_200,
+    },
     previewPan: () => {
       now += 3;
     },

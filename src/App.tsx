@@ -20,7 +20,12 @@ import {
   type TopologyBenchmarkBridge,
 } from "./application/topologyBenchmark";
 import { LoggingProvider } from "./components/loggingContext";
+import {
+  CanvasGraphicsDiagnosticProbeProvider,
+  type CanvasGraphicsDiagnosticProbe,
+} from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { SafeApplicationShell } from "./components/SafeApplicationShell";
 import { useTopologyBenchmarkCoordinator } from "./components/useTopologyBenchmarkCoordinator";
 import "./App.css";
 
@@ -30,6 +35,7 @@ interface AppProps {
   projectSessionPort: ProjectSessionPort;
   topologyBenchmarkBridge?: TopologyBenchmarkBridge;
   graphicsProbe: GraphicsProbe;
+  canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
 }
 
@@ -39,9 +45,13 @@ function App({
   projectSessionPort,
   topologyBenchmarkBridge = disabledTopologyBenchmarkBridge,
   graphicsProbe,
+  canvasGraphicsDiagnosticProbe,
   logger,
 }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
+  const [runtimeGraphicsDiagnostic, setRuntimeGraphicsDiagnostic] =
+    useState<GraphicsDiagnostic | null>(null);
+  const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
@@ -51,6 +61,7 @@ function App({
     useState(false);
 
   useEffect(() => {
+    if (!graphics.supported) return;
     let active = true;
     const operationId = createLogInstanceId("project-load");
     logger.write({
@@ -93,7 +104,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [logger, projectSessionPort]);
+  }, [graphics.supported, logger, projectSessionPort]);
 
   useEffect(() => {
     logger.write({
@@ -104,14 +115,14 @@ function App({
         : "graphics_probe_failed",
       reason: graphics.supported
         ? undefined
-        : "hardware_acceleration_unavailable",
+        : graphics.code,
     });
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId;
   const canvasPerformanceProbe =
     useTopologyBenchmarkCoordinator({
-      projectId: projectId ?? "",
+      projectId: editorGraphics.supported ? (projectId ?? "") : "",
       exportPort,
       topologyBridge: topologyBenchmarkBridge,
       mediaPreviewsReady,
@@ -119,7 +130,7 @@ function App({
   useEffect(() => {
     setMediaPreviewUrls({});
     setMediaPreviewsReady(false);
-    if (!projectId || !graphics.supported) return;
+    if (!projectId || !editorGraphics.supported) return;
 
     let active = true;
     const operationId = createLogInstanceId("media-cache");
@@ -167,10 +178,10 @@ function App({
     return () => {
       active = false;
     };
-  }, [graphics.supported, logger, mediaPreviewPort, projectId]);
+  }, [editorGraphics.supported, logger, mediaPreviewPort, projectId]);
 
-  if (!graphics.supported) {
-    return <GraphicsUnavailable diagnostic={graphics} />;
+  if (!editorGraphics.supported) {
+    return <SafeApplicationShell diagnostic={editorGraphics} />;
   }
 
   if (loadError) {
@@ -198,52 +209,20 @@ function App({
 
   return (
     <LoggingProvider logger={logger}>
-      <ProjectWorkspace
-        projection={projection}
-        exportPort={exportPort}
-        projectSessionPort={projectSessionPort}
-        canvasPerformanceProbe={canvasPerformanceProbe}
-        mediaPreviewUrls={mediaPreviewUrls}
-        onProjectionChange={setProjection}
-      />
+      <CanvasGraphicsDiagnosticProbeProvider
+        probe={canvasGraphicsDiagnosticProbe}
+      >
+        <ProjectWorkspace
+          projection={projection}
+          exportPort={exportPort}
+          projectSessionPort={projectSessionPort}
+          canvasPerformanceProbe={canvasPerformanceProbe}
+          mediaPreviewUrls={mediaPreviewUrls}
+          onProjectionChange={setProjection}
+          onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
+        />
+      </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
-  );
-}
-
-function GraphicsUnavailable({
-  diagnostic,
-}: {
-  diagnostic: GraphicsDiagnostic;
-}) {
-  return (
-    <main className="startup-surface">
-      <section className="startup-card diagnostic-card">
-        <div className="brand-lockup" aria-label="MyAlbuns">
-          <span className="brand-mark" aria-hidden="true">
-            M
-          </span>
-          <span>MyAlbuns</span>
-        </div>
-        <p className="eyebrow">Diagnóstico gráfico</p>
-        <h1>Editor indisponível neste computador</h1>
-        <p>{diagnostic.reason}</p>
-        <dl className="diagnostic-list">
-          <div>
-            <dt>Backend detectado</dt>
-            <dd>{diagnostic.renderer}</dd>
-          </div>
-          <div>
-            <dt>Requisito</dt>
-            <dd>WebGL2 com aceleração por hardware</dd>
-          </div>
-        </dl>
-        <p className="support-note">
-          O diagnóstico permanece disponível. Reative a aceleração por
-          hardware para abrir o editor com desempenho e composição visual
-          consistentes.
-        </p>
-      </section>
-    </main>
   );
 }
 
