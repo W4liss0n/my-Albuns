@@ -324,10 +324,12 @@ function Invoke-TopologyProcessCrash {
     $process = Get-Process -Id $ProcessId -ErrorAction Stop
     $observedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    Stop-Process -Id $ProcessId -Force
-    Wait-Process -Id $ProcessId -Timeout 10 -ErrorAction SilentlyContinue
+    if (-not $process.HasExited) {
+        $process.Kill()
+    }
+    $exitObserved = $process.WaitForExit(30000)
     $stopwatch.Stop()
-    if ($null -ne (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) {
+    if (-not $exitObserved -or -not $process.HasExited) {
         throw "The validated $Role process $ProcessId survived forced termination."
     }
     [void] $startedProcessIds.Remove($ProcessId)
