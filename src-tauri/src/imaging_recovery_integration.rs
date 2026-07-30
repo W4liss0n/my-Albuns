@@ -237,6 +237,7 @@ fn export_snapshot() -> (
     let mut snapshot = session.render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.frames.truncate(1);
+    sheet.overlay = None;
     let sheet_id = sheet.sheet_id.clone();
     (session, snapshot, sheet_id)
 }
@@ -251,6 +252,28 @@ fn write_evidence(name: &str, value: serde_json::Value) {
         serde_json::to_vec_pretty(&value).expect("evidence serializes"),
     )
     .expect("evidence is writable");
+}
+
+#[test]
+fn recovery_export_fixture_references_only_the_generated_source() {
+    let (_, snapshot, sheet_id) = export_snapshot();
+    let sheet = snapshot
+        .composition
+        .sheets
+        .iter()
+        .find(|sheet| sheet.sheet_id == sheet_id)
+        .expect("the recovery sheet exists");
+    let expected_media_id = sheet.frames[0]
+        .photo
+        .as_ref()
+        .expect("the recovery frame contains a Photo")
+        .media_id
+        .as_str();
+
+    assert_eq!(
+        sheet.referenced_media_ids().collect::<Vec<_>>(),
+        vec![expected_media_id]
+    );
 }
 
 #[test]
