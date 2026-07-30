@@ -86,16 +86,16 @@ tentativa incompleta ou se os hashes protegidos mudarem.
 
 | Evidência | Resultado observado |
 |---|---|
-| Processo de Cache encerrado | PID `26848` |
-| Processo reiniciado para Cache | PID `26616` |
+| Processo de Cache encerrado | PID `29712` |
+| Processo reiniciado para Cache | PID `824` |
 | Temporários do PID encerrado removidos | `1` |
 | Temporário de outro PID preservado | sim |
 | `metadata.json` depois da queda | ausente |
 | `metadata.json` depois do reinício | presente |
-| Processo de Exportação encerrado | PID `9228` |
+| Processo de Exportação encerrado | PID `9136` |
 | Resposta de sucesso antes da nova tentativa | não |
 | Política de fonte | `linkedOriginals` |
-| Processo da tentativa explícita | PID `21812` |
+| Processo da tentativa explícita | PID `10276` |
 
 O SHA-256 da Exportação publicada anterior permaneceu
 `30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79`
