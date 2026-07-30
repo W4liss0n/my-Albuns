@@ -364,6 +364,7 @@ async fn invoke_once(
     }
 
     let mut exit_code = None;
+    let mut termination_observed = false;
     let mut stream_error = None;
     loop {
         if control.is_cancelled() {
@@ -406,6 +407,7 @@ async fn invoke_once(
             }
             CommandEvent::Error(error) => stream_error = Some(error),
             CommandEvent::Terminated(payload) => {
+                termination_observed = true;
                 exit_code = payload.code;
                 break;
             }
@@ -413,13 +415,30 @@ async fn invoke_once(
         }
     }
 
+    if !termination_observed {
+        let message = stream_error.map_or_else(
+            || {
+                "O canal de eventos foi fechado sem confirmar o encerramento do Processador de Imagens."
+                    .to_string()
+            },
+            |error| {
+                format!(
+                    "O canal de eventos falhou sem confirmar o encerramento do Processador de Imagens: {error}"
+                )
+            },
+        );
+        return Err(InvocationFailure::termination_unconfirmed(
+            imaging_process_id,
+            message,
+        ));
+    }
     if let Some(error) = stream_error {
         return Err(InvocationFailure {
             stage: InvocationFailureStage::ReadResponse,
             exit_code,
             process_id: Some(imaging_process_id),
             message: format!("Não foi possível receber a resposta do Processador: {error}"),
-            termination_observed: exit_code.is_some(),
+            termination_observed: true,
         });
     }
     if exit_code != Some(0) {
@@ -466,14 +485,16 @@ async fn wait_for_termination_for(
     timeout: Duration,
 ) -> bool {
     tokio::time::timeout(timeout, async {
-        while let Some(event) = events.recv().await {
-            if matches!(event, CommandEvent::Terminated(_)) {
-                return;
+        loop {
+            match events.recv().await {
+                Some(CommandEvent::Terminated(_)) => return true,
+                Some(_) => {}
+                None => return false,
             }
         }
     })
     .await
-    .is_ok()
+    .unwrap_or(false)
 }
 
 fn decode_and_report_event_chunk(
@@ -518,6 +539,7 @@ mod tests {
         ImagingEvent, ImagingEventStreamDecoder, ImagingFailureStage, ImagingProgress,
         ImagingProgressStage, ImagingResponse, RenderCompletion, encode_event,
     };
+    use tauri_plugin_shell::process::{CommandEvent, TerminatedPayload};
 
     use super::{
         InvocationControl, InvocationFailure, InvocationFailureStage, complete_invocation,
@@ -627,6 +649,36 @@ mod tests {
             assert!(
                 !wait_for_termination_for(&mut events, Duration::from_millis(1)).await,
                 "an open event channel cannot make process reaping wait indefinitely"
+            );
+        });
+    }
+
+    #[test]
+    fn a_closed_event_channel_does_not_claim_process_termination() {
+        tauri::async_runtime::block_on(async {
+            let (sender, mut events) = tauri::async_runtime::channel(1);
+            drop(sender);
+            assert!(
+                !wait_for_termination_for(&mut events, Duration::from_secs(1)).await,
+                "only an explicit Terminated event confirms process termination"
+            );
+        });
+    }
+
+    #[test]
+    fn an_explicit_terminated_event_confirms_process_termination() {
+        tauri::async_runtime::block_on(async {
+            let (sender, mut events) = tauri::async_runtime::channel(1);
+            sender
+                .send(CommandEvent::Terminated(TerminatedPayload {
+                    code: None,
+                    signal: Some(9),
+                }))
+                .await
+                .expect("the termination event is delivered");
+            assert!(
+                wait_for_termination_for(&mut events, Duration::from_secs(1)).await,
+                "a signal termination is confirmed even without an exit code"
             );
         });
     }
