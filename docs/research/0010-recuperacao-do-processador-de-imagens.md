@@ -34,9 +34,10 @@ A recuperação mantém responsabilidades separadas:
   `std::process` exclusivo do teste compartilham o codec, a correlação e a
   classificação da terminação. No protocolo v6, o adaptador Tauri também
   encaminha progresso tipado conforme o fluxo é produzido e conserva o handle
-  da tentativa até observar o término após um cancelamento; somente a
-  inicialização e a coleta de eventos, dependentes de cada runtime, são
-  distintas. A fronteira não decide repetição nem ciclo de arquivos;
+  da tentativa até observar o término após um cancelamento ou atingir um limite
+  explícito. Uma terminação não confirmada recebe classificação própria;
+  somente a inicialização e a coleta de eventos, dependentes de cada runtime,
+  são distintas. A fronteira não decide repetição nem ciclo de arquivos;
 - `CacheEngine` possui a política de Cache: em uma queda inesperada, remove
   somente nomes terminados pelo PID encerrado e reinicia uma vez; uma falha
   determinística não é repetida e uma segunda queda termina a operação depois
@@ -44,7 +45,9 @@ A recuperação mantém responsabilidades separadas:
   artefatos e publica `metadata.json`;
 - `ExportPipeline` possui planejamento, preparação, validação, publicação e
   descarte; cada execução invoca o transporte uma vez e, portanto, não oferece
-  repetição automática;
+  repetição automática. Se o encerramento do Processador não puder ser
+  confirmado, conserva a preparação possivelmente ainda em uso em vez de
+  tentar removê-la;
 - `AppPaths` deriva uma pasta única
   `.myalbuns-export-{operation-id}.tmp` dentro do Destino, mantém a cadeia de
   diretórios validada e restringe descarte e publicação à tentativa;
@@ -86,16 +89,16 @@ tentativa incompleta ou se os hashes protegidos mudarem.
 
 | Evidência | Resultado observado |
 |---|---|
-| Processo de Cache encerrado | PID `29712` |
-| Processo reiniciado para Cache | PID `824` |
+| Processo de Cache encerrado | PID `29584` |
+| Processo reiniciado para Cache | PID `28448` |
 | Temporários do PID encerrado removidos | `1` |
 | Temporário de outro PID preservado | sim |
 | `metadata.json` depois da queda | ausente |
 | `metadata.json` depois do reinício | presente |
-| Processo de Exportação encerrado | PID `9136` |
+| Processo de Exportação encerrado | PID `27800` |
 | Resposta de sucesso antes da nova tentativa | não |
 | Política de fonte | `linkedOriginals` |
-| Processo da tentativa explícita | PID `10276` |
+| Processo da tentativa explícita | PID `23576` |
 
 O SHA-256 da Exportação publicada anterior permaneceu
 `30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79`

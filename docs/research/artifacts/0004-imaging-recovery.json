@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-07-30T02:30:38.5070183Z",
-    "gitCommit":  "d5c49f6f106a51c7bb44b61287936963f2b94a11",
+    "collectedAtUtc":  "2026-07-30T02:46:03.7775488Z",
+    "gitCommit":  "480a96b527804c8075d1c9cabefca006bc11e244",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -11,38 +11,38 @@
                    {
                        "name":  "protocol",
                        "passed":  true,
-                       "elapsedMs":  17017
+                       "elapsedMs":  6512
                    },
                    {
                        "name":  "cache-temporary-cleanup",
                        "passed":  true,
-                       "elapsedMs":  13761
+                       "elapsedMs":  559
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  1912
+                       "elapsedMs":  6402
                    },
                    {
                        "name":  "production-recovery-integration",
                        "passed":  true,
-                       "elapsedMs":  60115
+                       "elapsedMs":  41021
                    }
                ],
     "evidence":  {
                      "cache":  {
-                                   "failedProcessId":  29712,
+                                   "failedProcessId":  29584,
                                    "foreignTemporarySurvivedCleanup":  true,
                                    "generatedCountAfterRestart":  1,
                                    "metadataExistedAfterFailure":  false,
                                    "metadataExistedAfterRestart":  true,
                                    "removedTemporaryCount":  1,
-                                   "restartedProcessId":  824,
+                                   "restartedProcessId":  28448,
                                    "temporaryExistedAfterCleanup":  false,
                                    "temporaryObservedAfterFailure":  true
                                },
                      "export":  {
-                                    "failedProcessId":  9136,
+                                    "failedProcessId":  27800,
                                     "finalOutputSha256AfterExplicitRetry":  "845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb",
                                     "partialPreparationObserved":  true,
                                     "previousOutputSha256AfterFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
@@ -50,7 +50,7 @@
                                     "processCountBeforeExplicitRetry":  1,
                                     "projectSha256AfterFailure":  "1fa39a7104b6080a3397beb98dd073295e9bbaf07886f5593b5baa4a955d6c70",
                                     "projectSha256BeforeFailure":  "1fa39a7104b6080a3397beb98dd073295e9bbaf07886f5593b5baa4a955d6c70",
-                                    "retryProcessId":  10276,
+                                    "retryProcessId":  23576,
                                     "sourcePolicy":  "linkedOriginals",
                                     "successResponseBeforeExplicitRetry":  false
                                 }
