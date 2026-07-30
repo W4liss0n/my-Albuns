@@ -132,6 +132,11 @@ Cache\
 
 O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. Não existem tiles, pirâmides nem previews persistidos de Lâmina no MVP, salvo se o spike provar com medições que a representação única não atende.
 
+Conteúdo opaco usa JPEG; conteúdo que precisa preservar transparência usa PNG.
+O formato é propriedade do artefato derivado e integra seu caminho e o índice
+do Cache. Essa escolha não altera o original nem permite que a Exportação use a
+representação reduzida.
+
 O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Importação, Cache ou Exportação existem somente em memória e não criam outra pasta, índice ou categoria sob `Cache`.
 
 `CacheEngine` possui os jobs, o índice e as gerações. Cada job grava um temporário próprio, verifica se o pedido e o original ainda são atuais e promove o artefato imutável antes de publicar a entrada correspondente em `metadata.json`. Uma queda pode deixar temporários ou gerações não referenciadas, que são descartados no próximo uso, sem fazer o índice apontar para um arquivo incompleto.

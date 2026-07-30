@@ -4,7 +4,10 @@ use std::{
 };
 
 use directories::BaseDirs;
-use myalbuns_paths::{AppPaths, AppPathsError, ExportPathPlan, OperationPathContext, PathRootKind};
+use myalbuns_paths::{
+    AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, OperationPathContext,
+    PathRootKind,
+};
 
 #[test]
 fn derives_temporary_application_roots_from_known_folders() {
@@ -86,7 +89,11 @@ fn derives_only_safe_project_cache_namespaces() {
     );
     assert_eq!(
         cache
-            .preview_file("media-001", "0123456789abcdef-v1-1600")
+            .preview_file(
+                "media-001",
+                "0123456789abcdef-v1-1600",
+                CacheArtifactFormat::Jpeg,
+            )
             .expect("safe artifact identities are accepted"),
         Path::new(
             r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-001.0123456789abcdef-v1-1600.jpg"
@@ -94,10 +101,27 @@ fn derives_only_safe_project_cache_namespaces() {
     );
     assert_eq!(
         cache
-            .preview_temporary_file("media-001", "0123456789abcdef-v1-1600", 42)
+            .preview_temporary_file(
+                "media-001",
+                "0123456789abcdef-v1-1600",
+                CacheArtifactFormat::Jpeg,
+                42,
+            )
             .expect("temporary names are derived by the path module"),
         Path::new(
             r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-001.0123456789abcdef-v1-1600.jpg.tmp-42"
+        )
+    );
+    assert_eq!(
+        cache
+            .preview_file(
+                "decorative-001",
+                "0123456789abcdef-v1-1600",
+                CacheArtifactFormat::Png,
+            )
+            .expect("safe PNG artifact identities are accepted"),
+        Path::new(
+            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\decorative-001.0123456789abcdef-v1-1600.png"
         )
     );
     assert_eq!(
@@ -107,7 +131,7 @@ fn derives_only_safe_project_cache_namespaces() {
     for unsafe_artifact in ["", "../escape", r"nested\escape", "a.b", "álbum", "CON"] {
         assert!(
             cache
-                .preview_file(unsafe_artifact, "generation-01")
+                .preview_file(unsafe_artifact, "generation-01", CacheArtifactFormat::Jpeg,)
                 .is_err(),
             "{unsafe_artifact:?} must not become an artifact path component"
         );
@@ -137,7 +161,11 @@ fn validates_cache_artifacts_without_choosing_a_transport_protocol() {
     let preview = paths
         .project_cache("project-01")
         .expect("project namespace is safe")
-        .preview_file("media-001", "0123456789abcdef-v1-1600")
+        .preview_file(
+            "media-001",
+            "0123456789abcdef-v1-1600",
+            CacheArtifactFormat::Jpeg,
+        )
         .expect("artifact identity is safe");
 
     paths
@@ -417,10 +445,10 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
         .prepare_cache_storage(&cache)
         .expect("the Cache directory chain is held");
     let temporary = cache
-        .preview_temporary_file("media-01", "generation-01", 42)
+        .preview_temporary_file("media-01", "generation-01", CacheArtifactFormat::Jpeg, 42)
         .expect("the temporary path is valid");
     let published = cache
-        .preview_file("media-01", "generation-01")
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
         .expect("the published path is valid");
 
     let mut publication = storage
@@ -465,10 +493,10 @@ fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
         .prepare_cache_storage(&cache)
         .expect("the Cache directory chain is held");
     let temporary = cache
-        .preview_temporary_file("media-01", "generation-01", 42)
+        .preview_temporary_file("media-01", "generation-01", CacheArtifactFormat::Jpeg, 42)
         .expect("the temporary path is valid");
     let published = cache
-        .preview_file("media-01", "generation-01")
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
         .expect("the published path is valid");
     std::fs::write(&published, b"previous preview")
         .expect("the previous Cache artifact is writable");
@@ -502,7 +530,7 @@ fn rejects_using_the_same_cache_path_as_temporary_and_final() {
         .prepare_cache_storage(&cache)
         .expect("the Cache directory chain is held");
     let published = cache
-        .preview_file("media-01", "generation-01")
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
         .expect("the published path is valid");
 
     assert!(matches!(
@@ -522,13 +550,13 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
         .prepare_cache_storage(&cache)
         .expect("the Cache directory chain is held");
     let published = cache
-        .preview_file("media-01", "generation-01")
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
         .expect("the published path is valid");
     let preview_temporary = cache
-        .preview_temporary_file("media-01", "generation-02", 4242)
+        .preview_temporary_file("media-01", "generation-02", CacheArtifactFormat::Png, 4242)
         .expect("the preview temporary path is valid");
     let other_process_temporary = cache
-        .preview_temporary_file("media-01", "generation-03", 4343)
+        .preview_temporary_file("media-01", "generation-03", CacheArtifactFormat::Jpeg, 4343)
         .expect("the other process temporary path is valid");
     let metadata = cache.metadata_file();
     let metadata_temporary = cache.metadata_temporary_file(4242);

@@ -14,6 +14,11 @@ pub(crate) struct DecodedJpeg {
     pub(crate) exif_orientation: u8,
 }
 
+pub(crate) struct DecodedCacheSource {
+    pub(crate) image: RgbaImage,
+    pub(crate) exif_orientation: Option<u8>,
+}
+
 pub(crate) fn read_verified_source(
     source: &MediaSource,
     operational_path: &Path,
@@ -84,12 +89,64 @@ pub(crate) fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<Decod
     })
 }
 
-pub(crate) fn jpeg_orientation(media_id: &str, verified_bytes: &[u8]) -> Result<u8, String> {
+pub(crate) fn cache_source_orientation(
+    media_id: &str,
+    verified_bytes: &[u8],
+) -> Result<Option<u8>, String> {
+    match source_format(media_id, verified_bytes)? {
+        ImageFormat::Jpeg => jpeg_orientation(media_id, verified_bytes).map(Some),
+        ImageFormat::Png => Ok(None),
+        _ => Err(format!(
+            "a mídia {media_id} não usa um formato aceito pelo Cache"
+        )),
+    }
+}
+
+pub(crate) fn decode_cache_source(
+    media_id: &str,
+    verified_bytes: &[u8],
+) -> Result<DecodedCacheSource, String> {
+    match source_format(media_id, verified_bytes)? {
+        ImageFormat::Jpeg => {
+            let decoded = decode_jpeg(media_id, verified_bytes)?;
+            Ok(DecodedCacheSource {
+                image: decoded.image,
+                exif_orientation: Some(decoded.exif_orientation),
+            })
+        }
+        ImageFormat::Png => {
+            let decoded = ImageReader::new(Cursor::new(verified_bytes))
+                .with_guessed_format()
+                .map_err(|error| {
+                    format!("não foi possível inspecionar a mídia {media_id}: {error}")
+                })?
+                .decode()
+                .map_err(|error| format!("não foi possível decodificar a mídia: {error}"))?;
+            Ok(DecodedCacheSource {
+                image: decoded.to_rgba8(),
+                exif_orientation: None,
+            })
+        }
+        _ => Err(format!(
+            "a mídia {media_id} não usa um formato aceito pelo Cache"
+        )),
+    }
+}
+
+fn jpeg_orientation(media_id: &str, verified_bytes: &[u8]) -> Result<u8, String> {
     let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
     decoder
         .orientation()
         .map(|orientation| orientation.to_exif())
         .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))
+}
+
+fn source_format(media_id: &str, verified_bytes: &[u8]) -> Result<ImageFormat, String> {
+    ImageReader::new(Cursor::new(verified_bytes))
+        .with_guessed_format()
+        .map_err(|error| format!("não foi possível inspecionar a mídia {media_id}: {error}"))?
+        .format()
+        .ok_or_else(|| format!("não foi possível identificar o formato da mídia {media_id}"))
 }
 
 fn jpeg_decoder<'a>(

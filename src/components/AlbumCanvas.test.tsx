@@ -761,6 +761,127 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
   });
 });
 
+test("materializes and releases only the viewport margin while navigating a long Album", async () => {
+  const longComposition: CompositionPlan = {
+    sheets: Array.from({ length: 100 }, (_, index) => {
+      const number = index + 1;
+      return {
+        ...interactiveComposition.sheets[0],
+        sheetId: `sheet-${String(number).padStart(3, "0")}`,
+        number,
+        frames: [
+          {
+            ...interactiveComposition.sheets[0].frames[0],
+            frameId: `frame-${String(number).padStart(3, "0")}`,
+            photo: {
+              ...interactiveComposition.sheets[0].frames[0].photo!,
+              mediaId: `media-${String(number).padStart(3, "0")}`,
+              name: `Foto ${number}.jpg`,
+            },
+          },
+        ],
+      };
+    }),
+  };
+  const mediaPreviewUrls = Object.fromEntries(
+    longComposition.sheets.map((sheet) => {
+      const mediaId = sheet.frames[0].photo!.mediaId;
+      return [mediaId, `asset://localhost/cache/${mediaId}.jpg`];
+    }),
+  );
+  const callbacks = {
+    onSelectFrame: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const layout = createContinuousCanvasLayout(longComposition.sheets);
+  const canvasScale = (500 - 2 * 24) / (300 + 24);
+  const canvasAt = (focusedSheetId: string) => (
+    <AlbumCanvas
+      projectId="project-spike-001"
+      composition={longComposition}
+      mediaPreviewUrls={mediaPreviewUrls}
+      continuousCanvasLayout={layout}
+      selectedFrameId={null}
+      focusedSheetId={focusedSheetId}
+      centeredSheetId={focusedSheetId}
+      viewport={{
+        offsetX:
+          layout.centeredOffset(focusedSheetId, canvasScale, 1_200) ?? 0,
+      }}
+      {...callbacks}
+    />
+  );
+  let settledLoadCount = 0;
+  const settleNewTextures = async () => {
+    await act(async () => {
+      while (settledLoadCount < pixiLifecycle.resolveAssetLoads.length) {
+        pixiLifecycle.resolveAssetLoads[settledLoadCount]?.({
+          label: `viewport-texture-${settledLoadCount}`,
+        });
+        settledLoadCount += 1;
+      }
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+
+  const view = render(canvasAt("sheet-001"));
+  await finishPixiInitialization();
+
+  const world = pixiLifecycle.instances[0].stage.children[0] as {
+    children: Array<{ position: { x: number } }>;
+  };
+  const initialSheets = [...world.children];
+  const firstPreview = mediaPreviewUrls["media-001"];
+  const middlePreview = mediaPreviewUrls["media-050"];
+  const lastPreview = mediaPreviewUrls["media-100"];
+
+  expect(longComposition.sheets).toHaveLength(100);
+  expect(initialSheets.length).toBeGreaterThan(0);
+  expect(initialSheets.length).toBeLessThanOrEqual(8);
+  expect(pixiLifecycle.assetLoads).toContain(firstPreview);
+  expect(pixiLifecycle.assetLoads).not.toContain(lastPreview);
+  await settleNewTextures();
+
+  view.rerender(canvasAt("sheet-050"));
+
+  expect(world.children.length).toBeGreaterThan(0);
+  expect(world.children.length).toBeLessThanOrEqual(8);
+  expect(world.children).not.toContain(initialSheets[0]);
+  expect(pixiLifecycle.assetLoads).toContain(middlePreview);
+  await waitFor(() => {
+    expect(pixiLifecycle.assetUnloads).toContain(firstPreview);
+  });
+  await settleNewTextures();
+
+  view.rerender(canvasAt("sheet-100"));
+
+  expect(world.children.length).toBeGreaterThan(0);
+  expect(world.children.length).toBeLessThanOrEqual(8);
+  expect(pixiLifecycle.assetLoads).toContain(lastPreview);
+  await waitFor(() => {
+    expect(pixiLifecycle.assetUnloads).toContain(middlePreview);
+  });
+  await settleNewTextures();
+
+  view.rerender(canvasAt("sheet-001"));
+
+  expect(world.children.length).toBeGreaterThan(0);
+  expect(world.children.length).toBeLessThanOrEqual(8);
+  expect(world.children.some(({ position }) => position.x === 0)).toBe(true);
+  expect(world.children).not.toContain(initialSheets[0]);
+  expect(
+    pixiLifecycle.assetLoads.filter((url) => url === firstPreview),
+  ).toHaveLength(2);
+  await waitFor(() => {
+    expect(pixiLifecycle.assetUnloads).toContain(lastPreview);
+  });
+});
+
 test("selects the first composed benchmark Frame regardless of texture completion order", async () => {
   const onCompleted = vi.fn();
   renderCanvas({

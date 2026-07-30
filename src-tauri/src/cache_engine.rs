@@ -322,7 +322,7 @@ fn verify_completion(
         }
         let preview_path = request
             .cache_paths
-            .preview_file(&artifact.media_id, &artifact.generation_id)
+            .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
             .map_err(|error| {
                 CacheFailure::new(
                     CacheFailureStage::VerifyArtifacts,
@@ -393,7 +393,7 @@ fn write_cache_metadata(
                 }
                 let artifact_path = request
                     .cache_paths
-                    .preview_file(&artifact.media_id, &artifact.generation_id)
+                    .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
                     .map_err(|error| {
                         CacheFailure::new(
                             CacheFailureStage::PublishIndex,
@@ -564,17 +564,26 @@ mod tests {
     }
 
     fn completed(work: &CacheWork, app_paths: &AppPaths) -> ImagingResponse {
+        completed_with_format(work, app_paths, CacheArtifactFormat::Jpeg)
+    }
+
+    fn completed_with_format(
+        work: &CacheWork,
+        app_paths: &AppPaths,
+        format: CacheArtifactFormat,
+    ) -> ImagingResponse {
         let request = plan_request(work).expect("valid cache request");
         let job = &request.jobs[0];
         let preview_path = request
             .cache_paths
-            .preview_file(job.source.media_id(), &job.generation_id)
+            .preview_file(job.source.media_id(), &job.generation_id, format)
             .expect("valid preview path");
         let temporary_path = request
             .cache_paths
             .preview_temporary_file(
                 job.source.media_id(),
                 &job.generation_id,
+                format,
                 std::process::id(),
             )
             .expect("valid temporary path");
@@ -599,8 +608,8 @@ mod tests {
                     width_px: 10,
                     height_px: 5,
                     preview_bytes: 7,
-                    format: CacheArtifactFormat::Jpeg,
-                    exif_orientation: Some(1),
+                    format,
+                    exif_orientation: (format == CacheArtifactFormat::Jpeg).then_some(1),
                 }],
                 generated_count: 1,
                 reused_count: 0,
@@ -705,6 +714,36 @@ mod tests {
             assert!(
                 entry.get("sourceSha256").is_none(),
                 "the fingerprint must not have an unversioned duplicate"
+            );
+        });
+    }
+
+    #[test]
+    fn the_disposable_index_records_the_png_artifact_consumed_by_the_interface() {
+        tauri::async_runtime::block_on(async {
+            let (_root, app_paths, work, context) = work();
+            let response = completed_with_format(&work, &app_paths, CacheArtifactFormat::Png);
+            let mut transport = ScriptedTransport {
+                results: VecDeque::from([Ok(response)]),
+                attempts: Vec::new(),
+            };
+
+            execute(&mut transport, &app_paths, work.clone(), &context)
+                .await
+                .expect("the PNG Cache index is published");
+
+            let metadata: serde_json::Value = serde_json::from_slice(
+                &std::fs::read(work.cache_paths.metadata_file())
+                    .expect("the published index is readable"),
+            )
+            .expect("the published index is JSON");
+            let entry = &metadata["entries"][0];
+            assert_eq!(entry["format"], "png");
+            assert_eq!(entry["exifOrientation"], serde_json::Value::Null);
+            assert!(
+                entry["artifactName"]
+                    .as_str()
+                    .is_some_and(|name| name.ends_with(".png"))
             );
         });
     }

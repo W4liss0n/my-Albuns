@@ -100,7 +100,7 @@ pub(crate) async fn prepare_media_previews(
         .iter()
         .map(|artifact| -> Result<MediaPreview, String> {
             let preview_path = cache_paths
-                .preview_file(&artifact.media_id, &artifact.generation_id)
+                .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
                 .map_err(|error| error.to_string())?;
             Ok(MediaPreview {
                 media_id: artifact.media_id.clone(),
@@ -166,7 +166,7 @@ fn encode_uri_component(value: &str) -> String {
 mod tests {
     use std::path::Path;
 
-    use myalbuns_paths::AppPaths;
+    use myalbuns_paths::{AppPaths, CacheArtifactFormat};
 
     use super::cache_asset_url;
 
@@ -176,13 +176,37 @@ mod tests {
         let preview = paths
             .project_cache("project-01")
             .expect("project namespace is safe")
-            .preview_file("media-001", "0123456789abcdef-v1-1600")
+            .preview_file(
+                "media-001",
+                "0123456789abcdef-v1-1600",
+                CacheArtifactFormat::Jpeg,
+            )
             .expect("artifact identity is safe");
 
         assert_eq!(
             cache_asset_url(&paths, &preview)
                 .expect("the authorized Cache path becomes an asset URL"),
             "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-001.0123456789abcdef-v1-1600.jpg"
+        );
+    }
+
+    #[test]
+    fn encodes_an_authorized_png_cache_artifact_for_the_tauri_asset_protocol() {
+        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let preview = paths
+            .project_cache("project-01")
+            .expect("project namespace is safe")
+            .preview_file(
+                "decorative-001",
+                "0123456789abcdef-v1-1600",
+                CacheArtifactFormat::Png,
+            )
+            .expect("PNG artifact identity is safe");
+
+        assert_eq!(
+            cache_asset_url(&paths, &preview)
+                .expect("the authorized PNG Cache path becomes an asset URL"),
+            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cdecorative-001.0123456789abcdef-v1-1600.png"
         );
     }
 

@@ -123,7 +123,14 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
 
-A margem exata e a centralização da escala continuam abertas. A largura da pré-carga, a residência de texturas e os gatilhos de descarte serão definidos por testes de estresse com Álbuns longos.
+A política inicial de residência expande o viewport em 700 unidades lógicas do
+Canvas para cada lado e mantém ainda uma Lâmina adjacente antes e depois do
+intervalo encontrado. Ao sair dessa faixa, o nó visual da Lâmina é destruído e
+as texturas que não pertencem mais ao conjunto residente são descarregadas,
+inclusive quando uma carga assíncrona termina atrasada. Retornar à faixa
+reconstrói nós e texturas a partir do modelo lógico preservado. Esses valores
+são parâmetros internos de desempenho, não estado do Projeto, e podem ser
+recalibrados por medições posteriores sem alterar o comportamento documental.
 
 ### Barra da Lâmina e Painel de Layouts
 

@@ -9,7 +9,8 @@ mod operation;
 
 pub use app_paths::AppPaths;
 pub use cache::{
-    CachePathPlan, PendingCachePublication, PreparedCacheStorage, SynchronizedCachePublication,
+    CacheArtifactFormat, CachePathPlan, PendingCachePublication, PreparedCacheStorage,
+    SynchronizedCachePublication,
 };
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, PreparedExportStorage};

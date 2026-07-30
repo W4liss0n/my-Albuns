@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-29
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Cache com imagens reais
@@ -120,6 +120,16 @@ Por isso o ticket 01 e o critério geral de Cache continuam abertos. A evidênci
 atual apenas estabelece que uma representação única é tecnicamente viável
 como baseline e deve ser medida graficamente antes de qualquer adoção de
 tiles.
+
+## Estado posterior
+
+Em 30 de julho de 2026, o corte registrado em
+`0011-cenario-cache-e-virtualizacao.md` acrescentou a
+representação PNG para conteúdo com transparência, manteve JPEG para conteúdo
+opaco e executou o Canvas com textura real. Isso remove a lacuna de
+transparência do Processador, mas o critério permanece aberto até uma Imagem
+decorativa atravessar os consumidores reais. Os limites históricos desta coleta
+permanecem válidos; o `CacheEngine` completo continua sendo trabalho posterior.
 
 ## Repetição
 

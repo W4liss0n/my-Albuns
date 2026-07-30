@@ -9,7 +9,9 @@ use std::{
 
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
-use myalbuns_imaging_protocol::{ImagingCommand, ImagingResponse, MediaSource, encode_command};
+use myalbuns_imaging_protocol::{
+    CacheArtifactFormat, ImagingCommand, ImagingResponse, MediaSource, encode_command,
+};
 use myalbuns_paths::{AppPaths, ExportPathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
@@ -160,7 +162,12 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
             let job = request.jobs.first()?;
             request
                 .cache_paths
-                .preview_temporary_file(job.source.media_id(), &job.generation_id, process_id)
+                .preview_temporary_file(
+                    job.source.media_id(),
+                    &job.generation_id,
+                    CacheArtifactFormat::Jpeg,
+                    process_id,
+                )
                 .ok()
         }
         ImagingCommand::Render(request) => Some(request.prepared_output_path.clone()),
@@ -280,7 +287,12 @@ fn real_processor_recovery_flows_through_production_modules() {
         );
         let foreign_process_id = u32::MAX - 7;
         let foreign_temporary = cache_paths
-            .preview_temporary_file(source.media_id(), &generation_id, foreign_process_id)
+            .preview_temporary_file(
+                source.media_id(),
+                &generation_id,
+                CacheArtifactFormat::Jpeg,
+                foreign_process_id,
+            )
             .expect("the foreign temporary path is valid");
         let cache_storage = app_paths
             .prepare_cache_storage(&cache_paths)
@@ -318,6 +330,7 @@ fn real_processor_recovery_flows_through_production_modules() {
             .preview_temporary_file(
                 &artifact.media_id,
                 &artifact.generation_id,
+                artifact.format,
                 cache_transport.process_ids[0],
             )
             .expect("the failed temporary path is valid");

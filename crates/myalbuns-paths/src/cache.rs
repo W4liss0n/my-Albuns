@@ -24,6 +24,22 @@ impl From<GuardedFsError> for AppPathsError {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CacheArtifactFormat {
+    Jpeg,
+    Png,
+}
+
+impl CacheArtifactFormat {
+    const fn extension(self) -> &'static str {
+        match self {
+            Self::Jpeg => "jpg",
+            Self::Png => "png",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct CachePathPlan {
     root: PathBuf,
@@ -150,27 +166,30 @@ impl CachePathPlan {
         &self,
         media_id: &str,
         generation_id: &str,
+        format: CacheArtifactFormat,
     ) -> Result<PathBuf, AppPathsError> {
         if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
             return Err(AppPathsError::InvalidCacheArtifact);
         }
         Ok(self
             .media_directory()
-            .join(format!("{media_id}.{generation_id}.jpg")))
+            .join(format!("{media_id}.{generation_id}.{}", format.extension())))
     }
 
     pub fn preview_temporary_file(
         &self,
         media_id: &str,
         generation_id: &str,
+        format: CacheArtifactFormat,
         process_id: u32,
     ) -> Result<PathBuf, AppPathsError> {
         if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
             return Err(AppPathsError::InvalidCacheArtifact);
         }
-        Ok(self
-            .media_directory()
-            .join(format!("{media_id}.{generation_id}.jpg.tmp-{process_id}")))
+        Ok(self.media_directory().join(format!(
+            "{media_id}.{generation_id}.{}.tmp-{process_id}",
+            format.extension()
+        )))
     }
 
     pub fn metadata_file(&self) -> PathBuf {
@@ -496,7 +515,10 @@ fn is_preview_temporary_name_for(name: &std::ffi::OsStr, expected_process_id: u3
     else {
         return false;
     };
-    let Some(components) = artifact.strip_suffix(".jpg") else {
+    let Some(components) = [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png]
+        .into_iter()
+        .find_map(|format| artifact.strip_suffix(&format!(".{}", format.extension())))
+    else {
         return false;
     };
     let mut components = components.split('.');

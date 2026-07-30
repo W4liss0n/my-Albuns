@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
 use myalbuns_core::RenderSnapshot;
+pub use myalbuns_paths::CacheArtifactFormat;
 use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 6;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 7;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -566,7 +567,11 @@ impl CacheRequest {
                 ));
             }
             self.cache_paths
-                .preview_file(source.media_id(), &job.generation_id)
+                .preview_file(
+                    source.media_id(),
+                    &job.generation_id,
+                    CacheArtifactFormat::Jpeg,
+                )
                 .map_err(|error| error.to_string())?;
             if !media_ids.insert(source.media_id()) {
                 return Err("a solicitação de Cache contém mídia duplicada".into());
@@ -707,12 +712,6 @@ pub struct CacheArtifact {
     pub preview_bytes: u64,
     pub format: CacheArtifactFormat,
     pub exif_orientation: Option<u8>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CacheArtifactFormat {
-    Jpeg,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

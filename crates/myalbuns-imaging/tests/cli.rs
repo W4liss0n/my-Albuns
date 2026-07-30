@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use image::{ImageFormat, Rgb, RgbImage};
+use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource,
-    decode_event_stream,
+    CacheArtifactFormat, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
+    ImagingCommand, ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse,
+    MediaSource, decode_event_stream,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -222,6 +222,7 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         .preview_file(
             "benchmark-a-001",
             &format!("{}-v1-32", &source_sha256[..16]),
+            CacheArtifactFormat::Jpeg,
         )
         .expect("the preview path is derived centrally");
     let bytes = std::fs::read(preview_path).expect("the reduced representation is readable");
@@ -243,6 +244,132 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         .expect("the reuse response is correlated");
     assert_eq!(reused.generated_count, 0);
     assert_eq!(reused.reused_count, 1);
+}
+
+#[test]
+fn processor_preserves_transparency_in_one_reduced_png_representation() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let cache = TestCache::new("transparent-decorative");
+    let source_path = source_dir.path().join("overlay.png");
+    RgbaImage::from_pixel(2_400, 1_800, Rgba([24, 96, 180, 96]))
+        .save_with_format(&source_path, ImageFormat::Png)
+        .expect("the transparent decorative fixture is written");
+    let original_source = std::fs::read(&source_path).expect("the source is readable");
+    let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
+    let cache_paths = cache.paths.clone();
+    let media_source = MediaSource::new(
+        "decorative-overlay-001",
+        source_path,
+        original_source.len() as u64,
+        source_sha256.clone(),
+    )
+    .expect("the transparent decorative source is valid");
+    let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
+    let command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-transparent-decorative",
+            cache.project_id.clone(),
+            cache_paths.clone(),
+            vec![cache_job(media_source, 1_600)],
+            1_600,
+            bindings,
+        )
+        .expect("the Cache request is valid"),
+    );
+
+    let result = invoke_imaging_command(&command, None);
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let response = processor_response(&result.stdout);
+    let completed = response
+        .cache_completed_for("cache-transparent-decorative")
+        .expect("the Cache response is correlated");
+    assert_eq!(completed.generated_count, 1);
+    assert_eq!(completed.reused_count, 0);
+    assert_eq!(completed.artifacts.len(), 1);
+    let artifact = &completed.artifacts[0];
+    assert_eq!(artifact.format, CacheArtifactFormat::Png);
+    assert_eq!(artifact.exif_orientation, None);
+    assert_eq!((artifact.width_px, artifact.height_px), (1_600, 1_200));
+    let preview_path = cache_paths
+        .preview_file(
+            "decorative-overlay-001",
+            &format!("{}-v1-1600", &source_sha256[..16]),
+            CacheArtifactFormat::Png,
+        )
+        .expect("the PNG preview path is derived centrally");
+    let bytes = std::fs::read(&preview_path).expect("the reduced representation is readable");
+    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    let preview = image::open(preview_path)
+        .expect("the reduced representation decodes")
+        .to_rgba8();
+    assert_eq!((preview.width(), preview.height()), (1_600, 1_200));
+    assert_eq!(preview.get_pixel(800, 600)[3], 96);
+    assert_eq!(
+        std::fs::read(source_dir.path().join("overlay.png"))
+            .expect("the original remains readable"),
+        original_source
+    );
+}
+
+#[test]
+fn processor_keeps_an_opaque_png_source_in_the_jpeg_cache_baseline() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let cache = TestCache::new("opaque-png");
+    let source_path = source_dir.path().join("opaque-decorative.png");
+    RgbaImage::from_pixel(64, 48, Rgba([24, 96, 180, u8::MAX]))
+        .save_with_format(&source_path, ImageFormat::Png)
+        .expect("the opaque PNG fixture is written");
+    let original_source = std::fs::read(&source_path).expect("the source is readable");
+    let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
+    let cache_paths = cache.paths.clone();
+    let media_source = MediaSource::new(
+        "decorative-opaque-001",
+        source_path,
+        original_source.len() as u64,
+        source_sha256.clone(),
+    )
+    .expect("the opaque source is valid");
+    let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
+    let command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-opaque-png",
+            cache.project_id.clone(),
+            cache_paths.clone(),
+            vec![cache_job(media_source, 32)],
+            32,
+            bindings,
+        )
+        .expect("the Cache request is valid"),
+    );
+
+    let result = invoke_imaging_command(&command, None);
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let response = processor_response(&result.stdout);
+    let artifact = &response
+        .cache_completed_for("cache-opaque-png")
+        .expect("the Cache response is correlated")
+        .artifacts[0];
+    assert_eq!(artifact.format, CacheArtifactFormat::Jpeg);
+    assert_eq!(artifact.exif_orientation, None);
+    let preview_path = cache_paths
+        .preview_file(
+            "decorative-opaque-001",
+            &format!("{}-v1-32", &source_sha256[..16]),
+            CacheArtifactFormat::Jpeg,
+        )
+        .expect("the JPEG preview path is derived centrally");
+    let bytes = std::fs::read(preview_path).expect("the reduced representation is readable");
+    assert_eq!(&bytes[..2], b"\xff\xd8");
 }
 
 #[test]

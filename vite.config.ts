@@ -33,6 +33,8 @@ export default defineConfig(() => ({
         "**/crates/**",
         "**/target/**",
         "**/.tools/**",
+        "**/.scratch/**",
+        "**/benchmark-data/**",
       ],
     },
   },
