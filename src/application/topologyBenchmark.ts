@@ -11,11 +11,25 @@ export interface FrameTimingSummary {
   framesOver33Ms: number;
 }
 
-export interface CanvasPerformanceMeasurement {
+export interface CanvasInteractionPerformanceMeasurement {
   frameId: string;
   textureBacked: boolean;
   pan: FrameTimingSummary;
   zoom: FrameTimingSummary;
+}
+
+export interface CanvasNavigationMeasurement {
+  sheetCount: number;
+  cycleCount: number;
+  targetSheetIds: [string, string, string];
+  maxResidentSheetCount: number;
+  maxResidentTextureCount: number;
+  timings: FrameTimingSummary;
+}
+
+export interface CanvasPerformanceMeasurement
+  extends CanvasInteractionPerformanceMeasurement {
+  navigation: CanvasNavigationMeasurement;
 }
 
 export interface TopologyBenchmarkConfig {
@@ -25,6 +39,7 @@ export interface TopologyBenchmarkConfig {
   warmupFrames: number;
   panFrames: number;
   zoomFrames: number;
+  navigationCycles: number;
   runExport: boolean;
 }
 

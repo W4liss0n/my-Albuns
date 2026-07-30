@@ -7,6 +7,7 @@ import {
 } from "../application/logging";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
+import { runCanvasNavigationPerformanceProbe } from "./canvasNavigationPerformanceProbe";
 import { runCanvasPerformanceProbe } from "./canvasPerformanceProbe";
 import { useLogger } from "./loggingContext";
 import "./pixiRuntime";
@@ -215,14 +216,36 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       instanceId: sceneInstanceIdRef.current ?? undefined,
     });
     void Promise.resolve(request.onReady())
-      .then(() =>
-        runCanvasPerformanceProbe(
-          request.config,
+      .then(async () => {
+        const interaction = await runCanvasPerformanceProbe(
+          {
+            warmupFrames: request.config.warmupFrames,
+            panFrames: request.config.panFrames,
+            zoomFrames: request.config.zoomFrames,
+          },
           target,
           undefined,
           controller.signal,
-        ),
-      )
+        );
+        const navigationTarget = scene.navigationPerformanceTarget(
+          request.navigateToSheet,
+        );
+        if (!navigationTarget) {
+          throw new Error(
+            "O Canvas não disponibilizou o alvo de navegação.",
+          );
+        }
+        const navigation = await runCanvasNavigationPerformanceProbe(
+          { cycles: request.config.navigationCycles },
+          navigationTarget,
+          undefined,
+          controller.signal,
+        );
+        return {
+          ...interaction,
+          navigation,
+        };
+      })
       .then(async (measurement) => {
         if (
           controller.signal.aborted ||

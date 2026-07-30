@@ -25,6 +25,10 @@ import type {
   CanvasPerformanceTarget,
   CanvasPerformanceTargetState,
 } from "./canvasPerformanceProbe";
+import type {
+  CanvasNavigationPerformanceTarget,
+  CanvasNavigationRenderedFrame,
+} from "./canvasNavigationPerformanceProbe";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
@@ -108,6 +112,15 @@ interface ZoomGestureRuntime {
   timer: number | null;
 }
 
+interface PendingNavigationProbe {
+  generation: number;
+  sheetId: string;
+  resolve(value: CanvasNavigationRenderedFrame): void;
+  reject(reason: unknown): void;
+  signal?: AbortSignal;
+  abortHandler?: () => void;
+}
+
 export class AlbumCanvasScene {
   private readonly world = new Container();
   private readonly sheetNodes = new Map<string, SheetRenderNode>();
@@ -121,6 +134,7 @@ export class AlbumCanvasScene {
   private readonly pendingCommitFrames = new Set<string>();
   private externalPreviewFrameId: string | null = null;
   private lastCanvasMetrics: CanvasMetrics | null = null;
+  private pendingNavigationProbe: PendingNavigationProbe | null = null;
   private readonly previewTextures: ViewportTexturePool;
 
   constructor(
@@ -198,6 +212,7 @@ export class AlbumCanvasScene {
     );
 
     this.reconcileMaterializedSheets(layout, boundedOffsetX, scale);
+    this.settleNavigationProbe(layout, boundedOffsetX, scale);
     this.updateDecorations();
     this.applyExternalPhotoZoomPreview();
   }
@@ -208,6 +223,12 @@ export class AlbumCanvasScene {
   }
 
   destroy() {
+    this.rejectNavigationProbe(
+      new DOMException(
+        "O Canvas foi encerrado durante o probe.",
+        "AbortError",
+      ),
+    );
     this.resetTransientInteractions();
     this.app.canvas.removeEventListener(
       "wheel",
@@ -327,7 +348,78 @@ export class AlbumCanvasScene {
     return { status: "ready", target };
   }
 
+  navigationPerformanceTarget(
+    navigateToSheet: (sheetId: string) => void,
+  ): CanvasNavigationPerformanceTarget | null {
+    const input = this.input;
+    if (!input) return null;
+    const generation = this.projectGeneration;
+    const sheetIds = input.composition.sheets.map((sheet) => sheet.sheetId);
+
+    return {
+      sheetIds,
+      navigateToSheet: (sheetId, signal) => {
+        if (
+          generation !== this.projectGeneration ||
+          !sheetIds.includes(sheetId)
+        ) {
+          return Promise.reject(
+            new DOMException(
+              "O alvo do probe de navegação deixou de existir.",
+              "AbortError",
+            ),
+          );
+        }
+        this.rejectNavigationProbe(
+          new DOMException(
+            "O probe iniciou outra navegação antes de concluir a anterior.",
+            "AbortError",
+          ),
+        );
+
+        return new Promise<CanvasNavigationRenderedFrame>(
+          (resolve, reject) => {
+            const pending: PendingNavigationProbe = {
+              generation,
+              sheetId,
+              resolve,
+              reject,
+              signal,
+            };
+            if (signal) {
+              pending.abortHandler = () => {
+                if (this.pendingNavigationProbe === pending) {
+                  this.rejectNavigationProbe(
+                    new DOMException(
+                      "O probe do Canvas foi cancelado.",
+                      "AbortError",
+                    ),
+                  );
+                }
+              };
+              signal.addEventListener("abort", pending.abortHandler, {
+                once: true,
+              });
+            }
+            this.pendingNavigationProbe = pending;
+            try {
+              navigateToSheet(sheetId);
+            } catch (error: unknown) {
+              this.rejectNavigationProbe(error);
+            }
+          },
+        );
+      },
+    };
+  }
+
   private resetProjectScene() {
+    this.rejectNavigationProbe(
+      new DOMException(
+        "O Projeto mudou durante o probe de navegação.",
+        "AbortError",
+      ),
+    );
     this.resetTransientInteractions();
     this.clearMaterializedSheets();
     this.previewTextures.sync([]);
@@ -466,6 +558,91 @@ export class AlbumCanvasScene {
       }
       node.container.position.set(layout.entries[index].left, 0);
     }
+  }
+
+  private settleNavigationProbe(
+    layout: ContinuousCanvasLayout,
+    boundedOffsetX: number,
+    scale: number,
+  ) {
+    const pending = this.pendingNavigationProbe;
+    const input = this.input;
+    if (!pending || !input) return;
+    if (
+      pending.generation !== this.projectGeneration ||
+      pending.signal?.aborted
+    ) {
+      this.rejectNavigationProbe(
+        new DOMException(
+          "O probe do Canvas foi cancelado.",
+          "AbortError",
+        ),
+      );
+      return;
+    }
+    if (
+      layout.centeredSheetId(
+        boundedOffsetX,
+        scale,
+        this.app.screen.width,
+      ) !== pending.sheetId
+    ) {
+      return;
+    }
+    const sheet = input.composition.sheets.find(
+      ({ sheetId }) => sheetId === pending.sheetId,
+    );
+    const node = this.sheetNodes.get(pending.sheetId);
+    if (!sheet || !node || !this.previewTextures.isSettled()) return;
+
+    const texturedFrameIds = sheet.frames
+      .filter(
+        (frame) =>
+          frame.photo &&
+          input.mediaPreviewUrls?.[frame.photo.mediaId] !== undefined,
+      )
+      .map((frame) => frame.frameId);
+    if (
+      texturedFrameIds.length === 0 ||
+      texturedFrameIds.some(
+        (frameId) => !this.photoNodes.get(frameId)?.textureBacked,
+      )
+    ) {
+      this.rejectNavigationProbe(
+        new Error(
+          "A Lâmina de destino não possui uma textura real do Cache.",
+        ),
+      );
+      return;
+    }
+
+    const renderedFrame = {
+      residentSheetCount: this.sheetNodes.size,
+      residentTextureCount: this.previewTextures.loadedCount(),
+    };
+    this.pendingNavigationProbe = null;
+    if (pending.signal && pending.abortHandler) {
+      pending.signal.removeEventListener("abort", pending.abortHandler);
+    }
+    this.app.ticker.addOnce(
+      () =>
+        pending.resolve({
+          ...renderedFrame,
+          renderedAt: performance.now(),
+        }),
+      undefined,
+      UPDATE_PRIORITY.UTILITY,
+    );
+  }
+
+  private rejectNavigationProbe(reason: unknown) {
+    const pending = this.pendingNavigationProbe;
+    if (!pending) return;
+    this.pendingNavigationProbe = null;
+    if (pending.signal && pending.abortHandler) {
+      pending.signal.removeEventListener("abort", pending.abortHandler);
+    }
+    pending.reject(reason);
   }
 
   private clearMaterializedSheets() {

@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
@@ -14,7 +14,7 @@ import {
   type PhotoTransformPreview,
 } from "./AlbumCanvas";
 import type { LogEvent, Logger } from "../application/logging";
-import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
+import type { BoundCanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 import { LoggingProvider } from "./loggingContext";
 
@@ -371,25 +371,6 @@ const interactiveComposition: CompositionPlan = {
   ],
 };
 
-const twoPhotoComposition: CompositionPlan = {
-  sheets: [1, 2].map((number) => ({
-    ...interactiveComposition.sheets[0],
-    sheetId: `sheet-00${number}`,
-    number,
-    frames: [
-      {
-        ...interactiveComposition.sheets[0].frames[0],
-        frameId: `frame-00${number}`,
-        photo: {
-          ...interactiveComposition.sheets[0].frames[0].photo!,
-          mediaId: `media-00${number}`,
-          name: `Foto ${number}.jpg`,
-        },
-      },
-    ],
-  })),
-};
-
 const pannedInteractiveComposition: CompositionPlan = {
   sheets: [
     {
@@ -472,7 +453,7 @@ function renderCanvas({
   projectId?: string;
   compositionPlan?: CompositionPlan;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
-  performanceProbe?: CanvasPerformanceProbeRequest | null;
+  performanceProbe?: BoundCanvasPerformanceProbeRequest | null;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -882,42 +863,156 @@ test("materializes and releases only the viewport margin while navigating a long
   });
 });
 
-test("selects the first composed benchmark Frame regardless of texture completion order", async () => {
+test("measures long Album navigation through the public centering action and rendered Cache textures", async () => {
+  const longComposition: CompositionPlan = {
+    sheets: Array.from({ length: 100 }, (_, index) => {
+      const number = index + 1;
+      return {
+        ...interactiveComposition.sheets[0],
+        sheetId: `sheet-${String(number).padStart(3, "0")}`,
+        number,
+        frames: [
+          {
+            ...interactiveComposition.sheets[0].frames[0],
+            frameId: `frame-${String(number).padStart(3, "0")}`,
+            photo: {
+              ...interactiveComposition.sheets[0].frames[0].photo!,
+              mediaId: `media-${String(number).padStart(3, "0")}`,
+              name: `Foto ${number}.jpg`,
+            },
+          },
+        ],
+      };
+    }),
+  };
+  const mediaPreviewUrls = Object.fromEntries(
+    longComposition.sheets.map((sheet) => {
+      const mediaId = sheet.frames[0].photo!.mediaId;
+      return [mediaId, `asset://localhost/cache/${mediaId}.jpg`];
+    }),
+  );
+  const layout = createContinuousCanvasLayout(longComposition.sheets);
+  const canvasScale = (500 - 2 * 24) / (300 + 24);
+  const navigationCalls: string[] = [];
   const onCompleted = vi.fn();
-  renderCanvas({
-    compositionPlan: twoPhotoComposition,
-    mediaPreviewUrls: {
-      "media-001": "asset://localhost/cache/media-001.jpg",
-      "media-002": "asset://localhost/cache/media-002.jpg",
-    },
-    performanceProbe: {
-      key: "deterministic-target-probe",
-      config: {
-        warmupFrames: 1,
-        panFrames: 1,
-        zoomFrames: 1,
-      },
-      onReady: vi.fn(),
-      onCompleted,
-      onFailed: vi.fn(),
-    },
-  });
-  await finishPixiInitialization();
 
+  function NavigationHarness() {
+    const [centeredSheetId, setCenteredSheetId] = useState("sheet-001");
+    const navigateToSheet = (sheetId: string) => {
+      navigationCalls.push(sheetId);
+      setCenteredSheetId(sheetId);
+    };
+    return (
+      <AlbumCanvas
+        projectId="project-spike-001"
+        composition={longComposition}
+        mediaPreviewUrls={mediaPreviewUrls}
+        continuousCanvasLayout={layout}
+        selectedFrameId={null}
+        focusedSheetId={centeredSheetId}
+        centeredSheetId={centeredSheetId}
+        viewport={{
+          offsetX:
+            layout.centeredOffset(
+              centeredSheetId,
+              canvasScale,
+              1_200,
+            ) ?? 0,
+        }}
+        performanceProbe={{
+          key: "long-album-navigation-probe",
+          config: {
+            warmupFrames: 1,
+            panFrames: 1,
+            zoomFrames: 1,
+            navigationCycles: 1,
+          },
+          navigateToSheet,
+          onReady: vi.fn(),
+          onCompleted,
+          onFailed: vi.fn(),
+        }}
+        onSelectFrame={vi.fn()}
+        onFocusSheet={vi.fn()}
+        onCenteredSheetChange={vi.fn()}
+        onViewportChange={vi.fn()}
+        onTransformPreview={vi.fn()}
+        onTransformCommit={vi.fn(async () => true)}
+      />
+    );
+  }
+
+  let settledLoadCount = 0;
+  const settleNewTextures = async () => {
+    await act(async () => {
+      while (settledLoadCount < pixiLifecycle.resolveAssetLoads.length) {
+        pixiLifecycle.resolveAssetLoads[settledLoadCount]?.({
+          label: `navigation-texture-${settledLoadCount}`,
+        });
+        settledLoadCount += 1;
+      }
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+
+  render(<NavigationHarness />);
+  await finishPixiInitialization();
   await act(async () => {
-    pixiLifecycle.resolveAssetLoads[1]?.({ label: "second-texture" });
+    pixiLifecycle.resolveAssetLoads[1]?.({
+      label: "second-texture-first",
+    });
     await Promise.resolve();
     await Promise.resolve();
-    pixiLifecycle.resolveAssetLoads[0]?.({ label: "first-texture" });
+    pixiLifecycle.resolveAssetLoads[0]?.({
+      label: "first-texture-second",
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    for (
+      settledLoadCount = 2;
+      settledLoadCount < pixiLifecycle.resolveAssetLoads.length;
+      settledLoadCount += 1
+    ) {
+      pixiLifecycle.resolveAssetLoads[settledLoadCount]?.({
+        label: `navigation-texture-${settledLoadCount}`,
+      });
+    }
     await Promise.resolve();
     await Promise.resolve();
   });
+
+  for (const expectedSheetId of [
+    "sheet-050",
+    "sheet-100",
+    "sheet-001",
+  ]) {
+    await waitFor(() => {
+      expect(navigationCalls[navigationCalls.length - 1]).toBe(
+        expectedSheetId,
+      );
+      expect(pixiLifecycle.resolveAssetLoads.length).toBeGreaterThan(
+        settledLoadCount,
+      );
+    });
+    await settleNewTextures();
+  }
 
   await waitFor(() => {
     expect(onCompleted).toHaveBeenCalledWith(
       expect.objectContaining({
         frameId: "frame-001",
         textureBacked: true,
+        navigation: expect.objectContaining({
+          sheetCount: 100,
+          cycleCount: 1,
+          targetSheetIds: ["sheet-001", "sheet-050", "sheet-100"],
+          maxResidentSheetCount: expect.any(Number),
+          maxResidentTextureCount: expect.any(Number),
+          timings: expect.objectContaining({
+            sampleCount: 3,
+          }),
+        }),
       }),
     );
   });
@@ -937,7 +1032,9 @@ test("reports a terminal benchmark failure when every desired texture fails", as
         warmupFrames: 1,
         panFrames: 1,
         zoomFrames: 1,
+        navigationCycles: 1,
       },
+      navigateToSheet: vi.fn(),
       onReady,
       onCompleted: vi.fn(),
       onFailed,

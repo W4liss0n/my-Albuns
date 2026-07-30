@@ -52,6 +52,14 @@ export class ViewportTexturePool {
     return true;
   }
 
+  loadedCount() {
+    let count = 0;
+    for (const entry of this.entries.values()) {
+      if (entry.texture) count += 1;
+    }
+    return count;
+  }
+
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;

@@ -22,8 +22,9 @@ Esta rodada fecha o cenário representativo e avança dois gates da fundação:
 Ela não encerra o ticket 01. Perda de contexto WebGL2, pressão de memória
 gráfica, topologia final, permissões, caminhos de rede e coordenação global de
 operações continuam com critérios próprios. O baseline de Cache permanece
-aberto até uma Imagem decorativa atravessar seus consumidores reais; a
-virtualização permanece aberta até a latência da navegação longa ser medida.
+aberto até uma Imagem decorativa atravessar seus consumidores reais. A
+virtualização foi encerrada posteriormente pela medição registrada em
+`0012-navegacao-em-album-longo.md`.
 
 ## Cenário representativo
 
@@ -125,9 +126,12 @@ O número oito é consequência do viewport e da margem usados nesse teste, não
 um limite documental. Os parâmetros de residência podem ser recalibrados por
 medições futuras sem alterar o Projeto.
 
-O teste prova o comportamento funcional, mas não mede a latência da navegação
-entre Lâminas de um Álbum longo. Essa medição continua necessária antes de
-encerrar o critério de virtualização.
+O teste prova o comportamento funcional. A execução posterior com o host real,
+100 Lâminas por Projeto, texturas do Cache e 30 saltos por Projeto está em
+`0012-navegacao-em-album-longo.md`. Ela encontrou no máximo sete Lâminas e
+14 texturas residentes, preservou a latência de Pan/Zoom e limitou o pior salto
+observado a 283,2 ms. Com essa evidência, o critério de virtualização foi
+encerrado sem introduzir tiles ou outro modelo de cena.
 
 ## Conclusão
 
@@ -136,5 +140,5 @@ O cenário representativo está concluído sem antecipar subsistemas posteriores
 - existe um único cenário editorial atravessando as fronteiras reais;
 - o Processador agora preserva transparência na representação única, mas falta
   exercitar uma Imagem decorativa nos consumidores;
-- o Álbum lógico não é truncado e o descarte e a reconstrução da cena estão
-  provados, mas falta medir a latência da navegação longa.
+- o Álbum lógico não é truncado e o descarte, a reconstrução e a latência da
+  navegação longa foram provados pela medição complementar.

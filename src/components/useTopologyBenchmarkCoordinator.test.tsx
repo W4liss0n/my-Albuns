@@ -36,6 +36,25 @@ const measurement: CanvasPerformanceMeasurement = {
     framesOver16Ms: 0,
     framesOver33Ms: 0,
   },
+  navigation: {
+    sheetCount: 100,
+    cycleCount: 1,
+    targetSheetIds: ["lamina-01", "lamina-50", "lamina-100"],
+    maxResidentSheetCount: 8,
+    maxResidentTextureCount: 16,
+    timings: {
+      sampleCount: 3,
+      durationMs: 72,
+      firstFrameLatencyMs: 24,
+      meanFrameMs: 24,
+      p50FrameMs: 24,
+      p95FrameMs: 24,
+      p99FrameMs: 24,
+      maxFrameMs: 24,
+      framesOver16Ms: 3,
+      framesOver33Ms: 0,
+    },
+  },
 };
 
 const baseConfig: TopologyBenchmarkConfig = {
@@ -45,6 +64,7 @@ const baseConfig: TopologyBenchmarkConfig = {
   warmupFrames: 1,
   panFrames: 1,
   zoomFrames: 1,
+  navigationCycles: 1,
   runExport: true,
 };
 

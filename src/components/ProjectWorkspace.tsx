@@ -119,7 +119,14 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
-            performanceProbe={canvasPerformanceProbe}
+            performanceProbe={
+              canvasPerformanceProbe
+                ? {
+                    ...canvasPerformanceProbe,
+                    navigateToSheet: controller.navigateToSheet,
+                  }
+                : null
+            }
             mediaPreviewUrls={mediaPreviewUrls}
           />
         </section>

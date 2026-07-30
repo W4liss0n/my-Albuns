@@ -9,10 +9,13 @@ use crate::{
 pub(crate) const TOPOLOGY_ENV: &str = "MYALBUNS_TOPOLOGY_SPIKE";
 pub(crate) const PROJECT_SLOT_ENV: &str = "MYALBUNS_TOPOLOGY_PROJECT";
 pub(crate) const CORPUS_MANIFEST_ENV: &str = "MYALBUNS_TOPOLOGY_CORPUS_MANIFEST";
+const STANDARD_SHEET_COUNT: usize = 12;
+const LONG_ALBUM_BENCHMARK_SHEET_COUNT: usize = 100;
 
 pub(crate) struct TopologySpike {
     definition: TopologyDefinition,
     corpus: Option<BenchmarkCorpus>,
+    sheet_count: usize,
 }
 
 struct TopologyDefinition {
@@ -78,7 +81,16 @@ impl TopologySpike {
             ));
         }
         let corpus = corpus_manifest.map(BenchmarkCorpus::load).transpose()?;
-        Ok(Self { definition, corpus })
+        let sheet_count = if mode.is_some() {
+            LONG_ALBUM_BENCHMARK_SHEET_COUNT
+        } else {
+            STANDARD_SHEET_COUNT
+        };
+        Ok(Self {
+            definition,
+            corpus,
+            sheet_count,
+        })
     }
 
     pub(crate) fn project_host(&self) -> Result<ProjectHost, String> {
@@ -89,13 +101,13 @@ impl TopologySpike {
                     let album = corpus.album_for(window.sample);
                     Ok((
                         window.label,
-                        album.open_session(window.sample, 12)?,
+                        album.open_session(window.sample, self.sheet_count)?,
                         album.media_sources(),
                     ))
                 } else {
                     let source = window
                         .sample
-                        .persisted_source(12)
+                        .persisted_source(self.sheet_count)
                         .map_err(|error| error.to_string())?;
                     let session = ProjectCore::open_editable_session(&source)
                         .map_err(|error| error.to_string())?;
@@ -265,5 +277,50 @@ mod tests {
             "topology-independent-project-b"
         );
         assert_eq!(multiwindow.webview_data_namespace(), "topology-multiwindow");
+    }
+
+    #[test]
+    fn keeps_the_standard_sample_small_but_runs_the_topology_spike_with_a_long_album() {
+        let standard =
+            TopologySpike::from_values(None, None).expect("standard mode is a valid configuration");
+        let independent = TopologySpike::from_values(Some("independent"), Some("a"))
+            .expect("independent mode is a valid configuration");
+        let multiwindow = TopologySpike::from_values(Some("multiwindow"), None)
+            .expect("multiwindow mode is a valid configuration");
+
+        assert_eq!(
+            standard
+                .project_host()
+                .expect("the standard host is built")
+                .projection("main")
+                .expect("the standard projection is available")
+                .composition
+                .sheets
+                .len(),
+            12
+        );
+        assert_eq!(
+            independent
+                .project_host()
+                .expect("the independent host is built")
+                .projection("main")
+                .expect("the independent projection is available")
+                .composition
+                .sheets
+                .len(),
+            100
+        );
+        assert_eq!(
+            multiwindow
+                .project_host()
+                .expect("the multiwindow host is built")
+                .projection("project-b")
+                .expect("the secondary projection is available")
+                .state
+                .album
+                .sheets
+                .len(),
+            100
+        );
     }
 }

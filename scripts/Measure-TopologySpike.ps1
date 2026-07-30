@@ -48,7 +48,7 @@ $startedProcessIds = [System.Collections.Generic.List[int]]::new()
 $probeGatePaths = [System.Collections.Generic.List[string]]::new()
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path $script:WorkspaceRoot 'docs\research\artifacts\0003-topology-interaction-export.json'
+    $OutputPath = Join-Path $script:WorkspaceRoot 'docs\research\artifacts\0005-long-album-navigation.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
@@ -64,6 +64,7 @@ $reportText = @'
   "notes": [
     "O Cache foi reconstru\u00eddo a frio com uma representa\u00e7\u00e3o JPEG de at\u00e9 1600 px por Foto.",
     "Pan e Zoom foram medidos separadamente sobre uma textura real do Cache, depois de 24 frames de aquecimento.",
+    "A navega\u00e7\u00e3o percorreu 10 vezes a primeira, a 50\u00aa, a 100\u00aa e de volta \u00e0 primeira L\u00e2mina, aguardando a textura real do destino e o frame renderizado pelo PixiJS.",
     "As duas Janelas iniciaram o probe pelo mesmo arquivo-gate, somente depois da conclus\u00e3o do Cache frio.",
     "A Exporta\u00e7\u00e3o mediu a primeira L\u00e2mina do \u00c1lbum principal a 300 DPI, lendo e verificando os JPEGs originais.",
     "Cada uso valida o tamanho e o SHA-256 da Foto; o corpus completo foi recalculado depois das duas alternativas.",
@@ -73,7 +74,7 @@ $reportText = @'
     "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo."
   ],
   "summary": {
-    "title": "Intera\u00e7\u00f5es e Exporta\u00e7\u00e3o com imagens reais",
+    "title": "Navega\u00e7\u00e3o em \u00c1lbum longo com imagens reais",
     "collected": "Coletado em UTC",
     "raw": "JSON bruto",
     "measure": "Medida",
@@ -97,6 +98,10 @@ $reportText = @'
     "panOver33": "Pan: frames acima de 33 ms",
     "zoomP95": "Zoom: pior p95 entre Projetos",
     "zoomOver33": "Zoom: frames acima de 33 ms",
+    "navigationP95": "Navega\u00e7\u00e3o: pior p95 entre Projetos",
+    "navigationOver33": "Navega\u00e7\u00e3o: respostas acima de 33 ms",
+    "navigationResidentSheets": "Navega\u00e7\u00e3o: pico de L\u00e2minas residentes",
+    "navigationResidentTextures": "Navega\u00e7\u00e3o: pico de texturas residentes",
     "exportDuration": "Exporta\u00e7\u00e3o: dura\u00e7\u00e3o",
     "exportDimensions": "Exporta\u00e7\u00e3o: dimens\u00f5es a 300 DPI",
     "exportSources": "Exporta\u00e7\u00e3o: volume dos originais",
@@ -237,8 +242,10 @@ function Reset-TopologyCache {
     if ($LASTEXITCODE -ne 0) {
         throw 'The native imaging processor could not reset the topology Cache.'
     }
-    $response = $responseText | ConvertFrom-Json
+    $responseEvent = $responseText | ConvertFrom-Json
+    $response = $responseEvent.payload
     if (
+        $responseEvent.kind -ne 'response' -or
         $response.kind -ne 'cacheReset' -or
         $response.requestId -ne $requestId -or
         $response.removedCount -notin @(0, 1, 2)
@@ -769,7 +776,7 @@ function Convert-CanvasTiming {
     param(
         [Parameter(Mandatory = $true)] $Event,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('pan', 'zoom')]
+        [ValidateSet('pan', 'zoom', 'navigation')]
         [string] $Prefix
     )
 
@@ -838,20 +845,30 @@ function Assert-ComparableCanvasTargets {
         [Parameter(Mandatory = $true)] $Multiwindow
     )
 
-    $independentFrames = @{}
+    $independentTargets = @{}
     foreach ($project in $Independent.canvas.projects) {
-        $independentFrames[[string]$project.projectId] = [string]$project.frameId
+        $independentTargets[[string]$project.projectId] = [ordered]@{
+            frameId = [string]$project.frameId
+            sheetCount = [long]$project.navigation.sheetCount
+            targetSheetIds = @($project.navigation.targetSheetIds)
+        }
     }
     foreach ($project in $Multiwindow.canvas.projects) {
         $projectId = [string]$project.projectId
-        $independentFrame = $independentFrames[$projectId]
+        $independentTarget = $independentTargets[$projectId]
         if (
-            [string]::IsNullOrWhiteSpace($independentFrame) -or
-            $independentFrame -ne [string]$project.frameId
+            $null -eq $independentTarget -or
+            $independentTarget.frameId -ne [string]$project.frameId -or
+            $independentTarget.sheetCount -ne [long]$project.navigation.sheetCount -or
+            (
+                @($independentTarget.targetSheetIds) -join '|'
+            ) -ne (
+                @($project.navigation.targetSheetIds) -join '|'
+            )
         ) {
             throw (
                 "Canvas target mismatch for project ${projectId}: " +
-                "independent=${independentFrame}, " +
+                "independent=$($independentTarget.frameId), " +
                 "multiwindow=$($project.frameId)."
             )
         }
@@ -982,6 +999,22 @@ function Wait-ForTopologyBenchmark {
                 throw 'At least one Canvas probe did not use a real Cache texture.'
             }
             if (
+                @(
+                    $canvasEvents |
+                        Where-Object {
+                            [long]$_.navigation_sheet_count -lt 100 -or
+                            [long]$_.navigation_cycle_count -ne 10 -or
+                            [long]$_.navigation_sample_count -ne 30 -or
+                            [long]$_.navigation_max_resident_sheet_count -lt 1 -or
+                            [long]$_.navigation_max_resident_sheet_count -ge
+                                [long]$_.navigation_sheet_count -or
+                            [long]$_.navigation_max_resident_texture_count -lt 1
+                        }
+                ).Count -gt 0
+            ) {
+                throw 'The long-Album navigation benchmark returned invalid evidence.'
+            }
+            if (
                 [int]$exportEvent[0].dpi -ne 300 -or
                 [long]$exportEvent[0].source_count -lt 1 -or
                 [long]$exportEvent[0].source_bytes -lt 1 -or
@@ -1017,11 +1050,26 @@ function Wait-ForTopologyBenchmark {
                             textureBacked = [bool]$_.texture_backed
                             pan = Convert-CanvasTiming -Event $_ -Prefix pan
                             zoom = Convert-CanvasTiming -Event $_ -Prefix zoom
+                            navigation = [ordered]@{
+                                sheetCount = [long]$_.navigation_sheet_count
+                                cycleCount = [long]$_.navigation_cycle_count
+                                targetSheetIds = @(
+                                    [string]$_.navigation_first_sheet_id
+                                    [string]$_.navigation_middle_sheet_id
+                                    [string]$_.navigation_last_sheet_id
+                                )
+                                maxResidentSheetCount = [long]$_.navigation_max_resident_sheet_count
+                                maxResidentTextureCount = [long]$_.navigation_max_resident_texture_count
+                                timings = Convert-CanvasTiming -Event $_ -Prefix navigation
+                            }
                         }
                     }
             )
             $panTimings = @($projects | ForEach-Object { $_.pan })
             $zoomTimings = @($projects | ForEach-Object { $_.zoom })
+            $navigationTimings = @(
+                $projects | ForEach-Object { $_.navigation.timings }
+            )
             return [ordered]@{
                 completedElapsedMs = $TopologyStopwatch.ElapsedMilliseconds
                 canvas = [ordered]@{
@@ -1038,6 +1086,25 @@ function Wait-ForTopologyBenchmark {
                     aggregate = [ordered]@{
                         pan = Measure-CanvasTimingAggregate -Timings $panTimings
                         zoom = Measure-CanvasTimingAggregate -Timings $zoomTimings
+                        navigation = Measure-CanvasTimingAggregate -Timings $navigationTimings
+                        maxResidentSheetCount = [long](
+                            (
+                                $projects |
+                                    ForEach-Object {
+                                        [long]$_.navigation.maxResidentSheetCount
+                                    } |
+                                    Measure-Object -Maximum
+                            ).Maximum
+                        )
+                        maxResidentTextureCount = [long](
+                            (
+                                $projects |
+                                    ForEach-Object {
+                                        [long]$_.navigation.maxResidentTextureCount
+                                    } |
+                                    Measure-Object -Maximum
+                            ).Maximum
+                        )
                     }
                 }
                 export = [ordered]@{
@@ -1253,6 +1320,10 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.panOver33) | $($independent.interaction.canvas.aggregate.pan.framesOver33Ms) | $($multiwindow.interaction.canvas.aggregate.pan.framesOver33Ms) |"
         "| $($summary.zoomP95) | $($independent.interaction.canvas.aggregate.zoom.worstProjectP95FrameMs) ms | $($multiwindow.interaction.canvas.aggregate.zoom.worstProjectP95FrameMs) ms |"
         "| $($summary.zoomOver33) | $($independent.interaction.canvas.aggregate.zoom.framesOver33Ms) | $($multiwindow.interaction.canvas.aggregate.zoom.framesOver33Ms) |"
+        "| $($summary.navigationP95) | $($independent.interaction.canvas.aggregate.navigation.worstProjectP95FrameMs) ms | $($multiwindow.interaction.canvas.aggregate.navigation.worstProjectP95FrameMs) ms |"
+        "| $($summary.navigationOver33) | $($independent.interaction.canvas.aggregate.navigation.framesOver33Ms) | $($multiwindow.interaction.canvas.aggregate.navigation.framesOver33Ms) |"
+        "| $($summary.navigationResidentSheets) | $($independent.interaction.canvas.aggregate.maxResidentSheetCount) | $($multiwindow.interaction.canvas.aggregate.maxResidentSheetCount) |"
+        "| $($summary.navigationResidentTextures) | $($independent.interaction.canvas.aggregate.maxResidentTextureCount) | $($multiwindow.interaction.canvas.aggregate.maxResidentTextureCount) |"
         "| $($summary.exportDuration) | $($independent.interaction.export.elapsedMs) ms | $($multiwindow.interaction.export.elapsedMs) ms |"
         "| $($summary.exportDimensions) | $($independent.interaction.export.widthPx) x $($independent.interaction.export.heightPx) px | $($multiwindow.interaction.export.widthPx) x $($multiwindow.interaction.export.heightPx) px |"
         "| $($summary.exportSources) | $(Format-Mebibytes $independent.interaction.export.sourceBytes) MiB | $(Format-Mebibytes $multiwindow.interaction.export.sourceBytes) MiB |"
@@ -1462,7 +1533,7 @@ try {
 
     $currentInputState = Get-BuildInputState
     $report = [ordered]@{
-        schemaVersion = 7
+        schemaVersion = 8
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         hardware = Get-HardwareInventory
         corpus = [ordered]@{

@@ -76,6 +76,7 @@ export function useTopologyBenchmarkCoordinator({
         warmupFrames: config.warmupFrames,
         panFrames: config.panFrames,
         zoomFrames: config.zoomFrames,
+        navigationCycles: config.navigationCycles,
       },
       onReady: () => topologyBridge.reportCanvasReady(),
       onCompleted: async (measurement) => {

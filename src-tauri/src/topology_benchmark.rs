@@ -11,6 +11,8 @@ pub(crate) const EXPORT_GATE_ENV: &str = "MYALBUNS_TOPOLOGY_EXPORT_GATE";
 const WARMUP_FRAMES: usize = 24;
 const PAN_FRAMES: usize = 120;
 const ZOOM_FRAMES: usize = 120;
+const NAVIGATION_CYCLES: usize = 10;
+const MINIMUM_LONG_ALBUM_SHEETS: usize = 100;
 
 pub(crate) struct TopologyBenchmarkState {
     topology: &'static str,
@@ -28,6 +30,7 @@ pub(crate) struct TopologyBenchmarkConfig {
     warmup_frames: usize,
     pan_frames: usize,
     zoom_frames: usize,
+    navigation_cycles: usize,
     run_export: bool,
 }
 
@@ -38,6 +41,18 @@ pub(crate) struct CanvasBenchmarkMeasurement {
     texture_backed: bool,
     pan: FrameTimingSummary,
     zoom: FrameTimingSummary,
+    navigation: CanvasNavigationMeasurement,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CanvasNavigationMeasurement {
+    sheet_count: usize,
+    cycle_count: usize,
+    target_sheet_ids: [String; 3],
+    max_resident_sheet_count: usize,
+    max_resident_texture_count: usize,
+    timings: FrameTimingSummary,
 }
 
 #[derive(Debug, Deserialize)]
@@ -129,6 +144,7 @@ impl TopologyBenchmarkState {
             warmup_frames: WARMUP_FRAMES,
             pan_frames: PAN_FRAMES,
             zoom_frames: ZOOM_FRAMES,
+            navigation_cycles: NAVIGATION_CYCLES,
             run_export,
         }))
     }
@@ -151,7 +167,8 @@ impl TopologyBenchmarkState {
             return Err("O probe não usou uma textura real do Cache.".into());
         }
         measurement.pan.validate(config.pan_frames)?;
-        measurement.zoom.validate(config.zoom_frames)
+        measurement.zoom.validate(config.zoom_frames)?;
+        measurement.navigation.validate(config.navigation_cycles)
     }
 }
 
@@ -163,6 +180,34 @@ fn validate_gate_path(path: &std::path::Path, variable: &str) -> Result<(), Stri
         return Err(format!("{variable} contém um caminho inválido."));
     }
     Ok(())
+}
+
+impl CanvasNavigationMeasurement {
+    fn validate(&self, expected_cycles: usize) -> Result<(), String> {
+        if self.sheet_count < MINIMUM_LONG_ALBUM_SHEETS
+            || self.cycle_count != expected_cycles
+            || self.max_resident_sheet_count == 0
+            || self.max_resident_sheet_count >= self.sheet_count
+            || self.max_resident_texture_count == 0
+        {
+            return Err("A residência do probe de navegação é inválida.".into());
+        }
+        if self
+            .target_sheet_ids
+            .iter()
+            .any(|sheet_id| safe_log_identifier(sheet_id).is_none())
+            || self.target_sheet_ids[0] == self.target_sheet_ids[1]
+            || self.target_sheet_ids[1] == self.target_sheet_ids[2]
+            || self.target_sheet_ids[0] == self.target_sheet_ids[2]
+        {
+            return Err("Os alvos do probe de navegação são inválidos.".into());
+        }
+        self.timings.validate(
+            expected_cycles
+                .checked_mul(3)
+                .ok_or_else(|| "A contagem do probe de navegação excedeu o limite.".to_string())?,
+        )
+    }
 }
 
 impl FrameTimingSummary {
@@ -268,6 +313,23 @@ pub(crate) fn report_topology_canvas_benchmark(
         zoom_max_frame_ms = measurement.zoom.max_frame_ms,
         zoom_frames_over16_ms = measurement.zoom.frames_over16_ms,
         zoom_frames_over33_ms = measurement.zoom.frames_over33_ms,
+        navigation_sheet_count = measurement.navigation.sheet_count,
+        navigation_cycle_count = measurement.navigation.cycle_count,
+        navigation_first_sheet_id = safe_log_identifier(&measurement.navigation.target_sheet_ids[0]),
+        navigation_middle_sheet_id = safe_log_identifier(&measurement.navigation.target_sheet_ids[1]),
+        navigation_last_sheet_id = safe_log_identifier(&measurement.navigation.target_sheet_ids[2]),
+        navigation_max_resident_sheet_count = measurement.navigation.max_resident_sheet_count,
+        navigation_max_resident_texture_count = measurement.navigation.max_resident_texture_count,
+        navigation_sample_count = measurement.navigation.timings.sample_count,
+        navigation_duration_ms = measurement.navigation.timings.duration_ms,
+        navigation_first_frame_latency_ms = measurement.navigation.timings.first_frame_latency_ms,
+        navigation_mean_frame_ms = measurement.navigation.timings.mean_frame_ms,
+        navigation_p50_frame_ms = measurement.navigation.timings.p50_frame_ms,
+        navigation_p95_frame_ms = measurement.navigation.timings.p95_frame_ms,
+        navigation_p99_frame_ms = measurement.navigation.timings.p99_frame_ms,
+        navigation_max_frame_ms = measurement.navigation.timings.max_frame_ms,
+        navigation_frames_over16_ms = measurement.navigation.timings.frames_over16_ms,
+        navigation_frames_over33_ms = measurement.navigation.timings.frames_over33_ms,
         event = "canvas_benchmark_completed",
     );
     Ok(())
@@ -304,7 +366,10 @@ pub(crate) fn report_topology_benchmark_failure(
 
 #[cfg(test)]
 mod tests {
-    use super::{CanvasBenchmarkMeasurement, FrameTimingSummary, TopologyBenchmarkState};
+    use super::{
+        CanvasBenchmarkMeasurement, CanvasNavigationMeasurement, FrameTimingSummary,
+        TopologyBenchmarkState,
+    };
 
     fn timing(sample_count: usize) -> FrameTimingSummary {
         FrameTimingSummary {
@@ -355,6 +420,14 @@ mod tests {
                 .expect("the benchmark is active")
                 .export_gate_open
         );
+        assert_eq!(
+            state
+                .config_for("main")
+                .expect("main config is valid")
+                .expect("the benchmark is active")
+                .navigation_cycles,
+            10
+        );
         std::fs::write(directory.path().join("export.ready"), [])
             .expect("the runner opens the Export gate");
         assert!(
@@ -377,6 +450,14 @@ mod tests {
             texture_backed: true,
             pan: timing(PAN_FRAMES),
             zoom: timing(ZOOM_FRAMES),
+            navigation: CanvasNavigationMeasurement {
+                sheet_count: 100,
+                cycle_count: NAVIGATION_CYCLES,
+                target_sheet_ids: ["lamina-01".into(), "lamina-50".into(), "lamina-100".into()],
+                max_resident_sheet_count: 8,
+                max_resident_texture_count: 16,
+                timings: timing(NAVIGATION_CYCLES * 3),
+            },
         };
         state
             .validate_measurement("main", &measurement)
@@ -395,5 +476,5 @@ mod tests {
         );
     }
 
-    use super::{PAN_FRAMES, ZOOM_FRAMES};
+    use super::{NAVIGATION_CYCLES, PAN_FRAMES, ZOOM_FRAMES};
 }

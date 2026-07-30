@@ -1,5 +1,5 @@
 import type {
-  CanvasPerformanceMeasurement,
+  CanvasInteractionPerformanceMeasurement,
   FrameTimingSummary,
 } from "../application/topologyBenchmark";
 
@@ -36,7 +36,7 @@ export async function runCanvasPerformanceProbe(
   target: CanvasPerformanceTarget,
   clock: CanvasPerformanceClock = browserFrameClock,
   signal?: AbortSignal,
-): Promise<CanvasPerformanceMeasurement> {
+): Promise<CanvasInteractionPerformanceMeasurement> {
   validateConfig(config);
   if (!target.textureBacked) {
     throw new Error(
@@ -100,7 +100,7 @@ async function measureFrames(
   return summarizeFrameTimings(latencies);
 }
 
-function summarizeFrameTimings(
+export function summarizeFrameTimings(
   latencies: readonly number[],
 ): FrameTimingSummary {
   const ordered = [...latencies].sort((left, right) => left - right);

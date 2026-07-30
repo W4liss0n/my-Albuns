@@ -20,6 +20,7 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
     warmupFrames: 24,
     panFrames: 120,
     zoomFrames: 120,
+    navigationCycles: 10,
     runExport: true,
   };
   const measurement: CanvasPerformanceMeasurement = {
@@ -48,6 +49,25 @@ test("maps the isolated topology benchmark bridge to its Tauri commands", async 
       maxFrameMs: 31,
       framesOver16Ms: 42,
       framesOver33Ms: 0,
+    },
+    navigation: {
+      sheetCount: 100,
+      cycleCount: 10,
+      targetSheetIds: ["lamina-01", "lamina-50", "lamina-100"],
+      maxResidentSheetCount: 8,
+      maxResidentTextureCount: 16,
+      timings: {
+        sampleCount: 30,
+        durationMs: 900,
+        firstFrameLatencyMs: 45,
+        meanFrameMs: 30,
+        p50FrameMs: 28,
+        p95FrameMs: 44,
+        p99FrameMs: 50,
+        maxFrameMs: 50,
+        framesOver16Ms: 24,
+        framesOver33Ms: 5,
+      },
     },
   };
   vi.mocked(invoke).mockResolvedValueOnce(config);
