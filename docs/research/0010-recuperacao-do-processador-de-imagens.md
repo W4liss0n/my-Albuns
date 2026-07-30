@@ -32,9 +32,11 @@ A recuperação mantém responsabilidades separadas:
 - `imaging_processor` define a fronteira tipada comum à aplicação e à prova
   integrada. O adaptador Tauri usado pela aplicação e o adaptador
   `std::process` exclusivo do teste compartilham o codec, a correlação e a
-  classificação da terminação; somente a inicialização e a coleta de eventos,
-  dependentes de cada runtime, são distintas. A fronteira não decide repetição
-  nem ciclo de arquivos;
+  classificação da terminação. No protocolo v6, o adaptador Tauri também
+  encaminha progresso tipado conforme o fluxo é produzido e conserva o handle
+  da tentativa até observar o término após um cancelamento; somente a
+  inicialização e a coleta de eventos, dependentes de cada runtime, são
+  distintas. A fronteira não decide repetição nem ciclo de arquivos;
 - `CacheEngine` possui a política de Cache: em uma queda inesperada, remove
   somente nomes terminados pelo PID encerrado e reinicia uma vez; uma falha
   determinística não é repetida e uma segunda queda termina a operação depois
@@ -46,7 +48,7 @@ A recuperação mantém responsabilidades separadas:
 - `AppPaths` deriva uma pasta única
   `.myalbuns-export-{operation-id}.tmp` dentro do Destino, mantém a cadeia de
   diretórios validada e restringe descarte e publicação à tentativa;
-- `MyAlbuns.Imaging.exe` recebe no protocolo v5 somente o comando tipado, o
+- `MyAlbuns.Imaging.exe` recebe no protocolo v6 somente o comando tipado, o
   `RootBindingPlan` imutável da tentativa e os
   caminhos preparados. Ele grava, sincroniza, calcula tamanho e SHA-256 e
   responde sem
@@ -111,9 +113,10 @@ nem anunciar uma Publicação incompleta como sucesso.
 O comportamento pertence aos mesmos módulos nas duas topologias candidatas e
 não depende de uma segunda cópia mutável do Projeto. Isso não encerra o gate
 mais amplo de queda do processo principal e dos hosts, nem escolhe a topologia.
-Também permanecem abertos `OperationGate`, `OperationLease`, cancelamento,
-progresso, recuperação de órfãos após queda do próprio host, bindings de raiz e
-Exportação para UNC.
+Também permanecem abertos `OperationGate`, `OperationLease`, a conexão do
+cancelamento e do progresso da tentativa com a janela do produto, recuperação
+de órfãos após queda do próprio host, bindings reais de raiz e Exportação para
+UNC.
 
 ## Repetição
 

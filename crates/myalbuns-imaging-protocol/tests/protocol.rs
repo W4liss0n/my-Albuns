@@ -3,8 +3,9 @@ use std::path::PathBuf;
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
-    RenderCompletion, decode_command, decode_response, encode_command, encode_response,
+    ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
+    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, decode_command,
+    decode_event_stream, encode_command, encode_event,
 };
 use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 
@@ -148,20 +149,53 @@ fn host_and_processor_share_one_serialized_protocol() {
                 .into(),
         },
     );
-    let response_payload = encode_response(&response).expect("response serializes");
-    let response_json: serde_json::Value =
-        serde_json::from_slice(&response_payload).expect("response is JSON");
-    assert_eq!(response_json["kind"], "completed");
-    assert_eq!(response_json["requestId"], "render-42");
-
-    let decoded = decode_response(&response_payload).expect("response decodes");
+    let progress = ImagingProgress::new("render-42", ImagingProgressStage::Composing, 1, 2)
+        .expect("the processor progress is valid");
+    let mut event_stream =
+        encode_event(&ImagingEvent::Progress(progress.clone())).expect("progress serializes");
+    event_stream.extend(
+        encode_event(&ImagingEvent::Response(response.clone())).expect("response event serializes"),
+    );
+    let (decoded_progress, decoded_response) =
+        decode_event_stream(&event_stream).expect("the event stream decodes");
+    assert_eq!(decoded_progress, [progress]);
     assert_eq!(
-        decoded
+        decoded_response
             .completed_for("render-42")
             .map(|completion| (completion.width_px, completion.height_px)),
         Some((7087, 3543))
     );
-    assert_eq!(decoded.completed_for("another"), None);
+    assert_eq!(decoded_response.completed_for("another"), None);
+    assert_eq!(decoded_response, response);
+}
+
+#[test]
+fn processor_event_stream_rejects_invalid_or_out_of_order_progress() {
+    let invalid_progress = ImagingProgress {
+        request_id: "render-42".into(),
+        stage: ImagingProgressStage::Composing,
+        completed_units: 2,
+        total_units: 1,
+    };
+    let invalid_stream = encode_event(&ImagingEvent::Progress(invalid_progress))
+        .expect("the malformed fixture serializes");
+    assert!(
+        decode_event_stream(&invalid_stream).is_err(),
+        "deserialization validates progress even when its constructor was bypassed"
+    );
+
+    let response = ImagingResponse::cache_reset("render-42", 0);
+    let progress = ImagingProgress::new("render-42", ImagingProgressStage::EncodingOutput, 1, 1)
+        .expect("the progress fixture is valid");
+    let mut out_of_order =
+        encode_event(&ImagingEvent::Response(response)).expect("the final response serializes");
+    out_of_order.extend(
+        encode_event(&ImagingEvent::Progress(progress)).expect("the progress event serializes"),
+    );
+    assert!(
+        decode_event_stream(&out_of_order).is_err(),
+        "progress cannot be emitted after the final response"
+    );
 }
 
 #[test]

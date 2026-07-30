@@ -320,7 +320,7 @@ async fn export_spike(
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let mut transport = TauriImagingTransport::new(&app, &logging);
     let cancellation = AtomicBool::new(false);
-    let mut progress = |progress: export_pipeline::ExportProgress| {
+    let progress = |progress: export_pipeline::ExportProgress| {
         tracing::debug!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -338,7 +338,7 @@ async fn export_spike(
         plan,
         &root_bindings,
         &cancellation,
-        &mut progress,
+        &progress,
         &context,
     )
     .await

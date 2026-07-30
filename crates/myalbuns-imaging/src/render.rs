@@ -9,7 +9,7 @@ use std::{
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage, codecs::png::PngEncoder};
 use myalbuns_core::ComposedFrame;
 use myalbuns_imaging_protocol::{
-    ImagingFailureStage, ImagingRequest, RenderCompletion, RenderSourcePolicy,
+    ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion, RenderSourcePolicy,
 };
 
 use crate::source::{decode_jpeg, read_verified_source, sha256_file};
@@ -36,7 +36,10 @@ impl From<String> for RenderFailure {
     }
 }
 
-pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletion, RenderFailure> {
+pub(crate) fn render_request(
+    request: &ImagingRequest,
+    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
+) -> Result<RenderCompletion, RenderFailure> {
     let sheet = request
         .snapshot
         .composition
@@ -47,10 +50,13 @@ pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletio
     let pixels_per_micrometer = request.dpi as f64 / MICROMETERS_PER_INCH;
     let width_px = to_pixels(sheet.width_um, pixels_per_micrometer).max(1);
     let height_px = to_pixels(sheet.height_um, pixels_per_micrometer).max(1);
-    let (sources, source_bytes) = load_render_sources(request)?;
+    let (sources, source_bytes) = load_render_sources(request, progress)?;
     let mut image = RgbaImage::from_pixel(width_px, height_px, Rgba([239, 232, 218, 255]));
 
-    for frame in &sheet.frames {
+    let frame_count = u32::try_from(sheet.frames.len())
+        .map_err(|_| "a Lâmina contém Frames demais".to_string())?;
+    progress(ImagingProgressStage::Composing, 0, frame_count)?;
+    for (index, frame) in sheet.frames.iter().enumerate() {
         draw_frame(
             &mut image,
             frame,
@@ -58,12 +64,18 @@ pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletio
             request.source_policy,
             &sources,
         )?;
+        progress(
+            ImagingProgressStage::Composing,
+            u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
+            frame_count,
+        )?;
     }
     draw_vertical_line(&mut image, width_px / 2, Rgba([129, 112, 91, 90]));
     if sheet.has_overlay {
         draw_overlay(&mut image);
     }
 
+    progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
     let operational_output = request
         .root_bindings
         .resolve(&request.prepared_output_path)
@@ -74,6 +86,7 @@ pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletio
             )
         })?;
     let (output_bytes, output_sha256) = write_verified_png(&image, &operational_output)?;
+    progress(ImagingProgressStage::EncodingOutput, 1, 1)?;
     Ok(RenderCompletion {
         width_px,
         height_px,
@@ -87,14 +100,19 @@ pub(crate) fn render_request(request: &ImagingRequest) -> Result<RenderCompletio
 
 fn load_render_sources(
     request: &ImagingRequest,
+    progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<(HashMap<String, RgbaImage>, u64), RenderFailure> {
     if request.source_policy == RenderSourcePolicy::ProceduralFixture {
+        progress(ImagingProgressStage::LoadingSources, 1, 1)?;
         return Ok((HashMap::new(), 0));
     }
 
     let mut decoded = HashMap::with_capacity(request.sources.len());
     let mut source_bytes = 0_u64;
-    for source in &request.sources {
+    let source_count = u32::try_from(request.sources.len())
+        .map_err(|_| "a Exportação contém fontes demais".to_string())?;
+    progress(ImagingProgressStage::LoadingSources, 0, source_count)?;
+    for (index, source) in request.sources.iter().enumerate() {
         let operational_source = request
             .root_bindings
             .resolve(source.source_path())
@@ -120,6 +138,12 @@ fn load_render_sources(
                 .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?
                 .image,
         );
+        progress(
+            ImagingProgressStage::LoadingSources,
+            u32::try_from(index + 1)
+                .map_err(|_| "a Exportação contém fontes demais".to_string())?,
+            source_count,
+        )?;
     }
     Ok((decoded, source_bytes))
 }

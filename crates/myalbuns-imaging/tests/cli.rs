@@ -7,7 +7,8 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
     CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
+    ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource,
+    decode_event_stream,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -106,8 +107,31 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     assert!(output_path.exists());
     let bytes = std::fs::read(output_path).expect("rendered output is readable");
     assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
-    let response: ImagingResponse =
-        serde_json::from_slice(&result.stdout).expect("response is valid JSON");
+    let (progress, response) =
+        decode_event_stream(&result.stdout).expect("the processor output is a valid event stream");
+    let stage_transitions =
+        progress
+            .iter()
+            .map(|event| event.stage)
+            .fold(Vec::new(), |mut stages, stage| {
+                if stages.last() != Some(&stage) {
+                    stages.push(stage);
+                }
+                stages
+            });
+    assert_eq!(
+        stage_transitions,
+        [
+            ImagingProgressStage::LoadingSources,
+            ImagingProgressStage::Composing,
+            ImagingProgressStage::EncodingOutput,
+        ]
+    );
+    assert!(
+        progress
+            .iter()
+            .all(|event| event.completed_units <= event.total_units)
+    );
     let completion = response
         .completed_for("request-001")
         .expect("the response is correlated");
@@ -185,8 +209,7 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         "processor failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let response: ImagingResponse =
-        serde_json::from_slice(&result.stdout).expect("response is valid JSON");
+    let response = processor_response(&result.stdout);
     let completed = response
         .cache_completed_for("cache-001")
         .expect("the Cache response is correlated");
@@ -214,8 +237,7 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
 
     let reused_result = invoke_imaging_command(&command, Some(log_dir.path()));
     assert!(reused_result.status.success());
-    let reused_response: ImagingResponse =
-        serde_json::from_slice(&reused_result.stdout).expect("reuse response is valid JSON");
+    let reused_response = processor_response(&reused_result.stdout);
     let reused = reused_response
         .cache_completed_for("cache-001")
         .expect("the reuse response is correlated");
@@ -277,8 +299,7 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
         "processor failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let response: ImagingResponse =
-        serde_json::from_slice(&result.stdout).expect("response is valid JSON");
+    let response = processor_response(&result.stdout);
     let completion = response
         .completed_for("real-request-001")
         .expect("the response is correlated");
@@ -430,8 +451,7 @@ fn processor_resets_only_native_project_cache_namespaces() {
         "processor failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-    let response: ImagingResponse =
-        serde_json::from_slice(&result.stdout).expect("response is valid JSON");
+    let response = processor_response(&result.stdout);
     assert_eq!(response.cache_reset_for("reset-cache"), Some(2));
     assert!(!first.project_root().exists());
     assert!(!second.project_root().exists());
@@ -625,6 +645,12 @@ fn read_logs(log_dir: &Path) -> String {
             std::fs::read_to_string(path).expect("log file is readable")
         })
         .collect()
+}
+
+fn processor_response(stdout: &[u8]) -> ImagingResponse {
+    decode_event_stream(stdout)
+        .expect("the processor output is a valid event stream")
+        .1
 }
 
 fn invoke_processor_with_log_dir(

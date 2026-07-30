@@ -11,7 +11,7 @@ use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan};
 
 use crate::imaging_processor::{
-    ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
+    ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
     InvocationFailureStage, OperationFailure,
 };
 
@@ -171,7 +171,13 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     let mut recovery = None;
     loop {
         match transport
-            .invoke(command, context, ImagingOperation::Cache, attempt)
+            .invoke(
+                command,
+                context,
+                ImagingOperation::Cache,
+                attempt,
+                InvocationControl::uncontrolled(),
+            )
             .await
         {
             Ok(response) => {
@@ -468,7 +474,8 @@ mod tests {
 
     use super::{CacheFailureStage, CacheWork, execute, plan_request};
     use crate::imaging_processor::{
-        ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure, InvocationFuture,
+        ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
+        InvocationFailure, InvocationFuture,
     };
 
     struct ScriptedTransport {
@@ -483,6 +490,7 @@ mod tests {
             _context: &'a InvocationContext,
             operation: ImagingOperation,
             attempt: u8,
+            _control: InvocationControl<'a>,
         ) -> InvocationFuture<'a> {
             assert_eq!(operation, ImagingOperation::Cache);
             self.attempts.push(attempt);

@@ -1,8 +1,13 @@
-use std::{future::Future, pin::Pin};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::atomic::{AtomicBool, Ordering},
+    time::Duration,
+};
 
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailureStage, ImagingResponse,
-    decode_response, encode_command,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
+    ImagingResponse, decode_event, decode_event_stream, encode_command,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
 use tauri::AppHandle;
@@ -34,6 +39,7 @@ pub(crate) enum InvocationFailureStage {
     ReadResponse,
     DecodeResponse,
     ImagingProcess,
+    Cancelled,
     CacheRecoveryCleanup,
     Processor(ImagingFailureStage),
 }
@@ -48,6 +54,7 @@ impl InvocationFailureStage {
             Self::ReadResponse => "read_response",
             Self::DecodeResponse => "decode_response",
             Self::ImagingProcess => "imaging_process",
+            Self::Cancelled => "cancelled",
             Self::CacheRecoveryCleanup => "cache_recovery_cleanup",
             Self::Processor(stage) => stage.as_str(),
         }
@@ -125,6 +132,20 @@ impl InvocationFailure {
         }
     }
 
+    pub(crate) fn cancelled(process_id: u32) -> Self {
+        Self {
+            stage: InvocationFailureStage::Cancelled,
+            exit_code: None,
+            process_id: Some(process_id),
+            message: "A operação do Processador de Imagens foi cancelada.".into(),
+            termination_observed: false,
+        }
+    }
+
+    pub(crate) fn is_cancelled(&self) -> bool {
+        self.stage == InvocationFailureStage::Cancelled
+    }
+
     pub(crate) fn is_unexpected_termination(&self) -> bool {
         self.termination_observed
             && self
@@ -175,6 +196,42 @@ impl InvocationContext {
 pub(crate) type InvocationFuture<'a> =
     Pin<Box<dyn Future<Output = Result<ImagingResponse, InvocationFailure>> + Send + 'a>>;
 
+#[derive(Clone, Copy)]
+pub(crate) struct InvocationControl<'a> {
+    cancellation: Option<&'a AtomicBool>,
+    progress: Option<&'a (dyn Fn(ImagingProgress) + Send + Sync)>,
+}
+
+impl<'a> InvocationControl<'a> {
+    pub(crate) const fn uncontrolled() -> Self {
+        Self {
+            cancellation: None,
+            progress: None,
+        }
+    }
+
+    pub(crate) const fn controlled(
+        cancellation: &'a AtomicBool,
+        progress: &'a (dyn Fn(ImagingProgress) + Send + Sync),
+    ) -> Self {
+        Self {
+            cancellation: Some(cancellation),
+            progress: Some(progress),
+        }
+    }
+
+    pub(crate) fn is_cancelled(self) -> bool {
+        self.cancellation
+            .is_some_and(|cancellation| cancellation.load(Ordering::Acquire))
+    }
+
+    pub(crate) fn report(self, progress: ImagingProgress) {
+        if let Some(callback) = self.progress {
+            callback(progress);
+        }
+    }
+}
+
 /// Typed boundary shared by the production sidecar adapter and recovery tests.
 pub(crate) trait ImagingTransport {
     fn invoke<'a>(
@@ -183,6 +240,7 @@ pub(crate) trait ImagingTransport {
         context: &'a InvocationContext,
         operation: ImagingOperation,
         attempt: u8,
+        control: InvocationControl<'a>,
     ) -> InvocationFuture<'a>;
 }
 
@@ -204,6 +262,7 @@ impl ImagingTransport for TauriImagingTransport<'_> {
         context: &'a InvocationContext,
         operation: ImagingOperation,
         attempt: u8,
+        control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
         Box::pin(invoke_once(
             self.app,
@@ -212,6 +271,7 @@ impl ImagingTransport for TauriImagingTransport<'_> {
             context,
             operation,
             attempt,
+            control,
         ))
     }
 }
@@ -223,6 +283,7 @@ async fn invoke_once(
     context: &InvocationContext,
     operation: ImagingOperation,
     attempt: u8,
+    control: InvocationControl<'_>,
 ) -> Result<ImagingResponse, InvocationFailure> {
     let payload = encode_command(command).map_err(|error| {
         InvocationFailure::at_stage(
@@ -241,7 +302,8 @@ async fn invoke_once(
                 format!("Processador de Imagens indisponível: {error}"),
             )
         })?
-        .env(LOG_DIRECTORY_ENV, logging.directory());
+        .env(LOG_DIRECTORY_ENV, logging.directory())
+        .set_raw_out(true);
     let (mut events, mut child) = sidecar.spawn().map_err(|error| {
         InvocationFailure::at_stage(
             InvocationFailureStage::SpawnSidecar,
@@ -263,6 +325,7 @@ async fn invoke_once(
     );
     if let Err(error) = child.write(&payload) {
         let _ = child.kill();
+        wait_for_termination(&mut events).await;
         return Err(InvocationFailure::at_stage(
             InvocationFailureStage::WriteRequest,
             Some(imaging_process_id),
@@ -271,11 +334,47 @@ async fn invoke_once(
     }
 
     let mut stdout = Vec::new();
+    let mut pending_line = Vec::new();
+    let mut response_seen = false;
     let mut exit_code = None;
     let mut stream_error = None;
-    while let Some(event) = events.recv().await {
+    loop {
+        if control.is_cancelled() {
+            let kill_error = child.kill().err();
+            wait_for_termination(&mut events).await;
+            let mut failure = InvocationFailure::cancelled(imaging_process_id);
+            if let Some(error) = kill_error {
+                failure.message =
+                    format!("A operação foi cancelada, mas o encerramento falhou: {error}");
+            }
+            return Err(failure);
+        }
+        let event = match tokio::time::timeout(Duration::from_millis(20), events.recv()).await {
+            Ok(event) => event,
+            Err(_) => continue,
+        };
+        let Some(event) = event else {
+            break;
+        };
         match event {
-            CommandEvent::Stdout(bytes) => stdout.extend(bytes),
+            CommandEvent::Stdout(bytes) => {
+                stdout.extend_from_slice(&bytes);
+                pending_line.extend_from_slice(&bytes);
+                if let Err(error) = report_complete_event_lines(
+                    &mut pending_line,
+                    &mut response_seen,
+                    &context.operation_id,
+                    control,
+                ) {
+                    let _ = child.kill();
+                    wait_for_termination(&mut events).await;
+                    return Err(InvocationFailure::at_stage(
+                        InvocationFailureStage::DecodeResponse,
+                        Some(imaging_process_id),
+                        format!("Evento inválido do Processador de Imagens: {error}"),
+                    ));
+                }
+            }
             CommandEvent::Stderr(bytes) => {
                 tracing::warn!(
                     target: "myalbuns.desktop",
@@ -308,6 +407,46 @@ async fn invoke_once(
     complete_invocation(imaging_process_id, exit_code, &stdout)
 }
 
+async fn wait_for_termination(events: &mut tauri::async_runtime::Receiver<CommandEvent>) {
+    while let Some(event) = events.recv().await {
+        if matches!(event, CommandEvent::Terminated(_)) {
+            break;
+        }
+    }
+}
+
+fn report_complete_event_lines(
+    pending_line: &mut Vec<u8>,
+    response_seen: &mut bool,
+    expected_request_id: &str,
+    control: InvocationControl<'_>,
+) -> Result<(), String> {
+    while let Some(newline) = pending_line.iter().position(|byte| *byte == b'\n') {
+        let mut line = pending_line.drain(..=newline).collect::<Vec<_>>();
+        line.pop();
+        if line.is_empty() {
+            continue;
+        }
+        match decode_event(&line)? {
+            ImagingEvent::Progress(_) if *response_seen => {
+                return Err("o Processador devolveu progresso após a resposta final".into());
+            }
+            ImagingEvent::Progress(progress) if progress.request_id != expected_request_id => {
+                return Err("o progresso não corresponde à operação solicitada".into());
+            }
+            ImagingEvent::Progress(progress) => control.report(progress),
+            ImagingEvent::Response(_) if *response_seen => {
+                return Err("o Processador devolveu mais de uma resposta final".into());
+            }
+            ImagingEvent::Response(response) if response.request_id() != expected_request_id => {
+                return Err("a resposta final não corresponde à operação solicitada".into());
+            }
+            ImagingEvent::Response(_) => *response_seen = true,
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn complete_invocation(
     process_id: u32,
     exit_code: Option<i32>,
@@ -316,20 +455,30 @@ pub(crate) fn complete_invocation(
     if exit_code != Some(0) {
         return Err(InvocationFailure::terminated(process_id, exit_code));
     }
-    decode_response(stdout).map_err(|error| {
-        InvocationFailure::at_stage(
-            InvocationFailureStage::DecodeResponse,
-            Some(process_id),
-            format!("Resposta inválida do Processador de Imagens: {error}"),
-        )
-    })
+    decode_event_stream(stdout)
+        .map(|(_, response)| response)
+        .map_err(|error| {
+            InvocationFailure::at_stage(
+                InvocationFailureStage::DecodeResponse,
+                Some(process_id),
+                format!("Resposta inválida do Processador de Imagens: {error}"),
+            )
+        })
 }
 
 #[cfg(test)]
 mod tests {
-    use myalbuns_imaging_protocol::ImagingFailureStage;
+    use std::sync::{Mutex, atomic::AtomicBool};
 
-    use super::{InvocationFailure, InvocationFailureStage, complete_invocation};
+    use myalbuns_imaging_protocol::{
+        ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingResponse,
+        RenderCompletion, encode_event,
+    };
+
+    use super::{
+        InvocationControl, InvocationFailure, InvocationFailureStage, complete_invocation,
+        report_complete_event_lines,
+    };
 
     #[test]
     fn processor_exit_codes_remain_typed_at_the_host_boundary() {
@@ -360,6 +509,67 @@ mod tests {
         assert_eq!(
             deterministic.stage,
             InvocationFailureStage::Processor(ImagingFailureStage::SourceDecode)
+        );
+    }
+
+    #[test]
+    fn host_reports_chunked_progress_before_decoding_the_final_response() {
+        let progress = ImagingProgress::new("render-stream", ImagingProgressStage::Composing, 1, 2)
+            .expect("the progress fixture is valid");
+        let progress_event = encode_event(&ImagingEvent::Progress(progress.clone()))
+            .expect("the progress fixture serializes");
+        let split = progress_event.len() / 2;
+        let collected = Mutex::new(Vec::new());
+        let callback = |event| {
+            collected
+                .lock()
+                .expect("the progress collector is available")
+                .push(event);
+        };
+        let cancellation = AtomicBool::new(false);
+        let control = InvocationControl::controlled(&cancellation, &callback);
+        let mut pending = Vec::new();
+        let mut response_seen = false;
+
+        pending.extend_from_slice(&progress_event[..split]);
+        report_complete_event_lines(&mut pending, &mut response_seen, "render-stream", control)
+            .expect("an incomplete event remains buffered");
+        assert!(
+            collected
+                .lock()
+                .expect("the progress collector is available")
+                .is_empty()
+        );
+        pending.extend_from_slice(&progress_event[split..]);
+        report_complete_event_lines(&mut pending, &mut response_seen, "render-stream", control)
+            .expect("the completed event is reported");
+        assert_eq!(
+            collected
+                .lock()
+                .expect("the progress collector is available")
+                .as_slice(),
+            [progress]
+        );
+
+        let response = ImagingResponse::completed(
+            "render-stream",
+            RenderCompletion {
+                width_px: 10,
+                height_px: 5,
+                dpi: 25,
+                source_count: 1,
+                source_bytes: 100,
+                output_bytes: 200,
+                output_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .into(),
+            },
+        );
+        let response_event = encode_event(&ImagingEvent::Response(response.clone()))
+            .expect("the response fixture serializes");
+        assert_eq!(
+            complete_invocation(4242, Some(0), &response_event)
+                .expect("the final event stream decodes"),
+            response
         );
     }
 }

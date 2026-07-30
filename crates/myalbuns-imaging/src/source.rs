@@ -70,15 +70,7 @@ pub(crate) fn verify_source_current(
 }
 
 pub(crate) fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<DecodedJpeg, String> {
-    let reader = ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
-    if reader.format() != Some(ImageFormat::Jpeg) {
-        return Err(format!("a mídia {media_id} não é JPEG"));
-    }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))?;
+    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
     let orientation = decoder
         .orientation()
         .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
@@ -93,24 +85,31 @@ pub(crate) fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<Decod
 }
 
 pub(crate) fn jpeg_orientation(media_id: &str, verified_bytes: &[u8]) -> Result<u8, String> {
-    let reader = ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
-    if reader.format() != Some(ImageFormat::Jpeg) {
-        return Err(format!("a mídia {media_id} não é JPEG"));
-    }
-    let mut decoder = reader
-        .into_decoder()
-        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))?;
+    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
     decoder
         .orientation()
         .map(|orientation| orientation.to_exif())
         .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))
 }
 
+fn jpeg_decoder<'a>(
+    media_id: &str,
+    verified_bytes: &'a [u8],
+) -> Result<impl ImageDecoder + 'a, String> {
+    let reader = ImageReader::new(Cursor::new(verified_bytes))
+        .with_guessed_format()
+        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
+    if reader.format() != Some(ImageFormat::Jpeg) {
+        return Err(format!("a mídia {media_id} não é JPEG"));
+    }
+    reader
+        .into_decoder()
+        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))
+}
+
 fn source_changed_error(source: &MediaSource) -> String {
     format!(
-        "a mídia {} mudou desde o planejamento do Cache",
+        "a mídia {} mudou desde o planejamento da operação",
         source.media_id()
     )
 }

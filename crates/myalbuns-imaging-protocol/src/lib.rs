@@ -4,7 +4,7 @@ use myalbuns_core::RenderSnapshot;
 use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 5;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 6;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -90,14 +90,107 @@ pub fn decode_command(payload: &[u8]) -> Result<ImagingCommand, String> {
         .map_err(|error| format!("comando do Processador de Imagens inválido: {error}"))
 }
 
-pub fn encode_response(response: &ImagingResponse) -> Result<Vec<u8>, String> {
-    serde_json::to_vec(response)
-        .map_err(|error| format!("não foi possível serializar a resposta: {error}"))
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImagingProgressStage {
+    LoadingSources,
+    Composing,
+    EncodingOutput,
 }
 
-pub fn decode_response(payload: &[u8]) -> Result<ImagingResponse, String> {
-    serde_json::from_slice(payload)
-        .map_err(|error| format!("resposta do Processador de Imagens inválida: {error}"))
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImagingProgress {
+    pub request_id: String,
+    pub stage: ImagingProgressStage,
+    pub completed_units: u32,
+    pub total_units: u32,
+}
+
+impl ImagingProgress {
+    pub fn new(
+        request_id: impl Into<String>,
+        stage: ImagingProgressStage,
+        completed_units: u32,
+        total_units: u32,
+    ) -> Result<Self, String> {
+        let progress = Self {
+            request_id: request_id.into(),
+            stage,
+            completed_units,
+            total_units,
+        };
+        progress.validate()?;
+        Ok(progress)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if !is_safe_identifier(&self.request_id)
+            || self.total_units == 0
+            || self.completed_units > self.total_units
+        {
+            return Err("o progresso do Processador de Imagens é inválido".into());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "payload", rename_all = "camelCase")]
+pub enum ImagingEvent {
+    Progress(ImagingProgress),
+    Response(ImagingResponse),
+}
+
+pub fn encode_event(event: &ImagingEvent) -> Result<Vec<u8>, String> {
+    let mut payload = serde_json::to_vec(event)
+        .map_err(|error| format!("não foi possível serializar o evento: {error}"))?;
+    payload.push(b'\n');
+    Ok(payload)
+}
+
+pub fn decode_event(payload: &[u8]) -> Result<ImagingEvent, String> {
+    let event: ImagingEvent = serde_json::from_slice(payload)
+        .map_err(|error| format!("evento do Processador de Imagens inválido: {error}"))?;
+    match &event {
+        ImagingEvent::Progress(progress) => progress.validate()?,
+        ImagingEvent::Response(response) if !is_safe_identifier(response.request_id()) => {
+            return Err("a resposta final do Processador de Imagens é inválida".into());
+        }
+        ImagingEvent::Response(_) => {}
+    }
+    Ok(event)
+}
+
+pub fn decode_event_stream(
+    payload: &[u8],
+) -> Result<(Vec<ImagingProgress>, ImagingResponse), String> {
+    let mut progress = Vec::new();
+    let mut response = None;
+    for line in payload
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+    {
+        match decode_event(line)? {
+            ImagingEvent::Progress(_) if response.is_some() => {
+                return Err("o Processador devolveu progresso após a resposta final".into());
+            }
+            ImagingEvent::Progress(event) => progress.push(event),
+            ImagingEvent::Response(event) if response.is_none() => response = Some(event),
+            ImagingEvent::Response(_) => {
+                return Err("o Processador devolveu mais de uma resposta final".into());
+            }
+        }
+    }
+    let response =
+        response.ok_or_else(|| "o Processador não devolveu uma resposta final".to_string())?;
+    if progress
+        .iter()
+        .any(|event| event.request_id != response.request_id())
+    {
+        return Err("o progresso não corresponde à resposta final".into());
+    }
+    Ok((progress, response))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -181,56 +274,77 @@ impl ImagingRequest {
         if !self.root_bindings.covers(&self.prepared_output_path) {
             return Err("o caminho da preparação não pertence ao plano de raízes".into());
         }
-        if !(1..=1200).contains(&self.dpi) {
-            return Err("a resolução da Exportação é inválida".into());
-        }
-        self.snapshot
-            .validate()
-            .map_err(|error| format!("snapshot inválido: {error}"))?;
-        let sheet = self
-            .snapshot
-            .composition
-            .sheets
-            .iter()
-            .find(|sheet| sheet.sheet_id == self.sheet_id)
-            .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
-        let required_media = sheet
-            .frames
-            .iter()
-            .filter_map(|frame| frame.photo.as_ref())
-            .map(|photo| photo.media_id.as_str())
-            .collect::<std::collections::HashSet<_>>();
-        if required_media.is_empty() {
-            return Err("a Lâmina solicitada não contém Fotos".into());
-        }
+        validate_render_content(
+            &self.snapshot,
+            &self.sheet_id,
+            self.dpi,
+            &self.sources,
+            self.source_policy,
+        )?;
         match self.source_policy {
             RenderSourcePolicy::LinkedOriginals => {
-                let mut supplied_media = std::collections::HashSet::new();
                 for source in &self.sources {
-                    source.validate()?;
                     if !self.root_bindings.covers(source.source_path()) {
                         return Err(format!(
                             "a raiz da mídia {} não pertence ao plano da operação",
                             source.media_id()
                         ));
                     }
-                    if !supplied_media.insert(source.media_id()) {
-                        return Err("a Exportação contém mídia duplicada".into());
-                    }
                 }
-                if supplied_media != required_media {
-                    return Err(
-                        "as fontes da Exportação não correspondem às Fotos da Lâmina".into(),
-                    );
-                }
-            }
-            RenderSourcePolicy::ProceduralFixture if !self.sources.is_empty() => {
-                return Err("a prova procedural não aceita fontes nativas".into());
             }
             RenderSourcePolicy::ProceduralFixture => {}
         }
         Ok(())
     }
+}
+
+pub fn validate_render_content(
+    snapshot: &RenderSnapshot,
+    sheet_id: &str,
+    dpi: u32,
+    sources: &[MediaSource],
+    source_policy: RenderSourcePolicy,
+) -> Result<(), String> {
+    if !(1..=1200).contains(&dpi) {
+        return Err("a resolução da Exportação é inválida".into());
+    }
+    snapshot
+        .validate()
+        .map_err(|error| format!("snapshot inválido: {error}"))?;
+    let sheet = snapshot
+        .composition
+        .sheets
+        .iter()
+        .find(|sheet| sheet.sheet_id == sheet_id)
+        .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
+    let required_media = sheet
+        .frames
+        .iter()
+        .filter_map(|frame| frame.photo.as_ref())
+        .map(|photo| photo.media_id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    if required_media.is_empty() {
+        return Err("a Lâmina solicitada não contém Fotos".into());
+    }
+    match source_policy {
+        RenderSourcePolicy::LinkedOriginals => {
+            let mut supplied_media = std::collections::HashSet::new();
+            for source in sources {
+                source.validate()?;
+                if !supplied_media.insert(source.media_id()) {
+                    return Err("a Exportação contém mídia duplicada".into());
+                }
+            }
+            if supplied_media != required_media {
+                return Err("as fontes da Exportação não correspondem às Fotos da Lâmina".into());
+            }
+        }
+        RenderSourcePolicy::ProceduralFixture if !sources.is_empty() => {
+            return Err("a prova procedural não aceita fontes nativas".into());
+        }
+        RenderSourcePolicy::ProceduralFixture => {}
+    }
+    Ok(())
 }
 
 fn is_safe_identifier(value: &str) -> bool {
@@ -289,8 +403,8 @@ impl CacheRequest {
                 self.protocol_version
             ));
         }
-        if self.request_id.trim().is_empty() {
-            return Err("a Identidade da solicitação está vazia".into());
+        if !is_safe_identifier(&self.request_id) {
+            return Err("a Identidade da solicitação é inválida".into());
         }
         if self.project_id.trim().is_empty() {
             return Err("a Identidade do Projeto está vazia".into());
@@ -503,8 +617,8 @@ impl CacheResetRequest {
                 self.protocol_version
             ));
         }
-        if self.request_id.trim().is_empty() {
-            return Err("a Identidade da solicitação está vazia".into());
+        if !is_safe_identifier(&self.request_id) {
+            return Err("a Identidade da solicitação é inválida".into());
         }
         if self.project_ids.is_empty() {
             return Err("a limpeza de Cache não contém Projetos".into());
@@ -590,6 +704,14 @@ impl ImagingResponse {
                 removed_count,
             } if request_id == expected_request_id => Some(*removed_count),
             _ => None,
+        }
+    }
+
+    pub fn request_id(&self) -> &str {
+        match self {
+            Self::Completed { request_id, .. }
+            | Self::CacheCompleted { request_id, .. }
+            | Self::CacheReset { request_id, .. } => request_id,
         }
     }
 }

@@ -17,8 +17,8 @@ use crate::{
     cache_engine::{self, CacheWork},
     export_pipeline,
     imaging_processor::{
-        ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
-        InvocationFailureStage, InvocationFuture, complete_invocation,
+        ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
+        InvocationFailure, InvocationFailureStage, InvocationFuture, complete_invocation,
     },
     sample_project::SampleProject,
 };
@@ -147,6 +147,7 @@ impl ImagingTransport for RealProcessTransport {
         _context: &'a InvocationContext,
         operation: ImagingOperation,
         _attempt: u8,
+        _control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
         let result = self.invoke_process(command, operation);
         Box::pin(async move { result })
@@ -389,14 +390,14 @@ fn real_processor_recovery_flows_through_production_modules() {
         let mut failed_transport =
             RealProcessTransport::new(executable.clone(), log_directory.clone(), CrashNext::Export);
         let failed_cancellation = AtomicBool::new(false);
-        let mut failed_progress = |_| {};
+        let failed_progress = |_| {};
 
         export_pipeline::execute(
             &mut failed_transport,
             failed_plan,
             &failed_bindings,
             &failed_cancellation,
-            &mut failed_progress,
+            &failed_progress,
             &failed_context,
         )
         .await
@@ -432,13 +433,13 @@ fn real_processor_recovery_flows_through_production_modules() {
         let mut retry_transport =
             RealProcessTransport::new(executable, log_directory, CrashNext::Never);
         let retry_cancellation = AtomicBool::new(false);
-        let mut retry_progress = |_| {};
+        let retry_progress = |_| {};
         let published = export_pipeline::execute(
             &mut retry_transport,
             retry_plan,
             &retry_bindings,
             &retry_cancellation,
-            &mut retry_progress,
+            &retry_progress,
             &retry_context,
         )
         .await

@@ -8,8 +8,8 @@ use std::{
 };
 
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailureStage, ImagingRequest, ImagingResponse,
-    decode_command, encode_response,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
+    ImagingProgressStage, ImagingRequest, ImagingResponse, decode_command, encode_event,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -152,17 +152,22 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         );
     })?;
 
-    let completion = render::render_request(&request).inspect_err(|failure| {
-        tracing::error!(
-            target: "myalbuns.imaging",
-            process_role = ProcessRole::Imaging.as_str(),
-            protocol_version = request.protocol_version,
-            operation_id,
-            project_id,
-            stage = failure.stage.as_str(),
-            event = "imaging_render_failed",
-        );
-    })?;
+    let mut report_progress =
+        |stage: ImagingProgressStage, completed_units: u32, total_units: u32| {
+            write_progress(&request.request_id, stage, completed_units, total_units)
+        };
+    let completion =
+        render::render_request(&request, &mut report_progress).inspect_err(|failure| {
+            tracing::error!(
+                target: "myalbuns.imaging",
+                process_role = ProcessRole::Imaging.as_str(),
+                protocol_version = request.protocol_version,
+                operation_id,
+                project_id,
+                stage = failure.stage.as_str(),
+                event = "imaging_render_failed",
+            );
+        })?;
     let response = ImagingResponse::completed(request.request_id.clone(), completion.clone());
     write_response(&response).inspect_err(|_| {
         tracing::error!(
@@ -193,8 +198,28 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
 }
 
 pub(crate) fn write_response(response: &ImagingResponse) -> Result<(), String> {
-    let encoded = encode_response(response)?;
-    std::io::stdout()
+    write_event(&ImagingEvent::Response(response.clone()))
+}
+
+fn write_progress(
+    request_id: &str,
+    stage: ImagingProgressStage,
+    completed_units: u32,
+    total_units: u32,
+) -> Result<(), String> {
+    write_event(&ImagingEvent::Progress(ImagingProgress::new(
+        request_id,
+        stage,
+        completed_units,
+        total_units,
+    )?))
+}
+
+fn write_event(event: &ImagingEvent) -> Result<(), String> {
+    let encoded = encode_event(event)?;
+    let mut stdout = std::io::stdout().lock();
+    stdout
         .write_all(&encoded)
+        .and_then(|_| stdout.flush())
         .map_err(|error| format!("não foi possível responder: {error}"))
 }
