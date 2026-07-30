@@ -2,6 +2,8 @@ mod benchmark_corpus;
 mod cache_engine;
 mod export_pipeline;
 mod imaging_processor;
+#[cfg(test)]
+mod imaging_recovery_integration;
 mod logging;
 mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
@@ -13,15 +15,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use myalbuns_core::{EditorProjection, ExportResult, ProjectIntent};
-use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, ImagingResponse,
-};
+use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, ExportPathPlan};
+use myalbuns_paths::AppPaths;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-use imaging_processor::InvocationContext;
+use cache_engine::CacheWork;
+use imaging_processor::{InvocationContext, TauriImagingTransport};
 use logging::{LoggingState, frontend_log};
 use project_host::ProjectHost;
 use topology_benchmark::{
@@ -155,15 +156,16 @@ async fn prepare_media_previews(
     let cache_paths = app_paths
         .project_cache(&project_id)
         .map_err(|error| error.to_string())?;
-    let Some(request) = state.cache_request(
-        window.label(),
-        request_id.clone(),
-        cache_paths.clone(),
-        CACHE_PREVIEW_MAX_EDGE_PX,
-    )?
-    else {
+    let Some(sources) = state.cache_sources(window.label())? else {
         return Ok(None);
     };
+    let work = CacheWork::new(
+        request_id.clone(),
+        project_id.clone(),
+        cache_paths.clone(),
+        sources,
+        CACHE_PREVIEW_MAX_EDGE_PX,
+    );
     let safe_project_id = safe_log_identifier(&project_id);
     tracing::info!(
         target: "myalbuns.desktop",
@@ -172,45 +174,23 @@ async fn prepare_media_previews(
         operation_id = request_id.as_str(),
         project_id = safe_project_id,
         window_label = window.label(),
-        media_count = request.sources.len(),
+        media_count = work.sources.len(),
         event = "media_cache_started",
     );
     let started = Instant::now();
-    let mut payload =
-        serde_json::to_vec(&ImagingCommand::build_cache(request)).map_err(|error| {
-            log_media_cache_failure(&request_id, safe_project_id, "serialize_request", None);
-            format!("Não foi possível preparar o Cache: {error}")
+    let context = InvocationContext::new(request_id.clone(), safe_project_id);
+    let mut transport = TauriImagingTransport::new(&app, &logging);
+    let completed = cache_engine::execute(&mut transport, &app_paths, work, &context)
+        .await
+        .map_err(|failure| {
+            log_media_cache_failure(
+                &request_id,
+                safe_project_id,
+                failure.stage.as_str(),
+                failure.exit_code,
+            );
+            failure.message
         })?;
-    payload.push(b'\n');
-    let stdout = cache_engine::execute(
-        &app,
-        &logging,
-        &app_paths,
-        &cache_paths,
-        &payload,
-        InvocationContext {
-            operation_id: &request_id,
-            project_id: safe_project_id,
-        },
-    )
-    .await
-    .map_err(|failure| {
-        log_media_cache_failure(
-            &request_id,
-            safe_project_id,
-            failure.stage.as_str(),
-            failure.exit_code,
-        );
-        failure.message
-    })?;
-    let response: ImagingResponse = serde_json::from_slice(&stdout).map_err(|error| {
-        log_media_cache_failure(&request_id, safe_project_id, "decode_response", None);
-        format!("Resposta inválida do Processador de Imagens: {error}")
-    })?;
-    let completed = response.cache_completed_for(&request_id).ok_or_else(|| {
-        log_media_cache_failure(&request_id, safe_project_id, "validate_response", None);
-        "O Processador devolveu uma resposta de Cache inesperada.".to_string()
-    })?;
     let catalog = MediaPreviewCatalog {
         previews: completed
             .artifacts
@@ -278,14 +258,6 @@ async fn export_spike(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()
     ));
-    std::fs::create_dir_all(&output_dir).map_err(|error| {
-        log_export_failure(&request_id, None, "prepare_output", None);
-        format!("Não foi possível preparar a Exportação: {error}")
-    })?;
-    let path_plan = ExportPathPlan::new(output_path.clone(), &request_id).map_err(|error| {
-        log_export_failure(&request_id, None, "prepare_output", None);
-        format!("Não foi possível planejar o Destino da Exportação: {error}")
-    })?;
     let sheet_id = snapshot
         .composition
         .sheets
@@ -294,50 +266,41 @@ async fn export_spike(
         .sheet_id
         .clone();
     let sources = state.export_sources(window.label(), &snapshot, &sheet_id)?;
-    let request = match sources {
-        Some(sources) => ImagingRequest::new(
-            request_id.clone(),
-            path_plan.prepared_output_path().to_path_buf(),
-            snapshot,
-            sheet_id,
-            300,
-            sources,
-        ),
-        None => ImagingRequest::procedural_fixture(
-            request_id.clone(),
-            path_plan.prepared_output_path().to_path_buf(),
-            snapshot,
-            sheet_id,
-            25,
-        ),
-    }
-    .map_err(|error| {
-        log_export_failure(&request_id, None, "plan_request", None);
-        format!("Não foi possível planejar a Exportação: {error}")
-    })?;
-    let project_id = safe_log_identifier(&request.snapshot.project_id);
-
-    let started = Instant::now();
-    let completed = export_pipeline::execute(
-        &app,
-        &logging,
-        &path_plan,
-        &request,
-        InvocationContext {
-            operation_id: &request_id,
-            project_id,
-        },
+    let dpi = if sources.is_some() { 300 } else { 25 };
+    let project_id = safe_log_identifier(&snapshot.project_id).map(str::to_owned);
+    let plan = export_pipeline::plan(
+        request_id.clone(),
+        output_path,
+        snapshot,
+        sheet_id,
+        dpi,
+        sources,
     )
-    .await
     .map_err(|failure| {
         log_export_failure(
             &request_id,
-            project_id,
+            project_id.as_deref(),
             failure.stage.as_str(),
             failure.exit_code,
         );
         failure.message
     })?;
+
+    let started = Instant::now();
+    let context = InvocationContext::new(request_id.clone(), project_id.clone());
+    let mut transport = TauriImagingTransport::new(&app, &logging);
+    let published = export_pipeline::execute(&mut transport, plan, &context)
+        .await
+        .map_err(|failure| {
+            log_export_failure(
+                &request_id,
+                project_id.as_deref(),
+                failure.stage.as_str(),
+                failure.exit_code,
+            );
+            failure.message
+        })?;
+    let completed = published.completion;
     let elapsed_ms = started.elapsed().as_millis();
     tracing::info!(
         target: "myalbuns.desktop",
@@ -345,7 +308,7 @@ async fn export_spike(
         protocol_version = IMAGING_PROTOCOL_VERSION,
         operation_id = request_id.as_str(),
         process_id = std::process::id(),
-        project_id,
+        project_id = project_id.as_deref(),
         window_label = window.label(),
         width_px = completed.width_px,
         height_px = completed.height_px,
@@ -359,7 +322,8 @@ async fn export_spike(
     );
 
     Ok(ExportResult {
-        output_path: output_path
+        output_path: published
+            .output_path
             .to_str()
             .ok_or_else(|| {
                 "o caminho da Exportação não pode ser representado pela interface".to_string()

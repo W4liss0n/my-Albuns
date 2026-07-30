@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    CacheCompletion, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
+    CacheCompletion, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
+    ImagingCommand, ImagingFailureStage, ImagingRequest, ImagingResponse, MediaSource,
+    RenderCompletion, decode_command, decode_response, encode_command, encode_response,
 };
 use myalbuns_paths::AppPaths;
 
@@ -72,19 +73,31 @@ fn host_and_processor_share_one_serialized_protocol() {
     )
     .expect("the render request is valid");
 
-    let request_json = serde_json::to_value(&request).expect("request serializes");
-    assert_eq!(request_json["protocolVersion"], IMAGING_PROTOCOL_VERSION);
-    assert_eq!(request_json["requestId"], "render-42");
+    let command = ImagingCommand::render(request.clone());
+    let command_payload = encode_command(&command).expect("command serializes");
+    assert_eq!(command_payload.last(), Some(&b'\n'));
+    let request_json: serde_json::Value =
+        serde_json::from_slice(&command_payload).expect("command is JSON");
+    assert_eq!(request_json["kind"], "render");
     assert_eq!(
-        request_json["preparedOutputPath"],
+        request_json["request"]["protocolVersion"],
+        IMAGING_PROTOCOL_VERSION
+    );
+    assert_eq!(request_json["request"]["requestId"], "render-42");
+    assert_eq!(
+        request_json["request"]["preparedOutputPath"],
         r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png"
     );
-    assert_eq!(request_json["sheetId"], "lamina-01");
-    assert_eq!(request_json["dpi"], 300);
-    assert_eq!(request_json["sources"][0]["mediaId"], "media-costa");
-    let decoded_request: ImagingRequest =
-        serde_json::from_value(request_json).expect("request decodes");
-    assert_eq!(decoded_request, request);
+    assert_eq!(request_json["request"]["sheetId"], "lamina-01");
+    assert_eq!(request_json["request"]["dpi"], 300);
+    assert_eq!(
+        request_json["request"]["sources"][0]["mediaId"],
+        "media-costa"
+    );
+    assert_eq!(
+        decode_command(&command_payload).expect("command decodes"),
+        command
+    );
     assert!(
         ImagingRequest::procedural_fixture(
             r"C:\private\operation",
@@ -110,11 +123,13 @@ fn host_and_processor_share_one_serialized_protocol() {
                 .into(),
         },
     );
-    let response_json = serde_json::to_value(&response).expect("response serializes");
+    let response_payload = encode_response(&response).expect("response serializes");
+    let response_json: serde_json::Value =
+        serde_json::from_slice(&response_payload).expect("response is JSON");
     assert_eq!(response_json["kind"], "completed");
     assert_eq!(response_json["requestId"], "render-42");
 
-    let decoded: ImagingResponse = serde_json::from_value(response_json).expect("response decodes");
+    let decoded = decode_response(&response_payload).expect("response decodes");
     assert_eq!(
         decoded
             .completed_for("render-42")
@@ -138,13 +153,17 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
             "project-42",
             cache_paths,
             vec![
-                MediaSource::new(
-                    "media-42",
-                    PathBuf::from(r"C:\Photos\photo.jpg"),
-                    1024,
-                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                CacheJob::new(
+                    MediaSource::new(
+                        "media-42",
+                        PathBuf::from(r"C:\Photos\photo.jpg"),
+                        1024,
+                        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    )
+                    .expect("the native media source is valid"),
+                    "aaaaaaaaaaaaaaaa-v1-1600",
                 )
-                .expect("the native media source is valid"),
+                .expect("the Cache job is valid"),
             ],
             1600,
         )
@@ -158,7 +177,14 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
         IMAGING_PROTOCOL_VERSION
     );
     assert_eq!(command_json["request"]["requestId"], "cache-42");
-    assert_eq!(command_json["request"]["sources"][0]["mediaId"], "media-42");
+    assert_eq!(
+        command_json["request"]["jobs"][0]["source"]["mediaId"],
+        "media-42"
+    );
+    assert_eq!(
+        command_json["request"]["jobs"][0]["generationId"],
+        "aaaaaaaaaaaaaaaa-v1-1600"
+    );
 
     let decoded: ImagingCommand = serde_json::from_value(command_json).expect("command decodes");
     assert_eq!(decoded, command);

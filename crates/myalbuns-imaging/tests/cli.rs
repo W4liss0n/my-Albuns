@@ -2,16 +2,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
-use std::time::{Duration, Instant};
 
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheRequest, CacheResetRequest, ImagingCommand, ImagingFailureStage, ImagingRequest,
-    ImagingResponse, MediaSource, RenderSourcePolicy,
+    CacheJob, CacheRequest, CacheResetRequest, ImagingCommand, ImagingFailureStage, ImagingRequest,
+    ImagingResponse, MediaSource,
 };
-use myalbuns_paths::{AppPaths, CachePathPlan, ExportPathPlan};
+use myalbuns_paths::{AppPaths, CachePathPlan};
 use sha2::{Digest, Sha256};
 
 #[path = "../../../tests/support/sample_project.rs"]
@@ -20,7 +18,6 @@ mod sample_project;
 use sample_project::SampleProject;
 
 static NEXT_CACHE_ID: AtomicU64 = AtomicU64::new(1);
-const RECOVERY_EVIDENCE_DIRECTORY_ENV: &str = "MYALBUNS_RECOVERY_EVIDENCE_DIR";
 
 struct TestCache {
     paths: CachePathPlan,
@@ -65,6 +62,14 @@ impl Drop for TestCache {
             let _ = app_paths.clear_project_cache(&self.paths);
         }
     }
+}
+
+fn cache_job(source: MediaSource, max_edge_px: u32) -> CacheJob {
+    let generation_id = format!(
+        "{}-v1-{max_edge_px}",
+        source.source_sha256()[..16].to_ascii_lowercase()
+    );
+    CacheJob::new(source, generation_id).expect("the Cache job is valid")
 }
 
 fn sample_session(sample: SampleProject, sheet_count: usize) -> ProjectSession {
@@ -125,180 +130,6 @@ fn processor_never_replaces_an_existing_preparation() {
 }
 
 #[test]
-fn terminated_export_preserves_the_previous_output_until_an_explicit_retry() {
-    let source_dir = tempfile::tempdir().expect("temporary source directory");
-    let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let source_path = source_dir.path().join("linked-photo.jpg");
-    RgbImage::from_fn(512, 384, |x, y| {
-        Rgb([
-            x.wrapping_mul(17) as u8,
-            y.wrapping_mul(29) as u8,
-            x.wrapping_add(y).wrapping_mul(11) as u8,
-        ])
-    })
-    .save_with_format(&source_path, ImageFormat::Jpeg)
-    .expect("the linked JPEG fixture is written");
-    let source_bytes = std::fs::read(&source_path).expect("the source is readable");
-    let output_path = output_dir.path().join("recoverable-output.png");
-    let previous_output = b"previous completed export";
-    let previous_output_sha256 = format!("{:x}", Sha256::digest(previous_output));
-    std::fs::write(&output_path, previous_output).expect("the previous Export is writable");
-    let failed_plan = ExportPathPlan::new(output_path.clone(), "terminated-export")
-        .expect("the interrupted Export path plan is valid");
-    let failed_preparation = failed_plan
-        .prepare()
-        .expect("the interrupted Export preparation is reserved");
-    let session = sample_session(SampleProject::Horizon, 2);
-    let project_revision_before_failure = session
-        .persisted_revision()
-        .expect("the Project revision serializes before the failure");
-    let project_sha256_before_failure = format!(
-        "{:x}",
-        Sha256::digest(project_revision_before_failure.as_bytes())
-    );
-    let mut snapshot = session.render_snapshot();
-    let sheet = &mut snapshot.composition.sheets[0];
-    sheet.frames.truncate(1);
-    let sheet_id = sheet.sheet_id.clone();
-    let media_id = sheet.frames[0]
-        .photo
-        .as_ref()
-        .expect("the fixture frame contains a Photo")
-        .media_id
-        .clone();
-    let source = MediaSource::new(
-        media_id,
-        source_path,
-        source_bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&source_bytes)),
-    )
-    .expect("the linked source is valid");
-    let failed_request = ImagingRequest::new(
-        "terminated-export",
-        failed_plan.prepared_output_path().to_path_buf(),
-        snapshot.clone(),
-        sheet_id.clone(),
-        300,
-        vec![source.clone()],
-    )
-    .expect("the interrupted Export request is valid");
-    let source_policy = match failed_request.source_policy {
-        RenderSourcePolicy::LinkedOriginals => "linkedOriginals",
-        RenderSourcePolicy::ProceduralFixture => "proceduralFixture",
-    };
-    let temporary_path = failed_plan.prepared_output_path().to_path_buf();
-
-    let mut spawned_process_count = 0_u8;
-    let mut failed_process = spawn_render_request(&failed_request, None);
-    spawned_process_count += 1;
-    let failed_process_id = failed_process.id();
-    wait_for_file_while_running(
-        &mut failed_process,
-        &temporary_path,
-        Duration::from_secs(60),
-    );
-    failed_process
-        .kill()
-        .expect("the imaging processor is terminated during encoding");
-    let failed = failed_process
-        .wait_with_output()
-        .expect("the terminated processor is reaped");
-
-    assert!(!failed.status.success());
-    let success_response_before_retry = serde_json::from_slice::<ImagingResponse>(&failed.stdout)
-        .ok()
-        .and_then(|response| response.completed_for("terminated-export").cloned())
-        .is_some();
-    assert!(
-        !success_response_before_retry,
-        "a terminated processor must not announce Export success"
-    );
-    let output_after_failure =
-        std::fs::read(&output_path).expect("the previous Export remains readable");
-    let output_sha256_after_failure = format!("{:x}", Sha256::digest(&output_after_failure));
-    assert_eq!(output_after_failure, previous_output);
-    let project_revision_after_failure = session
-        .persisted_revision()
-        .expect("the Project revision serializes after the failure");
-    let project_sha256_after_failure = format!(
-        "{:x}",
-        Sha256::digest(project_revision_after_failure.as_bytes())
-    );
-    assert_eq!(
-        project_sha256_after_failure, project_sha256_before_failure,
-        "the failed Export cannot mutate the Project session"
-    );
-    let partial_preparation_observed = temporary_path.is_file();
-    assert!(
-        partial_preparation_observed,
-        "the abrupt process death leaves only its isolated temporary"
-    );
-
-    assert!(
-        failed_preparation
-            .discard()
-            .expect("the owner discards the interrupted attempt before retrying")
-    );
-    let process_count_before_explicit_retry = spawned_process_count;
-    let retry_plan = ExportPathPlan::new(output_path.clone(), "explicit-export-retry")
-        .expect("the retry Export path plan is valid");
-    let retry_preparation = retry_plan
-        .prepare()
-        .expect("the retry Export preparation is reserved");
-    let retry_request = ImagingRequest::new(
-        "explicit-export-retry",
-        retry_plan.prepared_output_path().to_path_buf(),
-        snapshot,
-        sheet_id,
-        300,
-        vec![source],
-    )
-    .expect("the explicit retry request is valid");
-    let retry_process = spawn_render_request(&retry_request, None);
-    spawned_process_count += 1;
-    let retry_process_id = retry_process.id();
-    let retried = retry_process
-        .wait_with_output()
-        .expect("the explicit retry processor exits");
-
-    assert_ne!(retry_process_id, failed_process_id);
-    assert_eq!(spawned_process_count, 2);
-    assert!(
-        retried.status.success(),
-        "the new processor completes the explicit retry: {}",
-        String::from_utf8_lossy(&retried.stderr)
-    );
-    let retried_response: ImagingResponse =
-        serde_json::from_slice(&retried.stdout).expect("the retry response is valid JSON");
-    assert!(
-        retried_response
-            .completed_for("explicit-export-retry")
-            .is_some()
-    );
-    retry_preparation
-        .publish()
-        .expect("the verified explicit retry is published by the owner");
-    let published = std::fs::read(output_path).expect("the retried Export is readable");
-    assert_eq!(&published[..8], b"\x89PNG\r\n\x1a\n");
-    write_recovery_evidence(
-        "export",
-        serde_json::json!({
-            "sourcePolicy": source_policy,
-            "failedProcessId": failed_process_id,
-            "retryProcessId": retry_process_id,
-            "processCountBeforeExplicitRetry": process_count_before_explicit_retry,
-            "successResponseBeforeExplicitRetry": success_response_before_retry,
-            "partialPreparationObserved": partial_preparation_observed,
-            "previousOutputSha256BeforeFailure": previous_output_sha256,
-            "previousOutputSha256AfterFailure": output_sha256_after_failure,
-            "projectSha256BeforeFailure": project_sha256_before_failure,
-            "projectSha256AfterFailure": project_sha256_after_failure,
-            "finalOutputSha256AfterExplicitRetry": format!("{:x}", Sha256::digest(&published)),
-        }),
-    );
-}
-
-#[test]
 fn processor_builds_one_reduced_representation_per_real_photo() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("build");
@@ -322,7 +153,7 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
             "cache-001",
             cache.project_id.clone(),
             cache_paths.clone(),
-            vec![
+            vec![cache_job(
                 MediaSource::new(
                     "benchmark-a-001",
                     source_path,
@@ -330,7 +161,8 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
                     source_sha256.clone(),
                 )
                 .expect("the native source is valid"),
-            ],
+                32,
+            )],
             32,
         )
         .expect("the Cache request is valid"),
@@ -365,14 +197,9 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         std::fs::read(source_dir.path().join("photo.jpg")).expect("the original remains readable"),
         original_source
     );
-    let metadata: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(cache_paths.metadata_file()).expect("the disposable index is readable"),
-    )
-    .expect("the disposable index is valid JSON");
-    assert_eq!(metadata["entries"].as_array().map(Vec::len), Some(1));
     assert!(
-        !metadata.to_string().contains("sourcePath"),
-        "the disposable index must not duplicate original paths"
+        !cache_paths.metadata_file().exists(),
+        "only CacheEngine publishes the disposable index after validating the response"
     );
 
     let reused_result = invoke_imaging_command(&command, Some(log_dir.path()));
@@ -384,111 +211,6 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         .expect("the reuse response is correlated");
     assert_eq!(reused.generated_count, 0);
     assert_eq!(reused.reused_count, 1);
-}
-
-#[test]
-fn cache_restarts_after_termination_and_discards_the_incomplete_item() {
-    let source_dir = tempfile::tempdir().expect("temporary source directory");
-    let cache = TestCache::new("crash-recovery");
-    let log_dir = tempfile::tempdir().expect("temporary log directory");
-    let source_path = source_dir.path().join("large-photo.jpg");
-    let source = RgbImage::from_fn(4096, 3072, |x, y| {
-        let mixed = x
-            .wrapping_mul(73_856_093)
-            .wrapping_add(y.wrapping_mul(19_349_663));
-        Rgb([
-            mixed as u8,
-            mixed.rotate_left(11) as u8,
-            mixed.rotate_left(23) as u8,
-        ])
-    });
-    source
-        .save_with_format(&source_path, ImageFormat::Jpeg)
-        .expect("the large JPEG fixture is written");
-    let source_bytes = std::fs::read(&source_path).expect("the source is readable");
-    let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
-    let generation_id = format!("{}-v1-4096", &source_sha256[..16]);
-    let command = ImagingCommand::build_cache(
-        CacheRequest::new(
-            "cache-crash-recovery",
-            cache.project_id.clone(),
-            cache.paths.clone(),
-            vec![
-                MediaSource::new(
-                    "large-media",
-                    source_path,
-                    source_bytes.len() as u64,
-                    source_sha256,
-                )
-                .expect("the source is valid"),
-            ],
-            4096,
-        )
-        .expect("the Cache request is valid"),
-    );
-
-    let mut failed_process = spawn_imaging_command(&command, Some(log_dir.path()));
-    let failed_process_id = failed_process.id();
-    let temporary_path = cache
-        .paths
-        .preview_temporary_file("large-media", &generation_id, failed_process_id)
-        .expect("the process-specific temporary path is valid");
-    wait_for_file_while_running(
-        &mut failed_process,
-        &temporary_path,
-        Duration::from_secs(60),
-    );
-    failed_process
-        .kill()
-        .expect("the imaging processor is terminated during Cache generation");
-    let failed = failed_process
-        .wait_with_output()
-        .expect("the terminated processor is reaped");
-
-    assert!(!failed.status.success());
-    let metadata_existed_after_failure = cache.paths.metadata_file().exists();
-    let temporary_observed_after_failure = temporary_path.is_file();
-    assert!(!metadata_existed_after_failure);
-    assert!(temporary_observed_after_failure);
-    let app_paths = AppPaths::discover().expect("the test can discover LocalAppData");
-    let removed_temporary_count = app_paths
-        .discard_project_cache_temporaries(&cache.paths, failed_process_id)
-        .expect("the Cache owner discards stale temporaries");
-    assert_eq!(removed_temporary_count, 1);
-    assert!(!temporary_path.exists());
-
-    let restarted_process = spawn_imaging_command(&command, Some(log_dir.path()));
-    let restarted_process_id = restarted_process.id();
-    let restarted = restarted_process
-        .wait_with_output()
-        .expect("the restarted processor exits");
-
-    assert_ne!(restarted_process_id, failed_process_id);
-    assert!(
-        restarted.status.success(),
-        "the restarted processor rebuilds the relevant item: {}",
-        String::from_utf8_lossy(&restarted.stderr)
-    );
-    let response: ImagingResponse =
-        serde_json::from_slice(&restarted.stdout).expect("the restarted response is valid");
-    let completed = response
-        .cache_completed_for("cache-crash-recovery")
-        .expect("the restarted Cache request completes");
-    assert_eq!(completed.generated_count, 1);
-    assert!(cache.paths.metadata_file().is_file());
-    write_recovery_evidence(
-        "cache",
-        serde_json::json!({
-            "failedProcessId": failed_process_id,
-            "restartedProcessId": restarted_process_id,
-            "temporaryObservedAfterFailure": temporary_observed_after_failure,
-            "removedTemporaryCount": removed_temporary_count,
-            "temporaryExistedAfterCleanup": temporary_path.exists(),
-            "metadataExistedAfterFailure": metadata_existed_after_failure,
-            "metadataExistedAfterRestart": cache.paths.metadata_file().is_file(),
-            "generatedCountAfterRestart": completed.generated_count,
-        }),
-    );
 }
 
 #[test]
@@ -645,7 +367,7 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
             "cache-integrity",
             cache.project_id.clone(),
             cache_paths,
-            vec![
+            vec![cache_job(
                 MediaSource::new(
                     "benchmark-a-001",
                     source_path.clone(),
@@ -653,7 +375,8 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
                     source_sha256,
                 )
                 .expect("the source is valid"),
-            ],
+                32,
+            )],
             32,
         )
         .expect("the Cache request is valid"),
@@ -745,8 +468,12 @@ fn processor_rejects_an_invalid_snapshot() {
     let mut request = serde_json::to_value(request).expect("request is serializable");
     request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
 
+    let command = serde_json::json!({
+        "kind": "render",
+        "request": request,
+    });
     let result = invoke_render_payload(
-        serde_json::to_vec(&request).expect("modified request is serializable"),
+        serde_json::to_vec(&command).expect("modified command is serializable"),
         None,
     );
 
@@ -782,7 +509,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_request_completed"));
     assert!(logs.contains("\"process_role\":\"imaging\""));
-    assert!(logs.contains("\"protocol_version\":3"));
+    assert!(logs.contains("\"protocol_version\":4"));
     assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
     assert!(
         !logs.contains(&output_path.to_string_lossy().into_owned()),
@@ -946,8 +673,7 @@ fn invoke_render_payload(mut payload: Vec<u8>, log_dir: Option<&Path>) -> std::p
 }
 
 fn spawn_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> Child {
-    let mut payload = serde_json::to_vec(request).expect("request is serializable");
-    spawn_render_payload(&mut payload, log_dir)
+    spawn_imaging_command(&ImagingCommand::render(request.clone()), log_dir)
 }
 
 fn spawn_render_payload(payload: &mut Vec<u8>, log_dir: Option<&Path>) -> Child {
@@ -998,37 +724,4 @@ fn spawn_imaging_command(command: &ImagingCommand, log_dir: Option<&Path>) -> Ch
         .write_all(&payload)
         .expect("command is sent");
     child
-}
-
-fn wait_for_file_while_running(child: &mut Child, path: &Path, timeout: Duration) {
-    let deadline = Instant::now() + timeout;
-    loop {
-        if path.is_file() {
-            return;
-        }
-        if let Some(status) = child.try_wait().expect("processor state is observable") {
-            panic!(
-                "processor exited with {status} before materializing {}",
-                path.display()
-            );
-        }
-        assert!(
-            Instant::now() < deadline,
-            "processor did not materialize {} within {timeout:?}",
-            path.display()
-        );
-        thread::sleep(Duration::from_millis(5));
-    }
-}
-
-fn write_recovery_evidence(name: &str, evidence: serde_json::Value) {
-    let Some(directory) = std::env::var_os(RECOVERY_EVIDENCE_DIRECTORY_ENV) else {
-        return;
-    };
-    let directory = PathBuf::from(directory);
-    std::fs::create_dir_all(&directory).expect("the recovery evidence directory is writable");
-    let path = directory.join(format!("{name}.json"));
-    let bytes =
-        serde_json::to_vec_pretty(&evidence).expect("the recovery evidence is serializable");
-    std::fs::write(path, bytes).expect("the recovery evidence is writable");
 }

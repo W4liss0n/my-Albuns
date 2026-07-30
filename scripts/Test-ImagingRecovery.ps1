@@ -38,34 +38,25 @@ $checks = @(
         )
     },
     [ordered]@{
-        name = 'host-recovery-lifecycle'
+        name = 'imaging-sidecar-build'
+        arguments = @(
+            'build',
+            '-p',
+            'myalbuns-imaging'
+        )
+    },
+    [ordered]@{
+        name = 'production-recovery-integration'
         arguments = @(
             'test',
             '-p',
             'myalbuns-desktop',
-            '--lib'
-        )
-    },
-    [ordered]@{
-        name = 'cache-process-crash'
-        arguments = @(
-            'test',
-            '-p',
-            'myalbuns-imaging',
-            '--test',
-            'cli',
-            'cache_restarts_after_termination_and_discards_the_incomplete_item'
-        )
-    },
-    [ordered]@{
-        name = 'export-process-crash'
-        arguments = @(
-            'test',
-            '-p',
-            'myalbuns-imaging',
-            '--test',
-            'cli',
-            'terminated_export_preserves_the_previous_output_until_an_explicit_retry'
+            '--lib',
+            'imaging_recovery_integration::real_processor_recovery_flows_through_production_modules',
+            '--',
+            '--ignored',
+            '--exact',
+            '--nocapture'
         )
     }
 )
@@ -89,13 +80,24 @@ if (-not [string]::Equals(
 
 New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
 $evidenceEnvironmentName = 'MYALBUNS_RECOVERY_EVIDENCE_DIR'
+$processorEnvironmentName = 'MYALBUNS_REAL_IMAGING_PROCESSOR'
+$processorPath = Join-Path $script:WorkspaceRoot 'target\debug\myalbuns-imaging.exe'
 $previousEvidenceDirectory = [System.Environment]::GetEnvironmentVariable(
     $evidenceEnvironmentName,
+    [System.EnvironmentVariableTarget]::Process
+)
+$previousProcessorPath = [System.Environment]::GetEnvironmentVariable(
+    $processorEnvironmentName,
     [System.EnvironmentVariableTarget]::Process
 )
 [System.Environment]::SetEnvironmentVariable(
     $evidenceEnvironmentName,
     $evidenceDirectory,
+    [System.EnvironmentVariableTarget]::Process
+)
+[System.Environment]::SetEnvironmentVariable(
+    $processorEnvironmentName,
+    $processorPath,
     [System.EnvironmentVariableTarget]::Process
 )
 
@@ -162,6 +164,11 @@ finally {
     [System.Environment]::SetEnvironmentVariable(
         $evidenceEnvironmentName,
         $previousEvidenceDirectory,
+        [System.EnvironmentVariableTarget]::Process
+    )
+    [System.Environment]::SetEnvironmentVariable(
+        $processorEnvironmentName,
+        $previousProcessorPath,
         [System.EnvironmentVariableTarget]::Process
     )
     if (Test-Path -LiteralPath $evidenceDirectory) {

@@ -1861,6 +1861,7 @@ dependencies = [
 name = "myalbuns-desktop"
 version = "0.1.0"
 dependencies = [
+ "image",
  "myalbuns-core",
  "myalbuns-imaging-protocol",
  "myalbuns-logging",

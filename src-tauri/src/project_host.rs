@@ -4,8 +4,7 @@ use std::{
 };
 
 use myalbuns_core::{EditorProjection, ProjectIntent, ProjectSession, RenderSnapshot};
-use myalbuns_imaging_protocol::{CacheRequest, MediaSource};
-use myalbuns_paths::CachePathPlan;
+use myalbuns_imaging_protocol::MediaSource;
 
 pub(crate) struct ProjectHost {
     sessions: HashMap<String, Mutex<ProjectSession>>,
@@ -61,25 +60,12 @@ impl ProjectHost {
         Ok(self.session(window_label)?.render_snapshot())
     }
 
-    pub(crate) fn cache_request(
+    pub(crate) fn cache_sources(
         &self,
         window_label: &str,
-        request_id: String,
-        cache_paths: CachePathPlan,
-        max_edge_px: u32,
-    ) -> Result<Option<CacheRequest>, String> {
-        let Some(sources) = self.media_sources.get(window_label) else {
-            return Ok(None);
-        };
-        let project_id = self.session(window_label)?.state().project_id;
-        CacheRequest::new(
-            request_id,
-            project_id,
-            cache_paths,
-            sources.clone(),
-            max_edge_px,
-        )
-        .map(Some)
+    ) -> Result<Option<Vec<MediaSource>>, String> {
+        drop(self.session(window_label)?);
+        Ok(self.media_sources.get(window_label).cloned())
     }
 
     pub(crate) fn export_sources(

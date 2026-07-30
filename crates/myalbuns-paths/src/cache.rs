@@ -1,0 +1,385 @@
+use std::{
+    fs::{self, File, OpenOptions},
+    path::{Path, PathBuf},
+};
+
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    AppPaths, AppPathsError,
+    app_paths::{valid_cache_component, valid_namespace_component},
+    guarded_fs::{
+        DirectoryGuard, ensure_direct_child, is_reparse_point, open_directory,
+        open_existing_direct_child, remove_empty_directory, validate_open_file,
+    },
+};
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CachePathPlan {
+    root: PathBuf,
+}
+
+/// Keeps the validated Cache directory chain open while artifacts are written.
+///
+/// On Windows the handles deny directory replacement, so a reparse point
+/// cannot redirect a job after containment has been verified.
+#[derive(Debug)]
+pub struct PreparedCacheStorage {
+    directories: Vec<DirectoryGuard>,
+}
+
+#[derive(Debug)]
+struct ExistingProjectCache {
+    directories: Vec<DirectoryGuard>,
+}
+
+impl ExistingProjectCache {
+    fn project(&self) -> &DirectoryGuard {
+        self.directories
+            .last()
+            .expect("an existing project Cache always contains its project directory")
+    }
+}
+
+impl CachePathPlan {
+    pub(crate) fn from_root(root: PathBuf) -> Self {
+        Self { root }
+    }
+
+    pub fn validate(&self) -> Result<(), AppPathsError> {
+        let namespace = self
+            .root
+            .file_name()
+            .and_then(|value| value.to_str())
+            .ok_or(AppPathsError::InvalidProjectNamespace)?;
+        let parent_name = self
+            .root
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|value| value.to_str());
+        if !self.root.is_absolute()
+            || self.root.components().any(|component| {
+                matches!(
+                    component,
+                    std::path::Component::CurDir | std::path::Component::ParentDir
+                )
+            })
+            || parent_name != Some("Cache")
+            || !valid_namespace_component(namespace)
+        {
+            return Err(AppPathsError::InvalidProjectNamespace);
+        }
+        Ok(())
+    }
+
+    pub fn media_directory(&self) -> PathBuf {
+        self.root.join("Media")
+    }
+
+    fn prepare_storage(&self) -> Result<PreparedCacheStorage, AppPathsError> {
+        self.validate()?;
+        let cache_root = self
+            .root
+            .parent()
+            .ok_or(AppPathsError::InvalidProjectNamespace)?;
+        let application_root = cache_root
+            .parent()
+            .ok_or(AppPathsError::InvalidProjectNamespace)?;
+        let local_data_root = application_root
+            .parent()
+            .ok_or(AppPathsError::InvalidProjectNamespace)?;
+        let directories = [
+            application_root.to_path_buf(),
+            cache_root.to_path_buf(),
+            self.root.clone(),
+            self.media_directory(),
+        ];
+
+        let mut guards = Vec::with_capacity(directories.len() + 1);
+        guards.push(open_directory(local_data_root)?);
+        for directory in directories {
+            let parent = guards
+                .last()
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            guards.push(ensure_direct_child(parent, &directory)?);
+        }
+        Ok(PreparedCacheStorage {
+            directories: guards,
+        })
+    }
+
+    pub fn preview_file(
+        &self,
+        media_id: &str,
+        generation_id: &str,
+    ) -> Result<PathBuf, AppPathsError> {
+        if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
+            return Err(AppPathsError::InvalidCacheArtifact);
+        }
+        Ok(self
+            .media_directory()
+            .join(format!("{media_id}.{generation_id}.jpg")))
+    }
+
+    pub fn preview_temporary_file(
+        &self,
+        media_id: &str,
+        generation_id: &str,
+        process_id: u32,
+    ) -> Result<PathBuf, AppPathsError> {
+        if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
+            return Err(AppPathsError::InvalidCacheArtifact);
+        }
+        Ok(self
+            .media_directory()
+            .join(format!("{media_id}.{generation_id}.jpg.tmp-{process_id}")))
+    }
+
+    pub fn metadata_file(&self) -> PathBuf {
+        self.root.join("metadata.json")
+    }
+
+    pub fn metadata_temporary_file(&self, process_id: u32) -> PathBuf {
+        self.root.join(format!("metadata.json.tmp-{process_id}"))
+    }
+}
+
+impl PreparedCacheStorage {
+    pub fn create_temporary_file(&self, path: &Path) -> Result<File, AppPathsError> {
+        let parent = self.parent_for(path)?;
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.file_type().is_dir() => {
+                return Err(AppPathsError::CacheStorageUnavailable);
+            }
+            Ok(_) => fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        }
+
+        let file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(parent, path, &file)?;
+        Ok(file)
+    }
+
+    pub fn open_existing_file(&self, path: &Path) -> Result<Option<File>, AppPathsError> {
+        let parent = self.parent_for(path)?;
+        let metadata = match fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(parent, path, &file)?;
+        Ok(Some(file))
+    }
+
+    pub fn replace_file(&self, temporary: &Path, final_path: &Path) -> Result<(), AppPathsError> {
+        let temporary_parent = self.parent_for(temporary)?;
+        let final_parent = self.parent_for(final_path)?;
+        if temporary_parent.logical_path != final_parent.logical_path {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+
+        let temporary_file =
+            File::open(temporary).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(temporary_parent, temporary, &temporary_file)?;
+        drop(temporary_file);
+
+        match fs::symlink_metadata(final_path) {
+            Ok(metadata) if metadata.file_type().is_dir() => {
+                return Err(AppPathsError::CacheStorageUnavailable);
+            }
+            Ok(_) => {
+                fs::remove_file(final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        }
+        fs::rename(temporary, final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let published =
+            File::open(final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(final_parent, final_path, &published)
+    }
+
+    fn parent_for(&self, path: &Path) -> Result<&DirectoryGuard, AppPathsError> {
+        self.directories
+            .iter()
+            .find(|directory| path.parent() == Some(directory.logical_path.as_path()))
+            .ok_or(AppPathsError::CacheStorageOutsideRoot)
+    }
+}
+
+pub(crate) fn prepare_cache_storage(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+) -> Result<PreparedCacheStorage, AppPathsError> {
+    if plan.root.parent() != Some(app_paths.cache_dir().as_path()) {
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
+    plan.prepare_storage()
+}
+
+pub(crate) fn clear_project_cache(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+) -> Result<bool, AppPathsError> {
+    let Some(project_cache) = open_existing_project_cache(app_paths, plan)? else {
+        return Ok(false);
+    };
+
+    clear_project_directory(project_cache.project())?;
+    drop(project_cache);
+    remove_empty_directory(&plan.root)?;
+    Ok(true)
+}
+
+pub(crate) fn discard_project_cache_temporaries(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+    process_id: u32,
+) -> Result<usize, AppPathsError> {
+    let Some(project_cache) = open_existing_project_cache(app_paths, plan)? else {
+        return Ok(0);
+    };
+
+    let project = project_cache.project();
+    let mut removed = discard_matching_files(project, |name| {
+        is_metadata_temporary_name_for(name, process_id)
+    })?;
+    if let Some(media) = open_existing_direct_child(project, &plan.media_directory())? {
+        removed += discard_matching_files(&media, |name| {
+            is_preview_temporary_name_for(name, process_id)
+        })?;
+    }
+    Ok(removed)
+}
+
+fn open_existing_project_cache(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+) -> Result<Option<ExistingProjectCache>, AppPathsError> {
+    if plan.root.parent() != Some(app_paths.cache_dir().as_path()) {
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
+    plan.validate()?;
+
+    let local_data_root = app_paths
+        .local_root
+        .parent()
+        .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
+    let mut directories = vec![open_directory(local_data_root)?];
+    for path in [&app_paths.local_root, &app_paths.cache_dir(), &plan.root] {
+        let parent = directories
+            .last()
+            .ok_or(AppPathsError::CacheStorageUnavailable)?;
+        let Some(directory) = open_existing_direct_child(parent, path)? else {
+            return Ok(None);
+        };
+        directories.push(directory);
+    }
+    Ok(Some(ExistingProjectCache { directories }))
+}
+
+fn clear_project_directory(project: &DirectoryGuard) -> Result<(), AppPathsError> {
+    for entry in
+        fs::read_dir(&project.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let path = entry
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+            .path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if is_reparse_point(&metadata) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        if metadata.is_file() {
+            fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            continue;
+        }
+        if metadata.is_dir() && path.file_name() == Some(std::ffi::OsStr::new("Media")) {
+            let media = open_existing_direct_child(project, &path)?
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            clear_cache_files(&media)?;
+            drop(media);
+            remove_empty_directory(&path)?;
+            continue;
+        }
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
+    Ok(())
+}
+
+fn clear_cache_files(directory: &DirectoryGuard) -> Result<(), AppPathsError> {
+    for entry in
+        fs::read_dir(&directory.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let path = entry
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+            .path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if is_reparse_point(&metadata) || !metadata.is_file() {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+    }
+    Ok(())
+}
+
+fn discard_matching_files<F>(
+    directory: &DirectoryGuard,
+    is_temporary: F,
+) -> Result<usize, AppPathsError>
+where
+    F: Fn(&std::ffi::OsStr) -> bool,
+{
+    let mut removed = 0;
+    for entry in
+        fs::read_dir(&directory.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let path = entry.path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if is_reparse_point(&metadata) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        if metadata.is_file() && is_temporary(&entry.file_name()) {
+            fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+fn is_metadata_temporary_name_for(name: &std::ffi::OsStr, process_id: u32) -> bool {
+    name.to_str()
+        .and_then(|name| name.strip_prefix("metadata.json.tmp-"))
+        .and_then(|value| value.parse::<u32>().ok())
+        == Some(process_id)
+}
+
+fn is_preview_temporary_name_for(name: &std::ffi::OsStr, expected_process_id: u32) -> bool {
+    let Some((artifact, process_id)) = name.to_str().and_then(|name| name.rsplit_once(".tmp-"))
+    else {
+        return false;
+    };
+    let Some(components) = artifact.strip_suffix(".jpg") else {
+        return false;
+    };
+    let mut components = components.split('.');
+    matches!(
+        (components.next(), components.next(), components.next()),
+        (Some(media_id), Some(generation_id), None)
+            if valid_cache_component(media_id)
+                && valid_cache_component(generation_id)
+                && process_id.parse::<u32>().ok() == Some(expected_process_id)
+    )
+}

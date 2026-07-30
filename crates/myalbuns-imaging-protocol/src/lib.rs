@@ -4,7 +4,7 @@ use myalbuns_core::RenderSnapshot;
 use myalbuns_paths::CachePathPlan;
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 3;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 4;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {
@@ -59,11 +59,16 @@ impl ImagingFailureStage {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
 pub enum ImagingCommand {
+    Render(ImagingRequest),
     BuildCache(CacheRequest),
     ResetCache(CacheResetRequest),
 }
 
 impl ImagingCommand {
+    pub fn render(request: ImagingRequest) -> Self {
+        Self::Render(request)
+    }
+
     pub fn build_cache(request: CacheRequest) -> Self {
         Self::BuildCache(request)
     }
@@ -71,6 +76,28 @@ impl ImagingCommand {
     pub fn reset_cache(request: CacheResetRequest) -> Self {
         Self::ResetCache(request)
     }
+}
+
+pub fn encode_command(command: &ImagingCommand) -> Result<Vec<u8>, String> {
+    let mut payload = serde_json::to_vec(command)
+        .map_err(|error| format!("não foi possível serializar o comando: {error}"))?;
+    payload.push(b'\n');
+    Ok(payload)
+}
+
+pub fn decode_command(payload: &[u8]) -> Result<ImagingCommand, String> {
+    serde_json::from_slice(payload)
+        .map_err(|error| format!("comando do Processador de Imagens inválido: {error}"))
+}
+
+pub fn encode_response(response: &ImagingResponse) -> Result<Vec<u8>, String> {
+    serde_json::to_vec(response)
+        .map_err(|error| format!("não foi possível serializar a resposta: {error}"))
+}
+
+pub fn decode_response(payload: &[u8]) -> Result<ImagingResponse, String> {
+    serde_json::from_slice(payload)
+        .map_err(|error| format!("resposta do Processador de Imagens inválida: {error}"))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -211,7 +238,7 @@ pub struct CacheRequest {
     pub request_id: String,
     pub project_id: String,
     pub cache_paths: CachePathPlan,
-    pub sources: Vec<MediaSource>,
+    pub jobs: Vec<CacheJob>,
     pub max_edge_px: u32,
 }
 
@@ -220,7 +247,7 @@ impl CacheRequest {
         request_id: impl Into<String>,
         project_id: impl Into<String>,
         cache_paths: CachePathPlan,
-        sources: Vec<MediaSource>,
+        jobs: Vec<CacheJob>,
         max_edge_px: u32,
     ) -> Result<Self, String> {
         let request = Self {
@@ -228,7 +255,7 @@ impl CacheRequest {
             request_id: request_id.into(),
             project_id: project_id.into(),
             cache_paths,
-            sources,
+            jobs,
             max_edge_px,
         };
         request.validate()?;
@@ -248,7 +275,7 @@ impl CacheRequest {
         if self.project_id.trim().is_empty() {
             return Err("a Identidade do Projeto está vazia".into());
         }
-        if self.sources.is_empty() {
+        if self.jobs.is_empty() {
             return Err("a solicitação de Cache não contém Fotos".into());
         }
         if !(1..=4096).contains(&self.max_edge_px) {
@@ -259,14 +286,44 @@ impl CacheRequest {
             .map_err(|error| error.to_string())?;
 
         let mut media_ids = std::collections::HashSet::new();
-        for source in &self.sources {
-            source.validate()?;
+        for job in &self.jobs {
+            job.validate()?;
+            let source = &job.source;
             self.cache_paths
-                .preview_file(source.media_id(), "validation")
+                .preview_file(source.media_id(), &job.generation_id)
                 .map_err(|error| error.to_string())?;
             if !media_ids.insert(source.media_id()) {
                 return Err("a solicitação de Cache contém mídia duplicada".into());
             }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheJob {
+    pub source: MediaSource,
+    pub generation_id: String,
+}
+
+impl CacheJob {
+    pub fn new(source: MediaSource, generation_id: impl Into<String>) -> Result<Self, String> {
+        let job = Self {
+            source,
+            generation_id: generation_id.into(),
+        };
+        job.validate()?;
+        Ok(job)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        self.source.validate()?;
+        if !is_safe_identifier(&self.generation_id) {
+            return Err(format!(
+                "a geração da mídia {} é inválida",
+                self.source.media_id()
+            ));
         }
         Ok(())
     }

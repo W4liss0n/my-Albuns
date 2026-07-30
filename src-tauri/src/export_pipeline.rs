@@ -1,30 +1,40 @@
 use std::{
     fs::File,
-    future::Future,
     io::{BufReader, Read},
+    path::PathBuf,
 };
 
+use myalbuns_core::RenderSnapshot;
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingRequest, ImagingResponse, RenderCompletion,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingRequest, MediaSource, RenderCompletion,
 };
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{ExportPathPlan, PreparedExportStorage};
 use sha2::{Digest, Sha256};
-use tauri::AppHandle;
 
-use crate::{
-    imaging_processor::{
-        ImagingOperation, InvocationContext, InvocationFailure, InvocationFailureStage, invoke_once,
-    },
-    logging::LoggingState,
+use crate::imaging_processor::{
+    ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
+    InvocationFailureStage,
 };
+
+#[derive(Debug)]
+pub(crate) struct ExportPlan {
+    output_path: PathBuf,
+    path_plan: ExportPathPlan,
+    request: ImagingRequest,
+}
+
+#[derive(Debug)]
+pub(crate) struct PublishedExport {
+    pub(crate) output_path: PathBuf,
+    pub(crate) completion: RenderCompletion,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ExportFailureStage {
+    Plan,
     Prepare,
-    Serialize,
     Processor(InvocationFailureStage),
-    DecodeResponse,
     ValidateResponse,
     VerifyPreparation,
     Publish,
@@ -33,10 +43,9 @@ pub(crate) enum ExportFailureStage {
 impl ExportFailureStage {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::Plan => "plan_request",
             Self::Prepare => "prepare_output",
-            Self::Serialize => "serialize_snapshot",
             Self::Processor(stage) => stage.as_str(),
-            Self::DecodeResponse => "decode_response",
             Self::ValidateResponse => "validate_response",
             Self::VerifyPreparation => "verify_preparation",
             Self::Publish => "publish_output",
@@ -69,83 +78,100 @@ impl ExportFailure {
     }
 }
 
-pub(crate) async fn execute(
-    app: &AppHandle,
-    logging: &LoggingState,
-    path_plan: &ExportPathPlan,
-    request: &ImagingRequest,
-    context: InvocationContext<'_>,
-) -> Result<RenderCompletion, ExportFailure> {
-    execute_with(
-        path_plan,
-        request,
-        |payload| async move {
-            invoke_once(app, logging, &payload, context, ImagingOperation::Export, 1).await
-        },
-        context,
-    )
-    .await
-}
-
-async fn execute_with<Invoke, Invocation>(
-    path_plan: &ExportPathPlan,
-    request: &ImagingRequest,
-    invoke: Invoke,
-    context: InvocationContext<'_>,
-) -> Result<RenderCompletion, ExportFailure>
-where
-    Invoke: FnOnce(Vec<u8>) -> Invocation,
-    Invocation: Future<Output = Result<Vec<u8>, InvocationFailure>>,
-{
-    if request.prepared_output_path != path_plan.prepared_output_path() {
-        return Err(ExportFailure::new(
-            ExportFailureStage::Prepare,
-            "A preparação da Exportação não corresponde ao plano de caminhos.",
-        ));
-    }
-    let preparation = path_plan.prepare().map_err(|error| {
+pub(crate) fn plan(
+    request_id: impl Into<String>,
+    output_path: PathBuf,
+    snapshot: RenderSnapshot,
+    sheet_id: impl Into<String>,
+    dpi: u32,
+    sources: Option<Vec<MediaSource>>,
+) -> Result<ExportPlan, ExportFailure> {
+    let request_id = request_id.into();
+    let sheet_id = sheet_id.into();
+    let destination = output_path.parent().ok_or_else(|| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            "O Destino da Exportação é inválido.",
+        )
+    })?;
+    std::fs::create_dir_all(destination).map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Prepare,
             format!("Não foi possível preparar a Exportação: {error}"),
         )
     })?;
-    let mut payload = match serde_json::to_vec(request) {
-        Ok(payload) => payload,
-        Err(error) => {
-            discard_failed_preparation(preparation, context);
-            return Err(ExportFailure::new(
-                ExportFailureStage::Serialize,
-                format!("Não foi possível preparar o snapshot: {error}"),
-            ));
-        }
-    };
-    payload.push(b'\n');
+    let path_plan = ExportPathPlan::new(output_path.clone(), &request_id).map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível planejar o Destino da Exportação: {error}"),
+        )
+    })?;
+    let request = match sources {
+        Some(sources) => ImagingRequest::new(
+            request_id,
+            path_plan.prepared_output_path().to_path_buf(),
+            snapshot,
+            sheet_id,
+            dpi,
+            sources,
+        ),
+        None => ImagingRequest::procedural_fixture(
+            request_id,
+            path_plan.prepared_output_path().to_path_buf(),
+            snapshot,
+            sheet_id,
+            dpi,
+        ),
+    }
+    .map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível planejar a Exportação: {error}"),
+        )
+    })?;
+    Ok(ExportPlan {
+        output_path,
+        path_plan,
+        request,
+    })
+}
 
-    let stdout = match invoke(payload).await {
-        Ok(stdout) => stdout,
+pub(crate) async fn execute<T: ImagingTransport>(
+    transport: &mut T,
+    plan: ExportPlan,
+    context: &InvocationContext,
+) -> Result<PublishedExport, ExportFailure> {
+    if plan.request.prepared_output_path != plan.path_plan.prepared_output_path() {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Prepare,
+            "A preparação da Exportação não corresponde ao plano de caminhos.",
+        ));
+    }
+    let preparation = plan.path_plan.prepare().map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Prepare,
+            format!("Não foi possível preparar a Exportação: {error}"),
+        )
+    })?;
+    let command = ImagingCommand::render(plan.request.clone());
+    let response = match transport
+        .invoke(&command, context, ImagingOperation::Export, 1)
+        .await
+    {
+        Ok(response) => response,
         Err(failure) => {
             discard_failed_preparation(preparation, context);
             return Err(ExportFailure::processor(failure));
         }
     };
-    let response: ImagingResponse = match serde_json::from_slice(&stdout) {
-        Ok(response) => response,
-        Err(error) => {
-            discard_failed_preparation(preparation, context);
-            return Err(ExportFailure::new(
-                ExportFailureStage::DecodeResponse,
-                format!("Resposta inválida do Processador de Imagens: {error}"),
-            ));
-        }
-    };
-    let Some(completion) = response.completed_for(&request.request_id).cloned() else {
+    let Some(completion) = response.completed_for(&plan.request.request_id).cloned() else {
         discard_failed_preparation(preparation, context);
         return Err(ExportFailure::new(
             ExportFailureStage::ValidateResponse,
             "O Processador de Imagens devolveu uma resposta inesperada.",
         ));
     };
-    if let Err(message) = verify_preparation(path_plan, &completion) {
+    if let Err(message) = verify_preparation(&plan.path_plan, &completion) {
         discard_failed_preparation(preparation, context);
         return Err(ExportFailure::new(
             ExportFailureStage::VerifyPreparation,
@@ -158,7 +184,10 @@ where
             format!("Não foi possível publicar a Exportação: {error}"),
         )
     })?;
-    Ok(completion)
+    Ok(PublishedExport {
+        output_path: plan.output_path,
+        completion,
+    })
 }
 
 fn verify_preparation(
@@ -194,14 +223,14 @@ fn verify_preparation(
     Ok(())
 }
 
-fn discard_failed_preparation(preparation: PreparedExportStorage, context: InvocationContext<'_>) {
+fn discard_failed_preparation(preparation: PreparedExportStorage, context: &InvocationContext) {
     match preparation.discard() {
         Ok(removed) => tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
-            operation_id = context.operation_id,
-            project_id = context.project_id,
+            operation_id = context.operation_id.as_str(),
+            project_id = context.project_id.as_deref(),
             removed,
             event = "incomplete_export_discarded",
         ),
@@ -209,8 +238,8 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: Invoc
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
-            operation_id = context.operation_id,
-            project_id = context.project_id,
+            operation_id = context.operation_id.as_str(),
+            project_id = context.project_id.as_deref(),
             event = "incomplete_export_cleanup_failed",
         ),
     }
@@ -218,25 +247,48 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: Invoc
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::Cell, future::ready};
+    use std::path::PathBuf;
 
     use myalbuns_core::ProjectCore;
-    use myalbuns_imaging_protocol::{ImagingRequest, ImagingResponse, RenderCompletion};
-    use myalbuns_paths::ExportPathPlan;
+    use myalbuns_imaging_protocol::{ImagingCommand, ImagingResponse, RenderCompletion};
     use sha2::{Digest, Sha256};
 
-    use super::{ExportFailureStage, execute_with};
+    use super::{ExportFailureStage, ExportPlan, execute, plan};
     use crate::{
-        imaging_processor::{InvocationContext, InvocationFailure},
+        imaging_processor::{
+            ImagingOperation, ImagingTransport, InvocationContext, InvocationFailure,
+            InvocationFuture,
+        },
         sample_project::SampleProject,
     };
 
-    const CONTEXT: InvocationContext<'static> = InvocationContext {
-        operation_id: "export-test",
-        project_id: Some("project-test"),
-    };
+    struct ScriptedTransport {
+        prepared_path: PathBuf,
+        prepared_bytes: Vec<u8>,
+        result: Option<Result<ImagingResponse, InvocationFailure>>,
+        invocations: usize,
+    }
 
-    fn request(path_plan: &ExportPathPlan, request_id: &str) -> ImagingRequest {
+    impl ImagingTransport for ScriptedTransport {
+        fn invoke<'a>(
+            &'a mut self,
+            command: &'a ImagingCommand,
+            _context: &'a InvocationContext,
+            operation: ImagingOperation,
+            attempt: u8,
+        ) -> InvocationFuture<'a> {
+            assert!(matches!(command, ImagingCommand::Render(_)));
+            assert_eq!(operation, ImagingOperation::Export);
+            assert_eq!(attempt, 1);
+            self.invocations += 1;
+            std::fs::write(&self.prepared_path, &self.prepared_bytes)
+                .expect("the processor writes its preparation");
+            let result = self.result.take().expect("one invocation");
+            Box::pin(async move { result })
+        }
+    }
+
+    fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
         let source = SampleProject::Horizon
             .persisted_source(2)
             .expect("the sample project serializes");
@@ -244,14 +296,11 @@ mod tests {
             .expect("the sample project opens")
             .render_snapshot();
         let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-        ImagingRequest::procedural_fixture(
-            request_id,
-            path_plan.prepared_output_path().to_path_buf(),
-            snapshot,
-            sheet_id,
-            25,
-        )
-        .expect("the Export request is valid")
+        plan(request_id, output, snapshot, sheet_id, 25, None).expect("the Export request is valid")
+    }
+
+    fn context(request_id: &str) -> InvocationContext {
+        InvocationContext::new(request_id, Some("project-test"))
     }
 
     #[test]
@@ -260,25 +309,17 @@ mod tests {
             let destination = tempfile::tempdir().expect("temporary Export destination");
             let output = destination.path().join("Album.png");
             std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-            let plan =
-                ExportPathPlan::new(output.clone(), "export-failure").expect("valid path plan");
-            let request = request(&plan, "export-failure");
-            let invocations = Cell::new(0);
-            let prepared = plan.prepared_output_path().to_path_buf();
+            let plan = export_plan(output.clone(), "export-failure");
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan.prepared_output_path().to_path_buf(),
+                prepared_bytes: b"incomplete".to_vec(),
+                result: Some(Err(InvocationFailure::unexpected_termination(4242))),
+                invocations: 0,
+            };
 
-            let failure = execute_with(
-                &plan,
-                &request,
-                |_| {
-                    invocations.set(invocations.get() + 1);
-                    std::fs::write(&prepared, b"incomplete")
-                        .expect("the failed processor writes a partial preparation");
-                    ready(Err(InvocationFailure::unexpected_termination(4242)))
-                },
-                CONTEXT,
-            )
-            .await
-            .expect_err("the Export failure remains visible");
+            let failure = execute(&mut transport, plan, &context("export-failure"))
+                .await
+                .expect_err("the Export failure remains visible");
 
             assert_eq!(
                 failure.stage,
@@ -286,12 +327,17 @@ mod tests {
                     crate::imaging_processor::InvocationFailureStage::ImagingProcess
                 )
             );
-            assert_eq!(invocations.get(), 1);
+            assert_eq!(transport.invocations, 1);
             assert_eq!(
                 std::fs::read(output).expect("the previous Export remains readable"),
                 b"previous export"
             );
-            assert!(!plan.preparation_directory().exists());
+            assert!(
+                !destination
+                    .path()
+                    .join(".myalbuns-export-export-failure.tmp")
+                    .exists()
+            );
         });
     }
 
@@ -301,10 +347,7 @@ mod tests {
             let destination = tempfile::tempdir().expect("temporary Export destination");
             let output = destination.path().join("Album.png");
             std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-            let plan =
-                ExportPathPlan::new(output.clone(), "export-success").expect("valid path plan");
-            let request = request(&plan, "export-success");
-            let prepared = plan.prepared_output_path().to_path_buf();
+            let plan = export_plan(output.clone(), "export-success");
             let bytes = b"verified export".to_vec();
             let completion = RenderCompletion {
                 width_px: 10,
@@ -316,28 +359,23 @@ mod tests {
                 output_sha256: format!("{:x}", Sha256::digest(&bytes)),
             };
             let response = ImagingResponse::completed("export-success", completion.clone());
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan.prepared_output_path().to_path_buf(),
+                prepared_bytes: bytes,
+                result: Some(Ok(response)),
+                invocations: 0,
+            };
 
-            let completed = execute_with(
-                &plan,
-                &request,
-                |_| {
-                    std::fs::write(&prepared, &bytes)
-                        .expect("the processor writes its verified preparation");
-                    ready(Ok(
-                        serde_json::to_vec(&response).expect("the response serializes")
-                    ))
-                },
-                CONTEXT,
-            )
-            .await
-            .expect("the verified Export is published");
+            let published = execute(&mut transport, plan, &context("export-success"))
+                .await
+                .expect("the verified Export is published");
 
-            assert_eq!(completed, completion);
+            assert_eq!(published.completion, completion);
+            assert_eq!(published.output_path, output);
             assert_eq!(
-                std::fs::read(output).expect("the published Export is readable"),
+                std::fs::read(&published.output_path).expect("the published Export is readable"),
                 b"verified export"
             );
-            assert!(!plan.preparation_directory().exists());
         });
     }
 
@@ -347,10 +385,7 @@ mod tests {
             let destination = tempfile::tempdir().expect("temporary Export destination");
             let output = destination.path().join("Album.png");
             std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-            let plan =
-                ExportPathPlan::new(output.clone(), "export-invalid").expect("valid path plan");
-            let request = request(&plan, "export-invalid");
-            let prepared = plan.prepared_output_path().to_path_buf();
+            let plan = export_plan(output.clone(), "export-invalid");
             let bytes = b"unverified export".to_vec();
             let response = ImagingResponse::completed(
                 "export-invalid",
@@ -365,28 +400,22 @@ mod tests {
                         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 },
             );
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan.prepared_output_path().to_path_buf(),
+                prepared_bytes: bytes,
+                result: Some(Ok(response)),
+                invocations: 0,
+            };
 
-            let failure = execute_with(
-                &plan,
-                &request,
-                |_| {
-                    std::fs::write(&prepared, &bytes)
-                        .expect("the processor writes its invalid preparation");
-                    ready(Ok(
-                        serde_json::to_vec(&response).expect("the response serializes")
-                    ))
-                },
-                CONTEXT,
-            )
-            .await
-            .expect_err("the mismatched preparation is rejected");
+            let failure = execute(&mut transport, plan, &context("export-invalid"))
+                .await
+                .expect_err("the mismatched preparation is rejected");
 
             assert_eq!(failure.stage, ExportFailureStage::VerifyPreparation);
             assert_eq!(
                 std::fs::read(output).expect("the previous Export remains readable"),
                 b"previous export"
             );
-            assert!(!plan.preparation_directory().exists());
         });
     }
 }
