@@ -5,15 +5,22 @@ use std::{
     time::Duration,
 };
 
+#[cfg(test)]
+use myalbuns_imaging_protocol::decode_event_stream;
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
-    ImagingResponse, decode_event, decode_event_stream, encode_command,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEventStreamDecoder, ImagingFailureStage,
+    ImagingProgress, ImagingResponse, encode_command,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
 use tauri::AppHandle;
-use tauri_plugin_shell::{ShellExt, process::CommandEvent};
+use tauri_plugin_shell::{
+    ShellExt,
+    process::{CommandChild, CommandEvent},
+};
 
 use crate::logging::LoggingState;
+
+const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ImagingOperation {
@@ -40,6 +47,7 @@ pub(crate) enum InvocationFailureStage {
     DecodeResponse,
     ImagingProcess,
     Cancelled,
+    TerminationUnconfirmed,
     CacheRecoveryCleanup,
     Processor(ImagingFailureStage),
 }
@@ -55,6 +63,7 @@ impl InvocationFailureStage {
             Self::DecodeResponse => "decode_response",
             Self::ImagingProcess => "imaging_process",
             Self::Cancelled => "cancelled",
+            Self::TerminationUnconfirmed => "termination_unconfirmed",
             Self::CacheRecoveryCleanup => "cache_recovery_cleanup",
             Self::Processor(stage) => stage.as_str(),
         }
@@ -142,8 +151,22 @@ impl InvocationFailure {
         }
     }
 
+    pub(crate) fn termination_unconfirmed(process_id: u32, message: impl Into<String>) -> Self {
+        Self {
+            stage: InvocationFailureStage::TerminationUnconfirmed,
+            exit_code: None,
+            process_id: Some(process_id),
+            message: message.into(),
+            termination_observed: false,
+        }
+    }
+
     pub(crate) fn is_cancelled(&self) -> bool {
         self.stage == InvocationFailureStage::Cancelled
+    }
+
+    pub(crate) fn is_termination_unconfirmed(&self) -> bool {
+        self.stage == InvocationFailureStage::TerminationUnconfirmed
     }
 
     pub(crate) fn is_unexpected_termination(&self) -> bool {
@@ -292,6 +315,14 @@ async fn invoke_once(
             format!("Não foi possível preparar a solicitação: {error}"),
         )
     })?;
+    let mut decoder =
+        ImagingEventStreamDecoder::for_request(&context.operation_id).map_err(|error| {
+            InvocationFailure::at_stage(
+                InvocationFailureStage::EncodeRequest,
+                None,
+                format!("A correlação da solicitação é inválida: {error}"),
+            )
+        })?;
     let sidecar = app
         .shell()
         .sidecar("myalbuns-imaging")
@@ -324,8 +355,7 @@ async fn invoke_once(
         event = "imaging_process_spawned",
     );
     if let Err(error) = child.write(&payload) {
-        let _ = child.kill();
-        wait_for_termination(&mut events).await;
+        terminate_process(child, &mut events, imaging_process_id).await?;
         return Err(InvocationFailure::at_stage(
             InvocationFailureStage::WriteRequest,
             Some(imaging_process_id),
@@ -333,15 +363,11 @@ async fn invoke_once(
         ));
     }
 
-    let mut stdout = Vec::new();
-    let mut pending_line = Vec::new();
-    let mut response_seen = false;
     let mut exit_code = None;
     let mut stream_error = None;
     loop {
         if control.is_cancelled() {
-            let kill_error = child.kill().err();
-            wait_for_termination(&mut events).await;
+            let kill_error = terminate_process(child, &mut events, imaging_process_id).await?;
             let mut failure = InvocationFailure::cancelled(imaging_process_id);
             if let Some(error) = kill_error {
                 failure.message =
@@ -358,16 +384,8 @@ async fn invoke_once(
         };
         match event {
             CommandEvent::Stdout(bytes) => {
-                stdout.extend_from_slice(&bytes);
-                pending_line.extend_from_slice(&bytes);
-                if let Err(error) = report_complete_event_lines(
-                    &mut pending_line,
-                    &mut response_seen,
-                    &context.operation_id,
-                    control,
-                ) {
-                    let _ = child.kill();
-                    wait_for_termination(&mut events).await;
+                if let Err(error) = decode_and_report_event_chunk(&mut decoder, &bytes, control) {
+                    terminate_process(child, &mut events, imaging_process_id).await?;
                     return Err(InvocationFailure::at_stage(
                         InvocationFailureStage::DecodeResponse,
                         Some(imaging_process_id),
@@ -404,49 +422,72 @@ async fn invoke_once(
             termination_observed: exit_code.is_some(),
         });
     }
-    complete_invocation(imaging_process_id, exit_code, &stdout)
-}
-
-async fn wait_for_termination(events: &mut tauri::async_runtime::Receiver<CommandEvent>) {
-    while let Some(event) = events.recv().await {
-        if matches!(event, CommandEvent::Terminated(_)) {
-            break;
-        }
+    if exit_code != Some(0) {
+        return Err(InvocationFailure::terminated(imaging_process_id, exit_code));
     }
+    decoder.finish().map_err(|error| {
+        InvocationFailure::at_stage(
+            InvocationFailureStage::DecodeResponse,
+            Some(imaging_process_id),
+            format!("Resposta inválida do Processador de Imagens: {error}"),
+        )
+    })
 }
 
-fn report_complete_event_lines(
-    pending_line: &mut Vec<u8>,
-    response_seen: &mut bool,
-    expected_request_id: &str,
+async fn terminate_process(
+    child: CommandChild,
+    events: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    process_id: u32,
+) -> Result<Option<String>, InvocationFailure> {
+    let kill_error = child.kill().err().map(|error| error.to_string());
+    if wait_for_termination(events).await {
+        return Ok(kill_error);
+    }
+    let message = kill_error.map_or_else(
+        || {
+            "O encerramento do Processador de Imagens não foi confirmado dentro do limite."
+                .to_string()
+        },
+        |error| {
+            format!("O encerramento do Processador de Imagens falhou e não foi confirmado: {error}")
+        },
+    );
+    Err(InvocationFailure::termination_unconfirmed(
+        process_id, message,
+    ))
+}
+
+async fn wait_for_termination(events: &mut tauri::async_runtime::Receiver<CommandEvent>) -> bool {
+    wait_for_termination_for(events, PROCESS_TERMINATION_TIMEOUT).await
+}
+
+async fn wait_for_termination_for(
+    events: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    timeout: Duration,
+) -> bool {
+    tokio::time::timeout(timeout, async {
+        while let Some(event) = events.recv().await {
+            if matches!(event, CommandEvent::Terminated(_)) {
+                return;
+            }
+        }
+    })
+    .await
+    .is_ok()
+}
+
+fn decode_and_report_event_chunk(
+    decoder: &mut ImagingEventStreamDecoder,
+    chunk: &[u8],
     control: InvocationControl<'_>,
 ) -> Result<(), String> {
-    while let Some(newline) = pending_line.iter().position(|byte| *byte == b'\n') {
-        let mut line = pending_line.drain(..=newline).collect::<Vec<_>>();
-        line.pop();
-        if line.is_empty() {
-            continue;
-        }
-        match decode_event(&line)? {
-            ImagingEvent::Progress(_) if *response_seen => {
-                return Err("o Processador devolveu progresso após a resposta final".into());
-            }
-            ImagingEvent::Progress(progress) if progress.request_id != expected_request_id => {
-                return Err("o progresso não corresponde à operação solicitada".into());
-            }
-            ImagingEvent::Progress(progress) => control.report(progress),
-            ImagingEvent::Response(_) if *response_seen => {
-                return Err("o Processador devolveu mais de uma resposta final".into());
-            }
-            ImagingEvent::Response(response) if response.request_id() != expected_request_id => {
-                return Err("a resposta final não corresponde à operação solicitada".into());
-            }
-            ImagingEvent::Response(_) => *response_seen = true,
-        }
+    for progress in decoder.push(chunk)? {
+        control.report(progress);
     }
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn complete_invocation(
     process_id: u32,
     exit_code: Option<i32>,
@@ -468,16 +509,19 @@ pub(crate) fn complete_invocation(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Mutex, atomic::AtomicBool};
+    use std::{
+        sync::{Mutex, atomic::AtomicBool},
+        time::Duration,
+    };
 
     use myalbuns_imaging_protocol::{
-        ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingResponse,
-        RenderCompletion, encode_event,
+        ImagingEvent, ImagingEventStreamDecoder, ImagingFailureStage, ImagingProgress,
+        ImagingProgressStage, ImagingResponse, RenderCompletion, encode_event,
     };
 
     use super::{
         InvocationControl, InvocationFailure, InvocationFailureStage, complete_invocation,
-        report_complete_event_lines,
+        decode_and_report_event_chunk, wait_for_termination_for,
     };
 
     #[test]
@@ -514,43 +558,21 @@ mod tests {
 
     #[test]
     fn host_reports_chunked_progress_before_decoding_the_final_response() {
-        let progress = ImagingProgress::new("render-stream", ImagingProgressStage::Composing, 1, 2)
-            .expect("the progress fixture is valid");
-        let progress_event = encode_event(&ImagingEvent::Progress(progress.clone()))
-            .expect("the progress fixture serializes");
-        let split = progress_event.len() / 2;
-        let collected = Mutex::new(Vec::new());
-        let callback = |event| {
-            collected
-                .lock()
-                .expect("the progress collector is available")
-                .push(event);
-        };
-        let cancellation = AtomicBool::new(false);
-        let control = InvocationControl::controlled(&cancellation, &callback);
-        let mut pending = Vec::new();
-        let mut response_seen = false;
-
-        pending.extend_from_slice(&progress_event[..split]);
-        report_complete_event_lines(&mut pending, &mut response_seen, "render-stream", control)
-            .expect("an incomplete event remains buffered");
-        assert!(
-            collected
-                .lock()
-                .expect("the progress collector is available")
-                .is_empty()
-        );
-        pending.extend_from_slice(&progress_event[split..]);
-        report_complete_event_lines(&mut pending, &mut response_seen, "render-stream", control)
-            .expect("the completed event is reported");
-        assert_eq!(
-            collected
-                .lock()
-                .expect("the progress collector is available")
-                .as_slice(),
-            [progress]
-        );
-
+        let progress = [
+            ImagingProgress::new("render-stream", ImagingProgressStage::LoadingSources, 1, 1)
+                .expect("the source progress fixture is valid"),
+            ImagingProgress::new("render-stream", ImagingProgressStage::Composing, 2, 2)
+                .expect("the composition progress fixture is valid"),
+            ImagingProgress::new("render-stream", ImagingProgressStage::EncodingOutput, 1, 1)
+                .expect("the encoding progress fixture is valid"),
+        ];
+        let mut event_stream = Vec::new();
+        for event in &progress {
+            event_stream.extend(
+                encode_event(&ImagingEvent::Progress(event.clone()))
+                    .expect("the progress fixture serializes"),
+            );
+        }
         let response = ImagingResponse::completed(
             "render-stream",
             RenderCompletion {
@@ -564,12 +586,48 @@ mod tests {
                     .into(),
             },
         );
-        let response_event = encode_event(&ImagingEvent::Response(response.clone()))
-            .expect("the response fixture serializes");
+        event_stream.extend(
+            encode_event(&ImagingEvent::Response(response.clone()))
+                .expect("the response fixture serializes"),
+        );
+        let split = event_stream.len() / 2;
+        let collected = Mutex::new(Vec::new());
+        let callback = |event| {
+            collected
+                .lock()
+                .expect("the progress collector is available")
+                .push(event);
+        };
+        let cancellation = AtomicBool::new(false);
+        let control = InvocationControl::controlled(&cancellation, &callback);
+        let mut decoder =
+            ImagingEventStreamDecoder::for_request("render-stream").expect("the request is valid");
+
+        decode_and_report_event_chunk(&mut decoder, &event_stream[..split], control)
+            .expect("an incomplete event remains buffered");
+        decode_and_report_event_chunk(&mut decoder, &event_stream[split..], control)
+            .expect("the completed event is reported");
         assert_eq!(
-            complete_invocation(4242, Some(0), &response_event)
-                .expect("the final event stream decodes"),
+            collected
+                .lock()
+                .expect("the progress collector is available")
+                .as_slice(),
+            progress
+        );
+        assert_eq!(
+            decoder.finish().expect("the response is decoded once"),
             response
         );
+    }
+
+    #[test]
+    fn process_reaping_has_a_finite_wait() {
+        tauri::async_runtime::block_on(async {
+            let (_sender, mut events) = tauri::async_runtime::channel(1);
+            assert!(
+                !wait_for_termination_for(&mut events, Duration::from_millis(1)).await,
+                "an open event channel cannot make process reaping wait indefinitely"
+            );
+        });
     }
 }

@@ -98,6 +98,19 @@ impl<'a> ExportPreparationGuard<'a> {
             .expect("an active Export preparation is published at most once")
             .publish()
     }
+
+    fn preserve(mut self) {
+        if self.storage.take().is_some() {
+            tracing::error!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::DesktopHost.as_str(),
+                protocol_version = IMAGING_PROTOCOL_VERSION,
+                operation_id = self.context.operation_id.as_str(),
+                project_id = self.context.project_id.as_deref(),
+                event = "incomplete_export_preserved",
+            );
+        }
+    }
 }
 
 impl Drop for ExportPreparationGuard<'_> {
@@ -295,6 +308,13 @@ pub(crate) async fn execute<T: ImagingTransport>(
     {
         Ok(response) => response,
         Err(failure) if failure.is_cancelled() => return Err(cancelled_failure()),
+        Err(failure) if failure.is_termination_unconfirmed() => {
+            preparation.preserve();
+            return Err(ExportFailure::from_invocation(
+                failure,
+                ExportFailureStage::Processor,
+            ));
+        }
         Err(failure) => {
             return Err(ExportFailure::from_invocation(
                 failure,
@@ -657,6 +677,58 @@ mod tests {
                     .path()
                     .join(".myalbuns-export-export-failure.tmp")
                     .exists()
+            );
+        });
+    }
+
+    #[test]
+    fn unconfirmed_process_termination_preserves_the_preparation_for_safe_recovery() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary Export destination");
+            let output = destination.path().join("Album.png");
+            std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+            let plan = export_plan(output.clone(), "export-unconfirmed-termination");
+            let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
+            let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
+            let mut transport = ScriptedTransport {
+                prepared_path: prepared_path.clone(),
+                prepared_bytes: b"possibly active export".to_vec(),
+                result: Some(Err(InvocationFailure::termination_unconfirmed(
+                    4242,
+                    "the processor may still own the preparation",
+                ))),
+                invocations: 0,
+            };
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(false);
+            let progress = |_| {};
+
+            let failure = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &progress,
+                &context("export-unconfirmed-termination"),
+            )
+            .await
+            .expect_err("the unconfirmed termination remains visible");
+
+            assert_eq!(
+                failure.stage,
+                ExportFailureStage::Processor(
+                    crate::imaging_processor::InvocationFailureStage::TerminationUnconfirmed
+                )
+            );
+            assert_eq!(transport.invocations, 1);
+            assert_eq!(
+                std::fs::read(output).expect("the previous Export remains readable"),
+                b"previous export"
+            );
+            assert!(preparation_directory.exists());
+            assert_eq!(
+                std::fs::read(prepared_path).expect("the preparation remains for safe recovery"),
+                b"possibly active export"
             );
         });
     }

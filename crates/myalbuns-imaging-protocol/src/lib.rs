@@ -162,34 +162,164 @@ pub fn decode_event(payload: &[u8]) -> Result<ImagingEvent, String> {
     Ok(event)
 }
 
-pub fn decode_event_stream(
-    payload: &[u8],
-) -> Result<(Vec<ImagingProgress>, ImagingResponse), String> {
-    let mut progress = Vec::new();
-    let mut response = None;
-    for line in payload
-        .split(|byte| *byte == b'\n')
-        .filter(|line| !line.is_empty())
-    {
-        match decode_event(line)? {
-            ImagingEvent::Progress(_) if response.is_some() => {
-                return Err("o Processador devolveu progresso após a resposta final".into());
+const MAX_INCOMPLETE_EVENT_BYTES: usize = 1024 * 1024;
+
+#[derive(Debug)]
+pub struct ImagingEventStreamDecoder {
+    request_id: Option<String>,
+    pending: Vec<u8>,
+    progress: Option<ProgressCursor>,
+    response: Option<ImagingResponse>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ProgressCursor {
+    stage: ImagingProgressStage,
+    completed_units: u32,
+    total_units: u32,
+}
+
+impl ImagingProgressStage {
+    const fn next(self) -> Option<Self> {
+        match self {
+            Self::LoadingSources => Some(Self::Composing),
+            Self::Composing => Some(Self::EncodingOutput),
+            Self::EncodingOutput => None,
+        }
+    }
+}
+
+impl ImagingEventStreamDecoder {
+    pub fn new() -> Self {
+        Self {
+            request_id: None,
+            pending: Vec::new(),
+            progress: None,
+            response: None,
+        }
+    }
+
+    pub fn for_request(request_id: impl Into<String>) -> Result<Self, String> {
+        let request_id = request_id.into();
+        if !is_safe_identifier(&request_id) {
+            return Err("a correlação do stream de eventos é inválida".into());
+        }
+        Ok(Self {
+            request_id: Some(request_id),
+            ..Self::new()
+        })
+    }
+
+    pub fn push(&mut self, chunk: &[u8]) -> Result<Vec<ImagingProgress>, String> {
+        self.pending.extend_from_slice(chunk);
+        let mut emitted = Vec::new();
+        while let Some(newline) = self.pending.iter().position(|byte| *byte == b'\n') {
+            let remainder = self.pending.split_off(newline + 1);
+            self.pending.truncate(newline);
+            let line = std::mem::replace(&mut self.pending, remainder);
+            if line.is_empty() {
+                continue;
             }
-            ImagingEvent::Progress(event) => progress.push(event),
-            ImagingEvent::Response(event) if response.is_none() => response = Some(event),
-            ImagingEvent::Response(_) => {
-                return Err("o Processador devolveu mais de uma resposta final".into());
+            if let Some(progress) = self.accept(decode_event(&line)?)? {
+                emitted.push(progress);
+            }
+        }
+        if self.pending.len() > MAX_INCOMPLETE_EVENT_BYTES {
+            return Err("o evento do Processador de Imagens excedeu o limite".into());
+        }
+        Ok(emitted)
+    }
+
+    pub fn finish(mut self) -> Result<ImagingResponse, String> {
+        if !self.pending.is_empty() {
+            return Err("o Processador devolveu um evento final incompleto".into());
+        }
+        self.response
+            .take()
+            .ok_or_else(|| "o Processador não devolveu uma resposta final".to_string())
+    }
+
+    fn accept(&mut self, event: ImagingEvent) -> Result<Option<ImagingProgress>, String> {
+        match event {
+            ImagingEvent::Progress(_) if self.response.is_some() => {
+                Err("o Processador devolveu progresso após a resposta final".into())
+            }
+            ImagingEvent::Progress(progress) => {
+                self.correlate(&progress.request_id)?;
+                self.advance_progress(&progress)?;
+                Ok(Some(progress))
+            }
+            ImagingEvent::Response(_) if self.response.is_some() => {
+                Err("o Processador devolveu mais de uma resposta final".into())
+            }
+            ImagingEvent::Response(response) => {
+                self.correlate(response.request_id())?;
+                if let Some(progress) = self.progress
+                    && (progress.stage != ImagingProgressStage::EncodingOutput
+                        || progress.completed_units != progress.total_units)
+                {
+                    return Err("a resposta final chegou antes da conclusão do progresso".into());
+                }
+                self.response = Some(response);
+                Ok(None)
             }
         }
     }
-    let response =
-        response.ok_or_else(|| "o Processador não devolveu uma resposta final".to_string())?;
-    if progress
-        .iter()
-        .any(|event| event.request_id != response.request_id())
-    {
-        return Err("o progresso não corresponde à resposta final".into());
+
+    fn correlate(&mut self, request_id: &str) -> Result<(), String> {
+        match &self.request_id {
+            Some(expected) if expected != request_id => {
+                Err("o evento não corresponde à operação solicitada".into())
+            }
+            Some(_) => Ok(()),
+            None => {
+                self.request_id = Some(request_id.to_owned());
+                Ok(())
+            }
+        }
     }
+
+    fn advance_progress(&mut self, progress: &ImagingProgress) -> Result<(), String> {
+        match self.progress {
+            None if progress.stage != ImagingProgressStage::LoadingSources => {
+                return Err("o progresso não começou pelo carregamento das fontes".into());
+            }
+            None => {}
+            Some(previous) if progress.stage == previous.stage => {
+                if progress.total_units != previous.total_units
+                    || progress.completed_units < previous.completed_units
+                {
+                    return Err("o progresso do Processador de Imagens regrediu".into());
+                }
+            }
+            Some(previous)
+                if previous.stage.next() == Some(progress.stage)
+                    && previous.completed_units == previous.total_units => {}
+            Some(_) => {
+                return Err("a ordem do progresso do Processador de Imagens é inválida".into());
+            }
+        }
+        self.progress = Some(ProgressCursor {
+            stage: progress.stage,
+            completed_units: progress.completed_units,
+            total_units: progress.total_units,
+        });
+        Ok(())
+    }
+}
+
+impl Default for ImagingEventStreamDecoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub fn decode_event_stream(
+    payload: &[u8],
+) -> Result<(Vec<ImagingProgress>, ImagingResponse), String> {
+    let mut decoder = ImagingEventStreamDecoder::new();
+    let progress = decoder.push(payload)?;
+    let response = decoder.finish()?;
     Ok((progress, response))
 }
 

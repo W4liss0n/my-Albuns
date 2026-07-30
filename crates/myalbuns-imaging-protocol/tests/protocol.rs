@@ -149,16 +149,26 @@ fn host_and_processor_share_one_serialized_protocol() {
                 .into(),
         },
     );
-    let progress = ImagingProgress::new("render-42", ImagingProgressStage::Composing, 1, 2)
-        .expect("the processor progress is valid");
-    let mut event_stream =
-        encode_event(&ImagingEvent::Progress(progress.clone())).expect("progress serializes");
+    let progress = [
+        ImagingProgress::new("render-42", ImagingProgressStage::LoadingSources, 1, 1)
+            .expect("source progress is valid"),
+        ImagingProgress::new("render-42", ImagingProgressStage::Composing, 2, 2)
+            .expect("composition progress is valid"),
+        ImagingProgress::new("render-42", ImagingProgressStage::EncodingOutput, 1, 1)
+            .expect("encoding progress is valid"),
+    ];
+    let mut event_stream = Vec::new();
+    for event in &progress {
+        event_stream.extend(
+            encode_event(&ImagingEvent::Progress(event.clone())).expect("progress serializes"),
+        );
+    }
     event_stream.extend(
         encode_event(&ImagingEvent::Response(response.clone())).expect("response event serializes"),
     );
     let (decoded_progress, decoded_response) =
         decode_event_stream(&event_stream).expect("the event stream decodes");
-    assert_eq!(decoded_progress, [progress]);
+    assert_eq!(decoded_progress, progress);
     assert_eq!(
         decoded_response
             .completed_for("render-42")
@@ -196,6 +206,47 @@ fn processor_event_stream_rejects_invalid_or_out_of_order_progress() {
         decode_event_stream(&out_of_order).is_err(),
         "progress cannot be emitted after the final response"
     );
+}
+
+#[test]
+fn processor_event_stream_rejects_regressive_progress() {
+    let response = ImagingResponse::cache_reset("render-42", 0);
+    let cases = [
+        vec![
+            (ImagingProgressStage::LoadingSources, 1, 1),
+            (ImagingProgressStage::EncodingOutput, 1, 1),
+        ],
+        vec![
+            (ImagingProgressStage::LoadingSources, 1, 1),
+            (ImagingProgressStage::Composing, 1, 2),
+            (ImagingProgressStage::Composing, 0, 2),
+        ],
+        vec![
+            (ImagingProgressStage::LoadingSources, 1, 1),
+            (ImagingProgressStage::Composing, 1, 1),
+            (ImagingProgressStage::LoadingSources, 1, 1),
+        ],
+    ];
+
+    for events in cases {
+        let mut stream = Vec::new();
+        for (stage, completed, total) in events {
+            let progress = ImagingProgress::new("render-42", stage, completed, total)
+                .expect("each individual progress event is valid");
+            stream.extend(
+                encode_event(&ImagingEvent::Progress(progress))
+                    .expect("the progress event serializes"),
+            );
+        }
+        stream.extend(
+            encode_event(&ImagingEvent::Response(response.clone()))
+                .expect("the final response serializes"),
+        );
+        assert!(
+            decode_event_stream(&stream).is_err(),
+            "the stream-level progress invariant rejects regressions"
+        );
+    }
 }
 
 #[test]
