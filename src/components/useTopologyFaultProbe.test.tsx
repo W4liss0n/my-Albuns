@@ -18,8 +18,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test("loads the canonical Project inside the shared queue before editing and persisting", async () => {
-  const probeId = "global-main-down:project-spike-001";
+test("loads the canonical Project with the safe probe id before editing and persisting", async () => {
+  const probeId = "global-main-down-project-spike-001";
   const renderedProjection = withLeadingPlaceholder(
     representativeProjection,
   );
@@ -78,9 +78,7 @@ test("loads the canonical Project inside the shared queue before editing and per
   });
 
   expect(runProjectMutation).toHaveBeenCalledOnce();
-  expect(port.load).toHaveBeenCalledWith(
-    `topology-fault-probe:${probeId}`,
-  );
+  expect(port.load).toHaveBeenCalledWith(probeId);
   expect(port.apply).toHaveBeenCalledWith({
     kind: "transformPhoto",
     frameId: "frame-001",
@@ -99,7 +97,7 @@ test("loads the canonical Project inside the shared queue before editing and per
 
 test("runs each probeId once and keeps polling for a later probe", async () => {
   vi.useFakeTimers();
-  let currentProbeId = "project-host-down:001";
+  let currentProbeId = "project-host-down-001";
   const applied26 = withState(representativeProjection, {
     revision: 26,
     dirty: true,
@@ -131,10 +129,10 @@ test("runs each probeId once and keeps polling for a later probe", async () => {
   const persistAndReport = vi
     .fn<TopologyFaultProbeBridge["persistAndReport"]>()
     .mockResolvedValueOnce(
-      persistedResult("project-host-down:001", saved26, 25, 26),
+      persistedResult("project-host-down-001", saved26, 25, 26),
     )
     .mockResolvedValueOnce(
-      persistedResult("project-host-down:002", saved27, 26, 27),
+      persistedResult("project-host-down-002", saved27, 26, 27),
     );
   const bridge = topologyBridge(
     async () =>
@@ -162,7 +160,7 @@ test("runs each probeId once and keeps polling for a later probe", async () => {
   });
   expect(port.apply).toHaveBeenCalledTimes(1);
 
-  currentProbeId = "project-host-down:002";
+  currentProbeId = "project-host-down-002";
   await act(async () => {
     await vi.advanceTimersByTimeAsync(250);
     await vi.waitFor(() =>
@@ -171,7 +169,7 @@ test("runs each probeId once and keeps polling for a later probe", async () => {
   });
 
   expect(persistAndReport).toHaveBeenNthCalledWith(2, {
-    probeId: "project-host-down:002",
+    probeId: "project-host-down-002",
     previousRevision: 26,
     expectedRevision: 27,
   });
@@ -179,7 +177,7 @@ test("runs each probeId once and keeps polling for a later probe", async () => {
 
 test("keeps polling while the shared gate is absent", async () => {
   vi.useFakeTimers();
-  const probeId = "global-restarted:001";
+  const probeId = "global-restarted-001";
   const applied = withState(representativeProjection, {
     revision: 26,
     dirty: true,
@@ -229,7 +227,7 @@ test("keeps polling while the shared gate is absent", async () => {
 
 test("retries polling after a transient configuration error", async () => {
   vi.useFakeTimers();
-  const probeId = "global-restarted:after-transient-error";
+  const probeId = "global-restarted-after-transient-error";
   const applied = withState(representativeProjection, {
     revision: 26,
     dirty: true,
@@ -311,7 +309,7 @@ test("stops polling permanently when the backend disables the probe", async () =
 
 test("reports a failed probe once without retrying the same probeId", async () => {
   vi.useFakeTimers();
-  const probeId = "project-host-down:failed";
+  const probeId = "project-host-down-failed";
   const port = projectSessionPort(
     vi.fn(async () => {
       throw new Error("session unavailable");

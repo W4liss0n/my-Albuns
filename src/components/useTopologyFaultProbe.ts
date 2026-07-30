@@ -69,9 +69,7 @@ export function useTopologyFaultProbe({
 
         attemptedRef.current.probeIds.add(config.probeId);
         const outcome = await runProjectMutation(async (port) => {
-          const canonicalProjection = await port.load(
-            `topology-fault-probe:${config.probeId}`,
-          );
+          const canonicalProjection = await port.load(config.probeId);
           const frameId = findFilledFrameId(canonicalProjection);
           if (frameId === null) {
             throw new Error(
