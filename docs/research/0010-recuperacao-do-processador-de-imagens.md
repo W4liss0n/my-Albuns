@@ -11,7 +11,7 @@ updated: 2026-07-29
 ## Resumo
 
 Este gate demonstra reinício seguro do Processador de Imagens durante Cache e
-falha controlada durante Exportação. As duas provas encerram processos reais
+falha controlada durante Exportação. Os dois cenários encerram processos reais
 depois que uma preparação parcial aparece no disco e derivam a evidência de
 PIDs, arquivos e hashes efetivamente observados.
 
@@ -29,19 +29,26 @@ identifica o commit exato dos insumos e confirma `sourceInputsDirty: false`.
 
 A recuperação mantém responsabilidades separadas:
 
-- `imaging_processor` transporta uma única mensagem, registra tentativa e PID e
-  devolve falhas tipadas; ele não decide repetição nem ciclo de arquivos;
+- `imaging_processor` define a fronteira tipada comum à aplicação e à prova
+  integrada. O adaptador Tauri usado pela aplicação e o adaptador
+  `std::process` exclusivo do teste compartilham o codec, a correlação e a
+  classificação da terminação; somente a inicialização e a coleta de eventos,
+  dependentes de cada runtime, são distintas. A fronteira não decide repetição
+  nem ciclo de arquivos;
 - `CacheEngine` possui a política de Cache: em uma queda inesperada, remove
   somente nomes terminados pelo PID encerrado e reinicia uma vez; uma falha
   determinística não é repetida e uma segunda queda termina a operação depois
-  de limpar seu próprio temporário;
-- `ExportPipeline` possui preparação, validação, publicação e descarte; seu
-  invocador é de uso único e, portanto, não oferece repetição automática;
+  de limpar seu próprio temporário. Ele também deriva gerações, valida
+  artefatos e publica `metadata.json`;
+- `ExportPipeline` possui planejamento, preparação, validação, publicação e
+  descarte; cada execução invoca o transporte uma vez e, portanto, não oferece
+  repetição automática;
 - `AppPaths` deriva uma pasta única
   `.myalbuns-export-{operation-id}.tmp` dentro do Destino, mantém a cadeia de
   diretórios validada e restringe descarte e publicação à tentativa;
-- `MyAlbuns.Imaging.exe` recebe no protocolo v3 somente o caminho do arquivo
-  preparado. Ele grava, sincroniza, calcula tamanho e SHA-256 e responde sem
+- `MyAlbuns.Imaging.exe` recebe no protocolo v4 somente o comando tipado e os
+  caminhos preparados. Ele grava, sincroniza, calcula tamanho e SHA-256 e
+  responde sem
   conhecer ou promover o nome final;
 - o host confere novamente tamanho e SHA-256 da preparação antes de pedir a
   promoção. Nenhuma verificação falível ocorre depois da Publicação.
@@ -52,22 +59,23 @@ dois SHA-256 são idênticos.
 
 ## Método
 
-O comando `npm run spike:imaging-recovery` executou cinco grupos de
+O comando `npm run spike:imaging-recovery` executou quatro grupos de
 verificação:
 
 1. contrato serializado e códigos de falha do protocolo;
 2. descarte seletivo de temporários de Cache, preservando um temporário
    pertencente a outro PID;
-3. políticas reais de `CacheEngine` e `ExportPipeline`, incluindo falha de
-   validação antes da Publicação;
-4. queda do processo durante a geração de uma representação JPEG a partir de
-   uma Foto real de 4096 × 3072 px;
-5. queda do processo durante uma Exportação a 300 DPI com original JPEG
-   vinculado, seguida somente depois por nova tentativa explícita.
+3. compilação do executável real do Processador de Imagens;
+4. uma prova integrada que atravessa a mesma fronteira `ImagingTransport`, o
+   `CacheEngine` e o `ExportPipeline` usados em produção: ela encerra o
+   processo durante a geração de uma representação JPEG a partir de uma Foto
+   real e durante uma
+   Exportação a 300 DPI, seguida somente depois por nova tentativa explícita.
 
-O teste espera o arquivo parcial aparecer enquanto o processo ainda está vivo,
-encerra exatamente esse processo e aguarda sua coleta. O relatório falha se os
-PIDs forem iguais, se o temporário não for observado ou removido, se o índice
+O mesmo teste integrado espera cada arquivo parcial aparecer enquanto o
+processo ainda está vivo, encerra exatamente esse processo e aguarda sua
+coleta. O relatório falha se os PIDs forem iguais, se o temporário não for
+observado ou removido, se um temporário de outro PID for removido, se o índice
 de Cache aparecer antes da conclusão, se houver resposta de sucesso na
 tentativa incompleta ou se os hashes protegidos mudarem.
 
@@ -75,22 +83,23 @@ tentativa incompleta ou se os hashes protegidos mudarem.
 
 | Evidência | Resultado observado |
 |---|---|
-| Processo de Cache encerrado | PID `25652` |
-| Processo reiniciado para Cache | PID `4756` |
+| Processo de Cache encerrado | PID `26848` |
+| Processo reiniciado para Cache | PID `26616` |
 | Temporários do PID encerrado removidos | `1` |
+| Temporário de outro PID preservado | sim |
 | `metadata.json` depois da queda | ausente |
 | `metadata.json` depois do reinício | presente |
-| Processo de Exportação encerrado | PID `3204` |
+| Processo de Exportação encerrado | PID `9228` |
 | Resposta de sucesso antes da nova tentativa | não |
 | Política de fonte | `linkedOriginals` |
-| Processo da tentativa explícita | PID `9820` |
+| Processo da tentativa explícita | PID `21812` |
 
 O SHA-256 da Exportação publicada anterior permaneceu
 `30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79`
 antes e depois da queda. O SHA-256 da revisão do Projeto permaneceu
 `1fa39a7104b6080a3397beb98dd073295e9bbaf07886f5593b5baa4a955d6c70`.
 A tentativa explícita publicou outro PNG, com SHA-256
-`bf96043e2672584027dd540bb7cccf84169c82d330a3b82592a9a4825ca9d945`.
+`845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb`.
 
 ## Conclusão do gate
 
