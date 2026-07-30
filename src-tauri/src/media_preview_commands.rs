@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
@@ -103,9 +104,7 @@ pub(crate) async fn prepare_media_previews(
                 .map_err(|error| error.to_string())?;
             Ok(MediaPreview {
                 media_id: artifact.media_id.clone(),
-                url: app_paths
-                    .cache_asset_url(&preview_path)
-                    .map_err(|error| error.to_string())?,
+                url: cache_asset_url(&app_paths, &preview_path)?,
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -126,4 +125,71 @@ pub(crate) async fn prepare_media_previews(
         event = "media_cache_completed",
     );
     Ok(Some(previews))
+}
+
+fn cache_asset_url(app_paths: &AppPaths, cache_file: &Path) -> Result<String, String> {
+    app_paths
+        .validate_cache_artifact(cache_file)
+        .map_err(|error| error.to_string())?;
+    let path = cache_file
+        .to_str()
+        .ok_or_else(|| "o caminho do Cache não pode ser representado pelo WebView".to_owned())?;
+    let protocol = if cfg!(any(target_os = "windows", target_os = "android")) {
+        "http://asset.localhost/"
+    } else {
+        "asset://localhost/"
+    };
+    Ok(format!("{protocol}{}", encode_uri_component(path)))
+}
+
+fn encode_uri_component(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')'
+            )
+        {
+            encoded.push(char::from(byte));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[(byte >> 4) as usize]));
+            encoded.push(char::from(HEX[(byte & 0x0f) as usize]));
+        }
+    }
+    encoded
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use myalbuns_paths::AppPaths;
+
+    use super::cache_asset_url;
+
+    #[test]
+    fn encodes_an_authorized_cache_artifact_for_the_tauri_asset_protocol() {
+        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let preview = paths
+            .project_cache("project-01")
+            .expect("project namespace is safe")
+            .preview_file("media-001", "0123456789abcdef-v1-1600")
+            .expect("artifact identity is safe");
+
+        assert_eq!(
+            cache_asset_url(&paths, &preview)
+                .expect("the authorized Cache path becomes an asset URL"),
+            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-001.0123456789abcdef-v1-1600.jpg"
+        );
+    }
+
+    #[test]
+    fn refuses_to_expose_a_file_outside_the_authorized_cache_root() {
+        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+
+        assert!(cache_asset_url(&paths, Path::new(r"C:\Photos\private.jpg")).is_err());
+    }
 }

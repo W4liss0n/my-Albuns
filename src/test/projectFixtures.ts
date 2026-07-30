@@ -55,20 +55,23 @@ export const representativeProjection: EditorProjection = {
         {
           id: "media-001",
           name: "Serra ao amanhecer.jpg",
+          sourceWidthPx: 6_000,
+          sourceHeightPx: 4_000,
           palette: ["#10202b", "#648493", "#dfa75e"],
-          usageCount: 1,
         },
         {
           id: "media-002",
           name: "Campo.jpg",
+          sourceWidthPx: 4_000,
+          sourceHeightPx: 6_000,
           palette: ["#21372f", "#92a277", "#e5d7b9"],
-          usageCount: 0,
         },
         {
           id: "media-003",
           name: "Praia.jpg",
+          sourceWidthPx: 6_000,
+          sourceHeightPx: 4_000,
           palette: ["#123e52", "#428596", "#e7bd76"],
-          usageCount: 0,
         },
       ],
     },
@@ -111,6 +114,11 @@ export const representativeProjection: EditorProjection = {
       },
     ],
   },
+  mediaUsage: [
+    { mediaId: "media-001", count: 1 },
+    { mediaId: "media-002", count: 0 },
+    { mediaId: "media-003", count: 0 },
+  ],
 };
 
 export function createEmptyProjection(): EditorProjection {
@@ -129,6 +137,7 @@ export function createEmptyProjection(): EditorProjection {
     composition: {
       sheets: [],
     },
+    mediaUsage: [],
   };
 }
 
@@ -161,5 +170,6 @@ export function createTwoSheetProjection(): EditorProjection {
         },
       ],
     },
+    mediaUsage: representativeProjection.mediaUsage,
   };
 }

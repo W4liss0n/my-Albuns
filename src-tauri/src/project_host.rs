@@ -36,7 +36,7 @@ impl ProjectHost {
 
     pub(crate) fn projection(&self, window_label: &str) -> Result<EditorProjection, String> {
         let session = self.session(window_label)?;
-        Ok(project_projection(&session))
+        Ok(session.projection())
     }
 
     pub(crate) fn apply(
@@ -46,19 +46,19 @@ impl ProjectHost {
     ) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.apply(intent).map_err(|error| error.to_string())?;
-        Ok(project_projection(&session))
+        Ok(session.projection())
     }
 
     pub(crate) fn undo(&self, window_label: &str) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.undo();
-        Ok(project_projection(&session))
+        Ok(session.projection())
     }
 
     pub(crate) fn redo(&self, window_label: &str) -> Result<EditorProjection, String> {
         let mut session = self.session(window_label)?;
         session.redo();
-        Ok(project_projection(&session))
+        Ok(session.projection())
     }
 
     pub(crate) fn render_snapshot(&self, window_label: &str) -> Result<RenderSnapshot, String> {
@@ -125,13 +125,6 @@ impl ProjectHost {
             .session
             .lock()
             .map_err(|_| "A Sessão do Projeto ficou indisponível.".to_string())
-    }
-}
-
-fn project_projection(session: &ProjectSession) -> EditorProjection {
-    EditorProjection {
-        state: session.state(),
-        composition: session.composition_plan(),
     }
 }
 

@@ -55,6 +55,9 @@ export function ProjectWorkspace({
     photoCount,
   } = controller;
   const focusedSheetId = controller.canvasProps.focusedSheetId;
+  const mediaUsageById = new Map(
+    projection.mediaUsage.map((usage) => [usage.mediaId, usage.count]),
+  );
 
   return (
     <div className="app-shell">
@@ -324,7 +327,7 @@ export function ProjectWorkspace({
                 </span>
                 <span className="media-meta">
                   <strong>{media.name}</strong>
-                  <small>{media.usageCount} usos</small>
+                  <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
                 </span>
               </button>
             ))}

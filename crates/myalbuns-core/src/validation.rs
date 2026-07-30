@@ -110,6 +110,12 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
                 media.id
             )));
         }
+        if media.source_width_px == 0 || media.source_height_px == 0 {
+            return Err(CoreError::InvalidProject(format!(
+                "dimensões de origem inválidas para a Foto {}",
+                media.id
+            )));
+        }
         validate_palette(&media.palette, &media.id, CoreError::InvalidProject)?;
     }
 

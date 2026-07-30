@@ -69,6 +69,34 @@ fn opens_an_editable_session_through_the_project_core_seam() {
 }
 
 #[test]
+fn rejects_the_previous_project_schema_after_intrinsic_media_dimensions_became_required() {
+    let session = horizon_project(12);
+    let persisted = session
+        .persisted_revision()
+        .expect("the current project can be serialized");
+    let mut document: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the current project JSON is valid");
+    document["schemaVersion"] = serde_json::json!(1);
+    for media in document["album"]["media"]
+        .as_array_mut()
+        .expect("the sample catalog is an array")
+    {
+        let media = media.as_object_mut().expect("a catalog item is an object");
+        media.remove("sourceWidthPx");
+        media.remove("sourceHeightPx");
+        media.insert("usageCount".into(), serde_json::json!(8));
+    }
+
+    let error = ProjectCore::open_editable_session(
+        &serde_json::to_string(&document).expect("the old project JSON serializes"),
+    )
+    .err()
+    .expect("the old schema must be rejected explicitly");
+
+    assert_eq!(error, crate::CoreError::UnsupportedSchema(1));
+}
+
+#[test]
 fn keeps_distinct_sample_projects_isolated() {
     let mut first = sample_project(SampleProject::Horizon, 12);
     let second = sample_project(SampleProject::Aurora, 12);
@@ -417,6 +445,104 @@ fn the_core_fills_the_leftmost_placeholder_for_a_photo_intent() {
     );
     assert!(state.album.sheets[1].frames[1].photo.is_none());
     assert_eq!(state.revision, 1);
+}
+
+#[test]
+fn editor_projection_derives_media_usage_across_fill_undo_and_redo() {
+    let mut session = horizon_project(12);
+
+    assert_eq!(
+        media_usage_count(&session.projection(), "media-campo"),
+        Some(7)
+    );
+
+    session
+        .apply(ProjectIntent::FillLeftmostPlaceholder {
+            sheet_id: "lamina-02".into(),
+            media_id: "media-campo".into(),
+        })
+        .expect("the sample sheet accepts the Photo");
+    assert_eq!(
+        media_usage_count(&session.projection(), "media-campo"),
+        Some(8)
+    );
+
+    session.undo().expect("the placement can be undone");
+    assert_eq!(
+        media_usage_count(&session.projection(), "media-campo"),
+        Some(7)
+    );
+
+    session.redo().expect("the placement can be redone");
+    assert_eq!(
+        media_usage_count(&session.projection(), "media-campo"),
+        Some(8)
+    );
+}
+
+#[test]
+fn persisted_revision_does_not_store_derived_media_usage() {
+    let session = horizon_project(12);
+    let persisted = session
+        .persisted_revision()
+        .expect("the sample project can be serialized");
+    let document: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the sample JSON is valid");
+
+    for media in document["album"]["media"]
+        .as_array()
+        .expect("the sample catalog is an array")
+    {
+        assert!(
+            media.get("usageCount").is_none(),
+            "usage is derived from Frame placements"
+        );
+    }
+}
+
+#[test]
+fn filling_a_placeholder_uses_the_catalog_intrinsic_dimensions() {
+    let session = horizon_project(12);
+    let persisted = session
+        .persisted_revision()
+        .expect("the sample project can be serialized");
+    let mut document: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the sample JSON is valid");
+    let catalog = document["album"]["media"]
+        .as_array_mut()
+        .expect("the sample catalog is an array");
+    let portrait = catalog
+        .iter_mut()
+        .find(|item| item["id"] == "media-campo")
+        .expect("the sample catalog contains the Photo");
+    portrait["sourceWidthPx"] = serde_json::json!(3_000);
+    portrait["sourceHeightPx"] = serde_json::json!(5_000);
+
+    let mut session = ProjectCore::open_editable_session(
+        &serde_json::to_string(&document).expect("the modified project serializes"),
+    )
+    .expect("the project with a portrait Photo opens");
+    let state = session
+        .apply(ProjectIntent::FillLeftmostPlaceholder {
+            sheet_id: "lamina-02".into(),
+            media_id: "media-campo".into(),
+        })
+        .expect("the portrait Photo fills the placeholder");
+    let photo = state.album.sheets[1].frames[0]
+        .photo
+        .as_ref()
+        .expect("the placeholder contains the portrait Photo");
+
+    assert_eq!(photo.source_width_px, 3_000);
+    assert_eq!(photo.source_height_px, 5_000);
+}
+
+fn media_usage_count(projection: &crate::EditorProjection, media_id: &str) -> Option<usize> {
+    projection
+        .media_usage
+        .iter()
+        .find(|usage| usage.media_id == media_id)
+        .map(|usage| usage.count)
 }
 
 #[test]

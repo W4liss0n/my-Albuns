@@ -65,7 +65,7 @@ impl AppPaths {
         ))
     }
 
-    pub fn cache_asset_url(&self, cache_file: &Path) -> Result<String, AppPathsError> {
+    pub fn validate_cache_artifact(&self, cache_file: &Path) -> Result<(), AppPathsError> {
         if !cache_file.is_absolute()
             || cache_file.components().any(|component| {
                 matches!(
@@ -77,15 +77,7 @@ impl AppPaths {
         {
             return Err(AppPathsError::CacheArtifactOutsideRoot);
         }
-        let path = cache_file
-            .to_str()
-            .ok_or(AppPathsError::PathNotRepresentable)?;
-        let protocol = if cfg!(any(target_os = "windows", target_os = "android")) {
-            "http://asset.localhost/"
-        } else {
-            "asset://localhost/"
-        };
-        Ok(format!("{protocol}{}", encode_uri_component(path)))
+        Ok(())
     }
 
     pub fn prepare_cache_storage(
@@ -172,24 +164,4 @@ pub(crate) fn valid_cache_component(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
-}
-
-fn encode_uri_component(value: &str) -> String {
-    const HEX: &[u8; 16] = b"0123456789ABCDEF";
-    let mut encoded = String::with_capacity(value.len());
-    for byte in value.bytes() {
-        if byte.is_ascii_alphanumeric()
-            || matches!(
-                byte,
-                b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')'
-            )
-        {
-            encoded.push(char::from(byte));
-        } else {
-            encoded.push('%');
-            encoded.push(char::from(HEX[(byte >> 4) as usize]));
-            encoded.push(char::from(HEX[(byte & 0x0f) as usize]));
-        }
-    }
-    encoded
 }

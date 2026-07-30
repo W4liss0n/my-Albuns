@@ -13,7 +13,6 @@ pub enum AppPathsError {
     InvalidOperationPath,
     PathRootNotBound,
     CacheArtifactOutsideRoot,
-    PathNotRepresentable,
     CacheStorageUnavailable,
     CacheStorageOutsideRoot,
     ExportStorageUnavailable,
@@ -44,9 +43,6 @@ impl Display for AppPathsError {
             }
             Self::CacheArtifactOutsideRoot => {
                 formatter.write_str("o artefato não pertence à raiz autorizada do Cache")
-            }
-            Self::PathNotRepresentable => {
-                formatter.write_str("o caminho do Cache não pode ser representado pelo WebView")
             }
             Self::CacheStorageUnavailable => {
                 formatter.write_str("a estrutura de diretórios do Cache está indisponível")

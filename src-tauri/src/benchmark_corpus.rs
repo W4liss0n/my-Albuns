@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
@@ -220,16 +220,6 @@ impl BenchmarkAlbum {
             });
         }
 
-        let usage_counts = state
-            .album
-            .sheets
-            .iter()
-            .flat_map(|sheet| &sheet.frames)
-            .filter_map(|frame| frame.photo.as_ref())
-            .fold(HashMap::<String, usize>::new(), |mut counts, photo| {
-                *counts.entry(photo.media_id.clone()).or_default() += 1;
-                counts
-            });
         state.album.media = self
             .sources
             .iter()
@@ -237,11 +227,9 @@ impl BenchmarkAlbum {
             .map(|(index, source)| MediaCatalogItem {
                 id: source.media_source.media_id().to_owned(),
                 name: source.name.clone(),
+                source_width_px: source.source_width_px,
+                source_height_px: source.source_height_px,
                 palette: palettes[index % palettes.len()].clone(),
-                usage_count: usage_counts
-                    .get(source.media_source.media_id())
-                    .copied()
-                    .unwrap_or_default(),
             })
             .collect();
 

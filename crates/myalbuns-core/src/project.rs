@@ -15,6 +15,12 @@ pub(crate) struct PersistedProject {
     pub(crate) album: AlbumSnapshot,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PersistedProjectHeader {
+    schema_version: u32,
+}
+
 pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String, CoreError> {
     serde_json::to_string_pretty(&PersistedProject {
         schema_version: PROJECT_SCHEMA_VERSION,
@@ -50,11 +56,14 @@ impl ProjectCore {
 }
 
 fn parse_persisted_project(source: &str) -> Result<PersistedProject, CoreError> {
+    let header: PersistedProjectHeader = serde_json::from_str(source)
+        .map_err(|error| CoreError::InvalidProject(error.to_string()))?;
+    if header.schema_version != PROJECT_SCHEMA_VERSION {
+        return Err(CoreError::UnsupportedSchema(header.schema_version));
+    }
+
     let project: PersistedProject = serde_json::from_str(source)
         .map_err(|error| CoreError::InvalidProject(error.to_string()))?;
-    if project.schema_version != PROJECT_SCHEMA_VERSION {
-        return Err(CoreError::UnsupportedSchema(project.schema_version));
-    }
     if project.project_id.trim().is_empty() {
         return Err(CoreError::InvalidProject(
             "a Identidade do Projeto está vazia".into(),

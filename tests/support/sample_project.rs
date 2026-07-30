@@ -35,7 +35,7 @@ impl SampleProject {
     pub fn persisted_source(self, sheet_count: usize) -> Result<String, serde_json::Error> {
         let state = sample_editor_state(sheet_count, self);
         serde_json::to_string_pretty(&serde_json::json!({
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "projectId": state.project_id,
             "projectName": state.project_name,
             "revision": state.revision,
@@ -116,8 +116,8 @@ fn sample_photo(index: usize) -> PhotoSnapshot {
     PhotoSnapshot {
         media_id: item.id.clone(),
         name: item.name.clone(),
-        source_width_px: 6_000,
-        source_height_px: 4_000,
+        source_width_px: item.source_width_px,
+        source_height_px: item.source_height_px,
         palette: item.palette.clone(),
         transform: MediaTransform::default(),
     }
@@ -128,20 +128,23 @@ fn sample_media_catalog() -> Vec<MediaCatalogItem> {
         MediaCatalogItem {
             id: "media-serra".into(),
             name: "Serra ao amanhecer.jpg".into(),
+            source_width_px: 6_000,
+            source_height_px: 4_000,
             palette: ["#153448".into(), "#3c7a89".into(), "#f1c27d".into()],
-            usage_count: 8,
         },
         MediaCatalogItem {
             id: "media-costa".into(),
             name: "Costa dourada.jpg".into(),
+            source_width_px: 6_000,
+            source_height_px: 4_000,
             palette: ["#11212d".into(), "#5b7c8d".into(), "#dca15d".into()],
-            usage_count: 8,
         },
         MediaCatalogItem {
             id: "media-campo".into(),
             name: "Campo de inverno.jpg".into(),
+            source_width_px: 6_000,
+            source_height_px: 4_000,
             palette: ["#26352e".into(), "#8a9a71".into(), "#e7dcc3".into()],
-            usage_count: 8,
         },
     ]
 }

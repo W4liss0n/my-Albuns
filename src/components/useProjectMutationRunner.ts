@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useMemo } from "react";
 
 import type { ProjectSessionPort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
@@ -24,33 +24,24 @@ export function useProjectMutationRunner(
   projectId: string,
   port: ProjectSessionPort,
 ) {
-  const contextRef = useRef<ProjectMutationContext | null>(null);
-  const context = contextRef.current;
-  if (
-    context === null ||
-    context.projectId !== projectId ||
-    context.port !== port
-  ) {
-    if (context) context.current = false;
-    contextRef.current = createContext(projectId, port);
-  }
+  const context = useMemo(
+    () => createContext(projectId, port),
+    [port, projectId],
+  );
 
-  useEffect(() => {
-    const activeContext = contextRef.current;
-    if (activeContext) activeContext.current = true;
+  useLayoutEffect(() => {
+    context.current = true;
     return () => {
-      if (activeContext) activeContext.current = false;
+      context.current = false;
     };
-  }, [port, projectId]);
+  }, [context]);
 
   return useCallback(
-    (operation: ProjectMutationOperation) => {
-      const activeContext = contextRef.current;
-      return activeContext
-        ? enqueueMutation(activeContext, operation)
-        : Promise.resolve({ status: "obsolete" } as const);
-    },
-    [],
+    (operation: ProjectMutationOperation) =>
+      context.current
+        ? enqueueMutation(context, operation)
+        : Promise.resolve({ status: "obsolete" } as const),
+    [context],
   );
 }
 
@@ -61,7 +52,7 @@ function createContext(
   return {
     projectId,
     port,
-    current: true,
+    current: false,
     active: false,
     tail: Promise.resolve(),
   };

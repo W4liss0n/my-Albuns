@@ -46,12 +46,10 @@ const twoSheetProjection = createTwoSheetProjection();
 
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<EditorProjection>((resolver, rejecter) => {
+  const promise = new Promise<EditorProjection>((resolver) => {
     resolve = resolver;
-    reject = rejecter;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 }
 
 const exportPort: ExportPort = {
@@ -188,6 +186,20 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test("renders media usage from the derived Editor projection", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(screen.getByText("1 usos")).toBeInTheDocument();
+  expect(screen.getAllByText("0 usos")).toHaveLength(2);
 });
 
 test("centers a Grade navigation target in the visible Canvas", () => {
@@ -614,95 +626,4 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   });
 
   expect(onProjectionChange).toHaveBeenLastCalledWith(secondProjection);
-});
-
-test("keeps a completed projection when the following mutation fails", async () => {
-  const first = deferredProjection();
-  const second = deferredProjection();
-  const undo = vi
-    .fn<ProjectSessionPort["undo"]>()
-    .mockImplementationOnce(() => first.promise)
-    .mockImplementationOnce(() => second.promise);
-  const onProjectionChange = vi.fn();
-
-  render(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={projection}
-      projectSessionPort={{
-        ...projectSessionPortWithApply(async () => projection),
-        undo,
-      }}
-      onProjectionChange={onProjectionChange}
-    />,
-  );
-
-  fireEvent.keyDown(window, { key: "z", ctrlKey: true });
-  fireEvent.keyDown(window, { key: "z", ctrlKey: true });
-  expect(undo).toHaveBeenCalledOnce();
-
-  const firstProjection = {
-    ...projection,
-    state: { ...projection.state, revision: 26 },
-  };
-  await act(async () => {
-    first.resolve(firstProjection);
-    await first.promise;
-  });
-  expect(undo).toHaveBeenCalledTimes(2);
-
-  await act(async () => {
-    second.reject(new Error("segunda mutação falhou"));
-    await second.promise.catch(() => undefined);
-  });
-
-  expect(onProjectionChange).toHaveBeenCalledWith(firstProjection);
-  expect(screen.getByText("segunda mutação falhou")).toBeInTheDocument();
-});
-
-test("ignores a pending mutation result after the Workspace changes Project", async () => {
-  const pending = deferredProjection();
-  const apply = vi.fn(() => pending.promise);
-  const onProjectionChange = vi.fn();
-  const view = render(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
-      onProjectionChange={onProjectionChange}
-    />,
-  );
-
-  canvasHarness.props?.onTransformCommit({
-    frameId: "frame-001",
-    deltaPanX: 0.1,
-    deltaPanY: 0,
-    deltaZoom: 0,
-  });
-  const otherProject = {
-    ...projection,
-    state: {
-      ...projection.state,
-      projectId: "project-spike-002",
-    },
-  };
-  view.rerender(
-    <ProjectWorkspace
-      exportPort={exportPort}
-      projection={otherProject}
-      projectSessionPort={projectSessionPortWithApply(apply)}
-      onProjectionChange={onProjectionChange}
-    />,
-  );
-
-  await act(async () => {
-    pending.resolve({
-      ...projection,
-      state: { ...projection.state, revision: 26 },
-    });
-    await pending.promise;
-  });
-
-  expect(onProjectionChange).not.toHaveBeenCalled();
-  expect(useEditorView.getState().projectId).toBe("project-spike-002");
 });

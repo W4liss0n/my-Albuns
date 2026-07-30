@@ -132,7 +132,7 @@ fn derives_only_safe_project_cache_namespaces() {
 }
 
 #[test]
-fn exposes_cache_artifacts_as_scoped_urls_instead_of_lossy_paths() {
+fn validates_cache_artifacts_without_choosing_a_transport_protocol() {
     let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
     let preview = paths
         .project_cache("project-01")
@@ -140,21 +140,20 @@ fn exposes_cache_artifacts_as_scoped_urls_instead_of_lossy_paths() {
         .preview_file("media-001", "0123456789abcdef-v1-1600")
         .expect("artifact identity is safe");
 
+    paths
+        .validate_cache_artifact(&preview)
+        .expect("the artifact belongs to the authorized Cache root");
     assert_eq!(
         paths
-            .cache_asset_url(&preview)
-            .expect("the authorized Cache path becomes an asset URL"),
-        "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-001.0123456789abcdef-v1-1600.jpg"
+            .validate_cache_artifact(Path::new(r"C:\Photos\private.jpg"))
+            .unwrap_err(),
+        AppPathsError::CacheArtifactOutsideRoot
     );
-    assert!(
+    assert_eq!(
         paths
-            .cache_asset_url(Path::new(r"C:\Photos\private.jpg"))
-            .is_err()
-    );
-    assert!(
-        paths
-            .cache_asset_url(Path::new(r"C:\Local\MyAlbuns2\Cache\..\private.jpg"))
-            .is_err()
+            .validate_cache_artifact(Path::new(r"C:\Local\MyAlbuns2\Cache\..\private.jpg"))
+            .unwrap_err(),
+        AppPathsError::CacheArtifactOutsideRoot
     );
 }
 

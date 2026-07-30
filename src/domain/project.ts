@@ -9,6 +9,7 @@ export type { FrameSnapshot } from "./generated/FrameSnapshot";
 export type { Matrix2 } from "./generated/Matrix2";
 export type { MediaCatalogItem } from "./generated/MediaCatalogItem";
 export type { MediaTransform } from "./generated/MediaTransform";
+export type { MediaUsage } from "./generated/MediaUsage";
 export type { NormalizedPan } from "./generated/NormalizedPan";
 export type { NumberRange } from "./generated/NumberRange";
 export type { PhotoPlacement } from "./generated/PhotoPlacement";

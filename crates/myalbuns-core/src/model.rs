@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-pub(crate) const PROJECT_SCHEMA_VERSION: u32 = 1;
+pub(crate) const PROJECT_SCHEMA_VERSION: u32 = 2;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -115,8 +115,8 @@ impl PhotoSnapshot {
         Self {
             media_id: item.id.clone(),
             name: item.name.clone(),
-            source_width_px: 6_000,
-            source_height_px: 4_000,
+            source_width_px: item.source_width_px,
+            source_height_px: item.source_height_px,
             palette: item.palette.clone(),
             transform: MediaTransform::default(),
         }
@@ -157,8 +157,9 @@ pub struct SheetSnapshot {
 pub struct MediaCatalogItem {
     pub id: String,
     pub name: String,
+    pub source_width_px: u32,
+    pub source_height_px: u32,
     pub palette: [String; 3],
-    pub usage_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -221,9 +222,17 @@ pub struct CompositionPlan {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct MediaUsage {
+    pub media_id: String,
+    pub count: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct EditorProjection {
     pub state: EditorState,
     pub composition: CompositionPlan,
+    pub media_usage: Vec<MediaUsage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -44,6 +44,12 @@ interface ScopedPhotoTransformPreview {
   preview: PhotoTransformPreview;
 }
 
+interface ExportContext {
+  exportPort: ExportPort;
+  projectId: string;
+  current: boolean;
+}
+
 function messageFromError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -87,23 +93,23 @@ export function useProjectEditorController({
     projectSessionPort,
   );
   const feedbackTokenRef = useRef(0);
-  const exportContextRef = useRef({
-    exportPort,
-    projectId: projection.state.projectId,
-    generation: 0,
-  });
-  if (
-    exportContextRef.current.exportPort !== exportPort ||
-    exportContextRef.current.projectId !== projection.state.projectId
-  ) {
-    exportContextRef.current = {
+  const exportContext = useMemo<ExportContext>(
+    () => ({
       exportPort,
       projectId: projection.state.projectId,
-      generation: exportContextRef.current.generation + 1,
-    };
-  }
+      current: false,
+    }),
+    [exportPort, projection.state.projectId],
+  );
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
     useState<ScopedPhotoTransformPreview | null>(null);
+
+  useLayoutEffect(() => {
+    exportContext.current = true;
+    return () => {
+      exportContext.current = false;
+    };
+  }, [exportContext]);
 
   useLayoutEffect(() => {
     synchronizeProject(
@@ -243,25 +249,28 @@ export function useProjectEditorController({
   }
 
   async function exportPreview() {
-    const generation = exportContextRef.current.generation;
+    const context = exportContext;
     const feedbackToken = feedbackTokenRef.current + 1;
     feedbackTokenRef.current = feedbackToken;
     setBusy("Exportando");
     setMessage(null);
     try {
-      const result = await exportPort.exportPreview();
-      if (generation === exportContextRef.current.generation) {
+      const result = await context.exportPort.exportPreview();
+      if (context.current) {
         setExportResult(result);
       }
     } catch (error: unknown) {
       if (
-        generation === exportContextRef.current.generation &&
+        context.current &&
         feedbackToken === feedbackTokenRef.current
       ) {
         setMessage(messageFromError(error));
       }
     } finally {
-      if (feedbackToken === feedbackTokenRef.current) {
+      if (
+        context.current &&
+        feedbackToken === feedbackTokenRef.current
+      ) {
         setBusy(null);
       }
     }
