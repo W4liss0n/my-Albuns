@@ -34,10 +34,6 @@ export const representativeProjection: EditorProjection = {
               zIndex: 0,
               photo: {
                 mediaId: "media-001",
-                name: "Serra ao amanhecer.jpg",
-                sourceWidthPx: 6_000,
-                sourceHeightPx: 4_000,
-                palette: ["#10202b", "#648493", "#dfa75e"],
                 transform: {
                   panX: 0,
                   panY: 0,

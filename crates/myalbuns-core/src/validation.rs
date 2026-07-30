@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use crate::model::{
     AlbumSnapshot, CoreError, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    PROJECT_SCHEMA_VERSION, RectUm, RenderSnapshot,
+    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot,
 };
 
 pub(crate) fn validate_render_snapshot(snapshot: &RenderSnapshot) -> Result<(), CoreError> {
-    if snapshot.schema_version != PROJECT_SCHEMA_VERSION {
+    if snapshot.schema_version != RENDER_SNAPSHOT_SCHEMA_VERSION {
         return Err(CoreError::UnsupportedSchema(snapshot.schema_version));
     }
     if snapshot.project_id.trim().is_empty() {
@@ -159,12 +159,6 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
                         photo.media_id
                     )));
                 }
-                if photo.source_width_px == 0 || photo.source_height_px == 0 {
-                    return Err(CoreError::InvalidProject(format!(
-                        "dimensões de origem inválidas para a Foto {}",
-                        photo.media_id
-                    )));
-                }
                 let transform = &photo.transform;
                 if !transform.pan_x.is_finite()
                     || !transform.pan_y.is_finite()
@@ -179,7 +173,6 @@ pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
                         photo.media_id
                     )));
                 }
-                validate_palette(&photo.palette, &photo.media_id, CoreError::InvalidProject)?;
             }
         }
     }

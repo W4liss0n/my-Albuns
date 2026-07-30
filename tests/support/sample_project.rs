@@ -115,10 +115,6 @@ fn sample_photo(index: usize) -> PhotoSnapshot {
     let item = &catalog[index % catalog.len()];
     PhotoSnapshot {
         media_id: item.id.clone(),
-        name: item.name.clone(),
-        source_width_px: item.source_width_px,
-        source_height_px: item.source_height_px,
-        palette: item.palette.clone(),
         transform: MediaTransform::default(),
     }
 }

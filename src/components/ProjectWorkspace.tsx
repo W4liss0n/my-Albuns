@@ -148,7 +148,7 @@ export function ProjectWorkspace({
               <>
                 <div className="context-heading">
                   <span>Frame selecionado</span>
-                  <h2>{selectedFrame.photo?.name ?? "Frame placeholder"}</h2>
+                  <h2>{selectedComposedPhoto?.name ?? "Frame placeholder"}</h2>
                 </div>
                 <InspectorSection
                   key="frame-photo-design"

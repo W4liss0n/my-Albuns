@@ -212,10 +212,6 @@ impl BenchmarkAlbum {
             let source = &self.sources[index % self.sources.len()];
             frame.photo = Some(PhotoSnapshot {
                 media_id: source.media_source.media_id().to_owned(),
-                name: source.name.clone(),
-                source_width_px: source.source_width_px,
-                source_height_px: source.source_height_px,
-                palette: palettes[index % palettes.len()].clone(),
                 transform: Default::default(),
             });
         }
@@ -361,14 +357,7 @@ mod tests {
             .state();
         assert_eq!(horizon_state.album.media.len(), 1);
         assert_eq!(horizon_state.album.media[0].id, "benchmark-a-001");
-        assert_eq!(
-            aurora_state.album.sheets[0].frames[0]
-                .photo
-                .as_ref()
-                .expect("the real fixture is placed")
-                .source_height_px,
-            6000
-        );
+        assert_eq!(aurora_state.album.media[0].source_height_px, 6000);
         assert_eq!(
             horizon.sources()[0].source_path(),
             fs::canonicalize(first_album.join("photo-a.jpg"))

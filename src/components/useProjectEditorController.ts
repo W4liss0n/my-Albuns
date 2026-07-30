@@ -46,7 +46,6 @@ interface ScopedPhotoTransformPreview {
 
 interface ExportContext {
   exportPort: ExportPort;
-  projectId: string;
   current: boolean;
 }
 
@@ -96,7 +95,6 @@ export function useProjectEditorController({
   const exportContext = useMemo<ExportContext>(
     () => ({
       exportPort,
-      projectId: projection.state.projectId,
       current: false,
     }),
     [exportPort, projection.state.projectId],

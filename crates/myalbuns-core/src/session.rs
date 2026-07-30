@@ -60,14 +60,15 @@ impl ProjectSession {
                     (photo.transform.user_zoom + delta_zoom).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX);
             }
             ProjectIntent::FillLeftmostPlaceholder { sheet_id, media_id } => {
-                let media = self
+                if !self
                     .state
                     .album
                     .media
                     .iter()
-                    .find(|item| item.id == media_id)
-                    .cloned()
-                    .ok_or_else(|| CoreError::MediaNotFound(media_id.clone()))?;
+                    .any(|item| item.id == media_id)
+                {
+                    return Err(CoreError::MediaNotFound(media_id));
+                }
                 let sheet = self
                     .state
                     .album
@@ -81,7 +82,7 @@ impl ProjectSession {
                     .filter(|frame| frame.photo.is_none())
                     .min_by_key(|frame| (frame.rect.x, frame.rect.y))
                     .ok_or_else(|| CoreError::PlaceholderNotFound(sheet_id.clone()))?;
-                frame.photo = Some(PhotoSnapshot::from_catalog_item(&media));
+                frame.photo = Some(PhotoSnapshot::for_media(media_id));
             }
         }
 

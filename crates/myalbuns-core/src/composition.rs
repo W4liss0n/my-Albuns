@@ -1,14 +1,21 @@
+use std::collections::HashMap;
+
 use crate::model::{
     AlbumSnapshot, ComposedFrame, ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2,
-    NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    PROJECT_SCHEMA_VERSION, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, RectUm,
-    RenderSnapshot, SizeUm, VectorUm,
+    MediaCatalogItem, NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX,
+    PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot,
+    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
 };
 
 pub(crate) struct CompositionCore;
 
 impl CompositionCore {
     pub(crate) fn compose(album: &AlbumSnapshot) -> CompositionPlan {
+        let media_by_id = album
+            .media
+            .iter()
+            .map(|media| (media.id.as_str(), media))
+            .collect::<HashMap<_, _>>();
         CompositionPlan {
             sheets: album
                 .sheets
@@ -21,10 +28,13 @@ impl CompositionCore {
                             frame_id: frame.id.clone(),
                             clip_rect: frame.rect.clone(),
                             z_index: frame.z_index,
-                            photo: frame
-                                .photo
-                                .as_ref()
-                                .map(|photo| compose_photo(&frame.rect, photo)),
+                            photo: frame.photo.as_ref().map(|photo| {
+                                let media = media_by_id
+                                    .get(photo.media_id.as_str())
+                                    .copied()
+                                    .expect("validated Frame media reference");
+                                compose_photo(&frame.rect, photo, media)
+                            }),
                         })
                         .collect::<Vec<_>>();
                     frames.sort_by(|left, right| {
@@ -54,7 +64,7 @@ pub(crate) fn build_render_snapshot(
     album: &AlbumSnapshot,
 ) -> RenderSnapshot {
     RenderSnapshot {
-        schema_version: PROJECT_SCHEMA_VERSION,
+        schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
         project_id: project_id.into(),
         project_name: project_name.into(),
         revision,
@@ -63,7 +73,7 @@ pub(crate) fn build_render_snapshot(
     }
 }
 
-fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
+fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem) -> ComposedPhoto {
     let rotation_degrees =
         photo.transform.quarter_turns as f32 * 90.0 + photo.transform.fine_rotation_degrees;
     let radians = (rotation_degrees as f64).to_radians();
@@ -71,8 +81,8 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
     let sine = radians.sin();
     let frame_width = frame.width as f64;
     let frame_height = frame.height as f64;
-    let source_width = photo.source_width_px as f64;
-    let source_height = photo.source_height_px as f64;
+    let source_width = media.source_width_px as f64;
+    let source_height = media.source_height_px as f64;
     let required_width = cosine.abs() * frame_width + sine.abs() * frame_height;
     let required_height = sine.abs() * frame_width + cosine.abs() * frame_height;
     let fill_scale = (required_width / source_width).max(required_height / source_height);
@@ -136,7 +146,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
 
     ComposedPhoto {
         media_id: photo.media_id.clone(),
-        name: photo.name.clone(),
+        name: media.name.clone(),
         draw_rect: RectUm {
             x: frame.x + (current.center.x - current.size.width / 2.0).round() as i64,
             y: frame.y + (current.center.y - current.size.height / 2.0).round() as i64,
@@ -146,7 +156,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
         placement,
         rotation_degrees,
         mirror_x: photo.transform.mirror_x,
-        palette: photo.palette.clone(),
+        palette: media.palette.clone(),
     }
 }
 

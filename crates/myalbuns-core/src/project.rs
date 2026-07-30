@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::composition::build_render_snapshot;
-use crate::model::{AlbumSnapshot, CoreError, EditorState, PROJECT_SCHEMA_VERSION, RenderSnapshot};
+use crate::model::{
+    AlbumSnapshot, CoreError, EditorState, PROJECT_DOCUMENT_SCHEMA_VERSION, RenderSnapshot,
+};
 use crate::session::ProjectSession;
 use crate::validation::validate_album;
 
@@ -23,7 +25,7 @@ struct PersistedProjectHeader {
 
 pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String, CoreError> {
     serde_json::to_string_pretty(&PersistedProject {
-        schema_version: PROJECT_SCHEMA_VERSION,
+        schema_version: PROJECT_DOCUMENT_SCHEMA_VERSION,
         project_id: state.project_id.clone(),
         project_name: state.project_name.clone(),
         revision: state.revision,
@@ -58,7 +60,7 @@ impl ProjectCore {
 fn parse_persisted_project(source: &str) -> Result<PersistedProject, CoreError> {
     let header: PersistedProjectHeader = serde_json::from_str(source)
         .map_err(|error| CoreError::InvalidProject(error.to_string()))?;
-    if header.schema_version != PROJECT_SCHEMA_VERSION {
+    if header.schema_version != PROJECT_DOCUMENT_SCHEMA_VERSION {
         return Err(CoreError::UnsupportedSchema(header.schema_version));
     }
 

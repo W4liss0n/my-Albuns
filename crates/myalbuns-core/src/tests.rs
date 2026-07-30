@@ -3,9 +3,9 @@ use serde::Deserialize;
 use crate::composition::CompositionCore;
 use crate::sample_project_fixture::SampleProject;
 use crate::{
-    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaTransform, NormalizedPan,
-    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent, ProjectSession,
-    RectUm, SheetRole, SheetSnapshot, VectorUm,
+    AlbumSnapshot, ComposedPhoto, FrameSnapshot, Matrix2, MediaCatalogItem, MediaTransform,
+    NormalizedPan, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectCore, ProjectIntent,
+    ProjectSession, RectUm, SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -19,8 +19,19 @@ struct PhotoPlacementFixture {
 struct PhotoPlacementCase {
     name: String,
     frame: RectUm,
-    photo: PhotoSnapshot,
+    photo: PlacementPhoto,
     expected_plan: PhotoPlacementPlan,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlacementPhoto {
+    media_id: String,
+    name: String,
+    source_width_px: u32,
+    source_height_px: u32,
+    palette: [String; 3],
+    transform: MediaTransform,
 }
 
 fn horizon_project(sheet_count: usize) -> ProjectSession {
@@ -222,6 +233,7 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
+    assert_eq!(snapshot.schema_version, 1);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo
         .as_ref()
@@ -250,7 +262,7 @@ fn rotated_composition_keeps_every_frame_corner_covered() {
         width: 300_000,
         height: 200_000,
     };
-    let photo = PhotoSnapshot {
+    let photo = PlacementPhoto {
         media_id: "media-rotated".into(),
         name: "Foto rotacionada.jpg".into(),
         source_width_px: 6_000,
@@ -304,7 +316,7 @@ fn photo_placement_plan_matches_the_shared_renderer_contract() {
     }
 }
 
-fn compose_through_public_contract(frame: &RectUm, photo: &PhotoSnapshot) -> ComposedPhoto {
+fn compose_through_public_contract(frame: &RectUm, photo: &PlacementPhoto) -> ComposedPhoto {
     let album = AlbumSnapshot {
         sheets: vec![SheetSnapshot {
             id: "sheet-under-test".into(),
@@ -316,11 +328,20 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PhotoSnapshot) -> Com
                 id: "frame-under-test".into(),
                 rect: frame.clone(),
                 z_index: 1,
-                photo: Some(photo.clone()),
+                photo: Some(PhotoSnapshot {
+                    media_id: photo.media_id.clone(),
+                    transform: photo.transform.clone(),
+                }),
             }],
             has_overlay: false,
         }],
-        media: Vec::new(),
+        media: vec![MediaCatalogItem {
+            id: photo.media_id.clone(),
+            name: photo.name.clone(),
+            source_width_px: photo.source_width_px,
+            source_height_px: photo.source_height_px,
+            palette: photo.palette.clone(),
+        }],
     };
 
     CompositionCore::compose(&album).sheets[0].frames[0]
@@ -522,19 +543,58 @@ fn filling_a_placeholder_uses_the_catalog_intrinsic_dimensions() {
         &serde_json::to_string(&document).expect("the modified project serializes"),
     )
     .expect("the project with a portrait Photo opens");
-    let state = session
+    session
         .apply(ProjectIntent::FillLeftmostPlaceholder {
             sheet_id: "lamina-02".into(),
             media_id: "media-campo".into(),
         })
         .expect("the portrait Photo fills the placeholder");
-    let photo = state.album.sheets[1].frames[0]
+    let composition = session.composition_plan();
+    let composed = composition.sheets[1].frames[0]
         .photo
         .as_ref()
-        .expect("the placeholder contains the portrait Photo");
+        .expect("the placeholder contains the composed portrait Photo");
 
-    assert_eq!(photo.source_width_px, 3_000);
-    assert_eq!(photo.source_height_px, 5_000);
+    assert_eq!(composed.placement.size_per_zoom.width, 252_000.0);
+    assert_eq!(composed.placement.size_per_zoom.height, 420_000.0);
+}
+
+#[test]
+fn composition_uses_the_catalog_as_the_single_source_of_media_metadata() {
+    let session = horizon_project(12);
+    let persisted = session
+        .persisted_revision()
+        .expect("the sample project can be serialized");
+    let mut document: serde_json::Value =
+        serde_json::from_str(&persisted).expect("the sample JSON is valid");
+    let media_id = document["album"]["sheets"][0]["frames"][0]["photo"]["mediaId"]
+        .as_str()
+        .expect("the first Frame references a catalog item")
+        .to_owned();
+    let catalog = document["album"]["media"]
+        .as_array_mut()
+        .expect("the sample catalog is an array");
+    let media = catalog
+        .iter_mut()
+        .find(|item| item["id"] == media_id)
+        .expect("the referenced Photo exists in the catalog");
+    media["sourceWidthPx"] = serde_json::json!(3_000);
+    media["sourceHeightPx"] = serde_json::json!(5_000);
+
+    let session = ProjectCore::open_editable_session(
+        &serde_json::to_string(&document).expect("the modified project serializes"),
+    )
+    .expect("the project with updated catalog metadata opens");
+    let composed = session.composition_plan().sheets[0].frames[0]
+        .photo
+        .as_ref()
+        .expect("the first Frame remains composed")
+        .placement
+        .size_per_zoom
+        .clone();
+
+    assert_eq!(composed.width, 252_000.0);
+    assert_eq!(composed.height, 420_000.0);
 }
 
 fn media_usage_count(projection: &crate::EditorProjection, media_id: &str) -> Option<usize> {
@@ -610,7 +670,7 @@ fn persisted_revision_rejects_invalid_media_dimensions() {
         .expect("sample project can be serialized");
     let mut document: serde_json::Value =
         serde_json::from_str(&persisted).expect("sample JSON is valid");
-    document["album"]["sheets"][0]["frames"][0]["photo"]["sourceWidthPx"] = serde_json::json!(0);
+    document["album"]["media"][0]["sourceWidthPx"] = serde_json::json!(0);
 
     let error = ProjectCore::load_persisted_revision(
         &serde_json::to_string(&document).expect("modified JSON is valid"),

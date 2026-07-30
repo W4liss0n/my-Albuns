@@ -13,7 +13,6 @@ type ProjectMutationOperation = (
 ) => Promise<EditorProjection>;
 
 interface ProjectMutationContext {
-  projectId: string;
   port: ProjectSessionPort;
   current: boolean;
   active: boolean;
@@ -25,7 +24,7 @@ export function useProjectMutationRunner(
   port: ProjectSessionPort,
 ) {
   const context = useMemo(
-    () => createContext(projectId, port),
+    () => createContext(port),
     [port, projectId],
   );
 
@@ -46,11 +45,9 @@ export function useProjectMutationRunner(
 }
 
 function createContext(
-  projectId: string,
   port: ProjectSessionPort,
 ): ProjectMutationContext {
   return {
-    projectId,
     port,
     current: false,
     active: false,

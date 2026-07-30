@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-pub(crate) const PROJECT_SCHEMA_VERSION: u32 = 2;
+pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 2;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 1;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -103,21 +104,13 @@ impl Default for MediaTransform {
 #[serde(rename_all = "camelCase")]
 pub struct PhotoSnapshot {
     pub media_id: String,
-    pub name: String,
-    pub source_width_px: u32,
-    pub source_height_px: u32,
-    pub palette: [String; 3],
     pub transform: MediaTransform,
 }
 
 impl PhotoSnapshot {
-    pub(crate) fn from_catalog_item(item: &MediaCatalogItem) -> Self {
+    pub(crate) fn for_media(media_id: String) -> Self {
         Self {
-            media_id: item.id.clone(),
-            name: item.name.clone(),
-            source_width_px: item.source_width_px,
-            source_height_px: item.source_height_px,
-            palette: item.palette.clone(),
+            media_id,
             transform: MediaTransform::default(),
         }
     }

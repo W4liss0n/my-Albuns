@@ -465,7 +465,7 @@ mod tests {
     use std::{
         path::PathBuf,
         sync::{
-            Arc, Mutex,
+            Arc, Barrier, Mutex,
             atomic::{AtomicBool, Ordering},
         },
         thread,
@@ -500,6 +500,7 @@ mod tests {
 
     struct CancellationAwareTransport {
         prepared_path: PathBuf,
+        invocation_started: Arc<Barrier>,
         invocations: usize,
     }
 
@@ -517,6 +518,7 @@ mod tests {
             self.invocations += 1;
             std::fs::write(&self.prepared_path, b"incomplete export")
                 .expect("the processor creates an incomplete preparation");
+            self.invocation_started.wait();
             Box::pin(async move {
                 loop {
                     if control.is_cancelled() {
@@ -903,15 +905,17 @@ mod tests {
             std::fs::write(&output, b"previous export").expect("the previous Export is writable");
             let plan = export_plan(output.clone(), "export-cancelled-during-processing");
             let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
+            let invocation_started = Arc::new(Barrier::new(2));
             let mut transport = CancellationAwareTransport {
                 prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+                invocation_started: Arc::clone(&invocation_started),
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
             let cancellation = Arc::new(AtomicBool::new(false));
             let cancellation_request = Arc::clone(&cancellation);
             let canceller = thread::spawn(move || {
-                thread::sleep(Duration::from_millis(25));
+                invocation_started.wait();
                 cancellation_request.store(true, Ordering::Release);
             });
             let progress = |_| {};
