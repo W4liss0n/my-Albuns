@@ -13,6 +13,23 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
     throw 'The Windows path gate must run on Windows.'
 }
 
+$runnerMutex = [System.Threading.Mutex]::new(
+    $false,
+    'Local\MyAlbuns.WindowsPathGateEvidence.v1'
+)
+$runnerMutexHeld = $false
+try {
+    $runnerMutexHeld = $runnerMutex.WaitOne(0)
+}
+catch [System.Threading.AbandonedMutexException] {
+    $runnerMutexHeld = $true
+}
+if (-not $runnerMutexHeld) {
+    $runnerMutex.Dispose()
+    throw 'Another Windows path evidence runner is already using the mapped-drive fixture.'
+}
+
+try {
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
@@ -445,3 +462,11 @@ if (Test-Path -LiteralPath $runRoot) {
 
 Write-Output "Windows path gate report: $OutputPath"
 Write-Output $json
+}
+finally {
+    if ($runnerMutexHeld) {
+        $runnerMutex.ReleaseMutex()
+        $runnerMutexHeld = $false
+    }
+    $runnerMutex.Dispose()
+}

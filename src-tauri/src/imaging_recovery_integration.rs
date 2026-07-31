@@ -576,10 +576,9 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             .expect("the unavailable output has a frozen UNC binding");
         let unavailable_log_directory = local_sidecar_root.join("unavailable-logs");
 
-        mapping.unmap();
+        mapping.unmap_and_wait(&logical_root);
         let offline_sidecar_root = local_root.join("sidecar-offline");
-        std::fs::rename(&local_sidecar_root, &offline_sidecar_root)
-            .expect("the captured operational binding becomes unavailable");
+        rename_fixture_directory(&local_sidecar_root, &offline_sidecar_root);
         let mut unavailable_transport = RealProcessTransport::new(
             executable.clone(),
             unavailable_log_directory,
@@ -607,8 +606,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
         );
         assert!(unavailable_transport.process_ids.is_empty());
         assert!(!unavailable_operational_output.exists());
-        std::fs::rename(&offline_sidecar_root, &local_sidecar_root)
-            .expect("the UNC fixture is restored for an explicit retry");
+        rename_fixture_directory(&offline_sidecar_root, &local_sidecar_root);
 
         mapping.map_to(&unc_sidecar_root);
         let request_id = "export-real-unc-plan";
@@ -639,7 +637,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
         assert!(operational_output.starts_with(&unc_sidecar_root));
         assert!(operational_preparation.starts_with(&unc_sidecar_root));
 
-        mapping.unmap();
+        mapping.unmap_and_wait(&logical_root);
         assert!(
             !logical_root.exists(),
             "the mapped drive is absent before host preparation and sidecar dispatch"
@@ -725,10 +723,58 @@ impl TemporaryDriveMapping {
             .args(["use", &self.drive, "/delete", "/y"])
             .output();
     }
+
+    fn unmap_and_wait(&self, logical_root: &Path) {
+        let output = Command::new("net.exe")
+            .args(["use", &self.drive, "/delete", "/y"])
+            .output()
+            .expect("net.exe starts while disconnecting the path-gate drive");
+        assert!(
+            output.status.success(),
+            "the temporary drive could not be disconnected: stdout={}, stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match logical_root.try_exists() {
+                Ok(false) => break,
+                Ok(true) if Instant::now() < deadline => {
+                    thread::sleep(Duration::from_millis(25));
+                }
+                Ok(true) => {
+                    panic!("the temporary drive remained reachable after the disconnect deadline")
+                }
+                Err(error) => {
+                    panic!("the temporary drive disconnect could not be observed safely: {error}")
+                }
+            }
+        }
+    }
 }
 
 impl Drop for TemporaryDriveMapping {
     fn drop(&mut self) {
         self.unmap();
+    }
+}
+
+fn rename_fixture_directory(source: &Path, destination: &Path) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        match std::fs::rename(source, destination) {
+            Ok(()) => return,
+            Err(error)
+                if matches!(error.raw_os_error(), Some(5 | 32)) && Instant::now() < deadline =>
+            {
+                thread::sleep(Duration::from_millis(25));
+            }
+            Err(error) => panic!(
+                "the path-gate fixture could not move from {} to {}: {error}",
+                source.display(),
+                destination.display(),
+            ),
+        }
     }
 }

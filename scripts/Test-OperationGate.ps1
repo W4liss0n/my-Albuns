@@ -252,18 +252,18 @@ function Get-RootBindingPlanCorrelation {
         )
     }
     $capture = $captureEvents[0]
-    $host = $hostEvents[0]
+    $hostSpawnEvent = $hostEvents[0]
     $processorStarted = $imagingStarted[0]
     $processorCompleted = $imagingCompleted[0]
-    $digest = [string] $host.root_binding_plan_sha256
+    $digest = [string] $hostSpawnEvent.root_binding_plan_sha256
     if (
         $digest -notmatch '^[0-9a-f]{64}$' -or
         [string] $capture.root_binding_plan_sha256 -cne $digest -or
         [string] $processorStarted.root_binding_plan_sha256 -cne $digest -or
         [string] $processorCompleted.root_binding_plan_sha256 -cne $digest -or
         [int] $capture.process_id -ne $ExpectedHostProcessId -or
-        [int] $host.process_id -ne $ExpectedHostProcessId -or
-        [int] $host.imaging_process_id -ne [int] $processorStarted.process_id -or
+        [int] $hostSpawnEvent.process_id -ne $ExpectedHostProcessId -or
+        [int] $hostSpawnEvent.imaging_process_id -ne [int] $processorStarted.process_id -or
         [int] $processorCompleted.process_id -ne [int] $processorStarted.process_id
     ) {
         throw "Operation '$OperationId' lost RootBindingPlan or process correlation."
@@ -273,7 +273,7 @@ function Get-RootBindingPlanCorrelation {
         topology = $Topology
         role = $Role
         operationId = $OperationId
-        hostProcessId = [int] $host.process_id
+        hostProcessId = [int] $hostSpawnEvent.process_id
         processorProcessId = [int] $processorStarted.process_id
         rootBindingPlanSha256 = $digest
         freshCaptureObserved = $true
