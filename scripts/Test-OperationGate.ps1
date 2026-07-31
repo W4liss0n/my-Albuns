@@ -271,94 +271,64 @@ function Read-StrictProbeEvent {
         $Path,
         [System.Text.Encoding]::UTF8
     )
-    $document = [System.Text.Json.JsonDocument]::Parse($json)
-    try {
-        $root = $document.RootElement
-        if ($root.ValueKind -ne [System.Text.Json.JsonValueKind]::Object) {
-            throw 'The OperationGate event root must be a JSON object.'
+    $root = $json | ConvertFrom-Json
+    if ($null -eq $root -or $root -isnot [System.Management.Automation.PSCustomObject]) {
+        throw 'The OperationGate event root must be a JSON object.'
+    }
+
+    $expectedNames = @(
+        'schemaVersion',
+        'processId',
+        'topology',
+        'windowLabel',
+        'state',
+        'operationMode'
+    )
+    $actualNames = @($root.PSObject.Properties.Name)
+    $missingNames = @(
+        $expectedNames |
+            Where-Object { $actualNames -cnotcontains $_ }
+    )
+    $unexpectedNames = @(
+        $actualNames |
+            Where-Object { $expectedNames -cnotcontains $_ }
+    )
+    if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
+        throw (
+            'The OperationGate event fields differ from the closed schema. ' +
+            "Missing: $($missingNames -join ', '); " +
+            "unexpected: $($unexpectedNames -join ', ')."
+        )
+    }
+
+    foreach ($name in @('schemaVersion', 'processId')) {
+        $value = $root.$name
+        if ($value -isnot [int] -and $value -isnot [long]) {
+            throw "OperationGate field '$name' must be an integer."
         }
-        $expectedNames = @(
-            'schemaVersion',
-            'processId',
+        if ($value -lt [int]::MinValue -or $value -gt [int]::MaxValue) {
+            throw "OperationGate field '$name' must be a 32-bit integer."
+        }
+    }
+
+    foreach ($name in @(
             'topology',
             'windowLabel',
             'state',
             'operationMode'
-        )
-        $actualNames = @(
-            $root.EnumerateObject() |
-                ForEach-Object { $_.Name }
-        )
-        $missingNames = @(
-            $expectedNames |
-                Where-Object { $actualNames -cnotcontains $_ }
-        )
-        $unexpectedNames = @(
-            $actualNames |
-                Where-Object { $expectedNames -cnotcontains $_ }
-        )
-        if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
-            throw (
-                'The OperationGate event fields differ from the closed schema. ' +
-                "Missing: $($missingNames -join ', '); " +
-                "unexpected: $($unexpectedNames -join ', ')."
-            )
-        }
-
-        $schemaElement = $root.GetProperty('schemaVersion')
-        $processElement = $root.GetProperty('processId')
-        foreach ($entry in @(
-                [ordered]@{
-                    name = 'schemaVersion'
-                    value = $schemaElement
-                },
-                [ordered]@{
-                    name = 'processId'
-                    value = $processElement
-                }
-            )) {
-            if (
-                $entry.value.ValueKind -ne
-                    [System.Text.Json.JsonValueKind]::Number
-            ) {
-                throw "OperationGate field '$($entry.name)' must be a number."
-            }
-        }
-        [int] $schemaVersion = 0
-        [int] $processId = 0
-        if (-not $schemaElement.TryGetInt32([ref] $schemaVersion) -or
-            -not $processElement.TryGetInt32([ref] $processId)) {
-            throw 'OperationGate numeric fields must be 32-bit integers.'
-        }
-
-        $stringValues = [ordered]@{}
-        foreach ($name in @(
-                'topology',
-                'windowLabel',
-                'state',
-                'operationMode'
-            )) {
-            $element = $root.GetProperty($name)
-            if (
-                $element.ValueKind -ne
-                    [System.Text.Json.JsonValueKind]::String
-            ) {
-                throw "OperationGate field '$name' must be a string."
-            }
-            $stringValues[$name] = $element.GetString()
-        }
-
-        return [ordered]@{
-            schemaVersion = $schemaVersion
-            processId = $processId
-            topology = $stringValues.topology
-            windowLabel = $stringValues.windowLabel
-            state = $stringValues.state
-            operationMode = $stringValues.operationMode
+        )) {
+        if ($root.$name -isnot [string]) {
+            throw "OperationGate field '$name' must be a string."
         }
     }
-    finally {
-        $document.Dispose()
+
+    return [ordered]@{
+        schemaVersion = [int] $root.schemaVersion
+        processId = [int] $root.processId
+        topology = [string] $root.topology
+        windowLabel = [string] $root.windowLabel
+        state = [string] $root.state
+        operationMode = [string] $root.operationMode
     }
 }
 
