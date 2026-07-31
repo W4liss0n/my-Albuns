@@ -4,6 +4,7 @@ use myalbuns_core::RenderSnapshot;
 pub use myalbuns_paths::CacheArtifactFormat;
 use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const IMAGING_PROTOCOL_VERSION: u32 = 9;
 
@@ -77,6 +78,27 @@ impl ImagingCommand {
     pub fn reset_cache(request: CacheResetRequest) -> Self {
         Self::ResetCache(request)
     }
+
+    /// Returns the immutable path plan carried by commands that perform
+    /// external I/O. Cache reset only addresses application-owned storage and
+    /// therefore has no operation plan.
+    pub fn root_bindings(&self) -> Option<&RootBindingPlan> {
+        match self {
+            Self::Render(request) => Some(&request.root_bindings),
+            Self::BuildCache(request) => Some(&request.root_bindings),
+            Self::ResetCache(_) => None,
+        }
+    }
+}
+
+/// Produces an opaque correlation value for one frozen root-binding plan.
+///
+/// The digest is diagnostic evidence only: it is never used to resolve paths,
+/// compare filesystem objects or select a cached plan.
+pub fn root_binding_plan_sha256(plan: &RootBindingPlan) -> Result<String, String> {
+    let payload = serde_json::to_vec(plan)
+        .map_err(|error| format!("não foi possível serializar o plano de raízes: {error}"))?;
+    Ok(format!("{:x}", Sha256::digest(payload)))
 }
 
 pub fn encode_command(command: &ImagingCommand) -> Result<Vec<u8>, String> {

@@ -2,6 +2,7 @@ use std::{
     error::Error,
     fmt::{self, Display, Formatter},
     fs::{File, OpenOptions},
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
 };
 
@@ -79,12 +80,63 @@ impl ResolvedObject {
     }
 
     pub fn compare_physical(&self, other: &Self) -> PhysicalIdentityEvidence {
-        match (file_identity(&self.file), file_identity(&other.file)) {
-            (Some(left), Some(right)) if left == right => PhysicalIdentityEvidence::Same,
-            (Some(_), Some(_)) => PhysicalIdentityEvidence::Different,
-            _ => PhysicalIdentityEvidence::Indeterminate,
-        }
+        compare_file_identity(&self.file, &other.file)
     }
+
+    /// Reads a resolved regular file through the physical handle already used
+    /// for identity, without resolving its pathname a second time.
+    pub fn read_to_string(&self) -> std::io::Result<String> {
+        if self.object_type != ExpectedObject::RegularFile {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "o objeto resolvido não é um arquivo regular",
+            ));
+        }
+        read_file_handle_to_string(&self.file)
+    }
+}
+
+pub(crate) fn compare_file_identity(left: &File, right: &File) -> PhysicalIdentityEvidence {
+    match (file_identity(left), file_identity(right)) {
+        (Some(left), Some(right)) if left == right => PhysicalIdentityEvidence::Same,
+        (Some(_), Some(_)) => PhysicalIdentityEvidence::Different,
+        _ => PhysicalIdentityEvidence::Indeterminate,
+    }
+}
+
+pub(crate) fn read_file_handle_to_string(file: &File) -> std::io::Result<String> {
+    let mut readable = reopen_file_for_read(file)?;
+    readable.seek(SeekFrom::Start(0))?;
+    let mut source = String::new();
+    readable.read_to_string(&mut source)?;
+    Ok(source)
+}
+
+#[cfg(windows)]
+fn reopen_file_for_read(file: &File) -> std::io::Result<File> {
+    use std::os::windows::io::{AsRawHandle, FromRawHandle};
+    use windows_sys::Win32::{
+        Foundation::{GENERIC_READ, HANDLE, INVALID_HANDLE_VALUE},
+        Storage::FileSystem::{FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, ReOpenFile},
+    };
+
+    let handle = unsafe {
+        ReOpenFile(
+            file.as_raw_handle() as HANDLE,
+            GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            0,
+        )
+    };
+    if handle == INVALID_HANDLE_VALUE {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(unsafe { File::from_raw_handle(handle.cast()) })
+}
+
+#[cfg(not(windows))]
+fn reopen_file_for_read(file: &File) -> std::io::Result<File> {
+    file.try_clone()
 }
 
 impl RootBindingPlan {

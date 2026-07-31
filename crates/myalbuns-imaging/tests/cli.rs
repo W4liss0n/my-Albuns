@@ -8,7 +8,7 @@ use myalbuns_core::{EditableProject, ProjectCore, ProjectIntent, RenderSnapshot}
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
     ImagingCommand, ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse,
-    MediaSource, decode_event_stream,
+    MediaSource, decode_event_stream, root_binding_plan_sha256,
 };
 use myalbuns_paths::{AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -757,6 +757,38 @@ fn processor_rejects_an_invalid_snapshot() {
 }
 
 #[test]
+fn processor_rejects_a_render_root_omitted_by_the_operation_owner() {
+    let session = sample_session(SampleProject::Horizon, 2);
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let output_path = output_dir.path().join("unbound.png");
+    let snapshot = session.render_snapshot();
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let request = ImagingRequest::procedural_fixture(
+        "unbound-root",
+        output_path.clone(),
+        snapshot,
+        sheet_id,
+        25,
+        root_bindings(&[&output_path]),
+    )
+    .expect("the baseline request is valid");
+    let mut command =
+        serde_json::to_value(ImagingCommand::render(request)).expect("the command is serializable");
+    command["request"]["rootBindings"] = serde_json::json!({ "bindings": [] });
+
+    let result = invoke_render_payload(
+        serde_json::to_vec(&command).expect("the altered command is serializable"),
+        None,
+    );
+
+    assert!(!result.status.success());
+    assert!(
+        !output_path.exists(),
+        "the Processor must reject the request before creating a preparation"
+    );
+}
+
+#[test]
 fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     let session = sample_session(SampleProject::Horizon, 12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
@@ -781,6 +813,30 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     assert!(logs.contains("\"process_role\":\"imaging\""));
     assert!(logs.contains(&format!("\"protocol_version\":{IMAGING_PROTOCOL_VERSION}")));
     assert!(logs.contains("\"operation_id\":\"logged-request-001\""));
+    let events = logs
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("the log line is JSON"))
+        .collect::<Vec<_>>();
+    let started = events
+        .iter()
+        .find(|event| event["event"] == "imaging_request_started")
+        .expect("the request start is logged");
+    let completed = events
+        .iter()
+        .find(|event| event["event"] == "imaging_request_completed")
+        .expect("the request completion is logged");
+    assert_eq!(
+        completed["process_id"], started["process_id"],
+        "the terminal event keeps the Processor PID used by the host correlation"
+    );
+    let expected_plan_sha256 = root_binding_plan_sha256(&root_bindings(&[&output_path]))
+        .expect("the expected plan has a digest");
+    assert!(
+        logs.contains(&format!(
+            "\"root_binding_plan_sha256\":\"{expected_plan_sha256}\""
+        )),
+        "expected RootBindingPlan digest {expected_plan_sha256} in logs: {logs}"
+    );
     assert!(
         !logs.contains(&output_path.to_string_lossy().into_owned()),
         "the output path must not be written to logs"

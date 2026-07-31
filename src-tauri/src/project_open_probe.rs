@@ -1,12 +1,9 @@
 use std::{
-    fmt::{self, Display, Formatter},
     path::{Path, PathBuf},
     time::Instant,
 };
 
-use myalbuns_core::{EditableProject, ProjectCore};
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
@@ -18,6 +15,9 @@ use crate::{
     probe_support::{
         PROBE_TIMEOUT, optional_utf8_environment, validate_probe_root, wait_for_file_async,
         write_json_atomic_new,
+    },
+    project_opening_guard::{
+        OpenedProject, ProjectOpeningError, ProjectOpeningGuard, ProjectOpeningOutcome,
     },
     sample_project::SampleProject,
     topology_spike::TopologySpike,
@@ -159,58 +159,6 @@ pub(crate) struct ProjectOpenProbe {
     window_label: &'static str,
 }
 
-/// Narrow spike seam that keeps the native opening lock alive for exactly the
-/// same scope as the editable Project session it protects.
-struct ProjectOpeningSession {
-    // Struct fields are dropped in declaration order: the editable session is
-    // closed before its owning core and native opening lock are released.
-    _session: EditableProject,
-    _project_core: ProjectCore,
-    _opening_lock: ProjectFileLock,
-}
-
-#[derive(Debug)]
-enum ProjectOpeningSessionError {
-    Lock(ProjectFileLockError),
-    Read(String),
-    InvalidProject(String),
-}
-
-impl Display for ProjectOpeningSessionError {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Lock(error) => Display::fmt(error, formatter),
-            Self::Read(reason) => {
-                write!(formatter, "o Projeto bloqueado não pôde ser lido: {reason}")
-            }
-            Self::InvalidProject(reason) => {
-                write!(
-                    formatter,
-                    "o Projeto bloqueado não abriu no ProjectCore: {reason}"
-                )
-            }
-        }
-    }
-}
-
-impl ProjectOpeningSession {
-    fn open(project_file: &Path) -> Result<Self, ProjectOpeningSessionError> {
-        let opening_lock =
-            ProjectFileLock::try_acquire(project_file).map_err(ProjectOpeningSessionError::Lock)?;
-        let source = std::fs::read_to_string(project_file)
-            .map_err(|error| ProjectOpeningSessionError::Read(error.to_string()))?;
-        let project_core = ProjectCore::new();
-        let session = project_core
-            .open_editable_session(&source)
-            .map_err(|error| ProjectOpeningSessionError::InvalidProject(error.to_string()))?;
-        Ok(Self {
-            _session: session,
-            _project_core: project_core,
-            _opening_lock: opening_lock,
-        })
-    }
-}
-
 impl ProjectOpenProbe {
     pub(crate) fn from_environment(topology: &TopologySpike) -> Result<Option<Self>, String> {
         let root = std::env::var_os(PROJECT_OPEN_PROBE_ROOT_ENV).map(PathBuf::from);
@@ -293,15 +241,21 @@ impl ProjectOpenProbe {
     }
 
     async fn run(&self, app: &AppHandle) -> Result<(), String> {
+        let opening_guard = ProjectOpeningGuard::new();
         match self.role {
-            ProbeRole::Owner => self.run_owner(app).await,
-            ProbeRole::Challenger => self.run_challenger(app).await,
+            ProbeRole::Owner => self.run_owner(app, &opening_guard).await,
+            ProbeRole::Challenger => self.run_challenger(app, &opening_guard).await,
         }
     }
 
-    async fn run_owner(&self, app: &AppHandle) -> Result<(), String> {
-        let project_session = ProjectOpeningSession::open(&self.project_file)
-            .map_err(|error| format!("o owner não abriu a Sessão do Projeto: {error}"))?;
+    async fn run_owner(
+        &self,
+        app: &AppHandle,
+        opening_guard: &ProjectOpeningGuard,
+    ) -> Result<(), String> {
+        let project_session =
+            open_project_session(opening_guard, &self.project_file, self.window_label)
+                .map_err(|error| format!("o owner não abriu a Sessão do Projeto: {error}"))?;
         let operation_lease = acquire_operation_lease(app)
             .await
             .map_err(|error| format!("o owner não adquiriu o OperationGate: {error}"))?;
@@ -361,14 +315,18 @@ impl ProjectOpenProbe {
         }
     }
 
-    async fn run_challenger(&self, app: &AppHandle) -> Result<(), String> {
+    async fn run_challenger(
+        &self,
+        app: &AppHandle,
+        opening_guard: &ProjectOpeningGuard,
+    ) -> Result<(), String> {
         wait_for_file_async(
             &self.root.join(ProbeState::OwnerBothHeld.file_name()),
             "a aquisição inicial dos dois mecanismos pelo owner",
         )
         .await?;
         expect_operation_conflict(app).await?;
-        expect_project_lock_conflict(&self.project_file)?;
+        expect_project_lock_conflict(opening_guard, &self.project_file, self.window_label)?;
         self.write_event(
             ProbeState::ChallengerBothConflict,
             MechanismState::Conflict,
@@ -383,7 +341,7 @@ impl ProjectOpenProbe {
         )
         .await?;
         let challenger_lease = acquire_operation_lease_after_release(app).await?;
-        expect_project_lock_conflict(&self.project_file)?;
+        expect_project_lock_conflict(opening_guard, &self.project_file, self.window_label)?;
         self.write_event(
             ProbeState::ChallengerGateHeldLockConflict,
             MechanismState::Held,
@@ -408,7 +366,8 @@ impl ProjectOpenProbe {
         )
         .await?;
         let (_project_session, _operation_lease) =
-            acquire_both_after_terminal(app, &self.project_file).await?;
+            acquire_both_after_terminal(app, opening_guard, &self.project_file, self.window_label)
+                .await?;
         self.write_event(
             ProbeState::ChallengerBothRecovered,
             MechanismState::Recovered,
@@ -494,13 +453,34 @@ async fn expect_operation_conflict(app: &AppHandle) -> Result<(), String> {
     }
 }
 
-fn expect_project_lock_conflict(project_file: &Path) -> Result<(), String> {
-    match ProjectFileLock::try_acquire(project_file) {
-        Err(ProjectFileLockError::Conflict) => Ok(()),
-        Ok(project_lock) => {
-            drop(project_lock);
-            Err("o challenger recebeu um segundo Bloqueio de abertura".into())
+fn open_project_session(
+    opening_guard: &ProjectOpeningGuard,
+    project_file: &Path,
+    focus_target: &str,
+) -> Result<OpenedProject, String> {
+    match opening_guard.open_or_focus(project_file, focus_target) {
+        Ok(ProjectOpeningOutcome::Opened(project)) => Ok(project),
+        Ok(outcome) => Err(format!(
+            "a abertura inicial recebeu uma classificação inesperada: {outcome:?}"
+        )),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn expect_project_lock_conflict(
+    opening_guard: &ProjectOpeningGuard,
+    project_file: &Path,
+    focus_target: &str,
+) -> Result<(), String> {
+    match opening_guard.open_or_focus(project_file, focus_target) {
+        Err(ProjectOpeningError::OpenedElsewhere) => Ok(()),
+        Ok(ProjectOpeningOutcome::Opened(project)) => {
+            drop(project);
+            Err("o challenger recebeu uma segunda Sessão editável".into())
         }
+        Ok(outcome) => Err(format!(
+            "o conflito de abertura recebeu uma classificação inesperada: {outcome:?}"
+        )),
         Err(error) => Err(format!(
             "o conflito do Bloqueio de abertura perdeu sua forma tipada: {error}"
         )),
@@ -528,26 +508,34 @@ async fn acquire_operation_lease_after_release(app: &AppHandle) -> Result<Operat
 
 async fn acquire_both_after_terminal(
     app: &AppHandle,
+    opening_guard: &ProjectOpeningGuard,
     project_file: &Path,
-) -> Result<(ProjectOpeningSession, OperationLease), String> {
+    focus_target: &str,
+) -> Result<(OpenedProject, OperationLease), String> {
     let deadline = Instant::now() + PROBE_TIMEOUT;
     loop {
-        match ProjectOpeningSession::open(project_file) {
-            Ok(project_session) => match acquire_operation_lease(app).await {
-                Ok(operation_lease) => return Ok((project_session, operation_lease)),
-                Err(OperationLeaseError::Gate(OperationGateError::Conflict { .. }))
-                    if Instant::now() < deadline =>
-                {
-                    drop(project_session);
+        match opening_guard.open_or_focus(project_file, focus_target) {
+            Ok(ProjectOpeningOutcome::Opened(project_session)) => {
+                match acquire_operation_lease(app).await {
+                    Ok(operation_lease) => return Ok((project_session, operation_lease)),
+                    Err(OperationLeaseError::Gate(OperationGateError::Conflict { .. }))
+                        if Instant::now() < deadline =>
+                    {
+                        drop(project_session);
+                    }
+                    Err(error) => {
+                        return Err(format!(
+                            "o OperationGate não foi recuperado depois do terminal: {error}"
+                        ));
+                    }
                 }
-                Err(error) => {
-                    return Err(format!(
-                        "o OperationGate não foi recuperado depois do terminal: {error}"
-                    ));
-                }
-            },
-            Err(ProjectOpeningSessionError::Lock(ProjectFileLockError::Conflict))
-                if Instant::now() < deadline => {}
+            }
+            Err(ProjectOpeningError::OpenedElsewhere) if Instant::now() < deadline => {}
+            Ok(outcome) => {
+                return Err(format!(
+                    "a recuperação recebeu uma classificação inesperada: {outcome:?}"
+                ));
+            }
             Err(error) => {
                 return Err(format!(
                     "o Bloqueio de abertura não foi recuperado depois do terminal: {error}"
@@ -577,8 +565,9 @@ fn validate_project_fixture(root: &Path, project_file: &Path) -> Result<(), Stri
 mod tests {
     use super::{
         MechanismState, ProbeEvent, ProbeRole, ProbeScenario, ProbeState, ProjectOpenProbe,
-        ProjectOpeningSession,
+        open_project_session,
     };
+    use crate::project_opening_guard::ProjectOpeningGuard;
     use crate::sample_project::SampleProject;
     use crate::topology_spike::TopologySpike;
     use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
@@ -592,7 +581,8 @@ mod tests {
             .expect("the Project fixture serializes");
         std::fs::write(&project, source).expect("the Project fixture is writable");
 
-        let session = ProjectOpeningSession::open(&project)
+        let opening_guard = ProjectOpeningGuard::new();
+        let session = open_project_session(&opening_guard, &project, "main")
             .expect("a valid Project opens as an editable locked session");
         assert_eq!(
             ProjectFileLock::try_acquire(&project).unwrap_err(),
@@ -612,10 +602,8 @@ mod tests {
         std::fs::write(&project, b"not a Project")
             .expect("the invalid Project fixture is writable");
 
-        assert!(
-            ProjectOpeningSession::open(&project).is_err(),
-            "an invalid Project must not create an editable session"
-        );
+        let opening_guard = ProjectOpeningGuard::new();
+        assert!(open_project_session(&opening_guard, &project, "main").is_err());
         ProjectFileLock::try_acquire(&project)
             .expect("a failed open releases the opening lock immediately");
     }

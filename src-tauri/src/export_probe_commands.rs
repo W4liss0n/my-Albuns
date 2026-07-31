@@ -3,7 +3,7 @@ use std::{
     time::Instant,
 };
 
-use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
+use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, root_binding_plan_sha256};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use serde::Serialize;
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
@@ -306,6 +306,18 @@ pub(crate) async fn export_spike(
             return Err(ExportCommandError::cancelled());
         },
     };
+    let root_binding_plan_sha256 =
+        root_binding_plan_sha256(&root_bindings).map_err(ExportCommandError::failed)?;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        process_id = std::process::id(),
+        operation_id = request_id.as_str(),
+        project_id = project_id.as_deref(),
+        window_label = window.label(),
+        root_binding_plan_sha256,
+        event = "root_binding_plan_captured",
+    );
 
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let lease_completion = acquisition.complete(&cache, &processor);

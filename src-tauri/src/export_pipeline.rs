@@ -695,6 +695,7 @@ mod tests {
     use myalbuns_core::ProjectCore;
     use myalbuns_imaging_protocol::{
         ImagingCommand, ImagingProgress, ImagingProgressStage, ImagingResponse, RenderCompletion,
+        decode_command, encode_command,
     };
     use myalbuns_paths::{OperationPathContext, RootBindingPlan};
     use sha2::{Digest, Sha256};
@@ -731,6 +732,13 @@ mod tests {
         first_output_before_second_invocation: Option<Vec<u8>>,
         block_output_before_publication: Option<PathBuf>,
         invocations: usize,
+    }
+
+    struct PlanObservingTransport {
+        expected_root_bindings: RootBindingPlan,
+        prepared_path: PathBuf,
+        prepared_bytes: Vec<u8>,
+        observed_round_trip: bool,
     }
 
     impl ImagingTransport for CancellationAwareTransport {
@@ -838,6 +846,43 @@ mod tests {
         }
     }
 
+    impl ImagingTransport for PlanObservingTransport {
+        fn invoke<'a>(
+            &'a mut self,
+            command: &'a ImagingCommand,
+            _context: &'a InvocationContext,
+            operation: ImagingOperation,
+            attempt: u8,
+            _control: InvocationControl<'a>,
+        ) -> InvocationFuture<'a> {
+            assert_eq!(operation, ImagingOperation::Export);
+            assert_eq!(attempt, 1);
+            assert_eq!(command.root_bindings(), Some(&self.expected_root_bindings));
+            let payload = encode_command(command).expect("the real IPC command encodes");
+            let decoded = decode_command(&payload).expect("the real IPC command decodes");
+            assert_eq!(decoded.root_bindings(), Some(&self.expected_root_bindings));
+            self.observed_round_trip = true;
+            std::fs::write(&self.prepared_path, &self.prepared_bytes)
+                .expect("the observed Processor writes its preparation");
+            let ImagingCommand::Render(request) = decoded else {
+                panic!("the Export sends a Render command");
+            };
+            let response = ImagingResponse::completed(
+                &request.request_id,
+                RenderCompletion {
+                    width_px: 10,
+                    height_px: 5,
+                    dpi: 25,
+                    source_count: 0,
+                    source_bytes: 0,
+                    output_bytes: self.prepared_bytes.len() as u64,
+                    output_sha256: format!("{:x}", Sha256::digest(&self.prepared_bytes)),
+                },
+            );
+            Box::pin(async move { Ok(response) })
+        }
+    }
+
     fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
         let source = SampleProject::Horizon
             .persisted_source(2)
@@ -903,6 +948,38 @@ mod tests {
                 r"\\servidor\destino\Exports\.myalbuns-export-export-mapped.tmp\Album.png"
             )
         );
+    }
+
+    #[test]
+    fn export_pipeline_sends_the_exact_plan_used_by_the_host_through_the_ipc_boundary() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary Export destination");
+            let output = destination.path().join("Album.png");
+            let plan = export_plan(output.clone(), "export-plan-correlation");
+            let bindings = root_bindings(&plan);
+            let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
+            let prepared_bytes = b"correlated plan".to_vec();
+            let mut transport = PlanObservingTransport {
+                expected_root_bindings: bindings.clone(),
+                prepared_path,
+                prepared_bytes,
+                observed_round_trip: false,
+            };
+
+            execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &ExportExecutionControl::default(),
+                &|_| {},
+                &context("export-plan-correlation"),
+            )
+            .await
+            .expect("the correlated Export completes");
+
+            assert!(transport.observed_round_trip);
+            assert!(output.exists());
+        });
     }
 
     #[test]

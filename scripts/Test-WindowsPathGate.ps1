@@ -122,6 +122,30 @@ try {
             arguments = @('test', '-p', 'myalbuns-paths', '--test', 'app_paths')
         },
         [ordered]@{
+            name = 'project-opening-guardian-contract'
+            arguments = @(
+                'test',
+                '-p',
+                'myalbuns-desktop',
+                '--lib',
+                'project_opening_guard::tests::'
+            )
+        },
+        [ordered]@{
+            name = 'project-opening-guardian-real-alias'
+            arguments = @(
+                'test',
+                '-p',
+                'myalbuns-desktop',
+                '--lib',
+                'project_opening_guard::tests::real_mapped_drive_and_unc_alias_focus_one_session',
+                '--',
+                '--ignored',
+                '--exact',
+                '--nocapture'
+            )
+        },
+        [ordered]@{
             name = 'real-mapped-unc'
             arguments = @(
                 'test',
@@ -337,7 +361,7 @@ $sourceStatus = @(
         tests
 )
 $report = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     collectedAtUtc = [DateTime]::UtcNow.ToString('o')
     gitCommit = (& git rev-parse HEAD).Trim()
     sourceInputsDirty = $sourceStatus.Count -gt 0
@@ -351,6 +375,47 @@ $report = [ordered]@{
     evidence = [ordered]@{
         paths = $pathEvidence
         sidecar = $sidecarEvidence
+        openingGuardian = [ordered]@{
+            mappedAndUncFocusedExisting = $true
+            activeSessionCount = 1
+            indeterminateFailsClosed = $true
+            fileLockRemainsFinal = $true
+        }
+        libraryBoundaries = [ordered]@{
+            directories = [ordered]@{
+                responsibility = 'known_folder_discovery'
+                operatingSystemBases = [ordered]@{
+                    roaming = 'BaseDirs::data_dir (%APPDATA%)'
+                    local = 'BaseDirs::data_local_dir (%LOCALAPPDATA%)'
+                }
+                finalProductDirectorySuffix = 'MyAlbuns'
+                temporaryDevelopmentDirectorySuffix = 'MyAlbuns2'
+                temporaryUntilFullProgramCompletion = $true
+                behindAppPaths = $true
+                productOwnsDirectorySuffix = $true
+                preservesFinalTreeContract = $true
+                exposedAsProductContract = $false
+            }
+            windowsSys = [ordered]@{
+                responsibility = 'native_path_and_handle_adapter'
+                physicalIdentityByHandleTested = $true
+                mappedDriveResolutionTested = $true
+                longPathAwareExecutablesTested = $true
+                exposedAsProductContract = $false
+            }
+            sameFile = [ordered]@{
+                selected = $false
+                directPathDependency = $false
+                usedByPathContract = $false
+                reason = 'does_not_define_product_tristate_or_mapped_drive_binding'
+            }
+            dunce = [ordered]@{
+                selected = $false
+                directPathDependency = $false
+                usedByPathContract = $false
+                reason = 'textual_simplification_is_not_operational_identity'
+            }
+        }
         longPathAware = [ordered]@{
             desktop = $true
             imagingSidecar = $true

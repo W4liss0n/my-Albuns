@@ -5,6 +5,11 @@ use std::{
     path::Path,
 };
 
+use crate::{
+    PhysicalIdentityEvidence, ResolvedObject,
+    resolve::{compare_file_identity, read_file_handle_to_string},
+};
+
 use windows_sys::Win32::{
     Foundation::{ERROR_LOCK_VIOLATION, ERROR_SHARING_VIOLATION, HANDLE},
     Storage::FileSystem::{
@@ -61,6 +66,18 @@ impl ProjectFileLock {
             return Err(classify_lock_error(std::io::Error::last_os_error()));
         }
         Ok(Self { file })
+    }
+
+    /// Confirms that this authoritative lock belongs to the object already
+    /// resolved by the opening policy.
+    pub fn compare_physical(&self, resolved: &ResolvedObject) -> PhysicalIdentityEvidence {
+        compare_file_identity(&self.file, resolved.file())
+    }
+
+    /// Reads the persisted revision through the handle that owns the lock, so
+    /// a path replacement cannot redirect the final opening read.
+    pub fn read_to_string(&self) -> std::io::Result<String> {
+        read_file_handle_to_string(&self.file)
     }
 }
 
@@ -124,6 +141,7 @@ fn lock_region() -> OVERLAPPED {
 #[cfg(test)]
 mod tests {
     use super::ProjectFileLock;
+    use crate::{ExpectedObject, OperationPathContext, PhysicalIdentityEvidence};
 
     #[test]
     fn acquiring_and_releasing_the_opening_lock_preserves_the_project_file() {
@@ -134,6 +152,21 @@ mod tests {
 
         let opening_lock =
             ProjectFileLock::try_acquire(&project).expect("the first session acquires the lock");
+        let mut paths = OperationPathContext::new();
+        let resolved = paths
+            .resolve_existing(&project, ExpectedObject::RegularFile)
+            .expect("the locked Project resolves by handle");
+        assert_eq!(
+            opening_lock.compare_physical(&resolved),
+            PhysicalIdentityEvidence::Same,
+            "the authoritative lock belongs to the resolved physical Project"
+        );
+        assert_eq!(
+            opening_lock
+                .read_to_string()
+                .expect("the persisted revision is read through the locked handle"),
+            String::from_utf8(expected.to_vec()).expect("the fixture is UTF-8")
+        );
         assert_eq!(
             std::fs::read(&project).expect("the locked Project remains readable"),
             expected

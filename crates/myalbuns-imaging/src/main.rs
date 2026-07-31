@@ -10,6 +10,7 @@ use std::{
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
     ImagingProgressStage, ImagingRequest, ImagingResponse, decode_command, encode_event,
+    root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -136,6 +137,7 @@ fn cache_failure(_: String) -> ProcessFailure {
 fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
     let operation_id = safe_log_identifier(&request.request_id);
     let project_id = safe_log_identifier(&request.snapshot.project_id);
+    let root_binding_plan_sha256 = root_binding_plan_sha256(&request.root_bindings)?;
     tracing::info!(
         target: "myalbuns.imaging",
         process_role = ProcessRole::Imaging.as_str(),
@@ -143,6 +145,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         operation_id,
         project_id,
         process_id = std::process::id(),
+        root_binding_plan_sha256,
         event = "imaging_request_started",
     );
 
@@ -190,6 +193,8 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        process_id = std::process::id(),
+        root_binding_plan_sha256,
         event = "imaging_request_completed",
         width_px = completion.width_px,
         height_px = completion.height_px,

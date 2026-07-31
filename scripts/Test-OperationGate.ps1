@@ -168,6 +168,120 @@ function Assert-BatchScenarioName {
     }
 }
 
+function Get-RootBindingPlanCorrelation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [DateTimeOffset] $Since,
+        [Parameter(Mandatory = $true)]
+        [string] $Topology,
+        [Parameter(Mandatory = $true)]
+        [string] $Role,
+        [Parameter(Mandatory = $true)]
+        [string] $OperationId,
+        [Parameter(Mandatory = $true)]
+        [int] $ExpectedHostProcessId
+    )
+
+    $localAppData = [System.Environment]::GetFolderPath(
+        [System.Environment+SpecialFolder]::LocalApplicationData
+    )
+    if ([string]::IsNullOrWhiteSpace($localAppData)) {
+        throw 'LocalApplicationData is unavailable for log correlation.'
+    }
+    $logDirectory = Join-Path $localAppData 'MyAlbuns2\Logs'
+    if (-not (Test-Path -LiteralPath $logDirectory -PathType Container)) {
+        throw 'The centralized MyAlbuns2 log directory does not exist.'
+    }
+
+    $events = [System.Collections.Generic.List[object]]::new()
+    foreach ($logFile in @(Get-ChildItem -LiteralPath $logDirectory -Filter '*.jsonl')) {
+        foreach ($line in @(Get-Content -LiteralPath $logFile.FullName)) {
+            if (
+                [string]::IsNullOrWhiteSpace($line) -or
+                -not $line.Contains('"operation_id":"' + $OperationId + '"')
+            ) {
+                continue
+            }
+            try {
+                $event = $line | ConvertFrom-Json -ErrorAction Stop
+            }
+            catch {
+                throw "Invalid structured log line in '$($logFile.Name)'."
+            }
+            if (
+                [string] $event.operation_id -cne $OperationId -or
+                [string]::IsNullOrWhiteSpace([string] $event.timestamp)
+            ) {
+                continue
+            }
+            $timestamp = [DateTimeOffset]::Parse(
+                [string] $event.timestamp,
+                [System.Globalization.CultureInfo]::InvariantCulture
+            )
+            if ($timestamp -ge $Since) {
+                $events.Add($event)
+            }
+        }
+    }
+
+    $captureEvents = @($events | Where-Object {
+        [string] $_.event -ceq 'root_binding_plan_captured' -and
+        [string] $_.process_role -ceq 'desktop_host'
+    })
+    $hostEvents = @($events | Where-Object {
+        [string] $_.event -ceq 'imaging_process_spawned' -and
+        [string] $_.process_role -ceq 'desktop_host'
+    })
+    $imagingStarted = @($events | Where-Object {
+        [string] $_.event -ceq 'imaging_request_started' -and
+        [string] $_.process_role -ceq 'imaging'
+    })
+    $imagingCompleted = @($events | Where-Object {
+        [string] $_.event -ceq 'imaging_request_completed' -and
+        [string] $_.process_role -ceq 'imaging'
+    })
+    if (
+        $captureEvents.Count -ne 1 -or
+        $hostEvents.Count -ne 1 -or
+        $imagingStarted.Count -ne 1 -or
+        $imagingCompleted.Count -ne 1
+    ) {
+        throw (
+            "Operation '$OperationId' did not produce exactly one owner capture, " +
+            'host spawn, Processor start and Processor completion log.'
+        )
+    }
+    $capture = $captureEvents[0]
+    $host = $hostEvents[0]
+    $processorStarted = $imagingStarted[0]
+    $processorCompleted = $imagingCompleted[0]
+    $digest = [string] $host.root_binding_plan_sha256
+    if (
+        $digest -notmatch '^[0-9a-f]{64}$' -or
+        [string] $capture.root_binding_plan_sha256 -cne $digest -or
+        [string] $processorStarted.root_binding_plan_sha256 -cne $digest -or
+        [string] $processorCompleted.root_binding_plan_sha256 -cne $digest -or
+        [int] $capture.process_id -ne $ExpectedHostProcessId -or
+        [int] $host.process_id -ne $ExpectedHostProcessId -or
+        [int] $host.imaging_process_id -ne [int] $processorStarted.process_id -or
+        [int] $processorCompleted.process_id -ne [int] $processorStarted.process_id
+    ) {
+        throw "Operation '$OperationId' lost RootBindingPlan or process correlation."
+    }
+
+    [ordered]@{
+        topology = $Topology
+        role = $Role
+        operationId = $OperationId
+        hostProcessId = [int] $host.process_id
+        processorProcessId = [int] $processorStarted.process_id
+        rootBindingPlanSha256 = $digest
+        freshCaptureObserved = $true
+        hostAndProcessorPlanMatch = $true
+        processorCompletedWithSamePlan = $true
+    }
+}
+
 
 function Invoke-RustCheck {
     param(
@@ -2788,12 +2902,13 @@ try {
             -Checks $checks
     }
     else {
-    $independent = Invoke-OperationTopologyProbe `
-        -Topology 'independent' `
-        -ProbeRoot $independentRoot
-    $multiwindow = Invoke-OperationTopologyProbe `
-        -Topology 'multiwindow' `
-        -ProbeRoot $multiwindowRoot
+        $rootBindingLogWindowStart = [DateTimeOffset]::UtcNow
+        $independent = Invoke-OperationTopologyProbe `
+            -Topology 'independent' `
+            -ProbeRoot $independentRoot
+        $multiwindow = Invoke-OperationTopologyProbe `
+            -Topology 'multiwindow' `
+            -ProbeRoot $multiwindowRoot
     $checks.Add([ordered]@{
         name = 'independent-two-host-operation-gate'
         passed = $independent.passed
@@ -2823,6 +2938,28 @@ try {
             })
         }
     }
+    $rootBindingPlanCorrelations =
+        [System.Collections.Generic.List[object]]::new()
+    foreach ($topology in @('independent', 'multiwindow')) {
+        $success = $terminalResults[$topology]['success']
+        $rootBindingPlanCorrelations.Add((Get-RootBindingPlanCorrelation `
+            -Since $rootBindingLogWindowStart `
+            -Topology $topology `
+            -Role 'owner' `
+            -OperationId ([string] $success.ownerTerminal.operationId) `
+            -ExpectedHostProcessId ([int] $success.ownerProcessId)))
+        $rootBindingPlanCorrelations.Add((Get-RootBindingPlanCorrelation `
+            -Since $rootBindingLogWindowStart `
+            -Topology $topology `
+            -Role 'successor' `
+            -OperationId ([string] $success.challengerSuccess.operationId) `
+            -ExpectedHostProcessId ([int] $success.successorProcessId)))
+    }
+    $checks.Add([ordered]@{
+        name = 'root-binding-plan-host-processor-correlation'
+        passed = ($rootBindingPlanCorrelations.Count -eq 4)
+        elapsedMs = 0
+    })
     $restoredImagingSha256 = (
         Get-FileHash -LiteralPath $imagingExecutablePath -Algorithm SHA256
     ).Hash.ToLowerInvariant()
@@ -2866,6 +3003,7 @@ try {
             independent = $independent
             multiwindow = $multiwindow
             exportTerminalMatrix = $terminalResults
+            rootBindingPlanCorrelations = @($rootBindingPlanCorrelations)
         }
         limits = [ordered]@{
             batchRunner = $false

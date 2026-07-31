@@ -21,6 +21,7 @@ mod project_commands;
 mod project_core_probe;
 mod project_host;
 mod project_open_probe;
+mod project_opening_guard;
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
 mod topology_benchmark;

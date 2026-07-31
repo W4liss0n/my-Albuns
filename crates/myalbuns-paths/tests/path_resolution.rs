@@ -53,6 +53,32 @@ fn operation_owner_resolves_and_accumulates_a_binding_before_freeze() {
     assert!(plan.covers(&project));
 }
 
+#[test]
+fn reads_a_regular_file_through_the_resolved_handle_after_path_replacement() {
+    let root = tempfile::tempdir().expect("temporary handle-bound read root");
+    let project = root.path().join("Projeto.myalbum");
+    let archived = root.path().join("Projeto-anterior.myalbum");
+    let replacement = root.path().join("Projeto-novo.myalbum");
+    std::fs::write(&project, "revisão original").expect("the original fixture is writable");
+    std::fs::write(&replacement, "revisão substituta")
+        .expect("the replacement fixture is writable");
+
+    let mut owner = OperationPathContext::new();
+    let resolved = owner
+        .resolve_existing(&project, ExpectedObject::RegularFile)
+        .expect("the original Project resolves by handle");
+    std::fs::rename(&project, &archived).expect("the original path can move while shared");
+    std::fs::rename(&replacement, &project).expect("the replacement takes the original path");
+
+    assert_eq!(
+        resolved
+            .read_to_string()
+            .expect("the resolved handle remains readable"),
+        "revisão original",
+        "reading a resolved object must not follow a later pathname replacement"
+    );
+}
+
 #[cfg(windows)]
 #[test]
 fn distinguishes_unbound_missing_and_unsupported_windows_paths() {

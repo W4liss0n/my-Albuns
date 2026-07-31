@@ -14,6 +14,7 @@ use myalbuns_imaging_protocol::decode_event_stream;
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEventStreamDecoder, ImagingFailureStage,
     ImagingProgress, ImagingResponse, encode_command,
+    root_binding_plan_sha256 as digest_root_binding_plan,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
 use tauri::AppHandle;
@@ -383,6 +384,17 @@ async fn invoke_once(
             format!("Não foi possível preparar a solicitação: {error}"),
         )
     })?;
+    let root_binding_plan_sha256 = command
+        .root_bindings()
+        .map(digest_root_binding_plan)
+        .transpose()
+        .map_err(|error| {
+            InvocationFailure::at_stage(
+                InvocationFailureStage::EncodeRequest,
+                None,
+                format!("Não foi possível correlacionar o plano de caminhos: {error}"),
+            )
+        })?;
     let mut decoder =
         ImagingEventStreamDecoder::for_request(&context.operation_id).map_err(|error| {
             InvocationFailure::at_stage(
@@ -419,7 +431,9 @@ async fn invoke_once(
         project_id = context.project_id.as_deref(),
         operation = operation.as_str(),
         attempt,
+        process_id = std::process::id(),
         imaging_process_id,
+        root_binding_plan_sha256 = root_binding_plan_sha256.as_deref(),
         event = "imaging_process_spawned",
     );
     if let Err(error) = child.write(&payload) {

@@ -5,7 +5,7 @@ use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
     ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
     ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, decode_command,
-    decode_event_stream, encode_command, encode_event,
+    decode_event_stream, encode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
 
@@ -97,6 +97,10 @@ fn host_and_processor_share_one_serialized_protocol() {
     .expect("the render request is valid");
 
     let command = ImagingCommand::render(request.clone());
+    let owner_plan_digest =
+        root_binding_plan_sha256(&root_bindings).expect("the frozen plan has a stable digest");
+    assert_eq!(owner_plan_digest.len(), 64);
+    assert_eq!(command.root_bindings(), Some(&root_bindings));
     let command_payload = encode_command(&command).expect("command serializes");
     assert_eq!(command_payload.last(), Some(&b'\n'));
     let request_json: serde_json::Value =
@@ -131,9 +135,16 @@ fn host_and_processor_share_one_serialized_protocol() {
             .is_some_and(|units| !units.is_empty()),
         "root bindings use the reversible native Windows wire form"
     );
+    let decoded_command = decode_command(&command_payload).expect("command decodes");
+    assert_eq!(decoded_command, command);
     assert_eq!(
-        decode_command(&command_payload).expect("command decodes"),
-        command
+        decoded_command
+            .root_bindings()
+            .map(root_binding_plan_sha256)
+            .transpose()
+            .expect("the received plan has a stable digest"),
+        Some(owner_plan_digest),
+        "the Processor observes exactly the plan frozen by the operation owner"
     );
     let mut legacy_json = request_json.clone();
     legacy_json["request"]["protocolVersion"] = serde_json::json!(8);

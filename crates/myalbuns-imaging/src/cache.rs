@@ -9,7 +9,7 @@ use image::{
 };
 use myalbuns_imaging_protocol::{
     CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheRequest, CacheResetRequest,
-    ImagingResponse,
+    ImagingResponse, root_binding_plan_sha256,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
@@ -64,6 +64,7 @@ pub(crate) fn run_cache_reset(
 pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> {
     let operation_id = safe_log_identifier(&request.request_id);
     let project_id = safe_log_identifier(&request.project_id);
+    let root_binding_plan_sha256 = root_binding_plan_sha256(&request.root_bindings)?;
     tracing::info!(
         target: "myalbuns.imaging",
         process_role = ProcessRole::Imaging.as_str(),
@@ -72,6 +73,7 @@ pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(
         project_id,
         process_id = std::process::id(),
         media_count = request.jobs.len(),
+        root_binding_plan_sha256,
         event = "cache_request_started",
     );
     request.validate()?;
@@ -91,10 +93,12 @@ pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        process_id = std::process::id(),
         generated_count = completion.generated_count,
         reused_count = completion.reused_count,
         source_bytes = completion.source_bytes,
         preview_bytes = completion.preview_bytes,
+        root_binding_plan_sha256,
         event = "cache_request_completed",
     );
     write_response(&ImagingResponse::cache_completed(

@@ -9,3 +9,4 @@ myalbuns-core = { path = "../myalbuns-core" }
 myalbuns-paths = { path = "../myalbuns-paths" }
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
