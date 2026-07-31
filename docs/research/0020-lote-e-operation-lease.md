@@ -40,8 +40,10 @@ possui `ProjectHost`, e o critério atual não exige repetir aquela matriz.
 - O chamador captura um único `RootBindingPlan` antes da aquisição e o entrega
   ao lote completo.
 - Os fixtures carregam revisões persistidas por `ProjectCore`, sem abrir uma
-  `ProjectSession`. Isso é evidência complementar e não encerra os critérios
-  mais amplos das duas entradas de `ProjectCore`.
+  `ProjectSession`. Naquele gate, isso era evidência complementar e ainda não
+  encerrava os critérios mais amplos das duas entradas de `ProjectCore`; o gate
+  posterior [`0022`](0022-project-core-sessoes-e-revisoes-persistidas.md)
+  fechou essa prova.
 - `ExportPipeline::execute_group` prepara e verifica todas as saídas de um
   item antes de iniciar a Publicação, depois as promove serialmente.
 - Uma falha de Publicação informa `promoted_outputs` e `total_outputs`, não

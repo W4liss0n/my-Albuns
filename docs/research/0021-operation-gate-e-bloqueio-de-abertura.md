@@ -41,8 +41,9 @@ O spike introduz `ProjectOpeningSession`, um escopo estreito que:
 
 1. adquire `ProjectFileLock`;
 2. lê uma revisão persistida válida;
-3. abre uma `ProjectSession` por `ProjectCore::open_editable_session`;
-4. mantém Sessão e trava no mesmo objeto;
+3. abre um `EditableProject` por `ProjectCore::open_editable_session`, mantendo
+   a `ProjectSession` interna ao núcleo;
+4. mantém a Sessão editável e a trava no mesmo objeto;
 5. encerra a Sessão antes de liberar a trava no fechamento normal.
 
 Esse tipo prova o encaixe entre os ciclos sem antecipar o guardião completo de
