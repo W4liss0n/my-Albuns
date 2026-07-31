@@ -101,7 +101,7 @@ function Invoke-RustCheck {
         throw "OperationGate check '$Name' failed with exit code $exitCode."
     }
     $transcript = $commandOutput -join [System.Environment]::NewLine
-    if ($transcript -notmatch '(?m)^running [1-9][0-9]* tests?$') {
+    if ($transcript -notmatch '(?m)^running [1-9][0-9]* tests?') {
         throw "OperationGate check '$Name' did not execute any test."
     }
     if (
