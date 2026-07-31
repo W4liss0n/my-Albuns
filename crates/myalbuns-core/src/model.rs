@@ -311,4 +311,6 @@ pub enum CoreError {
     UnsupportedSchema(u32),
     #[error("A revisão salva confirmada ({confirmed}) não corresponde à revisão atual ({current})")]
     SavedRevisionMismatch { current: u64, confirmed: u64 },
+    #[error("O Projeto já possui uma sessão editável aberta: {project_id}")]
+    EditableSessionAlreadyOpen { project_id: String },
 }

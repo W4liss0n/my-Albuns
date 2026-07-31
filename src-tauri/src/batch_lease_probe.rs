@@ -13,7 +13,7 @@ use tauri::{AppHandle, Manager};
 use crate::{
     batch_runner::{BatchEvent, BatchItem, BatchPlan, BatchRunFailure, BatchRunner},
     cache_engine::CacheEngine,
-    export_pipeline::{ExportFailureStage, ExportOptions, plan},
+    export_pipeline::{ExportFailureStage, ExportOptions},
     export_probe_commands::{ExportCommandError, ExportResult},
     imaging_processor::ImagingProcessor,
     logging::LoggingState,
@@ -661,9 +661,10 @@ fn build_fixture(root: &Path, scenario: ProbeScenario) -> Result<BatchFixture, S
         let source = sample
             .persisted_source(2)
             .map_err(|error| format!("Não foi possível criar o Projeto do lote: {error}"))?;
-        let snapshot = ProjectCore::load_persisted_revision(&source)
-            .map_err(|error| format!("Não foi possível carregar a revisão persistida: {error}"))?
-            .render_snapshot();
+        let revision = ProjectCore::new()
+            .load_persisted_revision(&source)
+            .map_err(|error| format!("Não foi possível carregar a revisão persistida: {error}"))?;
+        let snapshot = revision.render_snapshot();
         let sheet_id = snapshot
             .composition
             .sheets
@@ -671,17 +672,21 @@ fn build_fixture(root: &Path, scenario: ProbeScenario) -> Result<BatchFixture, S
             .ok_or_else(|| "A revisão persistida não contém Lâminas.".to_string())?
             .sheet_id
             .clone();
-        let mut plans = Vec::with_capacity(outputs.len());
+        let mut output_options = Vec::with_capacity(outputs.len());
         for (request_id, output_path) in outputs {
-            plans.push(
-                plan(
-                    snapshot.clone(),
-                    ExportOptions::new(request_id, output_path, sheet_id.clone(), 25, None),
-                )
-                .map_err(|failure| failure.message)?,
-            );
+            output_options.push(ExportOptions::new(
+                request_id,
+                output_path,
+                sheet_id.clone(),
+                25,
+                None,
+            ));
         }
-        items.push(BatchItem::new(format!("item-{item_index}"), plans)?);
+        items.push(BatchItem::from_persisted_revision(
+            format!("item-{item_index}"),
+            revision,
+            output_options,
+        )?);
     }
     let plan = BatchPlan::new(items)?;
     let injected_preparation = if scenario == ProbeScenario::BeforePreparation {

@@ -3,10 +3,14 @@ use std::{
     sync::{Mutex, MutexGuard},
 };
 
-use myalbuns_core::{EditorProjection, ProjectIntent, ProjectSession, RenderSnapshot};
+use myalbuns_core::{
+    EditableProject, EditorProjection, LoadedProjectRevision, ProjectCore, ProjectIntent,
+    RenderSnapshot,
+};
 use myalbuns_imaging_protocol::MediaSource;
 
 pub(crate) struct ProjectHost {
+    core: ProjectCore,
     projects: HashMap<String, HostedProject>,
 }
 
@@ -18,27 +22,41 @@ pub(crate) struct ProjectRevisionForPersistence {
 }
 
 struct HostedProject {
-    session: Mutex<ProjectSession>,
+    session: Mutex<EditableProject>,
     media_sources: Vec<MediaSource>,
 }
 
 impl ProjectHost {
     pub(crate) fn new(
-        projects: impl IntoIterator<Item = (&'static str, ProjectSession, Vec<MediaSource>)>,
-    ) -> Self {
+        core: ProjectCore,
+        projects: impl IntoIterator<Item = (&'static str, EditableProject, Vec<MediaSource>)>,
+    ) -> Result<Self, String> {
         let mut hosted_projects = HashMap::new();
+        let mut project_ids = BTreeSet::new();
         for (window_label, session, sources) in projects {
+            if hosted_projects.contains_key(window_label) {
+                return Err(format!(
+                    "A janela {window_label} possui mais de uma Sessão do Projeto."
+                ));
+            }
+            let project_id = session.state().project_id;
+            if !project_ids.insert(project_id.clone()) {
+                return Err(format!(
+                    "O Projeto {project_id} possui mais de uma Sessão editável neste host."
+                ));
+            }
             hosted_projects.insert(
-                window_label.into(),
+                window_label.to_owned(),
                 HostedProject {
                     session: Mutex::new(session),
                     media_sources: sources,
                 },
             );
         }
-        Self {
+        Ok(Self {
+            core,
             projects: hosted_projects,
-        }
+        })
     }
 
     pub(crate) fn projection(&self, window_label: &str) -> Result<EditorProjection, String> {
@@ -117,6 +135,15 @@ impl ProjectHost {
         Ok(self.session(window_label)?.render_snapshot())
     }
 
+    pub(crate) fn load_persisted_revision(
+        &self,
+        source: &str,
+    ) -> Result<LoadedProjectRevision, String> {
+        self.core
+            .load_persisted_revision(source)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn cache_sources(
         &self,
         window_label: &str,
@@ -167,7 +194,7 @@ impl ProjectHost {
         })
     }
 
-    fn session(&self, window_label: &str) -> Result<MutexGuard<'_, ProjectSession>, String> {
+    fn session(&self, window_label: &str) -> Result<MutexGuard<'_, EditableProject>, String> {
         self.hosted_project(window_label)?
             .session
             .lock()
@@ -179,26 +206,36 @@ impl ProjectHost {
 mod tests {
     use std::path::PathBuf;
 
-    use myalbuns_core::{ProjectCore, ProjectIntent, ProjectSession};
+    use myalbuns_core::{EditableProject, ProjectCore, ProjectIntent};
     use myalbuns_imaging_protocol::MediaSource;
 
     use super::ProjectHost;
     use crate::sample_project::SampleProject;
 
-    fn sample_session(sample: SampleProject) -> ProjectSession {
+    fn sample_session(core: &ProjectCore, sample: SampleProject) -> EditableProject {
         let source = sample
             .persisted_source(12)
             .expect("the sample project serializes");
-        ProjectCore::open_editable_session(&source)
+        core.open_editable_session(&source)
             .expect("the sample project opens through ProjectCore")
     }
 
     #[test]
     fn isolates_each_window_project_session() {
-        let host = ProjectHost::new([
-            ("project-a", sample_session(SampleProject::Horizon), vec![]),
-            ("project-b", sample_session(SampleProject::Aurora), vec![]),
-        ]);
+        let core = ProjectCore::new();
+        let projects = [
+            (
+                "project-a",
+                sample_session(&core, SampleProject::Horizon),
+                vec![],
+            ),
+            (
+                "project-b",
+                sample_session(&core, SampleProject::Aurora),
+                vec![],
+            ),
+        ];
+        let host = ProjectHost::new(core, projects).expect("the unique projects are hosted");
 
         host.apply(
             "project-a",
@@ -229,7 +266,10 @@ mod tests {
 
     #[test]
     fn exposes_a_revision_for_verified_persistence_before_confirming_it_as_saved() {
-        let host = ProjectHost::new([("main", sample_session(SampleProject::Horizon), vec![])]);
+        let core = ProjectCore::new();
+        let session = sample_session(&core, SampleProject::Horizon);
+        let host = ProjectHost::new(core, [("main", session, vec![])])
+            .expect("the unique project is hosted");
         host.apply(
             "main",
             ProjectIntent::TransformPhoto {
@@ -265,7 +305,10 @@ mod tests {
 
     #[test]
     fn rejects_a_fault_probe_that_skips_or_replays_a_document_revision() {
-        let host = ProjectHost::new([("main", sample_session(SampleProject::Horizon), vec![])]);
+        let core = ProjectCore::new();
+        let session = sample_session(&core, SampleProject::Horizon);
+        let host = ProjectHost::new(core, [("main", session, vec![])])
+            .expect("the unique project is hosted");
         host.apply(
             "main",
             ProjectIntent::TransformPhoto {
@@ -284,7 +327,8 @@ mod tests {
 
     #[test]
     fn selects_only_the_originals_used_by_the_requested_sheet() {
-        let session = sample_session(SampleProject::Horizon);
+        let core = ProjectCore::new();
+        let session = sample_session(&core, SampleProject::Horizon);
         let snapshot = session.render_snapshot();
         let source = |media_id: &str| {
             MediaSource::new(
@@ -295,16 +339,20 @@ mod tests {
             )
             .expect("the source is valid")
         };
-        let host = ProjectHost::new([(
-            "main",
-            session,
-            vec![
-                source("decorative-overlay"),
-                source("media-campo"),
-                source("media-costa"),
-                source("unused-media"),
-            ],
-        )]);
+        let host = ProjectHost::new(
+            core,
+            [(
+                "main",
+                session,
+                vec![
+                    source("decorative-overlay"),
+                    source("media-campo"),
+                    source("media-costa"),
+                    source("unused-media"),
+                ],
+            )],
+        )
+        .expect("the unique project is hosted");
 
         let sources = host
             .export_sources("main", &snapshot, "lamina-01")
@@ -318,5 +366,36 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["decorative-overlay", "media-campo", "media-costa"]
         );
+    }
+
+    #[test]
+    fn rejects_duplicate_window_labels_and_project_identities() {
+        let core = ProjectCore::new();
+        let duplicate_label = ProjectHost::new(
+            core.clone(),
+            [
+                (
+                    "main",
+                    sample_session(&core, SampleProject::Horizon),
+                    vec![],
+                ),
+                ("main", sample_session(&core, SampleProject::Aurora), vec![]),
+            ],
+        )
+        .err()
+        .expect("a duplicate window label is rejected");
+        assert!(duplicate_label.contains("janela main"));
+
+        let first_core = ProjectCore::new();
+        let second_core = ProjectCore::new();
+        let first = sample_session(&first_core, SampleProject::Horizon);
+        let duplicate = sample_session(&second_core, SampleProject::Horizon);
+        let duplicate_project = ProjectHost::new(
+            first_core,
+            [("main", first, vec![]), ("secondary", duplicate, vec![])],
+        )
+        .err()
+        .expect("a duplicate Project identity is rejected");
+        assert!(duplicate_project.contains("project-spike-001"));
     }
 }

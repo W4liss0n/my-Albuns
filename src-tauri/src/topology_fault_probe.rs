@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use myalbuns_core::{EditorProjection, ProjectCore};
+use myalbuns_core::EditorProjection;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -251,7 +251,8 @@ impl TopologyFaultProbeState {
         }
         let reopened_source = std::str::from_utf8(&reopened_bytes)
             .map_err(|_| "A revisão persistida não contém JSON UTF-8 válido.".to_string())?;
-        let reopened = ProjectCore::load_persisted_revision(reopened_source)
+        let reopened = projects
+            .load_persisted_revision(reopened_source)
             .map_err(|error| format!("A revisão persistida não pôde ser reaberta: {error}"))?;
         let reopened_snapshot = reopened.render_snapshot();
         if reopened_snapshot.project_id != revision.project_id
@@ -563,9 +564,12 @@ mod tests {
         let source = SampleProject::Horizon
             .persisted_source(100)
             .expect("the sample project serializes");
-        let session =
-            ProjectCore::open_editable_session(&source).expect("the sample session opens");
-        let host = ProjectHost::new([("main", session, vec![])]);
+        let core = ProjectCore::new();
+        let session = core
+            .open_editable_session(&source)
+            .expect("the sample session opens");
+        let host = ProjectHost::new(core, [("main", session, vec![])])
+            .expect("the unique project is hosted");
         host.apply(
             "main",
             ProjectIntent::TransformPhoto {
@@ -575,7 +579,7 @@ mod tests {
                 delta_zoom: 0.0,
             },
         )
-        .expect("the action reaches the existing ProjectSession command seam");
+        .expect("the action reaches the editable Project command seam");
 
         let result = state
             .persist_with_global_probe(
@@ -608,7 +612,8 @@ mod tests {
 
         let saved_path = output_root.join("project-spike-001-r1.json");
         let saved = std::fs::read_to_string(saved_path).expect("the atomic artifact is published");
-        let reopened = ProjectCore::load_persisted_revision(&saved)
+        let reopened = host
+            .load_persisted_revision(&saved)
             .expect("the published artifact reopens through ProjectCore");
         assert_eq!(reopened.revision(), 1);
         assert_eq!(
@@ -638,9 +643,12 @@ mod tests {
         let source = SampleProject::Horizon
             .persisted_source(100)
             .expect("the sample project serializes");
-        let session =
-            ProjectCore::open_editable_session(&source).expect("the sample session opens");
-        let host = ProjectHost::new([("main", session, vec![])]);
+        let core = ProjectCore::new();
+        let session = core
+            .open_editable_session(&source)
+            .expect("the sample session opens");
+        let host = ProjectHost::new(core, [("main", session, vec![])])
+            .expect("the unique project is hosted");
         host.apply(
             "main",
             ProjectIntent::TransformPhoto {

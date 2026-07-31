@@ -165,7 +165,9 @@ impl TopologySpike {
     }
 
     pub(crate) fn project_host(&self) -> Result<ProjectHost, String> {
-        self.definition
+        let core = ProjectCore::new();
+        let projects = self
+            .definition
             .windows()
             .map(|window| {
                 let media_sources = self
@@ -177,7 +179,8 @@ impl TopologySpike {
                     let source = std::fs::read_to_string(path).map_err(|error| {
                         format!("Não foi possível abrir a revisão salva do probe: {error}")
                     })?;
-                    let session = ProjectCore::open_editable_session(&source)
+                    let session = core
+                        .open_editable_session(&source)
                         .map_err(|error| error.to_string())?;
                     let state = session.state();
                     if state.project_id != window.sample.project_id() {
@@ -189,19 +192,19 @@ impl TopologySpike {
                     session
                 } else if let Some(corpus) = &self.corpus {
                     let album = corpus.album_for(window.sample);
-                    album.open_session(window.sample, self.sheet_count)?
+                    album.open_session(&core, window.sample, self.sheet_count)?
                 } else {
                     let source = window
                         .sample
                         .persisted_source(self.sheet_count)
                         .map_err(|error| error.to_string())?;
-                    ProjectCore::open_editable_session(&source)
+                    core.open_editable_session(&source)
                         .map_err(|error| error.to_string())?
                 };
                 Ok((window.label, session, media_sources))
             })
-            .collect::<Result<Vec<_>, String>>()
-            .map(ProjectHost::new)
+            .collect::<Result<Vec<_>, String>>()?;
+        ProjectHost::new(core, projects)
     }
 
     pub(crate) fn primary_title(&self) -> &str {
@@ -369,8 +372,10 @@ mod tests {
         let source = sample
             .persisted_source(100)
             .expect("the sample project serializes");
-        let mut session =
-            ProjectCore::open_editable_session(&source).expect("the sample session opens");
+        let core = ProjectCore::new();
+        let mut session = core
+            .open_editable_session(&source)
+            .expect("the sample session opens");
         session
             .apply(ProjectIntent::TransformPhoto {
                 frame_id: "frame-01-a".into(),

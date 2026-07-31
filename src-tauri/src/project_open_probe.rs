@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use myalbuns_core::{ProjectCore, ProjectSession};
+use myalbuns_core::{EditableProject, ProjectCore};
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
 use serde::Serialize;
@@ -163,8 +163,9 @@ pub(crate) struct ProjectOpenProbe {
 /// same scope as the editable Project session it protects.
 struct ProjectOpeningSession {
     // Struct fields are dropped in declaration order: the editable session is
-    // closed before its native opening lock is released.
-    _session: ProjectSession,
+    // closed before its owning core and native opening lock are released.
+    _session: EditableProject,
+    _project_core: ProjectCore,
     _opening_lock: ProjectFileLock,
 }
 
@@ -198,10 +199,13 @@ impl ProjectOpeningSession {
             ProjectFileLock::try_acquire(project_file).map_err(ProjectOpeningSessionError::Lock)?;
         let source = std::fs::read_to_string(project_file)
             .map_err(|error| ProjectOpeningSessionError::Read(error.to_string()))?;
-        let session = ProjectCore::open_editable_session(&source)
+        let project_core = ProjectCore::new();
+        let session = project_core
+            .open_editable_session(&source)
             .map_err(|error| ProjectOpeningSessionError::InvalidProject(error.to_string()))?;
         Ok(Self {
             _session: session,
+            _project_core: project_core,
             _opening_lock: opening_lock,
         })
     }

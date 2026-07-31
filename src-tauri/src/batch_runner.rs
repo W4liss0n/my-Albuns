@@ -1,5 +1,6 @@
 use std::{collections::HashSet, fmt, path::Path};
 
+use myalbuns_core::LoadedProjectRevision;
 use myalbuns_paths::RootBindingPlan;
 use tauri::AppHandle;
 
@@ -78,24 +79,24 @@ pub(crate) enum BatchRunFailure {
 pub(crate) struct BatchRunner;
 
 impl BatchItem {
-    pub(crate) fn new(
+    pub(crate) fn from_persisted_revision(
         item_id: impl Into<String>,
-        outputs: Vec<ExportPlan>,
+        revision: LoadedProjectRevision,
+        output_options: Vec<export_pipeline::ExportOptions>,
     ) -> Result<Self, String> {
         let item_id = item_id.into();
         if item_id.trim().is_empty() {
             return Err("A identidade do item do lote está vazia.".into());
         }
-        let Some(first_output) = outputs.first() else {
+        if output_options.is_empty() {
             return Err("Cada item do lote precisa conter ao menos uma saída.".into());
-        };
-        let project_id = first_output.project_id();
-        if outputs
-            .iter()
-            .any(|output| output.project_id() != project_id)
-        {
-            return Err("Todas as saídas de um item precisam pertencer ao mesmo Projeto.".into());
         }
+        let snapshot = revision.render_snapshot();
+        let outputs = output_options
+            .into_iter()
+            .map(|options| export_pipeline::plan(snapshot.clone(), options))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|failure| failure.message)?;
         Ok(Self { item_id, outputs })
     }
 }
@@ -297,7 +298,7 @@ mod tests {
     use super::{BatchEvent, BatchItem, BatchPlan, BatchRunner};
     use crate::{
         cache_engine::CacheEngine,
-        export_pipeline::{ExportOptions, plan},
+        export_pipeline::ExportOptions,
         imaging_processor::{
             ImagingOperation, ImagingProcessor, ImagingTransport, InvocationControl,
             InvocationFailure, InvocationFuture,
@@ -351,16 +352,23 @@ mod tests {
         let source = sample
             .persisted_source(2)
             .expect("the persisted batch fixture is valid");
-        let snapshot = ProjectCore::load_persisted_revision(&source)
-            .expect("the batch reads a persisted revision without opening a session")
-            .render_snapshot();
+        let revision = ProjectCore::new()
+            .load_persisted_revision(&source)
+            .expect("the batch reads a persisted revision without opening a session");
+        let snapshot = revision.render_snapshot();
         let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-        let plan = plan(
-            snapshot,
-            ExportOptions::new(request_id, output_path, sheet_id, 25, None),
+        BatchItem::from_persisted_revision(
+            request_id,
+            revision,
+            vec![ExportOptions::new(
+                request_id,
+                output_path,
+                sheet_id,
+                25,
+                None,
+            )],
         )
-        .expect("the batch output is plannable");
-        BatchItem::new(request_id, vec![plan]).expect("the batch item has one output")
+        .expect("the persisted revision produces one batch output")
     }
 
     fn bindings(plan: &BatchPlan) -> RootBindingPlan {

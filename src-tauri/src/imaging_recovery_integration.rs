@@ -229,14 +229,17 @@ fn real_source(directory: &Path) -> MediaSource {
 }
 
 fn export_snapshot() -> (
-    myalbuns_core::ProjectSession,
+    myalbuns_core::EditableProject,
     myalbuns_core::RenderSnapshot,
     String,
 ) {
     let source = SampleProject::Horizon
         .persisted_source(2)
         .expect("the sample project serializes");
-    let session = ProjectCore::open_editable_session(&source).expect("the sample project opens");
+    let core = ProjectCore::new();
+    let session = core
+        .open_editable_session(&source)
+        .expect("the sample project opens");
     let mut snapshot = session.render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.frames.truncate(1);

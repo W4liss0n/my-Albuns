@@ -1,3 +1,8 @@
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
+
 use serde::{Deserialize, Serialize};
 
 use crate::composition::build_render_snapshot;
@@ -34,26 +39,105 @@ pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String
     .map_err(|error| CoreError::InvalidProject(error.to_string()))
 }
 
-pub struct ProjectCore;
+#[derive(Clone, Default)]
+pub struct ProjectCore {
+    open_projects: Arc<Mutex<HashSet<String>>>,
+}
+
+pub struct EditableProject {
+    session: ProjectSession,
+    _registration: EditableRegistration,
+}
+
+struct EditableRegistration {
+    project_id: String,
+    open_projects: Arc<Mutex<HashSet<String>>>,
+}
 
 impl ProjectCore {
-    pub fn open_editable_session(source: &str) -> Result<ProjectSession, CoreError> {
-        let project = parse_persisted_project(source)?;
-        Ok(ProjectSession::from_state(EditorState {
-            project_id: project.project_id,
-            project_name: project.project_name,
-            album: project.album,
-            revision: project.revision,
-            saved_revision: project.revision,
-            dirty: false,
-            can_undo: false,
-            can_redo: false,
-        }))
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn load_persisted_revision(source: &str) -> Result<LoadedProjectRevision, CoreError> {
+    pub fn open_editable_session(&self, source: &str) -> Result<EditableProject, CoreError> {
+        let project = parse_persisted_project(source)?;
+        let project_id = project.project_id.clone();
+        let mut open_projects = self
+            .open_projects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !open_projects.insert(project_id.clone()) {
+            return Err(CoreError::EditableSessionAlreadyOpen { project_id });
+        }
+        drop(open_projects);
+
+        Ok(EditableProject {
+            session: ProjectSession::from_state(EditorState {
+                project_id: project.project_id,
+                project_name: project.project_name,
+                album: project.album,
+                revision: project.revision,
+                saved_revision: project.revision,
+                dirty: false,
+                can_undo: false,
+                can_redo: false,
+            }),
+            _registration: EditableRegistration {
+                project_id,
+                open_projects: Arc::clone(&self.open_projects),
+            },
+        })
+    }
+
+    pub fn load_persisted_revision(
+        &self,
+        source: &str,
+    ) -> Result<LoadedProjectRevision, CoreError> {
         let project = parse_persisted_project(source)?;
         Ok(LoadedProjectRevision { project })
+    }
+}
+
+impl EditableProject {
+    pub fn state(&self) -> EditorState {
+        self.session.state()
+    }
+
+    pub fn apply(&mut self, intent: crate::model::ProjectIntent) -> Result<EditorState, CoreError> {
+        self.session.apply(intent)
+    }
+
+    pub fn undo(&mut self) -> Option<EditorState> {
+        self.session.undo()
+    }
+
+    pub fn redo(&mut self) -> Option<EditorState> {
+        self.session.redo()
+    }
+
+    pub fn projection(&self) -> crate::model::EditorProjection {
+        self.session.projection()
+    }
+
+    pub fn render_snapshot(&self) -> RenderSnapshot {
+        self.session.render_snapshot()
+    }
+
+    pub fn persisted_revision(&self) -> Result<String, CoreError> {
+        self.session.persisted_revision()
+    }
+
+    pub fn confirm_saved_revision(&mut self, revision: u64) -> Result<EditorState, CoreError> {
+        self.session.confirm_saved_revision(revision)
+    }
+}
+
+impl Drop for EditableRegistration {
+    fn drop(&mut self) {
+        self.open_projects
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&self.project_id);
     }
 }
 

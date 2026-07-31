@@ -11,8 +11,7 @@ pub use model::{
     PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, RectUm, RenderSnapshot,
     SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
-pub use project::{LoadedProjectRevision, ProjectCore};
-pub use session::ProjectSession;
+pub use project::{EditableProject, LoadedProjectRevision, ProjectCore};
 
 #[cfg(test)]
 extern crate self as myalbuns_core;

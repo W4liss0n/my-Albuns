@@ -18,6 +18,7 @@ mod operation_lease;
 mod path_io;
 mod probe_support;
 mod project_commands;
+mod project_core_probe;
 mod project_host;
 mod project_open_probe;
 #[path = "../../tests/support/sample_project.rs"]
@@ -72,6 +73,14 @@ impl ExclusiveProbe {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    if project_core_probe::requested() {
+        if let Err(error) = project_core_probe::run_from_environment() {
+            eprintln!("probe de ProjectCore encerrado: {error}");
+            std::process::exit(project_core_probe::failure_exit_code());
+        }
+        return;
+    }
+
     if global_process_spike::global_process_requested() {
         if let Err(error) = global_process_spike::run_global_process_spike_from_environment() {
             eprintln!("processo global do spike encerrado: {error}");

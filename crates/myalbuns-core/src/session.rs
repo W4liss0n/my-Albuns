@@ -8,7 +8,7 @@ use crate::model::{
 };
 use crate::project::serialize_persisted_revision;
 
-pub struct ProjectSession {
+pub(crate) struct ProjectSession {
     state: EditorState,
     undo: Vec<HistoryEntry>,
     redo: Vec<HistoryEntry>,
@@ -28,11 +28,11 @@ impl ProjectSession {
         }
     }
 
-    pub fn state(&self) -> EditorState {
+    pub(crate) fn state(&self) -> EditorState {
         self.state.clone()
     }
 
-    pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorState, CoreError> {
+    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<EditorState, CoreError> {
         let previous = HistoryEntry {
             album: self.state.album.clone(),
             revision: self.state.revision,
@@ -93,7 +93,7 @@ impl ProjectSession {
         Ok(self.state())
     }
 
-    pub fn undo(&mut self) -> Option<EditorState> {
+    pub(crate) fn undo(&mut self) -> Option<EditorState> {
         let previous = self.undo.pop()?;
         self.redo.push(HistoryEntry {
             album: self.state.album.clone(),
@@ -105,7 +105,7 @@ impl ProjectSession {
         Some(self.state())
     }
 
-    pub fn redo(&mut self) -> Option<EditorState> {
+    pub(crate) fn redo(&mut self) -> Option<EditorState> {
         let next = self.redo.pop()?;
         self.undo.push(HistoryEntry {
             album: self.state.album.clone(),
@@ -117,11 +117,11 @@ impl ProjectSession {
         Some(self.state())
     }
 
-    pub fn composition_plan(&self) -> CompositionPlan {
+    fn composition_plan(&self) -> CompositionPlan {
         CompositionCore::compose(&self.state.album)
     }
 
-    pub fn projection(&self) -> EditorProjection {
+    pub(crate) fn projection(&self) -> EditorProjection {
         EditorProjection {
             state: self.state(),
             composition: self.composition_plan(),
@@ -129,7 +129,7 @@ impl ProjectSession {
         }
     }
 
-    pub fn render_snapshot(&self) -> RenderSnapshot {
+    pub(crate) fn render_snapshot(&self) -> RenderSnapshot {
         build_render_snapshot(
             &self.state.project_id,
             &self.state.project_name,
@@ -138,11 +138,14 @@ impl ProjectSession {
         )
     }
 
-    pub fn persisted_revision(&self) -> Result<String, CoreError> {
+    pub(crate) fn persisted_revision(&self) -> Result<String, CoreError> {
         serialize_persisted_revision(&self.state)
     }
 
-    pub fn confirm_saved_revision(&mut self, revision: u64) -> Result<EditorState, CoreError> {
+    pub(crate) fn confirm_saved_revision(
+        &mut self,
+        revision: u64,
+    ) -> Result<EditorState, CoreError> {
         if revision != self.state.revision {
             return Err(CoreError::SavedRevisionMismatch {
                 current: self.state.revision,

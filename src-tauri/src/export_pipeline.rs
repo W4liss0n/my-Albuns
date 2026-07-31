@@ -842,7 +842,9 @@ mod tests {
         let source = SampleProject::Horizon
             .persisted_source(2)
             .expect("the sample project serializes");
-        let snapshot = ProjectCore::open_editable_session(&source)
+        let core = ProjectCore::new();
+        let snapshot = core
+            .open_editable_session(&source)
             .expect("the sample project opens")
             .render_snapshot();
         let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();

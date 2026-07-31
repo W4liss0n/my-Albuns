@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use myalbuns_core::{MediaCatalogItem, MediaKind, PhotoSnapshot, ProjectCore, ProjectSession};
+use myalbuns_core::{EditableProject, MediaCatalogItem, MediaKind, PhotoSnapshot, ProjectCore};
 use myalbuns_imaging_protocol::MediaSource;
 use serde::Deserialize;
 
@@ -161,13 +161,15 @@ impl BenchmarkAlbum {
 
     pub(crate) fn open_session(
         &self,
+        core: &ProjectCore,
         sample: SampleProject,
         sheet_count: usize,
-    ) -> Result<ProjectSession, String> {
+    ) -> Result<EditableProject, String> {
         let template_source = sample
             .persisted_source(sheet_count)
             .map_err(|error| error.to_string())?;
-        let template = ProjectCore::open_editable_session(&template_source)
+        let template = core
+            .open_editable_session(&template_source)
             .map_err(|error| error.to_string())?;
         let mut state = template.state();
         let palettes = state
@@ -230,11 +232,11 @@ impl BenchmarkAlbum {
         .map_err(|error| format!("Fixture persistida inválida: {error}"))?;
         document["album"] = serde_json::to_value(state.album)
             .map_err(|error| format!("Não foi possível montar o Álbum do corpus: {error}"))?;
-        ProjectCore::open_editable_session(
-            &serde_json::to_string(&document)
-                .map_err(|error| format!("Não foi possível serializar o corpus: {error}"))?,
-        )
-        .map_err(|error| error.to_string())
+        let source = serde_json::to_string(&document)
+            .map_err(|error| format!("Não foi possível serializar o corpus: {error}"))?;
+        drop(template);
+        core.open_editable_session(&source)
+            .map_err(|error| error.to_string())
     }
 
     #[cfg(test)]
@@ -341,6 +343,8 @@ mod tests {
 
     use crate::sample_project::SampleProject;
 
+    use myalbuns_core::ProjectCore;
+
     use super::BenchmarkCorpus;
 
     #[test]
@@ -409,13 +413,14 @@ mod tests {
         let corpus = BenchmarkCorpus::load(&manifest_path).expect("valid corpus loads");
         let horizon = corpus.album_for(SampleProject::Horizon);
         let aurora = corpus.album_for(SampleProject::Aurora);
+        let core = ProjectCore::new();
 
         let horizon_state = horizon
-            .open_session(SampleProject::Horizon, 12)
+            .open_session(&core, SampleProject::Horizon, 12)
             .expect("the first corpus album opens through ProjectCore")
             .state();
         let aurora_state = aurora
-            .open_session(SampleProject::Aurora, 12)
+            .open_session(&core, SampleProject::Aurora, 12)
             .expect("the second corpus album opens through ProjectCore")
             .state();
         assert_eq!(horizon_state.album.media.len(), 2);
