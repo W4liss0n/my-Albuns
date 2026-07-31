@@ -60,7 +60,10 @@ impl TopologySpike {
     }
 
     #[cfg(test)]
-    fn from_values(mode: Option<&str>, project_slot: Option<&str>) -> Result<Self, String> {
+    pub(crate) fn from_values(
+        mode: Option<&str>,
+        project_slot: Option<&str>,
+    ) -> Result<Self, String> {
         Self::from_values_with_corpus(mode, project_slot, None)
     }
 
@@ -238,14 +241,16 @@ impl TopologySpike {
     }
 
     pub(crate) fn benchmark_window_settings(&self) -> Vec<(&'static str, bool)> {
+        self.project_windows()
+            .into_iter()
+            .map(|(window_label, sample)| (window_label, matches!(sample, SampleProject::Horizon)))
+            .collect()
+    }
+
+    pub(crate) fn project_windows(&self) -> Vec<(&'static str, SampleProject)> {
         self.definition
             .windows()
-            .map(|window| {
-                (
-                    window.label,
-                    matches!(window.sample, SampleProject::Horizon),
-                )
-            })
+            .map(|window| (window.label, window.sample))
             .collect()
     }
 }

@@ -8,6 +8,9 @@ mod imaging_processor;
 mod imaging_recovery_integration;
 mod logging;
 mod media_preview_commands;
+mod operation_gate;
+mod operation_gate_probe;
+mod operation_lease;
 mod path_io;
 mod project_commands;
 mod project_host;
@@ -21,9 +24,13 @@ use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+use cache_engine::CacheEngine;
 use export_probe_commands::export_spike;
+use imaging_processor::ImagingProcessor;
 use logging::frontend_log;
 use media_preview_commands::prepare_media_previews;
+use operation_gate::OperationGate;
+use operation_gate_probe::OperationGateProbe;
 use project_commands::{apply_project_intent, project_state, redo_project, undo_project};
 use topology_benchmark::{
     TopologyBenchmarkState, report_topology_benchmark_failure, report_topology_canvas_benchmark,
@@ -50,10 +57,21 @@ pub fn run() {
     let project_host = topology
         .project_host()
         .unwrap_or_else(|error| panic!("corpus inválido do spike de topologia: {error}"));
-    let topology_benchmark = TopologyBenchmarkState::from_environment(&topology)
-        .unwrap_or_else(|error| panic!("benchmark de topologia inválido: {error}"));
-    let topology_fault_probe = TopologyFaultProbeState::from_environment(&topology)
-        .unwrap_or_else(|error| panic!("probe de falhas de topologia inválido: {error}"));
+    let operation_gate_probe = OperationGateProbe::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("probe de OperationGate inválido: {error}"));
+    let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some() {
+        (
+            TopologyBenchmarkState::disabled(&topology),
+            TopologyFaultProbeState::disabled(&topology),
+        )
+    } else {
+        (
+            TopologyBenchmarkState::from_environment(&topology)
+                .unwrap_or_else(|error| panic!("benchmark de topologia inválido: {error}")),
+            TopologyFaultProbeState::from_environment(&topology)
+                .unwrap_or_else(|error| panic!("probe de falhas de topologia inválido: {error}")),
+        )
+    };
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -65,6 +83,9 @@ pub fn run() {
             let webview_data_directory =
                 app_paths.webview_data_directory(topology.webview_data_namespace())?;
             logging::initialize(app, &app_paths);
+            app.manage(OperationGate::new(&app_paths));
+            app.manage(CacheEngine::default());
+            app.manage(ImagingProcessor::default());
             app.manage(app_paths);
 
             let main_config = app.config().app.windows.first().ok_or_else(|| {
@@ -86,6 +107,11 @@ pub fn run() {
                 .resizable(true)
                 .data_directory(webview_data_directory)
                 .build()?;
+            }
+            if let Some(operation_gate_probe) = operation_gate_probe {
+                operation_gate_probe
+                    .start(app.handle())
+                    .map_err(std::io::Error::other)?;
             }
 
             for window_label in topology.reopened_window_labels() {

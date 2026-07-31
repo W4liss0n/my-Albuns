@@ -1,7 +1,10 @@
 use std::{
     future::Future,
     pin::Pin,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
@@ -17,10 +20,29 @@ use tauri_plugin_shell::{
     ShellExt,
     process::{CommandChild, CommandEvent},
 };
+use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
 use crate::logging::LoggingState;
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[derive(Debug, Default)]
+pub(crate) struct ImagingProcessor {
+    reservation: Arc<AsyncMutex<()>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ProcessorReservation {
+    _guard: OwnedMutexGuard<()>,
+}
+
+impl ImagingProcessor {
+    pub(crate) async fn reserve(&self) -> ProcessorReservation {
+        ProcessorReservation {
+            _guard: self.reservation.clone().lock_owned().await,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ImagingOperation {
@@ -258,11 +280,20 @@ pub(crate) trait ImagingTransport {
 pub(crate) struct TauriImagingTransport<'a> {
     app: &'a AppHandle,
     logging: &'a LoggingState,
+    _reservation: &'a ProcessorReservation,
 }
 
 impl<'a> TauriImagingTransport<'a> {
-    pub(crate) fn new(app: &'a AppHandle, logging: &'a LoggingState) -> Self {
-        Self { app, logging }
+    pub(crate) fn new(
+        app: &'a AppHandle,
+        logging: &'a LoggingState,
+        reservation: &'a ProcessorReservation,
+    ) -> Self {
+        Self {
+            app,
+            logging,
+            _reservation: reservation,
+        }
     }
 }
 
@@ -530,9 +561,31 @@ mod tests {
     use tauri_plugin_shell::process::{CommandEvent, TerminatedPayload};
 
     use super::{
-        InvocationControl, InvocationFailure, InvocationFailureStage, complete_invocation,
-        decode_and_report_event_chunk, wait_for_termination_for,
+        ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
+        complete_invocation, decode_and_report_event_chunk, wait_for_termination_for,
     };
+
+    #[test]
+    fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let first = processor.reserve().await;
+            let second = processor.reserve();
+            tokio::pin!(second);
+
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut second)
+                    .await
+                    .is_err(),
+                "a second caller must wait while the Processor is reserved"
+            );
+
+            drop(first);
+            tokio::time::timeout(Duration::from_secs(1), &mut second)
+                .await
+                .expect("the Processor is available when its reservation is released");
+        });
+    }
 
     #[test]
     fn processor_exit_codes_remain_typed_at_the_host_boundary() {

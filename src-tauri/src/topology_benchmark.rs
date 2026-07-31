@@ -111,6 +111,15 @@ struct FrameTimingSummary {
 }
 
 impl TopologyBenchmarkState {
+    pub(crate) fn disabled(topology: &TopologySpike) -> Self {
+        Self {
+            topology: topology.label(),
+            gate_path: None,
+            export_gate_path: None,
+            windows: HashMap::new(),
+        }
+    }
+
     pub(crate) fn from_environment(topology: &TopologySpike) -> Result<Self, String> {
         let gate_path = std::env::var_os(PROBE_GATE_ENV).map(PathBuf::from);
         let export_gate_path = std::env::var_os(EXPORT_GATE_ENV).map(PathBuf::from);

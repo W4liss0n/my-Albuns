@@ -73,6 +73,16 @@ pub(crate) struct TopologyFaultProbeResult {
 }
 
 impl TopologyFaultProbeState {
+    pub(crate) fn disabled(topology: &TopologySpike) -> Self {
+        Self {
+            topology: topology.label(),
+            gate_path: None,
+            output_root: None,
+            global_endpoint: None,
+            run_id: None,
+        }
+    }
+
     pub(crate) fn from_environment(topology: &TopologySpike) -> Result<Self, String> {
         let gate_path = std::env::var_os(FAULT_GATE_ENV).map(PathBuf::from);
         let output_root = std::env::var_os(FAULT_OUTPUT_ROOT_ENV).map(PathBuf::from);

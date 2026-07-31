@@ -9,9 +9,12 @@ use serde::Serialize;
 use tauri::{AppHandle, State, WebviewWindow};
 
 use crate::{
+    cache_engine::CacheEngine,
     export_pipeline,
-    imaging_processor::{InvocationContext, TauriImagingTransport},
+    imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
     logging::{LoggingState, log_imaging_failure},
+    operation_gate::{OperationGate, OperationMode},
+    operation_lease::OperationLease,
     path_io,
     project_host::ProjectHost,
 };
@@ -32,6 +35,9 @@ pub(crate) async fn export_spike(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
     logging: State<'_, LoggingState>,
+    operation_gate: State<'_, OperationGate>,
+    cache: State<'_, CacheEngine>,
+    processor: State<'_, ImagingProcessor>,
 ) -> Result<ExportResult, String> {
     let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("export-{}-{export_sequence}", std::process::id());
@@ -93,7 +99,23 @@ pub(crate) async fn export_spike(
 
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
-    let mut transport = TauriImagingTransport::new(&app, &logging);
+    let lease = OperationLease::acquire(
+        &operation_gate,
+        &cache,
+        &processor,
+        OperationMode::NormalExport,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        operation_id = request_id.as_str(),
+        project_id = project_id.as_deref(),
+        operation_mode = lease.mode().as_str(),
+        event = "operation_lease_acquired",
+    );
+    let mut transport = TauriImagingTransport::new(&app, &logging, lease.processor_reservation());
     let cancellation = AtomicBool::new(false);
     let progress = |progress: export_pipeline::ExportProgress| {
         tracing::debug!(

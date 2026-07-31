@@ -13,8 +13,8 @@ use serde::Serialize;
 use tauri::{AppHandle, State, WebviewWindow};
 
 use crate::{
-    cache_engine::{self, CacheWork},
-    imaging_processor::{InvocationContext, TauriImagingTransport},
+    cache_engine::{self, CacheEngine, CacheWork},
+    imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
     logging::{LoggingState, log_imaging_failure},
     path_io,
     project_host::ProjectHost,
@@ -37,6 +37,8 @@ pub(crate) async fn prepare_media_previews(
     state: State<'_, ProjectHost>,
     app_paths: State<'_, AppPaths>,
     logging: State<'_, LoggingState>,
+    cache: State<'_, CacheEngine>,
+    processor: State<'_, ImagingProcessor>,
 ) -> Result<Option<Vec<MediaPreview>>, String> {
     let cache_sequence = CACHE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("cache-{}-{cache_sequence}", std::process::id());
@@ -85,7 +87,9 @@ pub(crate) async fn prepare_media_previews(
     );
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), safe_project_id);
-    let mut transport = TauriImagingTransport::new(&app, &logging);
+    let _cache_activity = cache.begin_work().await;
+    let processor_reservation = processor.reserve().await;
+    let mut transport = TauriImagingTransport::new(&app, &logging, &processor_reservation);
     let execution = cache_engine::execute(&mut transport, &app_paths, work, &context)
         .await
         .map_err(|failure| {
