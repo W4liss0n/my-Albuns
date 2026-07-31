@@ -600,12 +600,9 @@ fn persisted_revision_stays_saved_while_an_editable_session_has_unsaved_changes(
     let source = SampleProject::Horizon
         .persisted_source(12)
         .expect("the persisted fixture serializes");
-    let loaded = core
-        .load_persisted_revision(&source)
-        .expect("read-only loading does not reserve an editable session");
     let mut editable = core
         .open_editable_session(&source)
-        .expect("the same Project can still open for editing");
+        .expect("the persisted Project opens for editing");
 
     editable
         .apply(ProjectIntent::TransformPhoto {
@@ -615,6 +612,9 @@ fn persisted_revision_stays_saved_while_an_editable_session_has_unsaved_changes(
             delta_zoom: 0.0,
         })
         .expect("the editable session accepts an unsaved command");
+    let loaded = core
+        .load_persisted_revision(&source)
+        .expect("read-only loading coexists with the dirty editable session");
     let first_snapshot = loaded.render_snapshot();
     let mut detached_snapshot = first_snapshot.clone();
     detached_snapshot.revision = 99;
