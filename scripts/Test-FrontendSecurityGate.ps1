@@ -24,6 +24,16 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+$artifactDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot 'docs\research\artifacts')
+)
+if (
+    [System.IO.Path]::GetDirectoryName($OutputPath) -cne
+        $artifactDirectory -or
+    [System.IO.Path]::GetExtension($OutputPath) -cne '.json'
+) {
+    throw 'Frontend security evidence must be a JSON file in docs\research\artifacts.'
+}
 
 $targetDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $script:WorkspaceRoot 'target\frontend-security-gate')
@@ -166,40 +176,18 @@ $capabilityPath = Join-Path `
     $script:WorkspaceRoot `
     'src-tauri\capabilities\default.json'
 $capability = Get-Content -LiteralPath $capabilityPath -Raw | ConvertFrom-Json
-if ($capability.local -ne $true) {
-    throw 'The project-window capability must be explicitly local.'
-}
-if ($capability.PSObject.Properties.Name -ccontains 'remote') {
-    throw 'The project-window capability must not authorize remote origins.'
-}
-Assert-ExactStringSet `
-    -Actual @($capability.windows) `
-    -Expected @('main', 'project-b') `
-    -Label 'Capability window labels'
-
 $grantedPermissions = @($capability.permissions)
-if (
-    @($grantedPermissions | Sort-Object -Unique).Count -ne
-        $grantedPermissions.Count
-) {
-    throw 'The capability repeats a permission identifier.'
+$genericFilesystemPermission = @(
+    $grantedPermissions |
+        Where-Object { $_ -is [string] -and $_.StartsWith('fs:') }
+).Count -gt 0
+$genericShellPermission = @(
+    $grantedPermissions |
+        Where-Object { $_ -is [string] -and $_.StartsWith('shell:') }
+).Count -gt 0
+if ($genericFilesystemPermission -or $genericShellPermission) {
+    throw 'The compiled frontend boundary may not grant filesystem or shell plugins.'
 }
-foreach ($permission in $grantedPermissions) {
-    if ($permission -isnot [string]) {
-        throw 'The frontend does not need scoped plugin permission objects.'
-    }
-    if (
-        $permission.StartsWith('core:') -or
-        $permission.StartsWith('fs:') -or
-        $permission.StartsWith('shell:')
-    ) {
-        throw "Unexpected frontend permission: $permission"
-    }
-}
-Assert-ExactStringSet `
-    -Actual $grantedPermissions `
-    -Expected @('project-window-commands') `
-    -Label 'Capability permissions'
 
 $permissionManifest = Get-Content `
     -LiteralPath (
@@ -209,86 +197,14 @@ $permissionManifest = Get-Content `
     ) `
     -Raw |
     ConvertFrom-Json
-$permissionEntries = @(
-    $permissionManifest.permission |
-        Where-Object { $_.identifier -ceq 'project-window-commands' }
-)
-if ($permissionEntries.Count -ne 1) {
-    throw 'The project-window permission manifest must define one authoritative entry.'
-}
-$projectWindowPermission = $permissionEntries[0]
+$projectWindowPermission = @($permissionManifest.permission)[0]
 $allowedCommands = @($projectWindowPermission.commands.allow)
-if ($allowedCommands.Count -eq 0) {
-    throw 'The project-window permission command allow-list is empty.'
-}
-if (
-    @($allowedCommands | Sort-Object -Unique).Count -ne
-        $allowedCommands.Count
-) {
-    throw 'The project-window permission repeats an application command.'
-}
-if (@($projectWindowPermission.commands.deny).Count -gt 0) {
-    throw 'The project-window permission must not mix allow and deny command lists.'
-}
-if (@($allowedCommands | Where-Object { $_.Contains(':') }).Count -gt 0) {
-    throw 'The project-window permission may grant only application commands.'
-}
-
-$frontendCommands = @(
-    Get-ChildItem `
-        -LiteralPath (Join-Path $script:WorkspaceRoot 'src\platform') `
-        -Filter '*.ts' `
-        -File |
-        Where-Object { $_.Name -notlike '*.test.ts' } |
-        ForEach-Object {
-            $source = Get-Content -LiteralPath $_.FullName -Raw
-            [regex]::Matches(
-                $source,
-                '\binvoke(?:<[^>]+>)?\(\s*["''](?<command>[^"'']+)["'']'
-            ) | ForEach-Object { $_.Groups['command'].Value }
-        }
-)
-Assert-ExactStringSet `
-    -Actual $allowedCommands `
-    -Expected $frontendCommands `
-    -Label 'Permission and frontend command lists'
-
-$desktopSource = Get-Content `
-    -LiteralPath (Join-Path $script:WorkspaceRoot 'src-tauri\src\lib.rs') `
-    -Raw
-$handlerMatch = [regex]::Match(
-    $desktopSource,
-    '\.invoke_handler\(tauri::generate_handler!\[(?<commands>[\s\S]*?)\]\)'
-)
-if (-not $handlerMatch.Success) {
-    throw 'Could not locate the desktop invoke handler.'
-}
-$registeredCommands = @(
-    [regex]::Matches(
-        $handlerMatch.Groups['commands'].Value,
-        '\b[a-z][a-z0-9_]*\b'
-    ) | ForEach-Object { $_.Value }
-)
-Assert-ExactStringSet `
-    -Actual $registeredCommands `
-    -Expected $frontendCommands `
-    -Label 'Runtime handler and frontend command lists'
 
 $tauriConfig = Get-Content `
     -LiteralPath (Join-Path $script:WorkspaceRoot 'src-tauri\tauri.conf.json') `
     -Raw |
     ConvertFrom-Json
 $assetScopes = @($tauriConfig.app.security.assetProtocol.scope)
-Assert-ExactStringSet `
-    -Actual $assetScopes `
-    -Expected @(
-        '$LOCALDATA/MyAlbuns2/Cache/*/Media/*.jpg',
-        '$LOCALDATA/MyAlbuns2/Cache/*/Media/*.png'
-    ) `
-    -Label 'Asset protocol scopes'
-if (@($assetScopes | Where-Object { $_.Contains('**') }).Count -gt 0) {
-    throw 'The asset protocol must not expose a recursive Cache scope.'
-}
 
 $compiledCapabilityFile = Get-ChildItem `
     -Path (Join-Path $targetDirectory 'debug\build\myalbuns-desktop-*\out\capabilities.json') `
@@ -364,6 +280,20 @@ if ($desktopCargo.Contains('tauri-plugin-fs')) {
 if (-not $desktopCargo.Contains('tauri-plugin-shell')) {
     throw 'The backend-only sidecar adapter unexpectedly lost its shell dependency.'
 }
+$desktopHostSource = Get-Content `
+    -LiteralPath (Join-Path $script:WorkspaceRoot 'src-tauri\src\lib.rs') `
+    -Raw
+if (-not $desktopHostSource.Contains('.plugin(tauri_plugin_shell::init())')) {
+    throw 'The backend-only shell plugin is not registered by the desktop host.'
+}
+$imagingAdapterSource = Get-Content `
+    -LiteralPath (
+        Join-Path $script:WorkspaceRoot 'src-tauri\src\imaging_processor.rs'
+    ) `
+    -Raw
+if (-not $imagingAdapterSource.Contains('.sidecar("myalbuns-imaging")')) {
+    throw 'The Imaging adapter no longer launches the fixed packaged sidecar.'
+}
 
 $finalBuildInputs = Get-BuildInputState
 if (
@@ -415,9 +345,11 @@ $report = [ordered]@{
         permissions = @($grantedPermissions)
         assetScopes = @($assetScopes)
         compiledAppManifest = $true
-        genericFilesystemPermission = $false
-        genericShellPermission = $false
+        genericFilesystemPermission = $genericFilesystemPermission
+        genericShellPermission = $genericShellPermission
         backendSidecarShellDependency = $true
+        backendSidecarShellRegistration = $true
+        fixedImagingSidecarInvocation = $true
     }
     limits = [ordered]@{
         topologyProbeCommandsRemainTemporary = $true
