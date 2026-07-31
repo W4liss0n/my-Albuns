@@ -144,8 +144,11 @@ parte do contrato, não uma lacuna preenchida por inferência.
   Processador. Uma terminação que não possa ser confirmada coloca o
   Processador em quarentena e, deliberadamente, não permite reaquisição; esse
   caso fail-closed não pertence à matriz de recuperação imediata.
-- `BatchRunner`, `BatchExclusive` produtivo, checkpoint, cada item do lote e
-  falhas entre promoções múltiplas não participam desta execução.
+- `BatchRunner`, `BatchExclusive` produtivo e promoções múltiplas não
+  participaram desta execução. Esses contratos foram cobertos posteriormente
+  em [`0020`](0020-lote-e-operation-lease.md); esse vínculo não amplia
+  retroativamente a matriz A/B deste documento. Checkpoint e retomada continuam
+  fora dos dois cortes.
 - O guardião de abertura, a focalização de uma `ProjectSession` existente e a
   distinção integrada entre `OperationGate` e Bloqueio de abertura continuam
   fora deste corte.
@@ -162,9 +165,10 @@ cancelamento devolvem os três recursos e permitem reaquisição local pelo
 próprio owner; a queda externa abandona a concessão sem cooperação; e todos os
 oito cenários permitem uma Exportação sucessora real de 39.164 bytes.
 
-Esta evidência encerra somente o critério 35 do ticket 01. Os critérios 36 e
-37 permanecem abertos: ainda faltam o caminho produtivo de cada item do lote,
-as falhas entre promoções múltiplas e o guardião de abertura integrado.
+Esta evidência encerra somente o critério 35 do ticket 01. No momento desta
+coleta, os critérios 36 e 37 permaneciam abertos. O critério 36 foi encerrado
+posteriormente em [`0020`](0020-lote-e-operation-lease.md); o critério 37 e o
+guardião de abertura integrado continuam abertos.
 
 ## Repetição
 

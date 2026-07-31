@@ -142,7 +142,7 @@ Sua implementação possui três fases internas:
 
 `ExportPipeline` possui o ciclo de vida da preparação; `ExportExecutor` grava e verifica as saídas nela, e o pipeline garante sua limpeza nos estados terminais tratáveis. `Publisher` segue a transação limitada do [ADR 0006](../adr/0006-publicar-exportacao-com-transacao-limitada.md). Staging no Destino permite substituição atômica por arquivo quando suportada, mas não oferece rollback do conjunto, backup integral ou manifesto persistente.
 
-`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Primeiro usa `plan` para os itens conhecidos e captura o único `RootBindingPlan` da tentativa do lote; depois chama `execute` para cada item com esse mesmo plano. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
+`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Primeiro usa `plan` para os itens conhecidos e captura o único `RootBindingPlan` da tentativa do lote; depois chama `execute_group` para cada item com esse mesmo plano — `execute` é apenas a especialização de saída única. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
 
 ### Dois mecanismos de exclusividade, deliberadamente separados
 
@@ -171,7 +171,7 @@ Toda Exportação precisa de três reservas antes de produzir saída: a concess�
 
 `OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. A pausa usa o menor escopo seguro permitido pela topologia, cobrindo ao menos o namespace do Projeto exportado.
 
-A Exportação normal e cada item da Exportação em lote usam o mesmo lease, e por isso não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
+A Exportação normal adquire uma instância de `OperationLease(NormalExport)` por tentativa. O `BatchRunner` adquire uma única instância de `OperationLease(BatchExclusive)` para toda a tentativa do lote e executa todos os itens sob ela, sem liberar ou readquirir entre itens. Assim, os dois caminhos usam o mesmo mecanismo e não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
 
 ## Persistência concreta e primitivas compartilhadas
 
