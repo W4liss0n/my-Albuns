@@ -238,6 +238,78 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn project_windows_receive_only_the_explicit_frontend_commands() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("valid project-window capability");
+        let windows = capability["windows"]
+            .as_array()
+            .expect("the capability targets explicit windows")
+            .iter()
+            .map(|label| label.as_str().expect("window labels are textual"))
+            .collect::<BTreeSet<_>>();
+        let permissions = capability["permissions"]
+            .as_array()
+            .expect("the capability has an explicit permission list")
+            .iter()
+            .map(|permission| {
+                permission
+                    .as_str()
+                    .expect("scoped permission objects are not needed by the frontend")
+            })
+            .collect::<BTreeSet<_>>();
+        let permission_manifest: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project-window permission manifest");
+        let project_window_permission = &permission_manifest["permission"][0];
+        let allowed_commands = project_window_permission["commands"]["allow"]
+            .as_array()
+            .expect("the project-window permission has an explicit command allow-list");
+
+        assert_eq!(capability["local"], true);
+        assert!(capability.get("remote").is_none());
+        assert_eq!(windows, BTreeSet::from(["main", "project-b"]));
+        assert_eq!(permissions, BTreeSet::from(["project-window-commands"]));
+        assert_eq!(
+            project_window_permission["identifier"],
+            "project-window-commands"
+        );
+        assert_eq!(
+            project_window_permission["commands"]["deny"],
+            serde_json::json!([])
+        );
+        assert!(!allowed_commands.is_empty());
+        assert!(allowed_commands.iter().all(|command| {
+            command
+                .as_str()
+                .is_some_and(|command| !command.contains(':'))
+        }));
+    }
+
+    #[test]
+    fn asset_protocol_serves_only_published_media_previews() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let scope = config["app"]["security"]["assetProtocol"]["scope"]
+            .as_array()
+            .expect("the asset protocol has an explicit scope")
+            .iter()
+            .map(|entry| entry.as_str().expect("asset scopes are textual"))
+            .collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            scope,
+            BTreeSet::from([
+                "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.jpg",
+                "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.png",
+            ])
+        );
+        assert!(scope.iter().all(|entry| !entry.contains("**")));
+    }
+
     #[test]
     fn tauri_csp_allows_the_scoped_asset_protocol_for_pixi_texture_fetches() {
         let config: serde_json::Value =

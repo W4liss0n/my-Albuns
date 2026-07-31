@@ -28,7 +28,8 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$LOCALDATA/MyAlbuns2/Cache/**"
+          "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.jpg",
+          "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.png"
         ]
       }
     }

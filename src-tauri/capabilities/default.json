@@ -2,8 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Permissões mínimas da Janela do Projeto",
+  "local": true,
   "windows": ["main", "project-b"],
   "permissions": [
-    "core:default"
+    "project-window-commands"
   ]
 }
