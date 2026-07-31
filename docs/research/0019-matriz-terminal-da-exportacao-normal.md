@@ -149,9 +149,11 @@ parte do contrato, não uma lacuna preenchida por inferência.
   em [`0020`](0020-lote-e-operation-lease.md); esse vínculo não amplia
   retroativamente a matriz A/B deste documento. Checkpoint e retomada continuam
   fora dos dois cortes.
-- O guardião de abertura, a focalização de uma `ProjectSession` existente e a
-  distinção integrada entre `OperationGate` e Bloqueio de abertura continuam
-  fora deste corte.
+- O guardião de abertura e a focalização de uma `ProjectSession` existente
+  permanecem fora deste corte. A distinção entre `OperationGate` e Bloqueio de
+  abertura foi coberta posteriormente em
+  [`0021`](0021-operation-gate-e-bloqueio-de-abertura.md), sem ampliar
+  retroativamente esta matriz A/B.
 - A coleta foi feita em uma única máquina Windows. Ela valida os estados e a
   liberação nas duas topologias implementadas, não compara diversidade de
   hardware nem decide a topologia final.
@@ -167,8 +169,9 @@ oito cenários permitem uma Exportação sucessora real de 39.164 bytes.
 
 Esta evidência encerra somente o critério 35 do ticket 01. No momento desta
 coleta, os critérios 36 e 37 permaneciam abertos. O critério 36 foi encerrado
-posteriormente em [`0020`](0020-lote-e-operation-lease.md); o critério 37 e o
-guardião de abertura integrado continuam abertos.
+posteriormente em [`0020`](0020-lote-e-operation-lease.md), e o critério 37 em
+[`0021`](0021-operation-gate-e-bloqueio-de-abertura.md). O guardião de abertura
+completo continua fora desses cortes.
 
 ## Repetição
 

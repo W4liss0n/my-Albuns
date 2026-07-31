@@ -153,12 +153,13 @@ ela não altera retroativamente o alcance da execução A/B deste documento.
   ainda não têm fluxos produtivos conectados.
 - O artefato `0009` não exercita a entrada de cancelamento nem a Janela de
   progresso conectadas posteriormente; a matriz terminal A/B continua aberta.
-- O guardião de abertura e a focalização de uma `ProjectSession` existente
-  ainda não foram implementados. O gate operacional e a trava de arquivo são
-  módulos distintos, e ambos recuperam a morte de um proprietário em ensaios
-  separados, mas sua diferença ainda não foi demonstrada no fluxo integrado
-  de abertura.
-- Por esses limites, os critérios 35, 36 e 37 do ticket permanecem abertos.
+- O guardião de abertura e a focalização de uma `ProjectSession` existente não
+  pertencem a esta coleta. A diferença entre o gate operacional e a trava de
+  arquivo foi demonstrada posteriormente, no escopo estreito de uma Sessão, em
+  [`0021`](0021-operation-gate-e-bloqueio-de-abertura.md); o guardião completo
+  permanece fora dos dois cortes.
+- No momento desta coleta, os critérios 35, 36 e 37 permaneciam abertos. Eles
+  foram encerrados, respectivamente, em `0019`, `0020` e `0021`.
 
 ## Conclusão
 
@@ -167,8 +168,9 @@ operações que ainda não existem. O gate possui somente exclusividade global,
 o lease possui somente ordem e garantia de liberação, e cada recurso continua
 com seu próprio estado. A Exportação normal já atravessa o caminho único de
 reserva. A conexão posterior do cancelamento e do progresso está documentada
-em `0018`; lote, manutenção total, matriz terminal A/B e guardião de abertura
-continuam como gates explícitos.
+em `0018`, a matriz terminal A/B em `0019`, o lote em `0020` e a separação do
+Bloqueio de abertura em `0021`. Manutenção total e o guardião de abertura
+completo continuam como gates explícitos.
 
 ## Repetição
 

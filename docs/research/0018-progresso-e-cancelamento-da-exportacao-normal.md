@@ -151,11 +151,14 @@ obsoletos.
   Checkpoint continuam ausentes.
 - Uma terminação não confirmada coloca o Processador em quarentena até o
   reinício do host; não foi introduzido um recuperador especulativo.
-- O guardião de abertura e a diferença integrada entre `OperationGate` e
-  Bloqueio de abertura continuam pendentes.
+- O guardião de abertura não pertence a este corte. A diferença entre
+  `OperationGate` e Bloqueio de abertura foi demonstrada posteriormente em
+  [`0021`](0021-operation-gate-e-bloqueio-de-abertura.md), sem antecipar o
+  guardião completo.
 
 Com a evidência complementar do 0019, o critério 35 do ticket 01 está
-encerrado. Os critérios 36 e 37 permanecem abertos.
+encerrado. Os critérios 36 e 37 foram encerrados posteriormente em `0020` e
+`0021`.
 
 ## Conclusão
 

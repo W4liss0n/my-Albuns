@@ -157,7 +157,9 @@ ensaio.
 - As múltiplas saídas PNG exercitam a fronteira transacional, não a matriz
   completa de formatos nem PDF.
 - Não implementa limpeza de Saídas órfãs.
-- Não implementa o guardião de abertura; o critério 37 permanece aberto.
+- Não implementa o guardião de abertura. O critério 37 foi encerrado depois,
+  no escopo estreito da Sessão e da trava, em
+  [`0021`](0021-operation-gate-e-bloqueio-de-abertura.md).
 - Os fixtures persistidos e o DPI reduzido servem ao contrato operacional, não
   à avaliação de qualidade final.
 - Esta evidência encerra somente o critério 36.
@@ -173,7 +175,8 @@ existe liberação entre itens.
 Sucesso, falha na Preparação, falha após uma de duas promoções e morte do
 proprietário não deixaram reserva presa e permitiram uma Exportação normal real
 posterior. A Publicação parcial observada respeitou a transação limitada do
-ADR 0006. O critério 36 está encerrado; o critério 37 continua aberto.
+ADR 0006. O critério 36 está encerrado; o critério 37 foi encerrado
+posteriormente em `0021`.
 
 ## Repetição
 
