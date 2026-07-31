@@ -128,7 +128,7 @@ O Projeto persiste sua Identidade própria e os caminhos escolhidos pelo usuári
 
 Para um arquivo existente, duas formas textuais podem representar o mesmo alvo, como uma unidade mapeada e seu UNC. Quando essa distinção for necessária, o módulo compara a identidade física obtida por handles. A comparação pode ser inconclusiva em determinados sistemas de arquivos ou servidores.
 
-O módulo encerra sua responsabilidade ao retornar a evidência tri-state. O guardião de abertura do Projeto aplica a política funcional:
+A comparação de identidade encerra sua responsabilidade ao retornar a evidência tri-state. O módulo também expõe a primitiva nativa de trava de arquivo, sem decidir identidade, foco, conflito funcional ou duração da posse. O guardião de abertura do Projeto aplica essa política e mantém a primitiva pelo mesmo ciclo de vida da Sessão editável:
 
 1. o arquivo é aberto e sua Identidade persistida é lida;
 2. a identidade física é comparada com as sessões abertas;

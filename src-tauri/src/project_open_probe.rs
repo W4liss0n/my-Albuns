@@ -1,8 +1,10 @@
 use std::{
+    fmt::{self, Display, Formatter},
     path::{Path, PathBuf},
     time::Instant,
 };
 
+use myalbuns_core::{ProjectCore, ProjectSession};
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
 use serde::Serialize;
@@ -157,6 +159,54 @@ pub(crate) struct ProjectOpenProbe {
     window_label: &'static str,
 }
 
+/// Narrow spike seam that keeps the native opening lock alive for exactly the
+/// same scope as the editable Project session it protects.
+struct ProjectOpeningSession {
+    // Struct fields are dropped in declaration order: the editable session is
+    // closed before its native opening lock is released.
+    _session: ProjectSession,
+    _opening_lock: ProjectFileLock,
+}
+
+#[derive(Debug)]
+enum ProjectOpeningSessionError {
+    Lock(ProjectFileLockError),
+    Read(String),
+    InvalidProject(String),
+}
+
+impl Display for ProjectOpeningSessionError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lock(error) => Display::fmt(error, formatter),
+            Self::Read(reason) => {
+                write!(formatter, "o Projeto bloqueado não pôde ser lido: {reason}")
+            }
+            Self::InvalidProject(reason) => {
+                write!(
+                    formatter,
+                    "o Projeto bloqueado não abriu no ProjectCore: {reason}"
+                )
+            }
+        }
+    }
+}
+
+impl ProjectOpeningSession {
+    fn open(project_file: &Path) -> Result<Self, ProjectOpeningSessionError> {
+        let opening_lock =
+            ProjectFileLock::try_acquire(project_file).map_err(ProjectOpeningSessionError::Lock)?;
+        let source = std::fs::read_to_string(project_file)
+            .map_err(|error| ProjectOpeningSessionError::Read(error.to_string()))?;
+        let session = ProjectCore::open_editable_session(&source)
+            .map_err(|error| ProjectOpeningSessionError::InvalidProject(error.to_string()))?;
+        Ok(Self {
+            _session: session,
+            _opening_lock: opening_lock,
+        })
+    }
+}
+
 impl ProjectOpenProbe {
     pub(crate) fn from_environment(topology: &TopologySpike) -> Result<Option<Self>, String> {
         let root = std::env::var_os(PROJECT_OPEN_PROBE_ROOT_ENV).map(PathBuf::from);
@@ -246,8 +296,8 @@ impl ProjectOpenProbe {
     }
 
     async fn run_owner(&self, app: &AppHandle) -> Result<(), String> {
-        let project_lock = ProjectFileLock::try_acquire(&self.project_file)
-            .map_err(|error| format!("o owner não adquiriu o Bloqueio de abertura: {error}"))?;
+        let project_session = ProjectOpeningSession::open(&self.project_file)
+            .map_err(|error| format!("o owner não abriu a Sessão do Projeto: {error}"))?;
         let operation_lease = acquire_operation_lease(app)
             .await
             .map_err(|error| format!("o owner não adquiriu o OperationGate: {error}"))?;
@@ -289,7 +339,7 @@ impl ProjectOpenProbe {
                 )
                 .await?;
                 drop(operation_lease);
-                drop(project_lock);
+                drop(project_session);
                 self.write_event(
                     ProbeState::OwnerSessionClosed,
                     MechanismState::Released,
@@ -353,7 +403,7 @@ impl ProjectOpenProbe {
             "a liberação terminal da Sessão do Projeto",
         )
         .await?;
-        let (_project_lock, _operation_lease) =
+        let (_project_session, _operation_lease) =
             acquire_both_after_terminal(app, &self.project_file).await?;
         self.write_event(
             ProbeState::ChallengerBothRecovered,
@@ -475,16 +525,16 @@ async fn acquire_operation_lease_after_release(app: &AppHandle) -> Result<Operat
 async fn acquire_both_after_terminal(
     app: &AppHandle,
     project_file: &Path,
-) -> Result<(ProjectFileLock, OperationLease), String> {
+) -> Result<(ProjectOpeningSession, OperationLease), String> {
     let deadline = Instant::now() + PROBE_TIMEOUT;
     loop {
-        match ProjectFileLock::try_acquire(project_file) {
-            Ok(project_lock) => match acquire_operation_lease(app).await {
-                Ok(operation_lease) => return Ok((project_lock, operation_lease)),
+        match ProjectOpeningSession::open(project_file) {
+            Ok(project_session) => match acquire_operation_lease(app).await {
+                Ok(operation_lease) => return Ok((project_session, operation_lease)),
                 Err(OperationLeaseError::Gate(OperationGateError::Conflict { .. }))
                     if Instant::now() < deadline =>
                 {
-                    drop(project_lock);
+                    drop(project_session);
                 }
                 Err(error) => {
                     return Err(format!(
@@ -492,7 +542,8 @@ async fn acquire_both_after_terminal(
                     ));
                 }
             },
-            Err(ProjectFileLockError::Conflict) if Instant::now() < deadline => {}
+            Err(ProjectOpeningSessionError::Lock(ProjectFileLockError::Conflict))
+                if Instant::now() < deadline => {}
             Err(error) => {
                 return Err(format!(
                     "o Bloqueio de abertura não foi recuperado depois do terminal: {error}"
@@ -522,8 +573,48 @@ fn validate_project_fixture(root: &Path, project_file: &Path) -> Result<(), Stri
 mod tests {
     use super::{
         MechanismState, ProbeEvent, ProbeRole, ProbeScenario, ProbeState, ProjectOpenProbe,
+        ProjectOpeningSession,
     };
+    use crate::sample_project::SampleProject;
     use crate::topology_spike::TopologySpike;
+    use myalbuns_paths::{ProjectFileLock, ProjectFileLockError};
+
+    #[test]
+    fn opening_session_owns_the_file_lock_until_its_scope_closes() {
+        let directory = probe_root();
+        let project = directory.path().join("Projeto.myalbum");
+        let source = SampleProject::Horizon
+            .persisted_source(2)
+            .expect("the Project fixture serializes");
+        std::fs::write(&project, source).expect("the Project fixture is writable");
+
+        let session = ProjectOpeningSession::open(&project)
+            .expect("a valid Project opens as an editable locked session");
+        assert_eq!(
+            ProjectFileLock::try_acquire(&project).unwrap_err(),
+            ProjectFileLockError::Conflict,
+            "the opening lock must remain owned for the whole session scope"
+        );
+
+        drop(session);
+        ProjectFileLock::try_acquire(&project)
+            .expect("closing the session scope releases the opening lock");
+    }
+
+    #[test]
+    fn rejected_project_does_not_leak_the_opening_lock() {
+        let directory = probe_root();
+        let project = directory.path().join("Projeto.myalbum");
+        std::fs::write(&project, b"not a Project")
+            .expect("the invalid Project fixture is writable");
+
+        assert!(
+            ProjectOpeningSession::open(&project).is_err(),
+            "an invalid Project must not create an editable session"
+        );
+        ProjectFileLock::try_acquire(&project)
+            .expect("a failed open releases the opening lock immediately");
+    }
 
     #[test]
     fn maps_two_independent_hosts_to_the_session_owner_and_challenger() {

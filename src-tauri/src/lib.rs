@@ -52,6 +52,24 @@ use topology_fault_probe::{
 };
 use topology_spike::TopologySpike;
 
+enum ExclusiveProbe {
+    OperationGate(OperationGateProbe),
+    ExportTerminal(ExportTerminalProbe),
+    BatchLease(BatchLeaseProbe),
+    ProjectOpen(ProjectOpenProbe),
+}
+
+impl ExclusiveProbe {
+    fn start(self, app: &tauri::AppHandle) -> Result<(), String> {
+        match self {
+            Self::OperationGate(probe) => probe.start(app),
+            Self::ExportTerminal(probe) => probe.start(app),
+            Self::BatchLease(probe) => probe.start(app),
+            Self::ProjectOpen(probe) => probe.start(app),
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if global_process_spike::global_process_requested() {
@@ -75,26 +93,21 @@ pub fn run() {
         .unwrap_or_else(|error| panic!("probe de lease do lote inválido: {error}"));
     let project_open_probe = ProjectOpenProbe::from_environment(&topology)
         .unwrap_or_else(|error| panic!("probe de abertura inválido: {error}"));
-    if [
-        operation_gate_probe.is_some(),
-        export_terminal_probe.is_some(),
-        batch_lease_probe.is_some(),
-        project_open_probe.is_some(),
+    let exclusive_probes = [
+        operation_gate_probe.map(ExclusiveProbe::OperationGate),
+        export_terminal_probe.map(ExclusiveProbe::ExportTerminal),
+        batch_lease_probe.map(ExclusiveProbe::BatchLease),
+        project_open_probe.map(ExclusiveProbe::ProjectOpen),
     ]
     .into_iter()
-    .filter(|enabled| *enabled)
-    .count()
-        > 1
-    {
+    .flatten()
+    .collect::<Vec<_>>();
+    if exclusive_probes.len() > 1 {
         panic!(
             "os probes de OperationGate, de terminais de Exportação, de lease do lote e de abertura são exclusivos"
         );
     }
-    let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some()
-        || export_terminal_probe.is_some()
-        || batch_lease_probe.is_some()
-        || project_open_probe.is_some()
-    {
+    let (topology_benchmark, topology_fault_probe) = if !exclusive_probes.is_empty() {
         (
             TopologyBenchmarkState::disabled(&topology),
             TopologyFaultProbeState::disabled(&topology),
@@ -160,25 +173,8 @@ pub fn run() {
                 .data_directory(webview_data_directory)
                 .build()?;
             }
-            if let Some(operation_gate_probe) = operation_gate_probe {
-                operation_gate_probe
-                    .start(app.handle())
-                    .map_err(std::io::Error::other)?;
-            }
-            if let Some(export_terminal_probe) = export_terminal_probe {
-                export_terminal_probe
-                    .start(app.handle())
-                    .map_err(std::io::Error::other)?;
-            }
-            if let Some(batch_lease_probe) = batch_lease_probe {
-                batch_lease_probe
-                    .start(app.handle())
-                    .map_err(std::io::Error::other)?;
-            }
-            if let Some(project_open_probe) = project_open_probe {
-                project_open_probe
-                    .start(app.handle())
-                    .map_err(std::io::Error::other)?;
+            for probe in exclusive_probes {
+                probe.start(app.handle()).map_err(std::io::Error::other)?;
             }
 
             for window_label in topology.reopened_window_labels() {

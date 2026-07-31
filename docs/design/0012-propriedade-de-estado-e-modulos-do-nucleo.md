@@ -148,12 +148,12 @@ Sua implementação possui três fases internas:
 
 O aplicativo possui duas exclusividades que nunca devem ser unificadas:
 
-| Mecanismo | Escopo | Sobrevive à queda? |
+| Mecanismo | Escopo da posse | Término da posse |
 |---|---|---|
-| `OperationGate` | concessões entre operações do aplicativo em execução | não — a concessão morre com o processo, e é isso que se quer |
-| Bloqueio de abertura | uma sessão editável por Identidade de Projeto | sim — é trava real de arquivo, some só quando o processo dono some |
+| `OperationGate` | uma tentativa de operação do aplicativo | terminal da tentativa ou abandono quando o processo proprietário morre |
+| Bloqueio de abertura | uma Sessão editável por Identidade de Projeto | fechamento normal da Sessão; em uma queda, o Windows só o libera depois que o processo proprietário realmente morre |
 
-A separação não é acidental. Uma concessão em memória não protege um arquivo depois que o programa morre, e uma trava de arquivo é cara demais para arbitrar operações internas. Unificá-las quebraria os dois lados: a recuperação automática de Bloqueio órfão depende de a trava pertencer ao processo, e a liberação imediata de uma concessão depende de ela não persistir.
+A separação não é acidental. O terminal de uma tentativa devolve sua concessão sem encerrar a Sessão e sem liberar o arquivo; o Bloqueio de abertura continua retido enquanto essa Sessão permanecer editável. Nenhum dos mecanismos é estado persistente: diante da queda do proprietário, o sistema operacional libera os recursos somente depois que o processo deixa de existir. Uma trava de arquivo também é inadequada para arbitrar operações internas. Unificá-los quebraria os dois ciclos de vida.
 
 O Bloqueio de abertura também combina identidade física e Identidade persistida, que o `OperationGate` desconhece por completo. Ele pertence ao fluxo de abertura de Projeto, não a este módulo.
 
