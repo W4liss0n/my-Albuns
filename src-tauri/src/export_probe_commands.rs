@@ -71,6 +71,12 @@ pub(crate) struct ExportCommandError {
     message: String,
 }
 
+impl ExportResult {
+    pub(crate) fn output_path(&self) -> &str {
+        &self.output_path
+    }
+}
+
 impl ExportEvent {
     fn started(operation_id: impl Into<String>) -> Self {
         Self::Started {
@@ -105,6 +111,14 @@ impl ExportEvent {
 }
 
 impl ExportCommandError {
+    pub(crate) const fn code(&self) -> &'static str {
+        self.code
+    }
+
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+
     fn cancelled() -> Self {
         Self {
             code: "cancelled",

@@ -1,7 +1,9 @@
 param(
     [string] $OutputPath,
     [ValidateRange(10, 300)]
-    [int] $ProbeTimeoutSeconds = 90
+    [int] $ProbeTimeoutSeconds = 90,
+    [ValidateRange(1, 8)]
+    [int] $CargoBuildJobs = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,10 +16,26 @@ if ($env:OS -ne 'Windows_NT') {
     throw 'The OperationGate gate must run on Windows.'
 }
 
+$runnerMutex = [System.Threading.Mutex]::new(
+    $false,
+    'Local\MyAlbuns.OperationGateEvidence.v1'
+)
+$runnerMutexHeld = $false
+try {
+    $runnerMutexHeld = $runnerMutex.WaitOne(0)
+}
+catch [System.Threading.AbandonedMutexException] {
+    $runnerMutexHeld = $true
+}
+if (-not $runnerMutexHeld) {
+    $runnerMutex.Dispose()
+    throw 'Another OperationGate evidence runner is already using the shared build artifacts.'
+}
+
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
-        'docs\research\artifacts\0009-operation-gate-lease.json'
+        'docs\research\artifacts\0010-export-terminal-matrix.json'
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
@@ -34,7 +52,25 @@ $independentRoot = [System.IO.Path]::GetFullPath(
 $multiwindowRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $probeParent "run-$runId-multiwindow")
 )
-$fixtureRoots = @($independentRoot, $multiwindowRoot)
+$terminalScenarios = @('success', 'failure', 'cancellation', 'owner_death')
+$terminalRoots = [ordered]@{
+    independent = [ordered]@{}
+    multiwindow = [ordered]@{}
+}
+foreach ($topology in @('independent', 'multiwindow')) {
+    foreach ($scenario in $terminalScenarios) {
+        $terminalRoots[$topology][$scenario] = [System.IO.Path]::GetFullPath(
+            (Join-Path $probeParent "run-$runId-$topology-$scenario")
+        )
+    }
+}
+$fixtureRoots = @($independentRoot, $multiwindowRoot) + @(
+    foreach ($topology in @('independent', 'multiwindow')) {
+        foreach ($scenario in $terminalScenarios) {
+            $terminalRoots[$topology][$scenario]
+        }
+    }
+)
 foreach ($fixtureRoot in $fixtureRoots) {
     if (-not $fixtureRoot.StartsWith(
             $probeParent + [System.IO.Path]::DirectorySeparatorChar,
@@ -48,13 +84,23 @@ foreach ($fixtureRoot in $fixtureRoots) {
 $targetDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path $script:WorkspaceRoot 'target\operation-gate')
 )
+$rustCheckTargetDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot 'target')
+)
 $executablePath = Join-Path $targetDirectory 'release\myalbuns-desktop.exe'
 $executableRelativePath = 'target/operation-gate/release/myalbuns-desktop.exe'
+$imagingExecutablePath = Join-Path $targetDirectory 'release\myalbuns-imaging.exe'
+$imagingExecutableRelativePath =
+    'target/operation-gate/release/myalbuns-imaging.exe'
 $startedProcesses =
     [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 $checks = [System.Collections.Generic.List[object]]::new()
 $previousCargoTarget = [System.Environment]::GetEnvironmentVariable(
     'CARGO_TARGET_DIR',
+    [System.EnvironmentVariableTarget]::Process
+)
+$previousCargoBuildJobs = [System.Environment]::GetEnvironmentVariable(
+    'CARGO_BUILD_JOBS',
     [System.EnvironmentVariableTarget]::Process
 )
 $locationWasPushed = $false
@@ -125,7 +171,11 @@ function Start-OperationProbeProcess {
         [Parameter(Mandatory = $true)]
         [string] $ProbeRoot,
         [ValidateSet('a', 'b')]
-        [string] $ProjectSlot
+        [string] $ProjectSlot,
+        [ValidateSet('success', 'failure', 'cancellation', 'owner_death')]
+        [string] $TerminalScenario,
+        [ValidateSet('matrix', 'successor')]
+        [string] $TerminalPhase = 'matrix'
     )
 
     $environment = [ordered]@{
@@ -141,7 +191,19 @@ function Start-OperationProbeProcess {
         MYALBUNS_TOPOLOGY_PROJECT_A_SOURCE = $null
         MYALBUNS_TOPOLOGY_PROJECT_B_SOURCE = $null
         MYALBUNS_GLOBAL_SPIKE_ENDPOINT = $null
-        MYALBUNS_OPERATION_GATE_PROBE_ROOT = $ProbeRoot
+        MYALBUNS_OPERATION_GATE_PROBE_ROOT = $null
+        MYALBUNS_EXPORT_TERMINAL_PROBE_ROOT = $null
+        MYALBUNS_EXPORT_TERMINAL_PROBE_SCENARIO = $null
+        MYALBUNS_EXPORT_TERMINAL_PROBE_PHASE = $null
+    }
+    if ([string]::IsNullOrWhiteSpace($TerminalScenario)) {
+        $environment.MYALBUNS_OPERATION_GATE_PROBE_ROOT = $ProbeRoot
+    }
+    else {
+        $environment.MYALBUNS_EXPORT_TERMINAL_PROBE_ROOT = $ProbeRoot
+        $environment.MYALBUNS_EXPORT_TERMINAL_PROBE_SCENARIO =
+            $TerminalScenario
+        $environment.MYALBUNS_EXPORT_TERMINAL_PROBE_PHASE = $TerminalPhase
     }
     if ($Topology -eq 'multiwindow') {
         $environment.MYALBUNS_TOPOLOGY_PROJECT = $null
@@ -203,12 +265,19 @@ function Assert-OwnedOperationProbeProcess {
 function Stop-OwnedOperationProbeProcess {
     param(
         [Parameter(Mandatory = $true)]
-        [System.Diagnostics.Process] $Process
+        [System.Diagnostics.Process] $Process,
+        [switch] $RequireLiveKill
     )
 
     $confirmedStopped = $false
     try {
         if ($Process.HasExited) {
+            if ($RequireLiveKill) {
+                throw (
+                    "OperationGate probe process $($Process.Id) exited " +
+                    'before the controlled owner-death injection.'
+                )
+            }
             $confirmedStopped = $true
             return
         }
@@ -350,6 +419,140 @@ function Read-StrictProbeEvent {
     }
 }
 
+function Read-StrictExportTerminalEvent {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $json = [System.IO.File]::ReadAllText(
+        $Path,
+        [System.Text.Encoding]::UTF8
+    )
+    $root = $json | ConvertFrom-Json
+    Assert-NoDuplicateJsonPropertyNames -Json $json
+    if (
+        $null -eq $root -or
+        $root -isnot [System.Management.Automation.PSCustomObject]
+    ) {
+        throw 'The Export terminal event root must be a JSON object.'
+    }
+
+    $expectedNames = @(
+        'schemaVersion',
+        'processId',
+        'topology',
+        'windowLabel',
+        'scenario',
+        'state',
+        'operationMode',
+        'operationId',
+        'terminal',
+        'progressStages',
+        'cancellationDisposition',
+        'resources',
+        'resourceState',
+        'outputBytes'
+    )
+    $actualNames = @($root.PSObject.Properties.Name)
+    $missingNames = @(
+        $expectedNames |
+            Where-Object { $actualNames -cnotcontains $_ }
+    )
+    $unexpectedNames = @(
+        $actualNames |
+            Where-Object { $expectedNames -cnotcontains $_ }
+    )
+    if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
+        throw (
+            'The Export terminal event fields differ from the closed schema. ' +
+            "Missing: $($missingNames -join ', '); " +
+            "unexpected: $($unexpectedNames -join ', ')."
+        )
+    }
+
+    foreach ($name in @('schemaVersion', 'processId')) {
+        $value = $root.$name
+        if ($value -isnot [int] -and $value -isnot [long]) {
+            throw "Export terminal field '$name' must be an integer."
+        }
+        if ($value -lt [int]::MinValue -or $value -gt [int]::MaxValue) {
+            throw "Export terminal field '$name' must be a 32-bit integer."
+        }
+    }
+    foreach ($name in @(
+            'topology',
+            'windowLabel',
+            'scenario',
+            'state',
+            'operationMode',
+            'resourceState'
+        )) {
+        if ($root.$name -isnot [string]) {
+            throw "Export terminal field '$name' must be a string."
+        }
+    }
+    foreach ($name in @('operationId', 'terminal', 'cancellationDisposition')) {
+        if ($null -ne $root.$name -and $root.$name -isnot [string]) {
+            throw "Export terminal field '$name' must be a string or null."
+        }
+    }
+    foreach ($name in @('progressStages', 'resources')) {
+        if ($root.$name -is [string] -or $null -eq $root.$name) {
+            throw "Export terminal field '$name' must be an array."
+        }
+        foreach ($value in @($root.$name)) {
+            if ($value -isnot [string]) {
+                throw "Export terminal field '$name' must contain strings."
+            }
+        }
+    }
+    if (
+        $null -ne $root.outputBytes -and
+        $root.outputBytes -isnot [int] -and
+        $root.outputBytes -isnot [long]
+    ) {
+        throw "Export terminal field 'outputBytes' must be an integer or null."
+    }
+    if ($null -ne $root.outputBytes -and $root.outputBytes -lt 0) {
+        throw "Export terminal field 'outputBytes' cannot be negative."
+    }
+
+    return [ordered]@{
+        schemaVersion = [int] $root.schemaVersion
+        processId = [int] $root.processId
+        topology = [string] $root.topology
+        windowLabel = [string] $root.windowLabel
+        scenario = [string] $root.scenario
+        state = [string] $root.state
+        operationMode = [string] $root.operationMode
+        operationId = if ($null -eq $root.operationId) {
+            $null
+        }
+        else {
+            [string] $root.operationId
+        }
+        terminal = if ($null -eq $root.terminal) {
+            $null
+        }
+        else {
+            [string] $root.terminal
+        }
+        progressStages = @($root.progressStages | ForEach-Object { [string] $_ })
+        cancellationDisposition = if ($null -eq $root.cancellationDisposition) {
+            $null
+        }
+        else {
+            [string] $root.cancellationDisposition
+        }
+        resources = @($root.resources | ForEach-Object { [string] $_ })
+        resourceState = [string] $root.resourceState
+        outputBytes = if ($null -eq $root.outputBytes) {
+            $null
+        }
+        else {
+            [long] $root.outputBytes
+        }
+    }
+}
+
 function Test-StrictProbeEventParser {
     param([Parameter(Mandatory = $true)][string] $ProbeRoot)
 
@@ -401,6 +604,37 @@ function Test-StrictProbeEventParser {
     })
 }
 
+function Test-StrictExportTerminalEventParser {
+    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $path = Join-Path $ProbeRoot 'terminal-parser-contract.json'
+    $valid = @'
+{"schemaVersion":1,"processId":42,"topology":"multiwindow","windowLabel":"main","scenario":"success","state":"owner_ready","operationMode":"normal_export","operationId":"export-42","terminal":null,"progressStages":["preparing"],"cancellationDisposition":null,"resources":["operation_gate","cache_pause","processor_reservation"],"resourceState":"held","outputBytes":null}
+'@
+    [System.IO.File]::WriteAllText(
+        $path,
+        $valid.Trim(),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $event = Read-StrictExportTerminalEvent -Path $path
+    if (
+        $event.schemaVersion -ne 1 -or
+        $event.processId -ne 42 -or
+        @($event.progressStages).Count -ne 1 -or
+        @($event.resources).Count -ne 3
+    ) {
+        throw 'The Export terminal parser changed a valid event.'
+    }
+
+    $stopwatch.Stop()
+    $checks.Add([ordered]@{
+        name = 'strict-export-terminal-json-parser'
+        passed = $true
+        elapsedMs = [long] $stopwatch.ElapsedMilliseconds
+    })
+}
+
 function Wait-ForProbeEvent {
     param(
         [Parameter(Mandatory = $true)]
@@ -408,7 +642,9 @@ function Wait-ForProbeEvent {
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Process[]] $Processes,
         [Parameter(Mandatory = $true)]
-        [string] $ProbeRoot
+        [string] $ProbeRoot,
+        [ValidateSet('operation', 'export_terminal')]
+        [string] $Contract = 'operation'
     )
 
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ProbeTimeoutSeconds)
@@ -416,11 +652,28 @@ function Wait-ForProbeEvent {
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         if (Test-Path -LiteralPath $Path -PathType Leaf) {
             try {
+                if ($Contract -eq 'export_terminal') {
+                    return Read-StrictExportTerminalEvent -Path $Path
+                }
                 return Read-StrictProbeEvent -Path $Path
             }
             catch {
+                if ($Contract -eq 'export_terminal') {
+                    throw
+                }
                 $lastReadError = $_.Exception.Message
             }
+        }
+        $failureFiles = @(
+            Get-ChildItem `
+                -LiteralPath $ProbeRoot `
+                -Filter 'failure-*.json' `
+                -File `
+                -ErrorAction SilentlyContinue
+        )
+        if ($failureFiles.Count -gt 0) {
+            $diagnostic = Get-ProbeFailureDiagnostic -ProbeRoot $ProbeRoot
+            throw "OperationGate probe reported a typed failure: $diagnostic"
         }
         foreach ($process in $Processes) {
             if ($process.HasExited) {
@@ -489,10 +742,16 @@ function Assert-ProbeEvent {
     }
 }
 
-function Open-OwnerReleaseGate {
-    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+function Open-ProbeMarker {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $ProbeRoot,
+        [Parameter(Mandatory = $true)]
+        [ValidatePattern('^[a-z][a-z0-9-]{0,63}$')]
+        [string] $Name
+    )
 
-    $path = Join-Path $ProbeRoot 'release-owner'
+    $path = Join-Path $ProbeRoot $Name
     $stream = [System.IO.File]::Open(
         $path,
         [System.IO.FileMode]::CreateNew,
@@ -508,6 +767,169 @@ function Open-OwnerReleaseGate {
         $stream.Dispose()
     }
     return $path
+}
+
+function Open-OwnerReleaseGate {
+    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+
+    return Open-ProbeMarker -ProbeRoot $ProbeRoot -Name 'release-owner'
+}
+
+function Assert-ExportTerminalEvent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Event,
+        [Parameter(Mandatory = $true)]
+        [int] $ExpectedProcessId,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('independent', 'multiwindow')]
+        [string] $ExpectedTopology,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('main', 'project-b')]
+        [string] $ExpectedWindowLabel,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('success', 'failure', 'cancellation', 'owner_death')]
+        [string] $ExpectedScenario,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'owner_ready',
+            'challenger_conflict',
+            'owner_terminal',
+            'challenger_success'
+        )]
+        [string] $ExpectedState
+    )
+
+    if (
+        [int] $Event.schemaVersion -ne 1 -or
+        [long] $Event.processId -ne $ExpectedProcessId -or
+        [string] $Event.topology -cne $ExpectedTopology -or
+        [string] $Event.windowLabel -cne $ExpectedWindowLabel -or
+        [string] $Event.scenario -cne $ExpectedScenario -or
+        [string] $Event.state -cne $ExpectedState -or
+        [string] $Event.operationMode -cne 'normal_export'
+    ) {
+        $actual = $Event | ConvertTo-Json -Depth 5 -Compress
+        throw (
+            "Invalid Export terminal event for state '$ExpectedState'. " +
+            "Received: $actual"
+        )
+    }
+
+    $fullResources = @(
+        'operation_gate',
+        'cache_pause',
+        'processor_reservation'
+    )
+    $resources = @($Event.resources)
+    $progressStages = @($Event.progressStages)
+    $hasOperation = -not [string]::IsNullOrWhiteSpace(
+        [string] $Event.operationId
+    )
+    switch ($ExpectedState) {
+        'owner_ready' {
+            if (
+                $null -ne $Event.terminal -or
+                -not $hasOperation -or
+                $progressStages -cnotcontains 'preparing' -or
+                $null -ne $Event.cancellationDisposition -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'held' -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The owner_ready event does not prove a complete held lease.'
+            }
+        }
+        'challenger_conflict' {
+            if (
+                [string] $Event.terminal -cne 'conflict' -or
+                $hasOperation -or
+                $progressStages.Count -ne 0 -or
+                $null -ne $Event.cancellationDisposition -or
+                $resources.Count -ne 0 -or
+                [string] $Event.resourceState -cne 'blocked' -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The challenger_conflict event is not a typed immediate conflict.'
+            }
+        }
+        'owner_terminal' {
+            $expectedTerminal = switch ($ExpectedScenario) {
+                'success' { 'success' }
+                'failure' { 'failed' }
+                'cancellation' { 'cancelled' }
+                default { throw 'owner_death must not emit owner_terminal.' }
+            }
+            if (
+                [string] $Event.terminal -cne $expectedTerminal -or
+                -not $hasOperation -or
+                $progressStages -cnotcontains 'preparing' -or
+                $resources.Count -ne 0 -or
+                [string] $Event.resourceState -cne 'released'
+            ) {
+                throw 'The owner_terminal event does not prove the expected release.'
+            }
+            if ($ExpectedScenario -eq 'success') {
+                if (
+                    $progressStages -cnotcontains 'completed' -or
+                    [long] $Event.outputBytes -le 0 -or
+                    $null -ne $Event.cancellationDisposition
+                ) {
+                    throw 'The successful owner did not prove a published output.'
+                }
+            }
+            elseif ($ExpectedScenario -eq 'failure') {
+                if (
+                    $progressStages -ccontains 'completed' -or
+                    $null -ne $Event.outputBytes -or
+                    $null -ne $Event.cancellationDisposition
+                ) {
+                    throw 'The failed owner exposed a successful publication.'
+                }
+            }
+            else {
+                if (
+                    [string] $Event.cancellationDisposition -cne 'requested' -or
+                    $progressStages -ccontains 'publishing' -or
+                    $progressStages -ccontains 'completed' -or
+                    $null -ne $Event.outputBytes
+                ) {
+                    throw 'The cancelled owner crossed the publication boundary.'
+                }
+            }
+        }
+        'challenger_success' {
+            if (
+                [string] $Event.terminal -cne 'success' -or
+                -not $hasOperation -or
+                $progressStages -cnotcontains 'preparing' -or
+                $progressStages -cnotcontains 'completed' -or
+                $null -ne $Event.cancellationDisposition -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'reacquired' -or
+                [long] $Event.outputBytes -le 0
+            ) {
+                throw 'The challenger did not prove a complete lease reacquisition.'
+            }
+        }
+    }
+
+    return [ordered]@{
+        schemaVersion = 1
+        processId = [int] $Event.processId
+        topology = [string] $Event.topology
+        windowLabel = [string] $Event.windowLabel
+        scenario = [string] $Event.scenario
+        state = [string] $Event.state
+        operationMode = [string] $Event.operationMode
+        operationId = $Event.operationId
+        terminal = $Event.terminal
+        progressStages = @($progressStages)
+        cancellationDisposition = $Event.cancellationDisposition
+        resources = @($resources)
+        resourceState = [string] $Event.resourceState
+        outputBytes = $Event.outputBytes
+    }
 }
 
 function Invoke-OperationTopologyProbe {
@@ -621,14 +1043,223 @@ function Invoke-OperationTopologyProbe {
     }
 }
 
+function Invoke-ExportTerminalScenario {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('independent', 'multiwindow')]
+        [string] $Topology,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('success', 'failure', 'cancellation', 'owner_death')]
+        [string] $Scenario,
+        [Parameter(Mandatory = $true)]
+        [string] $ProbeRoot
+    )
+
+    $scenarioProcesses =
+        [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+    $sidecarBackupPath = Join-Path $ProbeRoot 'myalbuns-imaging.exe.disabled'
+    $sidecarWasMoved = $false
+    $startedAt = [DateTimeOffset]::UtcNow
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    try {
+        if ($Scenario -eq 'failure') {
+            $releaseDirectory = [System.IO.Path]::GetFullPath(
+                (Join-Path $targetDirectory 'release')
+            )
+            $verifiedSidecarPath = [System.IO.Path]::GetFullPath(
+                $imagingExecutablePath
+            )
+            if (
+                -not (Test-Path -LiteralPath $verifiedSidecarPath -PathType Leaf) -or
+                -not [string]::Equals(
+                    [System.IO.Path]::GetDirectoryName($verifiedSidecarPath),
+                    $releaseDirectory,
+                    [System.StringComparison]::OrdinalIgnoreCase
+                )
+            ) {
+                throw 'The failure probe sidecar is not the verified release artifact.'
+            }
+            Move-Item `
+                -LiteralPath $verifiedSidecarPath `
+                -Destination $sidecarBackupPath
+            $sidecarWasMoved = $true
+        }
+
+        if ($Topology -eq 'independent') {
+            $ownerProcess = Start-OperationProbeProcess `
+                -Topology $Topology `
+                -ProbeRoot $ProbeRoot `
+                -ProjectSlot 'a' `
+                -TerminalScenario $Scenario
+            $scenarioProcesses.Add($ownerProcess)
+            $ownerReadyRaw = Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'owner-ready.json') `
+                -Processes @($ownerProcess) `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'export_terminal'
+
+            $challengerProcess = Start-OperationProbeProcess `
+                -Topology $Topology `
+                -ProbeRoot $ProbeRoot `
+                -ProjectSlot 'b' `
+                -TerminalScenario $Scenario
+            $scenarioProcesses.Add($challengerProcess)
+            $processes = @($ownerProcess, $challengerProcess)
+            $ownerWindow = 'main'
+            $challengerWindow = 'main'
+        }
+        else {
+            $ownerProcess = Start-OperationProbeProcess `
+                -Topology $Topology `
+                -ProbeRoot $ProbeRoot `
+                -TerminalScenario $Scenario
+            $scenarioProcesses.Add($ownerProcess)
+            $challengerProcess = $ownerProcess
+            $processes = @($ownerProcess)
+            $ownerWindow = 'main'
+            $challengerWindow = 'project-b'
+            $ownerReadyRaw = Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'owner-ready.json') `
+                -Processes $processes `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'export_terminal'
+        }
+
+        $ownerProcessId = $ownerProcess.Id
+        $ownerReady = Assert-ExportTerminalEvent `
+            -Event $ownerReadyRaw `
+            -ExpectedProcessId $ownerProcessId `
+            -ExpectedTopology $Topology `
+            -ExpectedWindowLabel $ownerWindow `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'owner_ready'
+        $challengerConflict = Assert-ExportTerminalEvent `
+            -Event (Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'challenger-conflict.json') `
+                -Processes $processes `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'export_terminal') `
+            -ExpectedProcessId $challengerProcess.Id `
+            -ExpectedTopology $Topology `
+            -ExpectedWindowLabel $challengerWindow `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'challenger_conflict'
+
+        $ownerTerminal = $null
+        $ownerTerminated = $false
+        if ($Scenario -eq 'owner_death') {
+            Stop-OwnedOperationProbeProcess `
+                -Process $ownerProcess `
+                -RequireLiveKill
+            [void] $scenarioProcesses.Remove($ownerProcess)
+            $ownerTerminated = $true
+
+            if ($Topology -eq 'multiwindow') {
+                $challengerProcess = Start-OperationProbeProcess `
+                    -Topology $Topology `
+                    -ProbeRoot $ProbeRoot `
+                    -TerminalScenario $Scenario `
+                    -TerminalPhase 'successor'
+                $scenarioProcesses.Add($challengerProcess)
+            }
+            $processes = @($challengerProcess)
+            [void] (Open-ProbeMarker `
+                -ProbeRoot $ProbeRoot `
+                -Name 'allow-successor')
+        }
+        else {
+            $trigger = if ($Scenario -eq 'cancellation') {
+                'cancel-owner'
+            }
+            else {
+                'continue-owner'
+            }
+            [void] (Open-ProbeMarker -ProbeRoot $ProbeRoot -Name $trigger)
+            $ownerTerminal = Assert-ExportTerminalEvent `
+                -Event (Wait-ForProbeEvent `
+                    -Path (Join-Path $ProbeRoot 'owner-terminal.json') `
+                    -Processes $processes `
+                    -ProbeRoot $ProbeRoot `
+                    -Contract 'export_terminal') `
+                -ExpectedProcessId $ownerProcessId `
+                -ExpectedTopology $Topology `
+                -ExpectedWindowLabel $ownerWindow `
+                -ExpectedScenario $Scenario `
+                -ExpectedState 'owner_terminal'
+
+            if ($sidecarWasMoved) {
+                Move-Item `
+                    -LiteralPath $sidecarBackupPath `
+                    -Destination $imagingExecutablePath
+                $sidecarWasMoved = $false
+            }
+            [void] (Open-ProbeMarker `
+                -ProbeRoot $ProbeRoot `
+                -Name 'allow-successor')
+        }
+
+        $challengerSuccess = Assert-ExportTerminalEvent `
+            -Event (Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'challenger-success.json') `
+                -Processes $processes `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'export_terminal') `
+            -ExpectedProcessId $challengerProcess.Id `
+            -ExpectedTopology $Topology `
+            -ExpectedWindowLabel $challengerWindow `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'challenger_success'
+
+        $stopwatch.Stop()
+        return [ordered]@{
+            topology = $Topology
+            scenario = $Scenario
+            passed = $true
+            startedAtUtc = $startedAt.ToString('o')
+            elapsedMs = [long] $stopwatch.ElapsedMilliseconds
+            ownerProcessId = $ownerProcessId
+            successorProcessId = [int] $challengerProcess.Id
+            ownerTerminated = $ownerTerminated
+            ownerReady = $ownerReady
+            challengerConflict = $challengerConflict
+            ownerTerminal = $ownerTerminal
+            challengerSuccess = $challengerSuccess
+        }
+    }
+    finally {
+        $stopwatch.Stop()
+        try {
+            foreach ($process in @($scenarioProcesses)) {
+                Stop-OwnedOperationProbeProcess -Process $process
+            }
+        }
+        finally {
+            if ($sidecarWasMoved) {
+                if (Test-Path -LiteralPath $imagingExecutablePath) {
+                    throw 'Refusing to overwrite the restored imaging sidecar.'
+                }
+                Move-Item `
+                    -LiteralPath $sidecarBackupPath `
+                    -Destination $imagingExecutablePath
+            }
+        }
+    }
+}
+
+try {
 try {
     Set-OperationProbeEnvironmentValue `
         -Name 'CARGO_TARGET_DIR' `
-        -Value $targetDirectory
+        -Value $rustCheckTargetDirectory
+    Set-OperationProbeEnvironmentValue `
+        -Name 'CARGO_BUILD_JOBS' `
+        -Value ([string] $CargoBuildJobs)
     Push-Location $script:WorkspaceRoot
     $locationWasPushed = $true
     $initialBuildInputState = Get-BuildInputState
     Test-StrictProbeEventParser -ProbeRoot $independentRoot
+    Test-StrictExportTerminalEventParser `
+        -ProbeRoot $terminalRoots['independent']['success']
 
     $rustChecks = @(
         [ordered]@{
@@ -663,6 +1294,18 @@ try {
                 'myalbuns-desktop',
                 '--lib',
                 'operation_gate_probe::tests::',
+                '--',
+                '--nocapture'
+            )
+        },
+        [ordered]@{
+            name = 'export-terminal-probe-contract'
+            arguments = @(
+                'test',
+                '-p',
+                'myalbuns-desktop',
+                '--lib',
+                'export_terminal_probe::tests::',
                 '--',
                 '--nocapture'
             )
@@ -779,6 +1422,10 @@ try {
             -Arguments @($check.arguments)
     }
 
+    Set-OperationProbeEnvironmentValue `
+        -Name 'CARGO_TARGET_DIR' `
+        -Value $targetDirectory
+
     $buildStartedAt = [DateTimeOffset]::UtcNow
     $buildStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     & (Join-Path $PSScriptRoot 'Invoke-LocalTauri.ps1') build --no-bundle
@@ -789,6 +1436,9 @@ try {
     }
     if (-not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
         throw "The real desktop executable was not produced at '$executablePath'."
+    }
+    if (-not (Test-Path -LiteralPath $imagingExecutablePath -PathType Leaf)) {
+        throw "The real imaging sidecar was not produced at '$imagingExecutablePath'."
     }
     $checks.Add([ordered]@{
         name = 'real-desktop-build'
@@ -822,12 +1472,21 @@ try {
         builtAtUtc = $buildStartedAt.ToString('o')
         elapsedMs = [long] $buildStopwatch.ElapsedMilliseconds
         profile = 'release'
+        cargoBuildJobs = $CargoBuildJobs
+        rustCheckTarget = 'target'
         executable = $executableRelativePath
         executableBytes = [long] (
             Get-Item -LiteralPath $executablePath
         ).Length
         executableSha256 = (
             Get-FileHash -LiteralPath $executablePath -Algorithm SHA256
+        ).Hash.ToLowerInvariant()
+        imagingExecutable = $imagingExecutableRelativePath
+        imagingExecutableBytes = [long] (
+            Get-Item -LiteralPath $imagingExecutablePath
+        ).Length
+        imagingExecutableSha256 = (
+            Get-FileHash -LiteralPath $imagingExecutablePath -Algorithm SHA256
         ).Hash.ToLowerInvariant()
         buildInputFileCount = $buildInputState.fileCount
         buildInputDigestSha256 = $buildInputState.digestSha256
@@ -852,11 +1511,53 @@ try {
         elapsedMs = $multiwindow.elapsedMs
     })
 
+    $terminalResults = [ordered]@{
+        independent = [ordered]@{}
+        multiwindow = [ordered]@{}
+    }
+    foreach ($topology in @('independent', 'multiwindow')) {
+        foreach ($scenario in $terminalScenarios) {
+            $result = Invoke-ExportTerminalScenario `
+                -Topology $topology `
+                -Scenario $scenario `
+                -ProbeRoot $terminalRoots[$topology][$scenario]
+            $terminalResults[$topology][$scenario] = $result
+            $checks.Add([ordered]@{
+                name = "export-terminal-$topology-$scenario"
+                passed = $result.passed
+                elapsedMs = $result.elapsedMs
+            })
+        }
+    }
+    $restoredImagingSha256 = (
+        Get-FileHash -LiteralPath $imagingExecutablePath -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    if ($restoredImagingSha256 -cne $build.imagingExecutableSha256) {
+        throw 'The imaging sidecar was not restored byte-for-byte after fault injection.'
+    }
+    $checks.Add([ordered]@{
+        name = 'imaging-sidecar-restored-after-failure-probes'
+        passed = $true
+        elapsedMs = 0
+    })
+    $finalBuildInputState = Get-BuildInputState
+    if (
+        $finalBuildInputState.fileCount -ne $buildInputState.fileCount -or
+        $finalBuildInputState.digestSha256 -cne
+            $buildInputState.digestSha256 -or
+        $finalBuildInputState.dirty -ne $buildInputState.dirty
+    ) {
+        throw (
+            'Export terminal probes changed source inputs after the build; ' +
+            'the evidence cannot be tied to one source state.'
+        )
+    }
+
     $report = [ordered]@{
-        schemaVersion = 1
+        schemaVersion = 2
         collectedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
         gitCommit = $gitCommit
-        sourceInputsDirty = $buildInputState.dirty
+        sourceInputsDirty = $finalBuildInputState.dirty
         platform = [ordered]@{
             operatingSystem = [System.Environment]::OSVersion.VersionString
             architecture = (
@@ -870,12 +1571,15 @@ try {
         results = [ordered]@{
             independent = $independent
             multiwindow = $multiwindow
+            exportTerminalMatrix = $terminalResults
         }
         limits = [ordered]@{
             batchRunner = $false
             multiOutputPromotion = $false
             projectOpenGuardian = $false
-            exportCancellationEntryPoint = $false
+            exportCancellationEntryPoint = $true
+            progressChannel = $true
+            uiCancellationFlow = $false
             progressWindow = $false
         }
     }
@@ -905,6 +1609,36 @@ finally {
     }
     catch {
         $cleanupErrors.Add($_.Exception.Message)
+    }
+    try {
+        Set-OperationProbeEnvironmentValue `
+            -Name 'CARGO_BUILD_JOBS' `
+            -Value $previousCargoBuildJobs
+    }
+    catch {
+        $cleanupErrors.Add($_.Exception.Message)
+    }
+
+    foreach ($topology in @('independent', 'multiwindow')) {
+        $backupPath = Join-Path `
+            $terminalRoots[$topology]['failure'] `
+            'myalbuns-imaging.exe.disabled'
+        if (Test-Path -LiteralPath $backupPath -PathType Leaf) {
+            try {
+                if (Test-Path -LiteralPath $imagingExecutablePath) {
+                    throw (
+                        'An imaging sidecar backup remains, but the release ' +
+                        'destination is already occupied.'
+                    )
+                }
+                Move-Item `
+                    -LiteralPath $backupPath `
+                    -Destination $imagingExecutablePath
+            }
+            catch {
+                $cleanupErrors.Add($_.Exception.Message)
+            }
+        }
     }
 
     if ($cleanupErrors.Count -eq 0) {
@@ -948,3 +1682,18 @@ $json = $report | ConvertTo-Json -Depth 10
 )
 Write-Output "OperationGate report: $OutputPath"
 Write-Output $json
+}
+finally {
+    if ($runnerMutexHeld) {
+        try {
+            $runnerMutex.ReleaseMutex()
+            $runnerMutexHeld = $false
+        }
+        finally {
+            $runnerMutex.Dispose()
+        }
+    }
+    else {
+        $runnerMutex.Dispose()
+    }
+}

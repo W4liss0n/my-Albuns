@@ -3,6 +3,7 @@ mod cache_engine;
 mod export_attempts;
 mod export_pipeline;
 mod export_probe_commands;
+mod export_terminal_probe;
 pub(crate) mod global_process_spike;
 mod imaging_processor;
 #[cfg(test)]
@@ -28,6 +29,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use cache_engine::CacheEngine;
 use export_attempts::ExportAttempts;
 use export_probe_commands::{cancel_export_spike, export_spike};
+use export_terminal_probe::ExportTerminalProbe;
 use imaging_processor::ImagingProcessor;
 use logging::frontend_log;
 use media_preview_commands::prepare_media_previews;
@@ -61,7 +63,14 @@ pub fn run() {
         .unwrap_or_else(|error| panic!("corpus inválido do spike de topologia: {error}"));
     let operation_gate_probe = OperationGateProbe::from_environment(&topology)
         .unwrap_or_else(|error| panic!("probe de OperationGate inválido: {error}"));
-    let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some() {
+    let export_terminal_probe = ExportTerminalProbe::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("probe terminal de Exportação inválido: {error}"));
+    if operation_gate_probe.is_some() && export_terminal_probe.is_some() {
+        panic!("os probes de OperationGate e de terminais de Exportação são exclusivos");
+    }
+    let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some()
+        || export_terminal_probe.is_some()
+    {
         (
             TopologyBenchmarkState::disabled(&topology),
             TopologyFaultProbeState::disabled(&topology),
@@ -129,6 +138,11 @@ pub fn run() {
             }
             if let Some(operation_gate_probe) = operation_gate_probe {
                 operation_gate_probe
+                    .start(app.handle())
+                    .map_err(std::io::Error::other)?;
+            }
+            if let Some(export_terminal_probe) = export_terminal_probe {
+                export_terminal_probe
                     .start(app.handle())
                     .map_err(std::io::Error::other)?;
             }
