@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-29
-updated: 2026-07-29
+updated: 2026-07-30
 ---
 
 # Recuperação do Processador de Imagens
@@ -89,21 +89,21 @@ tentativa incompleta ou se os hashes protegidos mudarem.
 
 | Evidência | Resultado observado |
 |---|---|
-| Processo de Cache encerrado | PID `12088` |
-| Processo reiniciado para Cache | PID `26140` |
+| Processo de Cache encerrado | PID `37368` |
+| Processo reiniciado para Cache | PID `28160` |
 | Temporários do PID encerrado removidos | `1` |
 | Temporário de outro PID preservado | sim |
 | `metadata.json` depois da queda | ausente |
 | `metadata.json` depois do reinício | presente |
-| Processo de Exportação encerrado | PID `10276` |
+| Processo de Exportação encerrado | PID `424` |
 | Resposta de sucesso antes da nova tentativa | não |
 | Política de fonte | `linkedOriginals` |
-| Processo da tentativa explícita | PID `29764` |
+| Processo da tentativa explícita | PID `24656` |
 
 O SHA-256 da Exportação publicada anterior permaneceu
 `30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79`
 antes e depois da queda. O SHA-256 da revisão do Projeto permaneceu
-`1fa39a7104b6080a3397beb98dd073295e9bbaf07886f5593b5baa4a955d6c70`.
+`2bff41c103c1b6acf7f9f01f64d8cfb158bf4e79252056cb5ed9e9d515cab193`.
 A tentativa explícita publicou outro PNG, com SHA-256
 `845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb`.
 
