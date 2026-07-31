@@ -173,7 +173,28 @@ $reportText = @'
     "cpu": "Processador",
     "physicalMemory": "Mem\u00f3ria f\u00edsica",
     "notMeasured": "Campos ainda n\u00e3o medidos",
-    "notes": "Observa\u00e7\u00f5es"
+    "notes": "Observa\u00e7\u00f5es",
+    "failureSection": "Falhas controladas",
+    "evidence": "Evid\u00eancia",
+    "globalOwnWindows": "Janelas pr\u00f3prias do processo global leve",
+    "globalWorkingSet": "Working set do processo global leve",
+    "windowsWhileGlobalUnavailable": "Janelas preservadas com o processo global indispon\u00edvel",
+    "projectsWhileGlobalUnavailable": "Projetos editados, salvos e relidos com o global indispon\u00edvel",
+    "globalExplicitRestart": "Rein\u00edcio global expl\u00edcito trocou o PID",
+    "projectsAfterGlobalRestart": "Projetos editados, salvos e relidos ap\u00f3s o rein\u00edcio global",
+    "windowsAfterHostFailure": "Janelas depois da queda do host",
+    "savedRevisionReopened": "\u00daltima revis\u00e3o salva reaberta ap\u00f3s rein\u00edcio expl\u00edcito do host",
+    "interruptedGlobalLinks": "Rela\u00e7\u00f5es host \u2192 global interrompidas pela queda global",
+    "minimumHostCommands": "Comandos m\u00ednimos ao host por probe de Projeto",
+    "minimumCorrelatedInteractions": "Intera\u00e7\u00f5es correlacionadas m\u00ednimas, incluindo status global",
+    "probeFailureEvents": "Eventos de falha do probe",
+    "ipcExplanation": "Os quatro comandos m\u00ednimos por probe s\u00e3o `topology_fault_probe_config`, `project_state`, `apply_project_intent` e `persist_topology_fault_probe`. A quinta intera\u00e7\u00e3o \u00e9 o status tipado do host para o processo global. Polls adicionais n\u00e3o s\u00e3o estimados.",
+    "imagingSection": "Processador de Imagens",
+    "validatedArtifact": "Artefato validado",
+    "artifactSha256": "SHA-256",
+    "cacheRecovered": "Cache recuperou ap\u00f3s um rein\u00edcio expl\u00edcito",
+    "exportFailedSafely": "Exporta\u00e7\u00e3o falhou com seguran\u00e7a at\u00e9 o retry expl\u00edcito",
+    "sameTopologyBuildCommit": "Mesmo commit da build topol\u00f3gica"
   }
 }
 '@ | ConvertFrom-Json
@@ -1836,6 +1857,15 @@ function Write-TopologyMarkdownSummary {
     $multiwindowHostReopened = if (
         $multiwindowReopenedProjectCount -eq 2
     ) { $yes } else { $no }
+    $cacheRecovered = if (
+        $Report.failureGate.imagingProcessor.cacheRecoveredAfterOneExplicitRestart
+    ) { $yes } else { $no }
+    $exportFailedSafely = if (
+        $Report.failureGate.imagingProcessor.exportFailedSafelyUntilExplicitRetry
+    ) { $yes } else { $no }
+    $sameTopologyBuildCommit = if (
+        $Report.failureGate.imagingProcessor.sameGitCommitAsTopologyBuild
+    ) { $yes } else { $no }
 
     $markdown = @(
         '---'
@@ -1893,32 +1923,32 @@ function Write-TopologyMarkdownSummary {
         "| $($summary.exportOutput) | $(Format-Mebibytes $independent.interaction.export.outputBytes) MiB | $(Format-Mebibytes $multiwindow.interaction.export.outputBytes) MiB |"
         "| $($summary.afterCrash) | $independentAfterCrash | $multiwindowAfterCrash |"
         ''
-        '## Falhas controladas'
+        "## $($summary.failureSection)"
         ''
-        '| Evidência | A — hosts independentes | B — host multiwindow |'
+        "| $($summary.evidence) | $($summary.independent) | $($summary.multiwindow) |"
         '|---|---:|---:|'
-        "| Janelas próprias do processo global leve | $($independent.forcedFailure.globalProcess.initial.visibleWindowCount) | $($multiwindow.forcedFailure.globalProcess.initial.visibleWindowCount) |"
-        "| Working set do processo global leve | $(Format-Mebibytes $independent.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB | $(Format-Mebibytes $multiwindow.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB |"
-        "| Janelas preservadas com o processo global indisponível | $($independent.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) | $($multiwindow.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) |"
-        "| Projetos editados, salvos e relidos com o global indisponível | $($independent.forcedFailure.globalProcess.offlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.offlineContinuity.observedCompletions) |"
-        "| Reinício global explícito trocou o PID | $independentGlobalRestarted | $multiwindowGlobalRestarted |"
-        "| Projetos editados, salvos e relidos após o reinício global | $($independent.forcedFailure.globalProcess.onlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.onlineContinuity.observedCompletions) |"
-        "| Janelas depois da queda do host | $independentAfterCrash | $multiwindowAfterCrash |"
-        "| Última revisão salva reaberta após reinício explícito do host | $independentHostReopened | $multiwindowHostReopened |"
-        "| Relações host → global interrompidas pela queda global | $($independent.forcedFailure.ipc.linksInterruptedByGlobalCrash) | $($multiwindow.forcedFailure.ipc.linksInterruptedByGlobalCrash) |"
-        "| Comandos mínimos ao host por probe de Projeto | $($independent.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) |"
-        "| Interações correlacionadas mínimas, incluindo status global | $($independent.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) |"
-        "| Eventos de falha do probe | $($independent.forcedFailure.logs.projectHosts.continuityFailureEvents) | $($multiwindow.forcedFailure.logs.projectHosts.continuityFailureEvents) |"
+        "| $($summary.globalOwnWindows) | $($independent.forcedFailure.globalProcess.initial.visibleWindowCount) | $($multiwindow.forcedFailure.globalProcess.initial.visibleWindowCount) |"
+        "| $($summary.globalWorkingSet) | $(Format-Mebibytes $independent.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB | $(Format-Mebibytes $multiwindow.forcedFailure.globalProcess.initial.processes.workingSetBytes) MiB |"
+        "| $($summary.windowsWhileGlobalUnavailable) | $($independent.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) | $($multiwindow.forcedFailure.globalProcess.windowsWhileUnavailable.observedCount) |"
+        "| $($summary.projectsWhileGlobalUnavailable) | $($independent.forcedFailure.globalProcess.offlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.offlineContinuity.observedCompletions) |"
+        "| $($summary.globalExplicitRestart) | $independentGlobalRestarted | $multiwindowGlobalRestarted |"
+        "| $($summary.projectsAfterGlobalRestart) | $($independent.forcedFailure.globalProcess.onlineContinuity.observedCompletions) | $($multiwindow.forcedFailure.globalProcess.onlineContinuity.observedCompletions) |"
+        "| $($summary.windowsAfterHostFailure) | $independentAfterCrash | $multiwindowAfterCrash |"
+        "| $($summary.savedRevisionReopened) | $independentHostReopened | $multiwindowHostReopened |"
+        "| $($summary.interruptedGlobalLinks) | $($independent.forcedFailure.ipc.linksInterruptedByGlobalCrash) | $($multiwindow.forcedFailure.ipc.linksInterruptedByGlobalCrash) |"
+        "| $($summary.minimumHostCommands) | $($independent.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumProjectHostCommandsPerProjectProbe) |"
+        "| $($summary.minimumCorrelatedInteractions) | $($independent.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) | $($multiwindow.forcedFailure.ipc.minimumCorrelatedInteractionsPerProjectProbe) |"
+        "| $($summary.probeFailureEvents) | $($independent.forcedFailure.logs.projectHosts.continuityFailureEvents) | $($multiwindow.forcedFailure.logs.projectHosts.continuityFailureEvents) |"
         ''
-        'Os quatro comandos mínimos por probe são `topology_fault_probe_config`, `project_state`, `apply_project_intent` e `persist_topology_fault_probe`. A quinta interação é o status tipado do host para o processo global. Polls adicionais não são estimados.'
+        "$($summary.ipcExplanation)"
         ''
-        '## Processador de Imagens'
+        "## $($summary.imagingSection)"
         ''
-        "- Artefato validado: ``$($Report.failureGate.imagingProcessor.artifact)``."
-        "- SHA-256: ``$($Report.failureGate.imagingProcessor.artifactSha256)``."
-        "- Cache recuperou após um reinício explícito: $($Report.failureGate.imagingProcessor.cacheRecoveredAfterOneExplicitRestart)."
-        "- Exportação falhou com segurança até o retry explícito: $($Report.failureGate.imagingProcessor.exportFailedSafelyUntilExplicitRetry)."
-        "- Mesmo commit da build topológica: $($Report.failureGate.imagingProcessor.sameGitCommitAsTopologyBuild)."
+        "- $($summary.validatedArtifact): ``$($Report.failureGate.imagingProcessor.artifact)``."
+        "- $($summary.artifactSha256): ``$($Report.failureGate.imagingProcessor.artifactSha256)``."
+        "- $($summary.cacheRecovered): $cacheRecovered."
+        "- $($summary.exportFailedSafely): $exportFailedSafely."
+        "- $($summary.sameTopologyBuildCommit): $sameTopologyBuildCommit."
         ''
         "## $($summary.corpus)"
         ''
@@ -1960,10 +1990,32 @@ function Write-TopologyMarkdownSummary {
     )
     $markdown += @($Report.notes | ForEach-Object { "- $_" })
 
+    $markdownText = ($markdown -join [System.Environment]::NewLine) +
+        [System.Environment]::NewLine
+    $mojibakeSequences = @(
+        ([char] 0x00c2).ToString()
+        ([char] 0x00c3).ToString()
+        (([char] 0x00e2).ToString() + [char] 0x20ac)
+        (([char] 0x00e2).ToString() + [char] 0x2020)
+    )
+    foreach ($sequence in $mojibakeSequences) {
+        if ($markdownText.IndexOf($sequence) -ge 0) {
+            throw 'The generated Markdown summary contains mojibake.'
+        }
+    }
+    foreach ($requiredText in @(
+        $summary.evidence,
+        $summary.globalExplicitRestart,
+        $summary.imagingSection
+    )) {
+        if (-not $markdownText.Contains($requiredText)) {
+            throw 'The generated Markdown summary lost localized text.'
+        }
+    }
+
     [System.IO.File]::WriteAllText(
         $SummaryPath,
-        ($markdown -join [System.Environment]::NewLine) +
-            [System.Environment]::NewLine,
+        $markdownText,
         [System.Text.UTF8Encoding]::new($false)
     )
 }
