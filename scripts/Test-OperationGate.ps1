@@ -146,6 +146,14 @@ function Set-OperationProbeEnvironmentValue {
     )
 }
 
+function Assert-BatchScenarioName {
+    param([Parameter(Mandatory = $true)][string] $Scenario)
+
+    if ($script:batchScenarios -cnotcontains $Scenario) {
+        throw "Unknown Batch lease scenario '$Scenario'."
+    }
+}
+
 function Invoke-RustCheck {
     param(
         [Parameter(Mandatory = $true)]
@@ -201,14 +209,22 @@ function Start-OperationProbeProcess {
         [string] $TerminalScenario,
         [ValidateSet('matrix', 'successor')]
         [string] $TerminalPhase = 'matrix',
-        [ValidateSet(
-            'success',
-            'before_preparation',
-            'between_promotions',
-            'owner_death'
-        )]
         [string] $BatchScenario
     )
+
+    $hasTerminalScenario = -not [string]::IsNullOrWhiteSpace(
+        $TerminalScenario
+    )
+    $hasBatchScenario = -not [string]::IsNullOrWhiteSpace($BatchScenario)
+    if ($hasTerminalScenario -and $hasBatchScenario) {
+        throw 'A probe process cannot run terminal and Batch scenarios together.'
+    }
+    if ($hasBatchScenario) {
+        Assert-BatchScenarioName -Scenario $BatchScenario
+        if ($Topology -cne 'independent') {
+            throw 'The Batch lease probe supports only independent hosts.'
+        }
+    }
 
     $environment = [ordered]@{
         MYALBUNS_PROCESS_ROLE = $null
@@ -230,11 +246,11 @@ function Start-OperationProbeProcess {
         MYALBUNS_BATCH_LEASE_PROBE_ROOT = $null
         MYALBUNS_BATCH_LEASE_PROBE_SCENARIO = $null
     }
-    if (-not [string]::IsNullOrWhiteSpace($BatchScenario)) {
+    if ($hasBatchScenario) {
         $environment.MYALBUNS_BATCH_LEASE_PROBE_ROOT = $ProbeRoot
         $environment.MYALBUNS_BATCH_LEASE_PROBE_SCENARIO = $BatchScenario
     }
-    elseif ([string]::IsNullOrWhiteSpace($TerminalScenario)) {
+    elseif (-not $hasTerminalScenario) {
         $environment.MYALBUNS_OPERATION_GATE_PROBE_ROOT = $ProbeRoot
     }
     else {
@@ -1393,12 +1409,6 @@ function Assert-BatchLeaseEvent {
         [Parameter(Mandatory = $true)]
         [int] $ExpectedProcessId,
         [Parameter(Mandatory = $true)]
-        [ValidateSet(
-            'success',
-            'before_preparation',
-            'between_promotions',
-            'owner_death'
-        )]
         [string] $ExpectedScenario,
         [Parameter(Mandatory = $true)]
         [ValidateSet(
@@ -1411,6 +1421,8 @@ function Assert-BatchLeaseEvent {
         )]
         [string] $ExpectedState
     )
+
+    Assert-BatchScenarioName -Scenario $ExpectedScenario
 
     $expectedTotalItems = if (
         $ExpectedScenario -eq 'success' -or
@@ -2040,16 +2052,12 @@ function Assert-NoBatchPreparationRemnants {
 function Invoke-BatchLeaseScenario {
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet(
-            'success',
-            'before_preparation',
-            'between_promotions',
-            'owner_death'
-        )]
         [string] $Scenario,
         [Parameter(Mandatory = $true)]
         [string] $ProbeRoot
     )
+
+    Assert-BatchScenarioName -Scenario $Scenario
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $startedAt = [DateTimeOffset]::UtcNow

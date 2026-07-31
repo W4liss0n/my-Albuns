@@ -1,13 +1,7 @@
 use std::{
-    fs::OpenOptions,
-    io::Write,
-    path::{Component, Path, PathBuf},
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     thread,
-    time::{Duration, Instant},
 };
 
 use myalbuns_core::ProjectCore;
@@ -21,14 +15,16 @@ use crate::{
     cache_engine::CacheEngine,
     export_pipeline::{ExportFailureStage, ExportOptions, plan},
     export_probe_commands::{ExportCommandError, ExportResult},
-    export_terminal_probe::{
-        ProbeCapture, capture_snapshot, execute_real_export, observing_channel,
-        verify_and_remove_output,
-    },
     imaging_processor::ImagingProcessor,
     logging::LoggingState,
     operation_gate::OperationGate,
     path_io,
+    probe_support::{
+        ExportProbeCapture as ProbeCapture, capture_snapshot, execute_real_export,
+        observing_channel, optional_utf8_environment, validate_probe_root,
+        verify_and_remove_output, wait_for_file_async, wait_for_file_blocking,
+        write_json_atomic_new,
+    },
     sample_project::SampleProject,
     topology_spike::TopologySpike,
 };
@@ -36,10 +32,7 @@ use crate::{
 pub(crate) const BATCH_LEASE_PROBE_ROOT_ENV: &str = "MYALBUNS_BATCH_LEASE_PROBE_ROOT";
 pub(crate) const BATCH_LEASE_PROBE_SCENARIO_ENV: &str = "MYALBUNS_BATCH_LEASE_PROBE_SCENARIO";
 
-const PROBE_TIMEOUT: Duration = Duration::from_secs(60);
-const PROBE_POLL_INTERVAL: Duration = Duration::from_millis(20);
 const LEASE_RESOURCES: [&str; 3] = ["operation_gate", "cache_pause", "processor_reservation"];
-static TEMPORARY_FILE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -857,51 +850,6 @@ fn record_owner_failure(capture: &Arc<Mutex<OwnerCapture>>, reason: String) {
     }
 }
 
-fn optional_utf8_environment(name: &str) -> Result<Option<String>, String> {
-    std::env::var_os(name)
-        .map(|value| {
-            value
-                .into_string()
-                .map_err(|_| format!("{name} precisa conter texto Unicode válido."))
-        })
-        .transpose()
-}
-
-fn validate_probe_root(root: &Path) -> Result<(), String> {
-    if !root.is_absolute() || !root.is_dir() {
-        return Err("A raiz do probe do lote precisa ser um diretório absoluto existente.".into());
-    }
-    if !root
-        .components()
-        .any(|component| component == Component::Normal(".scratch".as_ref()))
-    {
-        return Err("A raiz do probe do lote precisa permanecer sob .scratch.".into());
-    }
-    Ok(())
-}
-
-fn wait_for_file_blocking(path: &Path, description: &str) -> Result<(), String> {
-    let deadline = Instant::now() + PROBE_TIMEOUT;
-    while Instant::now() < deadline {
-        if path.is_file() {
-            return Ok(());
-        }
-        thread::sleep(PROBE_POLL_INTERVAL);
-    }
-    Err(format!("{description} excedeu o limite do probe"))
-}
-
-async fn wait_for_file_async(path: &Path, description: &str) -> Result<(), String> {
-    let deadline = Instant::now() + PROBE_TIMEOUT;
-    while Instant::now() < deadline {
-        if path.is_file() {
-            return Ok(());
-        }
-        tokio::time::sleep(PROBE_POLL_INTERVAL).await;
-    }
-    Err(format!("{description} excedeu o limite do probe"))
-}
-
 fn write_failure(
     root: &Path,
     role: ProbeRole,
@@ -926,45 +874,6 @@ fn write_failure(
 
 fn write_event(root: &Path, event: &ProbeEvent) -> Result<(), String> {
     write_json_atomic_new(&root.join(event.state.file_name()), event)
-}
-
-fn write_json_atomic_new(path: &Path, value: &impl Serialize) -> Result<(), String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| "O evento do probe não possui diretório pai.".to_string())?;
-    let metadata = std::fs::symlink_metadata(parent)
-        .map_err(|error| format!("Não foi possível inspecionar o diretório do probe: {error}"))?;
-    if !metadata.is_dir() || metadata.file_type().is_symlink() || path.exists() {
-        return Err("O Destino do evento do probe é inválido ou já existe.".into());
-    }
-    let bytes = serde_json::to_vec_pretty(value)
-        .map_err(|error| format!("Não foi possível serializar o evento do probe: {error}"))?;
-    let file_name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| "O nome do evento do probe é inválido.".to_string())?;
-    let temporary_path = parent.join(format!(
-        ".{file_name}.{}.{}.tmp",
-        std::process::id(),
-        TEMPORARY_FILE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
-    ));
-    let write_result = (|| {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary_path)
-            .map_err(|error| format!("Não foi possível criar o evento temporário: {error}"))?;
-        file.write_all(&bytes)
-            .and_then(|_| file.flush())
-            .and_then(|_| file.sync_all())
-            .map_err(|error| format!("Não foi possível sincronizar o evento: {error}"))?;
-        std::fs::rename(&temporary_path, path)
-            .map_err(|error| format!("Não foi possível publicar o evento: {error}"))
-    })();
-    if write_result.is_err() {
-        let _ = std::fs::remove_file(&temporary_path);
-    }
-    write_result
 }
 
 #[cfg(test)]

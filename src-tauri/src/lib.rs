@@ -16,6 +16,7 @@ mod operation_gate;
 mod operation_gate_probe;
 mod operation_lease;
 mod path_io;
+mod probe_support;
 mod project_commands;
 mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
