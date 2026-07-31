@@ -136,8 +136,11 @@ falha, cancelamento antes do início e cancelamento em voo. A Exportação norma
 do desktop usa o novo lease e conserva a reserva até o fim da execução.
 
 Essas duas evidências são complementares, mas não equivalem ainda a um
-cancelamento iniciado pela interface: o comando atual cria um token local que
-não possui entrada externa para ser alterado.
+cancelamento iniciado pela interface. Na coleta do artefato `0009`, o comando
+ainda criava um token local sem entrada externa. A implementação posterior
+desse contrato está registrada em
+[`0018-progresso-e-cancelamento-da-exportacao-normal.md`](0018-progresso-e-cancelamento-da-exportacao-normal.md);
+ela não altera retroativamente o alcance da execução A/B deste documento.
 
 ## Limites da conclusão
 
@@ -148,8 +151,8 @@ não possui entrada externa para ser alterado.
   adquire o mesmo lease, nem falha entre duas promoções de saída.
 - `BatchExclusive` e `CacheMaintenance` possuem contrato e conflitos, mas
   ainda não têm fluxos produtivos conectados.
-- A interface real ainda não possui entrada de cancelamento nem Janela de
-  progresso conectada à tentativa de Exportação.
+- O artefato `0009` não exercita a entrada de cancelamento nem a Janela de
+  progresso conectadas posteriormente; a matriz terminal A/B continua aberta.
 - O guardião de abertura e a focalização de uma `ProjectSession` existente
   ainda não foram implementados. O gate operacional e a trava de arquivo são
   módulos distintos, e ambos recuperam a morte de um proprietário em ensaios
@@ -163,8 +166,9 @@ O corte estabelece as fronteiras estruturais necessárias sem antecipar as
 operações que ainda não existem. O gate possui somente exclusividade global,
 o lease possui somente ordem e garantia de liberação, e cada recurso continua
 com seu próprio estado. A Exportação normal já atravessa o caminho único de
-reserva; lote, manutenção total, cancelamento pela interface e guardião de
-abertura continuam como gates explícitos.
+reserva. A conexão posterior do cancelamento e do progresso está documentada
+em `0018`; lote, manutenção total, matriz terminal A/B e guardião de abertura
+continuam como gates explícitos.
 
 ## Repetição
 
