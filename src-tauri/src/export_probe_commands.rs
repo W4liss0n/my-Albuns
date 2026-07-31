@@ -5,7 +5,6 @@ use std::{
 
 use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::OperationPathContext;
 use serde::Serialize;
 use tauri::{AppHandle, State, WebviewWindow};
 
@@ -13,6 +12,7 @@ use crate::{
     export_pipeline,
     imaging_processor::{InvocationContext, TauriImagingTransport},
     logging::{LoggingState, log_imaging_failure},
+    path_io,
     project_host::ProjectHost,
 };
 
@@ -84,13 +84,12 @@ pub(crate) async fn export_spike(
         );
         failure.message
     })?;
-    let mut path_context = OperationPathContext::new();
-    for path in plan.required_paths() {
-        path_context
-            .capture(path)
-            .map_err(|error| error.to_string())?;
-    }
-    let root_bindings = path_context.freeze();
+    let operation_paths = plan
+        .required_paths()
+        .into_iter()
+        .map(|path| path.to_path_buf())
+        .collect();
+    let root_bindings = path_io::capture_root_bindings(operation_paths).await?;
 
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), project_id.clone());

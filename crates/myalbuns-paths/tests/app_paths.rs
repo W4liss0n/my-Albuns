@@ -6,7 +6,7 @@ use std::{
 use directories::BaseDirs;
 use myalbuns_paths::{
     AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, OperationPathContext,
-    PathRootKind,
+    PathRootKind, RootBindingPlan,
 };
 
 #[test]
@@ -330,6 +330,64 @@ fn a_mapped_drive_binding_keeps_its_unc_target_for_the_whole_attempt() {
         Path::new(r"\\servidor\acervo\Álbuns\Casamento\foto-02.jpg")
     );
     assert_eq!(bindings.bindings()[0].kind(), PathRootKind::Disk);
+}
+
+#[cfg(windows)]
+#[test]
+fn a_mapped_drive_can_bind_to_a_directory_below_the_unc_share_root() {
+    let logical = Path::new(r"Z:\Casamento\foto-01.jpg");
+    let mut context = OperationPathContext::new();
+    context
+        .capture_with_binding(logical, Path::new(r"\\servidor\acervo\2026\cliente"))
+        .expect("a mapped drive may target a directory inside its UNC share");
+    let bindings = context.freeze();
+
+    assert_eq!(
+        bindings
+            .resolve(Path::new(r"Z:\Casamento\foto-02.jpg"))
+            .expect("the suffix is applied below the captured UNC base"),
+        Path::new(r"\\servidor\acervo\2026\cliente\Casamento\foto-02.jpg")
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn root_binding_plan_round_trips_native_windows_paths_without_loss() {
+    use std::{
+        ffi::OsString,
+        os::windows::ffi::{OsStrExt, OsStringExt},
+    };
+
+    let mut native_units = r"\\server\share\opaque-".encode_utf16().collect::<Vec<_>>();
+    native_units.push(0xd800);
+    let operational_base = PathBuf::from(OsString::from_wide(&native_units));
+    let logical_path = PathBuf::from(r"R:\Photo.jpg");
+    let mut context = OperationPathContext::new();
+    context
+        .capture_with_binding(&logical_path, &operational_base)
+        .expect("an opaque native Windows binding component is accepted");
+    let original = context.freeze();
+
+    let wire = serde_json::to_vec(&original).expect("the native path has a reversible wire form");
+    assert!(
+        !String::from_utf8_lossy(&wire).contains('\u{fffd}'),
+        "the wire representation must not substitute native units"
+    );
+    let restored: RootBindingPlan =
+        serde_json::from_slice(&wire).expect("the reversible native path wire form decodes");
+    assert_eq!(
+        restored.bindings()[0]
+            .operational_root()
+            .as_os_str()
+            .encode_wide()
+            .collect::<Vec<_>>(),
+        native_units
+    );
+    let resolved = restored
+        .resolve(&logical_path)
+        .expect("the restored plan still binds the exact native path");
+
+    assert_eq!(resolved, operational_base.join("Photo.jpg"));
 }
 
 #[test]

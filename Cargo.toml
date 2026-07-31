@@ -29,5 +29,7 @@ ts-rs = { version = "12.0.1", features = ["serde-compat"] }
 tokio = { version = "1", features = ["time"] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
+    "Win32_NetworkManagement_WNet",
     "Win32_Storage_FileSystem",
+    "Win32_System_IO",
 ] }

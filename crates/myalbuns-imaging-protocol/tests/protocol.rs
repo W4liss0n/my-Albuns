@@ -121,8 +121,29 @@ fn host_and_processor_share_one_serialized_protocol() {
         "disk"
     );
     assert_eq!(
+        request_json["request"]["rootBindings"]["bindings"][0]["logicalRoot"]["encoding"],
+        "windowsUtf16"
+    );
+    assert!(
+        request_json["request"]["rootBindings"]["bindings"][0]["logicalRoot"]["units"]
+            .as_array()
+            .is_some_and(|units| !units.is_empty()),
+        "root bindings use the reversible native Windows wire form"
+    );
+    assert_eq!(
         decode_command(&command_payload).expect("command decodes"),
         command
+    );
+    let mut legacy_json = request_json.clone();
+    legacy_json["request"]["protocolVersion"] = serde_json::json!(8);
+    let legacy_command: ImagingCommand =
+        serde_json::from_value(legacy_json).expect("the old wire remains syntactically JSON");
+    let ImagingCommand::Render(legacy_request) = legacy_command else {
+        panic!("the fixture remains a Render command");
+    };
+    assert!(
+        legacy_request.validate().is_err(),
+        "protocol 8 is rejected after the native path wire format changed"
     );
     let mut unbound_request = request.clone();
     unbound_request.root_bindings = RootBindingPlan::default();

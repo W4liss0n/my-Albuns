@@ -27,6 +27,10 @@ use crate::{
 
 const PROCESSOR_ENV: &str = "MYALBUNS_REAL_IMAGING_PROCESSOR";
 const EVIDENCE_DIRECTORY_ENV: &str = "MYALBUNS_RECOVERY_EVIDENCE_DIR";
+const PATH_GATE_LOCAL_ROOT_ENV: &str = "MYALBUNS_PATH_GATE_LOCAL_ROOT";
+const PATH_GATE_UNC_ROOT_ENV: &str = "MYALBUNS_PATH_GATE_UNC_ROOT";
+const PATH_GATE_DRIVE_ENV: &str = "MYALBUNS_PATH_GATE_DRIVE";
+const PATH_GATE_SIDECAR_EVIDENCE_ENV: &str = "MYALBUNS_PATH_GATE_SIDECAR_EVIDENCE";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum CrashNext {
@@ -505,4 +509,224 @@ fn real_processor_recovery_flows_through_production_modules() {
             .clear_project_cache(&cache_paths)
             .expect("the isolated Cache is removed");
     });
+}
+
+#[test]
+#[ignore = "executed by scripts/Test-WindowsPathGate.ps1 with the real sidecar and UNC fixture"]
+fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
+    tauri::async_runtime::block_on(async {
+        let executable = PathBuf::from(
+            std::env::var_os(PROCESSOR_ENV)
+                .expect("the real imaging executable path is configured"),
+        );
+        assert!(executable.is_file(), "the real sidecar exists");
+        let local_root = PathBuf::from(
+            std::env::var_os(PATH_GATE_LOCAL_ROOT_ENV)
+                .expect("the local path-gate root is configured"),
+        );
+        let unc_root = PathBuf::from(
+            std::env::var_os(PATH_GATE_UNC_ROOT_ENV).expect("the UNC path-gate root is configured"),
+        );
+        let drive =
+            std::env::var(PATH_GATE_DRIVE_ENV).expect("the temporary drive letter is configured");
+        let local_sidecar_root = local_root.join("sidecar");
+        let unc_sidecar_root = unc_root.join("sidecar");
+        std::fs::create_dir_all(local_sidecar_root.join("exports"))
+            .expect("the sidecar fixture is materialized");
+        let mapping = TemporaryDriveMapping::new(&drive, &unc_sidecar_root);
+        let logical_root = PathBuf::from(format!(r"{drive}\"));
+        let logical_exports = logical_root.join("exports");
+        assert!(
+            logical_exports.is_dir(),
+            "the mapped UNC fixture is reachable"
+        );
+        let source = real_source(&logical_root);
+        let (session, snapshot, sheet_id) = export_snapshot();
+        let media_id = snapshot.composition.sheets[0].frames[0]
+            .photo
+            .as_ref()
+            .expect("the Export frame contains a Photo")
+            .media_id
+            .clone();
+        let source = MediaSource::new(
+            media_id,
+            source.source_path().to_path_buf(),
+            source.source_bytes(),
+            source.source_sha256(),
+        )
+        .expect("the mapped source matches the Export frame");
+        let output_path = logical_exports.join("Album-path-gate.png");
+        let unavailable_request_id = "export-real-unc-unavailable";
+        let unavailable_plan = export_pipeline::plan(
+            snapshot.clone(),
+            export_pipeline::ExportOptions::new(
+                unavailable_request_id,
+                logical_exports.join("Album-unavailable.png"),
+                sheet_id.clone(),
+                300,
+                Some(vec![source.clone()]),
+            ),
+        )
+        .expect("the unavailable UNC Export is planned");
+        let unavailable_bindings = root_bindings(&unavailable_plan.required_paths());
+        let unavailable_operational_output = unavailable_bindings
+            .resolve(&logical_exports.join("Album-unavailable.png"))
+            .expect("the unavailable output has a frozen UNC binding");
+        let unavailable_log_directory = local_sidecar_root.join("unavailable-logs");
+
+        mapping.unmap();
+        let offline_sidecar_root = local_root.join("sidecar-offline");
+        std::fs::rename(&local_sidecar_root, &offline_sidecar_root)
+            .expect("the captured operational binding becomes unavailable");
+        let mut unavailable_transport = RealProcessTransport::new(
+            executable.clone(),
+            unavailable_log_directory,
+            CrashNext::Never,
+        );
+        let cancellation = AtomicBool::new(false);
+        let progress = |_| {};
+        let unavailable_context = InvocationContext::new(
+            unavailable_request_id,
+            Some(session.state().project_id.clone()),
+        );
+        let unavailable_failure = export_pipeline::execute(
+            &mut unavailable_transport,
+            unavailable_plan,
+            &unavailable_bindings,
+            &cancellation,
+            &progress,
+            &unavailable_context,
+        )
+        .await
+        .expect_err("an inaccessible frozen binding fails without implicit retry");
+        assert_eq!(
+            unavailable_failure.stage,
+            export_pipeline::ExportFailureStage::Prepare
+        );
+        assert!(unavailable_transport.process_ids.is_empty());
+        assert!(!unavailable_operational_output.exists());
+        std::fs::rename(&offline_sidecar_root, &local_sidecar_root)
+            .expect("the UNC fixture is restored for an explicit retry");
+
+        mapping.map_to(&unc_sidecar_root);
+        let request_id = "export-real-unc-plan";
+        let plan = export_pipeline::plan(
+            snapshot,
+            export_pipeline::ExportOptions::new(
+                request_id,
+                output_path.clone(),
+                sheet_id,
+                300,
+                Some(vec![source]),
+            ),
+        )
+        .expect("the real UNC Export is planned");
+        let bindings = root_bindings(&plan.required_paths());
+        let plan_wire = serde_json::to_vec(&bindings).expect("the frozen plan serializes");
+        let plan_sha256 = format!("{:x}", Sha256::digest(&plan_wire));
+        let logical_preparation = ExportPathPlan::new(output_path.clone(), request_id)
+            .expect("the logical Export path is valid")
+            .preparation_directory()
+            .to_path_buf();
+        let operational_output = bindings
+            .resolve(&output_path)
+            .expect("the output resolves to its frozen UNC binding");
+        let operational_preparation = bindings
+            .resolve(&logical_preparation)
+            .expect("the staging resolves to the same frozen UNC binding");
+        assert!(operational_output.starts_with(&unc_sidecar_root));
+        assert!(operational_preparation.starts_with(&unc_sidecar_root));
+
+        mapping.unmap();
+        assert!(
+            !logical_root.exists(),
+            "the mapped drive is absent before host preparation and sidecar dispatch"
+        );
+
+        let log_directory = local_sidecar_root.join("logs");
+        std::fs::create_dir_all(&log_directory).expect("the sidecar log directory exists");
+        let mut transport = RealProcessTransport::new(executable, log_directory, CrashNext::Never);
+        let context = InvocationContext::new(request_id, Some(session.state().project_id));
+        let published = export_pipeline::execute(
+            &mut transport,
+            plan,
+            &bindings,
+            &cancellation,
+            &progress,
+            &context,
+        )
+        .await
+        .expect("host and sidecar complete the Export through the frozen UNC plan");
+
+        assert_eq!(transport.process_ids.len(), 1);
+        assert!(operational_output.is_file());
+        assert!(!operational_preparation.exists());
+        let output_bytes = std::fs::read(&operational_output).expect("the UNC output is readable");
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&output_bytes)),
+            published.completion.output_sha256
+        );
+        let evidence_path = PathBuf::from(
+            std::env::var_os(PATH_GATE_SIDECAR_EVIDENCE_ENV)
+                .expect("the sidecar evidence path is configured"),
+        );
+        std::fs::write(
+            evidence_path,
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "rootBindingPlanSha256": plan_sha256,
+                "mappingRemovedBeforeDispatch": true,
+                "processorPid": transport.process_ids[0],
+                "processorUsedFrozenOperationalPath": true,
+                "outputPublishedOnUnc": true,
+                "stagingRemoved": true,
+                "unavailableBindingFailedAtPrepare": true,
+                "unavailableAttemptStartedProcessor": false,
+                "explicitRetryPublished": true,
+                "outputSha256": published.completion.output_sha256,
+            }))
+            .expect("the sidecar path evidence serializes"),
+        )
+        .expect("the sidecar path evidence is writable");
+    });
+}
+
+struct TemporaryDriveMapping {
+    drive: String,
+}
+
+impl TemporaryDriveMapping {
+    fn new(drive: &str, remote: &Path) -> Self {
+        let mapping = Self {
+            drive: drive.to_owned(),
+        };
+        mapping.map_to(remote);
+        mapping
+    }
+
+    fn map_to(&self, remote: &Path) {
+        self.unmap();
+        let status = Command::new("net.exe")
+            .arg("use")
+            .arg(&self.drive)
+            .arg(remote)
+            .arg("/persistent:no")
+            .status()
+            .expect("net.exe starts");
+        assert!(
+            status.success(),
+            "the temporary drive could not target the UNC fixture"
+        );
+    }
+
+    fn unmap(&self) {
+        let _ = Command::new("net.exe")
+            .args(["use", &self.drive, "/delete", "/y"])
+            .output();
+    }
+}
+
+impl Drop for TemporaryDriveMapping {
+    fn drop(&mut self) {
+        self.unmap();
+    }
 }

@@ -5,7 +5,10 @@ mod cache;
 mod error;
 mod export;
 mod guarded_fs;
+mod native_path_serde;
 mod operation;
+mod resolve;
+mod windows_path;
 
 pub use app_paths::AppPaths;
 pub use cache::{
@@ -15,3 +18,4 @@ pub use cache::{
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, PreparedExportStorage};
 pub use operation::{OperationPathContext, PathRootKind, RootBinding, RootBindingPlan};
+pub use resolve::{ExpectedObject, PhysicalIdentityEvidence, ResolveError, ResolvedObject};

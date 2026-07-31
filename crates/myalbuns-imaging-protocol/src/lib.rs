@@ -5,7 +5,7 @@ pub use myalbuns_paths::CacheArtifactFormat;
 use myalbuns_paths::{CachePathPlan, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 8;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 9;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImagingFailureStage {

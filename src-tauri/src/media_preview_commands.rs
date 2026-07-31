@@ -8,7 +8,7 @@ use std::{
 use myalbuns_core::MediaKind;
 use myalbuns_imaging_protocol::{CacheArtifactFormat, IMAGING_PROTOCOL_VERSION};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, OperationPathContext};
+use myalbuns_paths::AppPaths;
 use serde::Serialize;
 use tauri::{AppHandle, State, WebviewWindow};
 
@@ -16,6 +16,7 @@ use crate::{
     cache_engine::{self, CacheWork},
     imaging_processor::{InvocationContext, TauriImagingTransport},
     logging::{LoggingState, log_imaging_failure},
+    path_io,
     project_host::ProjectHost,
 };
 
@@ -55,22 +56,21 @@ pub(crate) async fn prepare_media_previews(
     let Some(sources) = state.cache_sources(window.label())? else {
         return Ok(None);
     };
-    let mut path_context = OperationPathContext::new();
-    path_context
-        .capture(cache_paths.root())
-        .map_err(|error| error.to_string())?;
-    for source in &sources {
-        path_context
-            .capture(source.source_path())
-            .map_err(|error| error.to_string())?;
-    }
+    let mut operation_paths = Vec::with_capacity(sources.len() + 1);
+    operation_paths.push(cache_paths.root().to_path_buf());
+    operation_paths.extend(
+        sources
+            .iter()
+            .map(|source| source.source_path().to_path_buf()),
+    );
+    let root_bindings = path_io::capture_root_bindings(operation_paths).await?;
     let work = CacheWork::new(
         request_id.clone(),
         project_id.clone(),
         cache_paths.clone(),
         sources,
         CACHE_PREVIEW_MAX_EDGE_PX,
-        path_context.freeze(),
+        root_bindings,
     );
     let safe_project_id = safe_log_identifier(&project_id);
     tracing::info!(

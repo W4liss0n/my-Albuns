@@ -8,6 +8,7 @@ mod imaging_processor;
 mod imaging_recovery_integration;
 mod logging;
 mod media_preview_commands;
+mod path_io;
 mod project_commands;
 mod project_host;
 #[path = "../../tests/support/sample_project.rs"]
