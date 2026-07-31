@@ -130,12 +130,30 @@ struct ProbeFailure<'a> {
 }
 
 #[derive(Clone, Debug, Default)]
-struct ProbeCapture {
+pub(crate) struct ProbeCapture {
     operation_id: Option<String>,
     progress_stages: Vec<String>,
     cancellation_disposition: Option<CancelDisposition>,
     preparing_claimed: bool,
     failure: Option<String>,
+}
+
+impl ProbeCapture {
+    pub(crate) fn operation_id(&self) -> Option<&str> {
+        self.operation_id.as_deref()
+    }
+
+    pub(crate) fn progress_stages(&self) -> &[String] {
+        &self.progress_stages
+    }
+
+    pub(crate) fn cancellation_disposition(&self) -> Option<CancelDisposition> {
+        self.cancellation_disposition
+    }
+
+    pub(crate) fn failure(&self) -> Option<&str> {
+        self.failure.as_deref()
+    }
 }
 
 #[derive(Debug)]
@@ -693,7 +711,7 @@ async fn run_challenger(
     )
 }
 
-async fn execute_real_export(
+pub(crate) async fn execute_real_export(
     app: &AppHandle,
     window: &WebviewWindow,
     channel: Channel<ExportEvent>,
@@ -768,7 +786,7 @@ fn owner_channel(
     })
 }
 
-fn observing_channel(capture: Arc<Mutex<ProbeCapture>>) -> Channel<ExportEvent> {
+pub(crate) fn observing_channel(capture: Arc<Mutex<ProbeCapture>>) -> Channel<ExportEvent> {
     Channel::new(move |body| {
         if let Err(reason) = record_channel_event(body, &capture, false) {
             record_capture_failure(&capture, reason);
@@ -913,7 +931,7 @@ fn cross_owner_barrier(
     }
 }
 
-fn capture_snapshot(capture: &Arc<Mutex<ProbeCapture>>) -> ProbeCapture {
+pub(crate) fn capture_snapshot(capture: &Arc<Mutex<ProbeCapture>>) -> ProbeCapture {
     capture
         .lock()
         .expect("the export terminal capture remains available")
@@ -960,7 +978,7 @@ fn cleanup_success_if_present(
     Ok(())
 }
 
-fn verify_and_remove_output(result: &ExportResult) -> Result<u64, String> {
+pub(crate) fn verify_and_remove_output(result: &ExportResult) -> Result<u64, String> {
     let output_path = PathBuf::from(result.output_path());
     let expected_root = std::env::temp_dir().join("MyAlbuns").join("spike");
     let file_name = output_path

@@ -1,3 +1,5 @@
+mod batch_lease_probe;
+mod batch_runner;
 mod benchmark_corpus;
 mod cache_engine;
 mod export_attempts;
@@ -26,6 +28,7 @@ use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+use batch_lease_probe::BatchLeaseProbe;
 use cache_engine::CacheEngine;
 use export_attempts::ExportAttempts;
 use export_probe_commands::{cancel_export_spike, export_spike};
@@ -65,11 +68,25 @@ pub fn run() {
         .unwrap_or_else(|error| panic!("probe de OperationGate inválido: {error}"));
     let export_terminal_probe = ExportTerminalProbe::from_environment(&topology)
         .unwrap_or_else(|error| panic!("probe terminal de Exportação inválido: {error}"));
-    if operation_gate_probe.is_some() && export_terminal_probe.is_some() {
-        panic!("os probes de OperationGate e de terminais de Exportação são exclusivos");
+    let batch_lease_probe = BatchLeaseProbe::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("probe de lease do lote inválido: {error}"));
+    if [
+        operation_gate_probe.is_some(),
+        export_terminal_probe.is_some(),
+        batch_lease_probe.is_some(),
+    ]
+    .into_iter()
+    .filter(|enabled| *enabled)
+    .count()
+        > 1
+    {
+        panic!(
+            "os probes de OperationGate, de terminais de Exportação e de lease do lote são exclusivos"
+        );
     }
     let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some()
         || export_terminal_probe.is_some()
+        || batch_lease_probe.is_some()
     {
         (
             TopologyBenchmarkState::disabled(&topology),
@@ -143,6 +160,11 @@ pub fn run() {
             }
             if let Some(export_terminal_probe) = export_terminal_probe {
                 export_terminal_probe
+                    .start(app.handle())
+                    .map_err(std::io::Error::other)?;
+            }
+            if let Some(batch_lease_probe) = batch_lease_probe {
+                batch_lease_probe
                     .start(app.handle())
                     .map_err(std::io::Error::other)?;
             }

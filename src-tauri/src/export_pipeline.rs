@@ -57,6 +57,14 @@ impl ExportOptions {
 }
 
 impl ExportPlan {
+    pub(crate) fn request_id(&self) -> &str {
+        &self.options.request_id
+    }
+
+    pub(crate) fn project_id(&self) -> &str {
+        &self.snapshot.project_id
+    }
+
     pub(crate) fn required_paths(&self) -> Vec<&Path> {
         let mut paths = Vec::with_capacity(
             self.options
@@ -83,16 +91,16 @@ pub(crate) struct PublishedExport {
     pub(crate) completion: RenderCompletion,
 }
 
-struct ExportPreparationGuard<'a> {
+struct ExportPreparationGuard {
     storage: Option<PreparedExportStorage>,
-    context: &'a InvocationContext,
+    context: InvocationContext,
 }
 
-impl<'a> ExportPreparationGuard<'a> {
-    fn new(storage: PreparedExportStorage, context: &'a InvocationContext) -> Self {
+impl ExportPreparationGuard {
+    fn new(storage: PreparedExportStorage, context: &InvocationContext) -> Self {
         Self {
             storage: Some(storage),
-            context,
+            context: context.clone(),
         }
     }
 
@@ -117,12 +125,18 @@ impl<'a> ExportPreparationGuard<'a> {
     }
 }
 
-impl Drop for ExportPreparationGuard<'_> {
+impl Drop for ExportPreparationGuard {
     fn drop(&mut self) {
         if let Some(storage) = self.storage.take() {
-            discard_failed_preparation(storage, self.context);
+            discard_failed_preparation(storage, &self.context);
         }
     }
+}
+
+struct PreparedExport {
+    preparation: ExportPreparationGuard,
+    output_path: PathBuf,
+    completion: RenderCompletion,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -133,7 +147,10 @@ pub(crate) enum ExportFailureStage {
     Processor(InvocationFailureStage),
     ValidateResponse,
     VerifyPreparation,
-    Publish,
+    Publish {
+        promoted_outputs: u32,
+        total_outputs: u32,
+    },
 }
 
 impl ExportFailureStage {
@@ -145,7 +162,7 @@ impl ExportFailureStage {
             Self::Processor(stage) => stage.as_str(),
             Self::ValidateResponse => "validate_response",
             Self::VerifyPreparation => "verify_preparation",
-            Self::Publish => "publish_output",
+            Self::Publish { .. } => "publish_output",
         }
     }
 }
@@ -340,6 +357,100 @@ pub(crate) async fn execute<T: ImagingTransport>(
     progress: &(dyn Fn(ExportProgress) + Send + Sync),
     context: &InvocationContext,
 ) -> Result<PublishedExport, ExportFailure> {
+    let mut published = execute_group(
+        transport,
+        vec![(plan, context.clone())],
+        root_bindings,
+        control,
+        progress,
+    )
+    .await?;
+    Ok(published
+        .pop()
+        .expect("a single Export execution publishes exactly one output"))
+}
+
+pub(crate) async fn execute_group<T: ImagingTransport>(
+    transport: &mut T,
+    exports: Vec<(ExportPlan, InvocationContext)>,
+    root_bindings: &RootBindingPlan,
+    control: &ExportExecutionControl,
+    progress: &(dyn Fn(ExportProgress) + Send + Sync),
+) -> Result<Vec<PublishedExport>, ExportFailure> {
+    if exports.is_empty() {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Plan,
+            "A Exportação agrupada precisa conter ao menos uma saída.",
+        ));
+    }
+    ensure_not_cancelled(control)?;
+    let total_units = u32::try_from(exports.len()).map_err(|_| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            "A Exportação agrupada excede a quantidade de saídas suportada.",
+        )
+    })?;
+    let mut preparations = Vec::with_capacity(exports.len());
+    for (plan, context) in exports {
+        preparations.push(
+            prepare_export(transport, plan, root_bindings, control, progress, &context).await?,
+        );
+    }
+    if !control.begin_publishing() {
+        return Err(cancelled_failure());
+    }
+    progress(ExportProgress::unmeasured(
+        ExportProgressStage::Publishing,
+        false,
+    ));
+    let total = preparations.len();
+    let mut published = Vec::with_capacity(total);
+    for prepared in preparations {
+        let PreparedExport {
+            preparation,
+            output_path,
+            completion,
+        } = prepared;
+        if let Err(error) = preparation.publish() {
+            let message = if total == 1 {
+                format!("Não foi possível publicar a Exportação: {error}")
+            } else {
+                format!(
+                    "Não foi possível publicar a Exportação após promover {} de {total} saídas: {error}",
+                    published.len()
+                )
+            };
+            return Err(ExportFailure::new(
+                ExportFailureStage::Publish {
+                    promoted_outputs: u32::try_from(published.len())
+                        .expect("the promoted count fits the validated total"),
+                    total_outputs: total_units,
+                },
+                message,
+            ));
+        }
+        published.push(PublishedExport {
+            output_path,
+            completion,
+        });
+    }
+    progress(ExportProgress::measured(
+        ExportProgressStage::Completed,
+        total_units,
+        total_units,
+        false,
+    ));
+    Ok(published)
+}
+
+async fn prepare_export<T: ImagingTransport>(
+    transport: &mut T,
+    plan: ExportPlan,
+    root_bindings: &RootBindingPlan,
+    control: &ExportExecutionControl,
+    progress: &(dyn Fn(ExportProgress) + Send + Sync),
+    context: &InvocationContext,
+) -> Result<PreparedExport, ExportFailure> {
     ensure_not_cancelled(control)?;
     let path_plan = plan.path_plan();
     let ExportPlan { snapshot, options } = plan;
@@ -459,26 +570,8 @@ pub(crate) async fn execute<T: ImagingTransport>(
             message,
         ));
     }
-    if !control.begin_publishing() {
-        return Err(cancelled_failure());
-    }
-    progress(ExportProgress::unmeasured(
-        ExportProgressStage::Publishing,
-        false,
-    ));
-    preparation.publish().map_err(|error| {
-        ExportFailure::new(
-            ExportFailureStage::Publish,
-            format!("Não foi possível publicar a Exportação: {error}"),
-        )
-    })?;
-    progress(ExportProgress::measured(
-        ExportProgressStage::Completed,
-        1,
-        1,
-        false,
-    ));
-    Ok(PublishedExport {
+    Ok(PreparedExport {
+        preparation,
         output_path,
         completion,
     })
@@ -592,6 +685,7 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: &Invo
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::VecDeque,
         path::PathBuf,
         sync::{Arc, Barrier, Mutex},
         thread,
@@ -607,7 +701,8 @@ mod tests {
 
     use super::{
         ExportCancellationResult, ExportExecutionControl, ExportFailureStage, ExportOptions,
-        ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute, plan,
+        ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute,
+        execute_group, plan,
     };
     use crate::{
         imaging_processor::{
@@ -627,6 +722,14 @@ mod tests {
     struct CancellationAwareTransport {
         prepared_path: PathBuf,
         invocation_started: Arc<Barrier>,
+        invocations: usize,
+    }
+
+    struct GroupedTransport {
+        prepared_outputs: VecDeque<Vec<u8>>,
+        first_output: PathBuf,
+        first_output_before_second_invocation: Option<Vec<u8>>,
+        block_output_before_publication: Option<PathBuf>,
         invocations: usize,
     }
 
@@ -688,6 +791,53 @@ mod tests {
         }
     }
 
+    impl ImagingTransport for GroupedTransport {
+        fn invoke<'a>(
+            &'a mut self,
+            command: &'a ImagingCommand,
+            _context: &'a InvocationContext,
+            operation: ImagingOperation,
+            attempt: u8,
+            _control: InvocationControl<'a>,
+        ) -> InvocationFuture<'a> {
+            let ImagingCommand::Render(request) = command else {
+                panic!("the grouped Export receives a Render command");
+            };
+            assert_eq!(operation, ImagingOperation::Export);
+            assert_eq!(attempt, 1);
+            if self.invocations == 1 {
+                self.first_output_before_second_invocation = Some(
+                    std::fs::read(&self.first_output)
+                        .expect("the first previous output remains readable"),
+                );
+            }
+            self.invocations += 1;
+            let prepared = self
+                .prepared_outputs
+                .pop_front()
+                .expect("one prepared payload exists per grouped Export unit");
+            std::fs::write(&request.prepared_output_path, &prepared)
+                .expect("the grouped Processor writes its preparation");
+            if self.invocations == 2
+                && let Some(blocked_output) = self.block_output_before_publication.take()
+            {
+                std::fs::create_dir(blocked_output)
+                    .expect("external interference blocks the second final output");
+            }
+            let completion = RenderCompletion {
+                width_px: 10,
+                height_px: 5,
+                dpi: 25,
+                source_count: 0,
+                source_bytes: 0,
+                output_bytes: prepared.len() as u64,
+                output_sha256: format!("{:x}", Sha256::digest(&prepared)),
+            };
+            let response = ImagingResponse::completed(&request.request_id, completion);
+            Box::pin(async move { Ok(response) })
+        }
+    }
+
     fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
         let source = SampleProject::Horizon
             .persisted_source(2)
@@ -709,6 +859,16 @@ mod tests {
             context
                 .capture(path)
                 .expect("the Export path root is captured");
+        }
+        context.freeze()
+    }
+
+    fn grouped_root_bindings(plans: &[&ExportPlan]) -> RootBindingPlan {
+        let mut context = OperationPathContext::new();
+        for path in plans.iter().flat_map(|plan| plan.required_paths()) {
+            context
+                .capture(path)
+                .expect("the grouped Export path root is captured");
         }
         context.freeze()
     }
@@ -759,6 +919,180 @@ mod tests {
 
     fn context(request_id: &str) -> InvocationContext {
         InvocationContext::new(request_id, Some("project-test"))
+    }
+
+    #[test]
+    fn grouped_export_prepares_every_output_before_publishing_the_complete_set() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary grouped Export destination");
+            let first_output = destination.path().join("Album_001.png");
+            let second_output = destination.path().join("Album_002.png");
+            std::fs::write(&first_output, b"previous first")
+                .expect("the first previous Export is writable");
+            std::fs::write(&second_output, b"previous second")
+                .expect("the second previous Export is writable");
+            let first_plan = export_plan(first_output.clone(), "export-group-success-1");
+            let second_plan = export_plan(second_output.clone(), "export-group-success-2");
+            let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
+            let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
+            let second_preparation = second_plan
+                .path_plan()
+                .preparation_directory()
+                .to_path_buf();
+            let mut transport = GroupedTransport {
+                prepared_outputs: VecDeque::from([b"new first".to_vec(), b"new second".to_vec()]),
+                first_output: first_output.clone(),
+                first_output_before_second_invocation: None,
+                block_output_before_publication: None,
+                invocations: 0,
+            };
+            let control = ExportExecutionControl::default();
+            let progress_events = Mutex::new(Vec::new());
+            let progress = |event: super::ExportProgress| {
+                progress_events
+                    .lock()
+                    .expect("the grouped progress collector remains available")
+                    .push(event);
+            };
+
+            let published = execute_group(
+                &mut transport,
+                vec![
+                    (first_plan, context("export-group-success-1")),
+                    (second_plan, context("export-group-success-2")),
+                ],
+                &bindings,
+                &control,
+                &progress,
+            )
+            .await
+            .expect("the complete prepared set is published");
+
+            assert_eq!(transport.invocations, 2);
+            assert_eq!(
+                transport.first_output_before_second_invocation,
+                Some(b"previous first".to_vec()),
+                "the first output cannot be promoted while the second is still being prepared"
+            );
+            assert_eq!(
+                published
+                    .iter()
+                    .map(|result| result.output_path.as_path())
+                    .collect::<Vec<_>>(),
+                [first_output.as_path(), second_output.as_path()]
+            );
+            assert_eq!(
+                std::fs::read(&first_output).expect("the first grouped output is readable"),
+                b"new first"
+            );
+            assert_eq!(
+                std::fs::read(&second_output).expect("the second grouped output is readable"),
+                b"new second"
+            );
+            assert!(!first_preparation.exists());
+            assert!(!second_preparation.exists());
+            let events = progress_events
+                .lock()
+                .expect("the grouped progress collector remains available");
+            let publishing_index = events
+                .iter()
+                .position(|event| event.stage == ExportProgressStage::Publishing)
+                .expect("the grouped Export reaches Publication");
+            assert_eq!(
+                events[..publishing_index]
+                    .iter()
+                    .filter(|event| event.stage == ExportProgressStage::Verifying)
+                    .count(),
+                2
+            );
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event.stage == ExportProgressStage::Completed)
+                    .map(|event| event.units)
+                    .collect::<Vec<_>>(),
+                [ExportProgressUnits::Measured {
+                    completed_units: 2,
+                    total_units: 2,
+                }]
+            );
+        });
+    }
+
+    #[test]
+    fn grouped_export_reports_a_typed_partial_publication_and_discards_the_remainder() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary grouped Export destination");
+            let first_output = destination.path().join("Album_001.png");
+            let second_output = destination.path().join("Album_002.png");
+            std::fs::write(&first_output, b"previous first")
+                .expect("the first previous Export is writable");
+            let first_plan = export_plan(first_output.clone(), "export-group-partial-1");
+            let second_plan = export_plan(second_output.clone(), "export-group-partial-2");
+            let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
+            let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
+            let second_preparation = second_plan
+                .path_plan()
+                .preparation_directory()
+                .to_path_buf();
+            let mut transport = GroupedTransport {
+                prepared_outputs: VecDeque::from([b"new first".to_vec(), b"new second".to_vec()]),
+                first_output: first_output.clone(),
+                first_output_before_second_invocation: None,
+                block_output_before_publication: Some(second_output.clone()),
+                invocations: 0,
+            };
+            let control = ExportExecutionControl::default();
+            let observed_stages = Mutex::new(Vec::new());
+            let progress = |event: super::ExportProgress| {
+                observed_stages
+                    .lock()
+                    .expect("the grouped progress collector remains available")
+                    .push(event.stage);
+            };
+
+            let failure = execute_group(
+                &mut transport,
+                vec![
+                    (first_plan, context("export-group-partial-1")),
+                    (second_plan, context("export-group-partial-2")),
+                ],
+                &bindings,
+                &control,
+                &progress,
+            )
+            .await
+            .expect_err("the second real filesystem promotion is rejected");
+
+            assert_eq!(
+                failure.stage,
+                ExportFailureStage::Publish {
+                    promoted_outputs: 1,
+                    total_outputs: 2,
+                }
+            );
+            assert_eq!(transport.invocations, 2);
+            assert_eq!(
+                transport.first_output_before_second_invocation,
+                Some(b"previous first".to_vec())
+            );
+            assert_eq!(
+                std::fs::read(&first_output).expect("the first promoted output remains readable"),
+                b"new first",
+                "the limited transaction does not roll back an earlier atomic promotion"
+            );
+            assert!(second_output.is_dir());
+            assert!(!first_preparation.exists());
+            assert!(!second_preparation.exists());
+            let stages = observed_stages
+                .lock()
+                .expect("the grouped progress collector remains available");
+            assert!(stages.contains(&ExportProgressStage::Publishing));
+            assert!(
+                !stages.contains(&ExportProgressStage::Completed),
+                "a partial publication is never announced as completed"
+            );
+        });
     }
 
     #[test]
