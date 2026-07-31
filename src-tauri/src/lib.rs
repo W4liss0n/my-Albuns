@@ -19,6 +19,7 @@ mod path_io;
 mod probe_support;
 mod project_commands;
 mod project_host;
+mod project_open_probe;
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
 mod topology_benchmark;
@@ -40,6 +41,7 @@ use media_preview_commands::prepare_media_previews;
 use operation_gate::OperationGate;
 use operation_gate_probe::OperationGateProbe;
 use project_commands::{apply_project_intent, project_state, redo_project, undo_project};
+use project_open_probe::ProjectOpenProbe;
 use topology_benchmark::{
     TopologyBenchmarkState, report_topology_benchmark_failure, report_topology_canvas_benchmark,
     report_topology_canvas_ready, topology_benchmark_config,
@@ -71,10 +73,13 @@ pub fn run() {
         .unwrap_or_else(|error| panic!("probe terminal de Exportação inválido: {error}"));
     let batch_lease_probe = BatchLeaseProbe::from_environment(&topology)
         .unwrap_or_else(|error| panic!("probe de lease do lote inválido: {error}"));
+    let project_open_probe = ProjectOpenProbe::from_environment(&topology)
+        .unwrap_or_else(|error| panic!("probe de abertura inválido: {error}"));
     if [
         operation_gate_probe.is_some(),
         export_terminal_probe.is_some(),
         batch_lease_probe.is_some(),
+        project_open_probe.is_some(),
     ]
     .into_iter()
     .filter(|enabled| *enabled)
@@ -82,12 +87,13 @@ pub fn run() {
         > 1
     {
         panic!(
-            "os probes de OperationGate, de terminais de Exportação e de lease do lote são exclusivos"
+            "os probes de OperationGate, de terminais de Exportação, de lease do lote e de abertura são exclusivos"
         );
     }
     let (topology_benchmark, topology_fault_probe) = if operation_gate_probe.is_some()
         || export_terminal_probe.is_some()
         || batch_lease_probe.is_some()
+        || project_open_probe.is_some()
     {
         (
             TopologyBenchmarkState::disabled(&topology),
@@ -166,6 +172,11 @@ pub fn run() {
             }
             if let Some(batch_lease_probe) = batch_lease_probe {
                 batch_lease_probe
+                    .start(app.handle())
+                    .map_err(std::io::Error::other)?;
+            }
+            if let Some(project_open_probe) = project_open_probe {
+                project_open_probe
                     .start(app.handle())
                     .map_err(std::io::Error::other)?;
             }

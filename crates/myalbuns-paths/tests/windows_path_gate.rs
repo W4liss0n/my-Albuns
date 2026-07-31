@@ -9,7 +9,8 @@ use std::{
 
 use myalbuns_paths::{
     AppPaths, CacheArtifactFormat, ExpectedObject, ExportPathPlan, OperationPathContext,
-    PathRootKind, PhysicalIdentityEvidence, ResolveError, RootBindingPlan,
+    PathRootKind, PhysicalIdentityEvidence, ProjectFileLock, ProjectFileLockError, ResolveError,
+    RootBindingPlan,
 };
 use sha2::{Digest, Sha256};
 
@@ -228,7 +229,7 @@ fn real_windows_paths_freeze_mapped_bindings_and_keep_unc_export_recoverable() {
         PhysicalIdentityEvidence::Same,
         "mapped and UNC aliases provide Same evidence to the opening guardian"
     );
-    let editable_lock = ExclusiveProjectLock::acquire(&logical_project)
+    let editable_lock = ProjectFileLock::try_acquire(&logical_project)
         .expect("the first editable session acquires a real file lock");
     assert!(
         run_project_lock_probe(&unc_project, "conflict").success(),
@@ -282,14 +283,12 @@ fn project_lock_probe_process() {
         );
         return;
     }
-    match (ExclusiveProjectLock::acquire(&path), expectation.as_str()) {
-        (Err(error), "conflict") => assert!(
-            matches!(error.raw_os_error(), Some(32 | 33)),
-            "the Windows lock conflict must remain distinguishable: {error}"
-        ),
+    match (ProjectFileLock::try_acquire(&path), expectation.as_str()) {
+        (Err(ProjectFileLockError::Conflict), "conflict") => {}
         (Ok(_lock), "acquired") => {}
         (Ok(_lock), "conflict") => panic!("the second process unexpectedly acquired the lock"),
         (Err(error), "acquired") => panic!("the released lock remained unavailable: {error}"),
+        (Err(error), "conflict") => panic!("the lock conflict lost its typed form: {error}"),
         (_, other) => panic!("unsupported lock expectation: {other}"),
     }
 }
@@ -371,70 +370,5 @@ impl DriveMapping {
 impl Drop for DriveMapping {
     fn drop(&mut self) {
         self.unmap();
-    }
-}
-
-struct ExclusiveProjectLock {
-    file: std::fs::File,
-    overlapped: windows_sys::Win32::System::IO::OVERLAPPED,
-}
-
-impl ExclusiveProjectLock {
-    fn acquire(path: &Path) -> std::io::Result<Self> {
-        use std::{os::windows::fs::OpenOptionsExt, os::windows::io::AsRawHandle};
-        use windows_sys::Win32::{
-            Foundation::HANDLE,
-            Storage::FileSystem::{
-                FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, LOCKFILE_EXCLUSIVE_LOCK,
-                LOCKFILE_FAIL_IMMEDIATELY, LockFileEx,
-            },
-            System::IO::OVERLAPPED,
-        };
-
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
-            .open(path)?;
-        let mut overlapped = OVERLAPPED {
-            Anonymous: windows_sys::Win32::System::IO::OVERLAPPED_0 {
-                Anonymous: windows_sys::Win32::System::IO::OVERLAPPED_0_0 {
-                    Offset: 0,
-                    OffsetHigh: 1_u32 << 30,
-                },
-            },
-            ..OVERLAPPED::default()
-        };
-        let succeeded = unsafe {
-            LockFileEx(
-                file.as_raw_handle() as HANDLE,
-                LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
-                0,
-                1,
-                0,
-                &mut overlapped,
-            )
-        };
-        if succeeded == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        Ok(Self { file, overlapped })
-    }
-}
-
-impl Drop for ExclusiveProjectLock {
-    fn drop(&mut self) {
-        use std::os::windows::io::AsRawHandle;
-        use windows_sys::Win32::{Foundation::HANDLE, Storage::FileSystem::UnlockFileEx};
-
-        unsafe {
-            UnlockFileEx(
-                self.file.as_raw_handle() as HANDLE,
-                0,
-                1,
-                0,
-                &mut self.overlapped,
-            );
-        }
     }
 }
