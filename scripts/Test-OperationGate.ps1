@@ -1,5 +1,7 @@
 param(
     [string] $OutputPath,
+    [ValidateSet('normal', 'batch')]
+    [string] $Suite = 'normal',
     [ValidateRange(10, 300)]
     [int] $ProbeTimeoutSeconds = 90,
     [ValidateRange(1, 8)]
@@ -33,9 +35,15 @@ if (-not $runnerMutexHeld) {
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $defaultArtifact = if ($Suite -eq 'batch') {
+        'docs\research\artifacts\0011-batch-operation-lease.json'
+    }
+    else {
+        'docs\research\artifacts\0010-export-terminal-matrix.json'
+    }
     $OutputPath = Join-Path `
         $script:WorkspaceRoot `
-        'docs\research\artifacts\0010-export-terminal-matrix.json'
+        $defaultArtifact
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
@@ -64,13 +72,30 @@ foreach ($topology in @('independent', 'multiwindow')) {
         )
     }
 }
-$fixtureRoots = @($independentRoot, $multiwindowRoot) + @(
-    foreach ($topology in @('independent', 'multiwindow')) {
-        foreach ($scenario in $terminalScenarios) {
-            $terminalRoots[$topology][$scenario]
-        }
-    }
+$batchScenarios = @(
+    'success',
+    'before_preparation',
+    'between_promotions',
+    'owner_death'
 )
+$batchRoots = [ordered]@{}
+foreach ($scenario in $batchScenarios) {
+    $batchRoots[$scenario] = [System.IO.Path]::GetFullPath(
+        (Join-Path $probeParent "run-$runId-batch-$scenario")
+    )
+}
+$fixtureRoots = if ($Suite -eq 'normal') {
+    @($independentRoot, $multiwindowRoot) + @(
+        foreach ($topology in @('independent', 'multiwindow')) {
+            foreach ($scenario in $terminalScenarios) {
+                $terminalRoots[$topology][$scenario]
+            }
+        }
+    )
+}
+else {
+    @($batchScenarios | ForEach-Object { $batchRoots[$_] })
+}
 foreach ($fixtureRoot in $fixtureRoots) {
     if (-not $fixtureRoot.StartsWith(
             $probeParent + [System.IO.Path]::DirectorySeparatorChar,
@@ -175,7 +200,14 @@ function Start-OperationProbeProcess {
         [ValidateSet('success', 'failure', 'cancellation', 'owner_death')]
         [string] $TerminalScenario,
         [ValidateSet('matrix', 'successor')]
-        [string] $TerminalPhase = 'matrix'
+        [string] $TerminalPhase = 'matrix',
+        [ValidateSet(
+            'success',
+            'before_preparation',
+            'between_promotions',
+            'owner_death'
+        )]
+        [string] $BatchScenario
     )
 
     $environment = [ordered]@{
@@ -195,8 +227,14 @@ function Start-OperationProbeProcess {
         MYALBUNS_EXPORT_TERMINAL_PROBE_ROOT = $null
         MYALBUNS_EXPORT_TERMINAL_PROBE_SCENARIO = $null
         MYALBUNS_EXPORT_TERMINAL_PROBE_PHASE = $null
+        MYALBUNS_BATCH_LEASE_PROBE_ROOT = $null
+        MYALBUNS_BATCH_LEASE_PROBE_SCENARIO = $null
     }
-    if ([string]::IsNullOrWhiteSpace($TerminalScenario)) {
+    if (-not [string]::IsNullOrWhiteSpace($BatchScenario)) {
+        $environment.MYALBUNS_BATCH_LEASE_PROBE_ROOT = $ProbeRoot
+        $environment.MYALBUNS_BATCH_LEASE_PROBE_SCENARIO = $BatchScenario
+    }
+    elseif ([string]::IsNullOrWhiteSpace($TerminalScenario)) {
         $environment.MYALBUNS_OPERATION_GATE_PROBE_ROOT = $ProbeRoot
     }
     else {
@@ -336,22 +374,95 @@ function Get-ProbeFailureDiagnostic {
 function Assert-NoDuplicateJsonPropertyNames {
     param([Parameter(Mandatory = $true)][string] $Json)
 
-    $propertyPattern =
-        '(?<name>"(?:\\["\\/bfnrt]|\\u[0-9a-fA-F]{4}|[^"\\\x00-\x1F])*")\s*:'
-    $seenNames =
-        [System.Collections.Generic.HashSet[string]]::new(
-            [System.StringComparer]::Ordinal
-        )
-    foreach ($match in [regex]::Matches($Json, $propertyPattern)) {
-        $name = $match.Groups['name'].Value | ConvertFrom-Json
-        if (-not $seenNames.Add($name)) {
+    # ConvertFrom-Json accepts duplicate names, so walk the JSON tokens first.
+    # Each object receives its own ordinal set: repeated names in two distinct
+    # outputEvidence entries remain valid, while duplicates in either object do not.
+    $scopes = [System.Collections.Generic.List[object]]::new()
+    for ($index = 0; $index -lt $Json.Length; $index++) {
+        $character = $Json[$index]
+        if ($character -eq '{') {
+            $scopes.Add(
+                [System.Collections.Generic.HashSet[string]]::new(
+                    [System.StringComparer]::Ordinal
+                )
+            )
+            continue
+        }
+        if ($character -eq '[') {
+            $scopes.Add([System.DBNull]::Value)
+            continue
+        }
+        if ($character -eq '}' -or $character -eq ']') {
+            if ($scopes.Count -eq 0) {
+                throw 'The OperationGate event contains unbalanced JSON scopes.'
+            }
+            $scopes.RemoveAt($scopes.Count - 1)
+            continue
+        }
+        if ($character -ne '"') {
+            continue
+        }
+
+        $tokenStart = $index
+        $escaped = $false
+        for ($index++; $index -lt $Json.Length; $index++) {
+            $tokenCharacter = $Json[$index]
+            if ($escaped) {
+                $escaped = $false
+                continue
+            }
+            if ($tokenCharacter -eq '\') {
+                $escaped = $true
+                continue
+            }
+            if ($tokenCharacter -eq '"') {
+                break
+            }
+        }
+        if ($index -ge $Json.Length) {
+            throw 'The OperationGate event contains an unterminated JSON string.'
+        }
+        $lookahead = $index + 1
+        while (
+            $lookahead -lt $Json.Length -and
+            [char]::IsWhiteSpace($Json[$lookahead])
+        ) {
+            $lookahead++
+        }
+        if (
+            $lookahead -ge $Json.Length -or
+            $Json[$lookahead] -ne ':'
+        ) {
+            continue
+        }
+        if (
+            $scopes.Count -eq 0 -or
+            $scopes[$scopes.Count - 1] -isnot
+                [System.Collections.Generic.HashSet[string]]
+        ) {
+            throw 'The OperationGate event contains a property outside an object.'
+        }
+        $rawName = $Json.Substring($tokenStart, $index - $tokenStart + 1)
+        $name = $rawName | ConvertFrom-Json
+        $seenNames = $scopes[$scopes.Count - 1]
+        if (-not $seenNames.Add([string] $name)) {
             throw "The OperationGate event repeats the JSON field '$name'."
         }
     }
+    if ($scopes.Count -ne 0) {
+        throw 'The OperationGate event contains unbalanced JSON scopes.'
+    }
 }
 
-function Read-StrictProbeEvent {
-    param([Parameter(Mandatory = $true)][string] $Path)
+function Read-StrictJsonObject {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Path,
+        [Parameter(Mandatory = $true)]
+        [string] $SchemaLabel,
+        [Parameter(Mandatory = $true)]
+        [string[]] $ExpectedNames
+    )
 
     $json = [System.IO.File]::ReadAllText(
         $Path,
@@ -359,9 +470,34 @@ function Read-StrictProbeEvent {
     )
     $root = $json | ConvertFrom-Json
     Assert-NoDuplicateJsonPropertyNames -Json $json
-    if ($null -eq $root -or $root -isnot [System.Management.Automation.PSCustomObject]) {
-        throw 'The OperationGate event root must be a JSON object.'
+    if (
+        $null -eq $root -or
+        $root -isnot [System.Management.Automation.PSCustomObject]
+    ) {
+        throw "$SchemaLabel event root must be a JSON object."
     }
+
+    $actualNames = @($root.PSObject.Properties.Name)
+    $missingNames = @(
+        $ExpectedNames |
+            Where-Object { $actualNames -cnotcontains $_ }
+    )
+    $unexpectedNames = @(
+        $actualNames |
+            Where-Object { $ExpectedNames -cnotcontains $_ }
+    )
+    if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
+        throw (
+            "$SchemaLabel event fields differ from the closed schema. " +
+            "Missing: $($missingNames -join ', '); " +
+            "unexpected: $($unexpectedNames -join ', ')."
+        )
+    }
+    return $root
+}
+
+function Read-StrictProbeEvent {
+    param([Parameter(Mandatory = $true)][string] $Path)
 
     $expectedNames = @(
         'schemaVersion',
@@ -371,22 +507,10 @@ function Read-StrictProbeEvent {
         'state',
         'operationMode'
     )
-    $actualNames = @($root.PSObject.Properties.Name)
-    $missingNames = @(
-        $expectedNames |
-            Where-Object { $actualNames -cnotcontains $_ }
-    )
-    $unexpectedNames = @(
-        $actualNames |
-            Where-Object { $expectedNames -cnotcontains $_ }
-    )
-    if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
-        throw (
-            'The OperationGate event fields differ from the closed schema. ' +
-            "Missing: $($missingNames -join ', '); " +
-            "unexpected: $($unexpectedNames -join ', ')."
-        )
-    }
+    $root = Read-StrictJsonObject `
+        -Path $Path `
+        -SchemaLabel 'The OperationGate' `
+        -ExpectedNames $expectedNames
 
     foreach ($name in @('schemaVersion', 'processId')) {
         $value = $root.$name
@@ -422,19 +546,6 @@ function Read-StrictProbeEvent {
 function Read-StrictExportTerminalEvent {
     param([Parameter(Mandatory = $true)][string] $Path)
 
-    $json = [System.IO.File]::ReadAllText(
-        $Path,
-        [System.Text.Encoding]::UTF8
-    )
-    $root = $json | ConvertFrom-Json
-    Assert-NoDuplicateJsonPropertyNames -Json $json
-    if (
-        $null -eq $root -or
-        $root -isnot [System.Management.Automation.PSCustomObject]
-    ) {
-        throw 'The Export terminal event root must be a JSON object.'
-    }
-
     $expectedNames = @(
         'schemaVersion',
         'processId',
@@ -451,22 +562,10 @@ function Read-StrictExportTerminalEvent {
         'resourceState',
         'outputBytes'
     )
-    $actualNames = @($root.PSObject.Properties.Name)
-    $missingNames = @(
-        $expectedNames |
-            Where-Object { $actualNames -cnotcontains $_ }
-    )
-    $unexpectedNames = @(
-        $actualNames |
-            Where-Object { $expectedNames -cnotcontains $_ }
-    )
-    if ($missingNames.Count -gt 0 -or $unexpectedNames.Count -gt 0) {
-        throw (
-            'The Export terminal event fields differ from the closed schema. ' +
-            "Missing: $($missingNames -join ', '); " +
-            "unexpected: $($unexpectedNames -join ', ')."
-        )
-    }
+    $root = Read-StrictJsonObject `
+        -Path $Path `
+        -SchemaLabel 'The Export terminal' `
+        -ExpectedNames $expectedNames
 
     foreach ($name in @('schemaVersion', 'processId')) {
         $value = $root.$name
@@ -544,6 +643,202 @@ function Read-StrictExportTerminalEvent {
         }
         resources = @($root.resources | ForEach-Object { [string] $_ })
         resourceState = [string] $root.resourceState
+        outputBytes = if ($null -eq $root.outputBytes) {
+            $null
+        }
+        else {
+            [long] $root.outputBytes
+        }
+    }
+}
+
+function Read-StrictBatchLeaseEvent {
+    param([Parameter(Mandatory = $true)][string] $Path)
+
+    $expectedNames = @(
+        'schemaVersion',
+        'processId',
+        'role',
+        'scenario',
+        'state',
+        'operationMode',
+        'operationId',
+        'terminal',
+        'itemIndex',
+        'totalItems',
+        'completedItems',
+        'promotedOutputs',
+        'totalOutputs',
+        'failureStage',
+        'progressStages',
+        'resources',
+        'resourceState',
+        'outputEvidence',
+        'outputBytes'
+    )
+    $root = Read-StrictJsonObject `
+        -Path $Path `
+        -SchemaLabel 'The Batch lease' `
+        -ExpectedNames $expectedNames
+
+    foreach ($name in @(
+            'schemaVersion',
+            'processId',
+            'totalItems',
+            'completedItems'
+        )) {
+        $value = $root.$name
+        if ($value -isnot [int] -and $value -isnot [long]) {
+            throw "Batch lease field '$name' must be an integer."
+        }
+        if ($value -lt 0 -or $value -gt [int]::MaxValue) {
+            throw "Batch lease field '$name' must be a non-negative 32-bit integer."
+        }
+    }
+    foreach ($name in @(
+            'itemIndex',
+            'promotedOutputs',
+            'totalOutputs',
+            'outputBytes'
+        )) {
+        $value = $root.$name
+        if (
+            $null -ne $value -and
+            $value -isnot [int] -and
+            $value -isnot [long]
+        ) {
+            throw "Batch lease field '$name' must be an integer or null."
+        }
+        if ($null -ne $value -and $value -lt 0) {
+            throw "Batch lease field '$name' cannot be negative."
+        }
+    }
+    foreach ($name in @(
+            'role',
+            'scenario',
+            'state',
+            'operationMode',
+            'resourceState'
+        )) {
+        if ($root.$name -isnot [string]) {
+            throw "Batch lease field '$name' must be a string."
+        }
+    }
+    foreach ($name in @('operationId', 'terminal', 'failureStage')) {
+        if ($null -ne $root.$name -and $root.$name -isnot [string]) {
+            throw "Batch lease field '$name' must be a string or null."
+        }
+    }
+    foreach ($name in @('progressStages', 'resources')) {
+        if ($root.$name -isnot [System.Array]) {
+            throw "Batch lease field '$name' must be an array."
+        }
+        foreach ($value in @($root.$name)) {
+            if ($value -isnot [string]) {
+                throw "Batch lease field '$name' must contain strings."
+            }
+        }
+    }
+    if ($root.outputEvidence -isnot [System.Array]) {
+        throw "Batch lease field 'outputEvidence' must be an array."
+    }
+    $outputEvidence = @(
+        foreach ($entry in @($root.outputEvidence)) {
+            if ($entry -isnot [System.Management.Automation.PSCustomObject]) {
+                throw "Batch lease field 'outputEvidence' must contain objects."
+            }
+            $evidenceNames = @($entry.PSObject.Properties.Name)
+            $expectedEvidenceNames = @('name', 'bytes', 'sha256')
+            if (
+                @($expectedEvidenceNames | Where-Object {
+                    $evidenceNames -cnotcontains $_
+                }).Count -gt 0 -or
+                @($evidenceNames | Where-Object {
+                    $expectedEvidenceNames -cnotcontains $_
+                }).Count -gt 0
+            ) {
+                throw (
+                    "Batch lease outputEvidence fields differ from the " +
+                    'closed schema.'
+                )
+            }
+            if (
+                $entry.name -isnot [string] -or
+                [string]::IsNullOrWhiteSpace($entry.name)
+            ) {
+                throw "Batch lease outputEvidence field 'name' must be text."
+            }
+            if (
+                ($entry.bytes -isnot [int] -and $entry.bytes -isnot [long]) -or
+                $entry.bytes -le 0
+            ) {
+                throw "Batch lease outputEvidence field 'bytes' must be positive."
+            }
+            if (
+                $entry.sha256 -isnot [string] -or
+                $entry.sha256 -cnotmatch '^[0-9a-f]{64}$'
+            ) {
+                throw "Batch lease outputEvidence field 'sha256' is invalid."
+            }
+            [ordered]@{
+                name = [string] $entry.name
+                bytes = [long] $entry.bytes
+                sha256 = [string] $entry.sha256
+            }
+        }
+    )
+
+    return [ordered]@{
+        schemaVersion = [int] $root.schemaVersion
+        processId = [int] $root.processId
+        role = [string] $root.role
+        scenario = [string] $root.scenario
+        state = [string] $root.state
+        operationMode = [string] $root.operationMode
+        operationId = if ($null -eq $root.operationId) {
+            $null
+        }
+        else {
+            [string] $root.operationId
+        }
+        terminal = if ($null -eq $root.terminal) {
+            $null
+        }
+        else {
+            [string] $root.terminal
+        }
+        itemIndex = if ($null -eq $root.itemIndex) {
+            $null
+        }
+        else {
+            [int] $root.itemIndex
+        }
+        totalItems = [int] $root.totalItems
+        completedItems = [int] $root.completedItems
+        promotedOutputs = if ($null -eq $root.promotedOutputs) {
+            $null
+        }
+        else {
+            [int] $root.promotedOutputs
+        }
+        totalOutputs = if ($null -eq $root.totalOutputs) {
+            $null
+        }
+        else {
+            [int] $root.totalOutputs
+        }
+        failureStage = if ($null -eq $root.failureStage) {
+            $null
+        }
+        else {
+            [string] $root.failureStage
+        }
+        progressStages = @(
+            $root.progressStages | ForEach-Object { [string] $_ }
+        )
+        resources = @($root.resources | ForEach-Object { [string] $_ })
+        resourceState = [string] $root.resourceState
+        outputEvidence = @($outputEvidence)
         outputBytes = if ($null -eq $root.outputBytes) {
             $null
         }
@@ -635,6 +930,86 @@ function Test-StrictExportTerminalEventParser {
     })
 }
 
+function Test-StrictBatchLeaseEventParser {
+    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $path = Join-Path $ProbeRoot 'batch-parser-contract.json'
+    $valid = @'
+{"schemaVersion":1,"processId":42,"role":"owner","scenario":"success","state":"owner_terminal","operationMode":"batch_exclusive","operationId":"batch-42-success","terminal":"success","itemIndex":null,"totalItems":2,"completedItems":2,"promotedOutputs":2,"totalOutputs":2,"failureStage":null,"progressStages":["0:preparing","0:completed","1:preparing","1:completed"],"resources":["operation_gate","cache_pause","processor_reservation"],"resourceState":"released","outputEvidence":[{"name":"one.png","bytes":10,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"name":"two.png","bytes":20,"sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],"outputBytes":null}
+'@
+    [System.IO.File]::WriteAllText(
+        $path,
+        $valid.Trim(),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $event = Read-StrictBatchLeaseEvent -Path $path
+    if (
+        $event.schemaVersion -ne 1 -or
+        $event.processId -ne 42 -or
+        @($event.outputEvidence).Count -ne 2
+    ) {
+        throw 'The Batch lease parser changed a valid event.'
+    }
+
+    $invalidCases = @(
+        [ordered]@{
+            label = 'duplicate field'
+            json = $valid.Replace(
+                '"schemaVersion":1',
+                '"schemaVersion":1,"schema\u0056ersion":2'
+            )
+            error = '^The OperationGate event repeats the JSON field'
+        },
+        [ordered]@{
+            label = 'unexpected field'
+            json = $valid.Replace(
+                '"outputBytes":null}',
+                '"outputBytes":null,"unexpected":true}'
+            )
+            error = '^The Batch lease event fields differ from the closed schema'
+        },
+        [ordered]@{
+            label = 'mis-cased field'
+            json = $valid.Replace('"resourceState":', '"ResourceState":')
+            error = '^The Batch lease event fields differ from the closed schema'
+        },
+        [ordered]@{
+            label = 'nested duplicate field'
+            json = $valid.Replace(
+                '"name":"one.png"',
+                '"name":"one.png","n\u0061me":"duplicate.png"'
+            )
+            error = '^The OperationGate event repeats the JSON field'
+        }
+    )
+    foreach ($invalidCase in $invalidCases) {
+        [System.IO.File]::WriteAllText(
+            $path,
+            [string] $invalidCase.json,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        try {
+            [void] (Read-StrictBatchLeaseEvent -Path $path)
+            throw (
+                "The Batch lease parser accepted $($invalidCase.label)."
+            )
+        }
+        catch {
+            if ($_.Exception.Message -cnotmatch $invalidCase.error) {
+                throw
+            }
+        }
+    }
+
+    $stopwatch.Stop()
+    $checks.Add([ordered]@{
+        name = 'strict-batch-lease-json-parser'
+        passed = $true
+        elapsedMs = [long] $stopwatch.ElapsedMilliseconds
+    })
+}
+
 function Wait-ForProbeEvent {
     param(
         [Parameter(Mandatory = $true)]
@@ -643,7 +1018,7 @@ function Wait-ForProbeEvent {
         [System.Diagnostics.Process[]] $Processes,
         [Parameter(Mandatory = $true)]
         [string] $ProbeRoot,
-        [ValidateSet('operation', 'export_terminal')]
+        [ValidateSet('operation', 'export_terminal', 'batch_lease')]
         [string] $Contract = 'operation'
     )
 
@@ -652,13 +1027,18 @@ function Wait-ForProbeEvent {
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         if (Test-Path -LiteralPath $Path -PathType Leaf) {
             try {
-                if ($Contract -eq 'export_terminal') {
-                    return Read-StrictExportTerminalEvent -Path $Path
+                switch ($Contract) {
+                    'export_terminal' {
+                        return Read-StrictExportTerminalEvent -Path $Path
+                    }
+                    'batch_lease' {
+                        return Read-StrictBatchLeaseEvent -Path $Path
+                    }
                 }
                 return Read-StrictProbeEvent -Path $Path
             }
             catch {
-                if ($Contract -eq 'export_terminal') {
+                if ($Contract -ne 'operation') {
                     throw
                 }
                 $lastReadError = $_.Exception.Message
@@ -928,6 +1308,357 @@ function Assert-ExportTerminalEvent {
         cancellationDisposition = $Event.cancellationDisposition
         resources = @($resources)
         resourceState = [string] $Event.resourceState
+        outputBytes = $Event.outputBytes
+    }
+}
+
+function Assert-BatchProgressOrder {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $ProgressStages,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'success',
+            'before_preparation',
+            'between_promotions'
+        )]
+        [string] $Scenario
+    )
+
+    foreach ($stage in $ProgressStages) {
+        if (
+            $stage -cnotmatch
+                '^[01]:(preparing|loading_sources|composing|encoding_output|verifying|publishing|completed)$'
+        ) {
+            throw "The Batch lease reported an unknown progress stage '$stage'."
+        }
+    }
+    if (
+        $ProgressStages -cnotcontains '0:preparing' -or
+        $ProgressStages -cnotcontains '0:publishing'
+    ) {
+        throw 'The Batch lease did not report the first item boundaries.'
+    }
+
+    if ($Scenario -eq 'between_promotions') {
+        if (
+            @($ProgressStages | Where-Object { $_ -notlike '0:*' }).Count -gt 0 -or
+            $ProgressStages -ccontains '0:completed'
+        ) {
+            throw 'The partial promotion exposed an impossible completed item.'
+        }
+        return
+    }
+
+    $firstSecondItem = -1
+    for ($index = 0; $index -lt $ProgressStages.Count; $index++) {
+        if ($ProgressStages[$index] -clike '1:*') {
+            $firstSecondItem = $index
+            break
+        }
+    }
+    $firstCompleted = [Array]::IndexOf($ProgressStages, '0:completed')
+    if (
+        $firstSecondItem -lt 0 -or
+        $firstCompleted -lt 0 -or
+        $firstSecondItem -le $firstCompleted -or
+        @($ProgressStages[$firstSecondItem..($ProgressStages.Count - 1)] |
+            Where-Object { $_ -clike '0:*' }).Count -gt 0
+    ) {
+        throw 'The Batch lease progress does not prove serial item execution.'
+    }
+    if ($ProgressStages -cnotcontains '1:preparing') {
+        throw 'The Batch lease never began its second item.'
+    }
+    if ($Scenario -eq 'success') {
+        if (
+            $ProgressStages -cnotcontains '1:publishing' -or
+            $ProgressStages -cnotcontains '1:completed'
+        ) {
+            throw 'The successful Batch lease did not complete its second item.'
+        }
+    }
+    elseif (
+        $ProgressStages -ccontains '1:publishing' -or
+        $ProgressStages -ccontains '1:completed'
+    ) {
+        throw 'The preparation failure crossed the publication boundary.'
+    }
+}
+
+function Assert-BatchLeaseEvent {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object] $Event,
+        [Parameter(Mandatory = $true)]
+        [int] $ExpectedProcessId,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'success',
+            'before_preparation',
+            'between_promotions',
+            'owner_death'
+        )]
+        [string] $ExpectedScenario,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'owner_ready',
+            'challenger_conflict',
+            'between_items_ready',
+            'between_items_conflict',
+            'owner_terminal',
+            'successor_success'
+        )]
+        [string] $ExpectedState
+    )
+
+    $expectedTotalItems = if (
+        $ExpectedScenario -eq 'success' -or
+        $ExpectedScenario -eq 'before_preparation'
+    ) {
+        2
+    }
+    else {
+        1
+    }
+    if (
+        [int] $Event.schemaVersion -ne 1 -or
+        [long] $Event.processId -ne $ExpectedProcessId -or
+        [string] $Event.scenario -cne $ExpectedScenario -or
+        [string] $Event.state -cne $ExpectedState -or
+        [int] $Event.totalItems -ne $expectedTotalItems -or
+        [int] $Event.completedItems -gt $expectedTotalItems
+    ) {
+        $actual = $Event | ConvertTo-Json -Depth 8 -Compress
+        throw (
+            "Invalid Batch lease event for state '$ExpectedState'. " +
+            "Received: $actual"
+        )
+    }
+
+    $resources = @($Event.resources)
+    $progressStages = @($Event.progressStages)
+    $outputEvidence = @($Event.outputEvidence)
+    $fullResources = @(
+        'operation_gate',
+        'cache_pause',
+        'processor_reservation'
+    )
+    $hasOperation = -not [string]::IsNullOrWhiteSpace(
+        [string] $Event.operationId
+    )
+    switch ($ExpectedState) {
+        'owner_ready' {
+            if (
+                [string] $Event.role -cne 'owner' -or
+                [string] $Event.operationMode -cne 'batch_exclusive' -or
+                -not $hasOperation -or
+                $null -ne $Event.terminal -or
+                $null -ne $Event.itemIndex -or
+                [int] $Event.completedItems -ne 0 -or
+                $null -ne $Event.promotedOutputs -or
+                $null -ne $Event.totalOutputs -or
+                $null -ne $Event.failureStage -or
+                $progressStages.Count -ne 0 -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'held' -or
+                $outputEvidence.Count -ne 0 -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The owner_ready event does not prove one complete BatchExclusive lease.'
+            }
+        }
+        'challenger_conflict' {
+            if (
+                [string] $Event.role -cne 'challenger' -or
+                [string] $Event.operationMode -cne 'normal_export' -or
+                $hasOperation -or
+                [string] $Event.terminal -cne 'conflict' -or
+                $null -ne $Event.itemIndex -or
+                [int] $Event.completedItems -ne 0 -or
+                $null -ne $Event.promotedOutputs -or
+                $null -ne $Event.totalOutputs -or
+                $null -ne $Event.failureStage -or
+                $progressStages.Count -ne 0 -or
+                $resources.Count -ne 0 -or
+                [string] $Event.resourceState -cne 'blocked' -or
+                $outputEvidence.Count -ne 0 -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The first batch challenger was not blocked before work began.'
+            }
+        }
+        'between_items_ready' {
+            if (
+                [string] $Event.role -cne 'owner' -or
+                [string] $Event.operationMode -cne 'batch_exclusive' -or
+                -not $hasOperation -or
+                $null -ne $Event.terminal -or
+                $null -eq $Event.itemIndex -or
+                [int] $Event.itemIndex -ne 0 -or
+                [int] $Event.completedItems -ne 1 -or
+                $null -ne $Event.promotedOutputs -or
+                $null -ne $Event.totalOutputs -or
+                $null -ne $Event.failureStage -or
+                $progressStages.Count -ne 0 -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'held' -or
+                $outputEvidence.Count -ne 0 -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The between-items event does not prove a continuous held lease.'
+            }
+        }
+        'between_items_conflict' {
+            if (
+                [string] $Event.role -cne 'challenger' -or
+                [string] $Event.operationMode -cne 'normal_export' -or
+                $hasOperation -or
+                [string] $Event.terminal -cne 'conflict' -or
+                $null -eq $Event.itemIndex -or
+                [int] $Event.itemIndex -ne 0 -or
+                [int] $Event.completedItems -ne 1 -or
+                $null -ne $Event.promotedOutputs -or
+                $null -ne $Event.totalOutputs -or
+                $null -ne $Event.failureStage -or
+                $progressStages.Count -ne 0 -or
+                $resources.Count -ne 0 -or
+                [string] $Event.resourceState -cne 'blocked' -or
+                $outputEvidence.Count -ne 0 -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The normal export entered between two batch items.'
+            }
+        }
+        'owner_terminal' {
+            if ($ExpectedScenario -eq 'owner_death') {
+                throw 'owner_death must not emit owner_terminal.'
+            }
+            $expectedTerminal = if ($ExpectedScenario -eq 'success') {
+                'success'
+            }
+            else {
+                'failed'
+            }
+            if (
+                [string] $Event.role -cne 'owner' -or
+                [string] $Event.operationMode -cne 'batch_exclusive' -or
+                -not $hasOperation -or
+                [string] $Event.terminal -cne $expectedTerminal -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'released' -or
+                $null -ne $Event.outputBytes
+            ) {
+                throw 'The batch owner did not publish its expected terminal state.'
+            }
+            switch ($ExpectedScenario) {
+                'success' {
+                    if (
+                        $null -ne $Event.itemIndex -or
+                        [int] $Event.completedItems -ne 2 -or
+                        $null -eq $Event.promotedOutputs -or
+                        [int] $Event.promotedOutputs -ne 2 -or
+                        $null -eq $Event.totalOutputs -or
+                        [int] $Event.totalOutputs -ne 2 -or
+                        $null -ne $Event.failureStage -or
+                        $outputEvidence.Count -ne 2
+                    ) {
+                        throw 'The successful batch terminal does not prove two outputs.'
+                    }
+                    Assert-BatchProgressOrder `
+                        -ProgressStages $progressStages `
+                        -Scenario $ExpectedScenario
+                }
+                'before_preparation' {
+                    if (
+                        $null -eq $Event.itemIndex -or
+                        [int] $Event.itemIndex -ne 1 -or
+                        [int] $Event.completedItems -ne 1 -or
+                        $null -eq $Event.promotedOutputs -or
+                        [int] $Event.promotedOutputs -ne 0 -or
+                        $null -eq $Event.totalOutputs -or
+                        [int] $Event.totalOutputs -ne 1 -or
+                        [string] $Event.failureStage -cne 'prepare_output' -or
+                        $outputEvidence.Count -ne 1
+                    ) {
+                        throw 'The injected preparation failure crossed its expected boundary.'
+                    }
+                    Assert-BatchProgressOrder `
+                        -ProgressStages $progressStages `
+                        -Scenario $ExpectedScenario
+                }
+                'between_promotions' {
+                    if (
+                        $null -eq $Event.itemIndex -or
+                        [int] $Event.itemIndex -ne 0 -or
+                        [int] $Event.completedItems -ne 0 -or
+                        $null -eq $Event.promotedOutputs -or
+                        [int] $Event.promotedOutputs -ne 1 -or
+                        $null -eq $Event.totalOutputs -or
+                        [int] $Event.totalOutputs -ne 2 -or
+                        [string] $Event.failureStage -cne 'publish_output' -or
+                        $outputEvidence.Count -ne 1
+                    ) {
+                        throw 'The partial publication was not typed as one of two promotions.'
+                    }
+                    Assert-BatchProgressOrder `
+                        -ProgressStages $progressStages `
+                        -Scenario $ExpectedScenario
+                }
+            }
+        }
+        'successor_success' {
+            $expectedRole = if ($ExpectedScenario -eq 'owner_death') {
+                'challenger'
+            }
+            else {
+                'owner'
+            }
+            $expectedCompleted = switch ($ExpectedScenario) {
+                'success' { 2 }
+                'before_preparation' { 1 }
+                default { 0 }
+            }
+            if (
+                [string] $Event.role -cne $expectedRole -or
+                [string] $Event.operationMode -cne 'normal_export' -or
+                $hasOperation -or
+                [string] $Event.terminal -cne 'success' -or
+                $null -ne $Event.itemIndex -or
+                [int] $Event.completedItems -ne $expectedCompleted -or
+                $null -ne $Event.promotedOutputs -or
+                $null -ne $Event.totalOutputs -or
+                $null -ne $Event.failureStage -or
+                $progressStages.Count -ne 0 -or
+                ($resources -join "`0") -cne ($fullResources -join "`0") -or
+                [string] $Event.resourceState -cne 'reacquired' -or
+                $outputEvidence.Count -ne 0 -or
+                [long] $Event.outputBytes -le 0
+            ) {
+                throw 'A real normal export did not reacquire the released lease.'
+            }
+        }
+    }
+
+    return [ordered]@{
+        schemaVersion = 1
+        processId = [int] $Event.processId
+        role = [string] $Event.role
+        scenario = [string] $Event.scenario
+        state = [string] $Event.state
+        operationMode = [string] $Event.operationMode
+        operationId = $Event.operationId
+        terminal = $Event.terminal
+        itemIndex = $Event.itemIndex
+        totalItems = [int] $Event.totalItems
+        completedItems = [int] $Event.completedItems
+        promotedOutputs = $Event.promotedOutputs
+        totalOutputs = $Event.totalOutputs
+        failureStage = $Event.failureStage
+        progressStages = @($progressStages)
+        resources = @($resources)
+        resourceState = [string] $Event.resourceState
+        outputEvidence = @($outputEvidence)
         outputBytes = $Event.outputBytes
     }
 }
@@ -1246,6 +1977,359 @@ function Invoke-ExportTerminalScenario {
     }
 }
 
+function Assert-BatchOutputEvidence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]] $Evidence,
+        [Parameter(Mandatory = $true)]
+        [string[]] $ExpectedPaths
+    )
+
+    if ($Evidence.Count -ne $ExpectedPaths.Count) {
+        throw 'The Batch lease output evidence count differs from the filesystem.'
+    }
+    $verified = @(
+        foreach ($path in $ExpectedPaths) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                throw "The expected Batch lease output '$path' does not exist."
+            }
+            $item = Get-Item -LiteralPath $path
+            $name = $item.Name
+            $matches = @($Evidence | Where-Object { $_.name -ceq $name })
+            if ($matches.Count -ne 1) {
+                throw "The Batch lease evidence does not identify '$name' exactly once."
+            }
+            $sha256 = (
+                Get-FileHash -LiteralPath $path -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+            if (
+                [long] $matches[0].bytes -ne [long] $item.Length -or
+                [string] $matches[0].sha256 -cne $sha256
+            ) {
+                throw "The Batch lease evidence does not match '$name' byte-for-byte."
+            }
+            [ordered]@{
+                name = $name
+                bytes = [long] $item.Length
+                sha256 = $sha256
+            }
+        }
+    )
+    return @($verified)
+}
+
+function Assert-NoBatchPreparationRemnants {
+    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+
+    $remnants = @(
+        Get-ChildItem `
+            -LiteralPath $ProbeRoot `
+            -Recurse `
+            -Force `
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '.myalbuns-export-*.tmp' }
+    )
+    if ($remnants.Count -gt 0) {
+        throw (
+            'The Batch lease left preparation remnants: ' +
+            (($remnants | ForEach-Object { $_.FullName }) -join ', ')
+        )
+    }
+}
+
+function Invoke-BatchLeaseScenario {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet(
+            'success',
+            'before_preparation',
+            'between_promotions',
+            'owner_death'
+        )]
+        [string] $Scenario,
+        [Parameter(Mandatory = $true)]
+        [string] $ProbeRoot
+    )
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $startedAt = [DateTimeOffset]::UtcNow
+    $scenarioProcesses =
+        [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
+    $lockedOutput = $null
+    $ownerTerminated = $false
+    $ownerTerminal = $null
+    $betweenItemsReady = $null
+    $betweenItemsConflict = $null
+    $previousOutputs = @()
+    try {
+        $ownerProcess = Start-OperationProbeProcess `
+            -Topology 'independent' `
+            -ProbeRoot $ProbeRoot `
+            -ProjectSlot 'a' `
+            -BatchScenario $Scenario
+        $scenarioProcesses.Add($ownerProcess)
+        $challengerProcess = Start-OperationProbeProcess `
+            -Topology 'independent' `
+            -ProbeRoot $ProbeRoot `
+            -ProjectSlot 'b' `
+            -BatchScenario $Scenario
+        $scenarioProcesses.Add($challengerProcess)
+        $processes = @($ownerProcess, $challengerProcess)
+
+        $ownerReady = Assert-BatchLeaseEvent `
+            -Event (Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'owner-ready.json') `
+                -Processes $processes `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'batch_lease') `
+            -ExpectedProcessId $ownerProcess.Id `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'owner_ready'
+        $challengerConflict = Assert-BatchLeaseEvent `
+            -Event (Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'challenger-conflict.json') `
+                -Processes $processes `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'batch_lease') `
+            -ExpectedProcessId $challengerProcess.Id `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'challenger_conflict'
+
+        if ($Scenario -eq 'between_promotions') {
+            $firstOutput = Join-Path `
+                $ProbeRoot `
+                'destination\between-promotions-1.png'
+            $secondOutput = Join-Path `
+                $ProbeRoot `
+                'destination\between-promotions-2.png'
+            foreach ($path in @($firstOutput, $secondOutput)) {
+                if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                    throw "The partial-promotion fixture '$path' was not created."
+                }
+            }
+            $previousOutputs = @(
+                foreach ($path in @($firstOutput, $secondOutput)) {
+                    [ordered]@{
+                        name = (Get-Item -LiteralPath $path).Name
+                        bytes = [long] (Get-Item -LiteralPath $path).Length
+                        sha256 = (
+                            Get-FileHash -LiteralPath $path -Algorithm SHA256
+                        ).Hash.ToLowerInvariant()
+                    }
+                }
+            )
+            # The exclusive handle deterministically blocks replacement of the
+            # second final file. The probe reports the first promoted output;
+            # this harness verifies the still-locked second output afterwards.
+            $lockedOutput = [System.IO.File]::Open(
+                $secondOutput,
+                [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read,
+                [System.IO.FileShare]::None
+            )
+        }
+
+        if ($Scenario -eq 'owner_death') {
+            Stop-OwnedOperationProbeProcess `
+                -Process $ownerProcess `
+                -RequireLiveKill
+            [void] $scenarioProcesses.Remove($ownerProcess)
+            $ownerTerminated = $true
+            if (Test-Path -LiteralPath (Join-Path $ProbeRoot 'owner-terminal.json')) {
+                throw 'The killed batch owner published a cooperative terminal event.'
+            }
+            [void] (Open-ProbeMarker `
+                -ProbeRoot $ProbeRoot `
+                -Name 'allow-successor')
+        }
+        else {
+            [void] (Open-ProbeMarker `
+                -ProbeRoot $ProbeRoot `
+                -Name 'allow-batch-start')
+            if (
+                $Scenario -eq 'success' -or
+                $Scenario -eq 'before_preparation'
+            ) {
+                $betweenItemsReady = Assert-BatchLeaseEvent `
+                    -Event (Wait-ForProbeEvent `
+                        -Path (Join-Path $ProbeRoot 'between-items-ready.json') `
+                        -Processes $processes `
+                        -ProbeRoot $ProbeRoot `
+                        -Contract 'batch_lease') `
+                    -ExpectedProcessId $ownerProcess.Id `
+                    -ExpectedScenario $Scenario `
+                    -ExpectedState 'between_items_ready'
+                $betweenItemsConflict = Assert-BatchLeaseEvent `
+                    -Event (Wait-ForProbeEvent `
+                        -Path (Join-Path $ProbeRoot 'between-items-conflict.json') `
+                        -Processes $processes `
+                        -ProbeRoot $ProbeRoot `
+                        -Contract 'batch_lease') `
+                    -ExpectedProcessId $challengerProcess.Id `
+                    -ExpectedScenario $Scenario `
+                    -ExpectedState 'between_items_conflict'
+                if (
+                    [string] $betweenItemsReady.operationId -cne
+                        [string] $ownerReady.operationId
+                ) {
+                    throw 'The BatchExclusive operation changed between items.'
+                }
+                [void] (Open-ProbeMarker `
+                    -ProbeRoot $ProbeRoot `
+                    -Name 'allow-next-item')
+            }
+            $ownerTerminal = Assert-BatchLeaseEvent `
+                -Event (Wait-ForProbeEvent `
+                    -Path (Join-Path $ProbeRoot 'owner-terminal.json') `
+                    -Processes $processes `
+                    -ProbeRoot $ProbeRoot `
+                    -Contract 'batch_lease') `
+                -ExpectedProcessId $ownerProcess.Id `
+                -ExpectedScenario $Scenario `
+                -ExpectedState 'owner_terminal'
+            if (
+                [string] $ownerTerminal.operationId -cne
+                    [string] $ownerReady.operationId
+            ) {
+                throw 'The terminal batch event belongs to a different operation.'
+            }
+        }
+
+        $successorProcessId = if ($Scenario -eq 'owner_death') {
+            $challengerProcess.Id
+        }
+        else {
+            $ownerProcess.Id
+        }
+        $successorProcesses = if ($Scenario -eq 'owner_death') {
+            @($challengerProcess)
+        }
+        else {
+            @($ownerProcess, $challengerProcess)
+        }
+        $successorSuccess = Assert-BatchLeaseEvent `
+            -Event (Wait-ForProbeEvent `
+                -Path (Join-Path $ProbeRoot 'successor-success.json') `
+                -Processes $successorProcesses `
+                -ProbeRoot $ProbeRoot `
+                -Contract 'batch_lease') `
+            -ExpectedProcessId $successorProcessId `
+            -ExpectedScenario $Scenario `
+            -ExpectedState 'successor_success'
+
+        if ($null -ne $lockedOutput) {
+            $lockedOutput.Dispose()
+            $lockedOutput = $null
+        }
+        if (
+            $Scenario -eq 'owner_death' -and
+            (Test-Path -LiteralPath (Join-Path $ProbeRoot 'owner-terminal.json'))
+        ) {
+            throw 'The killed owner emitted a terminal event after lease recovery.'
+        }
+
+        $publicationEvidence = @()
+        switch ($Scenario) {
+            'success' {
+                $publicationEvidence = Assert-BatchOutputEvidence `
+                    -Evidence @($ownerTerminal.outputEvidence) `
+                    -ExpectedPaths @(
+                        (Join-Path $ProbeRoot 'destination\success-item-1.png'),
+                        (Join-Path $ProbeRoot 'destination\success-item-2.png')
+                    )
+            }
+            'before_preparation' {
+                $firstOutput = Join-Path `
+                    $ProbeRoot `
+                    'destination\before-preparation-item-1.png'
+                $secondOutput = Join-Path `
+                    $ProbeRoot `
+                    'destination\before-preparation-item-2.png'
+                $publicationEvidence = Assert-BatchOutputEvidence `
+                    -Evidence @($ownerTerminal.outputEvidence) `
+                    -ExpectedPaths @($firstOutput)
+                if (Test-Path -LiteralPath $secondOutput) {
+                    throw 'The preparation failure published its second item.'
+                }
+            }
+            'between_promotions' {
+                $promotedEvidence = @(
+                    Assert-BatchOutputEvidence `
+                    -Evidence @($ownerTerminal.outputEvidence) `
+                    -ExpectedPaths @($firstOutput)
+                )
+                if (-not (Test-Path -LiteralPath $secondOutput -PathType Leaf)) {
+                    throw 'The unpromoted previous output disappeared.'
+                }
+                $secondItem = Get-Item -LiteralPath $secondOutput
+                $currentOutputs = @(
+                    $promotedEvidence[0],
+                    [ordered]@{
+                        name = $secondItem.Name
+                        bytes = [long] $secondItem.Length
+                        sha256 = (
+                            Get-FileHash `
+                                -LiteralPath $secondOutput `
+                                -Algorithm SHA256
+                        ).Hash.ToLowerInvariant()
+                    }
+                )
+                if (
+                    $currentOutputs[0].sha256 -ceq $previousOutputs[0].sha256 -or
+                    $currentOutputs[1].sha256 -cne $previousOutputs[1].sha256
+                ) {
+                    throw 'The partial promotion did not preserve the expected old/new mix.'
+                }
+                $publicationEvidence = [ordered]@{
+                    before = @($previousOutputs)
+                    after = @($currentOutputs)
+                    promotedOutputs = 1
+                    totalOutputs = 2
+                }
+            }
+            'owner_death' {
+                $batchOutput = Join-Path `
+                    $ProbeRoot `
+                    'destination\owner-death.png'
+                if (Test-Path -LiteralPath $batchOutput) {
+                    throw 'The killed owner published a batch output before recovery.'
+                }
+            }
+        }
+        Assert-NoBatchPreparationRemnants -ProbeRoot $ProbeRoot
+
+        $stopwatch.Stop()
+        return [ordered]@{
+            topology = 'independent'
+            scenario = $Scenario
+            passed = $true
+            startedAtUtc = $startedAt.ToString('o')
+            elapsedMs = [long] $stopwatch.ElapsedMilliseconds
+            ownerProcessId = [int] $ownerReady.processId
+            challengerProcessId = [int] $challengerProcess.Id
+            successorProcessId = [int] $successorProcessId
+            ownerTerminated = $ownerTerminated
+            ownerReady = $ownerReady
+            challengerConflict = $challengerConflict
+            betweenItemsReady = $betweenItemsReady
+            betweenItemsConflict = $betweenItemsConflict
+            ownerTerminal = $ownerTerminal
+            successorSuccess = $successorSuccess
+            publicationEvidence = $publicationEvidence
+            preparationRemnants = 0
+        }
+    }
+    finally {
+        $stopwatch.Stop()
+        if ($null -ne $lockedOutput) {
+            $lockedOutput.Dispose()
+        }
+        foreach ($process in @($scenarioProcesses)) {
+            Stop-OwnedOperationProbeProcess -Process $process
+        }
+    }
+}
+
 try {
 try {
     Set-OperationProbeEnvironmentValue `
@@ -1257,11 +2341,82 @@ try {
     Push-Location $script:WorkspaceRoot
     $locationWasPushed = $true
     $initialBuildInputState = Get-BuildInputState
-    Test-StrictProbeEventParser -ProbeRoot $independentRoot
-    Test-StrictExportTerminalEventParser `
-        -ProbeRoot $terminalRoots['independent']['success']
+    if ($Suite -eq 'batch') {
+        Test-StrictBatchLeaseEventParser `
+            -ProbeRoot $batchRoots['success']
+    }
+    else {
+        Test-StrictProbeEventParser -ProbeRoot $independentRoot
+        Test-StrictExportTerminalEventParser `
+            -ProbeRoot $terminalRoots['independent']['success']
+    }
 
     $rustChecks = @(
+        if ($Suite -eq 'batch') {
+            [ordered]@{
+                name = 'operation-lease'
+                arguments = @(
+                    'test',
+                    '-p',
+                    'myalbuns-desktop',
+                    '--lib',
+                    'operation_lease::tests::',
+                    '--',
+                    '--nocapture'
+                )
+            }
+            [ordered]@{
+                name = 'batch-runner'
+                arguments = @(
+                    'test',
+                    '-p',
+                    'myalbuns-desktop',
+                    '--lib',
+                    'batch_runner::tests::',
+                    '--',
+                    '--nocapture'
+                )
+            }
+            [ordered]@{
+                name = 'grouped-export-prepares-before-publish'
+                arguments = @(
+                    'test',
+                    '-p',
+                    'myalbuns-desktop',
+                    '--lib',
+                    'export_pipeline::tests::grouped_export_prepares_every_output_before_publishing_the_complete_set',
+                    '--',
+                    '--exact',
+                    '--nocapture'
+                )
+            }
+            [ordered]@{
+                name = 'grouped-export-partial-publication'
+                arguments = @(
+                    'test',
+                    '-p',
+                    'myalbuns-desktop',
+                    '--lib',
+                    'export_pipeline::tests::grouped_export_reports_a_typed_partial_publication_and_discards_the_remainder',
+                    '--',
+                    '--exact',
+                    '--nocapture'
+                )
+            }
+            [ordered]@{
+                name = 'batch-lease-probe-contract'
+                arguments = @(
+                    'test',
+                    '-p',
+                    'myalbuns-desktop',
+                    '--lib',
+                    'batch_lease_probe::tests::',
+                    '--',
+                    '--nocapture'
+                )
+            }
+        }
+        else {
         [ordered]@{
             name = 'operation-gate'
             arguments = @(
@@ -1415,6 +2570,7 @@ try {
                 '--nocapture'
             )
         }
+        }
     )
     foreach ($check in $rustChecks) {
         Invoke-RustCheck `
@@ -1494,6 +2650,66 @@ try {
         workingTreeDirty = $workingTreeStatus.Count -gt 0
     }
 
+    if ($Suite -eq 'batch') {
+        $batchResults = [ordered]@{}
+        foreach ($scenario in $batchScenarios) {
+            $result = Invoke-BatchLeaseScenario `
+                -Scenario $scenario `
+                -ProbeRoot $batchRoots[$scenario]
+            $batchResults[$scenario] = $result
+            $checks.Add([ordered]@{
+                name = "batch-lease-$scenario"
+                passed = $result.passed
+                elapsedMs = $result.elapsedMs
+            })
+        }
+        $finalBuildInputState = Get-BuildInputState
+        if (
+            $finalBuildInputState.fileCount -ne $buildInputState.fileCount -or
+            $finalBuildInputState.digestSha256 -cne
+                $buildInputState.digestSha256 -or
+            $finalBuildInputState.dirty -ne $buildInputState.dirty
+        ) {
+            throw (
+                'Batch lease probes changed source inputs after the build; ' +
+                'the evidence cannot be tied to one source state.'
+            )
+        }
+        $report = [ordered]@{
+            schemaVersion = 1
+            suite = 'batch_operation_lease'
+            collectedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
+            gitCommit = $gitCommit
+            sourceInputsDirty = $finalBuildInputState.dirty
+            platform = [ordered]@{
+                operatingSystem = [System.Environment]::OSVersion.VersionString
+                architecture = (
+                    [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+                )
+                powerShellEdition = [string] $PSVersionTable.PSEdition
+                powerShellVersion = [string] $PSVersionTable.PSVersion
+            }
+            build = $build
+            checks = @($checks)
+            results = [ordered]@{
+                topology = 'independent_two_host'
+                scenarios = $batchResults
+            }
+            limits = [ordered]@{
+                batchRunnerExecution = $true
+                batchWideOperationLease = $true
+                multiOutputPromotion = $true
+                topologyMatrix = $false
+                automaticDiscovery = $false
+                checkpoint = $false
+                resume = $false
+                batchUi = $false
+                orphanCleanup = $false
+                projectOpenGuardian = $false
+            }
+        }
+    }
+    else {
     $independent = Invoke-OperationTopologyProbe `
         -Topology 'independent' `
         -ProbeRoot $independentRoot
@@ -1582,6 +2798,7 @@ try {
             uiCancellationFlow = $false
             progressWindow = $false
         }
+    }
     }
 }
 finally {
