@@ -1,0 +1,108 @@
+{
+    "schemaVersion":  1,
+    "collectedAtUtc":  "2026-07-31T02:24:06.5851298Z",
+    "gitCommit":  "dba3a07098bf73c6babf32241ce6b6f69c9d8d0a",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "uncProvider":  "loopback-administrative-share"
+                 },
+    "checks":  [
+                   {
+                       "name":  "path-contract",
+                       "passed":  true,
+                       "elapsedMs":  1323
+                   },
+                   {
+                       "name":  "path-policy",
+                       "passed":  true,
+                       "elapsedMs":  1114
+                   },
+                   {
+                       "name":  "real-mapped-unc",
+                       "passed":  true,
+                       "elapsedMs":  5272
+                   },
+                   {
+                       "name":  "imaging-protocol",
+                       "passed":  true,
+                       "elapsedMs":  1354
+                   },
+                   {
+                       "name":  "imaging-sidecar-build",
+                       "passed":  true,
+                       "elapsedMs":  1269
+                   },
+                   {
+                       "name":  "sidecar-protocol-preflight",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "desktop-host-build",
+                       "passed":  true,
+                       "elapsedMs":  3939
+                   },
+                   {
+                       "name":  "path-io-thread",
+                       "passed":  true,
+                       "elapsedMs":  1001
+                   },
+                   {
+                       "name":  "real-sidecar-frozen-plan",
+                       "passed":  true,
+                       "elapsedMs":  37365
+                   },
+                   {
+                       "name":  "desktop-long-path-manifest",
+                       "passed":  true,
+                       "elapsedMs":  57
+                   },
+                   {
+                       "name":  "sidecar-long-path-manifest",
+                       "passed":  true,
+                       "elapsedMs":  474
+                   }
+               ],
+    "evidence":  {
+                     "paths":  {
+                                   "bindingReusedAfterRemapWithinAttempt":  true,
+                                   "cacheUnderLocalAppData":  true,
+                                   "explicitRetryRecaptured":  true,
+                                   "firstPlanSha256":  "2aea822c10b951b15ca81c6395aace555e4572ea9c082b4ac228a2822af77c47",
+                                   "identityFailure":  "indeterminate",
+                                   "lockReleasedAfterOwnerDrop":  true,
+                                   "mappedAndLocalIdentity":  "same",
+                                   "mappedAndUncIdentity":  "same",
+                                   "mappedRootKind":  "disk",
+                                   "operationalRootKind":  "unc",
+                                   "physicalAliasLockConflict":  true,
+                                   "planRoundTripLossless":  true,
+                                   "plansDistinct":  true,
+                                   "readOnlyBatchAllowedWhileLocked":  true,
+                                   "retryPlanSha256":  "27eeee8a21bc3b0fe728a8bdbf041052f73e1f3de0c8ed5001eaff9d14b6dd4c",
+                                   "stagingInsideDestination":  true,
+                                   "unavailableBinding":  "unavailable",
+                                   "uncExportPublished":  true,
+                                   "verbatimMappedBindingFrozenAsUnc":  true
+                               },
+                     "sidecar":  {
+                                     "explicitRetryPublished":  true,
+                                     "mappingRemovedBeforeDispatch":  true,
+                                     "outputPublishedOnUnc":  true,
+                                     "outputSha256":  "845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb",
+                                     "processorPid":  29760,
+                                     "processorUsedFrozenOperationalPath":  true,
+                                     "rootBindingPlanSha256":  "4be77efd2cabbda6aa19ccd9d626558c5f5446c5f569833922f3ab569297e490",
+                                     "stagingRemoved":  true,
+                                     "unavailableAttemptStartedProcessor":  false,
+                                     "unavailableBindingFailedAtPrepare":  true
+                                 },
+                     "longPathAware":  {
+                                           "desktop":  true,
+                                           "imagingSidecar":  true
+                                       },
+                     "pathIoRunsOutsideCallerThread":  true
+                 }
+}
