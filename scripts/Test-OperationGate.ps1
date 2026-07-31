@@ -84,8 +84,15 @@ function Invoke-RustCheck {
     )
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $commandOutput = @(& $script:CargoExecutable @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $commandOutput = @(& $script:CargoExecutable @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $stopwatch.Stop()
     foreach ($line in $commandOutput) {
         Write-Host $line
