@@ -159,6 +159,20 @@ pub(crate) enum ExportProgressStage {
     Completed,
 }
 
+impl ExportProgressStage {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Preparing => "preparing",
+            Self::LoadingSources => "loading_sources",
+            Self::Composing => "composing",
+            Self::EncodingOutput => "encoding_output",
+            Self::Verifying => "verifying",
+            Self::Publishing => "publishing",
+            Self::Completed => "completed",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ExportProgress {
     pub(crate) stage: ExportProgressStage,
@@ -342,6 +356,9 @@ pub(crate) async fn execute<T: ImagingTransport>(
         return Err(cancelled_failure());
     }
     progress(ExportProgress::at(ExportProgressStage::Publishing, 0));
+    if cancellation.load(Ordering::Acquire) {
+        return Err(cancelled_failure());
+    }
     preparation.publish().map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Publish,
@@ -797,6 +814,65 @@ mod tests {
                     ExportProgressStage::Publishing,
                     ExportProgressStage::Completed,
                 ]
+            );
+        });
+    }
+
+    #[test]
+    fn cancellation_that_wins_the_publication_boundary_preserves_the_previous_output() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary Export destination");
+            let output = destination.path().join("Album.png");
+            std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+            let plan = export_plan(output.clone(), "export-cancel-before-publish");
+            let bytes = b"verified replacement".to_vec();
+            let response = ImagingResponse::completed(
+                "export-cancel-before-publish",
+                RenderCompletion {
+                    width_px: 10,
+                    height_px: 5,
+                    dpi: 25,
+                    source_count: 0,
+                    source_bytes: 0,
+                    output_bytes: bytes.len() as u64,
+                    output_sha256: format!("{:x}", Sha256::digest(&bytes)),
+                },
+            );
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+                prepared_bytes: bytes,
+                result: Some(Ok(response)),
+                invocations: 0,
+            };
+            let bindings = root_bindings(&plan);
+            let cancellation = AtomicBool::new(false);
+            let progress = |event: super::ExportProgress| {
+                if event.stage == ExportProgressStage::Publishing {
+                    cancellation.store(true, Ordering::Release);
+                }
+            };
+
+            let failure = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &cancellation,
+                &progress,
+                &context("export-cancel-before-publish"),
+            )
+            .await
+            .expect_err("cancellation wins before the first publication");
+
+            assert_eq!(failure.stage, ExportFailureStage::Cancelled);
+            assert_eq!(
+                std::fs::read(output).expect("the previous Export remains readable"),
+                b"previous export"
+            );
+            assert!(
+                !destination
+                    .path()
+                    .join(".myalbuns-export-export-cancel-before-publish.tmp")
+                    .exists()
             );
         });
     }

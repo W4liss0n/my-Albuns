@@ -14,6 +14,47 @@ export interface ExportResult {
   heightPx: number;
 }
 
+export type ExportProgressStage =
+  | "preparing"
+  | "loading_sources"
+  | "composing"
+  | "encoding_output"
+  | "verifying"
+  | "publishing"
+  | "completed";
+
+export type ExportProgressEvent =
+  | {
+      event: "started";
+    }
+  | {
+      event: "progress";
+      stage: ExportProgressStage;
+      completedUnits: number;
+      totalUnits: number;
+      cancellable: boolean;
+    };
+
+export type ExportOutcome =
+  | {
+      status: "completed";
+      result: ExportResult;
+    }
+  | {
+      status: "cancelled";
+    };
+
+export type ExportCancelStatus =
+  | "requested"
+  | "already_requested"
+  | "too_late"
+  | "not_found";
+
+export interface ExportAttempt {
+  completion: Promise<ExportOutcome>;
+  cancel(): Promise<ExportCancelStatus>;
+}
+
 export interface ProjectSessionPort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
@@ -26,5 +67,5 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportPort {
-  exportPreview(): Promise<ExportResult>;
+  startPreview(onEvent: (event: ExportProgressEvent) => void): ExportAttempt;
 }

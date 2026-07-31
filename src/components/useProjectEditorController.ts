@@ -7,10 +7,6 @@ import {
 } from "react";
 
 import type {
-  ExportPort,
-  ExportResult,
-} from "../application/projectPorts";
-import type {
   EditorProjection,
   ProjectIntent,
 } from "../domain/project";
@@ -27,8 +23,8 @@ import type {
 } from "./useProjectMutationRunner";
 
 interface ProjectEditorControllerInput {
+  interactionBlocked?: boolean;
   projection: EditorProjection;
-  exportPort: ExportPort;
   runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
 }
@@ -46,18 +42,13 @@ interface ScopedPhotoTransformPreview {
   preview: PhotoTransformPreview;
 }
 
-interface ExportContext {
-  exportPort: ExportPort;
-  current: boolean;
-}
-
 function messageFromError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
 export function useProjectEditorController({
+  interactionBlocked = false,
   projection,
-  exportPort,
   runProjectMutation,
   onProjectionChange,
 }: ProjectEditorControllerInput) {
@@ -80,8 +71,6 @@ export function useProjectEditorController({
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [exportResult, setExportResult] =
-    useState<ExportResult | null>(null);
   const [canvasMetrics, setCanvasMetrics] =
     useState<CanvasMetrics | null>(null);
   const [zoomDraft, setZoomDraftState] = useState<ZoomDraft | null>(
@@ -90,22 +79,8 @@ export function useProjectEditorController({
   const zoomDraftRef = useRef<ZoomDraft | null>(null);
   const pendingSheetNavigationRef = useRef<string | null>(null);
   const feedbackTokenRef = useRef(0);
-  const exportContext = useMemo<ExportContext>(
-    () => ({
-      exportPort,
-      current: false,
-    }),
-    [exportPort, projection.state.projectId],
-  );
   const [canvasPhotoPreview, setCanvasPhotoPreview] =
     useState<ScopedPhotoTransformPreview | null>(null);
-
-  useLayoutEffect(() => {
-    exportContext.current = true;
-    return () => {
-      exportContext.current = false;
-    };
-  }, [exportContext]);
 
   useLayoutEffect(() => {
     synchronizeProject(
@@ -147,10 +122,9 @@ export function useProjectEditorController({
     pendingSheetNavigationRef.current = null;
     setBusy(null);
     setMessage(null);
-    setExportResult(null);
     setZoomDraft(null);
     setCanvasPhotoPreview(null);
-  }, [exportPort, runProjectMutation, projection.state.projectId]);
+  }, [runProjectMutation, projection.state.projectId]);
 
   function centerCanvasOnSheet(
     sheetId: string,
@@ -242,34 +216,6 @@ export function useProjectEditorController({
     return false;
   }
 
-  async function exportPreview() {
-    const context = exportContext;
-    const feedbackToken = feedbackTokenRef.current + 1;
-    feedbackTokenRef.current = feedbackToken;
-    setBusy("Exportando");
-    setMessage(null);
-    try {
-      const result = await context.exportPort.exportPreview();
-      if (context.current) {
-        setExportResult(result);
-      }
-    } catch (error: unknown) {
-      if (
-        context.current &&
-        feedbackToken === feedbackTokenRef.current
-      ) {
-        setMessage(messageFromError(error));
-      }
-    } finally {
-      if (
-        context.current &&
-        feedbackToken === feedbackTokenRef.current
-      ) {
-        setBusy(null);
-      }
-    }
-  }
-
   function beginZoomGesture() {
     if (!selectedFrame?.photo) return;
     const projectId = projection.state.projectId;
@@ -352,7 +298,7 @@ export function useProjectEditorController({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.altKey) return;
+      if (interactionBlocked || !event.ctrlKey || event.altKey) return;
       if (
         event.key.toLocaleLowerCase() === "z" &&
         projection.state.canUndo
@@ -459,7 +405,6 @@ export function useProjectEditorController({
   return {
     busy,
     message,
-    exportResult,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom,
@@ -487,7 +432,6 @@ export function useProjectEditorController({
       void runWithGlobalFeedback("Refazendo", (port) =>
         port.redo(),
       ),
-    exportPreview: () => void exportPreview(),
     fillMedia: (mediaId: string) => {
       if (implicitSheetId) {
         void applyWithStatus({
@@ -499,7 +443,6 @@ export function useProjectEditorController({
     },
     dismissFeedback: () => {
       setMessage(null);
-      setExportResult(null);
     },
   };
 }

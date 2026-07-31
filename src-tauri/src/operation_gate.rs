@@ -209,8 +209,9 @@ mod tests {
 
     use super::{OperationGate, OperationGateError, OperationMode};
     use crate::{
-        cache_engine::CacheEngine, imaging_processor::ImagingProcessor,
-        operation_lease::OperationLease,
+        cache_engine::CacheEngine,
+        imaging_processor::ImagingProcessor,
+        operation_lease::{OperationLease, OperationLeaseError},
     };
 
     const OWNER_ROOT_ENV: &str = "MYALBUNS_OPERATION_GATE_OWNER_ROOT";
@@ -320,9 +321,9 @@ mod tests {
                     OperationMode::BatchExclusive,
                 )
                 .await,
-                Err(OperationGateError::Conflict {
+                Err(OperationLeaseError::Gate(OperationGateError::Conflict {
                     requested: OperationMode::BatchExclusive,
-                })
+                }))
             ));
             owner.kill().expect("the owner process is terminated");
             owner.wait().expect("the terminated owner is reaped");

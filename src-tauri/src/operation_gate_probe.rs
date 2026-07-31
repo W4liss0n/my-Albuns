@@ -11,7 +11,7 @@ use crate::{
     cache_engine::CacheEngine,
     imaging_processor::ImagingProcessor,
     operation_gate::{OperationGateError, OperationMode},
-    operation_lease::OperationLease,
+    operation_lease::{OperationLease, OperationLeaseError},
     sample_project::SampleProject,
     topology_spike::TopologySpike,
 };
@@ -220,9 +220,9 @@ async fn run_challenger(
     )
     .await?;
     match acquire_lease(app).await {
-        Err(OperationGateError::Conflict {
+        Err(OperationLeaseError::Gate(OperationGateError::Conflict {
             requested: OperationMode::NormalExport,
-        }) => {}
+        })) => {}
         Ok(lease) => {
             drop(lease);
             return Err("o desafiante recebeu uma segunda concessão simultânea".into());
@@ -250,7 +250,9 @@ async fn acquire_after_release(app: &AppHandle) -> Result<OperationLease, String
     loop {
         match acquire_lease(app).await {
             Ok(lease) => return Ok(lease),
-            Err(OperationGateError::Conflict { .. }) if Instant::now() < deadline => {
+            Err(OperationLeaseError::Gate(OperationGateError::Conflict { .. }))
+                if Instant::now() < deadline =>
+            {
                 tokio::time::sleep(PROBE_POLL_INTERVAL).await;
             }
             Err(error) => {
@@ -262,7 +264,7 @@ async fn acquire_after_release(app: &AppHandle) -> Result<OperationLease, String
     }
 }
 
-async fn acquire_lease(app: &AppHandle) -> Result<OperationLease, OperationGateError> {
+async fn acquire_lease(app: &AppHandle) -> Result<OperationLease, OperationLeaseError> {
     OperationLease::acquire(
         &app.state(),
         &app.state::<CacheEngine>(),

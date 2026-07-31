@@ -88,7 +88,10 @@ pub(crate) async fn prepare_media_previews(
     let started = Instant::now();
     let context = InvocationContext::new(request_id.clone(), safe_project_id);
     let _cache_activity = cache.begin_work().await;
-    let processor_reservation = processor.reserve().await;
+    let processor_reservation = processor
+        .reserve()
+        .await
+        .map_err(|error| error.to_string())?;
     let mut transport = TauriImagingTransport::new(&app, &logging, &processor_reservation);
     let execution = cache_engine::execute(&mut transport, &app_paths, work, &context)
         .await

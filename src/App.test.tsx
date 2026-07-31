@@ -42,10 +42,16 @@ const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
 };
 const exportPort: ExportPort = {
-  exportPreview: async () => ({
-    outputPath: "C:\\Temp\\Album-Horizonte_001.png",
-    widthPx: 600,
-    heightPx: 300,
+  startPreview: () => ({
+    completion: Promise.resolve({
+      status: "completed",
+      result: {
+        outputPath: "C:\\Temp\\Album-Horizonte_001.png",
+        widthPx: 600,
+        heightPx: 300,
+      },
+    }),
+    cancel: async () => "not_found",
   }),
 };
 const canvasGraphicsDiagnosticProbe = () =>

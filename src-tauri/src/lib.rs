@@ -1,5 +1,6 @@
 mod benchmark_corpus;
 mod cache_engine;
+mod export_attempts;
 mod export_pipeline;
 mod export_probe_commands;
 pub(crate) mod global_process_spike;
@@ -25,7 +26,8 @@ use myalbuns_paths::AppPaths;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 use cache_engine::CacheEngine;
-use export_probe_commands::export_spike;
+use export_attempts::ExportAttempts;
+use export_probe_commands::{cancel_export_spike, export_spike};
 use imaging_processor::ImagingProcessor;
 use logging::frontend_log;
 use media_preview_commands::prepare_media_previews;
@@ -78,6 +80,23 @@ pub fn run() {
         .manage(project_host)
         .manage(topology_benchmark)
         .manage(topology_fault_probe)
+        .manage(ExportAttempts::default())
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                let cancelled_attempts = window
+                    .state::<ExportAttempts>()
+                    .request_cancel_for_window(window.label());
+                if cancelled_attempts > 0 {
+                    tracing::info!(
+                        target: "myalbuns.desktop",
+                        process_role = ProcessRole::DesktopHost.as_str(),
+                        window_label = window.label(),
+                        cancelled_attempts,
+                        event = "window_export_attempts_cancelled",
+                    );
+                }
+            }
+        })
         .setup(move |app| {
             let app_paths = AppPaths::discover()?;
             let webview_data_directory =
@@ -150,6 +169,7 @@ pub fn run() {
             redo_project,
             prepare_media_previews,
             export_spike,
+            cancel_export_spike,
             topology_benchmark_config,
             report_topology_canvas_ready,
             report_topology_canvas_benchmark,

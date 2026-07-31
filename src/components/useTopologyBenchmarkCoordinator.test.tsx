@@ -93,10 +93,10 @@ const baseConfig: TopologyBenchmarkConfig = {
 };
 
 function exportPort(
-  exportPreview: ExportPort["exportPreview"],
+  startPreview: ExportPort["startPreview"],
 ): ExportPort {
   return {
-    exportPreview,
+    startPreview,
   };
 }
 
@@ -109,10 +109,16 @@ test("waits until every Canvas probe reached the export barrier", async () => {
   let exportGateOpen = false;
   const reportCanvasReady = vi.fn(async () => undefined);
   const reportCanvas = vi.fn(async () => undefined);
-  const exportPreview = vi.fn(async () => ({
-    outputPath: "C:\\Temp\\Album-Horizonte_001.png",
-    widthPx: 600,
-    heightPx: 300,
+  const startPreview = vi.fn(() => ({
+    completion: Promise.resolve({
+      status: "completed" as const,
+      result: {
+        outputPath: "C:\\Temp\\Album-Horizonte_001.png",
+        widthPx: 600,
+        heightPx: 300,
+      },
+    }),
+    cancel: vi.fn(async () => "too_late" as const),
   }));
   const topologyBridge: TopologyBenchmarkBridge = {
     loadConfig: vi.fn(async () => ({
@@ -127,7 +133,7 @@ test("waits until every Canvas probe reached the export barrier", async () => {
   const { result } = renderHook(() =>
     useTopologyBenchmarkCoordinator({
       projectId: "project-spike-001",
-      exportPort: exportPort(exportPreview),
+      exportPort: exportPort(startPreview),
       topologyBridge,
       mediaPreviewsReady: true,
     }),
@@ -153,7 +159,7 @@ test("waits until every Canvas probe reached the export barrier", async () => {
   });
 
   expect(reportCanvas).toHaveBeenCalledWith(measurement);
-  expect(exportPreview).not.toHaveBeenCalled();
+  expect(startPreview).not.toHaveBeenCalled();
 
   exportGateOpen = true;
   await act(async () => {
@@ -161,7 +167,7 @@ test("waits until every Canvas probe reached the export barrier", async () => {
     await completion;
   });
 
-  expect(exportPreview).toHaveBeenCalledOnce();
+  expect(startPreview).toHaveBeenCalledOnce();
 });
 
 test("does not expose the probe before media previews are ready", async () => {
@@ -175,7 +181,14 @@ test("does not expose the probe before media previews are ready", async () => {
   const { result } = renderHook(() =>
     useTopologyBenchmarkCoordinator({
       projectId: "project-spike-001",
-      exportPort: exportPort(vi.fn()),
+      exportPort: exportPort(
+        vi.fn(() => ({
+          completion: Promise.resolve({
+            status: "cancelled" as const,
+          }),
+          cancel: vi.fn(async () => "not_found" as const),
+        })),
+      ),
       topologyBridge,
       mediaPreviewsReady: false,
     }),

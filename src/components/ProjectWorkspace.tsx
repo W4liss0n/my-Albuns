@@ -10,6 +10,7 @@ import {
 } from "../state/workspacePreferences";
 import { AlbumCanvas } from "./AlbumCanvas";
 import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
+import { ExportPreviewControl } from "./ExportPreviewControl";
 import { SheetPreview } from "./SheetPreview";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -37,9 +38,10 @@ export function ProjectWorkspace({
   onProjectionChange,
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
+  const [exportActive, setExportActive] = useState(false);
   const controller = useProjectEditorController({
+    interactionBlocked: exportActive,
     projection,
-    exportPort,
     runProjectMutation,
     onProjectionChange,
   });
@@ -50,7 +52,6 @@ export function ProjectWorkspace({
   const {
     busy,
     message,
-    exportResult,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom,
@@ -81,7 +82,9 @@ export function ProjectWorkspace({
           <Button
             className="icon-command"
             aria-label="Desfazer"
-            isDisabled={!projection.state.canUndo || Boolean(busy)}
+            isDisabled={
+              !projection.state.canUndo || Boolean(busy) || exportActive
+            }
             onPress={controller.undo}
           >
             ↶
@@ -89,7 +92,9 @@ export function ProjectWorkspace({
           <Button
             className="icon-command"
             aria-label="Refazer"
-            isDisabled={!projection.state.canRedo || Boolean(busy)}
+            isDisabled={
+              !projection.state.canRedo || Boolean(busy) || exportActive
+            }
             onPress={controller.redo}
           >
             ↷
@@ -101,14 +106,12 @@ export function ProjectWorkspace({
           <span>Selecionar</span>
         </div>
         <div className="command-spacer" />
-        <Button
-          className="primary-command"
-          onPress={controller.exportPreview}
-          isDisabled={Boolean(busy)}
-        >
-          <span aria-hidden="true">⇧</span>
-          Exportar prova
-        </Button>
+        <ExportPreviewControl
+          disabled={Boolean(busy)}
+          exportPort={exportPort}
+          onActiveChange={setExportActive}
+          projectId={projection.state.projectId}
+        />
       </div>
 
       <div
@@ -377,7 +380,7 @@ export function ProjectWorkspace({
         </section>
       </div>
 
-      {(busy || message || exportResult) && (
+      {(busy || message) && (
         <div
           className={`operation-toast ${message ? "error" : ""}`}
           role={message ? "alert" : "status"}
@@ -387,16 +390,9 @@ export function ProjectWorkspace({
             <strong>
               {message
                 ? "A operação não foi concluída"
-                : busy
-                  ? busy
-                  : "Exportação concluída"}
+                : busy}
             </strong>
-            <span>
-              {message ??
-                (exportResult
-                  ? `${exportResult.widthPx} × ${exportResult.heightPx}px · ${exportResult.outputPath}`
-                  : "Aguarde…")}
-            </span>
+            <span>{message ?? "Aguarde…"}</span>
           </div>
           {!busy && (
             <button

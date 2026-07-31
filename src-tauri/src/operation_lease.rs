@@ -1,6 +1,8 @@
+use std::fmt;
+
 use crate::{
     cache_engine::{CacheEngine, CachePause},
-    imaging_processor::{ImagingProcessor, ProcessorReservation},
+    imaging_processor::{ImagingProcessor, ProcessorReservation, ProcessorUnavailable},
     operation_gate::{OperationGate, OperationGateError, OperationGrant, OperationMode},
 };
 
@@ -11,21 +13,38 @@ pub(crate) struct OperationLease {
     gate_grant: Option<OperationGrant>,
 }
 
+#[derive(Debug)]
+pub(crate) struct OperationLeaseAcquisition {
+    gate_grant: Option<OperationGrant>,
+}
+
+#[derive(Debug)]
+pub(crate) enum OperationLeaseError {
+    Gate(OperationGateError),
+    Processor(ProcessorUnavailable),
+}
+
 impl OperationLease {
+    pub(crate) fn begin(
+        gate: &OperationGate,
+        mode: OperationMode,
+    ) -> Result<OperationLeaseAcquisition, OperationGateError> {
+        Ok(OperationLeaseAcquisition {
+            gate_grant: Some(gate.try_acquire(mode)?),
+        })
+    }
+
     pub(crate) async fn acquire(
         gate: &OperationGate,
         cache: &CacheEngine,
         processor: &ImagingProcessor,
         mode: OperationMode,
-    ) -> Result<Self, OperationGateError> {
-        let gate_grant = gate.try_acquire(mode)?;
-        let cache_pause = cache.pause().await;
-        let processor_reservation = processor.reserve().await;
-        Ok(Self {
-            processor_reservation: Some(processor_reservation),
-            cache_pause: Some(cache_pause),
-            gate_grant: Some(gate_grant),
-        })
+    ) -> Result<Self, OperationLeaseError> {
+        Self::begin(gate, mode)
+            .map_err(OperationLeaseError::Gate)?
+            .complete(cache, processor)
+            .await
+            .map_err(OperationLeaseError::Processor)
     }
 
     pub(crate) fn mode(&self) -> OperationMode {
@@ -41,6 +60,33 @@ impl OperationLease {
             .expect("an OperationLease keeps its Processor reservation until drop")
     }
 }
+
+impl OperationLeaseAcquisition {
+    pub(crate) async fn complete(
+        mut self,
+        cache: &CacheEngine,
+        processor: &ImagingProcessor,
+    ) -> Result<OperationLease, ProcessorUnavailable> {
+        let cache_pause = cache.pause().await;
+        let processor_reservation = processor.reserve().await?;
+        Ok(OperationLease {
+            processor_reservation: Some(processor_reservation),
+            cache_pause: Some(cache_pause),
+            gate_grant: self.gate_grant.take(),
+        })
+    }
+}
+
+impl fmt::Display for OperationLeaseError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Gate(error) => error.fmt(formatter),
+            Self::Processor(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for OperationLeaseError {}
 
 impl Drop for OperationLease {
     fn drop(&mut self) {
@@ -142,7 +188,8 @@ mod tests {
                 .expect("Cache resumes with the lease release");
             tokio::time::timeout(Duration::from_secs(1), &mut processor_work)
                 .await
-                .expect("the Processor returns with the lease release");
+                .expect("the Processor returns with the lease release")
+                .expect("the Processor remains healthy");
             OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport)
                 .await
                 .expect("the next Export acquires immediately");
@@ -210,6 +257,41 @@ mod tests {
     }
 
     #[test]
+    fn beginning_a_lease_resolves_the_global_conflict_before_waiting_for_cache() {
+        tauri::async_runtime::block_on(async {
+            let root = tempdir().expect("the staged acquisition fixture exists");
+            let paths = AppPaths::from_known_folders(
+                &root.path().join("roaming"),
+                &root.path().join("local"),
+            );
+            let gate = OperationGate::new(&paths);
+            let cache = CacheEngine::default();
+            let processor = ImagingProcessor::default();
+            let active_cache = cache.begin_work().await;
+
+            let acquisition = OperationLease::begin(&gate, OperationMode::NormalExport)
+                .expect("the first caller resolves the gate immediately");
+            assert!(
+                OperationLease::begin(&gate, OperationMode::NormalExport).is_err(),
+                "a concurrent caller receives a conflict before progress can start"
+            );
+
+            let mut completion = Box::pin(acquisition.complete(&cache, &processor));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut completion)
+                    .await
+                    .is_err(),
+                "the acquisition waits for active Cache work only after owning the gate"
+            );
+            drop(completion);
+
+            OperationLease::begin(&gate, OperationMode::NormalExport)
+                .expect("cancelling the completion releases the partial gate grant");
+            drop(active_cache);
+        });
+    }
+
+    #[test]
     fn cancelling_while_waiting_for_processor_releases_gate_and_cache_pause() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the Processor-cancellation fixture exists");
@@ -220,7 +302,10 @@ mod tests {
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
-            let occupied_processor = processor.reserve().await;
+            let occupied_processor = processor
+                .reserve()
+                .await
+                .expect("the Processor can be reserved");
             let mut pending = Box::pin(OperationLease::acquire(
                 &gate,
                 &cache,
@@ -242,6 +327,44 @@ mod tests {
                 .await
                 .expect("cancelling the pending future releases its Cache pause");
             drop(occupied_processor);
+        });
+    }
+
+    #[test]
+    fn processor_quarantine_fails_the_lease_without_leaking_gate_or_cache_pause() {
+        tauri::async_runtime::block_on(async {
+            let root = tempdir().expect("the quarantine fixture exists");
+            let paths = AppPaths::from_known_folders(
+                &root.path().join("roaming"),
+                &root.path().join("local"),
+            );
+            let gate = OperationGate::new(&paths);
+            let cache = CacheEngine::default();
+            let processor = ImagingProcessor::default();
+            let reservation = processor
+                .reserve()
+                .await
+                .expect("the healthy Processor can be reserved");
+            reservation.quarantine();
+            drop(reservation);
+
+            let failure = OperationLease::begin(&gate, OperationMode::NormalExport)
+                .expect("the gate can be acquired")
+                .complete(&cache, &processor)
+                .await
+                .expect_err("a quarantined Processor refuses a lease");
+
+            assert_eq!(
+                failure.to_string(),
+                "o Processador de Imagens está em quarentena porque o encerramento anterior não foi confirmado; reinicie o aplicativo antes de tentar novamente"
+            );
+            assert!(
+                OperationLease::begin(&gate, OperationMode::NormalExport).is_ok(),
+                "the failed completion releases the gate"
+            );
+            tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
+                .await
+                .expect("the failed completion releases the Cache pause");
         });
     }
 }

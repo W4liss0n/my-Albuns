@@ -3,7 +3,9 @@ import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
+  ExportOutcome,
   ExportPort,
+  ExportProgressEvent,
   ProjectSessionPort,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -106,10 +108,16 @@ function deferredProjection() {
 }
 
 const exportPort: ExportPort = {
-  exportPreview: async () => ({
-    outputPath: "C:\\Temp\\Album-Horizonte_001.png",
-    widthPx: 600,
-    heightPx: 300,
+  startPreview: () => ({
+    completion: Promise.resolve({
+      status: "completed",
+      result: {
+        outputPath: "C:\\Temp\\Album-Horizonte_001.png",
+        widthPx: 600,
+        heightPx: 300,
+      },
+    }),
+    cancel: async () => "not_found",
   }),
 };
 
@@ -159,6 +167,53 @@ beforeEach(() => {
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
   });
+});
+
+test("blocks only Project commands while its Export attempt is active", async () => {
+  let emit!: (event: ExportProgressEvent) => void;
+  let finish!: (outcome: ExportOutcome) => void;
+  const completion = new Promise<ExportOutcome>((resolve) => {
+    finish = resolve;
+  });
+  const controlledExportPort: ExportPort = {
+    startPreview: (onEvent) => {
+      emit = onEvent;
+      return {
+        completion,
+        cancel: async () => "requested",
+      };
+    },
+  };
+  const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  projectSessionPort.undo = vi.fn(async () => projection);
+
+  render(
+    <ProjectWorkspace
+      exportPort={controlledExportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Exportar prova" }),
+  );
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+
+  act(() => {
+    emit({ event: "started" });
+  });
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  expect(projectSessionPort.undo).not.toHaveBeenCalled();
+
+  await act(async () => {
+    finish({ status: "cancelled" });
+    await completion;
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
 });
 
 test("forwards a fatal Canvas graphics diagnostic without interpreting it", () => {

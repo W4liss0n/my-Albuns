@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     future::Future,
     pin::Pin,
     sync::{
@@ -29,20 +30,49 @@ const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Debug, Default)]
 pub(crate) struct ImagingProcessor {
     reservation: Arc<AsyncMutex<()>>,
+    quarantined: Arc<AtomicBool>,
 }
 
 #[derive(Debug)]
 pub(crate) struct ProcessorReservation {
     _guard: OwnedMutexGuard<()>,
+    quarantined: Arc<AtomicBool>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct ProcessorUnavailable;
+
 impl ImagingProcessor {
-    pub(crate) async fn reserve(&self) -> ProcessorReservation {
-        ProcessorReservation {
-            _guard: self.reservation.clone().lock_owned().await,
+    pub(crate) async fn reserve(&self) -> Result<ProcessorReservation, ProcessorUnavailable> {
+        if self.quarantined.load(Ordering::Acquire) {
+            return Err(ProcessorUnavailable);
         }
+        let guard = self.reservation.clone().lock_owned().await;
+        if self.quarantined.load(Ordering::Acquire) {
+            return Err(ProcessorUnavailable);
+        }
+        Ok(ProcessorReservation {
+            _guard: guard,
+            quarantined: Arc::clone(&self.quarantined),
+        })
     }
 }
+
+impl ProcessorReservation {
+    pub(crate) fn quarantine(&self) {
+        self.quarantined.store(true, Ordering::Release);
+    }
+}
+
+impl fmt::Display for ProcessorUnavailable {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(
+            "o Processador de Imagens está em quarentena porque o encerramento anterior não foi confirmado; reinicie o aplicativo antes de tentar novamente",
+        )
+    }
+}
+
+impl std::error::Error for ProcessorUnavailable {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ImagingOperation {
@@ -306,16 +336,35 @@ impl ImagingTransport for TauriImagingTransport<'_> {
         attempt: u8,
         control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
-        Box::pin(invoke_once(
-            self.app,
-            self.logging,
-            command,
-            context,
-            operation,
-            attempt,
-            control,
-        ))
+        Box::pin(async move {
+            protect_processor_after_invocation(
+                self._reservation,
+                invoke_once(
+                    self.app,
+                    self.logging,
+                    command,
+                    context,
+                    operation,
+                    attempt,
+                    control,
+                )
+                .await,
+            )
+        })
     }
+}
+
+fn protect_processor_after_invocation(
+    reservation: &ProcessorReservation,
+    result: Result<ImagingResponse, InvocationFailure>,
+) -> Result<ImagingResponse, InvocationFailure> {
+    if result
+        .as_ref()
+        .is_err_and(InvocationFailure::is_termination_unconfirmed)
+    {
+        reservation.quarantine();
+    }
+    result
 }
 
 async fn invoke_once(
@@ -562,14 +611,18 @@ mod tests {
 
     use super::{
         ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
-        complete_invocation, decode_and_report_event_chunk, wait_for_termination_for,
+        complete_invocation, decode_and_report_event_chunk, protect_processor_after_invocation,
+        wait_for_termination_for,
     };
 
     #[test]
     fn processor_reservation_serializes_callers_and_is_released_with_its_guard() {
         tauri::async_runtime::block_on(async {
             let processor = ImagingProcessor::default();
-            let first = processor.reserve().await;
+            let first = processor
+                .reserve()
+                .await
+                .expect("the healthy Processor can be reserved");
             let second = processor.reserve();
             tokio::pin!(second);
 
@@ -583,7 +636,49 @@ mod tests {
             drop(first);
             tokio::time::timeout(Duration::from_secs(1), &mut second)
                 .await
-                .expect("the Processor is available when its reservation is released");
+                .expect("the Processor is available when its reservation is released")
+                .expect("the Processor remains healthy");
+        });
+    }
+
+    #[test]
+    fn unconfirmed_termination_quarantines_the_processor_before_releasing_the_guard() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let reservation = processor
+                .reserve()
+                .await
+                .expect("a healthy Processor can be reserved");
+
+            reservation.quarantine();
+            drop(reservation);
+
+            assert!(
+                processor.reserve().await.is_err(),
+                "a new sidecar cannot start after termination became unconfirmed"
+            );
+        });
+    }
+
+    #[test]
+    fn transport_failure_marks_the_shared_processor_quarantine() {
+        tauri::async_runtime::block_on(async {
+            let processor = ImagingProcessor::default();
+            let reservation = processor
+                .reserve()
+                .await
+                .expect("a healthy Processor can be reserved");
+            let result: Result<ImagingResponse, InvocationFailure> =
+                Err(InvocationFailure::termination_unconfirmed(
+                    4242,
+                    "injected unconfirmed termination",
+                ));
+
+            let failure = protect_processor_after_invocation(&reservation, result)
+                .expect_err("the transport failure remains visible");
+            assert!(failure.is_termination_unconfirmed());
+            drop(reservation);
+            assert!(processor.reserve().await.is_err());
         });
     }
 

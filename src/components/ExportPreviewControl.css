@@ -1,0 +1,122 @@
+.export-preview-control {
+  display: contents;
+}
+
+.export-preview-trigger {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #d5aa73;
+  border-radius: 8px;
+  color: #1b242b;
+  background: #c99a5d;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 16%);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.export-preview-trigger:hover:not(:disabled) {
+  background: #d4a76d;
+}
+
+.export-preview-trigger:disabled {
+  opacity: 0.55;
+}
+
+.export-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgb(9 14 18 / 66%);
+  place-items: center;
+  z-index: 40;
+}
+
+.export-preview-modal {
+  width: min(420px, 100%);
+  outline: none;
+}
+
+.export-preview-dialog {
+  display: grid;
+  width: 100%;
+  padding: 24px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 14px;
+  color: #dce2e7;
+  background: #20272d;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 46%);
+  gap: 14px;
+}
+
+.export-preview-dialog h2,
+.export-preview-dialog p {
+  margin: 0;
+}
+
+.export-preview-dialog h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+}
+
+.export-preview-dialog p {
+  color: #aeb7bd;
+  font-size: 0.78rem;
+}
+
+.export-preview-progress {
+  width: 100%;
+  accent-color: #c99a5d;
+}
+
+.export-preview-count {
+  text-align: right;
+}
+
+.export-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.export-preview-actions button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  color: #dce2e7;
+  background: #29333b;
+}
+
+.export-preview-actions button:hover:not(:disabled) {
+  background: #323d46;
+}
+
+.export-preview-actions button:disabled {
+  opacity: 0.55;
+}
+
+.export-preview-actions .export-preview-action-primary {
+  border-color: #d5aa73;
+  color: #1b242b;
+  background: #c99a5d;
+}
+
+.export-preview-confirmation {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 13px 16px;
+  border: 1px solid rgb(104 188 133 / 20%);
+  border-radius: 10px;
+  color: #d9e4dc;
+  background: #202a24;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 35%);
+  font-size: 0.75rem;
+  font-weight: 650;
+  z-index: 40;
+}

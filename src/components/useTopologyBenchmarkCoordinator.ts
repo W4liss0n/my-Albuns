@@ -88,7 +88,13 @@ export function useTopologyBenchmarkCoordinator({
             topologyBridge,
             config.probeKey,
           );
-          await exportPort.exportPreview();
+          const attempt = exportPort.startPreview(() => undefined);
+          const outcome = await attempt.completion;
+          if (outcome.status === "cancelled") {
+            throw new Error(
+              "A Exportação do benchmark foi cancelada antes da conclusão.",
+            );
+          }
         }
       },
       onFailed: (reason) =>
