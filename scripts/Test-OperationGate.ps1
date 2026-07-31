@@ -264,6 +264,23 @@ function Get-ProbeFailureDiagnostic {
     return $failures -join ' | '
 }
 
+function Assert-NoDuplicateJsonPropertyNames {
+    param([Parameter(Mandatory = $true)][string] $Json)
+
+    $propertyPattern =
+        '(?<name>"(?:\\["\\/bfnrt]|\\u[0-9a-fA-F]{4}|[^"\\\x00-\x1F])*")\s*:'
+    $seenNames =
+        [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::Ordinal
+        )
+    foreach ($match in [regex]::Matches($Json, $propertyPattern)) {
+        $name = $match.Groups['name'].Value | ConvertFrom-Json
+        if (-not $seenNames.Add($name)) {
+            throw "The OperationGate event repeats the JSON field '$name'."
+        }
+    }
+}
+
 function Read-StrictProbeEvent {
     param([Parameter(Mandatory = $true)][string] $Path)
 
@@ -272,6 +289,7 @@ function Read-StrictProbeEvent {
         [System.Text.Encoding]::UTF8
     )
     $root = $json | ConvertFrom-Json
+    Assert-NoDuplicateJsonPropertyNames -Json $json
     if ($null -eq $root -or $root -isnot [System.Management.Automation.PSCustomObject]) {
         throw 'The OperationGate event root must be a JSON object.'
     }
@@ -330,6 +348,57 @@ function Read-StrictProbeEvent {
         state = [string] $root.state
         operationMode = [string] $root.operationMode
     }
+}
+
+function Test-StrictProbeEventParser {
+    param([Parameter(Mandatory = $true)][string] $ProbeRoot)
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $path = Join-Path $ProbeRoot 'parser-contract.json'
+    $valid = (
+        '{"schemaVersion":1,"processId":42,' +
+        '"topology":"independent","windowLabel":"main",' +
+        '"state":"owner_ready","operationMode":"normal_export"}'
+    )
+    [System.IO.File]::WriteAllText(
+        $path,
+        $valid,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $event = Read-StrictProbeEvent -Path $path
+    if ($event.schemaVersion -ne 1 -or $event.processId -ne 42) {
+        throw 'The OperationGate event parser changed valid numeric fields.'
+    }
+
+    $duplicate = (
+        '{"schemaVersion":1,"schema\u0056ersion":2,"processId":42,' +
+        '"topology":"independent","windowLabel":"main",' +
+        '"state":"owner_ready","operationMode":"normal_export"}'
+    )
+    [System.IO.File]::WriteAllText(
+        $path,
+        $duplicate,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    try {
+        [void] (Read-StrictProbeEvent -Path $path)
+        throw 'The OperationGate event parser accepted a duplicate JSON field.'
+    }
+    catch {
+        if (
+            $_.Exception.Message -notmatch
+                '^The OperationGate event repeats the JSON field'
+        ) {
+            throw
+        }
+    }
+
+    $stopwatch.Stop()
+    $checks.Add([ordered]@{
+        name = 'strict-probe-json-parser'
+        passed = $true
+        elapsedMs = [long] $stopwatch.ElapsedMilliseconds
+    })
 }
 
 function Wait-ForProbeEvent {
@@ -559,6 +628,7 @@ try {
     Push-Location $script:WorkspaceRoot
     $locationWasPushed = $true
     $initialBuildInputState = Get-BuildInputState
+    Test-StrictProbeEventParser -ProbeRoot $independentRoot
 
     $rustChecks = @(
         [ordered]@{
@@ -792,6 +862,8 @@ try {
             architecture = (
                 [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
             )
+            powerShellEdition = [string] $PSVersionTable.PSEdition
+            powerShellVersion = [string] $PSVersionTable.PSVersion
         }
         build = $build
         checks = @($checks)
