@@ -1,0 +1,98 @@
+{
+    "schemaVersion":  1,
+    "suite":  "frontend_security_capabilities",
+    "collectedAtUtc":  "2026-07-31T23:21:29.5610622+00:00",
+    "gitCommit":  "099c0ccaa157db1dd4a10bad4ba2b4b1e7a216dd",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "profile":  "dev-check-and-test",
+                  "cargoBuildJobs":  1,
+                  "targetDirectory":  "target/frontend-security-gate",
+                  "buildInputFileCount":  212,
+                  "buildInputDigestSha256":  "d70857f6956c780222d99ba2fb26e9d88bbc52541c76664620d21f492877e553",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "powershell-runner-ast",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "rust-capability-contract",
+                       "passed":  true,
+                       "elapsedMs":  183583
+                   },
+                   {
+                       "name":  "rust-asset-scope-contract",
+                       "passed":  true,
+                       "elapsedMs":  410
+                   },
+                   {
+                       "name":  "tauri-acl-compilation",
+                       "passed":  true,
+                       "elapsedMs":  1270
+                   },
+                   {
+                       "name":  "frontend-tauri-boundary",
+                       "passed":  true,
+                       "elapsedMs":  3522
+                   },
+                   {
+                       "name":  "frontend-production-build",
+                       "passed":  true,
+                       "elapsedMs":  21887
+                   }
+               ],
+    "results":  {
+                    "capabilityIdentifier":  "default",
+                    "local":  true,
+                    "windows":  [
+                                    "main",
+                                    "project-b"
+                                ],
+                    "commandCount":  15,
+                    "commands":  [
+                                     "apply_project_intent",
+                                     "cancel_export_spike",
+                                     "export_spike",
+                                     "frontend_log",
+                                     "persist_topology_fault_probe",
+                                     "prepare_media_previews",
+                                     "project_state",
+                                     "redo_project",
+                                     "report_topology_benchmark_failure",
+                                     "report_topology_canvas_benchmark",
+                                     "report_topology_canvas_ready",
+                                     "report_topology_fault_probe_failure",
+                                     "topology_benchmark_config",
+                                     "topology_fault_probe_config",
+                                     "undo_project"
+                                 ],
+                    "permissions":  [
+                                        "project-window-commands"
+                                    ],
+                    "assetScopes":  [
+                                        "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.jpg",
+                                        "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.png"
+                                    ],
+                    "compiledAppManifest":  true,
+                    "genericFilesystemPermission":  false,
+                    "genericShellPermission":  false,
+                    "backendSidecarShellDependency":  true,
+                    "backendSidecarShellRegistration":  true,
+                    "fixedImagingSidecarInvocation":  true
+                },
+    "limits":  {
+                   "topologyProbeCommandsRemainTemporary":  true,
+                   "assetScopeUsesTemporaryMyAlbuns2Namespace":  true,
+                   "runtimeWebView2AndInstallerGate":  false
+               }
+}
