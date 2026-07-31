@@ -2,7 +2,10 @@ use std::{
     fs::File,
     io::{BufReader, Read},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use myalbuns_core::RenderSnapshot;
@@ -13,6 +16,7 @@ use myalbuns_imaging_protocol::{
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{ExportPathPlan, PreparedExportStorage, RootBindingPlan};
 use sha2::{Digest, Sha256};
+use tokio::sync::Notify;
 
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
@@ -149,6 +153,81 @@ impl ExportFailureStage {
 pub(crate) type ExportFailure = OperationFailure<ExportFailureStage>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ExportCancellationResult {
+    Requested,
+    AlreadyRequested,
+    TooLate,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum ExportExecutionPhase {
+    #[default]
+    Running,
+    Cancelled,
+    Publishing,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ExportExecutionControl {
+    cancelled: AtomicBool,
+    phase: Mutex<ExportExecutionPhase>,
+    notification: Notify,
+}
+
+impl ExportExecutionControl {
+    pub(crate) fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+
+    pub(crate) async fn cancelled(&self) {
+        loop {
+            let notified = self.notification.notified();
+            if self.is_cancelled() {
+                return;
+            }
+            notified.await;
+        }
+    }
+
+    pub(crate) fn request_cancel(&self) -> ExportCancellationResult {
+        let mut phase = self
+            .phase
+            .lock()
+            .expect("the Export execution state remains available");
+        match *phase {
+            ExportExecutionPhase::Running => {
+                self.cancelled.store(true, Ordering::Release);
+                *phase = ExportExecutionPhase::Cancelled;
+                drop(phase);
+                self.notification.notify_one();
+                ExportCancellationResult::Requested
+            }
+            ExportExecutionPhase::Cancelled => ExportCancellationResult::AlreadyRequested,
+            ExportExecutionPhase::Publishing => ExportCancellationResult::TooLate,
+        }
+    }
+
+    fn begin_publishing(&self) -> bool {
+        let mut phase = self
+            .phase
+            .lock()
+            .expect("the Export execution state remains available");
+        match *phase {
+            ExportExecutionPhase::Running => {
+                *phase = ExportExecutionPhase::Publishing;
+                true
+            }
+            ExportExecutionPhase::Cancelled => false,
+            ExportExecutionPhase::Publishing => true,
+        }
+    }
+
+    fn cancellation_flag(&self) -> &AtomicBool {
+        &self.cancelled
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ExportProgressStage {
     Preparing,
     LoadingSources,
@@ -174,18 +253,43 @@ impl ExportProgressStage {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ExportProgressUnits {
+    Unmeasured,
+    Measured {
+        completed_units: u32,
+        total_units: u32,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ExportProgress {
     pub(crate) stage: ExportProgressStage,
-    pub(crate) completed_units: u32,
-    pub(crate) total_units: u32,
+    pub(crate) units: ExportProgressUnits,
+    pub(crate) cancellable: bool,
 }
 
 impl ExportProgress {
-    const fn at(stage: ExportProgressStage, completed_units: u32) -> Self {
+    const fn unmeasured(stage: ExportProgressStage, cancellable: bool) -> Self {
         Self {
             stage,
-            completed_units,
-            total_units: 1,
+            units: ExportProgressUnits::Unmeasured,
+            cancellable,
+        }
+    }
+
+    const fn measured(
+        stage: ExportProgressStage,
+        completed_units: u32,
+        total_units: u32,
+        cancellable: bool,
+    ) -> Self {
+        Self {
+            stage,
+            units: ExportProgressUnits::Measured {
+                completed_units,
+                total_units,
+            },
+            cancellable,
         }
     }
 }
@@ -232,11 +336,11 @@ pub(crate) async fn execute<T: ImagingTransport>(
     transport: &mut T,
     plan: ExportPlan,
     root_bindings: &RootBindingPlan,
-    cancellation: &AtomicBool,
+    control: &ExportExecutionControl,
     progress: &(dyn Fn(ExportProgress) + Send + Sync),
     context: &InvocationContext,
 ) -> Result<PublishedExport, ExportFailure> {
-    ensure_not_cancelled(cancellation)?;
+    ensure_not_cancelled(control)?;
     let path_plan = plan.path_plan();
     let ExportPlan { snapshot, options } = plan;
     let ExportOptions {
@@ -284,7 +388,10 @@ pub(crate) async fn execute<T: ImagingTransport>(
             "A preparação da Exportação não corresponde ao plano de caminhos.",
         ));
     }
-    progress(ExportProgress::at(ExportProgressStage::Preparing, 0));
+    progress(ExportProgress::unmeasured(
+        ExportProgressStage::Preparing,
+        true,
+    ));
     let preparation = ExportPreparationGuard::new(
         execution_path_plan.prepare().map_err(|error| {
             ExportFailure::new(
@@ -294,20 +401,19 @@ pub(crate) async fn execute<T: ImagingTransport>(
         })?,
         context,
     );
-    if cancellation.load(Ordering::Acquire) {
-        return Err(cancelled_failure());
-    }
+    ensure_not_cancelled(control)?;
     let processor_progress = |event: ImagingProgress| {
         let stage = match event.stage {
             ImagingProgressStage::LoadingSources => ExportProgressStage::LoadingSources,
             ImagingProgressStage::Composing => ExportProgressStage::Composing,
             ImagingProgressStage::EncodingOutput => ExportProgressStage::EncodingOutput,
         };
-        progress(ExportProgress {
+        progress(ExportProgress::measured(
             stage,
-            completed_units: event.completed_units,
-            total_units: event.total_units,
-        });
+            event.completed_units,
+            event.total_units,
+            true,
+        ));
     };
     let command = ImagingCommand::render(request.clone());
     let response = match transport
@@ -316,7 +422,7 @@ pub(crate) async fn execute<T: ImagingTransport>(
             context,
             ImagingOperation::Export,
             1,
-            InvocationControl::controlled(cancellation, &processor_progress),
+            InvocationControl::controlled(control.cancellation_flag(), &processor_progress),
         )
         .await
     {
@@ -336,36 +442,42 @@ pub(crate) async fn execute<T: ImagingTransport>(
             ));
         }
     };
-    if cancellation.load(Ordering::Acquire) {
-        return Err(cancelled_failure());
-    }
+    ensure_not_cancelled(control)?;
     let Some(completion) = response.completed_for(&request.request_id).cloned() else {
         return Err(ExportFailure::new(
             ExportFailureStage::ValidateResponse,
             "O Processador de Imagens devolveu uma resposta inesperada.",
         ));
     };
-    progress(ExportProgress::at(ExportProgressStage::Verifying, 0));
+    progress(ExportProgress::unmeasured(
+        ExportProgressStage::Verifying,
+        true,
+    ));
     if let Err(message) = verify_preparation(&execution_path_plan, &completion) {
         return Err(ExportFailure::new(
             ExportFailureStage::VerifyPreparation,
             message,
         ));
     }
-    if cancellation.load(Ordering::Acquire) {
+    if !control.begin_publishing() {
         return Err(cancelled_failure());
     }
-    progress(ExportProgress::at(ExportProgressStage::Publishing, 0));
-    if cancellation.load(Ordering::Acquire) {
-        return Err(cancelled_failure());
-    }
+    progress(ExportProgress::unmeasured(
+        ExportProgressStage::Publishing,
+        false,
+    ));
     preparation.publish().map_err(|error| {
         ExportFailure::new(
             ExportFailureStage::Publish,
             format!("Não foi possível publicar a Exportação: {error}"),
         )
     })?;
-    progress(ExportProgress::at(ExportProgressStage::Completed, 1));
+    progress(ExportProgress::measured(
+        ExportProgressStage::Completed,
+        1,
+        1,
+        false,
+    ));
     Ok(PublishedExport {
         output_path,
         completion,
@@ -410,8 +522,8 @@ fn bind_execution_paths(
     Ok(operational_plan)
 }
 
-fn ensure_not_cancelled(cancellation: &AtomicBool) -> Result<(), ExportFailure> {
-    if cancellation.load(Ordering::Acquire) {
+fn ensure_not_cancelled(control: &ExportExecutionControl) -> Result<(), ExportFailure> {
+    if control.is_cancelled() {
         Err(cancelled_failure())
     } else {
         Ok(())
@@ -481,10 +593,7 @@ fn discard_failed_preparation(preparation: PreparedExportStorage, context: &Invo
 mod tests {
     use std::{
         path::PathBuf,
-        sync::{
-            Arc, Barrier, Mutex,
-            atomic::{AtomicBool, Ordering},
-        },
+        sync::{Arc, Barrier, Mutex},
         thread,
         time::Duration,
     };
@@ -497,8 +606,8 @@ mod tests {
     use sha2::{Digest, Sha256};
 
     use super::{
-        ExportFailureStage, ExportOptions, ExportPlan, ExportProgressStage, bind_execution_paths,
-        execute, plan,
+        ExportCancellationResult, ExportExecutionControl, ExportFailureStage, ExportOptions,
+        ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute, plan,
     };
     use crate::{
         imaging_processor::{
@@ -666,7 +775,7 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(false);
+            let cancellation = ExportExecutionControl::default();
             let progress = |_| {};
 
             let failure = execute(
@@ -719,7 +828,7 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(false);
+            let cancellation = ExportExecutionControl::default();
             let progress = |_| {};
 
             let failure = execute(
@@ -777,13 +886,13 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(false);
+            let cancellation = ExportExecutionControl::default();
             let stages = Mutex::new(Vec::new());
             let progress = |progress: super::ExportProgress| {
                 stages
                     .lock()
                     .expect("the progress collector is available")
-                    .push(progress.stage);
+                    .push((progress.stage, progress.units, progress.cancellable));
             };
 
             let published = execute(
@@ -806,28 +915,68 @@ mod tests {
             assert_eq!(
                 *stages.lock().expect("the progress collector is available"),
                 [
-                    ExportProgressStage::Preparing,
-                    ExportProgressStage::LoadingSources,
-                    ExportProgressStage::Composing,
-                    ExportProgressStage::EncodingOutput,
-                    ExportProgressStage::Verifying,
-                    ExportProgressStage::Publishing,
-                    ExportProgressStage::Completed,
+                    (
+                        ExportProgressStage::Preparing,
+                        ExportProgressUnits::Unmeasured,
+                        true,
+                    ),
+                    (
+                        ExportProgressStage::LoadingSources,
+                        ExportProgressUnits::Measured {
+                            completed_units: 1,
+                            total_units: 1,
+                        },
+                        true,
+                    ),
+                    (
+                        ExportProgressStage::Composing,
+                        ExportProgressUnits::Measured {
+                            completed_units: 1,
+                            total_units: 1,
+                        },
+                        true,
+                    ),
+                    (
+                        ExportProgressStage::EncodingOutput,
+                        ExportProgressUnits::Measured {
+                            completed_units: 1,
+                            total_units: 1,
+                        },
+                        true,
+                    ),
+                    (
+                        ExportProgressStage::Verifying,
+                        ExportProgressUnits::Unmeasured,
+                        true,
+                    ),
+                    (
+                        ExportProgressStage::Publishing,
+                        ExportProgressUnits::Unmeasured,
+                        false,
+                    ),
+                    (
+                        ExportProgressStage::Completed,
+                        ExportProgressUnits::Measured {
+                            completed_units: 1,
+                            total_units: 1,
+                        },
+                        false,
+                    ),
                 ]
             );
         });
     }
 
     #[test]
-    fn cancellation_that_wins_the_publication_boundary_preserves_the_previous_output() {
+    fn pipeline_claims_publication_before_observers_receive_the_event() {
         tauri::async_runtime::block_on(async {
             let destination = tempfile::tempdir().expect("temporary Export destination");
             let output = destination.path().join("Album.png");
             std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-            let plan = export_plan(output.clone(), "export-cancel-before-publish");
+            let plan = export_plan(output.clone(), "export-publication-boundary");
             let bytes = b"verified replacement".to_vec();
             let response = ImagingResponse::completed(
-                "export-cancel-before-publish",
+                "export-publication-boundary",
                 RenderCompletion {
                     width_px: 10,
                     height_px: 5,
@@ -845,10 +994,81 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(false);
+            let control = ExportExecutionControl::default();
+            let cancellation_result = Mutex::new(None);
             let progress = |event: super::ExportProgress| {
                 if event.stage == ExportProgressStage::Publishing {
-                    cancellation.store(true, Ordering::Release);
+                    assert!(!event.cancellable);
+                    cancellation_result
+                        .lock()
+                        .expect("the cancellation result remains available")
+                        .replace(control.request_cancel());
+                }
+            };
+
+            let published = execute(
+                &mut transport,
+                plan,
+                &bindings,
+                &control,
+                &progress,
+                &context("export-publication-boundary"),
+            )
+            .await
+            .expect("publication is already non-cancellable when observers are notified");
+
+            assert_eq!(
+                *cancellation_result
+                    .lock()
+                    .expect("the cancellation result remains available"),
+                Some(ExportCancellationResult::TooLate)
+            );
+            assert_eq!(
+                std::fs::read(&published.output_path).expect("the new Export is readable"),
+                b"verified replacement"
+            );
+        });
+    }
+
+    #[test]
+    fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_output() {
+        tauri::async_runtime::block_on(async {
+            let destination = tempfile::tempdir().expect("temporary Export destination");
+            let output = destination.path().join("Album.png");
+            std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+            let plan = export_plan(output.clone(), "export-cancel-before-publication");
+            let bytes = b"verified replacement".to_vec();
+            let response = ImagingResponse::completed(
+                "export-cancel-before-publication",
+                RenderCompletion {
+                    width_px: 10,
+                    height_px: 5,
+                    dpi: 25,
+                    source_count: 0,
+                    source_bytes: 0,
+                    output_bytes: bytes.len() as u64,
+                    output_sha256: format!("{:x}", Sha256::digest(&bytes)),
+                },
+            );
+            let mut transport = ScriptedTransport {
+                prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+                prepared_bytes: bytes,
+                result: Some(Ok(response)),
+                invocations: 0,
+            };
+            let bindings = root_bindings(&plan);
+            let control = ExportExecutionControl::default();
+            let observed_stages = Mutex::new(Vec::new());
+            let progress = |event: super::ExportProgress| {
+                observed_stages
+                    .lock()
+                    .expect("the progress collector remains available")
+                    .push(event.stage);
+                if event.stage == ExportProgressStage::Verifying {
+                    assert_eq!(
+                        control.request_cancel(),
+                        ExportCancellationResult::Requested
+                    );
                 }
             };
 
@@ -856,14 +1076,20 @@ mod tests {
                 &mut transport,
                 plan,
                 &bindings,
-                &cancellation,
+                &control,
                 &progress,
-                &context("export-cancel-before-publish"),
+                &context("export-cancel-before-publication"),
             )
             .await
-            .expect_err("cancellation wins before the first publication");
+            .expect_err("cancellation wins before publication is claimed");
 
             assert_eq!(failure.stage, ExportFailureStage::Cancelled);
+            assert!(
+                !observed_stages
+                    .lock()
+                    .expect("the progress collector remains available")
+                    .contains(&ExportProgressStage::Publishing)
+            );
             assert_eq!(
                 std::fs::read(output).expect("the previous Export remains readable"),
                 b"previous export"
@@ -871,7 +1097,7 @@ mod tests {
             assert!(
                 !destination
                     .path()
-                    .join(".myalbuns-export-export-cancel-before-publish.tmp")
+                    .join(".myalbuns-export-export-cancel-before-publication.tmp")
                     .exists()
             );
         });
@@ -905,7 +1131,7 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(false);
+            let cancellation = ExportExecutionControl::default();
             let progress = |_| {};
 
             let failure = execute(
@@ -935,7 +1161,11 @@ mod tests {
             let plan = export_plan(output, "export-cancelled");
             let preparation_path = plan.path_plan().preparation_directory().to_path_buf();
             let bindings = root_bindings(&plan);
-            let cancellation = AtomicBool::new(true);
+            let cancellation = ExportExecutionControl::default();
+            assert_eq!(
+                cancellation.request_cancel(),
+                ExportCancellationResult::Requested
+            );
             let mut transport = ScriptedTransport {
                 prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
                 prepared_bytes: Vec::new(),
@@ -969,7 +1199,7 @@ mod tests {
                 0
             );
             assert!(!preparation_path.exists());
-            assert!(cancellation.load(Ordering::Acquire));
+            assert!(cancellation.is_cancelled());
         });
     }
 
@@ -988,11 +1218,11 @@ mod tests {
                 invocations: 0,
             };
             let bindings = root_bindings(&plan);
-            let cancellation = Arc::new(AtomicBool::new(false));
+            let cancellation = Arc::new(ExportExecutionControl::default());
             let cancellation_request = Arc::clone(&cancellation);
             let canceller = thread::spawn(move || {
                 invocation_started.wait();
-                cancellation_request.store(true, Ordering::Release);
+                cancellation_request.request_cancel();
             });
             let progress = |_| {};
 

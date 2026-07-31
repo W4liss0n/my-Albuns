@@ -40,13 +40,27 @@ pub(crate) struct ExportResult {
 pub(crate) enum ExportEvent {
     Started {
         operation_id: String,
+        cancellable: bool,
     },
     Progress {
         operation_id: String,
         stage: &'static str,
+        units: ExportProgressUnitsPayload,
+        cancellable: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub(crate) enum ExportProgressUnitsPayload {
+    Unmeasured,
+    Measured {
         completed_units: u32,
         total_units: u32,
-        cancellable: bool,
     },
 }
 
@@ -61,50 +75,32 @@ impl ExportEvent {
     fn started(operation_id: impl Into<String>) -> Self {
         Self::Started {
             operation_id: operation_id.into(),
-        }
-    }
-
-    fn progress(
-        operation_id: impl Into<String>,
-        stage: &'static str,
-        completed_units: u32,
-        total_units: u32,
-        cancellable: bool,
-    ) -> Self {
-        Self::Progress {
-            operation_id: operation_id.into(),
-            stage,
-            completed_units,
-            total_units,
-            cancellable,
+            cancellable: true,
         }
     }
 
     fn from_progress(
         operation_id: impl Into<String>,
         progress: export_pipeline::ExportProgress,
-        attempt: &crate::export_attempts::ExportAttempt,
-    ) -> Option<Self> {
-        let cancellable = match progress.stage {
-            export_pipeline::ExportProgressStage::Publishing => {
-                if !attempt.begin_publishing() {
-                    return None;
-                }
-                false
+    ) -> Self {
+        let units = match progress.units {
+            export_pipeline::ExportProgressUnits::Unmeasured => {
+                ExportProgressUnitsPayload::Unmeasured
             }
-            export_pipeline::ExportProgressStage::Completed => false,
-            _ if attempt.is_cancelled() => return None,
-            _ => true,
+            export_pipeline::ExportProgressUnits::Measured {
+                completed_units,
+                total_units,
+            } => ExportProgressUnitsPayload::Measured {
+                completed_units,
+                total_units,
+            },
         };
-        let completed_units =
-            u32::from(progress.stage == export_pipeline::ExportProgressStage::Completed);
-        Some(Self::progress(
-            operation_id,
-            progress.stage.as_str(),
-            completed_units,
-            1,
-            cancellable,
-        ))
+        Self::Progress {
+            operation_id: operation_id.into(),
+            stage: progress.stage.as_str(),
+            units,
+            cancellable: progress.cancellable,
+        }
     }
 }
 
@@ -331,6 +327,13 @@ pub(crate) async fn export_spike(
     );
     let mut transport = TauriImagingTransport::new(&app, &logging, lease.processor_reservation());
     let progress = |progress: export_pipeline::ExportProgress| {
+        let (completed_units, total_units) = match progress.units {
+            export_pipeline::ExportProgressUnits::Unmeasured => (None, None),
+            export_pipeline::ExportProgressUnits::Measured {
+                completed_units,
+                total_units,
+            } => (Some(completed_units), Some(total_units)),
+        };
         tracing::debug!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -338,21 +341,30 @@ pub(crate) async fn export_spike(
             operation_id = request_id.as_str(),
             project_id = project_id.as_deref(),
             stage = ?progress.stage,
-            completed_units = progress.completed_units,
-            total_units = progress.total_units,
+            completed_units,
+            total_units,
+            cancellable = progress.cancellable,
             event = "export_progress",
         );
-        if let Some(event) = ExportEvent::from_progress(request_id.clone(), progress, &attempt)
-            && on_event.send(event).is_err()
+        if on_event
+            .send(ExportEvent::from_progress(request_id.clone(), progress))
+            .is_err()
         {
-            attempt.request_cancel();
+            tracing::debug!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::DesktopHost.as_str(),
+                protocol_version = IMAGING_PROTOCOL_VERSION,
+                operation_id = request_id.as_str(),
+                project_id = project_id.as_deref(),
+                event = "export_progress_observer_unavailable",
+            );
         }
     };
     let published = export_pipeline::execute(
         &mut transport,
         plan,
         &root_bindings,
-        attempt.cancellation_flag(),
+        attempt.execution_control(),
         &progress,
         &context,
     )
@@ -446,8 +458,7 @@ mod tests {
     use tauri::ipc::{Channel, InvokeResponseBody};
 
     use crate::{
-        export_attempts::ExportAttempts,
-        export_pipeline::{ExportProgress, ExportProgressStage},
+        export_pipeline::{ExportProgress, ExportProgressStage, ExportProgressUnits},
         operation_gate::{OperationGateError, OperationMode},
     };
 
@@ -472,7 +483,17 @@ mod tests {
             .send(ExportEvent::started("export-42"))
             .expect("the Started event is sent");
         channel
-            .send(ExportEvent::progress("export-42", "composing", 0, 1, true))
+            .send(ExportEvent::from_progress(
+                "export-42",
+                ExportProgress {
+                    stage: ExportProgressStage::Composing,
+                    units: ExportProgressUnits::Measured {
+                        completed_units: 2,
+                        total_units: 5,
+                    },
+                    cancellable: true,
+                },
+            ))
             .expect("the Progress event is sent");
 
         assert_eq!(
@@ -484,6 +505,7 @@ mod tests {
                     "event": "started",
                     "data": {
                         "operationId": "export-42",
+                        "cancellable": true,
                     },
                 }),
                 json!({
@@ -491,8 +513,11 @@ mod tests {
                     "data": {
                         "operationId": "export-42",
                         "stage": "composing",
-                        "completedUnits": 0,
-                        "totalUnits": 1,
+                        "units": {
+                            "kind": "measured",
+                            "completedUnits": 2,
+                            "totalUnits": 5,
+                        },
                         "cancellable": true,
                     },
                 }),
@@ -529,55 +554,25 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_that_wins_the_boundary_does_not_announce_publication() {
-        let attempts = ExportAttempts::default();
-        let attempt = attempts
-            .begin("export-cancelled", "main")
-            .expect("the attempt starts");
-        attempt.request_cancel();
-
-        assert!(
-            ExportEvent::from_progress(
-                "export-cancelled",
+    fn backend_cancelability_is_forwarded_without_adapter_decisions() {
+        assert_eq!(
+            serde_json::to_value(ExportEvent::from_progress(
+                "export-publishing",
                 ExportProgress {
                     stage: ExportProgressStage::Publishing,
-                    completed_units: 0,
-                    total_units: 1,
+                    units: ExportProgressUnits::Unmeasured,
+                    cancellable: false,
                 },
-                &attempt,
-            )
-            .is_none()
-        );
-    }
-
-    #[test]
-    fn publication_that_wins_the_boundary_is_announced_as_non_cancellable() {
-        let attempts = ExportAttempts::default();
-        let attempt = attempts
-            .begin("export-publishing", "main")
-            .expect("the attempt starts");
-
-        assert_eq!(
-            serde_json::to_value(
-                ExportEvent::from_progress(
-                    "export-publishing",
-                    ExportProgress {
-                        stage: ExportProgressStage::Publishing,
-                        completed_units: 0,
-                        total_units: 1,
-                    },
-                    &attempt,
-                )
-                .expect("the winning publication is announced"),
-            )
+            ))
             .expect("the event serializes"),
             json!({
                 "event": "progress",
                 "data": {
                     "operationId": "export-publishing",
                     "stage": "publishing",
-                    "completedUnits": 0,
-                    "totalUnits": 1,
+                    "units": {
+                        "kind": "unmeasured",
+                    },
                     "cancellable": false,
                 },
             })

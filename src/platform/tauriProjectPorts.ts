@@ -9,6 +9,7 @@ import type {
   ExportPort,
   ExportProgressEvent,
   ExportProgressStage,
+  ExportProgressUnits,
   ExportResult,
   MediaPreview,
   MediaPreviewPort,
@@ -20,6 +21,7 @@ type TauriExportEvent =
       event: "started";
       data: {
         operationId: string;
+        cancellable: boolean;
       };
     }
   | {
@@ -27,8 +29,7 @@ type TauriExportEvent =
       data: {
         operationId: string;
         stage: ExportProgressStage;
-        completedUnits: number;
-        totalUnits: number;
+        units: ExportProgressUnits;
         cancellable: boolean;
       };
     };
@@ -78,15 +79,17 @@ export const tauriExportPort: ExportPort = {
     onEvent.onmessage = (event) => {
       if (event.event === "started") {
         settleCorrelation(event.data.operationId);
-        emitEvent({ event: "started" });
+        emitEvent({
+          event: "started",
+          cancellable: event.data.cancellable,
+        });
         return;
       }
 
       emitEvent({
         event: "progress",
         stage: event.data.stage,
-        completedUnits: event.data.completedUnits,
-        totalUnits: event.data.totalUnits,
+        units: event.data.units,
         cancellable: event.data.cancellable,
       });
     };

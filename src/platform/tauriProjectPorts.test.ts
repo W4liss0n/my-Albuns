@@ -58,6 +58,7 @@ test("forwards Export events without exposing the backend operation id", () => {
     event: "started",
     data: {
       operationId: "export-42",
+      cancellable: true,
     },
   });
   tauriBoundary.channels[0].onmessage({
@@ -65,20 +66,27 @@ test("forwards Export events without exposing the backend operation id", () => {
     data: {
       operationId: "export-42",
       stage: "loading_sources",
-      completedUnits: 2,
-      totalUnits: 5,
+      units: {
+        kind: "measured",
+        completedUnits: 2,
+        totalUnits: 5,
+      },
       cancellable: true,
     },
   });
 
   expect(onEvent).toHaveBeenNthCalledWith(1, {
     event: "started",
+    cancellable: true,
   });
   expect(onEvent).toHaveBeenNthCalledWith(2, {
     event: "progress",
     stage: "loading_sources",
-    completedUnits: 2,
-    totalUnits: 5,
+    units: {
+      kind: "measured",
+      completedUnits: 2,
+      totalUnits: 5,
+    },
     cancellable: true,
   });
 });
@@ -94,6 +102,7 @@ test("cancels an Export attempt using the operation id kept inside the adapter",
     event: "started",
     data: {
       operationId: "export-42",
+      cancellable: true,
     },
   });
 
@@ -141,6 +150,7 @@ test("keeps a cancellation requested before started until the operation id arriv
     event: "started",
     data: {
       operationId: "export-delayed",
+      cancellable: true,
     },
   });
 

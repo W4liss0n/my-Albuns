@@ -23,15 +23,25 @@ export type ExportProgressStage =
   | "publishing"
   | "completed";
 
+export type ExportProgressUnits =
+  | {
+      kind: "unmeasured";
+    }
+  | {
+      kind: "measured";
+      completedUnits: number;
+      totalUnits: number;
+    };
+
 export type ExportProgressEvent =
   | {
       event: "started";
+      cancellable: boolean;
     }
   | {
       event: "progress";
       stage: ExportProgressStage;
-      completedUnits: number;
-      totalUnits: number;
+      units: ExportProgressUnits;
       cancellable: boolean;
     };
 

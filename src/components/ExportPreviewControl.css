@@ -106,7 +106,7 @@
   background: #c99a5d;
 }
 
-.export-preview-confirmation {
+.export-preview-notification {
   position: fixed;
   right: 20px;
   bottom: 20px;
@@ -119,4 +119,10 @@
   font-size: 0.75rem;
   font-weight: 650;
   z-index: 40;
+}
+
+.export-preview-notification-error {
+  border-color: rgb(220 126 126 / 24%);
+  color: #f2d7d7;
+  background: #322426;
 }

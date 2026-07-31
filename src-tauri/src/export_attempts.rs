@@ -3,12 +3,13 @@ use std::{
     fmt,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
     },
 };
 
 use serde::Serialize;
-use tokio::sync::Notify;
+
+use crate::export_pipeline::{ExportCancellationResult, ExportExecutionControl};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ExportAttempts {
@@ -25,7 +26,7 @@ struct ExportAttemptsInner {
 struct AttemptRegistration {
     generation: u64,
     window_label: String,
-    cancellation: Arc<AttemptCancellation>,
+    control: Arc<ExportExecutionControl>,
 }
 
 #[derive(Debug)]
@@ -33,7 +34,7 @@ pub(crate) struct ExportAttempt {
     operation_id: String,
     generation: u64,
     attempts: Arc<ExportAttemptsInner>,
-    cancellation: Arc<AttemptCancellation>,
+    control: Arc<ExportExecutionControl>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -50,20 +51,6 @@ pub(crate) struct BeginExportAttemptError {
     operation_id: String,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CancellationPhase {
-    Running,
-    Cancelled,
-    Publishing,
-}
-
-#[derive(Debug)]
-struct AttemptCancellation {
-    cancelled: AtomicBool,
-    phase: Mutex<CancellationPhase>,
-    notification: Notify,
-}
-
 impl ExportAttempts {
     pub(crate) fn begin(
         &self,
@@ -72,11 +59,11 @@ impl ExportAttempts {
     ) -> Result<ExportAttempt, BeginExportAttemptError> {
         let operation_id = operation_id.into();
         let generation = self.inner.next_generation.fetch_add(1, Ordering::Relaxed);
-        let cancellation = Arc::new(AttemptCancellation::new());
+        let control = Arc::new(ExportExecutionControl::default());
         let registration = AttemptRegistration {
             generation,
             window_label: window_label.into(),
-            cancellation: Arc::clone(&cancellation),
+            control: Arc::clone(&control),
         };
         let mut registrations = self
             .inner
@@ -93,7 +80,7 @@ impl ExportAttempts {
             operation_id,
             generation,
             attempts: Arc::clone(&self.inner),
-            cancellation,
+            control,
         })
     }
 
@@ -102,7 +89,7 @@ impl ExportAttempts {
         operation_id: &str,
         window_label: &str,
     ) -> CancelDisposition {
-        let cancellation = {
+        let control = {
             let registrations = self
                 .inner
                 .registrations
@@ -114,13 +101,13 @@ impl ExportAttempts {
             if registration.window_label != window_label {
                 return CancelDisposition::NotFound;
             }
-            Arc::clone(&registration.cancellation)
+            Arc::clone(&registration.control)
         };
-        cancellation.request_cancel()
+        control.request_cancel().into()
     }
 
     pub(crate) fn request_cancel_for_window(&self, window_label: &str) -> usize {
-        let cancellations = {
+        let controls = {
             let registrations = self
                 .inner
                 .registrations
@@ -129,16 +116,17 @@ impl ExportAttempts {
             registrations
                 .values()
                 .filter(|registration| registration.window_label == window_label)
-                .map(|registration| Arc::clone(&registration.cancellation))
+                .map(|registration| Arc::clone(&registration.control))
                 .collect::<Vec<_>>()
         };
 
-        cancellations
+        controls
             .into_iter()
-            .filter(|cancellation| {
+            .filter(|control| {
                 matches!(
-                    cancellation.request_cancel(),
-                    CancelDisposition::Requested | CancelDisposition::AlreadyRequested
+                    control.request_cancel(),
+                    ExportCancellationResult::Requested
+                        | ExportCancellationResult::AlreadyRequested
                 )
             })
             .count()
@@ -146,30 +134,21 @@ impl ExportAttempts {
 }
 
 impl ExportAttempt {
-    pub(crate) fn cancellation_flag(&self) -> &AtomicBool {
-        &self.cancellation.cancelled
+    pub(crate) fn execution_control(&self) -> &ExportExecutionControl {
+        &self.control
     }
 
-    pub(crate) fn is_cancelled(&self) -> bool {
-        self.cancellation.cancelled.load(Ordering::Acquire)
+    #[cfg(test)]
+    fn is_cancelled(&self) -> bool {
+        self.control.is_cancelled()
     }
 
     pub(crate) async fn cancelled(&self) {
-        loop {
-            let notified = self.cancellation.notification.notified();
-            if self.is_cancelled() {
-                return;
-            }
-            notified.await;
-        }
-    }
-
-    pub(crate) fn begin_publishing(&self) -> bool {
-        self.cancellation.begin_publishing()
+        self.control.cancelled().await;
     }
 
     pub(crate) fn request_cancel(&self) -> CancelDisposition {
-        self.cancellation.request_cancel()
+        self.control.request_cancel().into()
     }
 }
 
@@ -189,45 +168,12 @@ impl Drop for ExportAttempt {
     }
 }
 
-impl AttemptCancellation {
-    fn new() -> Self {
-        Self {
-            cancelled: AtomicBool::new(false),
-            phase: Mutex::new(CancellationPhase::Running),
-            notification: Notify::new(),
-        }
-    }
-
-    fn request_cancel(&self) -> CancelDisposition {
-        let mut phase = self
-            .phase
-            .lock()
-            .expect("the Export cancellation state remains available");
-        match *phase {
-            CancellationPhase::Running => {
-                self.cancelled.store(true, Ordering::Release);
-                *phase = CancellationPhase::Cancelled;
-                drop(phase);
-                self.notification.notify_one();
-                CancelDisposition::Requested
-            }
-            CancellationPhase::Cancelled => CancelDisposition::AlreadyRequested,
-            CancellationPhase::Publishing => CancelDisposition::TooLate,
-        }
-    }
-
-    fn begin_publishing(&self) -> bool {
-        let mut phase = self
-            .phase
-            .lock()
-            .expect("the Export cancellation state remains available");
-        match *phase {
-            CancellationPhase::Running => {
-                *phase = CancellationPhase::Publishing;
-                true
-            }
-            CancellationPhase::Cancelled => false,
-            CancellationPhase::Publishing => true,
+impl From<ExportCancellationResult> for CancelDisposition {
+    fn from(result: ExportCancellationResult) -> Self {
+        match result {
+            ExportCancellationResult::Requested => Self::Requested,
+            ExportCancellationResult::AlreadyRequested => Self::AlreadyRequested,
+            ExportCancellationResult::TooLate => Self::TooLate,
         }
     }
 }
@@ -276,21 +222,6 @@ mod tests {
                 CancelDisposition::AlreadyRequested
             );
         });
-    }
-
-    #[test]
-    fn publication_and_cancellation_have_one_atomic_winner() {
-        let attempts = ExportAttempts::default();
-        let attempt = attempts
-            .begin("export-18", "main")
-            .expect("the Export attempt starts");
-
-        assert!(attempt.begin_publishing());
-        assert_eq!(
-            attempts.request_cancel("export-18", "main"),
-            CancelDisposition::TooLate
-        );
-        assert!(!attempt.is_cancelled());
     }
 
     #[test]

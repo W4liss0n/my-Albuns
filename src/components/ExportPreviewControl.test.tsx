@@ -80,22 +80,60 @@ test("waits for the started event before showing progress", async () => {
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: false,
+    });
   });
 
   expect(
     screen.getByRole("dialog", { name: "Exportando" }),
   ).toBeInTheDocument();
-  expect(screen.getByRole("progressbar")).toHaveAttribute(
+  expect(screen.getByText("Iniciando a exportação")).toBeInTheDocument();
+  expect(screen.getByRole("progressbar")).not.toHaveAttribute(
     "aria-valuenow",
-    "0",
   );
   expect(
-    screen.getByRole("button", { name: "Cancelar exportação" }),
-  ).toBeInTheDocument();
+    screen.queryByRole("button", { name: "Cancelar exportação" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/ de /)).not.toBeInTheDocument();
 });
 
-test("projects progress and removes cancellation when publishing starts", async () => {
+test("rejects an attempt before started without opening a modal", async () => {
+  const user = userEvent.setup();
+  const harness = createExportHarness();
+  const onActiveChange = vi.fn();
+
+  render(
+    <ExportPreviewControl
+      exportPort={harness.port}
+      onActiveChange={onActiveChange}
+      projectId="project-a"
+    />,
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Exportar prova" }),
+  );
+
+  await act(async () => {
+    harness.attempts[0].reject({
+      code: "conflict",
+      message: "Outra operação exclusiva já está em andamento.",
+    });
+    await Promise.resolve();
+  });
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Outra operação exclusiva já está em andamento.",
+  );
+  expect(
+    screen.getByRole("button", { name: "Exportar prova" }),
+  ).toBeEnabled();
+  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
+});
+
+test("projects progress and follows the backend cancellation declaration", async () => {
   const user = userEvent.setup();
   const harness = createExportHarness();
 
@@ -110,12 +148,33 @@ test("projects progress and removes cancellation when publishing starts", async 
   );
 
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
+    harness.attempts[0].emit({
+      event: "progress",
+      stage: "preparing",
+      units: { kind: "unmeasured" },
+      cancellable: true,
+    });
+  });
+
+  expect(screen.getByText("Preparando a prova")).toBeInTheDocument();
+  expect(screen.getByRole("progressbar")).not.toHaveAttribute(
+    "aria-valuenow",
+  );
+  expect(screen.queryByText(/ de /)).not.toBeInTheDocument();
+
+  act(() => {
     harness.attempts[0].emit({
       event: "progress",
       stage: "composing",
-      completedUnits: 2,
-      totalUnits: 5,
+      units: {
+        kind: "measured",
+        completedUnits: 2,
+        totalUnits: 5,
+      },
       cancellable: true,
     });
   });
@@ -131,8 +190,7 @@ test("projects progress and removes cancellation when publishing starts", async 
     harness.attempts[0].emit({
       event: "progress",
       stage: "verifying",
-      completedUnits: 4,
-      totalUnits: 5,
+      units: { kind: "unmeasured" },
       cancellable: false,
     });
   });
@@ -145,16 +203,15 @@ test("projects progress and removes cancellation when publishing starts", async 
     harness.attempts[0].emit({
       event: "progress",
       stage: "publishing",
-      completedUnits: 5,
-      totalUnits: 5,
+      units: { kind: "unmeasured" },
       cancellable: true,
     });
   });
 
   expect(screen.getByText("Publicando a prova")).toBeInTheDocument();
   expect(
-    screen.queryByRole("button", { name: "Cancelar exportação" }),
-  ).not.toBeInTheDocument();
+    screen.getByRole("button", { name: "Cancelar exportação" }),
+  ).toBeInTheDocument();
 });
 
 test("requests cancellation once and waits for completion before showing feedback", async () => {
@@ -171,12 +228,18 @@ test("requests cancellation once and waits for completion before showing feedbac
     screen.getByRole("button", { name: "Exportar prova" }),
   );
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
     harness.attempts[0].emit({
       event: "progress",
       stage: "composing",
-      completedUnits: 2,
-      totalUnits: 5,
+      units: {
+        kind: "measured",
+        completedUnits: 2,
+        totalUnits: 5,
+      },
       cancellable: true,
     });
   });
@@ -224,7 +287,10 @@ test("closes progress and confirms a completed Export briefly", async () => {
     screen.getByRole("button", { name: "Exportar prova" }),
   );
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
   });
 
   await act(async () => {
@@ -268,7 +334,10 @@ test("offers retry and close in feedback after an Export failure", async () => {
     screen.getByRole("button", { name: "Exportar prova" }),
   );
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
   });
 
   await act(async () => {
@@ -297,7 +366,10 @@ test("offers retry and close in feedback after an Export failure", async () => {
   ).toBeDisabled();
 
   act(() => {
-    harness.attempts[1].emit({ event: "started" });
+    harness.attempts[1].emit({
+      event: "started",
+      cancellable: true,
+    });
   });
   await act(async () => {
     harness.attempts[1].reject(new Error("still unavailable"));
@@ -327,7 +399,10 @@ test("retires an active attempt when the Project changes or the control unmounts
     screen.getByRole("button", { name: "Exportar prova" }),
   );
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
   });
   expect(onActiveChange.mock.calls).toEqual([[true]]);
 
@@ -347,8 +422,7 @@ test("retires an active attempt when the Project changes or the control unmounts
     harness.attempts[0].emit({
       event: "progress",
       stage: "publishing",
-      completedUnits: 5,
-      totalUnits: 5,
+      units: { kind: "unmeasured" },
       cancellable: false,
     });
   });
@@ -389,7 +463,8 @@ test("retires an active attempt when the Project changes or the control unmounts
   expect(onActiveChange).toHaveBeenCalledTimes(4);
 });
 
-test("honors external disabling and balances active notifications at the terminal result", async () => {
+test("honors external disabling and keeps commands blocked until terminal feedback closes", async () => {
+  const user = userEvent.setup();
   const harness = createExportHarness();
   const onActiveChange = vi.fn();
   const view = render(
@@ -421,11 +496,20 @@ test("honors external disabling and balances active notifications at the termina
 
   expect(onActiveChange.mock.calls).toEqual([[true]]);
 
+  act(() => {
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
+  });
   await act(async () => {
     harness.attempts[0].resolve({ status: "cancelled" });
     await Promise.resolve();
   });
 
+  expect(onActiveChange.mock.calls).toEqual([[true]]);
+
+  await user.click(screen.getByRole("button", { name: "Fechar" }));
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
@@ -445,7 +529,10 @@ test("moves focus into progress and restores it after completion", async () => {
   await user.click(exportButton);
 
   act(() => {
-    harness.attempts[0].emit({ event: "started" });
+    harness.attempts[0].emit({
+      event: "started",
+      cancellable: true,
+    });
   });
 
   await waitFor(() => {

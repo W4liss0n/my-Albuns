@@ -2,7 +2,6 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::atomic::AtomicBool,
     thread,
     time::{Duration, Instant},
 };
@@ -424,7 +423,7 @@ fn real_processor_recovery_flows_through_production_modules() {
         let failed_context = InvocationContext::new(failed_request_id, Some(project_id.clone()));
         let mut failed_transport =
             RealProcessTransport::new(executable.clone(), log_directory.clone(), CrashNext::Export);
-        let failed_cancellation = AtomicBool::new(false);
+        let failed_cancellation = export_pipeline::ExportExecutionControl::default();
         let failed_progress = |_| {};
 
         export_pipeline::execute(
@@ -467,7 +466,7 @@ fn real_processor_recovery_flows_through_production_modules() {
         let retry_context = InvocationContext::new(retry_request_id, Some(project_id.clone()));
         let mut retry_transport =
             RealProcessTransport::new(executable, log_directory, CrashNext::Never);
-        let retry_cancellation = AtomicBool::new(false);
+        let retry_cancellation = export_pipeline::ExportExecutionControl::default();
         let retry_progress = |_| {};
         let published = export_pipeline::execute(
             &mut retry_transport,
@@ -583,7 +582,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             unavailable_log_directory,
             CrashNext::Never,
         );
-        let cancellation = AtomicBool::new(false);
+        let cancellation = export_pipeline::ExportExecutionControl::default();
         let progress = |_| {};
         let unavailable_context = InvocationContext::new(
             unavailable_request_id,

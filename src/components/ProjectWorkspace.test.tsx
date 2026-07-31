@@ -202,7 +202,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
 
   act(() => {
-    emit({ event: "started" });
+    emit({ event: "started", cancellable: true });
   });
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   expect(projectSessionPort.undo).not.toHaveBeenCalled();
@@ -211,6 +211,9 @@ test("blocks only Project commands while its Export attempt is active", async ()
     finish({ status: "cancelled" });
     await completion;
   });
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  expect(projectSessionPort.undo).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();

@@ -17,6 +17,11 @@ interface ExportPreviewControlProps {
   projectId: string;
 }
 
+interface ExportNotification {
+  kind: "error" | "success";
+  message: string;
+}
+
 export function ExportPreviewControl({
   disabled = false,
   exportPort,
@@ -29,13 +34,16 @@ export function ExportPreviewControl({
   const [progress, setProgress] = useState<
     Extract<ExportProgressEvent, { event: "progress" }> | undefined
   >();
+  const [cancellable, setCancellable] = useState(false);
   const [cancelRequested, setCancelRequested] = useState(false);
   const [failureMessage, setFailureMessage] = useState<string | null>(
     null,
   );
-  const [confirmationVisible, setConfirmationVisible] = useState(false);
+  const [notification, setNotification] =
+    useState<ExportNotification | null>(null);
   const nextAttemptId = useRef(0);
   const currentAttemptId = useRef<number | null>(null);
+  const startedAttemptId = useRef<number | null>(null);
   const activeAttempt = useRef<{
     attempt: ExportAttempt;
     cancelRequested: boolean;
@@ -44,18 +52,20 @@ export function ExportPreviewControl({
   const activeChangeListener = useRef<
     ExportPreviewControlProps["onActiveChange"]
   >(undefined);
-  const confirmationTimer = useRef<number | undefined>(undefined);
+  const interactionActive = useRef(false);
+  const notificationTimer = useRef<number | undefined>(undefined);
 
   useLayoutEffect(() => {
     setPhase("idle");
     setProgress(undefined);
+    setCancellable(false);
     setCancelRequested(false);
     setFailureMessage(null);
-    clearConfirmation();
+    clearNotification();
 
     return () => {
       retireActiveAttempt();
-      clearConfirmationTimer();
+      clearNotificationTimer();
     };
   }, [projectId]);
 
@@ -66,11 +76,11 @@ export function ExportPreviewControl({
 
     const attemptId = ++nextAttemptId.current;
     currentAttemptId.current = attemptId;
-    activeChangeListener.current = onActiveChange;
-    onActiveChange?.(true);
+    beginInteraction();
     setPhase("starting");
     setProgress(undefined);
-    clearConfirmation();
+    setCancellable(false);
+    clearNotification();
     setCancelRequested(false);
     setFailureMessage(null);
 
@@ -82,23 +92,17 @@ export function ExportPreviewControl({
         }
 
         if (event.event === "started") {
-          setProgress({
-            event: "progress",
-            stage: "preparing",
-            completedUnits: 0,
-            totalUnits: 1,
-            cancellable: true,
-          });
+          startedAttemptId.current = attemptId;
+          setCancellable(event.cancellable);
           setPhase("running");
           return;
         }
 
+        setCancellable(event.cancellable);
         setProgress(event);
       });
     } catch (error: unknown) {
-      finishActiveAttempt(attemptId);
-      setFailureMessage(messageFromError(error));
-      setPhase("failed");
+      finishAttemptWithFailure(attemptId, error);
       return;
     }
 
@@ -114,23 +118,30 @@ export function ExportPreviewControl({
     };
     void attempt.completion.then(
       (outcome) => {
-        if (!finishActiveAttempt(attemptId)) {
+        const finished = finishActiveAttempt(attemptId);
+        if (!finished) {
           return;
         }
 
         if (outcome.status === "cancelled") {
-          setPhase("cancelled");
+          if (finished.started) {
+            setPhase("cancelled");
+          } else {
+            setPhase("idle");
+            endInteraction();
+          }
           return;
         }
 
         setPhase("idle");
-        showConfirmation();
+        endInteraction();
+        showNotification({
+          kind: "success",
+          message: "Exportação concluída",
+        });
       },
       (error: unknown) => {
-        if (finishActiveAttempt(attemptId)) {
-          setFailureMessage(messageFromError(error));
-          setPhase("failed");
-        }
+        finishAttemptWithFailure(attemptId, error);
       },
     );
   }
@@ -148,6 +159,7 @@ export function ExportPreviewControl({
 
   function dismissFeedback() {
     setPhase("idle");
+    endInteraction();
   }
 
   function finishActiveAttempt(attemptId: number) {
@@ -157,45 +169,82 @@ export function ExportPreviewControl({
 
     currentAttemptId.current = null;
     activeAttempt.current = undefined;
-    const notify = activeChangeListener.current;
-    activeChangeListener.current = undefined;
-    notify?.(false);
-    return true;
+    const started = startedAttemptId.current === attemptId;
+    startedAttemptId.current = null;
+    return { started };
+  }
+
+  function finishAttemptWithFailure(attemptId: number, error: unknown) {
+    const finished = finishActiveAttempt(attemptId);
+    if (!finished) {
+      return;
+    }
+
+    const message = messageFromError(error);
+    if (finished.started) {
+      setFailureMessage(message);
+      setPhase("failed");
+      return;
+    }
+
+    setPhase("idle");
+    endInteraction();
+    showNotification({ kind: "error", message });
   }
 
   function retireActiveAttempt() {
     const attemptId = currentAttemptId.current;
-    if (attemptId === null) {
+    if (attemptId !== null) {
+      const current = activeAttempt.current;
+      if (current?.id === attemptId && !current.cancelRequested) {
+        current.cancelRequested = true;
+        void current.attempt.cancel().catch(() => undefined);
+      }
+      finishActiveAttempt(attemptId);
+    }
+    endInteraction();
+  }
+
+  function beginInteraction() {
+    if (interactionActive.current) {
       return;
     }
 
-    const current = activeAttempt.current;
-    if (current?.id === attemptId && !current.cancelRequested) {
-      current.cancelRequested = true;
-      void current.attempt.cancel().catch(() => undefined);
+    interactionActive.current = true;
+    activeChangeListener.current = onActiveChange;
+    onActiveChange?.(true);
+  }
+
+  function endInteraction() {
+    if (!interactionActive.current) {
+      return;
     }
-    finishActiveAttempt(attemptId);
+
+    interactionActive.current = false;
+    const notify = activeChangeListener.current;
+    activeChangeListener.current = undefined;
+    notify?.(false);
   }
 
-  function clearConfirmationTimer() {
-    if (confirmationTimer.current !== undefined) {
-      window.clearTimeout(confirmationTimer.current);
-      confirmationTimer.current = undefined;
+  function clearNotificationTimer() {
+    if (notificationTimer.current !== undefined) {
+      window.clearTimeout(notificationTimer.current);
+      notificationTimer.current = undefined;
     }
   }
 
-  function clearConfirmation() {
-    clearConfirmationTimer();
-    setConfirmationVisible(false);
+  function clearNotification() {
+    clearNotificationTimer();
+    setNotification(null);
   }
 
-  function showConfirmation() {
-    clearConfirmationTimer();
-    setConfirmationVisible(true);
-    confirmationTimer.current = window.setTimeout(() => {
-      confirmationTimer.current = undefined;
-      setConfirmationVisible(false);
-    }, 3_000);
+  function showNotification(nextNotification: ExportNotification) {
+    clearNotificationTimer();
+    setNotification(nextNotification);
+    notificationTimer.current = window.setTimeout(() => {
+      notificationTimer.current = undefined;
+      setNotification(null);
+    }, nextNotification.kind === "success" ? 3_000 : 6_000);
   }
 
   return (
@@ -216,34 +265,49 @@ export function ExportPreviewControl({
               <p aria-live="polite">
                 {progressStageLabel(progress.stage)}
               </p>
+              {progress.units.kind === "measured" ? (
+                <>
+                  <progress
+                    className="export-preview-progress"
+                    aria-label="Progresso da exportação"
+                    aria-valuemax={progress.units.totalUnits}
+                    aria-valuenow={progress.units.completedUnits}
+                    max={progress.units.totalUnits}
+                    value={progress.units.completedUnits}
+                  />
+                  <p className="export-preview-count">
+                    {progress.units.completedUnits} de{" "}
+                    {progress.units.totalUnits}
+                  </p>
+                </>
+              ) : (
+                <progress
+                  className="export-preview-progress"
+                  aria-label="Progresso da exportação"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <p aria-live="polite">Iniciando a exportação</p>
               <progress
                 className="export-preview-progress"
                 aria-label="Progresso da exportação"
-                aria-valuemax={progress.totalUnits}
-                aria-valuenow={progress.completedUnits}
-                max={progress.totalUnits}
-                value={progress.completedUnits}
               />
-              <p className="export-preview-count">
-                {progress.completedUnits} de {progress.totalUnits}
-              </p>
-              {progress.cancellable &&
-                progress.stage !== "publishing" && (
-                  <div className="export-preview-actions">
-                    <button
-                      type="button"
-                      disabled={cancelRequested}
-                      onClick={requestCancellation}
-                    >
-                      {cancelRequested
-                        ? "Cancelando…"
-                        : "Cancelar exportação"}
-                    </button>
-                  </div>
-                )}
             </>
-          ) : (
-            <p>Iniciando…</p>
+          )}
+          {cancellable && (
+            <div className="export-preview-actions">
+              <button
+                type="button"
+                disabled={cancelRequested}
+                onClick={requestCancellation}
+              >
+                {cancelRequested
+                  ? "Cancelando…"
+                  : "Cancelar exportação"}
+              </button>
+            </div>
           )}
         </ExportModal>
       )}
@@ -278,9 +342,12 @@ export function ExportPreviewControl({
         </ExportModal>
       )}
 
-      {confirmationVisible && (
-        <div className="export-preview-confirmation" role="status">
-          Exportação concluída
+      {notification && (
+        <div
+          className={`export-preview-notification export-preview-notification-${notification.kind}`}
+          role={notification.kind === "error" ? "alert" : "status"}
+        >
+          {notification.message}
         </div>
       )}
     </div>
