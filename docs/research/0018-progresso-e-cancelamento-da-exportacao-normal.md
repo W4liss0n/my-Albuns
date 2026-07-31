@@ -25,9 +25,11 @@ Cada chamada de `export_spike` recebe um `Channel<ExportEvent>` exclusivo. O
 backend cria o identificador da operação, mantém a correlação dentro do
 adaptador Tauri e envia à interface somente dois eventos públicos:
 
-- `started`, depois que a tentativa venceu o `OperationGate`;
-- `progress`, com estágio, unidades concluídas, total e disponibilidade de
-  cancelamento.
+- `started`, depois que a tentativa venceu o `OperationGate`, declarando se o
+  cancelamento já está disponível;
+- `progress`, com estágio, disponibilidade de cancelamento e unidades
+  discriminadas entre `measured`, com concluídas e total confiáveis, ou
+  `unmeasured`.
 
 O `ExportPort` não expõe Tauri nem o identificador da operação. Ele devolve um
 `ExportAttempt` com uma única promessa terminal e uma operação `cancel()`
@@ -53,7 +55,9 @@ concessão ou pausa parcial.
 
 ## Fronteira de Publicação
 
-Cancelamento e Publicação disputam uma única transição atômica:
+Cancelamento e Publicação disputam uma única transição atômica, reivindicada
+diretamente pelo `ExportPipeline` antes de ele anunciar o estágio
+`publishing`. O adaptador Tauri somente traduz o progresso já decidido:
 
 - se o cancelamento vence, nenhum evento `publishing` é enviado, a preparação
   é descartada e a saída anterior permanece;
@@ -61,9 +65,9 @@ Cancelamento e Publicação disputam uma única transição atômica:
   `cancellable: false`, o botão desaparece e uma solicitação posterior recebe
   `too_late`.
 
-O `ExportPipeline` consulta novamente o token logo depois do callback dessa
-fronteira. Isso impede que uma corrida já vencida pelo cancelamento publique o
-arquivo preparado.
+Assim, o callback de progresso permanece observacional e nenhum chamador
+futuro do pipeline, inclusive o lote, precisa reproduzir a fronteira para
+preservar a saída anterior.
 
 Se o host não consegue confirmar a terminação do Processador de Imagens, a
 preparação continua preservada e o `ImagingProcessor` entra em quarentena. O
@@ -77,9 +81,10 @@ inicia outro sidecar enquanto o anterior talvez ainda esteja vivo.
 
 - o botão fica indisponível assim que a tentativa começa;
 - nenhum modal aparece antes de `started`, inclusive diante de conflito
-  global;
-- o modal `Exportando` pertence somente à Janela do Projeto, apresenta uma
-  barra geral e `X de Y`;
+  global; uma rejeição nesse intervalo produz somente um aviso não modal;
+- o modal `Exportando` pertence somente à Janela do Projeto; começa com barra
+  indeterminada e sem contagem, passando a uma barra geral com `X de Y`
+  somente ao receber um total confiável;
 - `Cancelar exportação` aparece somente enquanto o backend declara a operação
   cancelável;
 - solicitar cancelamento não fecha o modal; a interface aguarda o resultado
@@ -97,8 +102,10 @@ enquanto o modal local está ativo.
 
 ## Evidência reproduzível
 
-A implementação está no commit
-`28cab9cae52cc82fcda59a027dfcce14aad35a18`.
+A implementação inicial está no commit
+`28cab9cae52cc82fcda59a027dfcce14aad35a18`; a revisão final dos contratos de
+progresso, ciclo visual e fronteira de Publicação está no commit
+`6dd685b9cac324a9832bbc88409db0a2a400bb93`.
 
 Foram executados:
 
@@ -114,8 +121,8 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 Resultados:
 
-- 24 arquivos de teste do frontend, com 118 testes aprovados;
-- 158 testes Rust aprovados no workspace;
+- 24 arquivos de teste do frontend, com 119 testes aprovados;
+- 157 testes Rust aprovados no workspace;
 - seis testes Rust ignorados porque pertencem aos runners reais de caminhos,
   recuperação e `OperationGate`;
 - contrato TypeScript, build Vite, `cargo fmt` e
@@ -123,14 +130,18 @@ Resultados:
 
 Os testes direcionados cobrem canal e erros tipados, correlação privada,
 cancelamento idempotente antes e depois de `started`, propriedade por Janela,
-destruição da proprietária, aquisição parcial, fronteira de Publicação,
-quarentena do Processador, progresso acessível, retry, fechamento, foco e
-eventos obsoletos.
+destruição da proprietária, aquisição parcial, os dois vencedores da fronteira
+de Publicação, progresso medido e não medido, conflito anterior a `started`,
+quarentena do Processador, nova tentativa, fechamento, foco e eventos
+obsoletos.
 
 ## Limites da conclusão
 
 - A implementação produtiva está conectada, mas este corte não automatiza uma
   Exportação real cancelada pela UI nas duas topologias.
+- A indisponibilidade proativa das ações de Exportação nas outras Janelas
+  permanece para a matriz A/B; neste corte, uma corrida concorrente é rejeitada
+  pelo gate antes de `started` e informada sem modal.
 - Sucesso, falha, cancelamento e queda do proprietário ainda não foram
   injetados conjuntamente em A e B com readquisição posterior de todos os
   recursos.
