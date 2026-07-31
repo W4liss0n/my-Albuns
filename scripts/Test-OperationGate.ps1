@@ -2231,12 +2231,14 @@ function Invoke-BatchLeaseScenario {
         $publicationEvidence = @()
         switch ($Scenario) {
             'success' {
-                $publicationEvidence = Assert-BatchOutputEvidence `
-                    -Evidence @($ownerTerminal.outputEvidence) `
-                    -ExpectedPaths @(
-                        (Join-Path $ProbeRoot 'destination\success-item-1.png'),
-                        (Join-Path $ProbeRoot 'destination\success-item-2.png')
-                    )
+                $publicationEvidence = @(
+                    Assert-BatchOutputEvidence `
+                        -Evidence @($ownerTerminal.outputEvidence) `
+                        -ExpectedPaths @(
+                            (Join-Path $ProbeRoot 'destination\success-item-1.png'),
+                            (Join-Path $ProbeRoot 'destination\success-item-2.png')
+                        )
+                )
             }
             'before_preparation' {
                 $firstOutput = Join-Path `
@@ -2245,9 +2247,11 @@ function Invoke-BatchLeaseScenario {
                 $secondOutput = Join-Path `
                     $ProbeRoot `
                     'destination\before-preparation-item-2.png'
-                $publicationEvidence = Assert-BatchOutputEvidence `
-                    -Evidence @($ownerTerminal.outputEvidence) `
-                    -ExpectedPaths @($firstOutput)
+                $publicationEvidence = @(
+                    Assert-BatchOutputEvidence `
+                        -Evidence @($ownerTerminal.outputEvidence) `
+                        -ExpectedPaths @($firstOutput)
+                )
                 if (Test-Path -LiteralPath $secondOutput) {
                     throw 'The preparation failure published its second item.'
                 }
