@@ -1,0 +1,1120 @@
+{
+    "schemaVersion":  2,
+    "collectedAtUtc":  "2026-07-31T22:33:33.7282882+00:00",
+    "gitCommit":  "15bd09c39730e4c350df067e1c895d0f7eb49175",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "builtAtUtc":  "2026-07-31T22:30:13.5375484+00:00",
+                  "elapsedMs":  171046,
+                  "profile":  "release",
+                  "cargoBuildJobs":  1,
+                  "rustCheckTarget":  "target",
+                  "executable":  "target/operation-gate/release/myalbuns-desktop.exe",
+                  "executableBytes":  14653952,
+                  "executableSha256":  "fdc88e753e5299e6ea09241f359c6a98a00f83bef1dc5f7d03892c88222f0ab6",
+                  "imagingExecutable":  "target/operation-gate/release/myalbuns-imaging.exe",
+                  "imagingExecutableBytes":  2802176,
+                  "imagingExecutableSha256":  "fc0d224b8a396fc776347ad635798da7a27184854392f3545af8aa2db2061f23",
+                  "buildInputFileCount":  210,
+                  "buildInputDigestSha256":  "0a5dcb91b1bc0744c2317881c6c93ba516f2dab6d14fd8f09063bee61b298c47",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "strict-probe-json-parser",
+                       "passed":  true,
+                       "elapsedMs":  123
+                   },
+                   {
+                       "name":  "strict-export-terminal-json-parser",
+                       "passed":  true,
+                       "elapsedMs":  45
+                   },
+                   {
+                       "name":  "operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  512
+                   },
+                   {
+                       "name":  "operation-lease",
+                       "passed":  true,
+                       "elapsedMs":  538
+                   },
+                   {
+                       "name":  "operation-gate-probe-contract",
+                       "passed":  true,
+                       "elapsedMs":  556
+                   },
+                   {
+                       "name":  "export-terminal-probe-contract",
+                       "passed":  true,
+                       "elapsedMs":  543
+                   },
+                   {
+                       "name":  "cache-pause",
+                       "passed":  true,
+                       "elapsedMs":  603
+                   },
+                   {
+                       "name":  "processor-reservation",
+                       "passed":  true,
+                       "elapsedMs":  546
+                   },
+                   {
+                       "name":  "real-owner-process-death",
+                       "passed":  true,
+                       "elapsedMs":  446
+                   },
+                   {
+                       "name":  "export-success-and-progress",
+                       "passed":  true,
+                       "elapsedMs":  496
+                   },
+                   {
+                       "name":  "export-failure",
+                       "passed":  true,
+                       "elapsedMs":  512
+                   },
+                   {
+                       "name":  "export-cancellation-before-start",
+                       "passed":  true,
+                       "elapsedMs":  452
+                   },
+                   {
+                       "name":  "export-cancellation-in-flight",
+                       "passed":  true,
+                       "elapsedMs":  463
+                   },
+                   {
+                       "name":  "processor-progress-stream",
+                       "passed":  true,
+                       "elapsedMs":  485
+                   },
+                   {
+                       "name":  "real-desktop-build",
+                       "passed":  true,
+                       "elapsedMs":  171046
+                   },
+                   {
+                       "name":  "independent-two-host-operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  2334
+                   },
+                   {
+                       "name":  "multiwindow-two-window-operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  740
+                   },
+                   {
+                       "name":  "export-terminal-independent-success",
+                       "passed":  true,
+                       "elapsedMs":  3893
+                   },
+                   {
+                       "name":  "export-terminal-independent-failure",
+                       "passed":  true,
+                       "elapsedMs":  4466
+                   },
+                   {
+                       "name":  "export-terminal-independent-cancellation",
+                       "passed":  true,
+                       "elapsedMs":  3702
+                   },
+                   {
+                       "name":  "export-terminal-independent-owner_death",
+                       "passed":  true,
+                       "elapsedMs":  2925
+                   },
+                   {
+                       "name":  "export-terminal-multiwindow-success",
+                       "passed":  true,
+                       "elapsedMs":  884
+                   },
+                   {
+                       "name":  "export-terminal-multiwindow-failure",
+                       "passed":  true,
+                       "elapsedMs":  3564
+                   },
+                   {
+                       "name":  "export-terminal-multiwindow-cancellation",
+                       "passed":  true,
+                       "elapsedMs":  1295
+                   },
+                   {
+                       "name":  "export-terminal-multiwindow-owner_death",
+                       "passed":  true,
+                       "elapsedMs":  3805
+                   },
+                   {
+                       "name":  "root-binding-plan-host-processor-correlation",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "imaging-sidecar-restored-after-failure-probes",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   }
+               ],
+    "results":  {
+                    "independent":  {
+                                        "topology":  "independent",
+                                        "passed":  true,
+                                        "startedAtUtc":  "2026-07-31T22:33:05.0658354+00:00",
+                                        "elapsedMs":  2334,
+                                        "processCount":  2,
+                                        "processIds":  [
+                                                           36036,
+                                                           22992
+                                                       ],
+                                        "releaseGateCreated":  true,
+                                        "ownerReady":  {
+                                                           "schemaVersion":  1,
+                                                           "processId":  36036,
+                                                           "topology":  "independent",
+                                                           "windowLabel":  "main",
+                                                           "state":  "owner_ready",
+                                                           "operationMode":  "normal_export"
+                                                       },
+                                        "challengerConflict":  {
+                                                                   "schemaVersion":  1,
+                                                                   "processId":  22992,
+                                                                   "topology":  "independent",
+                                                                   "windowLabel":  "main",
+                                                                   "state":  "challenger_conflict",
+                                                                   "operationMode":  "normal_export"
+                                                               },
+                                        "ownerReleased":  {
+                                                              "schemaVersion":  1,
+                                                              "processId":  36036,
+                                                              "topology":  "independent",
+                                                              "windowLabel":  "main",
+                                                              "state":  "owner_released",
+                                                              "operationMode":  "normal_export"
+                                                          },
+                                        "challengerSuccess":  {
+                                                                  "schemaVersion":  1,
+                                                                  "processId":  22992,
+                                                                  "topology":  "independent",
+                                                                  "windowLabel":  "main",
+                                                                  "state":  "challenger_success",
+                                                                  "operationMode":  "normal_export"
+                                                              }
+                                    },
+                    "multiwindow":  {
+                                        "topology":  "multiwindow",
+                                        "passed":  true,
+                                        "startedAtUtc":  "2026-07-31T22:33:07.5132490+00:00",
+                                        "elapsedMs":  740,
+                                        "processCount":  1,
+                                        "processIds":  [
+                                                           13592
+                                                       ],
+                                        "releaseGateCreated":  true,
+                                        "ownerReady":  {
+                                                           "schemaVersion":  1,
+                                                           "processId":  13592,
+                                                           "topology":  "multiwindow",
+                                                           "windowLabel":  "main",
+                                                           "state":  "owner_ready",
+                                                           "operationMode":  "normal_export"
+                                                       },
+                                        "challengerConflict":  {
+                                                                   "schemaVersion":  1,
+                                                                   "processId":  13592,
+                                                                   "topology":  "multiwindow",
+                                                                   "windowLabel":  "project-b",
+                                                                   "state":  "challenger_conflict",
+                                                                   "operationMode":  "normal_export"
+                                                               },
+                                        "ownerReleased":  {
+                                                              "schemaVersion":  1,
+                                                              "processId":  13592,
+                                                              "topology":  "multiwindow",
+                                                              "windowLabel":  "main",
+                                                              "state":  "owner_released",
+                                                              "operationMode":  "normal_export"
+                                                          },
+                                        "challengerSuccess":  {
+                                                                  "schemaVersion":  1,
+                                                                  "processId":  13592,
+                                                                  "topology":  "multiwindow",
+                                                                  "windowLabel":  "project-b",
+                                                                  "state":  "challenger_success",
+                                                                  "operationMode":  "normal_export"
+                                                              }
+                                    },
+                    "exportTerminalMatrix":  {
+                                                 "independent":  {
+                                                                     "success":  {
+                                                                                     "topology":  "independent",
+                                                                                     "scenario":  "success",
+                                                                                     "passed":  true,
+                                                                                     "startedAtUtc":  "2026-07-31T22:33:08.2925195+00:00",
+                                                                                     "elapsedMs":  3893,
+                                                                                     "ownerProcessId":  33176,
+                                                                                     "successorProcessId":  33088,
+                                                                                     "ownerTerminated":  false,
+                                                                                     "ownerReady":  {
+                                                                                                        "schemaVersion":  1,
+                                                                                                        "processId":  33176,
+                                                                                                        "topology":  "independent",
+                                                                                                        "windowLabel":  "main",
+                                                                                                        "scenario":  "success",
+                                                                                                        "state":  "owner_ready",
+                                                                                                        "operationMode":  "normal_export",
+                                                                                                        "operationId":  "export-33176-1",
+                                                                                                        "terminal":  null,
+                                                                                                        "progressStages":  [
+                                                                                                                               "preparing"
+                                                                                                                           ],
+                                                                                                        "cancellationDisposition":  null,
+                                                                                                        "resources":  [
+                                                                                                                          "operation_gate",
+                                                                                                                          "cache_pause",
+                                                                                                                          "processor_reservation"
+                                                                                                                      ],
+                                                                                                        "resourceState":  "held",
+                                                                                                        "outputBytes":  null
+                                                                                                    },
+                                                                                     "challengerConflict":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  33088,
+                                                                                                                "topology":  "independent",
+                                                                                                                "windowLabel":  "main",
+                                                                                                                "scenario":  "success",
+                                                                                                                "state":  "challenger_conflict",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  null,
+                                                                                                                "terminal":  "conflict",
+                                                                                                                "progressStages":  [
+
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  null,
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "blocked",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                     "ownerTerminal":  {
+                                                                                                           "schemaVersion":  1,
+                                                                                                           "processId":  33176,
+                                                                                                           "topology":  "independent",
+                                                                                                           "windowLabel":  "main",
+                                                                                                           "scenario":  "success",
+                                                                                                           "state":  "owner_terminal",
+                                                                                                           "operationMode":  "normal_export",
+                                                                                                           "operationId":  "export-33176-1",
+                                                                                                           "terminal":  "success",
+                                                                                                           "progressStages":  [
+                                                                                                                                  "preparing",
+                                                                                                                                  "loading_sources",
+                                                                                                                                  "composing",
+                                                                                                                                  "composing",
+                                                                                                                                  "composing",
+                                                                                                                                  "encoding_output",
+                                                                                                                                  "encoding_output",
+                                                                                                                                  "verifying",
+                                                                                                                                  "publishing",
+                                                                                                                                  "completed"
+                                                                                                                              ],
+                                                                                                           "cancellationDisposition":  null,
+                                                                                                           "resources":  [
+
+                                                                                                                         ],
+                                                                                                           "resourceState":  "released",
+                                                                                                           "outputBytes":  39164
+                                                                                                       },
+                                                                                     "challengerSuccess":  {
+                                                                                                               "schemaVersion":  1,
+                                                                                                               "processId":  33088,
+                                                                                                               "topology":  "independent",
+                                                                                                               "windowLabel":  "main",
+                                                                                                               "scenario":  "success",
+                                                                                                               "state":  "challenger_success",
+                                                                                                               "operationMode":  "normal_export",
+                                                                                                               "operationId":  "export-33088-2",
+                                                                                                               "terminal":  "success",
+                                                                                                               "progressStages":  [
+                                                                                                                                      "preparing",
+                                                                                                                                      "loading_sources",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "verifying",
+                                                                                                                                      "publishing",
+                                                                                                                                      "completed"
+                                                                                                                                  ],
+                                                                                                               "cancellationDisposition":  null,
+                                                                                                               "resources":  [
+                                                                                                                                 "operation_gate",
+                                                                                                                                 "cache_pause",
+                                                                                                                                 "processor_reservation"
+                                                                                                                             ],
+                                                                                                               "resourceState":  "reacquired",
+                                                                                                               "outputBytes":  39164
+                                                                                                           }
+                                                                                 },
+                                                                     "failure":  {
+                                                                                     "topology":  "independent",
+                                                                                     "scenario":  "failure",
+                                                                                     "passed":  true,
+                                                                                     "startedAtUtc":  "2026-07-31T22:33:12.2317751+00:00",
+                                                                                     "elapsedMs":  4466,
+                                                                                     "ownerProcessId":  21564,
+                                                                                     "successorProcessId":  27712,
+                                                                                     "ownerTerminated":  false,
+                                                                                     "ownerReady":  {
+                                                                                                        "schemaVersion":  1,
+                                                                                                        "processId":  21564,
+                                                                                                        "topology":  "independent",
+                                                                                                        "windowLabel":  "main",
+                                                                                                        "scenario":  "failure",
+                                                                                                        "state":  "owner_ready",
+                                                                                                        "operationMode":  "normal_export",
+                                                                                                        "operationId":  "export-21564-1",
+                                                                                                        "terminal":  null,
+                                                                                                        "progressStages":  [
+                                                                                                                               "preparing"
+                                                                                                                           ],
+                                                                                                        "cancellationDisposition":  null,
+                                                                                                        "resources":  [
+                                                                                                                          "operation_gate",
+                                                                                                                          "cache_pause",
+                                                                                                                          "processor_reservation"
+                                                                                                                      ],
+                                                                                                        "resourceState":  "held",
+                                                                                                        "outputBytes":  null
+                                                                                                    },
+                                                                                     "challengerConflict":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  27712,
+                                                                                                                "topology":  "independent",
+                                                                                                                "windowLabel":  "main",
+                                                                                                                "scenario":  "failure",
+                                                                                                                "state":  "challenger_conflict",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  null,
+                                                                                                                "terminal":  "conflict",
+                                                                                                                "progressStages":  [
+
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  null,
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "blocked",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                     "ownerTerminal":  {
+                                                                                                           "schemaVersion":  1,
+                                                                                                           "processId":  21564,
+                                                                                                           "topology":  "independent",
+                                                                                                           "windowLabel":  "main",
+                                                                                                           "scenario":  "failure",
+                                                                                                           "state":  "owner_terminal",
+                                                                                                           "operationMode":  "normal_export",
+                                                                                                           "operationId":  "export-21564-1",
+                                                                                                           "terminal":  "failed",
+                                                                                                           "progressStages":  [
+                                                                                                                                  "preparing"
+                                                                                                                              ],
+                                                                                                           "cancellationDisposition":  null,
+                                                                                                           "resources":  [
+
+                                                                                                                         ],
+                                                                                                           "resourceState":  "released",
+                                                                                                           "outputBytes":  null
+                                                                                                       },
+                                                                                     "challengerSuccess":  {
+                                                                                                               "schemaVersion":  1,
+                                                                                                               "processId":  27712,
+                                                                                                               "topology":  "independent",
+                                                                                                               "windowLabel":  "main",
+                                                                                                               "scenario":  "failure",
+                                                                                                               "state":  "challenger_success",
+                                                                                                               "operationMode":  "normal_export",
+                                                                                                               "operationId":  "export-27712-2",
+                                                                                                               "terminal":  "success",
+                                                                                                               "progressStages":  [
+                                                                                                                                      "preparing",
+                                                                                                                                      "loading_sources",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "verifying",
+                                                                                                                                      "publishing",
+                                                                                                                                      "completed"
+                                                                                                                                  ],
+                                                                                                               "cancellationDisposition":  null,
+                                                                                                               "resources":  [
+                                                                                                                                 "operation_gate",
+                                                                                                                                 "cache_pause",
+                                                                                                                                 "processor_reservation"
+                                                                                                                             ],
+                                                                                                               "resourceState":  "reacquired",
+                                                                                                               "outputBytes":  39164
+                                                                                                           }
+                                                                                 },
+                                                                     "cancellation":  {
+                                                                                          "topology":  "independent",
+                                                                                          "scenario":  "cancellation",
+                                                                                          "passed":  true,
+                                                                                          "startedAtUtc":  "2026-07-31T22:33:16.7324322+00:00",
+                                                                                          "elapsedMs":  3702,
+                                                                                          "ownerProcessId":  25464,
+                                                                                          "successorProcessId":  8324,
+                                                                                          "ownerTerminated":  false,
+                                                                                          "ownerReady":  {
+                                                                                                             "schemaVersion":  1,
+                                                                                                             "processId":  25464,
+                                                                                                             "topology":  "independent",
+                                                                                                             "windowLabel":  "main",
+                                                                                                             "scenario":  "cancellation",
+                                                                                                             "state":  "owner_ready",
+                                                                                                             "operationMode":  "normal_export",
+                                                                                                             "operationId":  "export-25464-1",
+                                                                                                             "terminal":  null,
+                                                                                                             "progressStages":  [
+                                                                                                                                    "preparing"
+                                                                                                                                ],
+                                                                                                             "cancellationDisposition":  null,
+                                                                                                             "resources":  [
+                                                                                                                               "operation_gate",
+                                                                                                                               "cache_pause",
+                                                                                                                               "processor_reservation"
+                                                                                                                           ],
+                                                                                                             "resourceState":  "held",
+                                                                                                             "outputBytes":  null
+                                                                                                         },
+                                                                                          "challengerConflict":  {
+                                                                                                                     "schemaVersion":  1,
+                                                                                                                     "processId":  8324,
+                                                                                                                     "topology":  "independent",
+                                                                                                                     "windowLabel":  "main",
+                                                                                                                     "scenario":  "cancellation",
+                                                                                                                     "state":  "challenger_conflict",
+                                                                                                                     "operationMode":  "normal_export",
+                                                                                                                     "operationId":  null,
+                                                                                                                     "terminal":  "conflict",
+                                                                                                                     "progressStages":  [
+
+                                                                                                                                        ],
+                                                                                                                     "cancellationDisposition":  null,
+                                                                                                                     "resources":  [
+
+                                                                                                                                   ],
+                                                                                                                     "resourceState":  "blocked",
+                                                                                                                     "outputBytes":  null
+                                                                                                                 },
+                                                                                          "ownerTerminal":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  25464,
+                                                                                                                "topology":  "independent",
+                                                                                                                "windowLabel":  "main",
+                                                                                                                "scenario":  "cancellation",
+                                                                                                                "state":  "owner_terminal",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  "export-25464-1",
+                                                                                                                "terminal":  "cancelled",
+                                                                                                                "progressStages":  [
+                                                                                                                                       "preparing"
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  "requested",
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "released",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                          "challengerSuccess":  {
+                                                                                                                    "schemaVersion":  1,
+                                                                                                                    "processId":  8324,
+                                                                                                                    "topology":  "independent",
+                                                                                                                    "windowLabel":  "main",
+                                                                                                                    "scenario":  "cancellation",
+                                                                                                                    "state":  "challenger_success",
+                                                                                                                    "operationMode":  "normal_export",
+                                                                                                                    "operationId":  "export-8324-2",
+                                                                                                                    "terminal":  "success",
+                                                                                                                    "progressStages":  [
+                                                                                                                                           "preparing",
+                                                                                                                                           "loading_sources",
+                                                                                                                                           "composing",
+                                                                                                                                           "composing",
+                                                                                                                                           "composing",
+                                                                                                                                           "encoding_output",
+                                                                                                                                           "encoding_output",
+                                                                                                                                           "verifying",
+                                                                                                                                           "publishing",
+                                                                                                                                           "completed"
+                                                                                                                                       ],
+                                                                                                                    "cancellationDisposition":  null,
+                                                                                                                    "resources":  [
+                                                                                                                                      "operation_gate",
+                                                                                                                                      "cache_pause",
+                                                                                                                                      "processor_reservation"
+                                                                                                                                  ],
+                                                                                                                    "resourceState":  "reacquired",
+                                                                                                                    "outputBytes":  39164
+                                                                                                                }
+                                                                                      },
+                                                                     "owner_death":  {
+                                                                                         "topology":  "independent",
+                                                                                         "scenario":  "owner_death",
+                                                                                         "passed":  true,
+                                                                                         "startedAtUtc":  "2026-07-31T22:33:20.4768237+00:00",
+                                                                                         "elapsedMs":  2925,
+                                                                                         "ownerProcessId":  24652,
+                                                                                         "successorProcessId":  6760,
+                                                                                         "ownerTerminated":  true,
+                                                                                         "ownerReady":  {
+                                                                                                            "schemaVersion":  1,
+                                                                                                            "processId":  24652,
+                                                                                                            "topology":  "independent",
+                                                                                                            "windowLabel":  "main",
+                                                                                                            "scenario":  "owner_death",
+                                                                                                            "state":  "owner_ready",
+                                                                                                            "operationMode":  "normal_export",
+                                                                                                            "operationId":  "export-24652-1",
+                                                                                                            "terminal":  null,
+                                                                                                            "progressStages":  [
+                                                                                                                                   "preparing"
+                                                                                                                               ],
+                                                                                                            "cancellationDisposition":  null,
+                                                                                                            "resources":  [
+                                                                                                                              "operation_gate",
+                                                                                                                              "cache_pause",
+                                                                                                                              "processor_reservation"
+                                                                                                                          ],
+                                                                                                            "resourceState":  "held",
+                                                                                                            "outputBytes":  null
+                                                                                                        },
+                                                                                         "challengerConflict":  {
+                                                                                                                    "schemaVersion":  1,
+                                                                                                                    "processId":  6760,
+                                                                                                                    "topology":  "independent",
+                                                                                                                    "windowLabel":  "main",
+                                                                                                                    "scenario":  "owner_death",
+                                                                                                                    "state":  "challenger_conflict",
+                                                                                                                    "operationMode":  "normal_export",
+                                                                                                                    "operationId":  null,
+                                                                                                                    "terminal":  "conflict",
+                                                                                                                    "progressStages":  [
+
+                                                                                                                                       ],
+                                                                                                                    "cancellationDisposition":  null,
+                                                                                                                    "resources":  [
+
+                                                                                                                                  ],
+                                                                                                                    "resourceState":  "blocked",
+                                                                                                                    "outputBytes":  null
+                                                                                                                },
+                                                                                         "ownerTerminal":  null,
+                                                                                         "challengerSuccess":  {
+                                                                                                                   "schemaVersion":  1,
+                                                                                                                   "processId":  6760,
+                                                                                                                   "topology":  "independent",
+                                                                                                                   "windowLabel":  "main",
+                                                                                                                   "scenario":  "owner_death",
+                                                                                                                   "state":  "challenger_success",
+                                                                                                                   "operationMode":  "normal_export",
+                                                                                                                   "operationId":  "export-6760-2",
+                                                                                                                   "terminal":  "success",
+                                                                                                                   "progressStages":  [
+                                                                                                                                          "preparing",
+                                                                                                                                          "loading_sources",
+                                                                                                                                          "composing",
+                                                                                                                                          "composing",
+                                                                                                                                          "composing",
+                                                                                                                                          "encoding_output",
+                                                                                                                                          "encoding_output",
+                                                                                                                                          "verifying",
+                                                                                                                                          "publishing",
+                                                                                                                                          "completed"
+                                                                                                                                      ],
+                                                                                                                   "cancellationDisposition":  null,
+                                                                                                                   "resources":  [
+                                                                                                                                     "operation_gate",
+                                                                                                                                     "cache_pause",
+                                                                                                                                     "processor_reservation"
+                                                                                                                                 ],
+                                                                                                                   "resourceState":  "reacquired",
+                                                                                                                   "outputBytes":  39164
+                                                                                                               }
+                                                                                     }
+                                                                 },
+                                                 "multiwindow":  {
+                                                                     "success":  {
+                                                                                     "topology":  "multiwindow",
+                                                                                     "scenario":  "success",
+                                                                                     "passed":  true,
+                                                                                     "startedAtUtc":  "2026-07-31T22:33:23.4164417+00:00",
+                                                                                     "elapsedMs":  884,
+                                                                                     "ownerProcessId":  2220,
+                                                                                     "successorProcessId":  2220,
+                                                                                     "ownerTerminated":  false,
+                                                                                     "ownerReady":  {
+                                                                                                        "schemaVersion":  1,
+                                                                                                        "processId":  2220,
+                                                                                                        "topology":  "multiwindow",
+                                                                                                        "windowLabel":  "main",
+                                                                                                        "scenario":  "success",
+                                                                                                        "state":  "owner_ready",
+                                                                                                        "operationMode":  "normal_export",
+                                                                                                        "operationId":  "export-2220-1",
+                                                                                                        "terminal":  null,
+                                                                                                        "progressStages":  [
+                                                                                                                               "preparing"
+                                                                                                                           ],
+                                                                                                        "cancellationDisposition":  null,
+                                                                                                        "resources":  [
+                                                                                                                          "operation_gate",
+                                                                                                                          "cache_pause",
+                                                                                                                          "processor_reservation"
+                                                                                                                      ],
+                                                                                                        "resourceState":  "held",
+                                                                                                        "outputBytes":  null
+                                                                                                    },
+                                                                                     "challengerConflict":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  2220,
+                                                                                                                "topology":  "multiwindow",
+                                                                                                                "windowLabel":  "project-b",
+                                                                                                                "scenario":  "success",
+                                                                                                                "state":  "challenger_conflict",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  null,
+                                                                                                                "terminal":  "conflict",
+                                                                                                                "progressStages":  [
+
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  null,
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "blocked",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                     "ownerTerminal":  {
+                                                                                                           "schemaVersion":  1,
+                                                                                                           "processId":  2220,
+                                                                                                           "topology":  "multiwindow",
+                                                                                                           "windowLabel":  "main",
+                                                                                                           "scenario":  "success",
+                                                                                                           "state":  "owner_terminal",
+                                                                                                           "operationMode":  "normal_export",
+                                                                                                           "operationId":  "export-2220-1",
+                                                                                                           "terminal":  "success",
+                                                                                                           "progressStages":  [
+                                                                                                                                  "preparing",
+                                                                                                                                  "loading_sources",
+                                                                                                                                  "composing",
+                                                                                                                                  "composing",
+                                                                                                                                  "composing",
+                                                                                                                                  "encoding_output",
+                                                                                                                                  "encoding_output",
+                                                                                                                                  "verifying",
+                                                                                                                                  "publishing",
+                                                                                                                                  "completed"
+                                                                                                                              ],
+                                                                                                           "cancellationDisposition":  null,
+                                                                                                           "resources":  [
+
+                                                                                                                         ],
+                                                                                                           "resourceState":  "released",
+                                                                                                           "outputBytes":  39164
+                                                                                                       },
+                                                                                     "challengerSuccess":  {
+                                                                                                               "schemaVersion":  1,
+                                                                                                               "processId":  2220,
+                                                                                                               "topology":  "multiwindow",
+                                                                                                               "windowLabel":  "project-b",
+                                                                                                               "scenario":  "success",
+                                                                                                               "state":  "challenger_success",
+                                                                                                               "operationMode":  "normal_export",
+                                                                                                               "operationId":  "export-2220-3",
+                                                                                                               "terminal":  "success",
+                                                                                                               "progressStages":  [
+                                                                                                                                      "preparing",
+                                                                                                                                      "loading_sources",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "verifying",
+                                                                                                                                      "publishing",
+                                                                                                                                      "completed"
+                                                                                                                                  ],
+                                                                                                               "cancellationDisposition":  null,
+                                                                                                               "resources":  [
+                                                                                                                                 "operation_gate",
+                                                                                                                                 "cache_pause",
+                                                                                                                                 "processor_reservation"
+                                                                                                                             ],
+                                                                                                               "resourceState":  "reacquired",
+                                                                                                               "outputBytes":  39164
+                                                                                                           }
+                                                                                 },
+                                                                     "failure":  {
+                                                                                     "topology":  "multiwindow",
+                                                                                     "scenario":  "failure",
+                                                                                     "passed":  true,
+                                                                                     "startedAtUtc":  "2026-07-31T22:33:24.3221984+00:00",
+                                                                                     "elapsedMs":  3564,
+                                                                                     "ownerProcessId":  776,
+                                                                                     "successorProcessId":  776,
+                                                                                     "ownerTerminated":  false,
+                                                                                     "ownerReady":  {
+                                                                                                        "schemaVersion":  1,
+                                                                                                        "processId":  776,
+                                                                                                        "topology":  "multiwindow",
+                                                                                                        "windowLabel":  "main",
+                                                                                                        "scenario":  "failure",
+                                                                                                        "state":  "owner_ready",
+                                                                                                        "operationMode":  "normal_export",
+                                                                                                        "operationId":  "export-776-1",
+                                                                                                        "terminal":  null,
+                                                                                                        "progressStages":  [
+                                                                                                                               "preparing"
+                                                                                                                           ],
+                                                                                                        "cancellationDisposition":  null,
+                                                                                                        "resources":  [
+                                                                                                                          "operation_gate",
+                                                                                                                          "cache_pause",
+                                                                                                                          "processor_reservation"
+                                                                                                                      ],
+                                                                                                        "resourceState":  "held",
+                                                                                                        "outputBytes":  null
+                                                                                                    },
+                                                                                     "challengerConflict":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  776,
+                                                                                                                "topology":  "multiwindow",
+                                                                                                                "windowLabel":  "project-b",
+                                                                                                                "scenario":  "failure",
+                                                                                                                "state":  "challenger_conflict",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  null,
+                                                                                                                "terminal":  "conflict",
+                                                                                                                "progressStages":  [
+
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  null,
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "blocked",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                     "ownerTerminal":  {
+                                                                                                           "schemaVersion":  1,
+                                                                                                           "processId":  776,
+                                                                                                           "topology":  "multiwindow",
+                                                                                                           "windowLabel":  "main",
+                                                                                                           "scenario":  "failure",
+                                                                                                           "state":  "owner_terminal",
+                                                                                                           "operationMode":  "normal_export",
+                                                                                                           "operationId":  "export-776-1",
+                                                                                                           "terminal":  "failed",
+                                                                                                           "progressStages":  [
+                                                                                                                                  "preparing"
+                                                                                                                              ],
+                                                                                                           "cancellationDisposition":  null,
+                                                                                                           "resources":  [
+
+                                                                                                                         ],
+                                                                                                           "resourceState":  "released",
+                                                                                                           "outputBytes":  null
+                                                                                                       },
+                                                                                     "challengerSuccess":  {
+                                                                                                               "schemaVersion":  1,
+                                                                                                               "processId":  776,
+                                                                                                               "topology":  "multiwindow",
+                                                                                                               "windowLabel":  "project-b",
+                                                                                                               "scenario":  "failure",
+                                                                                                               "state":  "challenger_success",
+                                                                                                               "operationMode":  "normal_export",
+                                                                                                               "operationId":  "export-776-3",
+                                                                                                               "terminal":  "success",
+                                                                                                               "progressStages":  [
+                                                                                                                                      "preparing",
+                                                                                                                                      "loading_sources",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "composing",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "encoding_output",
+                                                                                                                                      "verifying",
+                                                                                                                                      "publishing",
+                                                                                                                                      "completed"
+                                                                                                                                  ],
+                                                                                                               "cancellationDisposition":  null,
+                                                                                                               "resources":  [
+                                                                                                                                 "operation_gate",
+                                                                                                                                 "cache_pause",
+                                                                                                                                 "processor_reservation"
+                                                                                                                             ],
+                                                                                                               "resourceState":  "reacquired",
+                                                                                                               "outputBytes":  39164
+                                                                                                           }
+                                                                                 },
+                                                                     "cancellation":  {
+                                                                                          "topology":  "multiwindow",
+                                                                                          "scenario":  "cancellation",
+                                                                                          "passed":  true,
+                                                                                          "startedAtUtc":  "2026-07-31T22:33:27.9012052+00:00",
+                                                                                          "elapsedMs":  1295,
+                                                                                          "ownerProcessId":  9856,
+                                                                                          "successorProcessId":  9856,
+                                                                                          "ownerTerminated":  false,
+                                                                                          "ownerReady":  {
+                                                                                                             "schemaVersion":  1,
+                                                                                                             "processId":  9856,
+                                                                                                             "topology":  "multiwindow",
+                                                                                                             "windowLabel":  "main",
+                                                                                                             "scenario":  "cancellation",
+                                                                                                             "state":  "owner_ready",
+                                                                                                             "operationMode":  "normal_export",
+                                                                                                             "operationId":  "export-9856-1",
+                                                                                                             "terminal":  null,
+                                                                                                             "progressStages":  [
+                                                                                                                                    "preparing"
+                                                                                                                                ],
+                                                                                                             "cancellationDisposition":  null,
+                                                                                                             "resources":  [
+                                                                                                                               "operation_gate",
+                                                                                                                               "cache_pause",
+                                                                                                                               "processor_reservation"
+                                                                                                                           ],
+                                                                                                             "resourceState":  "held",
+                                                                                                             "outputBytes":  null
+                                                                                                         },
+                                                                                          "challengerConflict":  {
+                                                                                                                     "schemaVersion":  1,
+                                                                                                                     "processId":  9856,
+                                                                                                                     "topology":  "multiwindow",
+                                                                                                                     "windowLabel":  "project-b",
+                                                                                                                     "scenario":  "cancellation",
+                                                                                                                     "state":  "challenger_conflict",
+                                                                                                                     "operationMode":  "normal_export",
+                                                                                                                     "operationId":  null,
+                                                                                                                     "terminal":  "conflict",
+                                                                                                                     "progressStages":  [
+
+                                                                                                                                        ],
+                                                                                                                     "cancellationDisposition":  null,
+                                                                                                                     "resources":  [
+
+                                                                                                                                   ],
+                                                                                                                     "resourceState":  "blocked",
+                                                                                                                     "outputBytes":  null
+                                                                                                                 },
+                                                                                          "ownerTerminal":  {
+                                                                                                                "schemaVersion":  1,
+                                                                                                                "processId":  9856,
+                                                                                                                "topology":  "multiwindow",
+                                                                                                                "windowLabel":  "main",
+                                                                                                                "scenario":  "cancellation",
+                                                                                                                "state":  "owner_terminal",
+                                                                                                                "operationMode":  "normal_export",
+                                                                                                                "operationId":  "export-9856-1",
+                                                                                                                "terminal":  "cancelled",
+                                                                                                                "progressStages":  [
+                                                                                                                                       "preparing"
+                                                                                                                                   ],
+                                                                                                                "cancellationDisposition":  "requested",
+                                                                                                                "resources":  [
+
+                                                                                                                              ],
+                                                                                                                "resourceState":  "released",
+                                                                                                                "outputBytes":  null
+                                                                                                            },
+                                                                                          "challengerSuccess":  {
+                                                                                                                    "schemaVersion":  1,
+                                                                                                                    "processId":  9856,
+                                                                                                                    "topology":  "multiwindow",
+                                                                                                                    "windowLabel":  "project-b",
+                                                                                                                    "scenario":  "cancellation",
+                                                                                                                    "state":  "challenger_success",
+                                                                                                                    "operationMode":  "normal_export",
+                                                                                                                    "operationId":  "export-9856-3",
+                                                                                                                    "terminal":  "success",
+                                                                                                                    "progressStages":  [
+                                                                                                                                           "preparing",
+                                                                                                                                           "loading_sources",
+                                                                                                                                           "composing",
+                                                                                                                                           "composing",
+                                                                                                                                           "composing",
+                                                                                                                                           "encoding_output",
+                                                                                                                                           "encoding_output",
+                                                                                                                                           "verifying",
+                                                                                                                                           "publishing",
+                                                                                                                                           "completed"
+                                                                                                                                       ],
+                                                                                                                    "cancellationDisposition":  null,
+                                                                                                                    "resources":  [
+                                                                                                                                      "operation_gate",
+                                                                                                                                      "cache_pause",
+                                                                                                                                      "processor_reservation"
+                                                                                                                                  ],
+                                                                                                                    "resourceState":  "reacquired",
+                                                                                                                    "outputBytes":  39164
+                                                                                                                }
+                                                                                      },
+                                                                     "owner_death":  {
+                                                                                         "topology":  "multiwindow",
+                                                                                         "scenario":  "owner_death",
+                                                                                         "passed":  true,
+                                                                                         "startedAtUtc":  "2026-07-31T22:33:29.2224863+00:00",
+                                                                                         "elapsedMs":  3805,
+                                                                                         "ownerProcessId":  21856,
+                                                                                         "successorProcessId":  9556,
+                                                                                         "ownerTerminated":  true,
+                                                                                         "ownerReady":  {
+                                                                                                            "schemaVersion":  1,
+                                                                                                            "processId":  21856,
+                                                                                                            "topology":  "multiwindow",
+                                                                                                            "windowLabel":  "main",
+                                                                                                            "scenario":  "owner_death",
+                                                                                                            "state":  "owner_ready",
+                                                                                                            "operationMode":  "normal_export",
+                                                                                                            "operationId":  "export-21856-1",
+                                                                                                            "terminal":  null,
+                                                                                                            "progressStages":  [
+                                                                                                                                   "preparing"
+                                                                                                                               ],
+                                                                                                            "cancellationDisposition":  null,
+                                                                                                            "resources":  [
+                                                                                                                              "operation_gate",
+                                                                                                                              "cache_pause",
+                                                                                                                              "processor_reservation"
+                                                                                                                          ],
+                                                                                                            "resourceState":  "held",
+                                                                                                            "outputBytes":  null
+                                                                                                        },
+                                                                                         "challengerConflict":  {
+                                                                                                                    "schemaVersion":  1,
+                                                                                                                    "processId":  21856,
+                                                                                                                    "topology":  "multiwindow",
+                                                                                                                    "windowLabel":  "project-b",
+                                                                                                                    "scenario":  "owner_death",
+                                                                                                                    "state":  "challenger_conflict",
+                                                                                                                    "operationMode":  "normal_export",
+                                                                                                                    "operationId":  null,
+                                                                                                                    "terminal":  "conflict",
+                                                                                                                    "progressStages":  [
+
+                                                                                                                                       ],
+                                                                                                                    "cancellationDisposition":  null,
+                                                                                                                    "resources":  [
+
+                                                                                                                                  ],
+                                                                                                                    "resourceState":  "blocked",
+                                                                                                                    "outputBytes":  null
+                                                                                                                },
+                                                                                         "ownerTerminal":  null,
+                                                                                         "challengerSuccess":  {
+                                                                                                                   "schemaVersion":  1,
+                                                                                                                   "processId":  9556,
+                                                                                                                   "topology":  "multiwindow",
+                                                                                                                   "windowLabel":  "project-b",
+                                                                                                                   "scenario":  "owner_death",
+                                                                                                                   "state":  "challenger_success",
+                                                                                                                   "operationMode":  "normal_export",
+                                                                                                                   "operationId":  "export-9556-1",
+                                                                                                                   "terminal":  "success",
+                                                                                                                   "progressStages":  [
+                                                                                                                                          "preparing",
+                                                                                                                                          "loading_sources",
+                                                                                                                                          "composing",
+                                                                                                                                          "composing",
+                                                                                                                                          "composing",
+                                                                                                                                          "encoding_output",
+                                                                                                                                          "encoding_output",
+                                                                                                                                          "verifying",
+                                                                                                                                          "publishing",
+                                                                                                                                          "completed"
+                                                                                                                                      ],
+                                                                                                                   "cancellationDisposition":  null,
+                                                                                                                   "resources":  [
+                                                                                                                                     "operation_gate",
+                                                                                                                                     "cache_pause",
+                                                                                                                                     "processor_reservation"
+                                                                                                                                 ],
+                                                                                                                   "resourceState":  "reacquired",
+                                                                                                                   "outputBytes":  39164
+                                                                                                               }
+                                                                                     }
+                                                                 }
+                                             },
+                    "rootBindingPlanCorrelations":  [
+                                                        {
+                                                            "topology":  "independent",
+                                                            "role":  "owner",
+                                                            "operationId":  "export-33176-1",
+                                                            "hostProcessId":  33176,
+                                                            "processorProcessId":  37180,
+                                                            "rootBindingPlanSha256":  "f4257ba8a70b39924c49a15e298891ecc4490237d7c738f3d57bb9946134ef41",
+                                                            "freshCaptureObserved":  true,
+                                                            "hostAndProcessorPlanMatch":  true,
+                                                            "processorCompletedWithSamePlan":  true
+                                                        },
+                                                        {
+                                                            "topology":  "independent",
+                                                            "role":  "successor",
+                                                            "operationId":  "export-33088-2",
+                                                            "hostProcessId":  33088,
+                                                            "processorProcessId":  30856,
+                                                            "rootBindingPlanSha256":  "f4257ba8a70b39924c49a15e298891ecc4490237d7c738f3d57bb9946134ef41",
+                                                            "freshCaptureObserved":  true,
+                                                            "hostAndProcessorPlanMatch":  true,
+                                                            "processorCompletedWithSamePlan":  true
+                                                        },
+                                                        {
+                                                            "topology":  "multiwindow",
+                                                            "role":  "owner",
+                                                            "operationId":  "export-2220-1",
+                                                            "hostProcessId":  2220,
+                                                            "processorProcessId":  26200,
+                                                            "rootBindingPlanSha256":  "f4257ba8a70b39924c49a15e298891ecc4490237d7c738f3d57bb9946134ef41",
+                                                            "freshCaptureObserved":  true,
+                                                            "hostAndProcessorPlanMatch":  true,
+                                                            "processorCompletedWithSamePlan":  true
+                                                        },
+                                                        {
+                                                            "topology":  "multiwindow",
+                                                            "role":  "successor",
+                                                            "operationId":  "export-2220-3",
+                                                            "hostProcessId":  2220,
+                                                            "processorProcessId":  15216,
+                                                            "rootBindingPlanSha256":  "f4257ba8a70b39924c49a15e298891ecc4490237d7c738f3d57bb9946134ef41",
+                                                            "freshCaptureObserved":  true,
+                                                            "hostAndProcessorPlanMatch":  true,
+                                                            "processorCompletedWithSamePlan":  true
+                                                        }
+                                                    ]
+                },
+    "limits":  {
+                   "batchRunner":  false,
+                   "multiOutputPromotion":  false,
+                   "projectOpenGuardian":  false,
+                   "exportCancellationEntryPoint":  true,
+                   "progressChannel":  true,
+                   "uiCancellationFlow":  false,
+                   "progressWindow":  false
+               }
+}
