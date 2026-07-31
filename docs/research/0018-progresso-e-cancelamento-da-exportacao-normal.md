@@ -137,14 +137,13 @@ obsoletos.
 
 ## Limites da conclusão
 
-- A implementação produtiva está conectada, mas este corte não automatiza uma
-  Exportação real cancelada pela UI nas duas topologias.
+- A implementação produtiva está conectada e a matriz backend A/B foi
+  concluída posteriormente em
+  `docs/research/0019-matriz-terminal-da-exportacao-normal.md`. Essa evidência
+  não constitui um teste ponta a ponta pela UI, pelo WebView e pelo modal.
 - A indisponibilidade proativa das ações de Exportação nas outras Janelas
-  permanece para a matriz A/B; neste corte, uma corrida concorrente é rejeitada
+  ainda não foi implementada; uma corrida concorrente continua sendo rejeitada
   pelo gate antes de `started` e informada sem modal.
-- Sucesso, falha, cancelamento e queda do proprietário ainda não foram
-  injetados conjuntamente em A e B com readquisição posterior de todos os
-  recursos.
 - O feedback de falha deste corte é separado do progresso e apresenta o
   motivo, mas a Tela de Problemas tabular completa pertence ao ticket de
   Exportação.
@@ -155,7 +154,8 @@ obsoletos.
 - O guardião de abertura e a diferença integrada entre `OperationGate` e
   Bloqueio de abertura continuam pendentes.
 
-Por esses limites, os critérios 35, 36 e 37 do ticket 01 permanecem abertos.
+Com a evidência complementar do 0019, o critério 35 do ticket 01 está
+encerrado. Os critérios 36 e 37 permanecem abertos.
 
 ## Conclusão
 
@@ -165,6 +165,8 @@ continua responsável apenas pela exclusividade, o lease continua responsável
 apenas pela reserva ordenada e a tentativa continua responsável pelo seu
 próprio progresso e cancelamento.
 
-O próximo gate deve usar essa implementação para injetar os estados terminais
-reais nas duas topologias; não há justificativa para antecipar o
+O gate seguinte usou essa mesma implementação para injetar os estados
+terminais reais nas duas topologias e está documentado no 0019. Permanecem
+separados um eventual ensaio ponta a ponta da UI e a indisponibilidade
+proativa nas outras Janelas; nenhum dos dois justifica antecipar o
 `BatchRunner` ou o guardião dentro deste corte.
