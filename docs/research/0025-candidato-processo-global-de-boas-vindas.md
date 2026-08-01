@@ -36,27 +36,31 @@ A interface possui um entrypoint separado:
 global.html
   └─ src/global/main.tsx
        ├─ GlobalShell
-       └─ Logger → tauriLogger → frontend_log
+       ├─ Logger → tauriLogger → frontend_log
+       └─ ProjectFileDialog → tauriProjectFileDialog → dialog:allow-open
 ```
 
-`GlobalShell` recebe apenas `Logger`. O composition root escolhe o adapter
-Tauri; a superfície não importa `App`, PixiJS, componentes do editor, domínio,
-ports do Projeto nem bridges dos probes de topologia. O build multipágina
-mantém `global.html` e `index.html` como entradas distintas.
+`GlobalShell` recebe `Logger` e o port estreito `ProjectFileDialog`. O
+composition root escolhe os adapters Tauri; a superfície não importa `App`,
+PixiJS, componentes do editor, domínio, ports da Sessão de Projeto nem bridges
+dos probes de topologia. O build multipágina mantém `global.html` e
+`index.html` como entradas distintas.
 
 Não foi criado `GlobalCoordinator`, command bus, store genérico de Projetos
-recentes ou port para controlar hosts. As ações `Novo Projeto`, `Abrir
-Projeto`, `Exportação em lote`, `Configurações` e `Ajuda` aparecem na hierarquia
-aceita da Tela de Boas-vindas, mas permanecem desabilitadas neste gate. Seus
-casos de uso pertencem aos tickets de produto correspondentes; inventar suas
-interfaces aqui aumentaria o contrato antes de existir comportamento.
+recentes ou port para controlar hosts. Depois deste gate, `Abrir Projeto`
+recebeu somente o port estreito `ProjectFileDialog` para validar a integração
+nativa de distribuição; seleção e cancelamento não iniciam Sessão nem decidem
+o formato do arquivo. `Novo Projeto`, `Exportação em lote`, `Configurações` e
+`Ajuda` permanecem desabilitados. Seus casos de uso pertencem aos tickets de
+produto correspondentes.
 
 ## Fronteira de segurança
 
 A Janela `global` recebe a capability local `global-shell`. Sua única
-permission própria, `global-shell-logging`, libera somente `frontend_log`. Ela
-não recebe nenhum dos 15 comandos das Janelas de Projeto e não recebe
-`core:*`, `fs:*` ou `shell:*`.
+permission própria, `global-shell-logging`, libera somente `frontend_log`.
+O gate posterior de distribuição acrescentou `dialog:allow-open`, sem liberar
+salvar, mensagens, filesystem ou shell. Ela não recebe nenhum dos 15 comandos
+das Janelas de Projeto e não recebe `core:*`, `fs:*` ou `shell:*`.
 
 O artefato atualizado
 [0016-frontend-security-gate.json](artifacts/0016-frontend-security-gate.json)
@@ -151,7 +155,9 @@ antes da medição.
 
 ## Limites preservados
 
-- Os botões e a lista de recentes ainda não executam casos de uso do produto.
+- O seletor nativo só confirma seleção ou cancelamento neste corte; ele ainda
+  não abre Projeto, valida formato ou atualiza recentes. As demais ações não
+  executam casos de uso do produto.
 - O gate não exercita a convivência funcional da Tela de Boas-vindas com
   Janelas de Projeto abertas.
 - O candidato usa o mesmo binário completo do aplicativo; não foi produzido ou
@@ -159,8 +165,9 @@ antes da medição.
 - O TCP loopback continua sendo transporte observacional do spike, não IPC
   normativa.
 - A rodada usa uma máquina e uma ordem fixa; não serve como benchmark A/B.
-- O gate não valida WebView2 Evergreen instalado, diálogo nativo, instalador
-  `win-x64` ou máquina limpa.
+- Este artefato `0017` não valida WebView2 Evergreen instalado, diálogo nativo,
+  instalador `win-x64` ou máquina limpa; esses itens pertencem ao gate posterior
+  de distribuição.
 - Não há watchdog, eleição, reinício automático ou coordenador universal.
 - A topologia, seus riscos e seu custo de implementação ainda não foram
   recomendados; o ADR 0005 permanece proposto.

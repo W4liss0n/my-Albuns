@@ -15,7 +15,7 @@ Boas-vindas e o backend Tauri. Cada superfície deve chamar somente os comandos
 próprios necessários ao corte atual, sem receber APIs genéricas do sistema
 operacional.
 
-A evidência canônica foi atualizada no commit `40649bc`, com os 220 inputs de
+A evidência canônica foi atualizada no commit `abc023d`, com os 223 inputs de
 código e build limpos:
 
 - [`artifacts/0016-frontend-security-gate.json`](artifacts/0016-frontend-security-gate.json).
@@ -45,10 +45,12 @@ topologias. `Channel` é parte do transporte de uma chamada permitida e não
 exige conceder `core:event` à Janela.
 
 A Tela de Boas-vindas usa outra capability local, `global-shell`, aplicada
-somente à Janela `global`. Sua única permission é `global-shell-logging`, cuja
-allow-list contém apenas `frontend_log`. Assim, materializar o processo global
-não concede à superfície acesso a estado, edição, previews, Exportação normal
-ou probes das Janelas de Projeto.
+somente à Janela `global`. Sua única permission própria é
+`global-shell-logging`, cuja allow-list contém apenas `frontend_log`. Para o
+gate de distribuição, ela também recebe somente a permission oficial
+`dialog:allow-open`; `dialog:default`, salvar e mensagens não são concedidos.
+Assim, materializar o processo global não concede à superfície acesso a
+estado, edição, previews, Exportação normal ou probes das Janelas de Projeto.
 
 O contrato Rust verifica separadamente as duas capabilities contra suas
 permissions. O teste de fronteira do frontend mantém o entrypoint global fora
@@ -57,8 +59,10 @@ plataforma.
 
 ## Sistema de arquivos e shell
 
-O frontend não possui dependência ou import de plugin de filesystem ou shell.
-Também não existe `core:*`, `fs:*` ou `shell:*` nas capabilities compiladas.
+O frontend não possui dependência ou import de plugin genérico de filesystem
+ou shell. Além da API central do Tauri, somente o adapter global do seletor
+importa `@tauri-apps/plugin-dialog`. Também não existe `core:*`, `fs:*` ou
+`shell:*` nas capabilities compiladas.
 
 O protocolo de assets deixou de expor recursivamente todo o Cache. O WebView
 pode ler somente as representações publicadas que a interface consome:
@@ -73,7 +77,8 @@ O plugin de shell permanece no backend Rust exclusivamente para iniciar o
 sidecar empacotado e fixo `myalbuns-imaging`. O runner verificou a dependência,
 o registro do plugin no host e a chamada fixa do adapter; isso não concede ao
 WebView permissão para escolher ou iniciar processos. O builder do processo
-global não registra esse plugin.
+global não registra esse plugin. Inversamente, o plugin de diálogo é registrado
+somente no builder global, não no host das Janelas de Projeto.
 
 ## Evidências
 
@@ -105,15 +110,20 @@ continuava contendo arquivos alheios aos inputs do gate, por isso
   momento; a Tela de Boas-vindas já está separada.
 - `MyAlbuns2` continua sendo o namespace temporário já documentado; a árvore
   final permanece `MyAlbuns`.
-- Este gate não valida runtime WebView2, diálogo nativo, instalador nem máquina
-  limpa. Esses itens permanecem no próximo critério da fase.
+- O plugin oficial inclui o caminho escolhido em seus scopes dinâmicos durante
+  o processo. O frontend não recebe o plugin de filesystem, e a validação do
+  arquivo continuará pertencendo ao `ProjectStore`; o filtro do seletor não
+  seria uma fronteira de confiança.
+- Este gate valida a ACL do diálogo, não sua janela real, o runtime WebView2,
+  o instalador ou a máquina limpa. Esses itens permanecem no gate de
+  distribuição.
 
 ## Conclusão
 
 O critério permanece encerrado. As Janelas de Projeto e a Tela de Boas-vindas
 têm capabilities locais, explícitas e separadas; nenhuma recebe filesystem ou
-shell genérico, e o único acesso direto a arquivo foi estreitado aos previews
-publicados das Janelas de Projeto.
+shell genérico. As Janelas de Projeto leem somente previews publicados, e a
+Tela de Boas-vindas pode apenas abrir o seletor nativo.
 
 ## Repetição
 

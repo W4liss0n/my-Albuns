@@ -1,8 +1,8 @@
 {
     "schemaVersion":  2,
     "suite":  "frontend_security_capabilities",
-    "collectedAtUtc":  "2026-08-01T01:36:57.7979573+00:00",
-    "gitCommit":  "40649bc40c36367f9e0b88e4d28edf54efdd24e2",
+    "collectedAtUtc":  "2026-08-01T02:18:30.5869530+00:00",
+    "gitCommit":  "abc023d6dd7fd55fd9d6c0131dd51bfcf359a245",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -12,10 +12,10 @@
                  },
     "build":  {
                   "profile":  "dev-check-and-test",
-                  "cargoBuildJobs":  1,
+                  "cargoBuildJobs":  2,
                   "targetDirectory":  "target/frontend-security-gate",
-                  "buildInputFileCount":  220,
-                  "buildInputDigestSha256":  "ee6c3a3adf56aba3240d92c6b59014747c501d8979db8a343ba27d4f0ff88c49",
+                  "buildInputFileCount":  223,
+                  "buildInputDigestSha256":  "425b449cd27d02163e11375145a6f50e8ac3e73646061d1ff4f0dbbe501e6243",
                   "buildInputsDirty":  false,
                   "workingTreeDirty":  true
               },
@@ -28,32 +28,32 @@
                    {
                        "name":  "rust-project-capability-contract",
                        "passed":  true,
-                       "elapsedMs":  499
+                       "elapsedMs":  48437
                    },
                    {
                        "name":  "rust-global-capability-contract",
                        "passed":  true,
-                       "elapsedMs":  398
+                       "elapsedMs":  6260
                    },
                    {
                        "name":  "rust-asset-scope-contract",
                        "passed":  true,
-                       "elapsedMs":  380
+                       "elapsedMs":  467
                    },
                    {
                        "name":  "tauri-acl-compilation",
                        "passed":  true,
-                       "elapsedMs":  391
+                       "elapsedMs":  19699
                    },
                    {
                        "name":  "frontend-tauri-boundary",
                        "passed":  true,
-                       "elapsedMs":  3270
+                       "elapsedMs":  3817
                    },
                    {
                        "name":  "frontend-production-build",
                        "passed":  true,
-                       "elapsedMs":  9299
+                       "elapsedMs":  10556
                    }
                ],
     "results":  {
@@ -69,6 +69,9 @@
                                                                  "project-window-commands"
                                                              ],
                                              "permissionIdentifier":  "project-window-commands",
+                                             "pluginPermissions":  [
+
+                                                                   ],
                                              "commands":  [
                                                               "apply_project_intent",
                                                               "cancel_export_spike",
@@ -94,9 +97,13 @@
                                                              "global"
                                                          ],
                                              "permissions":  [
-                                                                 "global-shell-logging"
+                                                                 "global-shell-logging",
+                                                                 "dialog:allow-open"
                                                              ],
                                              "permissionIdentifier":  "global-shell-logging",
+                                             "pluginPermissions":  [
+                                                                       "dialog:allow-open"
+                                                                   ],
                                              "commands":  [
                                                               "frontend_log"
                                                           ]
@@ -111,7 +118,12 @@
                     "genericShellPermission":  false,
                     "backendSidecarShellDependency":  true,
                     "backendSidecarShellRegistration":  true,
-                    "fixedImagingSidecarInvocation":  true
+                    "fixedImagingSidecarInvocation":  true,
+                    "globalNativeDialogDependency":  true,
+                    "globalNativeDialogRegistration":  true,
+                    "nativeDialogCommands":  [
+                                                 "open"
+                                             ]
                 },
     "limits":  {
                    "topologyProbeCommandsRemainTemporary":  true,
