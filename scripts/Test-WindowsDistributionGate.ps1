@@ -175,7 +175,10 @@ function Get-AvailableLoopbackPort {
 }
 
 function Get-GlobalLogEntries {
-    param([Parameter(Mandatory = $true)][string] $LogDirectory)
+    param(
+        [Parameter(Mandatory = $true)][string] $LogDirectory,
+        [switch] $AllowTrailingPartial
+    )
 
     $entries = [System.Collections.Generic.List[object]]::new()
     foreach (
@@ -187,7 +190,9 @@ function Get-GlobalLogEntries {
                 -ErrorAction SilentlyContinue
         )
     ) {
-        foreach ($line in @(Get-Content -LiteralPath $logFile.FullName)) {
+        $lines = @(Get-Content -LiteralPath $logFile.FullName -Encoding UTF8)
+        for ($index = 0; $index -lt $lines.Count; $index += 1) {
+            $line = $lines[$index]
             if ([string]::IsNullOrWhiteSpace($line)) {
                 continue
             }
@@ -195,7 +200,10 @@ function Get-GlobalLogEntries {
                 $entries.Add(($line | ConvertFrom-Json -ErrorAction Stop))
             }
             catch {
-                # The non-blocking writer can expose its last line while it is being flushed.
+                if ($AllowTrailingPartial -and $index -eq ($lines.Count - 1)) {
+                    continue
+                }
+                throw "Global runtime log contains invalid JSON: $($logFile.FullName)."
             }
         }
     }
@@ -214,18 +222,32 @@ function Get-WebView2Evidence {
         if ($null -eq $process -or $process.Name -cne 'msedgewebview2.exe') {
             continue
         }
-        $version = $null
         if (
-            -not [string]::IsNullOrWhiteSpace($process.ExecutablePath) -and
-            (Test-Path -LiteralPath $process.ExecutablePath -PathType Leaf)
+            [string]::IsNullOrWhiteSpace($process.ExecutablePath) -or
+            -not (Test-Path -LiteralPath $process.ExecutablePath -PathType Leaf)
         ) {
-            $version = (
-                Get-Item -LiteralPath $process.ExecutablePath
-            ).VersionInfo.ProductVersion
+            throw 'A WebView2 descendant did not expose an existing executable path.'
+        }
+        $resolvedPath = [System.IO.Path]::GetFullPath($process.ExecutablePath)
+        if (
+            $resolvedPath.StartsWith(
+                $script:WorkspaceRoot.TrimEnd('\') + '\',
+                [System.StringComparison]::OrdinalIgnoreCase
+            )
+        ) {
+            throw 'The observed WebView2 executable came from the application workspace.'
+        }
+        $version = (Get-Item -LiteralPath $resolvedPath).VersionInfo.ProductVersion
+        $parsedVersion = $null
+        if (
+            [string]::IsNullOrWhiteSpace($version) -or
+            -not [System.Version]::TryParse($version, [ref] $parsedVersion)
+        ) {
+            throw "The observed WebView2 executable has no valid version: $resolvedPath"
         }
         $processes.Add([ordered]@{
             processId = [uint32] $process.ProcessId
-            executablePath = [string] $process.ExecutablePath
+            executablePath = $resolvedPath
             productVersion = [string] $version
         })
     }
@@ -258,7 +280,9 @@ function Wait-ForGlobalRuntime {
             throw "Global runtime exited before readiness with code $($Process.ExitCode)."
         }
         $events = @(
-            Get-GlobalLogEntries -LogDirectory $LogDirectory |
+            Get-GlobalLogEntries `
+                -LogDirectory $LogDirectory `
+                -AllowTrailingPartial |
                 ForEach-Object { $_.event }
         )
         $webView2Processes = @(
@@ -282,23 +306,63 @@ function Wait-ForGlobalRuntime {
     throw 'The global runtime did not expose Welcome, its window and WebView2 before timeout.'
 }
 
+function Get-ComputerUseReceipt {
+    param(
+        [Parameter(Mandatory = $true)][string] $ReceiptPath,
+        [Parameter(Mandatory = $true)][uint32] $ExpectedProcessId
+    )
+
+    if (-not (Test-Path -LiteralPath $ReceiptPath -PathType Leaf)) {
+        return $null
+    }
+    $receipt = Get-Content -LiteralPath $ReceiptPath -Encoding UTF8 -Raw |
+        ConvertFrom-Json
+    if (
+        $receipt.schemaVersion -ne 1 -or
+        $receipt.driver -cne 'computer_use' -or
+        $receipt.action -cne 'open_project_then_cancel' -or
+        [uint32] $receipt.owner.processId -ne $ExpectedProcessId -or
+        $receipt.owner.title -cne 'MyAlbuns' -or
+        [string]::IsNullOrWhiteSpace($receipt.dialog.app) -or
+        [int64] $receipt.dialog.id -le 0 -or
+        $receipt.dialog.title -cne 'Abrir Projeto' -or
+        [string]::IsNullOrWhiteSpace($receipt.observedAtUtc)
+    ) {
+        throw 'The Computer Use receipt does not identify the expected native dialog.'
+    }
+    $observedAt = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse($receipt.observedAtUtc, [ref] $observedAt)) {
+        throw 'The Computer Use receipt has an invalid observation timestamp.'
+    }
+    return $receipt
+}
+
 function Wait-ForNativeDialogCancellation {
     param(
         [Parameter(Mandatory = $true)][System.Diagnostics.Process] $Process,
         [Parameter(Mandatory = $true)][string] $LogDirectory,
+        [Parameter(Mandatory = $true)][string] $ReceiptPath,
         [Parameter(Mandatory = $true)][int] $TimeoutSeconds
     )
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $receipt = $null
     do {
         Start-Sleep -Milliseconds 200
         $Process.Refresh()
         if ($Process.HasExited) {
             throw "Global runtime exited during native dialog validation with code $($Process.ExitCode)."
         }
+        if ($null -eq $receipt) {
+            $receipt = Get-ComputerUseReceipt `
+                -ReceiptPath $ReceiptPath `
+                -ExpectedProcessId ([uint32] $Process.Id)
+        }
         $matchingEntry = @(
-            Get-GlobalLogEntries -LogDirectory $LogDirectory |
+            Get-GlobalLogEntries `
+                -LogDirectory $LogDirectory `
+                -AllowTrailingPartial |
                 Where-Object {
                     $_.event -in @(
                         'project_file_selection_cancelled',
@@ -313,9 +377,13 @@ function Wait-ForNativeDialogCancellation {
             if ($matchingEntry[0].event -cne 'project_file_selection_cancelled') {
                 throw "Unexpected native dialog outcome: $($matchingEntry[0].event)."
             }
+            if ($null -eq $receipt) {
+                throw 'The dialog was cancelled without an external Computer Use receipt.'
+            }
             return [ordered]@{
                 elapsedMs = [long] $stopwatch.ElapsedMilliseconds
                 entry = $matchingEntry[0]
+                receipt = $receipt
             }
         }
     } while ([DateTime]::UtcNow -lt $deadline)
@@ -381,7 +449,12 @@ function Get-CleanEnvironmentEvidence {
         }
         installerExecuted = $false
         e2ePassed = $false
-        reasonCode = 'no_disposable_windows_environment'
+        reasonCode = if ($sandboxAvailable) {
+            'disposable_environment_not_exercised'
+        }
+        else {
+            'no_disposable_windows_environment'
+        }
     }
 }
 
@@ -525,11 +598,13 @@ try {
     Add-Check -Name 'global-welcome-and-webview2' -ElapsedMs $readyMs
 
     $checkpointPath = Join-Path $runDirectory 'computer-use-ready.json'
+    $receiptPath = Join-Path $runDirectory 'computer-use-receipt.json'
     $checkpoint = [ordered]@{
         processId = [uint32] $startedProcess.Id
         windowTitle = $startedProcess.MainWindowTitle
-        action = 'Clique em Abrir Projeto e cancele o diálogo nativo.'
+        action = 'Click Open Project, observe the native dialog, write the receipt, then cancel.'
         logDirectory = $logDirectory
+        receiptPath = $receiptPath
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $checkpointPath,
@@ -541,10 +616,17 @@ try {
     $nativeDialog = Wait-ForNativeDialogCancellation `
         -Process $startedProcess `
         -LogDirectory $logDirectory `
+        -ReceiptPath $receiptPath `
         -TimeoutSeconds $InteractionTimeoutSeconds
     Add-Check `
         -Name 'native-dialog-cancelled' `
         -ElapsedMs $nativeDialog.elapsedMs
+
+    $runtimeProcessId = [uint32] $startedProcess.Id
+    $runtimeWindowTitle = $startedProcess.MainWindowTitle
+    Start-Sleep -Milliseconds 500
+    Stop-StartedProcessTree -RootProcess $startedProcess
+    $startedProcess = $null
 
     $logEntries = @(Get-GlobalLogEntries -LogDirectory $logDirectory)
     $observedEvents = @(
@@ -575,8 +657,8 @@ try {
         source = 'unpacked_release'
         installedBinaryExercised = $false
         topology = 'independent'
-        processId = [uint32] $startedProcess.Id
-        windowTitle = $startedProcess.MainWindowTitle
+        processId = $runtimeProcessId
+        windowTitle = $runtimeWindowTitle
         readyMs = [long] $readyMs
         webView2 = $webView2
         nativeDialog = [ordered]@{
@@ -585,6 +667,7 @@ try {
             action = 'open_project_then_cancel'
             outcome = 'cancelled'
             evidenceEvent = 'project_file_selection_cancelled'
+            externalReceipt = $nativeDialog.receipt
         }
         logCapture = [ordered]@{
             files = $logFiles
@@ -704,9 +787,8 @@ $report = [ordered]@{
     interpretation = [ordered]@{
         criterionClosed = $false
         reason = (
-            'O bundle, os payloads x64, o WebView2 e o diálogo nativo foram validados ' +
-            'localmente; instalação e execução em uma máquina Windows limpa não estavam ' +
-            'disponíveis neste host.'
+            'The bundle, x64 payloads, WebView2 and native dialog passed locally; ' +
+            'installation and execution on a clean Windows machine were unavailable.'
         )
     }
 }
@@ -721,4 +803,9 @@ $json = $report | ConvertTo-Json -Depth 16
 )
 
 Write-Output "Local Windows distribution probe passed: $OutputPath"
-Write-Output 'Clean-machine installation remains pending because no disposable Windows exists.'
+if ($cleanEnvironment.available) {
+    Write-Output 'A disposable Windows exists, but its clean-machine E2E was not exercised.'
+}
+else {
+    Write-Output 'Clean-machine installation remains pending because no disposable Windows exists.'
+}
