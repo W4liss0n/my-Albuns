@@ -3,8 +3,8 @@ param(
     [string] $CleanMachineEvidencePath,
     [ValidateRange(1, 8)]
     [int] $CargoBuildJobs = 2,
-    [ValidateRange(30, 600)]
-    [int] $InteractionTimeoutSeconds = 300
+    [ValidateRange(30, 1800)]
+    [int] $InteractionTimeoutSeconds = 1200
 )
 
 $ErrorActionPreference = 'Stop'
