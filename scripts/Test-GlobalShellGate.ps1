@@ -321,16 +321,16 @@ function Get-ProcessTreeSnapshot {
     return [ordered]@{
         processCount = @($observed).Count
         workingSetBytes = [long] (
-            @($observed | Measure-Object workingSetBytes -Sum).Sum
+            ($observed | ForEach-Object { $_.workingSetBytes } | Measure-Object -Sum).Sum
         )
         privateMemoryBytes = [long] (
-            @($observed | Measure-Object privateMemoryBytes -Sum).Sum
+            ($observed | ForEach-Object { $_.privateMemoryBytes } | Measure-Object -Sum).Sum
         )
         handleCount = [long] (
-            @($observed | Measure-Object handleCount -Sum).Sum
+            ($observed | ForEach-Object { $_.handleCount } | Measure-Object -Sum).Sum
         )
         threadCount = [long] (
-            @($observed | Measure-Object threadCount -Sum).Sum
+            ($observed | ForEach-Object { $_.threadCount } | Measure-Object -Sum).Sum
         )
         processes = @($observed)
     }
@@ -448,7 +448,9 @@ function Get-GlobalBundleEvidence {
     )
     return [ordered]@{
         htmlBytes = [long] (Get-Item -LiteralPath $globalHtmlPath).Length
-        directAssetBytes = [long] (@($assets | Measure-Object bytes -Sum).Sum)
+        directAssetBytes = [long] (
+            ($assets | ForEach-Object { $_.bytes } | Measure-Object -Sum).Sum
+        )
         assets = $assets
         projectAssetReferences = 0
     }
