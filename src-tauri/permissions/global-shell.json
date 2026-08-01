@@ -1,0 +1,14 @@
+{
+  "permission": [
+    {
+      "identifier": "global-shell-logging",
+      "description": "Permite à Tela de Boas-vindas registrar somente eventos estruturados locais.",
+      "commands": {
+        "allow": [
+          "frontend_log"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

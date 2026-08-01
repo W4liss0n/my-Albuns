@@ -290,6 +290,31 @@ mod tests {
     }
 
     #[test]
+    fn global_window_receives_only_structured_logging() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/global-shell.json"))
+                .expect("valid global-shell capability");
+        let permission_manifest: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-shell.json"))
+                .expect("valid global-shell permission manifest");
+        let permission = &permission_manifest["permission"][0];
+
+        assert_eq!(capability["local"], true);
+        assert!(capability.get("remote").is_none());
+        assert_eq!(capability["windows"], serde_json::json!(["global"]));
+        assert_eq!(
+            capability["permissions"],
+            serde_json::json!(["global-shell-logging"])
+        );
+        assert_eq!(permission["identifier"], "global-shell-logging");
+        assert_eq!(
+            permission["commands"]["allow"],
+            serde_json::json!(["frontend_log"])
+        );
+        assert_eq!(permission["commands"]["deny"], serde_json::json!([]));
+    }
+
+    #[test]
     fn asset_protocol_serves_only_published_media_previews() {
         let config: serde_json::Value =
             serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");

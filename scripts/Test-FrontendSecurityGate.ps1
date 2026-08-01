@@ -128,11 +128,19 @@ try {
     $locationWasPushed = $true
 
     Invoke-FrontendSecurityCheck `
-        -Name 'rust-capability-contract' `
+        -Name 'rust-project-capability-contract' `
         -Executable $script:CargoExecutable `
         -Arguments @(
             'test', '-p', 'myalbuns-desktop', '--lib',
             'tests::project_windows_receive_only_the_explicit_frontend_commands',
+            '--', '--exact'
+        )
+    Invoke-FrontendSecurityCheck `
+        -Name 'rust-global-capability-contract' `
+        -Executable $script:CargoExecutable `
+        -Arguments @(
+            'test', '-p', 'myalbuns-desktop', '--lib',
+            'tests::global_window_receives_only_structured_logging',
             '--', '--exact'
         )
     Invoke-FrontendSecurityCheck `
@@ -172,11 +180,50 @@ finally {
     )
 }
 
-$capabilityPath = Join-Path `
-    $script:WorkspaceRoot `
-    'src-tauri\capabilities\default.json'
-$capability = Get-Content -LiteralPath $capabilityPath -Raw | ConvertFrom-Json
-$grantedPermissions = @($capability.permissions)
+$capabilitySpecifications = @(
+    [ordered]@{
+        capabilityPath = 'src-tauri\capabilities\default.json'
+        permissionPath = 'src-tauri\permissions\project-window.json'
+        permissionIdentifier = 'project-window-commands'
+    },
+    [ordered]@{
+        capabilityPath = 'src-tauri\capabilities\global-shell.json'
+        permissionPath = 'src-tauri\permissions\global-shell.json'
+        permissionIdentifier = 'global-shell-logging'
+    }
+)
+$capabilityEvidence = [System.Collections.Generic.List[object]]::new()
+foreach ($specification in $capabilitySpecifications) {
+    $capability = Get-Content `
+        -LiteralPath (Join-Path $script:WorkspaceRoot $specification.capabilityPath) `
+        -Raw |
+        ConvertFrom-Json
+    $permissionManifest = Get-Content `
+        -LiteralPath (Join-Path $script:WorkspaceRoot $specification.permissionPath) `
+        -Raw |
+        ConvertFrom-Json
+    $manifestPermissions = @($permissionManifest.permission)
+    if ($manifestPermissions.Count -ne 1) {
+        throw "Capability '$($capability.identifier)' must own one permission."
+    }
+    $permission = $manifestPermissions[0]
+    if (
+        $permission.identifier -cne $specification.permissionIdentifier -or
+        @($capability.permissions).Count -ne 1 -or
+        $capability.permissions[0] -cne $permission.identifier
+    ) {
+        throw "Capability '$($capability.identifier)' does not match its permission."
+    }
+    $capabilityEvidence.Add([ordered]@{
+        identifier = [string] $capability.identifier
+        local = [bool] $capability.local
+        windows = @($capability.windows)
+        permissions = @($capability.permissions)
+        permissionIdentifier = [string] $permission.identifier
+        commands = @($permission.commands.allow | Sort-Object)
+    })
+}
+$grantedPermissions = @($capabilityEvidence | ForEach-Object { $_.permissions })
 $genericFilesystemPermission = @(
     $grantedPermissions |
         Where-Object { $_ -is [string] -and $_.StartsWith('fs:') }
@@ -188,17 +235,6 @@ $genericShellPermission = @(
 if ($genericFilesystemPermission -or $genericShellPermission) {
     throw 'The compiled frontend boundary may not grant filesystem or shell plugins.'
 }
-
-$permissionManifest = Get-Content `
-    -LiteralPath (
-        Join-Path `
-            $script:WorkspaceRoot `
-            'src-tauri\permissions\project-window.json'
-    ) `
-    -Raw |
-    ConvertFrom-Json
-$projectWindowPermission = @($permissionManifest.permission)[0]
-$allowedCommands = @($projectWindowPermission.commands.allow)
 
 $tauriConfig = Get-Content `
     -LiteralPath (Join-Path $script:WorkspaceRoot 'src-tauri\tauri.conf.json') `
@@ -222,17 +258,28 @@ $compiledCapabilities = Get-Content `
     -LiteralPath $compiledCapabilityFile.FullName `
     -Raw |
     ConvertFrom-Json
-$compiledCapability = $compiledCapabilities.default
 Assert-ExactStringSet `
-    -Actual @($compiledCapability.permissions) `
-    -Expected $grantedPermissions `
-    -Label 'Source and compiled capability permissions'
-Assert-ExactStringSet `
-    -Actual @($compiledCapability.windows) `
-    -Expected @($capability.windows) `
-    -Label 'Source and compiled capability windows'
-if ($compiledCapability.local -ne $true) {
-    throw 'The compiled project-window capability is not local.'
+    -Actual @($compiledCapabilities.PSObject.Properties.Name) `
+    -Expected @($capabilityEvidence | ForEach-Object { $_.identifier }) `
+    -Label 'Source and compiled capability identifiers'
+foreach ($evidence in $capabilityEvidence) {
+    $compiledCapabilityProperty =
+        $compiledCapabilities.PSObject.Properties[$evidence.identifier]
+    if ($null -eq $compiledCapabilityProperty) {
+        throw "Compiled capability '$($evidence.identifier)' is missing."
+    }
+    $compiledCapability = $compiledCapabilityProperty.Value
+    Assert-ExactStringSet `
+        -Actual @($compiledCapability.permissions) `
+        -Expected @($evidence.permissions) `
+        -Label "Capability '$($evidence.identifier)' permissions"
+    Assert-ExactStringSet `
+        -Actual @($compiledCapability.windows) `
+        -Expected @($evidence.windows) `
+        -Label "Capability '$($evidence.identifier)' windows"
+    if ($compiledCapability.local -ne $true) {
+        throw "Compiled capability '$($evidence.identifier)' is not local."
+    }
 }
 
 $compiledAcl = Get-Content -LiteralPath $compiledAclPath -Raw | ConvertFrom-Json
@@ -243,20 +290,20 @@ if ($null -eq $appAclProperty) {
 $appAcl = $appAclProperty.Value
 Assert-ExactStringSet `
     -Actual @($appAcl.permissions.PSObject.Properties.Name) `
-    -Expected @('project-window-commands') `
+    -Expected @($capabilityEvidence | ForEach-Object { $_.permissionIdentifier }) `
     -Label 'Compiled application permission identifiers'
-$compiledProjectWindowPermission =
-    $appAcl.permissions.PSObject.Properties['project-window-commands'].Value
-$compiledAllowedCommands = @(
-    $compiledProjectWindowPermission.commands.allow
-)
-if (@($compiledProjectWindowPermission.commands.deny).Count -gt 0) {
-    throw 'The compiled application permission unexpectedly denies commands.'
+foreach ($evidence in $capabilityEvidence) {
+    $compiledPermission = $appAcl.permissions.PSObject.Properties[
+        $evidence.permissionIdentifier
+    ].Value
+    if (@($compiledPermission.commands.deny).Count -gt 0) {
+        throw "Permission '$($evidence.permissionIdentifier)' unexpectedly denies commands."
+    }
+    Assert-ExactStringSet `
+        -Actual @($compiledPermission.commands.allow) `
+        -Expected @($evidence.commands) `
+        -Label "Permission '$($evidence.permissionIdentifier)' commands"
 }
-Assert-ExactStringSet `
-    -Actual $compiledAllowedCommands `
-    -Expected $allowedCommands `
-    -Label 'Compiled AppManifest and capability commands'
 
 $package = Get-Content `
     -LiteralPath (Join-Path $script:WorkspaceRoot 'package.json') `
@@ -313,7 +360,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $report = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     suite = 'frontend_security_capabilities'
     collectedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
     gitCommit = $gitCommit
@@ -337,12 +384,7 @@ $report = [ordered]@{
     }
     checks = @($checks)
     results = [ordered]@{
-        capabilityIdentifier = [string] $capability.identifier
-        local = [bool] $capability.local
-        windows = @($capability.windows)
-        commandCount = $allowedCommands.Count
-        commands = @($allowedCommands | Sort-Object)
-        permissions = @($grantedPermissions)
+        capabilities = @($capabilityEvidence)
         assetScopes = @($assetScopes)
         compiledAppManifest = $true
         genericFilesystemPermission = $genericFilesystemPermission

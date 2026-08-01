@@ -17,6 +17,7 @@ use myalbuns_logging::{
 };
 use myalbuns_paths::AppPaths;
 use serde::{Deserialize, Serialize};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 use crate::topology_spike::TOPOLOGY_ENV;
 
@@ -377,6 +378,9 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
     let config = GlobalProcessSpikeConfig::from_environment()?;
     let app_paths = AppPaths::discover()
         .map_err(|error| GlobalProcessSpikeError::InvalidConfiguration(error.to_string()))?;
+    let webview_data_directory = app_paths
+        .webview_data_directory("global-shell")
+        .map_err(|error| GlobalProcessSpikeError::InvalidConfiguration(error.to_string()))?;
     let log_directory = sidecar_log_directory(&app_paths);
     let _logging_guard = match init_local_logging(&log_directory, ProcessRole::GlobalShell) {
         Ok(guard) => Some(guard),
@@ -385,7 +389,39 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
             None
         }
     };
-    bind_global_process_spike(config)?.run()
+    let server = bind_global_process_spike(config)?;
+    std::thread::Builder::new()
+        .name("global-status-spike".into())
+        .spawn(move || {
+            if let Err(error) = server.run() {
+                tracing::error!(
+                    target: "myalbuns.global",
+                    process_role = ProcessRole::GlobalShell.as_str(),
+                    reason = %error,
+                    event = "status_server_failed",
+                );
+            }
+        })
+        .map_err(|error| GlobalProcessSpikeError::Io(error.to_string()))?;
+
+    tauri::Builder::default()
+        .setup(move |app| {
+            WebviewWindowBuilder::new(app, "global", WebviewUrl::App("global.html".into()))
+                .title("MyAlbuns")
+                .inner_size(980.0, 680.0)
+                .min_inner_size(720.0, 520.0)
+                .visible(global_welcome_window_visible())
+                .data_directory(webview_data_directory)
+                .build()?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![crate::logging::frontend_log])
+        .run(tauri::generate_context!())
+        .map_err(|error| GlobalProcessSpikeError::Io(error.to_string()))
+}
+
+fn global_welcome_window_visible() -> bool {
+    std::env::var_os("MYALBUNS_GLOBAL_SPIKE_WELCOME_VISIBLE").is_some()
 }
 
 fn is_global_process_role(value: Option<&OsStr>) -> bool {

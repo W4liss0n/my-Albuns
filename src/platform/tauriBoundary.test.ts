@@ -35,10 +35,36 @@ test("selects concrete platform adapters only at the composition root", () => {
   const offenders = findOffenders(
     (path, source) =>
       path !== "../main.tsx" &&
+      path !== "../global/main.tsx" &&
       !path.startsWith("../platform/") &&
       platformImport.test(source),
   );
 
+  expect(offenders).toEqual([]);
+});
+
+test("keeps the global shell entry independent from the Project editor", () => {
+  const globalEntry = sourceFiles["../global/main.tsx"];
+  const globalSources = Object.entries(sourceFiles).filter(
+    ([path]) => path.startsWith("../global/") && !path.includes(".test."),
+  );
+  const forbiddenDependencies = [
+    "pixi.js",
+    "../App",
+    "../components/",
+    "../domain/",
+    "tauriProjectPorts",
+    "tauriTopologyBenchmarkBridge",
+    "tauriTopologyFaultProbeBridge",
+  ];
+  const offenders = globalSources
+    .filter(([, source]) =>
+      forbiddenDependencies.some((dependency) => source.includes(dependency)),
+    )
+    .map(([path]) => path)
+    .sort();
+
+  expect(globalEntry).toBeTypeOf("string");
   expect(offenders).toEqual([]);
 });
 

@@ -2,6 +2,7 @@ $script:BuildInputPathspecs = @(
     'Cargo.toml',
     'Cargo.lock',
     'crates',
+    'global.html',
     'index.html',
     'package.json',
     'package-lock.json',
