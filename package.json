@@ -20,6 +20,7 @@
     "tauri:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalTauri.ps1 build",
     "spike:corpus": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Prepare-TopologyCorpus.ps1",
     "spike:topology": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Measure-TopologySpike.ps1",
+    "spike:topology-final": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-TopologyComparisonGate.ps1",
     "spike:imaging-recovery": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ImagingRecovery.ps1",
     "spike:windows-distribution": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-WindowsDistributionGate.ps1",
     "preview": "vite preview",

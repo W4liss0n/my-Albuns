@@ -1206,22 +1206,25 @@ function Read-ValidatedImagingRecoveryArtifact {
     )
 
     $fullPath = [System.IO.Path]::GetFullPath($Path)
-    $expectedPath = [System.IO.Path]::GetFullPath(
-        (Join-Path `
-            $script:WorkspaceRoot `
-            'docs\research\artifacts\0004-imaging-recovery.json')
-    )
-    if (-not [string]::Equals(
-        $fullPath,
-        $expectedPath,
+    $workspacePrefix = [System.IO.Path]::GetFullPath(
+        $script:WorkspaceRoot
+    ).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $fullPath.StartsWith(
+        $workspacePrefix,
         [System.StringComparison]::OrdinalIgnoreCase
     )) {
-        throw 'The Imaging recovery evidence must be artifact 0004.'
+        throw 'The Imaging recovery evidence must stay inside the workspace.'
     }
+    $relativeArtifactPath = $fullPath.
+        Substring($workspacePrefix.Length).
+        Replace([System.IO.Path]::DirectorySeparatorChar, '/')
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
         throw (
-            'Imaging recovery artifact 0004 is missing. Run ' +
-            'npm run spike:imaging-recovery first.'
+            "Imaging recovery artifact is missing at $relativeArtifactPath. " +
+            'Run npm run spike:imaging-recovery with the matching OutputPath first.'
         )
     }
     $artifact = Get-Content `
@@ -1253,7 +1256,7 @@ function Read-ValidatedImagingRecoveryArtifact {
                 }
         ).Count -gt 0
     ) {
-        throw 'Imaging recovery artifact 0004 has incomplete checks.'
+        throw 'The Imaging recovery artifact has incomplete checks.'
     }
 
     $cache = $artifact.evidence.cache
@@ -1286,18 +1289,18 @@ function Read-ValidatedImagingRecoveryArtifact {
             $export.previousOutputSha256BeforeFailure
     )
     if (-not $cacheRecovered -or -not $exportFailedSafely) {
-        throw 'Imaging recovery artifact 0004 does not satisfy its gate.'
+        throw 'The Imaging recovery artifact does not satisfy its gate.'
     }
     if ([string]$artifact.gitCommit -ne $TopologyBuildCommit) {
         throw (
-            'Imaging recovery artifact 0004 does not match the topology ' +
+            'The Imaging recovery artifact does not match the topology ' +
             'build commit. Run npm run spike:imaging-recovery after the ' +
             'implementation commit and before npm run spike:topology.'
         )
     }
     if ([bool]$artifact.sourceInputsDirty) {
         throw (
-            'Imaging recovery artifact 0004 was collected with dirty source ' +
+            'The Imaging recovery artifact was collected with dirty source ' +
             'inputs. Commit the implementation and run ' +
             'npm run spike:imaging-recovery again.'
         )
@@ -1305,7 +1308,7 @@ function Read-ValidatedImagingRecoveryArtifact {
 
     return [ordered]@{
         validated = $true
-        artifact = 'docs/research/artifacts/0004-imaging-recovery.json'
+        artifact = $relativeArtifactPath
         artifactSha256 = (
             Get-FileHash -LiteralPath $fullPath -Algorithm SHA256
         ).Hash.ToLowerInvariant()

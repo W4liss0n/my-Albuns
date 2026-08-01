@@ -6,10 +6,14 @@ param(
     [int] $CacheTimeoutSeconds = 900,
     [ValidateRange(30, 1800)]
     [int] $PerformanceTimeoutSeconds = 300,
+    [ValidateSet('AB', 'BA')]
+    [string] $ExecutionOrder = 'AB',
+    [string] $ImagingRecoveryPath,
     [string] $OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
+$ExecutionOrder = $ExecutionOrder.ToUpperInvariant()
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
 . (Join-Path $PSScriptRoot 'Evidence-BuildInputs.ps1')
@@ -54,6 +58,18 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 
+if ([string]::IsNullOrWhiteSpace($ImagingRecoveryPath)) {
+    $ImagingRecoveryPath = Join-Path `
+        $script:WorkspaceRoot `
+        'docs\research\artifacts\0004-imaging-recovery.json'
+}
+elseif (-not [System.IO.Path]::IsPathRooted($ImagingRecoveryPath)) {
+    $ImagingRecoveryPath = Join-Path `
+        $script:WorkspaceRoot `
+        $ImagingRecoveryPath
+}
+$ImagingRecoveryPath = [System.IO.Path]::GetFullPath($ImagingRecoveryPath)
+
 $reportText = @'
 {
   "notMeasured": [
@@ -79,11 +95,12 @@ $reportText = @'
     "O gate de falhas aplica uma inten\u00e7\u00e3o real, persiste atomicamente, rel\u00ea pelo n\u00facleo e s\u00f3 ent\u00e3o confirma a revis\u00e3o como salva.",
     "A recupera\u00e7\u00e3o do host reabre apenas a \u00faltima revis\u00e3o explicitamente salva; recupera\u00e7\u00e3o de altera\u00e7\u00f5es n\u00e3o salvas permanece fora deste gate.",
     "A IPC \u00e9 descrita por limites, rela\u00e7\u00f5es e contagens m\u00ednimas observ\u00e1veis; nenhum escore sint\u00e9tico de complexidade foi inventado.",
-    "A evid\u00eancia do Processador de Imagens \u00e9 validada e referenciada pelo artefato 0004, sem duplicar seu mecanismo de queda neste runner."
+    "A evid\u00eancia do Processador de Imagens \u00e9 validada e referenciada pelo artefato informado ao runner, sem duplicar seu mecanismo de queda."
   ],
   "summary": {
     "title": "Falhas controladas e isolamento das topologias de processo",
     "collected": "Coletado em UTC",
+    "executionOrder": "Ordem de execu\u00e7\u00e3o",
     "raw": "JSON bruto",
     "measure": "Medida",
     "independent": "A \u2014 hosts independentes",
@@ -1800,6 +1817,7 @@ function Write-TopologyMarkdownSummary {
         "# $($summary.title)"
         ''
         "$($summary.collected): ``$($Report.collectedAtUtc)``."
+        "$($summary.executionOrder): ``$($Report.execution.order)``."
         "[$($summary.raw)]($([System.IO.Path]::GetFileName($OutputPath)))."
         ''
         "| $($summary.measure) | $($summary.independent) | $($summary.multiwindow) |"
@@ -2012,13 +2030,12 @@ try {
     $probeGatePaths.Add($multiwindowFaultGate)
 
     $imagingRecovery = Read-ValidatedImagingRecoveryArtifact `
-        -Path (
-            Join-Path `
-                $script:WorkspaceRoot `
-                'docs\research\artifacts\0004-imaging-recovery.json'
-        ) `
+        -Path $ImagingRecoveryPath `
         -TopologyBuildCommit $buildManifest.gitCommit
 
+    # These seams are dot-sourced below so their named evidence remains in
+    # the report scope without duplicating the topology-specific rules.
+    $runIndependentTopology = {
     Reset-TopologyCache
     $independentStartedAt = [DateTimeOffset]::UtcNow
     $independentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -2310,8 +2327,9 @@ try {
     Stop-OwnedTopologyProcess -ProcessId $independentRestartedA.Id
     Stop-OwnedTopologyProcess -ProcessId $independentB.Id
     Stop-OwnedTopologyProcess -ProcessId $independentRestartedGlobal.Id
+    }
 
-    Start-Sleep -Milliseconds 750
+    $runMultiwindowTopology = {
     Reset-TopologyCache
     $multiwindowStartedAt = [DateTimeOffset]::UtcNow
     $multiwindowStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -2369,9 +2387,6 @@ try {
         -StartedAt $multiwindowStartedAt `
         -TopologyStopwatch $multiwindowStopwatch `
         -ExportGatePath $multiwindowExportGate
-    Assert-ComparableCanvasTargets `
-        -Independent $independentInteraction `
-        -Multiwindow $multiwindowInteraction
     $multiwindowMetrics = Measure-TopologyProcesses `
         -RootProcessIds @($multiwindow.Id)
 
@@ -2576,6 +2591,28 @@ try {
     }
     Stop-OwnedTopologyProcess -ProcessId $multiwindowRestarted.Id
     Stop-OwnedTopologyProcess -ProcessId $multiwindowRestartedGlobal.Id
+    }
+
+    $topologyRunners = @{
+        independent = $runIndependentTopology
+        multiwindow = $runMultiwindowTopology
+    }
+    $topologyRunOrder = if ($ExecutionOrder -eq 'AB') {
+        @('independent', 'multiwindow')
+    }
+    else {
+        @('multiwindow', 'independent')
+    }
+    for ($topologyIndex = 0; $topologyIndex -lt 2; $topologyIndex++) {
+        if ($topologyIndex -gt 0) {
+            Start-Sleep -Milliseconds 750
+        }
+        $topologyRunner = $topologyRunners[$topologyRunOrder[$topologyIndex]]
+        . $topologyRunner
+    }
+    Assert-ComparableCanvasTargets `
+        -Independent $independentInteraction `
+        -Multiwindow $multiwindowInteraction
 
     & (Join-Path $PSScriptRoot 'Prepare-TopologyCorpus.ps1')
     if ($LASTEXITCODE -ne 0) {
@@ -2631,6 +2668,9 @@ try {
     $report = [ordered]@{
         schemaVersion = 11
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
+        execution = [ordered]@{
+            order = $ExecutionOrder
+        }
         hardware = Get-HardwareInventory
         corpus = [ordered]@{
             schemaVersion = $corpusManifest.schemaVersion
