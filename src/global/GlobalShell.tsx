@@ -1,19 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-import type { Logger } from "../application/logging";
+import { logReasonFromError, type Logger } from "../application/logging";
+import type { ProjectFileDialog } from "../application/projectFileDialog";
 import "./GlobalShell.css";
 
 interface GlobalShellProps {
   logger: Logger;
+  projectFileDialog: ProjectFileDialog;
 }
 
-const pendingActions = [
-  "Novo Projeto",
-  "Abrir Projeto",
-  "Exportação em lote",
-] as const;
+export function GlobalShell({ logger, projectFileDialog }: GlobalShellProps) {
+  const [dialogStatus, setDialogStatus] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-export function GlobalShell({ logger }: GlobalShellProps) {
   useEffect(() => {
     logger.write({
       level: "info",
@@ -21,6 +20,39 @@ export function GlobalShell({ logger }: GlobalShellProps) {
       event: "welcome_screen_ready",
     });
   }, [logger]);
+
+  const openProjectFile = async () => {
+    setDialogOpen(true);
+    setDialogStatus(null);
+    try {
+      const selectedPath = await projectFileDialog.openProjectFile();
+      if (selectedPath === null) {
+        setDialogStatus("Seleção cancelada.");
+        logger.write({
+          level: "info",
+          component: "global_shell",
+          event: "project_file_selection_cancelled",
+        });
+        return;
+      }
+      setDialogStatus("Arquivo selecionado para validação.");
+      logger.write({
+        level: "info",
+        component: "global_shell",
+        event: "project_file_selected",
+      });
+    } catch (error) {
+      setDialogStatus("Não foi possível abrir o seletor de arquivos.");
+      logger.write({
+        level: "error",
+        component: "global_shell",
+        event: "project_file_selection_failed",
+        reason: logReasonFromError(error),
+      });
+    } finally {
+      setDialogOpen(false);
+    }
+  };
 
   return (
     <main className="global-shell">
@@ -42,11 +74,20 @@ export function GlobalShell({ logger }: GlobalShellProps) {
         </div>
 
         <aside className="global-shell__actions" aria-label="Ações globais">
-          {pendingActions.map((action) => (
-            <button key={action} type="button" disabled>
-              {action}
-            </button>
-          ))}
+          <button type="button" disabled>
+            Novo Projeto
+          </button>
+          <button type="button" disabled={dialogOpen} onClick={openProjectFile}>
+            Abrir Projeto
+          </button>
+          <button type="button" disabled>
+            Exportação em lote
+          </button>
+          {dialogStatus !== null && (
+            <p className="global-shell__dialog-status" role="status">
+              {dialogStatus}
+            </p>
+          )}
         </aside>
       </section>
 

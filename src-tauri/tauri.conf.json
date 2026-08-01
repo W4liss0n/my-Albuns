@@ -37,6 +37,15 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "externalBin": [
       "binaries/myalbuns-imaging"
     ],

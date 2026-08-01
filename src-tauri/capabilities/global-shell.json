@@ -5,6 +5,7 @@
   "local": true,
   "windows": ["global"],
   "permissions": [
-    "global-shell-logging"
+    "global-shell-logging",
+    "dialog:allow-open"
   ]
 }

@@ -151,14 +151,17 @@ test("keeps the global capability aligned with its invoked commands", () => {
   const permission = permissionManifest.permission[0];
 
   expect(permissionManifest.permission).toHaveLength(1);
-  expect(capability.permissions).toEqual([permission.identifier]);
+  expect(capability.permissions).toEqual([
+    permission.identifier,
+    "dialog:allow-open",
+  ]);
   expect(permission.commands.deny).toEqual([]);
   expect([...permission.commands.allow].sort()).toEqual(
     [...invokedCommands].sort(),
   );
 });
 
-test("does not expose generic filesystem or shell packages to the frontend", () => {
+test("exposes only the native open dialog beyond the Tauri core bridge", () => {
   const tauriPackages = new Set(
     Object.values(sourceFiles).flatMap((source) =>
       Array.from(
@@ -168,5 +171,13 @@ test("does not expose generic filesystem or shell packages to the frontend", () 
     ),
   );
 
-  expect([...tauriPackages]).toEqual(["@tauri-apps/api/core"]);
+  expect([...tauriPackages].sort()).toEqual([
+    "@tauri-apps/api/core",
+    "@tauri-apps/plugin-dialog",
+  ]);
+  expect(sourceFiles["./tauriProjectFileDialog.ts"]).toContain(
+    'from "@tauri-apps/plugin-dialog"',
+  );
+  expect(globalShellCapability).toContain('"dialog:allow-open"');
+  expect(projectWindowCapability).not.toContain("dialog:");
 });

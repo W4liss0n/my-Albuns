@@ -405,6 +405,7 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
         .map_err(|error| GlobalProcessSpikeError::Io(error.to_string()))?;
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             WebviewWindowBuilder::new(app, "global", WebviewUrl::App("global.html".into()))
                 .title("MyAlbuns")

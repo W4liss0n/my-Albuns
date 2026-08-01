@@ -140,7 +140,7 @@ try {
         -Executable $script:CargoExecutable `
         -Arguments @(
             'test', '-p', 'myalbuns-desktop', '--lib',
-            'tests::global_window_receives_only_structured_logging',
+            'tests::global_window_receives_only_logging_and_the_native_open_dialog',
             '--', '--exact'
         )
     Invoke-FrontendSecurityCheck `
@@ -185,11 +185,13 @@ $capabilitySpecifications = @(
         capabilityPath = 'src-tauri\capabilities\default.json'
         permissionPath = 'src-tauri\permissions\project-window.json'
         permissionIdentifier = 'project-window-commands'
+        pluginPermissions = @()
     },
     [ordered]@{
         capabilityPath = 'src-tauri\capabilities\global-shell.json'
         permissionPath = 'src-tauri\permissions\global-shell.json'
         permissionIdentifier = 'global-shell-logging'
+        pluginPermissions = @('dialog:allow-open')
     }
 )
 $capabilityEvidence = [System.Collections.Generic.List[object]]::new()
@@ -207,19 +209,24 @@ foreach ($specification in $capabilitySpecifications) {
         throw "Capability '$($capability.identifier)' must own one permission."
     }
     $permission = $manifestPermissions[0]
-    if (
-        $permission.identifier -cne $specification.permissionIdentifier -or
-        @($capability.permissions).Count -ne 1 -or
-        $capability.permissions[0] -cne $permission.identifier
-    ) {
+    if ($permission.identifier -cne $specification.permissionIdentifier) {
         throw "Capability '$($capability.identifier)' does not match its permission."
     }
+    $expectedCapabilityPermissions = @(
+        [string] $permission.identifier
+        @($specification.pluginPermissions)
+    )
+    Assert-ExactStringSet `
+        -Actual @($capability.permissions) `
+        -Expected $expectedCapabilityPermissions `
+        -Label "Capability '$($capability.identifier)' source permissions"
     $capabilityEvidence.Add([ordered]@{
         identifier = [string] $capability.identifier
         local = [bool] $capability.local
         windows = @($capability.windows)
         permissions = @($capability.permissions)
         permissionIdentifier = [string] $permission.identifier
+        pluginPermissions = @($specification.pluginPermissions)
         commands = @($permission.commands.allow | Sort-Object)
     })
 }
@@ -304,6 +311,19 @@ foreach ($evidence in $capabilityEvidence) {
         -Expected @($evidence.commands) `
         -Label "Permission '$($evidence.permissionIdentifier)' commands"
 }
+$dialogAclProperty = $compiledAcl.PSObject.Properties['dialog']
+if ($null -eq $dialogAclProperty) {
+    throw 'The compiled Tauri ACL has no native dialog manifest.'
+}
+$dialogOpenPermission =
+    $dialogAclProperty.Value.permissions.PSObject.Properties['allow-open'].Value
+Assert-ExactStringSet `
+    -Actual @($dialogOpenPermission.commands.allow) `
+    -Expected @('open') `
+    -Label 'Compiled native open-dialog commands'
+if (@($dialogOpenPermission.commands.deny).Count -gt 0) {
+    throw 'The native open-dialog permission unexpectedly denies commands.'
+}
 
 $package = Get-Content `
     -LiteralPath (Join-Path $script:WorkspaceRoot 'package.json') `
@@ -315,7 +335,7 @@ $frontendTauriPackages = @(
 )
 Assert-ExactStringSet `
     -Actual $frontendTauriPackages `
-    -Expected @('@tauri-apps/api') `
+    -Expected @('@tauri-apps/api', '@tauri-apps/plugin-dialog') `
     -Label 'Frontend Tauri packages'
 
 $desktopCargo = Get-Content `
@@ -327,11 +347,25 @@ if ($desktopCargo.Contains('tauri-plugin-fs')) {
 if (-not $desktopCargo.Contains('tauri-plugin-shell')) {
     throw 'The backend-only sidecar adapter unexpectedly lost its shell dependency.'
 }
+if (-not $desktopCargo.Contains('tauri-plugin-dialog')) {
+    throw 'The global host unexpectedly lost its native dialog dependency.'
+}
 $desktopHostSource = Get-Content `
     -LiteralPath (Join-Path $script:WorkspaceRoot 'src-tauri\src\lib.rs') `
     -Raw
 if (-not $desktopHostSource.Contains('.plugin(tauri_plugin_shell::init())')) {
     throw 'The backend-only shell plugin is not registered by the desktop host.'
+}
+$globalHostSource = Get-Content `
+    -LiteralPath (
+        Join-Path $script:WorkspaceRoot 'src-tauri\src\global_process_spike.rs'
+    ) `
+    -Raw
+if (-not $globalHostSource.Contains('.plugin(tauri_plugin_dialog::init())')) {
+    throw 'The native dialog plugin is not registered by the global host.'
+}
+if ($desktopHostSource.Contains('.plugin(tauri_plugin_dialog::init())')) {
+    throw 'The Project host must not register the global native dialog plugin.'
 }
 $imagingAdapterSource = Get-Content `
     -LiteralPath (
@@ -392,6 +426,9 @@ $report = [ordered]@{
         backendSidecarShellDependency = $true
         backendSidecarShellRegistration = $true
         fixedImagingSidecarInvocation = $true
+        globalNativeDialogDependency = $true
+        globalNativeDialogRegistration = $true
+        nativeDialogCommands = @('open')
     }
     limits = [ordered]@{
         topologyProbeCommandsRemainTemporary = $true

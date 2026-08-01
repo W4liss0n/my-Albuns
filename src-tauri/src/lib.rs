@@ -290,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn global_window_receives_only_structured_logging() {
+    fn global_window_receives_only_logging_and_the_native_open_dialog() {
         let capability: serde_json::Value =
             serde_json::from_str(include_str!("../capabilities/global-shell.json"))
                 .expect("valid global-shell capability");
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(capability["windows"], serde_json::json!(["global"]));
         assert_eq!(
             capability["permissions"],
-            serde_json::json!(["global-shell-logging"])
+            serde_json::json!(["global-shell-logging", "dialog:allow-open"])
         );
         assert_eq!(permission["identifier"], "global-shell-logging");
         assert_eq!(
@@ -312,6 +312,24 @@ mod tests {
             serde_json::json!(["frontend_log"])
         );
         assert_eq!(permission["commands"]["deny"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn windows_bundle_uses_current_user_nsis_and_evergreen_webview2() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let bundle = &config["bundle"];
+        let windows = &bundle["windows"];
+
+        assert_eq!(bundle["targets"], serde_json::json!(["nsis"]));
+        assert_eq!(windows["nsis"]["installMode"], "currentUser");
+        assert_eq!(
+            windows["webviewInstallMode"],
+            serde_json::json!({
+                "type": "downloadBootstrapper",
+                "silent": true
+            })
+        );
     }
 
     #[test]

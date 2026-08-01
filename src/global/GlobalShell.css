@@ -133,6 +133,13 @@ button {
   opacity: 0.78;
 }
 
+.global-shell__dialog-status {
+  margin: 6px 2px 0;
+  color: #aeb7bd;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .global-shell__footer {
   display: flex;
   align-items: center;
