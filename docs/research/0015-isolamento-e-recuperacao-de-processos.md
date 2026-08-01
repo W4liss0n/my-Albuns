@@ -27,12 +27,19 @@ antecipar eleição, watchdog ou reinício automático:
 
 ## Contrato exercitado
 
-O executável medido possui um papel global exclusivo do spike. Quando
-`MYALBUNS_PROCESS_ROLE=global`, ele desvia antes de construir Tauri,
-`ProjectHost`, `ProjectSession`, WebView, Canvas ou Cache. Nesse papel, mantém
-somente um servidor tipado em TCP loopback. O bind do endpoint funciona também
-como proteção de instância única; uma segunda cópia termina com o código
-estável `73` e não desloca a proprietária.
+Na execução histórica deste gate, o executável medido possuía um papel global
+exclusivo do spike. Quando `MYALBUNS_PROCESS_ROLE=global`, ele desviava antes de
+construir Tauri, `ProjectHost`, `ProjectSession`, WebView, Canvas ou Cache.
+Nesse papel, mantinha somente um servidor tipado em TCP loopback. O bind do
+endpoint também funcionava como proteção de instância única; uma segunda cópia
+terminava com o código estável `73` e não deslocava a proprietária.
+
+Essa descrição e as métricas abaixo pertencem ao commit histórico deste gate.
+O corte posterior
+[Candidato do processo global de Boas-vindas](0025-candidato-processo-global-de-boas-vindas.md)
+preservou o desvio anterior a `ProjectHost`, Sessão, Canvas e Cache, mas passou
+a construir uma WebView Tauri real com entrypoint próprio. Portanto os números
+headless desta seção não representam o custo atual do candidato visual.
 
 Esse transporte aceita apenas uma consulta de status em uma linha JSON,
 correlacionada por execução, topologia e probe. Ele existe para tornar
@@ -121,9 +128,9 @@ geral do cenário.
 
 ### Processo global
 
-O papel global real ocupou uma única árvore com um único processo, cinco
-threads, 143 handles, nenhuma Janela e nenhum uso gráfico observado nas duas
-alternativas.
+O papel global headless medido nesta rodada ocupou uma única árvore com um
+único processo, cinco threads, 143 handles, nenhuma Janela e nenhum uso gráfico
+observado nas duas alternativas.
 
 | Evidência | A — hosts independentes | B — host multiwindow |
 | --- | ---: | ---: |
@@ -276,8 +283,10 @@ O resultado agregado do schema `11` foi `failureGate.passed: true`.
 Este gate não:
 
 - implementa a UI real de Boas-vindas nem operações globais do produto. O
-  papel global medido é intencionalmente headless; portanto o candidato
-  completo a `MyAlbuns.exe` permanece em aberto;
+  papel global medido aqui é intencionalmente headless; a lacuna da superfície
+  visual foi fechada posteriormente em
+  [0025](0025-candidato-processo-global-de-boas-vindas.md), sem reescrever esta
+  evidência histórica;
 - escolhe TCP loopback como IPC normativa;
 - escolhe definitivamente entre as topologias A e B;
 - cria eleição, watchdog, reinício automático ou coordenador universal;
@@ -317,9 +326,9 @@ Os critérios de falha e continuidade estão atendidos:
   ausências ou falhas de continuidade.
 
 Isso encerra a comparação exigida para essas falhas, mas não encerra o spike de
-topologia. A UI real do processo global, o processo final de Boas-vindas, os
-gates de caminhos e operações, a recomendação de topologia e a atualização do
-ADR continuam separados.
+topologia. A UI real do processo global foi tratada depois em
+[0025](0025-candidato-processo-global-de-boas-vindas.md); a recomendação de
+topologia e a atualização do ADR continuam separadas.
 
 ## Repetição
 
