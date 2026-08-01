@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
+import globalShellCapability from "../../src-tauri/capabilities/global-shell.json?raw";
+import globalShellPermission from "../../src-tauri/permissions/global-shell.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
@@ -8,6 +10,16 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   import: "default",
 }) as Record<string, string>;
 
+const tauriCommandSources = {
+  shared: ["./tauriLogger.ts"],
+  project: [
+    "./tauriProjectPorts.ts",
+    "./tauriTopologyBenchmarkBridge.ts",
+    "./tauriTopologyFaultProbeBridge.ts",
+  ],
+  global: [],
+} as const;
+
 function findOffenders(
   isOffender: (path: string, source: string) => boolean,
 ) {
@@ -15,6 +27,19 @@ function findOffenders(
     .filter(([path, source]) => isOffender(path, source))
     .map(([path]) => path)
     .sort();
+}
+
+function extractInvokedCommands(sourcePaths: readonly string[]) {
+  return new Set(
+    sourcePaths.flatMap((path) =>
+      Array.from(
+        sourceFiles[path].matchAll(
+          /\binvoke(?:<[^>]+>)?\(\s*["']([^"']+)["']/g,
+        ),
+        (match) => match[1],
+      ),
+    ),
+  );
 }
 
 test("keeps Tauri dependencies inside platform adapters", () => {
@@ -68,20 +93,29 @@ test("keeps the global shell entry independent from the Project editor", () => {
   expect(offenders).toEqual([]);
 });
 
+test("assigns every Tauri command adapter to an explicit surface", () => {
+  const invokingSources = Object.entries(sourceFiles)
+    .filter(
+      ([path, source]) =>
+        !path.includes(".test.") &&
+        source.includes("@tauri-apps/api/core") &&
+        /\binvoke(?:<[^>]+>)?\(/.test(source),
+    )
+    .map(([path]) => path)
+    .sort();
+  const assignedSources = [
+    ...tauriCommandSources.shared,
+    ...tauriCommandSources.project,
+    ...tauriCommandSources.global,
+  ];
+
+  expect(new Set(assignedSources).size).toBe(assignedSources.length);
+  expect([...assignedSources].sort()).toEqual(invokingSources);
+});
+
 test("keeps the project-window capability aligned with the invoked commands", () => {
-  const invokedCommands = new Set(
-    Object.entries(sourceFiles)
-      .filter(
-        ([path, source]) =>
-          !path.includes(".test.") &&
-          source.includes("@tauri-apps/api/core"),
-      )
-      .flatMap(([, source]) =>
-        Array.from(
-          source.matchAll(/\binvoke(?:<[^>]+>)?\(\s*["']([^"']+)["']/g),
-          (match) => match[1],
-        ),
-      ),
+  const invokedCommands = extractInvokedCommands(
+    [...tauriCommandSources.shared, ...tauriCommandSources.project],
   );
   const capability = JSON.parse(projectWindowCapability) as {
     permissions: string[];
@@ -99,6 +133,29 @@ test("keeps the project-window capability aligned with the invoked commands", ()
   expect(capability.permissions).toEqual([permission.identifier]);
   expect(permission.commands.deny).toEqual([]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
+});
+
+test("keeps the global capability aligned with its invoked commands", () => {
+  const invokedCommands = extractInvokedCommands(
+    [...tauriCommandSources.shared, ...tauriCommandSources.global],
+  );
+  const capability = JSON.parse(globalShellCapability) as {
+    permissions: string[];
+  };
+  const permissionManifest = JSON.parse(globalShellPermission) as {
+    permission: Array<{
+      identifier: string;
+      commands: { allow: string[]; deny: string[] };
+    }>;
+  };
+  const permission = permissionManifest.permission[0];
+
+  expect(permissionManifest.permission).toHaveLength(1);
+  expect(capability.permissions).toEqual([permission.identifier]);
+  expect(permission.commands.deny).toEqual([]);
+  expect([...permission.commands.allow].sort()).toEqual(
+    [...invokedCommands].sort(),
+  );
 });
 
 test("does not expose generic filesystem or shell packages to the frontend", () => {

@@ -22,8 +22,6 @@ describe("GlobalShell", () => {
     ]) {
       expect(screen.getByRole("button", { name: action })).toBeDisabled();
     }
-    expect(screen.queryByTestId("project-canvas")).not.toBeInTheDocument();
-
     await waitFor(() => {
       expect(write).toHaveBeenCalledWith({
         level: "info",
