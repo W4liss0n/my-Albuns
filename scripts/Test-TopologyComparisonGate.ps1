@@ -39,10 +39,22 @@ function Resolve-WorkspacePath {
 function Get-WorkspaceRelativePath {
     param([Parameter(Mandatory = $true)][string] $Path)
 
-    return [System.IO.Path]::GetRelativePath(
-        $script:WorkspaceRoot,
-        [System.IO.Path]::GetFullPath($Path)
-    ).Replace([System.IO.Path]::DirectorySeparatorChar, '/')
+    $workspacePrefix = [System.IO.Path]::GetFullPath(
+        $script:WorkspaceRoot
+    ).TrimEnd(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    ) + [System.IO.Path]::DirectorySeparatorChar
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    Assert-Condition `
+        -Condition $fullPath.StartsWith(
+            $workspacePrefix,
+            [System.StringComparison]::OrdinalIgnoreCase
+        ) `
+        -Message 'Topology comparison paths must stay inside the workspace.'
+    return $fullPath.
+        Substring($workspacePrefix.Length).
+        Replace([System.IO.Path]::DirectorySeparatorChar, '/')
 }
 
 function Read-JsonObject {
@@ -578,10 +590,10 @@ $protocolSha256 = (
 ).Hash.ToLowerInvariant()
 $protocolText = Get-Content -LiteralPath $ProtocolPath -Raw -Encoding utf8
 foreach ($requiredProtocolText in @(
-    'Neutralização da ordem',
+    '## Neutraliza',
     '`AB`: A seguida de B',
     '`BA`: B seguida de A',
-    'Custo de implementação e operação',
+    '## Custo de implementa',
     '33,33 ms'
 )) {
     Assert-Condition `
