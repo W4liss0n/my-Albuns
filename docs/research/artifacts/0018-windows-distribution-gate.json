@@ -1,0 +1,323 @@
+{
+    "schemaVersion":  1,
+    "suite":  "windows_distribution_local_probe",
+    "collectedAtUtc":  "2026-08-01T15:22:12.8013501+00:00",
+    "gitCommit":  "a76a541e90ff2a3bb26d56b1f94634632b151819",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows 11 Pro",
+                     "operatingSystemVersion":  "10.0.26200",
+                     "osArchitecture":  "X64",
+                     "processArchitecture":  "X64",
+                     "rustHost":  "x86_64-pc-windows-msvc"
+                 },
+    "build":  {
+                  "profile":  "release",
+                  "target":  "win-x64",
+                  "cargoBuildJobs":  2,
+                  "targetDirectory":  "target/windows-distribution-gate",
+                  "inputFileCount":  225,
+                  "inputDigestSha256":  "bb0fac49da283fc4f07a68faeb7ffb9b5595d52a93bf15aaf27b4604fd79b64a",
+                  "workingTreeDirty":  true,
+                  "configuration":  {
+                                        "bundleTargets":  [
+                                                              "nsis"
+                                                          ],
+                                        "webView2":  {
+                                                         "distribution":  "Evergreen",
+                                                         "webviewInstallMode":  {
+                                                                                    "type":  "downloadBootstrapper",
+                                                                                    "silent":  true
+                                                                                }
+                                                     },
+                                        "nsis":  {
+                                                     "installMode":  "currentUser"
+                                                 },
+                                        "externalBin":  [
+                                                            "binaries/myalbuns-imaging"
+                                                        ]
+                                    },
+                  "outputs":  {
+                                  "application":  {
+                                                      "path":  "target/windows-distribution-gate/release/myalbuns-desktop.exe",
+                                                      "bytes":  15584256,
+                                                      "sha256":  "efaf4c22b417b2b000a6c7739f3827d368140c3c57300c553c433f459454b055",
+                                                      "pe":  {
+                                                                 "machine":  "0x8664",
+                                                                 "architecture":  "x64",
+                                                                 "optionalHeaderMagic":  "0x020b",
+                                                                 "format":  "PE32+"
+                                                             }
+                                                  },
+                                  "builtSidecar":  {
+                                                       "path":  "target/windows-distribution-gate/release/myalbuns-imaging.exe",
+                                                       "bytes":  2802176,
+                                                       "sha256":  "af639d86c3a31887bad1fe70079583b860b1d6a1369f89c9c515b169a9cecd3a",
+                                                       "pe":  {
+                                                                  "machine":  "0x8664",
+                                                                  "architecture":  "x64",
+                                                                  "optionalHeaderMagic":  "0x020b",
+                                                                  "format":  "PE32+"
+                                                              }
+                                                   },
+                                  "packagedSidecar":  {
+                                                          "path":  "src-tauri/binaries/myalbuns-imaging-x86_64-pc-windows-msvc.exe",
+                                                          "bytes":  2802176,
+                                                          "sha256":  "af639d86c3a31887bad1fe70079583b860b1d6a1369f89c9c515b169a9cecd3a",
+                                                          "pe":  {
+                                                                     "machine":  "0x8664",
+                                                                     "architecture":  "x64",
+                                                                     "optionalHeaderMagic":  "0x020b",
+                                                                     "format":  "PE32+"
+                                                                 },
+                                                          "matchesBuiltSidecar":  true
+                                                      },
+                                  "installer":  {
+                                                    "path":  "target/windows-distribution-gate/release/bundle/nsis/MyAlbuns_0.1.0_x64-setup.exe",
+                                                    "bytes":  4217171,
+                                                    "sha256":  "b514ead6e0f51cd5bfa8120c784c79d94c00241b1ebd6a390764a8046bfcf946"
+                                                }
+                              }
+              },
+    "checks":  [
+                   {
+                       "name":  "powershell-runner-ast",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "clean-machine-evidence-type-contract",
+                       "passed":  true,
+                       "elapsedMs":  387
+                   },
+                   {
+                       "name":  "clean-build-inputs",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "evergreen-current-user-config",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "frontend-native-dialog-contract",
+                       "passed":  true,
+                       "elapsedMs":  68659
+                   },
+                   {
+                       "name":  "rust-windows-bundle-contract",
+                       "passed":  true,
+                       "elapsedMs":  83546
+                   },
+                   {
+                       "name":  "tauri-nsis-release-build",
+                       "passed":  true,
+                       "elapsedMs":  195550
+                   },
+                   {
+                       "name":  "application-pe-x64",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "sidecar-pe-x64-and-origin",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "global-welcome-and-webview2",
+                       "passed":  true,
+                       "elapsedMs":  1750
+                   },
+                   {
+                       "name":  "native-dialog-cancelled",
+                       "passed":  true,
+                       "elapsedMs":  405556
+                   },
+                   {
+                       "name":  "runtime-log-captured",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "correlated-clean-machine-e2e",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   }
+               ],
+    "results":  {
+                    "runtime":  {
+                                    "source":  "unpacked_release",
+                                    "installedBinaryExercised":  false,
+                                    "topology":  "independent",
+                                    "processId":  18308,
+                                    "windowTitle":  "MyAlbuns",
+                                    "readyMs":  1750,
+                                    "webView2":  {
+                                                     "observedProcessCount":  6,
+                                                     "processes":  [
+                                                                       {
+                                                                           "processId":  4024,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       },
+                                                                       {
+                                                                           "processId":  10392,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       },
+                                                                       {
+                                                                           "processId":  12276,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       },
+                                                                       {
+                                                                           "processId":  13112,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       },
+                                                                       {
+                                                                           "processId":  16900,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       },
+                                                                       {
+                                                                           "processId":  24580,
+                                                                           "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\150.0.4078.105\\msedgewebview2.exe",
+                                                                           "productVersion":  "150.0.4078.105"
+                                                                       }
+                                                                   ],
+                                                     "evergreenEvidence":  [
+                                                                               "downloadBootstrapper_config",
+                                                                               "system_runtime_process"
+                                                                           ]
+                                                 },
+                                    "nativeDialog":  {
+                                                         "checkpointEmitted":  true,
+                                                         "requestedDriver":  "computer_use",
+                                                         "action":  "open_project_then_cancel",
+                                                         "outcome":  "cancelled",
+                                                         "evidenceEvent":  "project_file_selection_cancelled",
+                                                         "externalReceipt":  {
+                                                                                 "schemaVersion":  1,
+                                                                                 "driver":  "computer_use",
+                                                                                 "action":  "open_project_then_cancel",
+                                                                                 "owner":  {
+                                                                                               "processId":  18308,
+                                                                                               "title":  "MyAlbuns"
+                                                                                           },
+                                                                                 "dialog":  {
+                                                                                                "app":  "com.myalbuns.desktop",
+                                                                                                "id":  1378396,
+                                                                                                "title":  "Abrir Projeto"
+                                                                                            },
+                                                                                 "observedAtUtc":  "2026-08-01T15:21:39.9262619+00:00"
+                                                                             }
+                                                     },
+                                    "logCapture":  {
+                                                       "files":  [
+                                                                     {
+                                                                         "path":  "target/windows-distribution-gate/gate-runs/windows-distribution-639211941191496290/logs/myalbuns-global.2026-08-01.jsonl",
+                                                                         "bytes":  612,
+                                                                         "sha256":  "d4b05505e4d91ec686351a5e1faa933149f0967eb60eb2c1b768e22868318726"
+                                                                     }
+                                                                 ],
+                                                       "observedEvents":  [
+                                                                              "project_file_selection_cancelled",
+                                                                              "start",
+                                                                              "welcome_screen_ready"
+                                                                          ],
+                                                       "matchingEntry":  {
+                                                                             "timestamp":  "2026-08-01T15:22:08.670843Z",
+                                                                             "level":  "INFO",
+                                                                             "process_role":  "frontend",
+                                                                             "component":  "global_shell",
+                                                                             "event":  "project_file_selection_cancelled",
+                                                                             "target":  "myalbuns.frontend"
+                                                                         }
+                                                   }
+                                },
+                    "cleanEnvironment":  {
+                                             "required":  true,
+                                             "scope":  "imported_clean_machine_e2e",
+                                             "available":  true,
+                                             "provider":  "windows_sandbox",
+                                             "installerExecuted":  true,
+                                             "e2ePassed":  true,
+                                             "reasonCode":  null,
+                                             "importedEvidence":  {
+                                                                      "fileName":  "clean-evidence.json",
+                                                                      "sha256":  "3de964084dc93ed65145152e0e021fba0b03c8bdc188d11c8025542992fed24b",
+                                                                      "schemaVersion":  1,
+                                                                      "suite":  "myalbuns_windows_clean_machine_e2e",
+                                                                      "collectedAtUtc":  "2026-08-01T15:20:12.0809678+00:00",
+                                                                      "gitCommit":  "a76a541e90ff2a3bb26d56b1f94634632b151819",
+                                                                      "installerSha256":  "b514ead6e0f51cd5bfa8120c784c79d94c00241b1ebd6a390764a8046bfcf946"
+                                                                  },
+                                             "environment":  {
+                                                                 "provider":  "windows_sandbox",
+                                                                 "disposable":  true,
+                                                                 "preexistingMyAlbuns":  false,
+                                                                 "operatingSystem":  "Microsoft Windows 11 Enterprise",
+                                                                 "operatingSystemVersion":  "10.0.26100"
+                                                             },
+                                             "results":  {
+                                                             "installerExecuted":  true,
+                                                             "installationPassed":  true,
+                                                             "installedBinaryExercised":  true,
+                                                             "appLaunched":  true,
+                                                             "installedApplication":  {
+                                                                                          "path":  "C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\MyAlbuns\\myalbuns-desktop.exe",
+                                                                                          "sha256":  "ffcb425860db4ca9716ea6e678d466417e4fb5f9470f27c282208ae88f4ae80b",
+                                                                                          "installLocation":  "C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\MyAlbuns",
+                                                                                          "uninstallString":  "\"C:\\Users\\WDAGUtilityAccount\\AppData\\Local\\MyAlbuns\\uninstall.exe\""
+                                                                                      },
+                                                             "webView2":  {
+                                                                              "distribution":  "Evergreen",
+                                                                              "executablePath":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\151.0.4129.59\\msedgewebview2.exe",
+                                                                              "productVersion":  "151.0.4129.59",
+                                                                              "observedProcessCount":  6
+                                                                          },
+                                                             "nativeDialog":  {
+                                                                                  "observed":  true,
+                                                                                  "kind":  "native_file_open",
+                                                                                  "outcome":  "cancelled",
+                                                                                  "receipt":  {
+                                                                                                  "schemaVersion":  1,
+                                                                                                  "driver":  "computer_use",
+                                                                                                  "action":  "open_project_then_cancel",
+                                                                                                  "owner":  {
+                                                                                                                "processId":  2352,
+                                                                                                                "title":  "MyAlbuns"
+                                                                                                            },
+                                                                                                  "dialog":  {
+                                                                                                                 "app":  "MicrosoftWindows.WindowsSandbox_cw5n1h2txyewy!App",
+                                                                                                                 "id":  2427004,
+                                                                                                                 "title":  "Abrir Projeto"
+                                                                                                             },
+                                                                                                  "observedAtUtc":  "2026-08-01T15:19:56.4616736+00:00"
+                                                                                              },
+                                                                                  "logEvent":  {
+                                                                                                   "timestamp":  "2026-08-01T15:20:11.725433Z",
+                                                                                                   "level":  "INFO",
+                                                                                                   "process_role":  "frontend",
+                                                                                                   "component":  "global_shell",
+                                                                                                   "event":  "project_file_selection_cancelled",
+                                                                                                   "target":  "myalbuns.frontend"
+                                                                                               }
+                                                                              },
+                                                             "passed":  true
+                                                         }
+                                         }
+                },
+    "completion":  {
+                       "localProbePassed":  true,
+                       "cleanMachineE2ePassed":  true,
+                       "ticketCriterionSatisfied":  true
+                   },
+    "interpretation":  {
+                           "criterionClosed":  true,
+                           "reason":  "Local distribution checks and the correlated clean-machine E2E passed."
+                       }
+}

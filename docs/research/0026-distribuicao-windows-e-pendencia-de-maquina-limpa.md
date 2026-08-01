@@ -3,22 +3,23 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-01
 ---
 
-# Distribuição Windows e pendência de máquina limpa
+# Distribuição Windows e validação em máquina limpa
 
 ## Objetivo e estado
 
-Este gate precisa validar em conjunto WebView2 Evergreen, diálogo nativo de
-arquivo, instalador `win-x64` e um fluxo ponta a ponta depois da instalação em
-uma máquina Windows limpa.
+Este gate validou em conjunto WebView2 Evergreen, diálogo nativo de arquivo,
+instalador `win-x64` e um fluxo ponta a ponta depois da instalação em uma
+máquina Windows limpa.
 
-O corte local avançou, mas o critério permanece aberto. O bundle NSIS, seus
-payloads x64, a configuração Evergreen, a ACL do diálogo e o runtime WebView2
-foram exercitados. O recibo visual do diálogo foi bloqueado pela área de
-trabalho travada, e este host não possui ambiente Windows descartável no qual
-instalar o pacote.
+A rodada final executou o release local e uma instalação por usuário em Windows
+Sandbox descartável. As duas partes foram correlacionadas ao commit
+`a76a541e90ff2a3bb26d56b1f94634632b151819` e ao mesmo SHA-256 do instalador.
+O artefato canônico
+[0018-windows-distribution-gate.json](artifacts/0018-windows-distribution-gate.json)
+encerra o critério do ticket 01.
 
 ## Corte implementado
 
@@ -86,10 +87,10 @@ O runner `scripts/Test-WindowsDistributionGate.ps1` usa
 
 | Artefato | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `myalbuns-desktop.exe` | 15.584.256 | `c3820c947af4f2871861345a9c5be317cfd2272586f9df1a7e7de38495625a5a` |
+| `myalbuns-desktop.exe` | 15.584.256 | `efaf4c22b417b2b000a6c7739f3827d368140c3c57300c553c433f459454b055` |
 | `myalbuns-imaging.exe` | 2.802.176 | `af639d86c3a31887bad1fe70079583b860b1d6a1369f89c9c515b169a9cecd3a` |
 | Sidecar preparado para o bundle | 2.802.176 | `af639d86c3a31887bad1fe70079583b860b1d6a1369f89c9c515b169a9cecd3a` |
-| `MyAlbuns_0.1.0_x64-setup.exe` | 4.221.187 | `0c78ef701cfb11cec15d2d47ed9c37bd68e09f2ac167b49c7e5063b783c2c4a7` |
+| `MyAlbuns_0.1.0_x64-setup.exe` | 4.217.171 | `b514ead6e0f51cd5bfa8120c784c79d94c00241b1ebd6a390764a8046bfcf946` |
 
 O executável do aplicativo, o Processador recém-compilado e o sidecar preparado
 possuem `Machine = 0x8664` e optional header `0x020b`, isto é, AMD64 PE32+.
@@ -111,11 +112,10 @@ O arquivo observado informou `ProductVersion` e `FileVersion`
 `150.0.4078.105`. O runner endurecido exige caminho existente fora do
 workspace e versão válida; não aceita apenas um processo com o nome esperado.
 
-Essa rodada prova o release local sobre WebView2 de sistema. Ela não prova que
-o bootstrapper consegue instalar ou atualizar o runtime em uma máquina sem
-WebView2.
+Essa observação prova o release local sobre o WebView2 de sistema. A rodada em
+Windows Sandbox, descrita abaixo, cobre separadamente o aplicativo instalado.
 
-## Diálogo nativo: evidência ainda pendente
+## Diálogo nativo local
 
 O runner emite um checkpoint e espera duas evidências independentes:
 
@@ -123,69 +123,61 @@ O runner emite um checkpoint e espera duas evidências independentes:
 2. o evento estruturado `project_file_selection_cancelled` depois de cancelar.
 
 Um retorno `null` isolado do adapter não é aceito como prova de que a Janela
-nativa apareceu. Nesta execução, o Computer Use encontrou a tela de login do
-Windows e, por segurança, não tentou desbloqueá-la nem fornecer credenciais. O
-runner expirou após cinco minutos, falhou explicitamente, encerrou toda a árvore
-e não escreveu o artefato canônico `0018`. Assim, o diálogo está coberto por
-contratos e ACL, mas sua observação visual real continua pendente.
+nativa apareceu. O Computer Use observou a Janela `Abrir Projeto`, gravou o
+recibo externo antes de enviar `Escape`, e o log estruturado confirmou
+`project_file_selection_cancelled`. O runner correlacionou proprietário,
+diálogo, ação solicitada e evento de cancelamento.
 
-## Ausência de ambiente descartável
+## E2E em ambiente descartável
 
-A inspeção somente leitura encontrou:
+O setup produzido foi copiado para um Windows Sandbox sem instalação prévia do
+MyAlbuns. A execução limpa confirmou:
 
-- `Containers-DisposableClientVM` e Windows Sandbox desabilitados, sem
-  `WindowsSandbox.exe`;
-- Hyper-V, Virtual Machine Platform, Hypervisor Platform, Containers e WSL
-  desabilitados;
-- nenhuma VM ou ferramenta utilizável de Hyper-V, VMware, VirtualBox, Docker
-  ou Sandboxie.
+- Windows 11 Enterprise `10.0.26100`, com `disposable: true` e
+  `preexistingMyAlbuns: false`;
+- execução e conclusão do instalador NSIS por usuário;
+- aplicativo instalado em
+  `C:\Users\WDAGUtilityAccount\AppData\Local\MyAlbuns` e iniciado pelo binário
+  instalado;
+- seis processos do WebView2 Evergreen `151.0.4129.59`;
+- diálogo nativo `Abrir Projeto` observado por Computer Use, recibo gravado
+  antes do cancelamento e evento estruturado correspondente.
 
-O hipervisor observado pertence ao VBS/HVCI de segurança e não oferece uma VM
-para o gate. Criar outro usuário, trocar apenas `%LOCALAPPDATA%` ou instalar no
-host atual não equivale a máquina limpa, pois continuaria compartilhando
-Windows, HKLM e o runtime WebView2.
+A evidência limpa importada possui SHA-256
+`3de964084dc93ed65145152e0e021fba0b03c8bdc188d11c8025542992fed24b` e
+repete o commit e o SHA-256 do setup local. O runner rejeita qualquer divergência
+nesses valores.
 
-Nenhum instalador foi executado no host. Para fechar o critério será necessário
-habilitar Windows Sandbox com privilégios administrativos e possível reinício,
-ou fornecer uma VM Windows restaurável a partir de snapshot.
+No host usado para o ensaio, a configuração temporária do Sandbox com
+`<VGpu>Disable</VGpu>` reproduziu a perda da sessão visual, enquanto
+`<VGpu>Enable</VGpu>` manteve a conexão. Essa é uma observação específica do
+ambiente de teste; o arquivo `.wsb` permanece descartável sob `target/` e não é
+contrato do produto.
 
 ## Conclusão
 
-O corte local é tecnicamente viável e o instalador `win-x64` existe, mas o
-critério do ticket 01 não está encerrado. Faltam duas confirmações externas:
+Todos os 13 checks do artefato `0018` passaram. Os marcadores
+`localProbePassed`, `cleanMachineE2ePassed`, `ticketCriterionSatisfied` e
+`criterionClosed` são `true`. O gate de distribuição Windows do ticket 01 está
+encerrado sem executar o instalador no host de desenvolvimento.
 
-1. desbloquear a área de trabalho e repetir o recibo visual do diálogo;
-2. instalar e executar o setup em Windows descartável realmente limpo.
-
-Somente depois delas o runner poderá publicar
-`artifacts/0018-windows-distribution-gate.json` com
-`ticketCriterionSatisfied: true`.
-
-O runner já possui o caminho de fechamento para uma VM ou Sandbox externa. A
-execução limpa deve exportar um JSON correlacionado ao commit e ao SHA-256 do
-instalador produzido. O host local importa esse recibo com
-`-CleanMachineEvidencePath`, rejeitando commit ou instalador diferentes, uma
-máquina não descartável, uma instalação incompleta, um binário não exercitado,
-WebView2 que não seja Evergreen ou um diálogo nativo não observado e
-cancelado. Portanto, disponibilizar a máquina limpa não exigirá alterar o gate
-nem aceitar evidência manual sem correlação.
+O fechamento não decide a topologia A/B nem encerra o spike completo. A coleta
+comparativa consolidada e a recomendação final continuam nos dois critérios
+seguintes do ticket.
 
 ## Repetição
 
-```powershell
-npm run spike:windows-distribution
-```
-
-O runner imprime `COMPUTER_USE_READY=<checkpoint>` quando a Janela está pronta.
-O driver deve observar `Abrir Projeto`, gravar o recibo indicado pelo
-checkpoint e cancelar o diálogo. Sem esse recibo ou sem ambiente limpo, o gate
-permanece aberto.
+O runner imprime `COMPUTER_USE_READY=<checkpoint>` quando a Janela local está
+pronta. O driver deve observar `Abrir Projeto`, gravar o recibo indicado pelo
+checkpoint e só então cancelar o diálogo. O limite configurável foi ampliado
+para acomodar a interação local e a rodada externa sem afrouxar as validações.
 
 Quando o E2E for executado em uma máquina descartável, a repetição local usa:
 
 ```powershell
 ./scripts/Test-WindowsDistributionGate.ps1 `
-  -CleanMachineEvidencePath <caminho-do-recibo.json>
+  -CleanMachineEvidencePath <caminho-do-recibo.json> `
+  -InteractionTimeoutSeconds 1200
 ```
 
 O recibo usa `schemaVersion: 1`, suite
