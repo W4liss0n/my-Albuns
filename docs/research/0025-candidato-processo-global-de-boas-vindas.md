@@ -65,8 +65,8 @@ das Janelas de Projeto e não recebe `core:*`, `fs:*` ou `shell:*`.
 O artefato atualizado
 [0016-frontend-security-gate.json](artifacts/0016-frontend-security-gate.json)
 comparou as duas capabilities escritas com `capabilities.json` e
-`acl-manifests.json` compilados pelo Tauri. Os sete checks passaram com os 220
-inputs limpos no commit `40649bc`.
+`acl-manifests.json` compilados pelo Tauri. Os sete checks passaram com os 223
+inputs limpos no commit `abc023d`.
 
 ## Build da superfície global
 

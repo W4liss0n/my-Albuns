@@ -161,6 +161,15 @@ Somente depois delas o runner poderá publicar
 `artifacts/0018-windows-distribution-gate.json` com
 `ticketCriterionSatisfied: true`.
 
+O runner já possui o caminho de fechamento para uma VM ou Sandbox externa. A
+execução limpa deve exportar um JSON correlacionado ao commit e ao SHA-256 do
+instalador produzido. O host local importa esse recibo com
+`-CleanMachineEvidencePath`, rejeitando commit ou instalador diferentes, uma
+máquina não descartável, uma instalação incompleta, um binário não exercitado,
+WebView2 que não seja Evergreen ou um diálogo nativo não observado e
+cancelado. Portanto, disponibilizar a máquina limpa não exigirá alterar o gate
+nem aceitar evidência manual sem correlação.
+
 ## Repetição
 
 ```powershell
@@ -171,3 +180,45 @@ O runner imprime `COMPUTER_USE_READY=<checkpoint>` quando a Janela está pronta.
 O driver deve observar `Abrir Projeto`, gravar o recibo indicado pelo
 checkpoint e cancelar o diálogo. Sem esse recibo ou sem ambiente limpo, o gate
 permanece aberto.
+
+Quando o E2E for executado em uma máquina descartável, a repetição local usa:
+
+```powershell
+./scripts/Test-WindowsDistributionGate.ps1 `
+  -CleanMachineEvidencePath <caminho-do-recibo.json>
+```
+
+O recibo usa `schemaVersion: 1`, suite
+`myalbuns_windows_clean_machine_e2e` e os seguintes campos normativos:
+
+```json
+{
+  "schemaVersion": 1,
+  "suite": "myalbuns_windows_clean_machine_e2e",
+  "gitCommit": "<commit de 40 caracteres>",
+  "installerSha256": "<sha256 do setup>",
+  "collectedAtUtc": "<timestamp ISO 8601>",
+  "environment": {
+    "provider": "<VM ou Sandbox>",
+    "disposable": true,
+    "preexistingMyAlbuns": false
+  },
+  "results": {
+    "installerExecuted": true,
+    "installationPassed": true,
+    "installedBinaryExercised": true,
+    "appLaunched": true,
+    "webView2": {
+      "distribution": "Evergreen",
+      "executablePath": "<caminho observado>",
+      "productVersion": "<versão em quatro partes>"
+    },
+    "nativeDialog": {
+      "observed": true,
+      "kind": "native_file_open",
+      "outcome": "cancelled"
+    },
+    "passed": true
+  }
+}
+```

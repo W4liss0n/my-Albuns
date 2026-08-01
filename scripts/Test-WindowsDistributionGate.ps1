@@ -1,5 +1,6 @@
 param(
     [string] $OutputPath,
+    [string] $CleanMachineEvidencePath,
     [ValidateRange(1, 8)]
     [int] $CargoBuildJobs = 2,
     [ValidateRange(30, 600)]
@@ -391,7 +392,7 @@ function Wait-ForNativeDialogCancellation {
     throw 'Computer Use did not open and cancel the native dialog before timeout.'
 }
 
-function Get-CleanEnvironmentEvidence {
+function Get-LocalCleanEnvironmentEvidence {
     $featureNames = @(
         'Containers-DisposableClientVM',
         'Microsoft-Hyper-V-All',
@@ -458,6 +459,381 @@ function Get-CleanEnvironmentEvidence {
     }
 }
 
+function Get-RequiredEvidenceProperty {
+    param(
+        [Parameter(Mandatory = $true)][object] $Object,
+        [Parameter(Mandatory = $true)][string] $Name,
+        [Parameter(Mandatory = $true)][string] $Context
+    )
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        throw "Clean-machine evidence is missing '$Context.$Name'."
+    }
+    return $property.Value
+}
+
+function Assert-EvidenceValueType {
+    param(
+        [AllowNull()][object] $Value,
+        [Parameter(Mandatory = $true)][Type] $ExpectedType,
+        [Parameter(Mandatory = $true)][string] $Context
+    )
+
+    if (
+        $null -eq $Value -or
+        -not $ExpectedType.IsInstanceOfType($Value)
+    ) {
+        $actualType = if ($null -eq $Value) {
+            'null'
+        }
+        else {
+            $Value.GetType().FullName
+        }
+        throw (
+            "Clean-machine evidence '$Context' must be " +
+            "$($ExpectedType.FullName), received $actualType."
+        )
+    }
+}
+
+function Import-CleanMachineEvidence {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $ExpectedGitCommit,
+        [Parameter(Mandatory = $true)][string] $ExpectedInstallerSha256
+    )
+
+    if (-not [System.IO.Path]::IsPathRooted($Path)) {
+        $Path = Join-Path $script:WorkspaceRoot $Path
+    }
+    $Path = [System.IO.Path]::GetFullPath($Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Clean-machine evidence does not exist: $Path"
+    }
+
+    try {
+        $evidence = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Clean-machine evidence is not valid JSON: $($_.Exception.Message)"
+    }
+    Assert-EvidenceValueType `
+        -Value $evidence `
+        -ExpectedType ([pscustomobject]) `
+        -Context 'root'
+    $schemaVersion = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'schemaVersion' `
+        -Context 'root'
+    $suite = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'suite' `
+        -Context 'root'
+    $evidenceCommit = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'gitCommit' `
+        -Context 'root'
+    $evidenceInstallerHash = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'installerSha256' `
+        -Context 'root'
+    $collectedAtText = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'collectedAtUtc' `
+        -Context 'root'
+    $environment = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'environment' `
+        -Context 'root'
+    $results = Get-RequiredEvidenceProperty `
+        -Object $evidence `
+        -Name 'results' `
+        -Context 'root'
+
+    Assert-EvidenceValueType `
+        -Value $schemaVersion `
+        -ExpectedType ([int]) `
+        -Context 'schemaVersion'
+    foreach ($rootString in @(
+        @{ context = 'suite'; value = $suite },
+        @{ context = 'gitCommit'; value = $evidenceCommit },
+        @{ context = 'installerSha256'; value = $evidenceInstallerHash },
+        @{ context = 'collectedAtUtc'; value = $collectedAtText }
+    )) {
+        Assert-EvidenceValueType `
+            -Value $rootString.value `
+            -ExpectedType ([string]) `
+            -Context $rootString.context
+    }
+    Assert-EvidenceValueType `
+        -Value $environment `
+        -ExpectedType ([pscustomobject]) `
+        -Context 'environment'
+    Assert-EvidenceValueType `
+        -Value $results `
+        -ExpectedType ([pscustomobject]) `
+        -Context 'results'
+
+    if ($schemaVersion -ne 1) {
+        throw "Unsupported clean-machine evidence schema: $schemaVersion."
+    }
+    if ($suite -cne 'myalbuns_windows_clean_machine_e2e') {
+        throw "Unexpected clean-machine evidence suite: $suite."
+    }
+    if ($evidenceCommit -cne $ExpectedGitCommit) {
+        throw 'Clean-machine evidence was collected from a different Git commit.'
+    }
+    if (
+        $evidenceInstallerHash -notmatch '^[0-9a-fA-F]{64}$' -or
+        $evidenceInstallerHash.ToLowerInvariant() -cne
+            $ExpectedInstallerSha256.ToLowerInvariant()
+    ) {
+        throw 'Clean-machine evidence references a different installer.'
+    }
+    $collectedAt = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse($collectedAtText, [ref] $collectedAt)) {
+        throw 'Clean-machine evidence has an invalid collection timestamp.'
+    }
+
+    $provider = Get-RequiredEvidenceProperty `
+        -Object $environment `
+        -Name 'provider' `
+        -Context 'environment'
+    $disposable = Get-RequiredEvidenceProperty `
+        -Object $environment `
+        -Name 'disposable' `
+        -Context 'environment'
+    $preexistingMyAlbuns = Get-RequiredEvidenceProperty `
+        -Object $environment `
+        -Name 'preexistingMyAlbuns' `
+        -Context 'environment'
+    Assert-EvidenceValueType `
+        -Value $provider `
+        -ExpectedType ([string]) `
+        -Context 'environment.provider'
+    Assert-EvidenceValueType `
+        -Value $disposable `
+        -ExpectedType ([bool]) `
+        -Context 'environment.disposable'
+    Assert-EvidenceValueType `
+        -Value $preexistingMyAlbuns `
+        -ExpectedType ([bool]) `
+        -Context 'environment.preexistingMyAlbuns'
+    if (
+        [string]::IsNullOrWhiteSpace($provider) -or
+        $disposable -ne $true -or
+        $preexistingMyAlbuns -ne $false
+    ) {
+        throw 'The imported run was not performed in a disposable clean environment.'
+    }
+
+    foreach ($requiredTrue in @(
+        'installerExecuted',
+        'installationPassed',
+        'installedBinaryExercised',
+        'appLaunched',
+        'passed'
+    )) {
+        $value = Get-RequiredEvidenceProperty `
+            -Object $results `
+            -Name $requiredTrue `
+            -Context 'results'
+        Assert-EvidenceValueType `
+            -Value $value `
+            -ExpectedType ([bool]) `
+            -Context "results.$requiredTrue"
+        if ($value -ne $true) {
+            throw "Clean-machine result '$requiredTrue' did not pass."
+        }
+    }
+
+    $webView2 = Get-RequiredEvidenceProperty `
+        -Object $results `
+        -Name 'webView2' `
+        -Context 'results'
+    Assert-EvidenceValueType `
+        -Value $webView2 `
+        -ExpectedType ([pscustomobject]) `
+        -Context 'results.webView2'
+    $webViewDistribution = Get-RequiredEvidenceProperty `
+        -Object $webView2 `
+        -Name 'distribution' `
+        -Context 'results.webView2'
+    $webViewPath = Get-RequiredEvidenceProperty `
+        -Object $webView2 `
+        -Name 'executablePath' `
+        -Context 'results.webView2'
+    $webViewVersion = Get-RequiredEvidenceProperty `
+        -Object $webView2 `
+        -Name 'productVersion' `
+        -Context 'results.webView2'
+    foreach ($webViewString in @(
+        @{ context = 'results.webView2.distribution'; value = $webViewDistribution },
+        @{ context = 'results.webView2.executablePath'; value = $webViewPath },
+        @{ context = 'results.webView2.productVersion'; value = $webViewVersion }
+    )) {
+        Assert-EvidenceValueType `
+            -Value $webViewString.value `
+            -ExpectedType ([string]) `
+            -Context $webViewString.context
+    }
+    if (
+        $webViewDistribution -cne 'Evergreen' -or
+        [string]::IsNullOrWhiteSpace($webViewPath) -or
+        $webViewVersion -notmatch '^\d+(\.\d+){3}$'
+    ) {
+        throw 'Clean-machine evidence does not identify an Evergreen WebView2 runtime.'
+    }
+
+    $nativeDialog = Get-RequiredEvidenceProperty `
+        -Object $results `
+        -Name 'nativeDialog' `
+        -Context 'results'
+    Assert-EvidenceValueType `
+        -Value $nativeDialog `
+        -ExpectedType ([pscustomobject]) `
+        -Context 'results.nativeDialog'
+    $dialogObserved = Get-RequiredEvidenceProperty `
+        -Object $nativeDialog `
+        -Name 'observed' `
+        -Context 'results.nativeDialog'
+    $dialogKind = Get-RequiredEvidenceProperty `
+        -Object $nativeDialog `
+        -Name 'kind' `
+        -Context 'results.nativeDialog'
+    $dialogOutcome = Get-RequiredEvidenceProperty `
+        -Object $nativeDialog `
+        -Name 'outcome' `
+        -Context 'results.nativeDialog'
+    Assert-EvidenceValueType `
+        -Value $dialogObserved `
+        -ExpectedType ([bool]) `
+        -Context 'results.nativeDialog.observed'
+    foreach ($dialogString in @(
+        @{ context = 'results.nativeDialog.kind'; value = $dialogKind },
+        @{ context = 'results.nativeDialog.outcome'; value = $dialogOutcome }
+    )) {
+        Assert-EvidenceValueType `
+            -Value $dialogString.value `
+            -ExpectedType ([string]) `
+            -Context $dialogString.context
+    }
+    if (
+        $dialogObserved -ne $true -or
+        $dialogKind -cne 'native_file_open' -or
+        $dialogOutcome -cne 'cancelled'
+    ) {
+        throw 'Clean-machine evidence does not prove the native open dialog flow.'
+    }
+
+    return [ordered]@{
+        required = $true
+        scope = 'imported_clean_machine_e2e'
+        available = $true
+        provider = $provider
+        installerExecuted = $true
+        e2ePassed = $true
+        reasonCode = $null
+        importedEvidence = [ordered]@{
+            fileName = [System.IO.Path]::GetFileName($Path)
+            sha256 = (
+                Get-FileHash -LiteralPath $Path -Algorithm SHA256
+            ).Hash.ToLowerInvariant()
+            schemaVersion = [int] $schemaVersion
+            suite = $suite
+            collectedAtUtc = $collectedAt.ToUniversalTime().ToString('o')
+            gitCommit = $evidenceCommit
+            installerSha256 = $evidenceInstallerHash.ToLowerInvariant()
+        }
+        environment = $environment
+        results = $results
+    }
+}
+
+function Test-CleanMachineEvidenceTypeContract {
+    $expectedCommit = '1' * 40
+    $expectedInstallerHash = 'a' * 64
+    $validJson = @'
+{"schemaVersion":1,"suite":"myalbuns_windows_clean_machine_e2e","gitCommit":"1111111111111111111111111111111111111111","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","collectedAtUtc":"2026-07-31T20:00:00Z","environment":{"provider":"contract-test","disposable":true,"preexistingMyAlbuns":false},"results":{"installerExecuted":true,"installationPassed":true,"installedBinaryExercised":true,"appLaunched":true,"webView2":{"distribution":"Evergreen","executablePath":"C:\\WebView2\\msedgewebview2.exe","productVersion":"150.0.4078.105"},"nativeDialog":{"observed":true,"kind":"native_file_open","outcome":"cancelled"},"passed":true}}
+'@
+    $cases = @(
+        @{
+            name = 'schema-string'
+            from = '"schemaVersion":1'
+            to = '"schemaVersion":"1"'
+        },
+        @{
+            name = 'disposable-string'
+            from = '"disposable":true'
+            to = '"disposable":"true"'
+        },
+        @{
+            name = 'preexisting-string'
+            from = '"preexistingMyAlbuns":false'
+            to = '"preexistingMyAlbuns":"false"'
+        },
+        @{
+            name = 'passed-number'
+            from = '"passed":true'
+            to = '"passed":1'
+        }
+    )
+    $testDirectory = Join-Path `
+        ([System.IO.Path]::GetTempPath()) `
+        "myalbuns-clean-evidence-$([Guid]::NewGuid().ToString('N'))"
+    [System.IO.Directory]::CreateDirectory($testDirectory) | Out-Null
+
+    try {
+        $validPath = Join-Path $testDirectory 'valid.json'
+        [System.IO.File]::WriteAllText(
+            $validPath,
+            $validJson,
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        $valid = Import-CleanMachineEvidence `
+            -Path $validPath `
+            -ExpectedGitCommit $expectedCommit `
+            -ExpectedInstallerSha256 $expectedInstallerHash
+        if (-not $valid.e2ePassed) {
+            throw 'The valid clean-machine evidence contract was rejected.'
+        }
+
+        foreach ($case in $cases) {
+            $casePath = Join-Path $testDirectory "$($case.name).json"
+            [System.IO.File]::WriteAllText(
+                $casePath,
+                $validJson.Replace($case.from, $case.to),
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $rejected = $false
+            try {
+                [void] (Import-CleanMachineEvidence `
+                    -Path $casePath `
+                    -ExpectedGitCommit $expectedCommit `
+                    -ExpectedInstallerSha256 $expectedInstallerHash)
+            }
+            catch {
+                if ($_.Exception.Message -notlike '*must be*') {
+                    throw
+                }
+                $rejected = $true
+            }
+            if (-not $rejected) {
+                throw "Mistyped clean-machine evidence was accepted: $($case.name)."
+            }
+        }
+    }
+    finally {
+        foreach ($temporaryFile in @(
+            Get-ChildItem -LiteralPath $testDirectory -File -ErrorAction SilentlyContinue
+        )) {
+            [System.IO.File]::Delete($temporaryFile.FullName)
+        }
+        [System.IO.Directory]::Delete($testDirectory, $false)
+    }
+}
+
 $tokens = $null
 $parserErrors = $null
 foreach ($scriptPath in @($PSCommandPath, (Join-Path $PSScriptRoot 'WindowsProcessTree.ps1'))) {
@@ -472,6 +848,13 @@ foreach ($scriptPath in @($PSCommandPath, (Join-Path $PSScriptRoot 'WindowsProce
     }
 }
 Add-Check -Name 'powershell-runner-ast' -ElapsedMs 0
+
+$evidenceContractWatch = [System.Diagnostics.Stopwatch]::StartNew()
+Test-CleanMachineEvidenceTypeContract
+$evidenceContractWatch.Stop()
+Add-Check `
+    -Name 'clean-machine-evidence-type-contract' `
+    -ElapsedMs $evidenceContractWatch.ElapsedMilliseconds
 
 $initialBuildInputs = Get-BuildInputState
 if ($initialBuildInputs.dirty) {
@@ -721,7 +1104,6 @@ $rustHost = @(
 if ($rustHost.Count -ne 1 -or $rustHost[0] -cne 'x86_64-pc-windows-msvc') {
     throw "Unexpected Rust host: $($rustHost -join ', ')."
 }
-$cleanEnvironment = Get-CleanEnvironmentEvidence
 $operatingSystem = Get-CimInstance Win32_OperatingSystem
 
 $applicationEvidence = Get-FileEvidence -Path $applicationPath
@@ -732,6 +1114,17 @@ $packagedSidecarEvidence = Get-FileEvidence -Path $packagedSidecarPath
 $packagedSidecarEvidence.pe = $packagedSidecarPe
 $packagedSidecarEvidence.matchesBuiltSidecar = $true
 $installerEvidence = Get-FileEvidence -Path $installerPath
+if ([string]::IsNullOrWhiteSpace($CleanMachineEvidencePath)) {
+    $cleanEnvironment = Get-LocalCleanEnvironmentEvidence
+}
+else {
+    $cleanEnvironment = Import-CleanMachineEvidence `
+        -Path $CleanMachineEvidencePath `
+        -ExpectedGitCommit $gitCommit `
+        -ExpectedInstallerSha256 $installerEvidence.sha256
+    Add-Check -Name 'correlated-clean-machine-e2e' -ElapsedMs 0
+}
+$criterionSatisfied = [bool] $cleanEnvironment.e2ePassed
 
 $report = [ordered]@{
     schemaVersion = 1
@@ -781,15 +1174,20 @@ $report = [ordered]@{
     }
     completion = [ordered]@{
         localProbePassed = $true
-        cleanMachineE2ePassed = $false
-        ticketCriterionSatisfied = $false
+        cleanMachineE2ePassed = $criterionSatisfied
+        ticketCriterionSatisfied = $criterionSatisfied
     }
     interpretation = [ordered]@{
-        criterionClosed = $false
-        reason = (
-            'The bundle, x64 payloads, WebView2 and native dialog passed locally; ' +
-            'installation and execution on a clean Windows machine were unavailable.'
-        )
+        criterionClosed = $criterionSatisfied
+        reason = if ($criterionSatisfied) {
+            'Local distribution checks and the correlated clean-machine E2E passed.'
+        }
+        else {
+            (
+                'The bundle, x64 payloads, WebView2 and native dialog passed locally; ' +
+                'installation and execution on a clean Windows machine were unavailable.'
+            )
+        }
     }
 }
 
@@ -803,7 +1201,10 @@ $json = $report | ConvertTo-Json -Depth 16
 )
 
 Write-Output "Local Windows distribution probe passed: $OutputPath"
-if ($cleanEnvironment.available) {
+if ($criterionSatisfied) {
+    Write-Output 'Correlated clean-machine installation and E2E evidence passed.'
+}
+elseif ($cleanEnvironment.available) {
     Write-Output 'A disposable Windows exists, but its clean-machine E2E was not exercised.'
 }
 else {
