@@ -15,7 +15,7 @@ Boas-vindas e o backend Tauri. Cada superfície deve chamar somente os comandos
 próprios necessários ao corte atual, sem receber APIs genéricas do sistema
 operacional.
 
-A evidência canônica foi atualizada no commit `d200628`, com os 220 inputs de
+A evidência canônica foi atualizada no commit `40649bc`, com os 220 inputs de
 código e build limpos:
 
 - [`artifacts/0016-frontend-security-gate.json`](artifacts/0016-frontend-security-gate.json).
@@ -86,7 +86,7 @@ O runner executou sete checks:
 | Contrato Rust da capability da Tela de Boas-vindas | passou |
 | Contrato Rust do scope de assets | passou |
 | Compilação da ACL pelo Tauri | passou |
-| Fronteira Tauri no frontend | 5 testes passaram |
+| Fronteira Tauri no frontend | 7 testes passaram |
 | Build de produção do frontend | passou |
 
 Além dos testes-fonte, o runner comparou a capability e a permission escritas

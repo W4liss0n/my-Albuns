@@ -1,8 +1,8 @@
 {
     "schemaVersion":  2,
     "suite":  "frontend_security_capabilities",
-    "collectedAtUtc":  "2026-08-01T01:24:46.2146244+00:00",
-    "gitCommit":  "d20062830159ee7eef2198c6b83191f1b529aeb1",
+    "collectedAtUtc":  "2026-08-01T01:36:57.7979573+00:00",
+    "gitCommit":  "40649bc40c36367f9e0b88e4d28edf54efdd24e2",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -15,7 +15,7 @@
                   "cargoBuildJobs":  1,
                   "targetDirectory":  "target/frontend-security-gate",
                   "buildInputFileCount":  220,
-                  "buildInputDigestSha256":  "25481f3a3e96773c68ef1060828dbb26c2dfb8433c8091f5882d97d8b3048589",
+                  "buildInputDigestSha256":  "ee6c3a3adf56aba3240d92c6b59014747c501d8979db8a343ba27d4f0ff88c49",
                   "buildInputsDirty":  false,
                   "workingTreeDirty":  true
               },
@@ -28,32 +28,32 @@
                    {
                        "name":  "rust-project-capability-contract",
                        "passed":  true,
-                       "elapsedMs":  46081
+                       "elapsedMs":  499
                    },
                    {
                        "name":  "rust-global-capability-contract",
                        "passed":  true,
-                       "elapsedMs":  413
+                       "elapsedMs":  398
                    },
                    {
                        "name":  "rust-asset-scope-contract",
                        "passed":  true,
-                       "elapsedMs":  393
+                       "elapsedMs":  380
                    },
                    {
                        "name":  "tauri-acl-compilation",
                        "passed":  true,
-                       "elapsedMs":  13889
+                       "elapsedMs":  391
                    },
                    {
                        "name":  "frontend-tauri-boundary",
                        "passed":  true,
-                       "elapsedMs":  3766
+                       "elapsedMs":  3270
                    },
                    {
                        "name":  "frontend-production-build",
                        "passed":  true,
-                       "elapsedMs":  10464
+                       "elapsedMs":  9299
                    }
                ],
     "results":  {
