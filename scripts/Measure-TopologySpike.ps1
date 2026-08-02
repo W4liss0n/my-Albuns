@@ -45,7 +45,9 @@ $rgba8BytesPerPixel = 4
 $corpusManifestPath = Join-Path $script:WorkspaceRoot '.scratch\topology-corpus\manifest.json'
 $probeGateDirectory = Join-Path $script:WorkspaceRoot '.scratch\topology-probe-gates'
 $desktopLogDirectory = Join-Path $env:LOCALAPPDATA 'MyAlbuns2\Logs'
-$startedProcessIds = [System.Collections.Generic.List[int]]::new()
+$startedProcesses = [System.Collections.Generic.Dictionary[int, long]]::new()
+$startedProcessWebViewNamespaces =
+    [System.Collections.Generic.Dictionary[int, string]]::new()
 $probeGatePaths = [System.Collections.Generic.List[string]]::new()
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -92,6 +94,7 @@ $reportText = @'
     "A Exporta\u00e7\u00e3o foi liberada por um segundo gate somente depois dos dois probes de Canvas e desse snapshot gr\u00e1fico.",
     "Os dois hosts independentes foram iniciados antes da espera pelas Janelas, usando o mesmo marco inicial da alternativa multiwindow.",
     "A queda s\u00f3 \u00e9 for\u00e7ada depois de validar o caminho do execut\u00e1vel do PID alvo.",
+    "O runner captura a identidade do host e de seus descendentes antes da queda, encerra toda a \u00e1rvore e confirma que nenhum descendente identificado permaneceu ativo.",
     "O gate de falhas aplica uma inten\u00e7\u00e3o real, persiste atomicamente, rel\u00ea pelo n\u00facleo e s\u00f3 ent\u00e3o confirma a revis\u00e3o como salva.",
     "A recupera\u00e7\u00e3o do host reabre apenas a \u00faltima revis\u00e3o explicitamente salva; recupera\u00e7\u00e3o de altera\u00e7\u00f5es n\u00e3o salvas permanece fora deste gate.",
     "A IPC \u00e9 descrita por limites, rela\u00e7\u00f5es e contagens m\u00ednimas observ\u00e1veis; nenhum escore sint\u00e9tico de complexidade foi inventado.",
@@ -486,7 +489,17 @@ function Start-TopologyProcess {
             -FilePath $executablePath `
             -WorkingDirectory $script:WorkspaceRoot `
             -PassThru
-        $startedProcessIds.Add($process.Id)
+        $startedProcesses[$process.Id] = [long](
+            $process.StartTime.ToUniversalTime().Ticks
+        )
+        $startedProcessWebViewNamespaces[$process.Id] = if (
+            $Topology -eq 'multiwindow'
+        ) {
+            'topology-multiwindow'
+        }
+        else {
+            "topology-independent-project-$ProjectSlot"
+        }
         return $process
     }
     finally {
@@ -514,26 +527,457 @@ function Assert-OwnedTopologyProcess {
     }
 }
 
+function Get-TopologyProcessTreeSnapshot {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int[]] $RootProcessIds,
+        [hashtable] $VirtualRootBounds = @{}
+    )
+
+    $allProcesses = @(Get-CimInstance Win32_Process)
+    $childrenByParent = @{}
+    $processById = @{}
+    foreach ($process in $allProcesses) {
+        $processById[[int]$process.ProcessId] = $process
+        $parentProcessId = [int]$process.ParentProcessId
+        if (-not $childrenByParent.ContainsKey($parentProcessId)) {
+            $childrenByParent[$parentProcessId] =
+                [System.Collections.Generic.List[object]]::new()
+        }
+        $childrenByParent[$parentProcessId].Add($process)
+    }
+    $currentProcessById = @{}
+    foreach ($process in @(Get-CimInstance Win32_Process)) {
+        $currentProcessById[[int]$process.ProcessId] = $process
+    }
+
+    $known = [System.Collections.Generic.HashSet[int]]::new()
+    $queue = [System.Collections.Generic.Queue[object]]::new()
+    foreach ($rootProcessId in $RootProcessIds) {
+        $rootProcess = $processById[$rootProcessId]
+        if ($null -ne $rootProcess -and $known.Add($rootProcessId)) {
+            $queue.Enqueue([pscustomobject]@{
+                processId = $rootProcessId
+                creationTimeUtcTicks = [long](
+                    $rootProcess.CreationDate.ToUniversalTime().Ticks
+                )
+                maximumChildCreationTimeUtcTicks = [long]::MaxValue
+                depth = 0
+            })
+        }
+        elseif (
+            $VirtualRootBounds.ContainsKey($rootProcessId) -and
+            $known.Add($rootProcessId)
+        ) {
+            $bounds = $VirtualRootBounds[$rootProcessId]
+            $queue.Enqueue([pscustomobject]@{
+                processId = $rootProcessId
+                creationTimeUtcTicks = [long]$bounds.creationTimeUtcTicks
+                maximumChildCreationTimeUtcTicks =
+                    [long]$bounds.maximumChildCreationTimeUtcTicks
+                depth = 0
+            })
+        }
+    }
+
+    $snapshot = [System.Collections.Generic.List[object]]::new()
+    while ($queue.Count -gt 0) {
+        $entry = $queue.Dequeue()
+        $sourceProcess = $processById[[int]$entry.processId]
+        $runtimeProcess = Get-Process `
+            -Id $entry.processId `
+            -ErrorAction SilentlyContinue
+        if ($null -ne $sourceProcess -and $null -ne $runtimeProcess) {
+            try {
+                $runtimeStartTimeUtcTicks = [long](
+                    $runtimeProcess.StartTime.ToUniversalTime().Ticks
+                )
+                $null = $runtimeProcess.Handle
+                $currentProcess = $currentProcessById[[int]$entry.processId]
+                if ($null -eq $currentProcess) {
+                    $runtimeProcess.Dispose()
+                }
+                else {
+                    $sourceCreationTimeUtcTicks = [long](
+                        $sourceProcess.CreationDate.ToUniversalTime().Ticks
+                    )
+                    $currentCreationTimeUtcTicks = [long](
+                        $currentProcess.CreationDate.ToUniversalTime().Ticks
+                    )
+                    if (
+                        $sourceCreationTimeUtcTicks -ne
+                            $currentCreationTimeUtcTicks -or
+                        [Math]::Abs(
+                            $runtimeStartTimeUtcTicks -
+                                $currentCreationTimeUtcTicks
+                        ) -gt 10000
+                    ) {
+                        throw 'the PID identity changed during the snapshot'
+                    }
+                    $snapshot.Add([pscustomobject]@{
+                        processId = [int]$runtimeProcess.Id
+                        parentProcessId = [int]$sourceProcess.ParentProcessId
+                        startTimeUtcTicks = $runtimeStartTimeUtcTicks
+                        process = $runtimeProcess
+                        depth = [int]$entry.depth
+                    })
+                }
+            }
+            catch {
+                $identityError = $_
+                $exitedDuringSnapshot = $false
+                try {
+                    $exitedDuringSnapshot = $runtimeProcess.HasExited
+                }
+                catch {
+                    $exitedDuringSnapshot = $false
+                }
+                if (-not $exitedDuringSnapshot) {
+                    throw (
+                        "Could not capture the identity of topology process " +
+                        "$($entry.processId): $($identityError.Exception.Message)"
+                    )
+                }
+            }
+        }
+
+        if (-not $childrenByParent.ContainsKey([int]$entry.processId)) {
+            continue
+        }
+        foreach ($child in $childrenByParent[[int]$entry.processId]) {
+            $childProcessId = [int]$child.ProcessId
+            $childCreationTimeUtcTicks = [long](
+                $child.CreationDate.ToUniversalTime().Ticks
+            )
+            if (
+                $childCreationTimeUtcTicks -ge $entry.creationTimeUtcTicks -and
+                $childCreationTimeUtcTicks -le
+                    $entry.maximumChildCreationTimeUtcTicks -and
+                $known.Add($childProcessId)
+            ) {
+                $queue.Enqueue([pscustomobject]@{
+                    processId = $childProcessId
+                    creationTimeUtcTicks = $childCreationTimeUtcTicks
+                    maximumChildCreationTimeUtcTicks = [long]::MaxValue
+                    depth = [int]$entry.depth + 1
+                })
+            }
+        }
+    }
+
+    return @($snapshot | Sort-Object depth, processId)
+}
+
+function Get-MatchingTopologyProcess {
+    param([Parameter(Mandatory = $true)] $Snapshot)
+
+    $process = $Snapshot.process
+    try {
+        if ($process.HasExited) {
+            return $null
+        }
+    }
+    catch {
+        throw (
+            "Could not confirm topology process identity " +
+            "$($Snapshot.processId): $($_.Exception.Message)"
+        )
+    }
+    return $process
+}
+
+function Stop-CapturedTopologyProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Process] $Process,
+        [Parameter(Mandatory = $true)]
+        [string] $Description
+    )
+
+    if ($Process.HasExited) {
+        return $false
+    }
+    try {
+        $Process.Kill()
+        return $true
+    }
+    catch {
+        $killError = $_
+        try {
+            if ($Process.HasExited) {
+                return $false
+            }
+        }
+        catch {
+            throw (
+                "Could not confirm $Description after termination failed: " +
+                $killError.Exception.Message
+            )
+        }
+        throw (
+            "Could not terminate ${Description}: " +
+            $killError.Exception.Message
+        )
+    }
+}
+
+function Stop-TopologyProcessTree {
+    param(
+        [Parameter(Mandatory = $true)]
+        [int] $RootProcessId,
+        [Parameter(Mandatory = $true)]
+        [long] $ExpectedRootStartTimeUtcTicks,
+        [ValidateRange(1000, 60000)]
+        [int] $TimeoutMilliseconds = 30000
+    )
+
+    $initialSnapshot = @(
+        Get-TopologyProcessTreeSnapshot -RootProcessIds @($RootProcessId)
+    )
+    $rootSnapshot = @(
+        $initialSnapshot | Where-Object { $_.processId -eq $RootProcessId }
+    )
+    if (
+        $rootSnapshot.Count -ne 1 -or
+        $rootSnapshot[0].startTimeUtcTicks -ne
+            $ExpectedRootStartTimeUtcTicks
+    ) {
+        throw "Topology root PID $RootProcessId no longer has its captured identity."
+    }
+
+    $capturedRootProcess = $rootSnapshot[0].process
+    $rootProcess = Get-MatchingTopologyProcess -Snapshot $rootSnapshot[0]
+    $rootStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    if ($null -ne $rootProcess) {
+        [void](
+            Stop-CapturedTopologyProcess `
+                -Process $rootProcess `
+                -Description "topology root process $RootProcessId"
+        )
+    }
+    $rootExitObserved = $capturedRootProcess.WaitForExit(
+        $TimeoutMilliseconds
+    )
+    $rootStopwatch.Stop()
+    if (-not $rootExitObserved) {
+        throw "Topology root process $RootProcessId survived forced termination."
+    }
+
+    $postExitSnapshot = @(
+        Get-TopologyProcessTreeSnapshot `
+            -RootProcessIds @($RootProcessId) `
+            -VirtualRootBounds @{
+                $RootProcessId = [ordered]@{
+                    creationTimeUtcTicks = $ExpectedRootStartTimeUtcTicks
+                    maximumChildCreationTimeUtcTicks = [long](
+                        $capturedRootProcess.ExitTime.ToUniversalTime().Ticks
+                    )
+                }
+            }
+    )
+    $snapshotByIdentity = @{}
+    $startTimeByProcessId = @{}
+    foreach ($entry in @($initialSnapshot) + @($postExitSnapshot)) {
+        if (
+            $startTimeByProcessId.ContainsKey([int]$entry.processId) -and
+            $startTimeByProcessId[[int]$entry.processId] -ne
+                [long]$entry.startTimeUtcTicks
+        ) {
+            throw (
+                "Topology process PID $($entry.processId) was reused " +
+                'during termination.'
+            )
+        }
+        $startTimeByProcessId[[int]$entry.processId] =
+            [long]$entry.startTimeUtcTicks
+        $identity = "$($entry.processId)|$($entry.startTimeUtcTicks)"
+        if (-not $snapshotByIdentity.ContainsKey($identity)) {
+            $snapshotByIdentity[$identity] = $entry
+        }
+    }
+    $descendants = @(
+        $snapshotByIdentity.Values | Where-Object {
+            $_.processId -ne $RootProcessId
+        }
+    )
+
+    $cleanupStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $cleanupDeadline = [DateTime]::UtcNow.AddMilliseconds(
+        $TimeoutMilliseconds
+    )
+    $naturalExitDeadline = [DateTime]::UtcNow.AddMilliseconds(
+        [Math]::Min(5000, $TimeoutMilliseconds)
+    )
+    do {
+        $remainingDescendants = @(
+            $descendants | Where-Object {
+                $null -ne (Get-MatchingTopologyProcess -Snapshot $_)
+            }
+        )
+        if ($remainingDescendants.Count -eq 0) {
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $naturalExitDeadline)
+
+    $forcedCleanupIdentities = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($descendant in @(
+        $remainingDescendants | Sort-Object depth, processId
+    )) {
+        $process = Get-MatchingTopologyProcess -Snapshot $descendant
+        if ($null -ne $process) {
+            $terminated = Stop-CapturedTopologyProcess `
+                -Process $process `
+                -Description "topology descendant $($descendant.processId)"
+            if ($terminated) {
+                [void]$forcedCleanupIdentities.Add(
+                    "$($descendant.processId)|$($descendant.startTimeUtcTicks)"
+                )
+            }
+        }
+    }
+
+    do {
+        $remainingDescendants = @(
+            $descendants | Where-Object {
+                $null -ne (Get-MatchingTopologyProcess -Snapshot $_)
+            }
+        )
+        if ($remainingDescendants.Count -eq 0) {
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $cleanupDeadline)
+    $cleanupStopwatch.Stop()
+
+    if ($remainingDescendants.Count -ne 0) {
+        $remainingIds = @(
+            $remainingDescendants | ForEach-Object { $_.processId }
+        ) -join ', '
+        throw (
+            "Topology root process $RootProcessId left descendants running: " +
+            $remainingIds
+        )
+    }
+
+    return [ordered]@{
+        exitObserved = $true
+        exitObservationMs = [long]$rootStopwatch.ElapsedMilliseconds
+        descendantProcessCount = [int]$descendants.Count
+        forcedDescendantCleanupCount = [int]$forcedCleanupIdentities.Count
+        descendantsExited = $true
+        remainingDescendantProcessCount = 0
+        descendantCleanupMs = [long]$cleanupStopwatch.ElapsedMilliseconds
+    }
+}
+
+function Stop-TopologyWebViewProfileProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidatePattern('^topology-(independent-project-[ab]|multiwindow)$')]
+        [string] $Namespace,
+        [Parameter(Mandatory = $true)]
+        [long] $MinimumStartTimeUtcTicks,
+        [ValidateRange(1000, 60000)]
+        [int] $TimeoutMilliseconds = 10000
+    )
+
+    $profilePath = Join-Path `
+        $env:LOCALAPPDATA `
+        "MyAlbuns2\State\WebView2\$Namespace"
+    $profilePattern = [regex]::Escape($profilePath) + '(\\|"|\s|$)'
+    $captured = [System.Collections.Generic.List[object]]::new()
+    foreach ($candidate in @(Get-CimInstance Win32_Process)) {
+        if (
+            $candidate.Name -ne 'msedgewebview2.exe' -or
+            [string]::IsNullOrWhiteSpace([string]$candidate.CommandLine) -or
+            $candidate.CommandLine -notmatch $profilePattern -or
+            [long]$candidate.CreationDate.ToUniversalTime().Ticks -lt
+                $MinimumStartTimeUtcTicks
+        ) {
+            continue
+        }
+        $process = Get-Process `
+            -Id ([int]$candidate.ProcessId) `
+            -ErrorAction SilentlyContinue
+        if ($null -eq $process) {
+            continue
+        }
+        $startTimeUtcTicks = [long](
+            $process.StartTime.ToUniversalTime().Ticks
+        )
+        $creationTimeUtcTicks = [long](
+            $candidate.CreationDate.ToUniversalTime().Ticks
+        )
+        if ([Math]::Abs($startTimeUtcTicks - $creationTimeUtcTicks) -gt 10000) {
+            throw (
+                "WebView2 PID $($candidate.ProcessId) changed identity " +
+                "while cleaning profile '$Namespace'."
+            )
+        }
+        $null = $process.Handle
+        $captured.Add($process)
+    }
+
+    foreach ($process in $captured) {
+        [void](
+            Stop-CapturedTopologyProcess `
+                -Process $process `
+                -Description "WebView2 profile '$Namespace' process $($process.Id)"
+        )
+    }
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+    do {
+        $remaining = @($captured | Where-Object { -not $_.HasExited })
+        if ($remaining.Count -eq 0) {
+            break
+        }
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($remaining.Count -ne 0) {
+        throw (
+            "WebView2 profile '$Namespace' left captured processes running."
+        )
+    }
+    return [int]$captured.Count
+}
+
 function Stop-OwnedTopologyProcess {
     param([Parameter(Mandatory = $true)][int] $ProcessId)
 
-    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-    if ($null -eq $process) {
-        [void] $startedProcessIds.Remove($ProcessId)
+    if (-not $startedProcesses.ContainsKey($ProcessId)) {
         return
     }
-    try {
-        Assert-OwnedTopologyProcess -ProcessId $ProcessId
-        Stop-Process -Id $ProcessId -Force
-        Wait-Process -Id $ProcessId -Timeout 10 -ErrorAction SilentlyContinue
-    }
-    finally {
-        if ($null -eq (
-            Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-        )) {
-            [void] $startedProcessIds.Remove($ProcessId)
+    $expectedStartTimeUtcTicks = $startedProcesses[$ProcessId]
+    $webViewNamespace = $startedProcessWebViewNamespaces[$ProcessId]
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        if (-not [string]::IsNullOrWhiteSpace($webViewNamespace)) {
+            [void](
+                Stop-TopologyWebViewProfileProcesses `
+                    -Namespace $webViewNamespace `
+                    -MinimumStartTimeUtcTicks $expectedStartTimeUtcTicks
+            )
         }
+        [void]$startedProcesses.Remove($ProcessId)
+        [void]$startedProcessWebViewNamespaces.Remove($ProcessId)
+        return
     }
+    $actualStartTimeUtcTicks = [long](
+        $process.StartTime.ToUniversalTime().Ticks
+    )
+    if ($actualStartTimeUtcTicks -ne $expectedStartTimeUtcTicks) {
+        throw "Topology root PID $ProcessId was reused before cleanup."
+    }
+    Assert-OwnedTopologyProcess -ProcessId $ProcessId
+    [void](
+        Stop-TopologyProcessTree `
+            -RootProcessId $ProcessId `
+            -ExpectedRootStartTimeUtcTicks $expectedStartTimeUtcTicks `
+            -TimeoutMilliseconds 10000
+    )
+    [void]$startedProcesses.Remove($ProcessId)
+    [void]$startedProcessWebViewNamespaces.Remove($ProcessId)
 }
 
 function Wait-ForTopologyWindows {
@@ -679,6 +1123,10 @@ function Wait-ForMediaCache {
         [Parameter(Mandatory = $true)]
         [int] $ExpectedProjectCount,
         [Parameter(Mandatory = $true)]
+        [int] $ExpectedWindowCount,
+        [Parameter(Mandatory = $true)]
+        [string] $ExpectedTitleMarker,
+        [Parameter(Mandatory = $true)]
         [DateTimeOffset] $StartedAt,
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Stopwatch] $TopologyStopwatch
@@ -693,6 +1141,23 @@ function Wait-ForMediaCache {
             if ($null -eq (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
                 throw "Topology host $processId exited before its media Cache was ready."
             }
+        }
+        $windows = @(
+            [MyAlbunsWindowProbe]::VisibleWindowsFor($RootProcessIds)
+        )
+        $unexpectedTitles = @(
+            $windows | Where-Object {
+                -not ($_.Title.Contains($ExpectedTitleMarker))
+            }
+        )
+        if (
+            $windows.Count -ne $ExpectedWindowCount -or
+            $unexpectedTitles.Count -ne 0
+        ) {
+            throw (
+                'A topology window disappeared or changed identity before ' +
+                'its media Cache was ready.'
+            )
         }
         $cacheEvents = @(Get-DesktopLogEventsSince -Since $StartedAt)
         $failedEvents = @(
@@ -2099,6 +2564,8 @@ try {
     $independentCache = Wait-ForMediaCache `
         -RootProcessIds @($independentA.Id, $independentB.Id) `
         -ExpectedProjectCount 2 `
+        -ExpectedWindowCount 2 `
+        -ExpectedTitleMarker '[Topologia A]' `
         -StartedAt $independentStartedAt `
         -TopologyStopwatch $independentStopwatch
     Open-TopologyProbeGate -Path $independentProbeGate
@@ -2230,6 +2697,8 @@ try {
     $independentRestartedCache = Wait-ForMediaCache `
         -RootProcessIds @($independentRestartedA.Id) `
         -ExpectedProjectCount 1 `
+        -ExpectedWindowCount 1 `
+        -ExpectedTitleMarker '[Topologia A]' `
         -StartedAt $independentHostRestartStartedAt `
         -TopologyStopwatch $independentHostRestartStopwatch
     $independentReopen = Wait-ForTopologyProjectReopen `
@@ -2383,6 +2852,8 @@ try {
     $multiwindowCache = Wait-ForMediaCache `
         -RootProcessIds @($multiwindow.Id) `
         -ExpectedProjectCount 2 `
+        -ExpectedWindowCount 2 `
+        -ExpectedTitleMarker '[Topologia B]' `
         -StartedAt $multiwindowStartedAt `
         -TopologyStopwatch $multiwindowStopwatch
     Open-TopologyProbeGate -Path $multiwindowProbeGate
@@ -2503,6 +2974,8 @@ try {
     $multiwindowRestartedCache = Wait-ForMediaCache `
         -RootProcessIds @($multiwindowRestarted.Id) `
         -ExpectedProjectCount 2 `
+        -ExpectedWindowCount 2 `
+        -ExpectedTitleMarker '[Topologia B]' `
         -StartedAt $multiwindowHostRestartStartedAt `
         -TopologyStopwatch $multiwindowHostRestartStopwatch
     $multiwindowReopen = Wait-ForTopologyProjectReopen `
@@ -2661,18 +3134,40 @@ try {
         $multiwindowFailureIsolation.projectHost.explicitRestart.
             reopen.observedProjects -eq 2
     )
+    $independentTreeCleanupComplete = (
+        $independentFailureIsolation.globalProcess.termination.
+            descendantsExited -and
+        $independentFailureIsolation.globalProcess.termination.
+            remainingDescendantProcessCount -eq 0 -and
+        $independentFailureIsolation.projectHost.termination.
+            descendantsExited -and
+        $independentFailureIsolation.projectHost.termination.
+            remainingDescendantProcessCount -eq 0
+    )
+    $multiwindowTreeCleanupComplete = (
+        $multiwindowFailureIsolation.globalProcess.termination.
+            descendantsExited -and
+        $multiwindowFailureIsolation.globalProcess.termination.
+            remainingDescendantProcessCount -eq 0 -and
+        $multiwindowFailureIsolation.projectHost.termination.
+            descendantsExited -and
+        $multiwindowFailureIsolation.projectHost.termination.
+            remainingDescendantProcessCount -eq 0
+    )
     $failureGatePassed = (
         $independentOfflineComplete -and
         $independentReopenComplete -and
+        $independentTreeCleanupComplete -and
         $multiwindowOfflineComplete -and
         $multiwindowReopenComplete -and
+        $multiwindowTreeCleanupComplete -and
         -not $buildManifest.buildInputsDirty -and
         $currentInputState.digestSha256 -eq
             $buildManifest.buildInputDigestSha256 -and
         $imagingRecovery.validated
     )
     $report = [ordered]@{
-        schemaVersion = 12
+        schemaVersion = 13
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         execution = [ordered]@{
             order = $ExecutionOrder
@@ -2758,7 +3253,7 @@ try {
     Write-Output $json
 }
 finally {
-    foreach ($processId in @($startedProcessIds)) {
+    foreach ($processId in @($startedProcesses.Keys)) {
         try {
             Stop-OwnedTopologyProcess -ProcessId $processId
         }

@@ -55,7 +55,10 @@ function Start-TopologyGlobalProcess {
             -WorkingDirectory $script:WorkspaceRoot `
             -PassThru
         if (-not $DoNotTrack) {
-            $startedProcessIds.Add($process.Id)
+            $startedProcesses[$process.Id] = [long](
+                $process.StartTime.ToUniversalTime().Ticks
+            )
+            $startedProcessWebViewNamespaces[$process.Id] = ''
         }
         return $process
     }
@@ -282,6 +285,10 @@ function Confirm-TopologyGlobalSingleton {
         -Endpoint $Endpoint `
         -DoNotTrack
     if (-not $duplicate.WaitForExit(10000)) {
+        $startedProcesses[$duplicate.Id] = [long](
+            $duplicate.StartTime.ToUniversalTime().Ticks
+        )
+        $startedProcessWebViewNamespaces[$duplicate.Id] = ''
         Invoke-TopologyProcessCrash `
             -ProcessId $duplicate.Id `
             -Role 'unexpected_global_duplicate' | Out-Null
@@ -321,26 +328,31 @@ function Invoke-TopologyProcessCrash {
     )
 
     Assert-OwnedTopologyProcess -ProcessId $ProcessId
-    $process = Get-Process -Id $ProcessId -ErrorAction Stop
     $observedAtUtc = [DateTimeOffset]::UtcNow.ToString('o')
-    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    if (-not $process.HasExited) {
-        $process.Kill()
+    if (-not $startedProcesses.ContainsKey($ProcessId)) {
+        throw "Topology process $ProcessId does not have a captured identity."
     }
-    $exitObserved = $process.WaitForExit(30000)
-    $stopwatch.Stop()
-    if (-not $exitObserved -or -not $process.HasExited) {
-        throw "The validated $Role process $ProcessId survived forced termination."
-    }
-    [void] $startedProcessIds.Remove($ProcessId)
+    $termination = Stop-TopologyProcessTree `
+        -RootProcessId $ProcessId `
+        -ExpectedRootStartTimeUtcTicks $startedProcesses[$ProcessId] `
+        -TimeoutMilliseconds 30000
+    [void] $startedProcesses.Remove($ProcessId)
+    [void] $startedProcessWebViewNamespaces.Remove($ProcessId)
     return [ordered]@{
         role = $Role
         processId = $ProcessId
         executable = $executableRelativePath
         executableValidated = $true
         requestedAtUtc = $observedAtUtc
-        exitObserved = $true
-        exitObservationMs = [long] $stopwatch.ElapsedMilliseconds
+        exitObserved = [bool]$termination.exitObserved
+        exitObservationMs = [long]$termination.exitObservationMs
+        descendantProcessCount = [int]$termination.descendantProcessCount
+        forcedDescendantCleanupCount =
+            [int]$termination.forcedDescendantCleanupCount
+        descendantsExited = [bool]$termination.descendantsExited
+        remainingDescendantProcessCount =
+            [int]$termination.remainingDescendantProcessCount
+        descendantCleanupMs = [long]$termination.descendantCleanupMs
     }
 }
 

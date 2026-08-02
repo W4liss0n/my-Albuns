@@ -192,6 +192,40 @@ function Assert-ContinuityProbeContract {
     }
 }
 
+function Assert-TerminationContract {
+    param(
+        [Parameter(Mandatory = $true)] $Termination,
+        [Parameter(Mandatory = $true)][string] $Field
+    )
+
+    foreach ($name in @(
+        'exitObserved',
+        'executableValidated',
+        'descendantsExited'
+    )) {
+        Assert-JsonBoolean `
+            -Value $Termination.$name `
+            -Field "$Field.$name"
+    }
+    foreach ($name in @(
+        'exitObservationMs',
+        'descendantProcessCount',
+        'forcedDescendantCleanupCount',
+        'remainingDescendantProcessCount',
+        'descendantCleanupMs'
+    )) {
+        Assert-JsonNumber `
+            -Value $Termination.$name `
+            -Field "$Field.$name"
+    }
+    Assert-Condition `
+        -Condition (
+            [int]$Termination.forcedDescendantCleanupCount -le
+                [int]$Termination.descendantProcessCount
+        ) `
+        -Message "Final topology termination counts are inconsistent: $Field"
+}
+
 function Assert-TopologyAlternativeContract {
     param(
         [Parameter(Mandatory = $true)] $Alternative,
@@ -262,11 +296,12 @@ function Assert-TopologyAlternativeContract {
         -Pattern '^(Idle|BelowNormal|Normal|AboveNormal|High|RealTime)$'
 
     $global = $Alternative.forcedFailure.globalProcess
+    Assert-TerminationContract `
+        -Termination $global.termination `
+        -Field "$Field.forcedFailure.globalProcess.termination"
     foreach ($entry in @(
         [ordered]@{ value = $global.initial.status.available; name = 'initial.status.available' },
         [ordered]@{ value = $global.initial.singleton.ownerPreserved; name = 'initial.singleton.ownerPreserved' },
-        [ordered]@{ value = $global.termination.exitObserved; name = 'termination.exitObserved' },
-        [ordered]@{ value = $global.termination.executableValidated; name = 'termination.executableValidated' },
         [ordered]@{ value = $global.unavailableBeforeExplicitRestart.available; name = 'unavailableBeforeExplicitRestart.available' },
         [ordered]@{ value = $global.noAutomaticRestartObserved; name = 'noAutomaticRestartObserved' },
         [ordered]@{ value = $global.explicitRestart.pidChanged; name = 'explicitRestart.pidChanged' },
@@ -296,9 +331,10 @@ function Assert-TopologyAlternativeContract {
         -Field "$Field.forcedFailure.globalProcess.onlineContinuity"
 
     $projectHost = $Alternative.forcedFailure.projectHost
+    Assert-TerminationContract `
+        -Termination $projectHost.termination `
+        -Field "$Field.forcedFailure.projectHost.termination"
     foreach ($entry in @(
-        [ordered]@{ value = $projectHost.termination.exitObserved; name = 'termination.exitObserved' },
-        [ordered]@{ value = $projectHost.termination.executableValidated; name = 'termination.executableValidated' },
         [ordered]@{ value = $projectHost.hostSurvived; name = 'hostSurvived' },
         [ordered]@{ value = $projectHost.otherHostSurvived; name = 'otherHostSurvived' },
         [ordered]@{ value = $projectHost.noAutomaticRestartObserved; name = 'noAutomaticRestartObserved' },
@@ -454,8 +490,8 @@ function Assert-TopologyRunContract {
     )
 
     Assert-Condition `
-        -Condition ($Report.schemaVersion -eq 12) `
-        -Message 'Final topology runs must use measurement schema 12.'
+        -Condition ($Report.schemaVersion -eq 13) `
+        -Message 'Final topology runs must use measurement schema 13.'
     Assert-Condition `
         -Condition ($Report.execution.order -ceq $ExpectedOrder) `
         -Message "Final topology report did not execute order $ExpectedOrder."
@@ -771,6 +807,13 @@ function New-AlternativeRobustnessFacts {
     $globalOutage = [ordered]@{
         terminationObserved = [bool]$global.termination.exitObserved
         terminationExecutableValidated = [bool]$global.termination.executableValidated
+        descendantProcessCount = [int]$global.termination.descendantProcessCount
+        forcedDescendantCleanupCount =
+            [int]$global.termination.forcedDescendantCleanupCount
+        descendantsExited = [bool]$global.termination.descendantsExited
+        remainingDescendantProcessCount =
+            [int]$global.termination.remainingDescendantProcessCount
+        descendantCleanupMs = [long]$global.termination.descendantCleanupMs
         unavailableBeforeExplicitRestart = -not [bool]$global.unavailableBeforeExplicitRestart.available
         noAutomaticRestartObserved = [bool]$global.noAutomaticRestartObserved
         expectedWindows = [int]$global.windowsWhileUnavailable.expectedCount
@@ -781,6 +824,8 @@ function New-AlternativeRobustnessFacts {
     $globalOutage.passed = (
         $globalOutage.terminationObserved -and
         $globalOutage.terminationExecutableValidated -and
+        $globalOutage.descendantsExited -and
+        $globalOutage.remainingDescendantProcessCount -eq 0 -and
         $globalOutage.unavailableBeforeExplicitRestart -and
         $globalOutage.noAutomaticRestartObserved -and
         $globalOutage.expectedWindows -eq 2 -and
@@ -807,6 +852,16 @@ function New-AlternativeRobustnessFacts {
     $projectHost = [ordered]@{
         terminationObserved = [bool]$projectHostSource.termination.exitObserved
         terminationExecutableValidated = [bool]$projectHostSource.termination.executableValidated
+        descendantProcessCount =
+            [int]$projectHostSource.termination.descendantProcessCount
+        forcedDescendantCleanupCount =
+            [int]$projectHostSource.termination.forcedDescendantCleanupCount
+        descendantsExited =
+            [bool]$projectHostSource.termination.descendantsExited
+        remainingDescendantProcessCount =
+            [int]$projectHostSource.termination.remainingDescendantProcessCount
+        descendantCleanupMs =
+            [long]$projectHostSource.termination.descendantCleanupMs
         terminatedHostSurvived = [bool]$projectHostSource.hostSurvived
         otherHostSurvived = [bool]$projectHostSource.otherHostSurvived
         expectedOtherHostSurvived = $ExpectedOtherHostSurvived
@@ -832,6 +887,8 @@ function New-AlternativeRobustnessFacts {
     $projectHost.passed = (
         $projectHost.terminationObserved -and
         $projectHost.terminationExecutableValidated -and
+        $projectHost.descendantsExited -and
+        $projectHost.remainingDescendantProcessCount -eq 0 -and
         -not $projectHost.terminatedHostSurvived -and
         $projectHost.otherHostSurvived -eq $ExpectedOtherHostSurvived -and
         $projectHost.noAutomaticRestartObserved -and
@@ -1355,7 +1412,7 @@ $checks = @(
 $ticketCriterionSatisfied = @($checks | Where-Object { -not $_.passed }).Count -eq 0
 
 $artifact = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     suite = 'topology_final_comparison'
     collectedAtUtc = [DateTime]::UtcNow.ToString('o')
     gitCommit = $headCommit
