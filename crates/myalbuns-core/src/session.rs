@@ -10,6 +10,7 @@ use crate::project::serialize_persisted_revision;
 
 pub(crate) struct ProjectSession {
     state: EditorState,
+    latest_revision: u64,
     undo: Vec<HistoryEntry>,
     redo: Vec<HistoryEntry>,
 }
@@ -21,8 +22,10 @@ struct HistoryEntry {
 
 impl ProjectSession {
     pub(crate) fn from_state(state: EditorState) -> Self {
+        let latest_revision = state.revision;
         Self {
             state,
+            latest_revision,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -33,6 +36,9 @@ impl ProjectSession {
     }
 
     pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<EditorState, CoreError> {
+        let next_revision = self.latest_revision.checked_add(1).ok_or_else(|| {
+            CoreError::InvalidProject("A SessÃ£o do Projeto esgotou o espaÃ§o de revisÃµes.".into())
+        })?;
         let previous = HistoryEntry {
             album: self.state.album.clone(),
             revision: self.state.revision,
@@ -88,7 +94,8 @@ impl ProjectSession {
 
         self.undo.push(previous);
         self.redo.clear();
-        self.state.revision += 1;
+        self.latest_revision = next_revision;
+        self.state.revision = next_revision;
         self.refresh_history_flags();
         Ok(self.state())
     }

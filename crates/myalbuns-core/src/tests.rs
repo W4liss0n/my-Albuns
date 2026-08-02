@@ -302,6 +302,48 @@ fn confirms_only_the_current_revision_as_saved() {
 }
 
 #[test]
+fn divergent_history_branch_never_reuses_the_saved_revision() {
+    let mut session = horizon_project(12);
+    let saved = session
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: "frame-01-a".into(),
+            delta_pan_x: 0.25,
+            delta_pan_y: 0.0,
+            delta_zoom: 0.0,
+        })
+        .expect("the first edit creates the revision that will be saved");
+    session
+        .confirm_saved_revision(saved.revision)
+        .expect("the first edit is confirmed as the saved revision");
+
+    session
+        .undo()
+        .expect("the session can return behind the saved revision");
+    let branched = session
+        .apply(ProjectIntent::TransformPhoto {
+            frame_id: "frame-01-a".into(),
+            delta_pan_x: 0.0,
+            delta_pan_y: 0.40,
+            delta_zoom: 0.0,
+        })
+        .expect("a different edit creates a divergent history branch");
+
+    assert_eq!(branched.revision, 2);
+    assert_eq!(branched.saved_revision, saved.revision);
+    assert!(branched.dirty);
+    assert_eq!(
+        session
+            .confirm_saved_revision(saved.revision)
+            .expect_err("an old save completion cannot confirm a divergent branch"),
+        crate::CoreError::SavedRevisionMismatch {
+            current: branched.revision,
+            confirmed: saved.revision,
+        }
+    );
+    assert!(session.state().dirty);
+}
+
+#[test]
 fn commits_simultaneous_pan_and_zoom_as_one_domain_revision() {
     let mut session = horizon_project(12);
 
