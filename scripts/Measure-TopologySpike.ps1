@@ -1687,6 +1687,12 @@ function Measure-TopologyProcesses {
     })
     return [ordered]@{
         hostProcessCount = $RootProcessIds.Count
+        rootPriorityClasses = @(
+            $RootProcessIds | ForEach-Object {
+                $rootProcess = Get-Process -Id $_ -ErrorAction Stop
+                $rootProcess.PriorityClass.ToString()
+            }
+        )
         processTreeCount = $processes.Count
         workingSetBytes = [long] (($processes | Measure-Object WorkingSet64 -Sum).Sum)
         privateMemoryBytes = [long] (($processes | Measure-Object PrivateMemorySize64 -Sum).Sum)
@@ -2666,7 +2672,7 @@ try {
         $imagingRecovery.validated
     )
     $report = [ordered]@{
-        schemaVersion = 11
+        schemaVersion = 12
         collectedAtUtc = [DateTime]::UtcNow.ToString('o')
         execution = [ordered]@{
             order = $ExecutionOrder

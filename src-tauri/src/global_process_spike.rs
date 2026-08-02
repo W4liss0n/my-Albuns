@@ -18,6 +18,10 @@ use myalbuns_logging::{
 use myalbuns_paths::AppPaths;
 use serde::{Deserialize, Serialize};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
+#[cfg(windows)]
+use windows_sys::Win32::System::Threading::{
+    BELOW_NORMAL_PRIORITY_CLASS, GetCurrentProcess, SetPriorityClass,
+};
 
 use crate::topology_spike::TOPOLOGY_ENV;
 
@@ -378,9 +382,6 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
     let config = GlobalProcessSpikeConfig::from_environment()?;
     let app_paths = AppPaths::discover()
         .map_err(|error| GlobalProcessSpikeError::InvalidConfiguration(error.to_string()))?;
-    let webview_data_directory = app_paths
-        .webview_data_directory("global-shell")
-        .map_err(|error| GlobalProcessSpikeError::InvalidConfiguration(error.to_string()))?;
     let log_directory = sidecar_log_directory(&app_paths);
     let _logging_guard = match init_local_logging(&log_directory, ProcessRole::GlobalShell) {
         Ok(guard) => Some(guard),
@@ -390,6 +391,14 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
         }
     };
     let server = bind_global_process_spike(config)?;
+    if !global_welcome_window_visible() {
+        configure_headless_process_priority()?;
+        return server.run();
+    }
+
+    let webview_data_directory = app_paths
+        .webview_data_directory("global-shell")
+        .map_err(|error| GlobalProcessSpikeError::InvalidConfiguration(error.to_string()))?;
     std::thread::Builder::new()
         .name("global-status-spike".into())
         .spawn(move || {
@@ -411,7 +420,6 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
                 .title("MyAlbuns")
                 .inner_size(980.0, 680.0)
                 .min_inner_size(720.0, 520.0)
-                .visible(global_welcome_window_visible())
                 .data_directory(webview_data_directory)
                 .build()?;
             Ok(())
@@ -423,6 +431,38 @@ pub(crate) fn run_global_process_spike_from_environment() -> Result<(), GlobalPr
 
 fn global_welcome_window_visible() -> bool {
     std::env::var_os("MYALBUNS_GLOBAL_SPIKE_WELCOME_VISIBLE").is_some()
+}
+
+#[cfg(windows)]
+fn configure_headless_process_priority() -> Result<(), GlobalProcessSpikeError> {
+    let configured = unsafe { SetPriorityClass(GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS) };
+    if configured == 0 {
+        let error = std::io::Error::last_os_error();
+        tracing::error!(
+            target: "myalbuns.global",
+            process_role = ProcessRole::GlobalShell.as_str(),
+            process_id = std::process::id(),
+            reason = %error,
+            event = "process_priority_configuration_failed",
+        );
+        return Err(GlobalProcessSpikeError::Io(format!(
+            "não foi possível priorizar os hosts interativos: {}",
+            error
+        )));
+    }
+    tracing::info!(
+        target: "myalbuns.global",
+        process_role = ProcessRole::GlobalShell.as_str(),
+        process_id = std::process::id(),
+        priority = "below_normal",
+        event = "process_priority_configured",
+    );
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn configure_headless_process_priority() -> Result<(), GlobalProcessSpikeError> {
+    Ok(())
 }
 
 fn is_global_process_role(value: Option<&OsStr>) -> bool {

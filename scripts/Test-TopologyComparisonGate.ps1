@@ -161,14 +161,43 @@ function Assert-TimingSummary {
     }
 }
 
+function Assert-ContinuityProbeContract {
+    param(
+        [Parameter(Mandatory = $true)] $Probe,
+        [Parameter(Mandatory = $true)][string] $Field
+    )
+
+    foreach ($name in @(
+        'expectedCompletions',
+        'observedCompletions',
+        'duplicateCompletions',
+        'missingCompletions'
+    )) {
+        Assert-JsonNumber -Value $Probe.$name -Field "$Field.$name"
+    }
+    foreach ($entry in @($Probe.evidence)) {
+        Assert-JsonString -Value $entry.projectId -Field "$Field.evidence.projectId"
+        Assert-JsonNumber -Value $entry.persistedRevision -Field "$Field.evidence.persistedRevision"
+        Assert-JsonNumber -Value $entry.reopenedRevision -Field "$Field.evidence.reopenedRevision"
+        Assert-JsonBoolean -Value $entry.dirty -Field "$Field.evidence.dirty"
+        Assert-JsonBoolean `
+            -Value $entry.globalAvailable `
+            -Field "$Field.evidence.globalAvailable"
+        if ($null -ne $entry.globalProcessId) {
+            Assert-JsonNumber `
+                -Value $entry.globalProcessId `
+                -Field "$Field.evidence.globalProcessId" `
+                -Minimum 1
+        }
+    }
+}
+
 function Assert-TopologyAlternativeContract {
     param(
         [Parameter(Mandatory = $true)] $Alternative,
         [Parameter(Mandatory = $true)][string] $Field,
         [Parameter(Mandatory = $true)][int] $ExpectedHostProcessCount,
-        [Parameter(Mandatory = $true)][int] $ExpectedHostGlobalLinks,
-        [Parameter(Mandatory = $true)][int] $ExpectedRemainingWindows,
-        [Parameter(Mandatory = $true)][int] $ExpectedReopenedProjects
+        [Parameter(Mandatory = $true)][int] $ExpectedHostGlobalLinks
     )
 
     Assert-JsonNumber -Value $Alternative.ready.elapsedMs -Field "$Field.ready.elapsedMs"
@@ -210,6 +239,101 @@ function Assert-TopologyAlternativeContract {
     )) {
         Assert-JsonNumber -Value $Alternative.processes.$name -Field "$Field.processes.$name"
     }
+    $projectHostPriorityClasses = @($Alternative.processes.rootPriorityClasses)
+    Assert-Condition `
+        -Condition ($projectHostPriorityClasses.Count -eq $ExpectedHostProcessCount) `
+        -Message "Final topology evidence must record every Project Host priority: $Field.processes"
+    foreach ($priorityClass in $projectHostPriorityClasses) {
+        Assert-JsonString `
+            -Value $priorityClass `
+            -Field "$Field.processes.rootPriorityClasses" `
+            -Pattern '^(Idle|BelowNormal|Normal|AboveNormal|High|RealTime)$'
+    }
+
+    $globalPriorityClasses = @(
+        $Alternative.forcedFailure.globalProcess.initial.processes.rootPriorityClasses
+    )
+    Assert-Condition `
+        -Condition ($globalPriorityClasses.Count -eq 1) `
+        -Message "Final topology evidence must record the global process priority: $Field.forcedFailure.globalProcess.initial.processes"
+    Assert-JsonString `
+        -Value $globalPriorityClasses[0] `
+        -Field "$Field.forcedFailure.globalProcess.initial.processes.rootPriorityClasses" `
+        -Pattern '^(Idle|BelowNormal|Normal|AboveNormal|High|RealTime)$'
+
+    $global = $Alternative.forcedFailure.globalProcess
+    foreach ($entry in @(
+        [ordered]@{ value = $global.initial.status.available; name = 'initial.status.available' },
+        [ordered]@{ value = $global.initial.singleton.ownerPreserved; name = 'initial.singleton.ownerPreserved' },
+        [ordered]@{ value = $global.termination.exitObserved; name = 'termination.exitObserved' },
+        [ordered]@{ value = $global.termination.executableValidated; name = 'termination.executableValidated' },
+        [ordered]@{ value = $global.unavailableBeforeExplicitRestart.available; name = 'unavailableBeforeExplicitRestart.available' },
+        [ordered]@{ value = $global.noAutomaticRestartObserved; name = 'noAutomaticRestartObserved' },
+        [ordered]@{ value = $global.explicitRestart.pidChanged; name = 'explicitRestart.pidChanged' },
+        [ordered]@{ value = $global.explicitRestart.status.available; name = 'explicitRestart.status.available' },
+        [ordered]@{ value = $global.explicitRestart.singleton.ownerPreserved; name = 'explicitRestart.singleton.ownerPreserved' }
+    )) {
+        Assert-JsonBoolean `
+            -Value $entry.value `
+            -Field "$Field.forcedFailure.globalProcess.$($entry.name)"
+    }
+    foreach ($entry in @(
+        [ordered]@{ value = $global.initial.visibleWindowCount; name = 'initial.visibleWindowCount' },
+        [ordered]@{ value = $global.initial.singleton.rejectedExitCode; name = 'initial.singleton.rejectedExitCode' },
+        [ordered]@{ value = $global.windowsWhileUnavailable.expectedCount; name = 'windowsWhileUnavailable.expectedCount' },
+        [ordered]@{ value = $global.windowsWhileUnavailable.observedCount; name = 'windowsWhileUnavailable.observedCount' },
+        [ordered]@{ value = $global.explicitRestart.singleton.rejectedExitCode; name = 'explicitRestart.singleton.rejectedExitCode' }
+    )) {
+        Assert-JsonNumber `
+            -Value $entry.value `
+            -Field "$Field.forcedFailure.globalProcess.$($entry.name)"
+    }
+    Assert-ContinuityProbeContract `
+        -Probe $global.offlineContinuity `
+        -Field "$Field.forcedFailure.globalProcess.offlineContinuity"
+    Assert-ContinuityProbeContract `
+        -Probe $global.onlineContinuity `
+        -Field "$Field.forcedFailure.globalProcess.onlineContinuity"
+
+    $projectHost = $Alternative.forcedFailure.projectHost
+    foreach ($entry in @(
+        [ordered]@{ value = $projectHost.termination.exitObserved; name = 'termination.exitObserved' },
+        [ordered]@{ value = $projectHost.termination.executableValidated; name = 'termination.executableValidated' },
+        [ordered]@{ value = $projectHost.hostSurvived; name = 'hostSurvived' },
+        [ordered]@{ value = $projectHost.otherHostSurvived; name = 'otherHostSurvived' },
+        [ordered]@{ value = $projectHost.noAutomaticRestartObserved; name = 'noAutomaticRestartObserved' },
+        [ordered]@{ value = $projectHost.explicitRestart.pidChanged; name = 'explicitRestart.pidChanged' },
+        [ordered]@{ value = $projectHost.explicitRestart.globalStatus.available; name = 'explicitRestart.globalStatus.available' }
+    )) {
+        Assert-JsonBoolean `
+            -Value $entry.value `
+            -Field "$Field.forcedFailure.projectHost.$($entry.name)"
+    }
+    foreach ($entry in @(
+        [ordered]@{ value = $projectHost.remainingWindowCount; name = 'remainingWindowCount' },
+        [ordered]@{ value = $projectHost.explicitRestart.reopen.expectedProjects; name = 'explicitRestart.reopen.expectedProjects' },
+        [ordered]@{ value = $projectHost.explicitRestart.reopen.observedProjects; name = 'explicitRestart.reopen.observedProjects' }
+    )) {
+        Assert-JsonNumber `
+            -Value $entry.value `
+            -Field "$Field.forcedFailure.projectHost.$($entry.name)"
+    }
+    if ($null -ne $projectHost.survivorContinuity) {
+        Assert-ContinuityProbeContract `
+            -Probe $projectHost.survivorContinuity `
+            -Field "$Field.forcedFailure.projectHost.survivorContinuity"
+    }
+
+    $graphics = $Alternative.interaction.canvas.aggregate.graphics
+    Assert-JsonNumber -Value $graphics.webglVersion -Field "$Field.graphics.webglVersion"
+    Assert-JsonString `
+        -Value $graphics.contextRecovery.mechanism `
+        -Field "$Field.graphics.contextRecovery.mechanism"
+    foreach ($name in @('projectCount', 'lostCount', 'restoredCount', 'glError')) {
+        Assert-JsonNumber `
+            -Value $graphics.contextRecovery.$name `
+            -Field "$Field.graphics.contextRecovery.$name"
+    }
     Assert-JsonNumber `
         -Value $Alternative.interaction.postProbeGpuMemory.totalBytes `
         -Field "$Field.interaction.postProbeGpuMemory.totalBytes"
@@ -224,6 +348,9 @@ function Assert-TopologyAlternativeContract {
         Assert-JsonNumber `
             -Value $Alternative.interaction.canvas.aggregate.$metric.worstProjectP95FrameMs `
             -Field "$Field.interaction.canvas.aggregate.$metric.worstProjectP95FrameMs"
+        Assert-JsonNumber `
+            -Value $Alternative.interaction.canvas.aggregate.$metric.framesOver33Ms `
+            -Field "$Field.interaction.canvas.aggregate.$metric.framesOver33Ms"
     }
     foreach ($project in @($Alternative.interaction.canvas.projects)) {
         Assert-JsonString -Value $project.projectId -Field "$Field.canvas.project.projectId"
@@ -291,6 +418,17 @@ function Assert-TopologyAlternativeContract {
     }
     foreach ($name in @(
         'streamCount',
+        'startEvents',
+        'singletonRejectionEvents',
+        'statusEvents',
+        'missingRequiredFields'
+    )) {
+        Assert-JsonNumber `
+            -Value $Alternative.forcedFailure.logs.global.$name `
+            -Field "$Field.forcedFailure.logs.global.$name"
+    }
+    foreach ($name in @(
+        'streamCount',
         'continuityCompletionEvents',
         'continuityFailureEvents',
         'reopenEvents',
@@ -302,32 +440,9 @@ function Assert-TopologyAlternativeContract {
     }
     Assert-Condition `
         -Condition (
-            [int]$Alternative.forcedFailure.logs.projectHosts.continuityFailureEvents -eq 0 -and
-            [int]$Alternative.forcedFailure.logs.projectHosts.missingRequiredFields -eq 0
-        ) `
-        -Message "Final topology evidence contains incomplete or failed host logs: $Field"
-    Assert-JsonNumber `
-        -Value $Alternative.forcedFailure.projectHost.remainingWindowCount `
-        -Field "$Field.forcedFailure.projectHost.remainingWindowCount"
-    Assert-JsonNumber `
-        -Value $Alternative.forcedFailure.projectHost.explicitRestart.reopen.observedProjects `
-        -Field "$Field.forcedFailure.projectHost.explicitRestart.reopen.observedProjects" `
-        -Minimum 1
-    Assert-JsonBoolean `
-        -Value $Alternative.forcedFailure.projectHost.noAutomaticRestartObserved `
-        -Field "$Field.forcedFailure.projectHost.noAutomaticRestartObserved"
-    Assert-Condition `
-        -Condition $Alternative.forcedFailure.projectHost.noAutomaticRestartObserved `
-        -Message "Final topology evidence observed an automatic host restart: $Field"
-    Assert-Condition `
-        -Condition (
             [int]$Alternative.processes.hostProcessCount -eq $ExpectedHostProcessCount -and
             [int]$Alternative.forcedFailure.ipc.projectHostToGlobalLinkCount -eq
-                $ExpectedHostGlobalLinks -and
-            [int]$Alternative.forcedFailure.projectHost.remainingWindowCount -eq
-                $ExpectedRemainingWindows -and
-            [int]$Alternative.forcedFailure.projectHost.explicitRestart.reopen.observedProjects -eq
-                $ExpectedReopenedProjects
+                $ExpectedHostGlobalLinks
         ) `
         -Message "Final topology evidence changed the expected process topology: $Field"
 }
@@ -339,8 +454,8 @@ function Assert-TopologyRunContract {
     )
 
     Assert-Condition `
-        -Condition ($Report.schemaVersion -eq 11) `
-        -Message 'Final topology runs must use measurement schema 11.'
+        -Condition ($Report.schemaVersion -eq 12) `
+        -Message 'Final topology runs must use measurement schema 12.'
     Assert-Condition `
         -Condition ($Report.execution.order -ceq $ExpectedOrder) `
         -Message "Final topology report did not execute order $ExpectedOrder."
@@ -408,20 +523,24 @@ function Assert-TopologyRunContract {
         -Alternative $Report.alternatives.independentHosts `
         -Field "$ExpectedOrder.alternatives.independentHosts" `
         -ExpectedHostProcessCount 2 `
-        -ExpectedHostGlobalLinks 2 `
-        -ExpectedRemainingWindows 1 `
-        -ExpectedReopenedProjects 1
+        -ExpectedHostGlobalLinks 2
     Assert-TopologyAlternativeContract `
         -Alternative $Report.alternatives.multiwindowHost `
         -Field "$ExpectedOrder.alternatives.multiwindowHost" `
         -ExpectedHostProcessCount 1 `
-        -ExpectedHostGlobalLinks 1 `
-        -ExpectedRemainingWindows 0 `
-        -ExpectedReopenedProjects 2
+        -ExpectedHostGlobalLinks 1
     Assert-JsonBoolean -Value $Report.failureGate.passed -Field "$ExpectedOrder.failureGate.passed"
     Assert-JsonBoolean `
         -Value $Report.failureGate.imagingProcessor.validated `
         -Field "$ExpectedOrder.failureGate.imagingProcessor.validated"
+    Assert-JsonString `
+        -Value $Report.failureGate.imagingProcessor.artifactSha256 `
+        -Field "$ExpectedOrder.failureGate.imagingProcessor.artifactSha256" `
+        -Pattern '^[0-9a-f]{64}$'
+    Assert-JsonNumber `
+        -Value $Report.failureGate.imagingProcessor.artifactSchemaVersion `
+        -Field "$ExpectedOrder.failureGate.imagingProcessor.artifactSchemaVersion" `
+        -Minimum 1
     foreach ($name in @(
         'sourceInputsDirty',
         'sameGitCommitAsTopologyBuild',
@@ -432,16 +551,6 @@ function Assert-TopologyRunContract {
             -Value $Report.failureGate.imagingProcessor.$name `
             -Field "$ExpectedOrder.failureGate.imagingProcessor.$name"
     }
-    Assert-Condition `
-        -Condition (
-            $Report.failureGate.passed -and
-            $Report.failureGate.imagingProcessor.validated -and
-            -not $Report.failureGate.imagingProcessor.sourceInputsDirty -and
-            $Report.failureGate.imagingProcessor.sameGitCommitAsTopologyBuild -and
-            $Report.failureGate.imagingProcessor.cacheRecoveredAfterOneExplicitRestart -and
-            $Report.failureGate.imagingProcessor.exportFailedSafelyUntilExplicitRetry
-        ) `
-        -Message "Final topology report failed its resilience gate: $ExpectedOrder"
 }
 
 function Assert-CanonicalArtifactPath {
@@ -533,6 +642,314 @@ function New-MetricComparison {
             minimumCrossTopologyGap = $minimumGap
             maximumWithinTopologyRange = $withinAlternativeRange
         }
+    }
+}
+
+function New-ContinuityFacts {
+    param(
+        [Parameter(Mandatory = $true)] $Probe,
+        [Parameter(Mandatory = $true)][int] $ExpectedCompletions,
+        [Parameter(Mandatory = $true)][bool] $ExpectedGlobalAvailable
+    )
+
+    $evidence = @($Probe.evidence)
+    $reportedExpectedCompletions = [int]$Probe.expectedCompletions
+    $revisionsRecovered = (
+        $evidence.Count -eq $ExpectedCompletions -and
+        @(
+            $evidence | Where-Object {
+                [int]$_.persistedRevision -ne [int]$_.reopenedRevision
+            }
+        ).Count -eq 0
+    )
+    $globalAvailabilityMatched = @(
+        $evidence | Where-Object {
+            [bool]$_.globalAvailable -ne $ExpectedGlobalAvailable
+        }
+    ).Count -eq 0
+    $globalProcessIdentityMatched = @(
+        $evidence | Where-Object {
+            if ($ExpectedGlobalAvailable) {
+                $null -eq $_.globalProcessId -or [int]$_.globalProcessId -le 0
+            }
+            else {
+                $null -ne $_.globalProcessId
+            }
+        }
+    ).Count -eq 0
+    $cleanPersistedState = @(
+        $evidence | Where-Object { [bool]$_.dirty }
+    ).Count -eq 0
+    $passed = (
+        $reportedExpectedCompletions -eq $ExpectedCompletions -and
+        [int]$Probe.observedCompletions -eq $ExpectedCompletions -and
+        [int]$Probe.duplicateCompletions -eq 0 -and
+        [int]$Probe.missingCompletions -eq 0 -and
+        $revisionsRecovered -and
+        $cleanPersistedState -and
+        $globalAvailabilityMatched -and
+        $globalProcessIdentityMatched
+    )
+
+    return [ordered]@{
+        expectedCompletions = $ExpectedCompletions
+        reportedExpectedCompletions = $reportedExpectedCompletions
+        observedCompletions = [int]$Probe.observedCompletions
+        duplicateCompletions = [int]$Probe.duplicateCompletions
+        missingCompletions = [int]$Probe.missingCompletions
+        revisionsRecovered = $revisionsRecovered
+        cleanPersistedState = $cleanPersistedState
+        expectedGlobalAvailable = $ExpectedGlobalAvailable
+        globalAvailabilityMatched = $globalAvailabilityMatched
+        globalProcessIdentityMatched = $globalProcessIdentityMatched
+        passed = $passed
+    }
+}
+
+function New-AlternativeRobustnessFacts {
+    param(
+        [Parameter(Mandatory = $true)] $Alternative,
+        [Parameter(Mandatory = $true)][int] $ExpectedRemainingWindows,
+        [Parameter(Mandatory = $true)][int] $ExpectedReopenedProjects,
+        [Parameter(Mandatory = $true)][bool] $ExpectedOtherHostSurvived
+    )
+
+    $global = $Alternative.forcedFailure.globalProcess
+    $projectHostSource = $Alternative.forcedFailure.projectHost
+    $offlineContinuity = New-ContinuityFacts `
+        -Probe $global.offlineContinuity `
+        -ExpectedCompletions 2 `
+        -ExpectedGlobalAvailable $false
+    $onlineContinuity = New-ContinuityFacts `
+        -Probe $global.onlineContinuity `
+        -ExpectedCompletions 2 `
+        -ExpectedGlobalAvailable $true
+    $reopenedProjects = @($projectHostSource.explicitRestart.reopen.projects)
+    $onlineEvidence = @($global.onlineContinuity.evidence)
+    $reopenedRevisionsRecovered = (
+        $reopenedProjects.Count -eq $ExpectedReopenedProjects -and
+        @(
+            $reopenedProjects | Where-Object {
+                $reopenedProject = $_
+                @(
+                    $onlineEvidence | Where-Object {
+                        $_.projectId -ceq $reopenedProject.projectId -and
+                        [int]$_.persistedRevision -eq [int]$reopenedProject.revision
+                    }
+                ).Count -ne 1
+            }
+        ).Count -eq 0
+    )
+    $survivorApplicable = $ExpectedRemainingWindows -gt 0
+    $survivorContinuity = if ($survivorApplicable) {
+        New-ContinuityFacts `
+            -Probe $projectHostSource.survivorContinuity `
+            -ExpectedCompletions 1 `
+            -ExpectedGlobalAvailable $true
+    }
+    else {
+        $null
+    }
+
+    $globalInitial = [ordered]@{
+        available = [bool]$global.initial.status.available
+        visibleWindowCount = [int]$global.initial.visibleWindowCount
+        processTreeCount = [int]$global.initial.processes.processTreeCount
+        workingSetBytes = [long]$global.initial.processes.workingSetBytes
+        priorityClasses = @($global.initial.processes.rootPriorityClasses)
+        singletonOwnerPreserved = [bool]$global.initial.singleton.ownerPreserved
+        singletonRejectedExitCode = [int]$global.initial.singleton.rejectedExitCode
+    }
+    $globalInitial.passed = (
+        $globalInitial.available -and
+        $globalInitial.visibleWindowCount -eq 0 -and
+        $globalInitial.priorityClasses.Count -eq 1 -and
+        $globalInitial.singletonOwnerPreserved -and
+        $globalInitial.singletonRejectedExitCode -eq 73
+    )
+
+    $globalOutage = [ordered]@{
+        terminationObserved = [bool]$global.termination.exitObserved
+        terminationExecutableValidated = [bool]$global.termination.executableValidated
+        unavailableBeforeExplicitRestart = -not [bool]$global.unavailableBeforeExplicitRestart.available
+        noAutomaticRestartObserved = [bool]$global.noAutomaticRestartObserved
+        expectedWindows = [int]$global.windowsWhileUnavailable.expectedCount
+        observedWindows = [int]$global.windowsWhileUnavailable.observedCount
+        unexpectedProcesses = @($global.processSetWhileUnavailable.unexpectedProcessIds).Count
+        offlineContinuity = $offlineContinuity
+    }
+    $globalOutage.passed = (
+        $globalOutage.terminationObserved -and
+        $globalOutage.terminationExecutableValidated -and
+        $globalOutage.unavailableBeforeExplicitRestart -and
+        $globalOutage.noAutomaticRestartObserved -and
+        $globalOutage.expectedWindows -eq 2 -and
+        $globalOutage.observedWindows -eq 2 -and
+        $globalOutage.unexpectedProcesses -eq 0 -and
+        $offlineContinuity.passed
+    )
+
+    $globalRestart = [ordered]@{
+        pidChanged = [bool]$global.explicitRestart.pidChanged
+        available = [bool]$global.explicitRestart.status.available
+        singletonOwnerPreserved = [bool]$global.explicitRestart.singleton.ownerPreserved
+        singletonRejectedExitCode = [int]$global.explicitRestart.singleton.rejectedExitCode
+        onlineContinuity = $onlineContinuity
+    }
+    $globalRestart.passed = (
+        $globalRestart.pidChanged -and
+        $globalRestart.available -and
+        $globalRestart.singletonOwnerPreserved -and
+        $globalRestart.singletonRejectedExitCode -eq 73 -and
+        $onlineContinuity.passed
+    )
+
+    $projectHost = [ordered]@{
+        terminationObserved = [bool]$projectHostSource.termination.exitObserved
+        terminationExecutableValidated = [bool]$projectHostSource.termination.executableValidated
+        terminatedHostSurvived = [bool]$projectHostSource.hostSurvived
+        otherHostSurvived = [bool]$projectHostSource.otherHostSurvived
+        expectedOtherHostSurvived = $ExpectedOtherHostSurvived
+        noAutomaticRestartObserved = [bool]$projectHostSource.noAutomaticRestartObserved
+        expectedRemainingWindows = $ExpectedRemainingWindows
+        observedRemainingWindows = [int]$projectHostSource.remainingWindowCount
+        unexpectedProcesses = @($projectHostSource.processSetAfterCrash.unexpectedProcessIds).Count
+        survivorContinuityApplicable = $survivorApplicable
+        survivorContinuity = $survivorContinuity
+        restartPidChanged = [bool]$projectHostSource.explicitRestart.pidChanged
+        expectedReopenedProjects = $ExpectedReopenedProjects
+        reportedExpectedReopenedProjects = [int]$projectHostSource.explicitRestart.reopen.expectedProjects
+        observedReopenedProjects = [int]$projectHostSource.explicitRestart.reopen.observedProjects
+        reopenedRevisionsRecovered = $reopenedRevisionsRecovered
+        globalAvailableAfterRestart = [bool]$projectHostSource.explicitRestart.globalStatus.available
+    }
+    $survivorPassed = if ($survivorApplicable) {
+        $null -ne $survivorContinuity -and $survivorContinuity.passed
+    }
+    else {
+        $null -eq $projectHostSource.survivorContinuity
+    }
+    $projectHost.passed = (
+        $projectHost.terminationObserved -and
+        $projectHost.terminationExecutableValidated -and
+        -not $projectHost.terminatedHostSurvived -and
+        $projectHost.otherHostSurvived -eq $ExpectedOtherHostSurvived -and
+        $projectHost.noAutomaticRestartObserved -and
+        $projectHost.observedRemainingWindows -eq $ExpectedRemainingWindows -and
+        $projectHost.unexpectedProcesses -eq 0 -and
+        $survivorPassed -and
+        $projectHost.restartPidChanged -and
+        $projectHost.reportedExpectedReopenedProjects -eq $ExpectedReopenedProjects -and
+        $projectHost.observedReopenedProjects -eq $ExpectedReopenedProjects -and
+        $projectHost.reopenedRevisionsRecovered -and
+        $projectHost.globalAvailableAfterRestart
+    )
+
+    $graphicsSource = $Alternative.interaction.canvas.aggregate.graphics
+    $graphics = [ordered]@{
+        webglVersion = [int]$graphicsSource.webglVersion
+        contextRecoveryMechanism = [string]$graphicsSource.contextRecovery.mechanism
+        projectCount = [int]$graphicsSource.contextRecovery.projectCount
+        contextLostCount = [int]$graphicsSource.contextRecovery.lostCount
+        contextRestoredCount = [int]$graphicsSource.contextRecovery.restoredCount
+        glError = [int]$graphicsSource.contextRecovery.glError
+    }
+    $graphics.passed = (
+        $graphics.webglVersion -eq 2 -and
+        $graphics.contextRecoveryMechanism -ceq 'webgl_lose_context' -and
+        $graphics.projectCount -eq 2 -and
+        $graphics.contextLostCount -eq $graphics.projectCount -and
+        $graphics.contextRestoredCount -eq $graphics.projectCount -and
+        $graphics.glError -eq 0
+    )
+
+    $globalLogs = $Alternative.forcedFailure.logs.global
+    $projectLogs = $Alternative.forcedFailure.logs.projectHosts
+    $logs = [ordered]@{
+        globalStreamCount = [int]$globalLogs.streamCount
+        globalMissingRequiredFields = [int]$globalLogs.missingRequiredFields
+        projectHostStreamCount = [int]$projectLogs.streamCount
+        projectHostContinuityFailureEvents = [int]$projectLogs.continuityFailureEvents
+        projectHostMissingRequiredFields = [int]$projectLogs.missingRequiredFields
+    }
+    $logs.passed = (
+        $logs.globalStreamCount -gt 0 -and
+        $logs.globalMissingRequiredFields -eq 0 -and
+        $logs.projectHostStreamCount -gt 0 -and
+        $logs.projectHostContinuityFailureEvents -eq 0 -and
+        $logs.projectHostMissingRequiredFields -eq 0
+    )
+
+    $passed = (
+        $globalInitial.passed -and
+        $globalOutage.passed -and
+        $globalRestart.passed -and
+        $projectHost.passed -and
+        $graphics.passed -and
+        $logs.passed
+    )
+    return [ordered]@{
+        globalProcess = [ordered]@{
+            initial = $globalInitial
+            outage = $globalOutage
+            explicitRestart = $globalRestart
+        }
+        projectHost = $projectHost
+        graphics = $graphics
+        logs = $logs
+        passed = $passed
+    }
+}
+
+function New-RunRobustnessFacts {
+    param([Parameter(Mandatory = $true)] $Run)
+
+    $independent = New-AlternativeRobustnessFacts `
+        -Alternative $Run.alternatives.independentHosts `
+        -ExpectedRemainingWindows 1 `
+        -ExpectedReopenedProjects 1 `
+        -ExpectedOtherHostSurvived $true
+    $multiwindow = New-AlternativeRobustnessFacts `
+        -Alternative $Run.alternatives.multiwindowHost `
+        -ExpectedRemainingWindows 0 `
+        -ExpectedReopenedProjects 2 `
+        -ExpectedOtherHostSurvived $false
+    $imagingSource = $Run.failureGate.imagingProcessor
+    $imaging = [ordered]@{
+        validated = [bool]$imagingSource.validated
+        artifactSha256 = [string]$imagingSource.artifactSha256
+        artifactSchemaVersion = [int]$imagingSource.artifactSchemaVersion
+        sourceInputsDirty = [bool]$imagingSource.sourceInputsDirty
+        sameGitCommitAsTopologyBuild = [bool]$imagingSource.sameGitCommitAsTopologyBuild
+        cacheRecoveredAfterOneExplicitRestart = [bool]$imagingSource.cacheRecoveredAfterOneExplicitRestart
+        exportFailedSafelyUntilExplicitRetry = [bool]$imagingSource.exportFailedSafelyUntilExplicitRetry
+    }
+    $imaging.passed = (
+        $imaging.validated -and
+        -not $imaging.sourceInputsDirty -and
+        $imaging.sameGitCommitAsTopologyBuild -and
+        $imaging.cacheRecoveredAfterOneExplicitRestart -and
+        $imaging.exportFailedSafelyUntilExplicitRetry
+    )
+    $rawFailureGatePassed = [bool]$Run.failureGate.passed
+    $factsPassed = (
+        $independent.passed -and
+        $multiwindow.passed -and
+        $imaging.passed
+    )
+
+    return [ordered]@{
+        rawFailureGatePassed = $rawFailureGatePassed
+        rawFailureGateConsistent = $rawFailureGatePassed -eq $factsPassed
+        independent = $independent
+        multiwindow = $multiwindow
+        imagingProcessor = $imaging
+        factsRecorded = $true
+        passed = (
+            $rawFailureGatePassed -and
+            $factsPassed -and
+            $rawFailureGatePassed -eq $factsPassed
+        )
     }
 }
 
@@ -688,10 +1105,24 @@ $sameHardware = $hardwareAb -ceq $hardwareBa
 Assert-Condition `
     -Condition $sameHardware `
     -Message 'Final topology runs were not collected on the same hardware.'
-$resilienceGatesPassed = $runAb.failureGate.passed -and $runBa.failureGate.passed
-Assert-Condition `
-    -Condition $resilienceGatesPassed `
-    -Message 'At least one final topology run failed its resilience gate.'
+$robustness = [ordered]@{
+    method = 'normalized_facts_from_raw_runs'
+    byExecutionOrder = [ordered]@{
+        AB = New-RunRobustnessFacts -Run $runAb
+        BA = New-RunRobustnessFacts -Run $runBa
+    }
+}
+$robustness.factsRecorded = (
+    $robustness.byExecutionOrder.AB.factsRecorded -and
+    $robustness.byExecutionOrder.BA.factsRecorded
+)
+$robustness.passed = (
+    $robustness.factsRecorded -and
+    $robustness.byExecutionOrder.AB.passed -and
+    $robustness.byExecutionOrder.BA.passed
+)
+$robustnessFactsRecorded = [bool]$robustness.factsRecorded
+$resilienceGatesPassed = [bool]$robustness.passed
 
 $runPairs = @(
     [ordered]@{ order = 'AB'; report = $runAb },
@@ -699,19 +1130,13 @@ $runPairs = @(
 )
 $allP95WithinTarget = $true
 $sameCanvasTargets = $true
+$sameExportOutputs = $true
 $exportHashes = [System.Collections.Generic.List[string]]::new()
 $frameTargetSignatures = [System.Collections.Generic.List[string]]::new()
 $navigationTargetSignatures = [System.Collections.Generic.List[string]]::new()
 foreach ($runPair in $runPairs) {
     foreach ($alternativeName in @('independentHosts', 'multiwindowHost')) {
         $alternative = $runPair.report.alternatives.$alternativeName
-        Assert-Condition `
-            -Condition (
-                $alternative.ready.windows.Count -eq 2 -and
-                $alternative.cache.projectCount -eq 2 -and
-                $alternative.interaction.canvas.projects.Count -eq 2
-            ) `
-            -Message "The $($runPair.order) $alternativeName run lost a Project or Window."
         foreach ($project in $alternative.interaction.canvas.projects) {
             if (
                 [double]$project.pan.p95FrameMs -gt 33.33 -or
@@ -726,16 +1151,17 @@ foreach ($runPair in $runPairs) {
     $multiwindow = $runPair.report.alternatives.multiwindowHost
     $exportHashes.Add([string]$independent.interaction.export.outputSha256)
     $exportHashes.Add([string]$multiwindow.interaction.export.outputSha256)
-    Assert-Condition `
-        -Condition (
+    $sameExportOutputs = (
+        $sameExportOutputs -and
+        (
             $independent.interaction.export.outputSha256 -ceq
                 $multiwindow.interaction.export.outputSha256 -and
             $independent.interaction.export.widthPx -eq
                 $multiwindow.interaction.export.widthPx -and
             $independent.interaction.export.heightPx -eq
                 $multiwindow.interaction.export.heightPx
-        ) `
-        -Message "The $($runPair.order) run produced different exports for A and B."
+        )
+    )
     $independentFrames = @(
         $independent.interaction.canvas.projects |
             Sort-Object projectId |
@@ -767,22 +1193,16 @@ foreach ($runPair in $runPairs) {
     $sameCanvasTargets = $sameCanvasTargets -and $targetsMatch
     $frameTargetSignatures.Add($independentFrames)
     $navigationTargetSignatures.Add($independentNavigation)
-    Assert-Condition `
-        -Condition $targetsMatch `
-        -Message "The $($runPair.order) run compared different Canvas targets."
 }
 $sameTargetsAcrossOrders = (
     @($frameTargetSignatures | Select-Object -Unique).Count -eq 1 -and
     @($navigationTargetSignatures | Select-Object -Unique).Count -eq 1
 )
 $sameCanvasTargets = $sameCanvasTargets -and $sameTargetsAcrossOrders
-Assert-Condition `
-    -Condition $sameTargetsAcrossOrders `
-    -Message 'The AB and BA runs compared different Canvas or navigation targets.'
-$identicalExports = @($exportHashes | Select-Object -Unique).Count -eq 1
-Assert-Condition `
-    -Condition $identicalExports `
-    -Message 'The final AB and BA runs did not produce one deterministic Export.'
+$identicalExports = (
+    $sameExportOutputs -and
+    @($exportHashes | Select-Object -Unique).Count -eq 1
+)
 
 function New-FinalMetric {
     param(
@@ -819,8 +1239,14 @@ $metrics = [ordered]@{
     panWorstProjectP95 = New-FinalMetric -Unit 'ms' -Better lower -Selector {
         param($alternative) $alternative.interaction.canvas.aggregate.pan.worstProjectP95FrameMs
     }
+    panFramesOver33 = New-FinalMetric -Unit 'frames' -Better lower -Selector {
+        param($alternative) $alternative.interaction.canvas.aggregate.pan.framesOver33Ms
+    }
     zoomWorstProjectP95 = New-FinalMetric -Unit 'ms' -Better lower -Selector {
         param($alternative) $alternative.interaction.canvas.aggregate.zoom.worstProjectP95FrameMs
+    }
+    zoomFramesOver33 = New-FinalMetric -Unit 'frames' -Better lower -Selector {
+        param($alternative) $alternative.interaction.canvas.aggregate.zoom.framesOver33Ms
     }
     navigationWorstProjectP95 = New-FinalMetric -Unit 'ms' -Better lower -Selector {
         param($alternative) $alternative.interaction.canvas.aggregate.navigation.worstProjectP95FrameMs
@@ -842,6 +1268,27 @@ $metrics = [ordered]@{
     }
 }
 
+function Select-ImplementationCostSnapshot {
+    param([Parameter(Mandatory = $true)] $Alternative)
+
+    return [ordered]@{
+        hostProcessCount = [int]$Alternative.processes.hostProcessCount
+        projectProcessTreeCount = [int]$Alternative.processes.processTreeCount
+        projectWorkingSetBytes = [long]$Alternative.processes.workingSetBytes
+        projectHostPriorityClasses = @($Alternative.processes.rootPriorityClasses)
+        globalProcessTreeCount = [int]$Alternative.forcedFailure.globalProcess.initial.processes.processTreeCount
+        globalWorkingSetBytes = [long]$Alternative.forcedFailure.globalProcess.initial.processes.workingSetBytes
+        globalVisibleWindowCount = [int]$Alternative.forcedFailure.globalProcess.initial.visibleWindowCount
+        globalPriorityClasses = @(
+            $Alternative.forcedFailure.globalProcess.initial.processes.rootPriorityClasses
+        )
+        projectHostToGlobalLinkCount = [int]$Alternative.forcedFailure.ipc.projectHostToGlobalLinkCount
+        logStreamCount = [int]$Alternative.forcedFailure.logs.projectHosts.streamCount
+        windowsRemainingAfterHostCrash = [int]$Alternative.forcedFailure.projectHost.remainingWindowCount
+        projectsReopenedAfterHostRestart = [int]$Alternative.forcedFailure.projectHost.explicitRestart.reopen.observedProjects
+    }
+}
+
 function Select-ImplementationCostFacts {
     param(
         [Parameter(Mandatory = $true)] $AbAlternative,
@@ -849,30 +1296,10 @@ function Select-ImplementationCostFacts {
     )
 
     return [ordered]@{
-        hostProcessCount = @(
-            [int]$AbAlternative.processes.hostProcessCount,
-            [int]$BaAlternative.processes.hostProcessCount
-        )
-        processTreeCount = @(
-            [int]$AbAlternative.processes.processTreeCount,
-            [int]$BaAlternative.processes.processTreeCount
-        )
-        projectHostToGlobalLinkCount = @(
-            [int]$AbAlternative.forcedFailure.ipc.projectHostToGlobalLinkCount,
-            [int]$BaAlternative.forcedFailure.ipc.projectHostToGlobalLinkCount
-        )
-        logStreamCount = @(
-            [int]$AbAlternative.forcedFailure.logs.projectHosts.streamCount,
-            [int]$BaAlternative.forcedFailure.logs.projectHosts.streamCount
-        )
-        windowsRemainingAfterHostCrash = @(
-            [int]$AbAlternative.forcedFailure.projectHost.remainingWindowCount,
-            [int]$BaAlternative.forcedFailure.projectHost.remainingWindowCount
-        )
-        projectsReopenedAfterHostRestart = @(
-            [int]$AbAlternative.forcedFailure.projectHost.explicitRestart.reopen.observedProjects,
-            [int]$BaAlternative.forcedFailure.projectHost.explicitRestart.reopen.observedProjects
-        )
+        byExecutionOrder = [ordered]@{
+            AB = Select-ImplementationCostSnapshot -Alternative $AbAlternative
+            BA = Select-ImplementationCostSnapshot -Alternative $BaAlternative
+        }
     }
 }
 
@@ -901,17 +1328,13 @@ $rawMeasurementsPreserved = (
 )
 $implementationCostRecorded = $true
 foreach ($cost in @($implementationCost.independent, $implementationCost.multiwindow)) {
-    foreach ($field in @(
-        'hostProcessCount',
-        'processTreeCount',
-        'projectHostToGlobalLinkCount',
-        'logStreamCount',
-        'windowsRemainingAfterHostCrash',
-        'projectsReopenedAfterHostRestart'
-    )) {
+    foreach ($order in @('AB', 'BA')) {
+        $snapshot = $cost.byExecutionOrder.$order
         $implementationCostRecorded = (
             $implementationCostRecorded -and
-            @($cost.$field).Count -eq 2
+            $null -ne $snapshot -and
+            @($snapshot.projectHostPriorityClasses).Count -eq [int]$snapshot.hostProcessCount -and
+            @($snapshot.globalPriorityClasses).Count -eq 1
         )
     }
 }
@@ -923,6 +1346,7 @@ $checks = @(
     [ordered]@{ name = 'same-hardware-and-corpus'; passed = ($sameHardware -and $sameCorpus) },
     [ordered]@{ name = 'same-canvas-targets'; passed = $sameCanvasTargets },
     [ordered]@{ name = 'identical-exports-across-runs'; passed = $identicalExports },
+    [ordered]@{ name = 'robustness-facts-recorded'; passed = $robustnessFactsRecorded },
     [ordered]@{ name = 'resilience-gates'; passed = $resilienceGatesPassed },
     [ordered]@{ name = 'pan-zoom-p95-at-most-33ms'; passed = $allP95WithinTarget },
     [ordered]@{ name = 'raw-measurements-preserved'; passed = $rawMeasurementsPreserved },
@@ -931,7 +1355,7 @@ $checks = @(
 $ticketCriterionSatisfied = @($checks | Where-Object { -not $_.passed }).Count -eq 0
 
 $artifact = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     suite = 'topology_final_comparison'
     collectedAtUtc = [DateTime]::UtcNow.ToString('o')
     gitCommit = $headCommit
@@ -961,6 +1385,7 @@ $artifact = [ordered]@{
         }
     )
     metrics = $metrics
+    robustness = $robustness
     implementationCost = $implementationCost
     checks = $checks
     completion = [ordered]@{
@@ -969,7 +1394,8 @@ $artifact = [ordered]@{
         hardwareRecorded = $sameHardware
         corpusRecorded = $sameCorpus
         rawMeasurementsRecorded = $rawMeasurementsPreserved
-        failuresRecorded = $resilienceGatesPassed
+        failuresRecorded = $robustnessFactsRecorded
+        robustnessFactsRecorded = $robustnessFactsRecorded
         implementationCostRecorded = $implementationCostRecorded
         ticketCriterionSatisfied = $ticketCriterionSatisfied
     }
@@ -981,7 +1407,7 @@ $artifact = [ordered]@{
             'The frozen AB/BA comparison protocol passed; the topology decision remains separate.'
         }
         else {
-            'At least one topology missed the frozen Pan/Zoom responsiveness target.'
+            'At least one frozen comparison gate failed; the recorded facts identify which one.'
         }
     }
 }
