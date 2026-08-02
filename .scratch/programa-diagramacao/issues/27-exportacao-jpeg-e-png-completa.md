@@ -18,7 +18,7 @@
 - [ ] `Exportar Lâmina` no menu contextual abre a tela com início e fim preenchidos pela Lâmina selecionada.
 - [ ] A Exportação normal usa o estado visível atual, inclusive mudanças não salvas, sem executar `Salvar`.
 - [ ] Adquirir `NormalExport` no `OperationGate`: somente uma Exportação normal pode estar ativa, as demais ações ficam indisponíveis e não criam fila, enquanto edição e Salvamento de outras janelas continuam disponíveis.
-- [ ] Antes de reservar o Processador de Imagens, obter do `CacheEngine` a pausa de todo trabalho de Cache que o compartilharia, no menor escopo seguro da topologia e cobrindo ao menos o namespace do Projeto exportado; retomar a fila em sucesso, falha ou cancelamento.
+- [ ] Antes de reservar o Processador de Imagens da Sessão, obter do `CacheEngine` a pausa do trabalho de Cache do Projeto exportado; retomar a fila em sucesso, falha ou cancelamento.
 - [ ] O progresso usa um modal pertencente somente à janela do Projeto exportado, bloqueando esse Projeto sem aparecer ou bloquear os demais.
 - [ ] A validação considera somente a seleção e bloqueia placeholders, Arquivos ausentes ou Arquivos indisponíveis realmente necessários, apresentando todos os motivos antes de renderizar.
 - [ ] Apresentar bloqueios num diálogo separado em tabela com Projeto, Problema e Ações; placeholder abre o Projeto, Arquivo ausente permite escolher a pasta de Fotos para Religar e Arquivo indisponível oferece `Tentar novamente`.

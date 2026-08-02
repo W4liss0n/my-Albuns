@@ -26,7 +26,7 @@
 - [ ] Aceitar na primeira versão o risco raro de uma alteração feita com o aplicativo fechado preservar exatamente tamanho e data de alteração; não calcular hash completo de todos os originais a cada abertura.
 - [ ] Se o original estiver ausente, permitir manter a última representação e os últimos metadados apenas como contexto visual, preservando o estado ausente e o bloqueio de toda Exportação que dependa dele.
 - [ ] Se a origem estiver indisponível, preservar vínculo e última representação com estado próprio e `Tentar novamente`; não oferecer Religação nem confirmar ausência até a raiz voltar a ser acessível.
-- [ ] Definir o modo de mídia do Processador de Imagens associado ao contexto do Projeto conforme a topologia escolhida no ticket 01, seus limites de memória e as prioridades entre Lâmina ativa, Painel visível, prefetch, reconstrução e limpeza.
+- [ ] Definir o modo de mídia do Processador de Imagens isolado associado ao host de cada Projeto, seus limites de memória e as prioridades entre Lâmina ativa, Painel visível, prefetch, reconstrução e limpeza.
 - [ ] Pedidos de preview obsoletos devem ser canceláveis e pedidos equivalentes agrupados sem bloquear a fila de comandos do Projeto.
 - [ ] Ao iniciar Exportação, o trabalho de Cache concorrente é pausado ou cancelado com segurança; o Processador responsável pela saída final recebe exclusividade e a fila descartável é retomada depois.
 - [ ] Se o Processador de Imagens cair durante o Cache, reiniciá-lo automaticamente, descartar o item incompleto e reconstruir somente os pedidos ainda relevantes a partir do estado canônico e dos originais; falhas repetidas suspendem o Cache e geram aviso, sem bloquear edição ou Salvamento.

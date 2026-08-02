@@ -66,7 +66,7 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 
 `SettingsStore` guarda preferências de apresentação em `settings.json`. `LayoutCatalogStore` guarda o catálogo global criado pelo usuário em `Layouts`. Esses dados não são Cache e nunca podem ser apagados por uma ação de liberação de espaço.
 
-Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Broadcast imediato entre todas as Janelas pode ser acrescentado depois se a topologia escolhida torná-lo praticamente gratuito, mas não é requisito do MVP.
+Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
 `StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e as preferências de interface que dependem da tela.
 
@@ -162,7 +162,7 @@ O Monitor apenas sinaliza uma possível mudança e agrupa eventos. Depois de uma
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 
-Fora de manutenção, `CacheEngine` é o proprietário lógico de cada namespace. Conforme a topologia escolhida, um único Processador de Imagens atua como adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
+Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. O Processador de Imagens isolado daquela Sessão atua como único adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
 
 ## Liberação de espaço
 

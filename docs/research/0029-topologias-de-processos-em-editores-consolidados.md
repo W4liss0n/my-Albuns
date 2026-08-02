@@ -343,3 +343,6 @@ mas não é imposta por ela.
 Esta pesquisa fornece subsídio para o último gate do ticket 01, mas não altera
 por si só o status do [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) nem o
 ticket.
+
+> **Decisão posterior:** o ADR 0005 foi aceito com a topologia A após a
+> ponderação desta pesquisa, dos requisitos do MyAlbuns e das medições do spike.

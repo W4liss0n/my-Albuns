@@ -24,9 +24,14 @@ Esta coleta não escolhe a topologia. Conforme o protocolo:
 - `performanceRankingAllowed=false`;
 - `topologyRecommendationDeferred=true`.
 
-As classificações deste relatório pertencem a cada métrica isoladamente. Elas
-não formam uma pontuação global e não substituem a recomendação arquitetural
-nem a atualização do ADR 0005, reservadas ao último critério do spike.
+> **Decisão posterior:** este relatório permanece como coleta neutra. A escolha
+> normativa da topologia A foi registrada no [ADR 0005](../adr/0005-adotar-tauri-react-rust.md)
+> depois da análise arquitetural complementar.
+
+As classificações deste relatório pertencem a cada métrica isoladamente. Na
+data da coleta, elas não formavam uma pontuação global e a recomendação
+arquitetural, junto da atualização do ADR 0005, permanecia reservada ao último
+critério do spike.
 
 ## Rastreabilidade
 

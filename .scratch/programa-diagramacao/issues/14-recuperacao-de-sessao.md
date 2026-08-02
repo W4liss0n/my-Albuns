@@ -16,7 +16,7 @@
 - [ ] Gravar cada checkpoint por substituição atômica, sem modificar o arquivo do Projeto; uma queda durante um gesto recupera o estado anterior ao início daquele gesto.
 - [ ] Remover o temporário depois de `Salvar` sem novas mudanças ou de fechamento normal confirmado.
 - [ ] Ao detectar recuperação disponível, a interface permite restaurar ou descartar de forma explícita.
-- [ ] Isolar cada checkpoint por Identidade persistente e nunca recuperar estado de um Projeto em outro. O domínio de falha entre Janelas e processos segue a topologia escolhida no ticket 01, sem ser antecipado por este ticket.
+- [ ] Isolar cada checkpoint por Identidade persistente e nunca recuperar estado de um Projeto em outro. Como cada Projeto possui host independente, a queda de um host não encerra as demais Janelas nem mistura seus checkpoints.
 - [ ] O aviso oferece `Reabrir e recuperar`, `Abrir última versão salva` e `Agora não`.
 - [ ] `Reabrir e recuperar` cria uma nova sessão ainda não salva; `Abrir última versão salva` exige confirmação antes de descartar o temporário; `Agora não` mantém a recuperação para a próxima abertura.
 - [ ] Restaurar reconstitui somente o estado criativo consolidado, marca a sessão como não salva, inicia Undo/Redo vazios e não sobrescreve o arquivo original.

@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 document: design
+updated: 2026-08-02
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -9,7 +10,7 @@ document: design
 
 Definir onde vivem o estado criativo, os cálculos de composição e os estados operacionais do MyAlbuns. O desenho evita duas fontes canônicas para o mesmo Projeto, impede que Cache, watcher ou interface marquem o documento como alterado e fornece os mesmos cálculos para editor, Exportação normal e lote.
 
-Este documento detalha a direção ainda proposta no [ADR 0005](../adr/0005-adotar-tauri-react-rust.md). Os nomes abaixo são nomes de trabalho e podem mudar no spike. O contrato de propriedade e as separações de responsabilidade importam mais que a quantidade final de crates, processos ou tipos públicos.
+Este documento detalha a direção aceita no [ADR 0005](../adr/0005-adotar-tauri-react-rust.md). Os nomes abaixo continuam sendo nomes de trabalho. O contrato de propriedade e as separações de responsabilidade importam mais que a quantidade final de crates ou tipos públicos.
 
 ## Princípios
 
@@ -17,7 +18,7 @@ Este documento detalha a direção ainda proposta no [ADR 0005](../adr/0005-adot
 - O arquivo persistido, a Sessão do Projeto, o estado transitório da interface, o estado operacional das mídias e o Cache são estados diferentes.
 - Cálculos de composição são puros e determinísticos: recebem valores imutáveis e retornam resultados sem I/O ou mutação escondida.
 - O `ProjectCore` continua sendo o seam externo pequeno usado pelo host interativo e pelo lote. Suas subdivisões são inicialmente internas e não precisam virar interfaces públicas.
-- Processos são uma decisão de implantação. Os módulos não presumem uma das topologias avaliadas pelo spike.
+- Processos são uma decisão de implantação. Os módulos permanecem neutros, embora a implantação aceita use um host independente por Projeto.
 - Uma operação longa possui seus próprios cancelamento e progresso. Exclusividade global é pequena e explícita, não um coordenador universal de toda ação do aplicativo.
 - Persistências com garantias diferentes usam stores concretos; somente primitivas mecânicas comprovadamente iguais são compartilhadas.
 
@@ -169,7 +170,7 @@ Cada tentativa possui seu próprio token de cancelamento e destino de progresso.
 
 Toda Exportação precisa de três reservas antes de produzir saída: a concessão aplicável do `OperationGate`, a pausa do trabalho de Cache que compartilharia o Processador e a reserva do próprio Processador. As três são adquiridas e liberadas por um `OperationLease` único, e não pelo chamador.
 
-`OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. A pausa usa o menor escopo seguro permitido pela topologia, cobrindo ao menos o namespace do Projeto exportado.
+`OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. Como cada Projeto possui host e Processador de Imagens isolados, a pausa cobre o namespace do Projeto exportado.
 
 A Exportação normal adquire uma instância de `OperationLease(NormalExport)` por tentativa. O `BatchRunner` adquire uma única instância de `OperationLease(BatchExclusive)` para toda a tentativa do lote e executa todos os itens sob ela, sem liberar ou readquirir entre itens. Assim, os dois caminhos usam o mesmo mecanismo e não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
 
@@ -188,11 +189,11 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 ## Topologia e IPC
 
-Os módulos acima são neutros entre host independente por Projeto e host multiwindow. O spike continua responsável por escolher a topologia.
+Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e, caso a topologia escolhida coloque o consumidor da composição em outro processo, `CompositionPlan`. O spike define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e `CompositionPlan`. A implementação define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
-O cenário baseline a medir continua sendo uma aplicação Tauri com Janelas separadas, uma Sessão por Projeto, Processador de Imagens isolado conforme a topologia e Processador temporário para lote. Isso é hipótese de comparação, não decisão aceita antes do relatório do spike.
+O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
 ## Testes
 
@@ -212,7 +213,7 @@ Testes não dependem da quantidade final de crates nem atravessam seams internos
 ## Decisões adiadas
 
 - nomes finais, crates e visibilidade pública das subdivisões internas;
-- topologia de processos e transporte concreto de IPC;
+- transporte e esquema concretos da IPC;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
 - algoritmo do Gerador de Layouts;
 - codecs, perfis de cor e implementação do renderizador;

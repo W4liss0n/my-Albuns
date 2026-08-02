@@ -2,6 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
+updated: 2026-08-02
 ---
 
 # Programa de Diagramação de Álbuns
@@ -953,9 +954,9 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Cada Projeto mantém Undo/Redo dentro de um orçamento automático de memória. Comandos contêm somente deltas de domínio e referências, nunca IDs genéricos de comandos da interface, pixels, Cache ou cópias dos originais.
 - Ao alcançar o orçamento, as ações de Undo mais antigas são descartadas primeiro. Estado atual, Redo ainda válido, marco do último Salvamento e indicação de mudanças pendentes permanecem independentes.
 - A Recuperação não guarda o Histórico disponível. O orçamento do Histórico em memória será definido pelo spike e não terá configuração manual na primeira versão.
-- Uma falha em uma Sessão do Projeto não pode corromper o estado ou a Recuperação de outro Projeto. A sobrevivência das demais Janelas depende da topologia escolhida pelo spike.
+- Uma falha em uma Sessão ou host de Projeto não pode corromper o estado ou a Recuperação de outro Projeto. Cada Projeto usa um host independente; a queda de um deles encerra somente sua Janela e preserva os demais hosts.
 - Após a queda, `Reabrir e recuperar` cria uma nova sessão ainda não salva; `Abrir última versão salva` exige confirmação antes de descartar a recuperação; `Agora não` mantém o estado temporário para a próxima abertura.
-- Se a topologia permitir que Janelas sobrevivam à indisponibilidade do componente global, edição e Salvamento locais continuam, enquanto operações globais ficam indisponíveis até uma reinicialização explícita protegida pelo singleton; não há eleição ou reinício automático no MVP.
+- Se o componente global ficar indisponível, as Janelas de Projeto sobreviventes continuam a editar e salvar localmente, enquanto operações globais ficam indisponíveis até uma reinicialização explícita protegida pelo singleton; não há eleição ou reinício automático no MVP.
 - Undo e Redo abrangem todas as alterações editáveis durante a sessão, continuam disponíveis depois de Salvar e não persistem após fechar.
 - Alterar um Projeto nunca modifica o estado pertencente a outro Projeto.
 
@@ -975,7 +976,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Outros Projetos continuam disponíveis para edição, Undo/Redo, Salvamento e navegação durante a Exportação; somente suas ações de Exportação normal ficam indisponíveis.
 - O Bloqueio global de Exportação normal é liberado ao concluir, falhar ou cancelar a operação ativa.
 - A exclusividade usa uma concessão global limitada à tentativa; progresso e cancelamento pertencem somente àquela tentativa e não transformam o mecanismo de exclusividade em coordenador de comandos ou estado criativo.
-- Antes de reservar o Processador para a saída final, a Exportação pausa todo trabalho de Cache que compartilharia esse Processador, usando o menor escopo seguro permitido pela topologia. A pausa cobre ao menos o Cache do Projeto exportado e é liberada ao concluir, falhar ou cancelar.
+- Antes de reservar o Processador da Sessão para uma Exportação normal, o sistema pausa o trabalho de Cache do Projeto exportado. A pausa é liberada ao concluir, falhar ou cancelar. O lote usa seu Processador temporário e não compartilha o Processador de uma Sessão editável.
 - Toda saída é renderizada a partir dos Arquivos vinculados originais, nunca do Cache.
 - Exportação normal e cada item do lote percorrem o mesmo contrato de planejamento, execução e Publicação. A operação recebe um snapshot imutável, não salva nem religa o Projeto e conserva a Publicação limitada documentada.
 - A validação considera somente a seleção. Arquivos ausentes ou indisponíveis efetivamente necessários à renderização e placeholders dentro dela bloqueiam; problemas fora dela não bloqueiam. O Filtro de uso do Painel não substitui essa análise de dependências.
@@ -1083,7 +1084,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Operações em lote devem cobrir descoberta recursiva, execução estritamente serial, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item, retomada que refaz o item interrompido, isolamento de falhas, cópia integral do estado visível do Projeto modelo e importação das novas imagens somente no Painel.
 - Namespace, representação reduzida única, metadados, invalidação e políticas de liberação do Cache exigem testes próprios, incluindo a impossibilidade de limpar Cache ativo ao vivo. Formato, resolução, fingerprint e eventual tiling aguardam medições.
 - Álbuns longos devem ser testados com virtualização da cena, margem de pré-carga, descarte e reconstrução de texturas, preservando todo o modelo lógico e a latência de navegação.
-- O spike arquitetural deve exercitar a pequena interface externa do núcleo e o mesmo conjunto de cenários nas duas topologias, sem acoplar os testes às subdivisões internas, e registrar memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs.
+- O spike arquitetural exercitou a pequena interface externa do núcleo e o mesmo conjunto de cenários nas topologias A e B, registrando memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs. A regressão da topologia adotada deve abrir ao menos dois hosts independentes e provar o isolamento entre Projetos sem acoplar os testes às subdivisões internas.
 
 ## Out of Scope
 
@@ -1144,8 +1145,8 @@ As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliber
 - comportamento da numeração de arquivos quando uma Exportação ultrapassar o índice `999`;
 - formato e extensão do arquivo de Projeto, codificação reversível dos caminhos Windows persistidos e mecanismo interno usado para detectar movimentações e Cópias externas.
 
-O repositório ainda não possui implementação nem convenções de teste estabelecidas. Tauri 2 com React/TypeScript e Rust é a hipótese principal da primeira versão, sujeita a um spike que compare duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões e Processadores de Imagens isolados. A comparação mede memória, GPU, quantidade de processos, tempo de abertura, latência do Canvas, propagação de falhas, recuperação, IPC e complexidade operacional; a escolha não está congelada pela documentação atual.
+O spike executável validou Tauri 2 com React/TypeScript e Rust para a primeira versão e comparou duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões isoladas. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) aceita A: cada Projeto aberto possui seu próprio `MyAlbuns.Project.exe`, enquanto o processo global e o Processador de Imagens conservam responsabilidades separadas. A comparação de memória, GPU, processos, abertura, Canvas, falhas, Recuperação e custo operacional permanece registrada como evidência, não como comportamento do produto.
 
-As duas alternativas reutilizam um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o componente de imagem recebe um snapshot validado e imutável e não interpreta independentemente o documento persistido.
+A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o componente de imagem recebe um snapshot validado e imutável e não interpreta independentemente o documento persistido.
 
-`MyAlbuns.exe` permanece como nome pretendido da experiência global e da Tela de Boas-vindas se a topologia escolhida o permitir sem custo desproporcional. PixiJS sobre WebGL2 continua a hipótese para a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece contingência. Formato do arquivo de Projeto, topologia final dos processos e controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC.
+`MyAlbuns.exe` hospeda a experiência global e a Tela de Boas-vindas sem possuir estado criativo mutável. PixiJS sobre WebGL2 compõe a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece somente como contingência futura, sem implementação paralela. O formato do arquivo de Projeto e os controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC.

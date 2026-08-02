@@ -1,15 +1,16 @@
 ---
-status: proposed
+status: accepted
 date: 2026-07-28
+updated: 2026-08-02
 ---
 
-# Validar Tauri 2, React/TypeScript e Rust como arquitetura principal
+# Adotar Tauri 2, React/TypeScript e Rust com host independente por Projeto
 
 O MyAlbuns será inicialmente um aplicativo para Windows 10/11 x64. A primeira versão precisa combinar uma interface desktop rica, um Canvas acelerado por hardware, estado criativo confiável, múltiplos Projetos isolados e um pipeline final independente da prévia e do Cache.
 
-Tauri 2 com React/TypeScript e Rust é a hipótese arquitetural principal. Ela ainda não é uma escolha irreversível: um spike vertical deve validar a stack e comparar as duas topologias de hospedagem descritas neste ADR antes de o status mudar para `accepted`.
+Tauri 2 com React/TypeScript e Rust é a arquitetura aceita para o MVP. O spike vertical validou a stack e comparou as duas topologias descritas neste ADR. Após ponderar seus requisitos e as medições, o MyAlbuns adota um host independente por Projeto, mantendo o processo global e o Processador de Imagens como responsabilidades separadas.
 
-## Direção proposta
+## Decisão
 
 - React/TypeScript hospeda a interface e apenas o estado transitório das interações.
 - PixiJS sobre WebGL2 compõe a prévia interativa.
@@ -45,23 +46,25 @@ Stores de Projeto, Configurações, Layouts, Estado, Recuperação e Cache conse
 
 O detalhamento e os nomes de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md). Eles orientam o spike sem transformar subdivisões internas em interfaces públicas prematuras.
 
-## Topologias a comparar
+## Topologia de processos adotada
 
-O spike deve implementar o menor esqueleto suficiente das duas alternativas:
+### A — host independente por Projeto, adotada
 
-### A — host independente por Projeto
+Cada Projeto aberto possui um processo `MyAlbuns.Project.exe` próprio, com uma Janela e uma instância isolada do núcleo. No spike, a falha de um host ficou restrita àquele Projeto; A usou mais hosts, processos, vínculos com o componente global e streams de log, enquanto as diferenças de memória permaneceram inconclusivas.
 
-Cada Projeto aberto possui um processo `MyAlbuns.Project.exe` próprio, com uma Janela e uma instância isolada do núcleo. A falha de um host tende a ficar restrita àquele Projeto, ao custo de mais processos, WebViews, contextos gráficos, IPC, logs e memória.
+O spike confirmou a contenção: ao encerrar um host de A, a Janela e a revisão salva do outro Projeto permaneceram disponíveis. A também apresentou diferenças consistentes favoráveis em Cache pronto, duração e vazão do Cache, Canvas pronto e navegação. A unidade de falha coincide, por decisão do produto, com a unidade de Salvamento e Recuperação: o Projeto.
 
-### B — host multiwindow
+### B — host multiwindow, não adotada no MVP
 
 Um único `MyAlbuns.Project.exe`, ou host equivalente, mantém várias Janelas e sessões isoladas. A alternativa tende a reduzir processos e duplicação de runtime, mas aumenta o domínio de falha e exige provar que estado, comandos, Cache e recursos gráficos nunca vazam entre Projetos.
 
-A existência de Janelas separadas para o usuário é obrigatória nas duas alternativas. A quantidade de processos por Janela não é comportamento de produto e será escolhida pelas evidências do spike.
+B permaneceu tecnicamente viável e usou 8 processos, contra 14 em A, além de apresentar resultados melhores em métricas específicas de Zoom e GPU. As diferenças de working set e memória privada foram inconclusivas. A queda do host nativo de B, porém, encerrou as duas Janelas, enquanto A preservou o Projeto não relacionado. Esses resultados estão na [comparação final A/B](../research/0028-comparacao-final-de-topologias.md); a [pesquisa de programas consolidados](../research/0029-topologias-de-processos-em-editores-consolidados.md) confirma apenas que A é compatível com arquiteturas híbridas existentes, não que seja um padrão universal.
+
+Janelas separadas continuam obrigatórias. A implantação normativa usa um host nativo por Projeto. A árvore auxiliar administrada pelo WebView2 é detalhe do runtime e não se torna proprietária do estado criativo; a identidade e o ciclo de vida de seus dados permanecem explícitos por host.
 
 ## Processamento de imagens
 
-Durante a edição, `CacheEngine` agenda o trabalho descartável e cada sessão usa um Processador de Imagens isolado conforme a topologia escolhida. O adaptador executa Cache ou Exportação, nunca as duas atividades pesadas ao mesmo tempo; Exportação tem prioridade e usa os originais.
+Durante a edição, `CacheEngine` agenda o trabalho descartável e cada Sessão do Projeto usa um Processador de Imagens separado do host interativo e isolado dos demais Projetos. O adaptador executa Cache ou Exportação, nunca as duas atividades pesadas ao mesmo tempo; Exportação tem prioridade e usa os originais.
 
 A Exportação em lote da primeira versão é exclusiva e serial. Um `BatchRunner` em `MyAlbuns.exe` carrega e valida um Projeto por vez pela entrada somente de leitura do `ProjectCore`, sem abrir sessão editável, chama o mesmo `ExportPipeline` do fluxo normal e inicia um único `MyAlbuns.Imaging.exe` temporário para aquele item. Paralelismo entre Álbuns, calibração automática e Perfil de desempenho ficam fora do MVP até existirem medições que justifiquem a complexidade.
 
@@ -73,7 +76,7 @@ O modelo lógico conserva todas as Lâminas de um Álbum, sem um limite arbitrá
 
 Não haverá eleição automática entre Janelas nem reinício automático de `MyAlbuns.exe` no MVP.
 
-Se a topologia escolhida permitir que uma Janela de Projeto sobreviva à queda de `MyAlbuns.exe`, edição e Salvamento locais podem continuar; ações globais permanecem indisponíveis até o usuário relançar explicitamente o processo principal, protegido por singleton. Se a alternativa multiwindow não permitir essa sobrevivência, a Recuperação separada por Identidade deve limitar a perda. O spike registra a diferença em vez de pressupor um resultado.
+As Janelas de Projeto sobrevivem à queda de `MyAlbuns.exe`: edição e Salvamento locais podem continuar, enquanto ações globais permanecem indisponíveis até o usuário relançar explicitamente o processo principal, protegido por singleton. A queda de `MyAlbuns.Project.exe` encerra somente a Janela e a sessão daquele Projeto; os demais hosts continuam ativos. A Recuperação permanece separada por Identidade do Projeto.
 
 A queda do Processador durante Cache descarta o trabalho incompleto e permite reconstruí-lo dos originais. Durante Exportação, a tentativa falha com segurança e nunca é apresentada como concluída apenas porque parte da saída existe.
 
@@ -83,9 +86,9 @@ WebGL2 acelerado por hardware é requisito do editor. Criar um contexto não bas
 
 O instalador usará inicialmente WebView2 Evergreen e verificará sua disponibilidade. Capabilities, permissions e scopes do Tauri devem ser mínimos e explícitos; o frontend não recebe acesso genérico ao sistema de arquivos nem permissão genérica para iniciar processos.
 
-## Validação obrigatória
+## Evidências do spike
 
-O spike deve produzir evidência reproduzível para:
+O spike produziu evidência reproduzível para:
 
 - uma Lâmina realista com Fotos grandes, Frames, máscara, Pan, Zoom, Overlay, seleção e Undo/Redo;
 - feedback contínuo no Canvas e um único commit de domínio por gesto;
@@ -107,20 +110,23 @@ O spike deve produzir evidência reproduzível para:
 
 Os gates funcionais são binários. Metas quantitativas são congeladas no relatório antes da execução final de aceitação e não podem ser reajustadas depois de conhecido o resultado.
 
-O relatório encerra o spike recomendando uma topologia e registrando os custos observados. A escolha só se torna normativa quando este ADR for atualizado para `accepted`; se nenhuma alternativa satisfizer os gates, um novo ADR avalia a contingência WPF/.NET com C# antes de qualquer implementação paralela.
+Os relatórios finais registram os custos observados e a recomendação. Todos os gates acordados foram satisfeitos; por isso, este ADR passa a `accepted` e a contingência WPF/.NET com C# não será implementada em paralelo.
 
 ## Consequências
 
 - A stack favorece uma interface React e concentra domínio e processamento de imagens em Rust.
 - O núcleo compartilhado reduz o risco de editor e lote interpretarem documentos de maneiras diferentes.
 - Uma única sessão mutável e cálculos puros reduzem o risco de divergência entre estado salvo, prévia, Cache e Exportação.
-- A alternativa por processo oferece domínio de falha menor, enquanto a multiwindow pode reduzir memória e complexidade operacional; o spike decide com evidência.
+- Um host por Projeto reduz o domínio da falha e preserva os demais Projetos, ao custo observado de mais hosts, processos, vínculos com o componente global e streams de log.
 - A solução exige duas toolchains, contratos TypeScript/Rust, empacotamento de sidecar, logs correlacionados e testes reais no WebView2.
 - O desempenho depende do WebGL2 disponível e precisa ser medido com cenas representativas.
 
+## Quando reavaliar
+
+A alternativa multiwindow não será mantida em paralelo. Ela só volta à decisão se telemetria de uso real demonstrar pressão recorrente de processos, memória, GPU, disco ou grupos WebView2 por Projeto, e se um mecanismo testado preservar ou recuperar de forma aceitável os Projetos não relacionados quando o host compartilhado falhar. Uma mudança futura exige atualizar ou substituir este ADR.
+
 ## Decisões adiadas
 
-- topologia A ou B;
 - nomes finais, crates e visibilidade pública das subdivisões internas;
 - transporte e esquema concretos entre processos;
 - WebGPU no frontend e `wgpu` no pipeline Rust;

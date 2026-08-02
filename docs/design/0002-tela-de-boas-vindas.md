@@ -58,7 +58,7 @@ A lista usa a abertura mais recente como ordenação decrescente. Sempre que um 
 
 ## Relação com as Janelas de Projeto
 
-Cada Projeto continua em uma Janela e Sessão do Projeto isoladas. O spike arquitetural decidirá se cada Janela usa um host próprio ou se várias Janelas compartilham um host multiwindow com Processadores de Imagens isolados; essa escolha não altera o fluxo visual. Abrir o primeiro Projeto oculta a Tela de Boas-vindas sem encerrar o componente global; uma ação em qualquer Janela de Projeto pode exibi-la novamente. Quando a última Janela de Projeto é fechada, a Tela reaparece.
+Cada Projeto permanece em uma Janela e Sessão do Projeto isoladas, hospedadas por um processo `MyAlbuns.Project.exe` próprio. O Processador de Imagens também fica separado do host interativo e dos demais Projetos. Abrir o primeiro Projeto oculta a Tela de Boas-vindas sem encerrar o componente global; uma ação em qualquer Janela de Projeto pode exibi-la novamente. Quando a última Janela de Projeto é fechada, a Tela reaparece.
 
 Abrir diretamente um arquivo pelo Windows pode iniciar sua Janela de Projeto sem mostrar antes a Tela de Boas-vindas.
 
