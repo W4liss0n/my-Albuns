@@ -1,0 +1,1148 @@
+{
+    "schemaVersion":  3,
+    "suite":  "topology_final_comparison",
+    "collectedAtUtc":  "2026-08-02T03:56:22.4699824Z",
+    "gitCommit":  "e5e3c8d4bc2009092a043baf359fa2dc3907fce6",
+    "sourceInputsDirty":  false,
+    "protocol":  {
+                     "path":  "docs/research/0027-protocolo-da-comparacao-final-de-topologias.md",
+                     "sha256":  "cec596df2140903c7ddac3d01f1d6d50e715cd034e43d8dc1d1f47a2a465f90b",
+                     "frozenBeforeFinalExecution":  true
+                 },
+    "build":  {
+                  "manifestVersion":  1,
+                  "builtAtUtc":  "2026-08-02T03:50:20.4129000Z",
+                  "gitCommit":  "e5e3c8d4bc2009092a043baf359fa2dc3907fce6",
+                  "workingTreeDirty":  true,
+                  "buildInputsDirty":  false,
+                  "buildInputFileCount":  226,
+                  "buildInputDigestSha256":  "fb47bba04e56af7a21e62636ffd862559308c1127d605e8832d9b3f021e84d3f",
+                  "executable":  ".scratch/topology-spike-target/release/myalbuns-desktop.exe",
+                  "executableSha256":  "0f5cd2b6608200c18a4290787eef7921a732b702cab5a10ddb4ff28ee0e300a5",
+                  "imagingExecutable":  ".scratch/topology-spike-target/release/myalbuns-imaging.exe",
+                  "imagingExecutableSha256":  "3fa637332bc57ad6ebeeb1f0e7e9d3f4ec36ef0efd873e9700c333cffe7c61d0",
+                  "profile":  "release",
+                  "currentBuildInputsMatchManifest":  true
+              },
+    "hardware":  {
+                     "operatingSystem":  {
+                                             "caption":  "Microsoft Windows 11 Pro",
+                                             "version":  "10.0.26200",
+                                             "buildNumber":  "26200"
+                                         },
+                     "cpu":  [
+                                 "13th Gen Intel(R) Core(TM) i5-13450HX"
+                             ],
+                     "totalPhysicalMemoryBytes":  25439191040,
+                     "gpu":  [
+                                 {
+                                     "name":  "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+                                     "adapterRamBytes":  4293918720,
+                                     "driverVersion":  "32.0.15.8195"
+                                 },
+                                 {
+                                     "name":  "Intel(R) UHD Graphics",
+                                     "adapterRamBytes":  2147479552,
+                                     "driverVersion":  "32.0.101.7077"
+                                 }
+                             ]
+                 },
+    "corpus":  {
+                   "schemaVersion":  2,
+                   "albumCount":  2,
+                   "mediaCount":  173,
+                   "photoCount":  172,
+                   "decorativeCount":  1,
+                   "sourceBytes":  1469084414,
+                   "corpusSha256":  "c160ef3e3a2a1c7401f10574e3383fddb830678eb3fbc984dbca28dc59ebd01f",
+                   "integrity":  {
+                                     "verified":  true,
+                                     "beforeSha256":  "c160ef3e3a2a1c7401f10574e3383fddb830678eb3fbc984dbca28dc59ebd01f",
+                                     "afterSha256":  "c160ef3e3a2a1c7401f10574e3383fddb830678eb3fbc984dbca28dc59ebd01f"
+                                 },
+                   "previewPolicy":  {
+                                         "representationsPerMedia":  1,
+                                         "opaqueFormat":  "jpeg",
+                                         "transparentFormat":  "png",
+                                         "maximumEdgePx":  1600
+                                     }
+               },
+    "rawRuns":  [
+                    {
+                        "executionOrder":  "AB",
+                        "path":  "docs/research/artifacts/0019-topology-final-ab.json",
+                        "sha256":  "af1bd0249decce907ec1d66edf5109810611019b995968a4cb45d843c64dadba",
+                        "schemaVersion":  13,
+                        "collectedAtUtc":  "2026-08-02T03:53:21.3537651Z"
+                    },
+                    {
+                        "executionOrder":  "BA",
+                        "path":  "docs/research/artifacts/0020-topology-final-ba.json",
+                        "sha256":  "3184b2b110b1025703f379388b35474baefbffb0a8e58681912d94c09b34871c",
+                        "schemaVersion":  13,
+                        "collectedAtUtc":  "2026-08-02T03:56:20.0652265Z"
+                    }
+                ],
+    "metrics":  {
+                    "windowsReady":  {
+                                         "unit":  "ms",
+                                         "better":  "lower",
+                                         "independent":  {
+                                                             "byExecutionOrder":  {
+                                                                                      "AB":  3384,
+                                                                                      "BA":  1980
+                                                                                  },
+                                                             "minimum":  1980,
+                                                             "maximum":  3384,
+                                                             "median":  2682
+                                                         },
+                                         "multiwindow":  {
+                                                             "byExecutionOrder":  {
+                                                                                      "AB":  2632,
+                                                                                      "BA":  2527
+                                                                                  },
+                                                             "minimum":  2527,
+                                                             "maximum":  2632,
+                                                             "median":  2579.5
+                                                         },
+                                         "interpretation":  {
+                                                                "classification":  "inconclusive",
+                                                                "winner":  null,
+                                                                "minimumCrossTopologyGap":  547,
+                                                                "maximumWithinTopologyRange":  1404
+                                                            }
+                                     },
+                    "cacheReady":  {
+                                       "unit":  "ms",
+                                       "better":  "lower",
+                                       "independent":  {
+                                                           "byExecutionOrder":  {
+                                                                                    "AB":  31336,
+                                                                                    "BA":  33668
+                                                                                },
+                                                           "minimum":  31336,
+                                                           "maximum":  33668,
+                                                           "median":  32502
+                                                       },
+                                       "multiwindow":  {
+                                                           "byExecutionOrder":  {
+                                                                                    "AB":  56179,
+                                                                                    "BA":  53617
+                                                                                },
+                                                           "minimum":  53617,
+                                                           "maximum":  56179,
+                                                           "median":  54898
+                                                       },
+                                       "interpretation":  {
+                                                              "classification":  "consistent",
+                                                              "winner":  "independent",
+                                                              "minimumCrossTopologyGap":  19949,
+                                                              "maximumWithinTopologyRange":  2562
+                                                          }
+                                   },
+                    "cacheWallTime":  {
+                                          "unit":  "ms",
+                                          "better":  "lower",
+                                          "independent":  {
+                                                              "byExecutionOrder":  {
+                                                                                       "AB":  26887,
+                                                                                       "BA":  30736
+                                                                                   },
+                                                              "minimum":  26887,
+                                                              "maximum":  30736,
+                                                              "median":  28811.5
+                                                          },
+                                          "multiwindow":  {
+                                                              "byExecutionOrder":  {
+                                                                                       "AB":  52864,
+                                                                                       "BA":  50293
+                                                                                   },
+                                                              "minimum":  50293,
+                                                              "maximum":  52864,
+                                                              "median":  51578.5
+                                                          },
+                                          "interpretation":  {
+                                                                 "classification":  "consistent",
+                                                                 "winner":  "independent",
+                                                                 "minimumCrossTopologyGap":  19557,
+                                                                 "maximumWithinTopologyRange":  3849
+                                                             }
+                                      },
+                    "cacheThroughput":  {
+                                            "unit":  "bytes_per_second",
+                                            "better":  "higher",
+                                            "independent":  {
+                                                                "byExecutionOrder":  {
+                                                                                         "AB":  54641077,
+                                                                                         "BA":  47798498
+                                                                                     },
+                                                                "minimum":  47798498,
+                                                                "maximum":  54641077,
+                                                                "median":  51219787.5
+                                                            },
+                                            "multiwindow":  {
+                                                                "byExecutionOrder":  {
+                                                                                         "AB":  27790834,
+                                                                                         "BA":  29211513
+                                                                                     },
+                                                                "minimum":  27790834,
+                                                                "maximum":  29211513,
+                                                                "median":  28501173.5
+                                                            },
+                                            "interpretation":  {
+                                                                   "classification":  "consistent",
+                                                                   "winner":  "independent",
+                                                                   "minimumCrossTopologyGap":  18586985,
+                                                                   "maximumWithinTopologyRange":  6842579
+                                                               }
+                                        },
+                    "canvasReady":  {
+                                        "unit":  "ms",
+                                        "better":  "lower",
+                                        "independent":  {
+                                                            "byExecutionOrder":  {
+                                                                                     "AB":  31421,
+                                                                                     "BA":  33938
+                                                                                 },
+                                                            "minimum":  31421,
+                                                            "maximum":  33938,
+                                                            "median":  32679.5
+                                                        },
+                                        "multiwindow":  {
+                                                            "byExecutionOrder":  {
+                                                                                     "AB":  56362,
+                                                                                     "BA":  53782
+                                                                                 },
+                                                            "minimum":  53782,
+                                                            "maximum":  56362,
+                                                            "median":  55072
+                                                        },
+                                        "interpretation":  {
+                                                               "classification":  "consistent",
+                                                               "winner":  "independent",
+                                                               "minimumCrossTopologyGap":  19844,
+                                                               "maximumWithinTopologyRange":  2580
+                                                           }
+                                    },
+                    "panWorstProjectP95":  {
+                                               "unit":  "ms",
+                                               "better":  "lower",
+                                               "independent":  {
+                                                                   "byExecutionOrder":  {
+                                                                                            "AB":  17,
+                                                                                            "BA":  18.6
+                                                                                        },
+                                                                   "minimum":  17,
+                                                                   "maximum":  18.6,
+                                                                   "median":  17.8
+                                                               },
+                                               "multiwindow":  {
+                                                                   "byExecutionOrder":  {
+                                                                                            "AB":  15.7,
+                                                                                            "BA":  18
+                                                                                        },
+                                                                   "minimum":  15.7,
+                                                                   "maximum":  18,
+                                                                   "median":  16.85
+                                                               },
+                                               "interpretation":  {
+                                                                      "classification":  "inconclusive",
+                                                                      "winner":  null,
+                                                                      "minimumCrossTopologyGap":  0.60000000000000142,
+                                                                      "maximumWithinTopologyRange":  2.3000000000000007
+                                                                  }
+                                           },
+                    "panFramesOver33":  {
+                                            "unit":  "frames",
+                                            "better":  "lower",
+                                            "independent":  {
+                                                                "byExecutionOrder":  {
+                                                                                         "AB":  0,
+                                                                                         "BA":  0
+                                                                                     },
+                                                                "minimum":  0,
+                                                                "maximum":  0,
+                                                                "median":  0
+                                                            },
+                                            "multiwindow":  {
+                                                                "byExecutionOrder":  {
+                                                                                         "AB":  0,
+                                                                                         "BA":  0
+                                                                                     },
+                                                                "minimum":  0,
+                                                                "maximum":  0,
+                                                                "median":  0
+                                                            },
+                                            "interpretation":  {
+                                                                   "classification":  "inconclusive",
+                                                                   "winner":  null,
+                                                                   "minimumCrossTopologyGap":  0,
+                                                                   "maximumWithinTopologyRange":  0
+                                                               }
+                                        },
+                    "zoomWorstProjectP95":  {
+                                                "unit":  "ms",
+                                                "better":  "lower",
+                                                "independent":  {
+                                                                    "byExecutionOrder":  {
+                                                                                             "AB":  22.7,
+                                                                                             "BA":  24.6
+                                                                                         },
+                                                                    "minimum":  22.7,
+                                                                    "maximum":  24.6,
+                                                                    "median":  23.65
+                                                                },
+                                                "multiwindow":  {
+                                                                    "byExecutionOrder":  {
+                                                                                             "AB":  18,
+                                                                                             "BA":  19.6
+                                                                                         },
+                                                                    "minimum":  18,
+                                                                    "maximum":  19.6,
+                                                                    "median":  18.8
+                                                                },
+                                                "interpretation":  {
+                                                                       "classification":  "consistent",
+                                                                       "winner":  "multiwindow",
+                                                                       "minimumCrossTopologyGap":  4.6999999999999993,
+                                                                       "maximumWithinTopologyRange":  1.9000000000000021
+                                                                   }
+                                            },
+                    "zoomFramesOver33":  {
+                                             "unit":  "frames",
+                                             "better":  "lower",
+                                             "independent":  {
+                                                                 "byExecutionOrder":  {
+                                                                                          "AB":  0,
+                                                                                          "BA":  2
+                                                                                      },
+                                                                 "minimum":  0,
+                                                                 "maximum":  2,
+                                                                 "median":  1
+                                                             },
+                                             "multiwindow":  {
+                                                                 "byExecutionOrder":  {
+                                                                                          "AB":  0,
+                                                                                          "BA":  0
+                                                                                      },
+                                                                 "minimum":  0,
+                                                                 "maximum":  0,
+                                                                 "median":  0
+                                                             },
+                                             "interpretation":  {
+                                                                    "classification":  "inconclusive",
+                                                                    "winner":  null,
+                                                                    "minimumCrossTopologyGap":  0,
+                                                                    "maximumWithinTopologyRange":  2
+                                                                }
+                                         },
+                    "navigationWorstProjectP95":  {
+                                                      "unit":  "ms",
+                                                      "better":  "lower",
+                                                      "independent":  {
+                                                                          "byExecutionOrder":  {
+                                                                                                   "AB":  227.2,
+                                                                                                   "BA":  272.5
+                                                                                               },
+                                                                          "minimum":  227.2,
+                                                                          "maximum":  272.5,
+                                                                          "median":  249.85
+                                                                      },
+                                                      "multiwindow":  {
+                                                                          "byExecutionOrder":  {
+                                                                                                   "AB":  313.7,
+                                                                                                   "BA":  324.8
+                                                                                               },
+                                                                          "minimum":  313.7,
+                                                                          "maximum":  324.8,
+                                                                          "median":  319.25
+                                                                      },
+                                                      "interpretation":  {
+                                                                             "classification":  "consistent",
+                                                                             "winner":  "independent",
+                                                                             "minimumCrossTopologyGap":  52.300000000000011,
+                                                                             "maximumWithinTopologyRange":  45.300000000000011
+                                                                         }
+                                                  },
+                    "export":  {
+                                   "unit":  "ms",
+                                   "better":  "lower",
+                                   "independent":  {
+                                                       "byExecutionOrder":  {
+                                                                                "AB":  2376,
+                                                                                "BA":  2485
+                                                                            },
+                                                       "minimum":  2376,
+                                                       "maximum":  2485,
+                                                       "median":  2430.5
+                                                   },
+                                   "multiwindow":  {
+                                                       "byExecutionOrder":  {
+                                                                                "AB":  2458,
+                                                                                "BA":  2482
+                                                                            },
+                                                       "minimum":  2458,
+                                                       "maximum":  2482,
+                                                       "median":  2470
+                                                   },
+                                   "interpretation":  {
+                                                          "classification":  "inconclusive",
+                                                          "winner":  null,
+                                                          "minimumCrossTopologyGap":  3,
+                                                          "maximumWithinTopologyRange":  109
+                                                      }
+                               },
+                    "workingSet":  {
+                                       "unit":  "bytes",
+                                       "better":  "lower",
+                                       "independent":  {
+                                                           "byExecutionOrder":  {
+                                                                                    "AB":  2517135360,
+                                                                                    "BA":  2359042048
+                                                                                },
+                                                           "minimum":  2359042048,
+                                                           "maximum":  2517135360,
+                                                           "median":  2438088704
+                                                       },
+                                       "multiwindow":  {
+                                                           "byExecutionOrder":  {
+                                                                                    "AB":  2354089984,
+                                                                                    "BA":  2320809984
+                                                                                },
+                                                           "minimum":  2320809984,
+                                                           "maximum":  2354089984,
+                                                           "median":  2337449984
+                                                       },
+                                       "interpretation":  {
+                                                              "classification":  "inconclusive",
+                                                              "winner":  null,
+                                                              "minimumCrossTopologyGap":  38232064,
+                                                              "maximumWithinTopologyRange":  158093312
+                                                          }
+                                   },
+                    "privateMemory":  {
+                                          "unit":  "bytes",
+                                          "better":  "lower",
+                                          "independent":  {
+                                                              "byExecutionOrder":  {
+                                                                                       "AB":  1937010688,
+                                                                                       "BA":  1784885248
+                                                                                   },
+                                                              "minimum":  1784885248,
+                                                              "maximum":  1937010688,
+                                                              "median":  1860947968
+                                                          },
+                                          "multiwindow":  {
+                                                              "byExecutionOrder":  {
+                                                                                       "AB":  1948401664,
+                                                                                       "BA":  1926492160
+                                                                                   },
+                                                              "minimum":  1926492160,
+                                                              "maximum":  1948401664,
+                                                              "median":  1937446912
+                                                          },
+                                          "interpretation":  {
+                                                                 "classification":  "inconclusive",
+                                                                 "winner":  null,
+                                                                 "minimumCrossTopologyGap":  11390976,
+                                                                 "maximumWithinTopologyRange":  152125440
+                                                             }
+                                      },
+                    "gpuPostProbe":  {
+                                         "unit":  "bytes",
+                                         "better":  "lower",
+                                         "independent":  {
+                                                             "byExecutionOrder":  {
+                                                                                      "AB":  713195520,
+                                                                                      "BA":  725217280
+                                                                                  },
+                                                             "minimum":  713195520,
+                                                             "maximum":  725217280,
+                                                             "median":  719206400
+                                                         },
+                                         "multiwindow":  {
+                                                             "byExecutionOrder":  {
+                                                                                      "AB":  688177152,
+                                                                                      "BA":  687755264
+                                                                                  },
+                                                             "minimum":  687755264,
+                                                             "maximum":  688177152,
+                                                             "median":  687966208
+                                                         },
+                                         "interpretation":  {
+                                                                "classification":  "consistent",
+                                                                "winner":  "multiwindow",
+                                                                "minimumCrossTopologyGap":  25018368,
+                                                                "maximumWithinTopologyRange":  12021760
+                                                            }
+                                     },
+                    "processTree":  {
+                                        "unit":  "processes",
+                                        "better":  "lower",
+                                        "independent":  {
+                                                            "byExecutionOrder":  {
+                                                                                     "AB":  14,
+                                                                                     "BA":  14
+                                                                                 },
+                                                            "minimum":  14,
+                                                            "maximum":  14,
+                                                            "median":  14
+                                                        },
+                                        "multiwindow":  {
+                                                            "byExecutionOrder":  {
+                                                                                     "AB":  8,
+                                                                                     "BA":  8
+                                                                                 },
+                                                            "minimum":  8,
+                                                            "maximum":  8,
+                                                            "median":  8
+                                                        },
+                                        "interpretation":  {
+                                                               "classification":  "consistent",
+                                                               "winner":  "multiwindow",
+                                                               "minimumCrossTopologyGap":  6,
+                                                               "maximumWithinTopologyRange":  0
+                                                           }
+                                    }
+                },
+    "robustness":  {
+                       "method":  "normalized_facts_from_raw_runs",
+                       "byExecutionOrder":  {
+                                                "AB":  {
+                                                           "rawFailureGatePassed":  true,
+                                                           "rawFailureGateConsistent":  true,
+                                                           "independent":  {
+                                                                               "globalProcess":  {
+                                                                                                     "initial":  {
+                                                                                                                     "available":  true,
+                                                                                                                     "visibleWindowCount":  0,
+                                                                                                                     "processTreeCount":  1,
+                                                                                                                     "workingSetBytes":  14831616,
+                                                                                                                     "priorityClasses":  [
+                                                                                                                                             "BelowNormal"
+                                                                                                                                         ],
+                                                                                                                     "singletonOwnerPreserved":  true,
+                                                                                                                     "singletonRejectedExitCode":  73,
+                                                                                                                     "passed":  true
+                                                                                                                 },
+                                                                                                     "outage":  {
+                                                                                                                    "terminationObserved":  true,
+                                                                                                                    "terminationExecutableValidated":  true,
+                                                                                                                    "descendantProcessCount":  0,
+                                                                                                                    "forcedDescendantCleanupCount":  0,
+                                                                                                                    "descendantsExited":  true,
+                                                                                                                    "remainingDescendantProcessCount":  0,
+                                                                                                                    "descendantCleanupMs":  7,
+                                                                                                                    "unavailableBeforeExplicitRestart":  true,
+                                                                                                                    "noAutomaticRestartObserved":  true,
+                                                                                                                    "expectedWindows":  2,
+                                                                                                                    "observedWindows":  2,
+                                                                                                                    "unexpectedProcesses":  0,
+                                                                                                                    "offlineContinuity":  {
+                                                                                                                                              "expectedCompletions":  2,
+                                                                                                                                              "reportedExpectedCompletions":  2,
+                                                                                                                                              "observedCompletions":  2,
+                                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                                              "missingCompletions":  0,
+                                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                                              "expectedGlobalAvailable":  false,
+                                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                                              "passed":  true
+                                                                                                                                          },
+                                                                                                                    "passed":  true
+                                                                                                                },
+                                                                                                     "explicitRestart":  {
+                                                                                                                             "pidChanged":  true,
+                                                                                                                             "available":  true,
+                                                                                                                             "singletonOwnerPreserved":  true,
+                                                                                                                             "singletonRejectedExitCode":  73,
+                                                                                                                             "onlineContinuity":  {
+                                                                                                                                                      "expectedCompletions":  2,
+                                                                                                                                                      "reportedExpectedCompletions":  2,
+                                                                                                                                                      "observedCompletions":  2,
+                                                                                                                                                      "duplicateCompletions":  0,
+                                                                                                                                                      "missingCompletions":  0,
+                                                                                                                                                      "revisionsRecovered":  true,
+                                                                                                                                                      "cleanPersistedState":  true,
+                                                                                                                                                      "expectedGlobalAvailable":  true,
+                                                                                                                                                      "globalAvailabilityMatched":  true,
+                                                                                                                                                      "globalProcessIdentityMatched":  true,
+                                                                                                                                                      "passed":  true
+                                                                                                                                                  },
+                                                                                                                             "passed":  true
+                                                                                                                         }
+                                                                                                 },
+                                                                               "projectHost":  {
+                                                                                                   "terminationObserved":  true,
+                                                                                                   "terminationExecutableValidated":  true,
+                                                                                                   "descendantProcessCount":  6,
+                                                                                                   "forcedDescendantCleanupCount":  0,
+                                                                                                   "descendantsExited":  true,
+                                                                                                   "remainingDescendantProcessCount":  0,
+                                                                                                   "descendantCleanupMs":  1293,
+                                                                                                   "terminatedHostSurvived":  false,
+                                                                                                   "otherHostSurvived":  true,
+                                                                                                   "expectedOtherHostSurvived":  true,
+                                                                                                   "noAutomaticRestartObserved":  true,
+                                                                                                   "expectedRemainingWindows":  1,
+                                                                                                   "observedRemainingWindows":  1,
+                                                                                                   "unexpectedProcesses":  0,
+                                                                                                   "survivorContinuityApplicable":  true,
+                                                                                                   "survivorContinuity":  {
+                                                                                                                              "expectedCompletions":  1,
+                                                                                                                              "reportedExpectedCompletions":  1,
+                                                                                                                              "observedCompletions":  1,
+                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                              "missingCompletions":  0,
+                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                              "expectedGlobalAvailable":  true,
+                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                              "passed":  true
+                                                                                                                          },
+                                                                                                   "restartPidChanged":  true,
+                                                                                                   "expectedReopenedProjects":  1,
+                                                                                                   "reportedExpectedReopenedProjects":  1,
+                                                                                                   "observedReopenedProjects":  1,
+                                                                                                   "reopenedRevisionsRecovered":  true,
+                                                                                                   "globalAvailableAfterRestart":  true,
+                                                                                                   "passed":  true
+                                                                                               },
+                                                                               "graphics":  {
+                                                                                                "webglVersion":  2,
+                                                                                                "contextRecoveryMechanism":  "webgl_lose_context",
+                                                                                                "projectCount":  2,
+                                                                                                "contextLostCount":  2,
+                                                                                                "contextRestoredCount":  2,
+                                                                                                "glError":  0,
+                                                                                                "passed":  true
+                                                                                            },
+                                                                               "logs":  {
+                                                                                            "globalStreamCount":  4,
+                                                                                            "globalMissingRequiredFields":  0,
+                                                                                            "projectHostStreamCount":  3,
+                                                                                            "projectHostContinuityFailureEvents":  0,
+                                                                                            "projectHostMissingRequiredFields":  0,
+                                                                                            "passed":  true
+                                                                                        },
+                                                                               "passed":  true
+                                                                           },
+                                                           "multiwindow":  {
+                                                                               "globalProcess":  {
+                                                                                                     "initial":  {
+                                                                                                                     "available":  true,
+                                                                                                                     "visibleWindowCount":  0,
+                                                                                                                     "processTreeCount":  1,
+                                                                                                                     "workingSetBytes":  14827520,
+                                                                                                                     "priorityClasses":  [
+                                                                                                                                             "BelowNormal"
+                                                                                                                                         ],
+                                                                                                                     "singletonOwnerPreserved":  true,
+                                                                                                                     "singletonRejectedExitCode":  73,
+                                                                                                                     "passed":  true
+                                                                                                                 },
+                                                                                                     "outage":  {
+                                                                                                                    "terminationObserved":  true,
+                                                                                                                    "terminationExecutableValidated":  true,
+                                                                                                                    "descendantProcessCount":  0,
+                                                                                                                    "forcedDescendantCleanupCount":  0,
+                                                                                                                    "descendantsExited":  true,
+                                                                                                                    "remainingDescendantProcessCount":  0,
+                                                                                                                    "descendantCleanupMs":  0,
+                                                                                                                    "unavailableBeforeExplicitRestart":  true,
+                                                                                                                    "noAutomaticRestartObserved":  true,
+                                                                                                                    "expectedWindows":  2,
+                                                                                                                    "observedWindows":  2,
+                                                                                                                    "unexpectedProcesses":  0,
+                                                                                                                    "offlineContinuity":  {
+                                                                                                                                              "expectedCompletions":  2,
+                                                                                                                                              "reportedExpectedCompletions":  2,
+                                                                                                                                              "observedCompletions":  2,
+                                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                                              "missingCompletions":  0,
+                                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                                              "expectedGlobalAvailable":  false,
+                                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                                              "passed":  true
+                                                                                                                                          },
+                                                                                                                    "passed":  true
+                                                                                                                },
+                                                                                                     "explicitRestart":  {
+                                                                                                                             "pidChanged":  true,
+                                                                                                                             "available":  true,
+                                                                                                                             "singletonOwnerPreserved":  true,
+                                                                                                                             "singletonRejectedExitCode":  73,
+                                                                                                                             "onlineContinuity":  {
+                                                                                                                                                      "expectedCompletions":  2,
+                                                                                                                                                      "reportedExpectedCompletions":  2,
+                                                                                                                                                      "observedCompletions":  2,
+                                                                                                                                                      "duplicateCompletions":  0,
+                                                                                                                                                      "missingCompletions":  0,
+                                                                                                                                                      "revisionsRecovered":  true,
+                                                                                                                                                      "cleanPersistedState":  true,
+                                                                                                                                                      "expectedGlobalAvailable":  true,
+                                                                                                                                                      "globalAvailabilityMatched":  true,
+                                                                                                                                                      "globalProcessIdentityMatched":  true,
+                                                                                                                                                      "passed":  true
+                                                                                                                                                  },
+                                                                                                                             "passed":  true
+                                                                                                                         }
+                                                                                                 },
+                                                                               "projectHost":  {
+                                                                                                   "terminationObserved":  true,
+                                                                                                   "terminationExecutableValidated":  true,
+                                                                                                   "descendantProcessCount":  7,
+                                                                                                   "forcedDescendantCleanupCount":  0,
+                                                                                                   "descendantsExited":  true,
+                                                                                                   "remainingDescendantProcessCount":  0,
+                                                                                                   "descendantCleanupMs":  3822,
+                                                                                                   "terminatedHostSurvived":  false,
+                                                                                                   "otherHostSurvived":  false,
+                                                                                                   "expectedOtherHostSurvived":  false,
+                                                                                                   "noAutomaticRestartObserved":  true,
+                                                                                                   "expectedRemainingWindows":  0,
+                                                                                                   "observedRemainingWindows":  0,
+                                                                                                   "unexpectedProcesses":  0,
+                                                                                                   "survivorContinuityApplicable":  false,
+                                                                                                   "survivorContinuity":  null,
+                                                                                                   "restartPidChanged":  true,
+                                                                                                   "expectedReopenedProjects":  2,
+                                                                                                   "reportedExpectedReopenedProjects":  2,
+                                                                                                   "observedReopenedProjects":  2,
+                                                                                                   "reopenedRevisionsRecovered":  true,
+                                                                                                   "globalAvailableAfterRestart":  true,
+                                                                                                   "passed":  true
+                                                                                               },
+                                                                               "graphics":  {
+                                                                                                "webglVersion":  2,
+                                                                                                "contextRecoveryMechanism":  "webgl_lose_context",
+                                                                                                "projectCount":  2,
+                                                                                                "contextLostCount":  2,
+                                                                                                "contextRestoredCount":  2,
+                                                                                                "glError":  0,
+                                                                                                "passed":  true
+                                                                                            },
+                                                                               "logs":  {
+                                                                                            "globalStreamCount":  4,
+                                                                                            "globalMissingRequiredFields":  0,
+                                                                                            "projectHostStreamCount":  2,
+                                                                                            "projectHostContinuityFailureEvents":  0,
+                                                                                            "projectHostMissingRequiredFields":  0,
+                                                                                            "passed":  true
+                                                                                        },
+                                                                               "passed":  true
+                                                                           },
+                                                           "imagingProcessor":  {
+                                                                                    "validated":  true,
+                                                                                    "artifactSha256":  "3694123e77d2187b59ec36d8fcf9af8b5e89153dd1fc295c51107fa901fd7997",
+                                                                                    "artifactSchemaVersion":  1,
+                                                                                    "sourceInputsDirty":  false,
+                                                                                    "sameGitCommitAsTopologyBuild":  true,
+                                                                                    "cacheRecoveredAfterOneExplicitRestart":  true,
+                                                                                    "exportFailedSafelyUntilExplicitRetry":  true,
+                                                                                    "passed":  true
+                                                                                },
+                                                           "factsRecorded":  true,
+                                                           "passed":  true
+                                                       },
+                                                "BA":  {
+                                                           "rawFailureGatePassed":  true,
+                                                           "rawFailureGateConsistent":  true,
+                                                           "independent":  {
+                                                                               "globalProcess":  {
+                                                                                                     "initial":  {
+                                                                                                                     "available":  true,
+                                                                                                                     "visibleWindowCount":  0,
+                                                                                                                     "processTreeCount":  1,
+                                                                                                                     "workingSetBytes":  14823424,
+                                                                                                                     "priorityClasses":  [
+                                                                                                                                             "BelowNormal"
+                                                                                                                                         ],
+                                                                                                                     "singletonOwnerPreserved":  true,
+                                                                                                                     "singletonRejectedExitCode":  73,
+                                                                                                                     "passed":  true
+                                                                                                                 },
+                                                                                                     "outage":  {
+                                                                                                                    "terminationObserved":  true,
+                                                                                                                    "terminationExecutableValidated":  true,
+                                                                                                                    "descendantProcessCount":  0,
+                                                                                                                    "forcedDescendantCleanupCount":  0,
+                                                                                                                    "descendantsExited":  true,
+                                                                                                                    "remainingDescendantProcessCount":  0,
+                                                                                                                    "descendantCleanupMs":  0,
+                                                                                                                    "unavailableBeforeExplicitRestart":  true,
+                                                                                                                    "noAutomaticRestartObserved":  true,
+                                                                                                                    "expectedWindows":  2,
+                                                                                                                    "observedWindows":  2,
+                                                                                                                    "unexpectedProcesses":  0,
+                                                                                                                    "offlineContinuity":  {
+                                                                                                                                              "expectedCompletions":  2,
+                                                                                                                                              "reportedExpectedCompletions":  2,
+                                                                                                                                              "observedCompletions":  2,
+                                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                                              "missingCompletions":  0,
+                                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                                              "expectedGlobalAvailable":  false,
+                                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                                              "passed":  true
+                                                                                                                                          },
+                                                                                                                    "passed":  true
+                                                                                                                },
+                                                                                                     "explicitRestart":  {
+                                                                                                                             "pidChanged":  true,
+                                                                                                                             "available":  true,
+                                                                                                                             "singletonOwnerPreserved":  true,
+                                                                                                                             "singletonRejectedExitCode":  73,
+                                                                                                                             "onlineContinuity":  {
+                                                                                                                                                      "expectedCompletions":  2,
+                                                                                                                                                      "reportedExpectedCompletions":  2,
+                                                                                                                                                      "observedCompletions":  2,
+                                                                                                                                                      "duplicateCompletions":  0,
+                                                                                                                                                      "missingCompletions":  0,
+                                                                                                                                                      "revisionsRecovered":  true,
+                                                                                                                                                      "cleanPersistedState":  true,
+                                                                                                                                                      "expectedGlobalAvailable":  true,
+                                                                                                                                                      "globalAvailabilityMatched":  true,
+                                                                                                                                                      "globalProcessIdentityMatched":  true,
+                                                                                                                                                      "passed":  true
+                                                                                                                                                  },
+                                                                                                                             "passed":  true
+                                                                                                                         }
+                                                                                                 },
+                                                                               "projectHost":  {
+                                                                                                   "terminationObserved":  true,
+                                                                                                   "terminationExecutableValidated":  true,
+                                                                                                   "descendantProcessCount":  6,
+                                                                                                   "forcedDescendantCleanupCount":  0,
+                                                                                                   "descendantsExited":  true,
+                                                                                                   "remainingDescendantProcessCount":  0,
+                                                                                                   "descendantCleanupMs":  3465,
+                                                                                                   "terminatedHostSurvived":  false,
+                                                                                                   "otherHostSurvived":  true,
+                                                                                                   "expectedOtherHostSurvived":  true,
+                                                                                                   "noAutomaticRestartObserved":  true,
+                                                                                                   "expectedRemainingWindows":  1,
+                                                                                                   "observedRemainingWindows":  1,
+                                                                                                   "unexpectedProcesses":  0,
+                                                                                                   "survivorContinuityApplicable":  true,
+                                                                                                   "survivorContinuity":  {
+                                                                                                                              "expectedCompletions":  1,
+                                                                                                                              "reportedExpectedCompletions":  1,
+                                                                                                                              "observedCompletions":  1,
+                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                              "missingCompletions":  0,
+                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                              "expectedGlobalAvailable":  true,
+                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                              "passed":  true
+                                                                                                                          },
+                                                                                                   "restartPidChanged":  true,
+                                                                                                   "expectedReopenedProjects":  1,
+                                                                                                   "reportedExpectedReopenedProjects":  1,
+                                                                                                   "observedReopenedProjects":  1,
+                                                                                                   "reopenedRevisionsRecovered":  true,
+                                                                                                   "globalAvailableAfterRestart":  true,
+                                                                                                   "passed":  true
+                                                                                               },
+                                                                               "graphics":  {
+                                                                                                "webglVersion":  2,
+                                                                                                "contextRecoveryMechanism":  "webgl_lose_context",
+                                                                                                "projectCount":  2,
+                                                                                                "contextLostCount":  2,
+                                                                                                "contextRestoredCount":  2,
+                                                                                                "glError":  0,
+                                                                                                "passed":  true
+                                                                                            },
+                                                                               "logs":  {
+                                                                                            "globalStreamCount":  4,
+                                                                                            "globalMissingRequiredFields":  0,
+                                                                                            "projectHostStreamCount":  3,
+                                                                                            "projectHostContinuityFailureEvents":  0,
+                                                                                            "projectHostMissingRequiredFields":  0,
+                                                                                            "passed":  true
+                                                                                        },
+                                                                               "passed":  true
+                                                                           },
+                                                           "multiwindow":  {
+                                                                               "globalProcess":  {
+                                                                                                     "initial":  {
+                                                                                                                     "available":  true,
+                                                                                                                     "visibleWindowCount":  0,
+                                                                                                                     "processTreeCount":  1,
+                                                                                                                     "workingSetBytes":  14823424,
+                                                                                                                     "priorityClasses":  [
+                                                                                                                                             "BelowNormal"
+                                                                                                                                         ],
+                                                                                                                     "singletonOwnerPreserved":  true,
+                                                                                                                     "singletonRejectedExitCode":  73,
+                                                                                                                     "passed":  true
+                                                                                                                 },
+                                                                                                     "outage":  {
+                                                                                                                    "terminationObserved":  true,
+                                                                                                                    "terminationExecutableValidated":  true,
+                                                                                                                    "descendantProcessCount":  0,
+                                                                                                                    "forcedDescendantCleanupCount":  0,
+                                                                                                                    "descendantsExited":  true,
+                                                                                                                    "remainingDescendantProcessCount":  0,
+                                                                                                                    "descendantCleanupMs":  0,
+                                                                                                                    "unavailableBeforeExplicitRestart":  true,
+                                                                                                                    "noAutomaticRestartObserved":  true,
+                                                                                                                    "expectedWindows":  2,
+                                                                                                                    "observedWindows":  2,
+                                                                                                                    "unexpectedProcesses":  0,
+                                                                                                                    "offlineContinuity":  {
+                                                                                                                                              "expectedCompletions":  2,
+                                                                                                                                              "reportedExpectedCompletions":  2,
+                                                                                                                                              "observedCompletions":  2,
+                                                                                                                                              "duplicateCompletions":  0,
+                                                                                                                                              "missingCompletions":  0,
+                                                                                                                                              "revisionsRecovered":  true,
+                                                                                                                                              "cleanPersistedState":  true,
+                                                                                                                                              "expectedGlobalAvailable":  false,
+                                                                                                                                              "globalAvailabilityMatched":  true,
+                                                                                                                                              "globalProcessIdentityMatched":  true,
+                                                                                                                                              "passed":  true
+                                                                                                                                          },
+                                                                                                                    "passed":  true
+                                                                                                                },
+                                                                                                     "explicitRestart":  {
+                                                                                                                             "pidChanged":  true,
+                                                                                                                             "available":  true,
+                                                                                                                             "singletonOwnerPreserved":  true,
+                                                                                                                             "singletonRejectedExitCode":  73,
+                                                                                                                             "onlineContinuity":  {
+                                                                                                                                                      "expectedCompletions":  2,
+                                                                                                                                                      "reportedExpectedCompletions":  2,
+                                                                                                                                                      "observedCompletions":  2,
+                                                                                                                                                      "duplicateCompletions":  0,
+                                                                                                                                                      "missingCompletions":  0,
+                                                                                                                                                      "revisionsRecovered":  true,
+                                                                                                                                                      "cleanPersistedState":  true,
+                                                                                                                                                      "expectedGlobalAvailable":  true,
+                                                                                                                                                      "globalAvailabilityMatched":  true,
+                                                                                                                                                      "globalProcessIdentityMatched":  true,
+                                                                                                                                                      "passed":  true
+                                                                                                                                                  },
+                                                                                                                             "passed":  true
+                                                                                                                         }
+                                                                                                 },
+                                                                               "projectHost":  {
+                                                                                                   "terminationObserved":  true,
+                                                                                                   "terminationExecutableValidated":  true,
+                                                                                                   "descendantProcessCount":  7,
+                                                                                                   "forcedDescendantCleanupCount":  0,
+                                                                                                   "descendantsExited":  true,
+                                                                                                   "remainingDescendantProcessCount":  0,
+                                                                                                   "descendantCleanupMs":  1876,
+                                                                                                   "terminatedHostSurvived":  false,
+                                                                                                   "otherHostSurvived":  false,
+                                                                                                   "expectedOtherHostSurvived":  false,
+                                                                                                   "noAutomaticRestartObserved":  true,
+                                                                                                   "expectedRemainingWindows":  0,
+                                                                                                   "observedRemainingWindows":  0,
+                                                                                                   "unexpectedProcesses":  0,
+                                                                                                   "survivorContinuityApplicable":  false,
+                                                                                                   "survivorContinuity":  null,
+                                                                                                   "restartPidChanged":  true,
+                                                                                                   "expectedReopenedProjects":  2,
+                                                                                                   "reportedExpectedReopenedProjects":  2,
+                                                                                                   "observedReopenedProjects":  2,
+                                                                                                   "reopenedRevisionsRecovered":  true,
+                                                                                                   "globalAvailableAfterRestart":  true,
+                                                                                                   "passed":  true
+                                                                                               },
+                                                                               "graphics":  {
+                                                                                                "webglVersion":  2,
+                                                                                                "contextRecoveryMechanism":  "webgl_lose_context",
+                                                                                                "projectCount":  2,
+                                                                                                "contextLostCount":  2,
+                                                                                                "contextRestoredCount":  2,
+                                                                                                "glError":  0,
+                                                                                                "passed":  true
+                                                                                            },
+                                                                               "logs":  {
+                                                                                            "globalStreamCount":  4,
+                                                                                            "globalMissingRequiredFields":  0,
+                                                                                            "projectHostStreamCount":  2,
+                                                                                            "projectHostContinuityFailureEvents":  0,
+                                                                                            "projectHostMissingRequiredFields":  0,
+                                                                                            "passed":  true
+                                                                                        },
+                                                                               "passed":  true
+                                                                           },
+                                                           "imagingProcessor":  {
+                                                                                    "validated":  true,
+                                                                                    "artifactSha256":  "3694123e77d2187b59ec36d8fcf9af8b5e89153dd1fc295c51107fa901fd7997",
+                                                                                    "artifactSchemaVersion":  1,
+                                                                                    "sourceInputsDirty":  false,
+                                                                                    "sameGitCommitAsTopologyBuild":  true,
+                                                                                    "cacheRecoveredAfterOneExplicitRestart":  true,
+                                                                                    "exportFailedSafelyUntilExplicitRetry":  true,
+                                                                                    "passed":  true
+                                                                                },
+                                                           "factsRecorded":  true,
+                                                           "passed":  true
+                                                       }
+                                            },
+                       "factsRecorded":  true,
+                       "passed":  true
+                   },
+    "implementationCost":  {
+                               "method":  "observable_responsibilities_without_synthetic_score_or_effort_estimate",
+                               "responsibilityModel":  "docs/research/0027-protocolo-da-comparacao-final-de-topologias.md",
+                               "independent":  {
+                                                   "byExecutionOrder":  {
+                                                                            "AB":  {
+                                                                                       "hostProcessCount":  2,
+                                                                                       "projectProcessTreeCount":  14,
+                                                                                       "projectWorkingSetBytes":  2517135360,
+                                                                                       "projectHostPriorityClasses":  [
+                                                                                                                          "Normal",
+                                                                                                                          "Normal"
+                                                                                                                      ],
+                                                                                       "globalProcessTreeCount":  1,
+                                                                                       "globalWorkingSetBytes":  14831616,
+                                                                                       "globalVisibleWindowCount":  0,
+                                                                                       "globalPriorityClasses":  [
+                                                                                                                     "BelowNormal"
+                                                                                                                 ],
+                                                                                       "projectHostToGlobalLinkCount":  2,
+                                                                                       "logStreamCount":  3,
+                                                                                       "windowsRemainingAfterHostCrash":  1,
+                                                                                       "projectsReopenedAfterHostRestart":  1
+                                                                                   },
+                                                                            "BA":  {
+                                                                                       "hostProcessCount":  2,
+                                                                                       "projectProcessTreeCount":  14,
+                                                                                       "projectWorkingSetBytes":  2359042048,
+                                                                                       "projectHostPriorityClasses":  [
+                                                                                                                          "Normal",
+                                                                                                                          "Normal"
+                                                                                                                      ],
+                                                                                       "globalProcessTreeCount":  1,
+                                                                                       "globalWorkingSetBytes":  14823424,
+                                                                                       "globalVisibleWindowCount":  0,
+                                                                                       "globalPriorityClasses":  [
+                                                                                                                     "BelowNormal"
+                                                                                                                 ],
+                                                                                       "projectHostToGlobalLinkCount":  2,
+                                                                                       "logStreamCount":  3,
+                                                                                       "windowsRemainingAfterHostCrash":  1,
+                                                                                       "projectsReopenedAfterHostRestart":  1
+                                                                                   }
+                                                                        }
+                                               },
+                               "multiwindow":  {
+                                                   "byExecutionOrder":  {
+                                                                            "AB":  {
+                                                                                       "hostProcessCount":  1,
+                                                                                       "projectProcessTreeCount":  8,
+                                                                                       "projectWorkingSetBytes":  2354089984,
+                                                                                       "projectHostPriorityClasses":  [
+                                                                                                                          "Normal"
+                                                                                                                      ],
+                                                                                       "globalProcessTreeCount":  1,
+                                                                                       "globalWorkingSetBytes":  14827520,
+                                                                                       "globalVisibleWindowCount":  0,
+                                                                                       "globalPriorityClasses":  [
+                                                                                                                     "BelowNormal"
+                                                                                                                 ],
+                                                                                       "projectHostToGlobalLinkCount":  1,
+                                                                                       "logStreamCount":  2,
+                                                                                       "windowsRemainingAfterHostCrash":  0,
+                                                                                       "projectsReopenedAfterHostRestart":  2
+                                                                                   },
+                                                                            "BA":  {
+                                                                                       "hostProcessCount":  1,
+                                                                                       "projectProcessTreeCount":  8,
+                                                                                       "projectWorkingSetBytes":  2320809984,
+                                                                                       "projectHostPriorityClasses":  [
+                                                                                                                          "Normal"
+                                                                                                                      ],
+                                                                                       "globalProcessTreeCount":  1,
+                                                                                       "globalWorkingSetBytes":  14823424,
+                                                                                       "globalVisibleWindowCount":  0,
+                                                                                       "globalPriorityClasses":  [
+                                                                                                                     "BelowNormal"
+                                                                                                                 ],
+                                                                                       "projectHostToGlobalLinkCount":  1,
+                                                                                       "logStreamCount":  2,
+                                                                                       "windowsRemainingAfterHostCrash":  0,
+                                                                                       "projectsReopenedAfterHostRestart":  2
+                                                                                   }
+                                                                        }
+                                               }
+                           },
+    "checks":  [
+                   {
+                       "name":  "criteria-frozen-before-final-execution",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "balanced-ab-ba-orders",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "same-clean-release-build",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "same-hardware-and-corpus",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "same-canvas-targets",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "identical-exports-across-runs",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "robustness-facts-recorded",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "resilience-gates",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "pan-zoom-p95-at-most-33ms",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "raw-measurements-preserved",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "implementation-cost-recorded",
+                       "passed":  true
+                   }
+               ],
+    "completion":  {
+                       "criteriaFrozenBeforeFinalExecution":  true,
+                       "balancedOrdersPassed":  true,
+                       "hardwareRecorded":  true,
+                       "corpusRecorded":  true,
+                       "rawMeasurementsRecorded":  true,
+                       "failuresRecorded":  true,
+                       "robustnessFactsRecorded":  true,
+                       "implementationCostRecorded":  true,
+                       "ticketCriterionSatisfied":  true
+                   },
+    "interpretation":  {
+                           "criterionClosed":  true,
+                           "performanceRankingAllowed":  false,
+                           "topologyRecommendationDeferred":  true,
+                           "reason":  "The frozen AB/BA comparison protocol passed; the topology decision remains separate."
+                       }
+}
