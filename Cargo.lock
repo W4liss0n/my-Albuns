@@ -1876,6 +1876,8 @@ dependencies = [
  "tokio",
  "tracing",
  "ts-rs",
+ "webview2-com",
+ "windows",
  "windows-sys 0.61.2",
 ]
 

@@ -17,6 +17,14 @@ Manter a composição do Álbum como foco principal, permitir navegação contí
 
 A referência fixa a organização espacial, não o estilo visual final, as cores ou o tamanho exato de cada região.
 
+## Comportamento desktop da WebView
+
+A WebView da Janela do Projeto funciona como uma superfície desktop e não expõe ações próprias de navegador. Recarregar a página, alterar o zoom da página, abrir busca, salvar, imprimir ou abrir a página, navegar pelo histórico, acessar código-fonte ou ferramentas de desenvolvimento, abrir o menu de contexto nativo e navegar por link ou arquivo solto ficam desabilitados. Botões auxiliares do mouse também não acionam histórico ou rolagem automática do navegador.
+
+Essa política impede apenas o comportamento padrão da WebView: os eventos continuam chegando aos controles do produto. Assim, atalhos contextuais, menus próprios, Pan com botão do meio e importação por arraste podem usar as mesmas entradas quando forem implementados. Edição de texto, seleção, Clipboard, Undo/Redo e comportamentos da janela fornecidos pelo sistema operacional permanecem disponíveis.
+
+No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de navegador e o menu de contexto padrão; uma falha nessa configuração impede a abertura da Janela do Projeto. Zoom nativo e ferramentas de desenvolvimento também ficam desabilitados na configuração declarativa da janela. A política DOM cuida somente de navegação por link ou arquivo solto e das ações nativas dos botões auxiliares do mouse. Nenhuma dessas políticas executa comandos do produto ou substitui o registro contextual de comandos e atalhos.
+
 ## Estrutura-base
 
 ```text

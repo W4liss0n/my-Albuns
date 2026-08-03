@@ -1,5 +1,6 @@
 mod cache_engine;
 mod demo_project;
+mod desktop_webview_policy;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;
@@ -211,5 +212,22 @@ mod tests {
         assert_eq!(windows.len(), 1);
         assert_eq!(windows[0]["label"], "main");
         assert_eq!(windows[0]["create"], false);
+    }
+
+    #[test]
+    fn main_window_disables_native_browser_controls() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let main_window = &config["app"]["windows"][0];
+
+        assert_eq!(main_window["devtools"], false);
+        assert_eq!(main_window["zoomHotkeysEnabled"], false);
+    }
+
+    #[test]
+    fn product_runtime_applies_the_native_webview_policy() {
+        let runtime_source = include_str!("product_runtime.rs");
+
+        assert!(runtime_source.contains("desktop_webview_policy::enforce(&main_window)?;"));
     }
 }

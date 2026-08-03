@@ -10,7 +10,10 @@ import {
   tauriMediaPreviewPort,
   tauriProjectSessionPort,
 } from "./platform/tauriProjectPorts";
+import { installDesktopWebViewPolicy } from "./platform/desktopWebViewPolicy";
 import { tauriLogger } from "./platform/tauriLogger";
+
+installDesktopWebViewPolicy(document);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

@@ -3,8 +3,9 @@ use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Manager, WebviewWindowBuilder};
 
 use crate::{
-    cache_engine::CacheEngine, demo_project, imaging_processor::ImagingProcessor, logging,
-    operation_gate::OperationGate, project_host::ProjectHost,
+    cache_engine::CacheEngine, demo_project, desktop_webview_policy,
+    imaging_processor::ImagingProcessor, logging, operation_gate::OperationGate,
+    project_host::ProjectHost,
 };
 
 pub(crate) const MAIN_WINDOW_LABEL: &str = "main";
@@ -55,9 +56,10 @@ pub(crate) fn setup(
         .iter()
         .find(|window| window.label == MAIN_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("a configuração da janela principal não existe"))?;
-    WebviewWindowBuilder::from_config(app, main_config)?
+    let main_window = WebviewWindowBuilder::from_config(app, main_config)?
         .data_directory(webview_data_directory)
         .build()?;
+    desktop_webview_policy::enforce(&main_window)?;
 
     tracing::info!(
         target: "myalbuns.desktop",
