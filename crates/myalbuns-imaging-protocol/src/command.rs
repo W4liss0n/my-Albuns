@@ -2,7 +2,7 @@ use myalbuns_paths::RootBindingPlan;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::cache::{CacheRequest, CacheResetRequest};
+use crate::cache::CacheRequest;
 use crate::render::ImagingRequest;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -60,7 +60,6 @@ impl ImagingFailureStage {
 pub enum ImagingCommand {
     Render(ImagingRequest),
     BuildCache(CacheRequest),
-    ResetCache(CacheResetRequest),
 }
 
 impl ImagingCommand {
@@ -72,18 +71,12 @@ impl ImagingCommand {
         Self::BuildCache(request)
     }
 
-    pub fn reset_cache(request: CacheResetRequest) -> Self {
-        Self::ResetCache(request)
-    }
-
     /// Returns the immutable path plan carried by commands that perform
-    /// external I/O. Cache reset only addresses application-owned storage and
-    /// therefore has no operation plan.
+    /// external I/O.
     pub fn root_bindings(&self) -> Option<&RootBindingPlan> {
         match self {
             Self::Render(request) => Some(&request.root_bindings),
             Self::BuildCache(request) => Some(&request.root_bindings),
-            Self::ResetCache(_) => None,
         }
     }
 }

@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    CacheCompletion, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
-    ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, decode_command,
-    decode_event_stream, encode_command, encode_event, root_binding_plan_sha256,
+    CacheCompletion, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
+    ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingRequest,
+    ImagingResponse, MediaSource, RenderCompletion, decode_command, decode_event_stream,
+    encode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_paths::{AppPaths, CacheArtifactFormat, OperationPathContext, RootBindingPlan};
 
@@ -13,6 +13,19 @@ use myalbuns_paths::{AppPaths, CacheArtifactFormat, OperationPathContext, RootBi
 mod sample_project;
 
 use sample_project::SampleProject;
+
+fn empty_cache_response(request_id: &str) -> ImagingResponse {
+    ImagingResponse::cache_completed(
+        request_id,
+        CacheCompletion {
+            artifacts: vec![],
+            generated_count: 0,
+            reused_count: 0,
+            source_bytes: 0,
+            preview_bytes: 0,
+        },
+    )
+}
 
 #[test]
 fn imaging_failure_stages_have_stable_process_exit_codes() {
@@ -239,7 +252,7 @@ fn processor_event_stream_rejects_invalid_or_out_of_order_progress() {
         "deserialization validates progress even when its constructor was bypassed"
     );
 
-    let response = ImagingResponse::cache_reset("render-42", 0);
+    let response = empty_cache_response("render-42");
     let progress = ImagingProgress::new("render-42", ImagingProgressStage::EncodingOutput, 1, 1)
         .expect("the progress fixture is valid");
     let mut out_of_order =
@@ -255,7 +268,7 @@ fn processor_event_stream_rejects_invalid_or_out_of_order_progress() {
 
 #[test]
 fn processor_event_stream_rejects_regressive_progress() {
-    let response = ImagingResponse::cache_reset("render-42", 0);
+    let response = empty_cache_response("render-42");
     let cases = [
         vec![
             (ImagingProgressStage::LoadingSources, 1, 1),
@@ -326,15 +339,7 @@ fn media_identity_stays_opaque_across_the_protocol_and_cache_paths() {
 }
 
 #[test]
-fn cache_reset_rejects_an_empty_project_identity() {
-    assert!(
-        CacheResetRequest::new("reset-empty", vec![" \t".into()]).is_err(),
-        "an impossible Project identity must not derive an internal namespace"
-    );
-}
-
-#[test]
-fn cache_command_keeps_source_paths_inside_the_native_protocol() {
+fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
     let cache_paths = AppPaths::from_known_folders(
         PathBuf::from(r"C:\Roaming").as_path(),
         PathBuf::from(r"C:\Local").as_path(),
@@ -358,7 +363,7 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-42",
-            "project-42",
+            "Projeto/\u{00c1}rvore CON",
             cache_paths,
             vec![
                 CacheJob::new(source, "aaaaaaaaaaaaaaaa-v1-1600").expect("the Cache job is valid"),
@@ -377,6 +382,10 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
     );
     assert_eq!(command_json["request"]["requestId"], "cache-42");
     assert_eq!(
+        command_json["request"]["projectId"],
+        "Projeto/\u{00c1}rvore CON"
+    );
+    assert_eq!(
         command_json["request"]["jobs"][0]["source"]["mediaId"],
         "media-42"
     );
@@ -387,6 +396,14 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
 
     let decoded: ImagingCommand = serde_json::from_value(command_json).expect("command decodes");
     assert_eq!(decoded, command);
+    let ImagingCommand::BuildCache(mut invalid_project) = decoded.clone() else {
+        panic!("the decoded command remains a Cache request");
+    };
+    invalid_project.project_id = " \t".into();
+    assert!(
+        invalid_project.validate().is_err(),
+        "an empty Project identity is rejected without constraining opaque identities"
+    );
 
     let response = ImagingResponse::cache_completed(
         "cache-42",
@@ -400,15 +417,4 @@ fn cache_command_keeps_source_paths_inside_the_native_protocol() {
     );
     assert!(response.cache_completed_for("cache-42").is_some());
     assert!(response.cache_completed_for("another").is_none());
-
-    let reset = ImagingCommand::reset_cache(
-        CacheResetRequest::new("reset-42", vec!["project-42".into(), "project-43".into()])
-            .expect("the reset request is valid"),
-    );
-    let reset_json = serde_json::to_value(&reset).expect("reset command serializes");
-    assert_eq!(reset_json["kind"], "resetCache");
-    assert_eq!(reset_json["request"]["projectIds"][1], "project-43");
-    let response = ImagingResponse::cache_reset("reset-42", 2);
-    assert_eq!(response.cache_reset_for("reset-42"), Some(2));
-    assert_eq!(response.cache_reset_for("another"), None);
 }

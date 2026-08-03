@@ -4,7 +4,7 @@ use std::fmt;
 use crate::{
     cache_engine::{CacheEngine, CachePause},
     imaging_processor::{ImagingProcessor, ProcessorReservation, ProcessorUnavailable},
-    operation_gate::{OperationGate, OperationGateError, OperationGrant, OperationMode},
+    operation_gate::{OperationGate, OperationGateError, OperationGrant},
 };
 
 #[derive(Debug)]
@@ -29,10 +29,9 @@ pub(crate) enum OperationLeaseError {
 impl OperationLease {
     pub(crate) fn begin(
         gate: &OperationGate,
-        mode: OperationMode,
     ) -> Result<OperationLeaseAcquisition, OperationGateError> {
         Ok(OperationLeaseAcquisition {
-            gate_grant: Some(gate.try_acquire(mode)?),
+            gate_grant: Some(gate.try_acquire()?),
         })
     }
 
@@ -41,20 +40,12 @@ impl OperationLease {
         gate: &OperationGate,
         cache: &CacheEngine,
         processor: &ImagingProcessor,
-        mode: OperationMode,
     ) -> Result<Self, OperationLeaseError> {
-        Self::begin(gate, mode)
+        Self::begin(gate)
             .map_err(OperationLeaseError::Gate)?
             .complete(cache, processor)
             .await
             .map_err(OperationLeaseError::Processor)
-    }
-
-    pub(crate) fn mode(&self) -> OperationMode {
-        self.gate_grant
-            .as_ref()
-            .expect("an OperationLease keeps its gate grant until drop")
-            .mode()
     }
 
     pub(crate) fn processor_reservation(&self) -> &ProcessorReservation {
@@ -113,9 +104,8 @@ mod tests {
 
     use super::OperationLease;
     use crate::{
-        cache_engine::CacheEngine,
-        imaging_processor::ImagingProcessor,
-        operation_gate::{OperationGate, OperationMode},
+        cache_engine::CacheEngine, imaging_processor::ImagingProcessor,
+        operation_gate::OperationGate,
     };
 
     #[test]
@@ -130,8 +120,7 @@ mod tests {
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let active_cache = cache.begin_work().await;
-            let lease =
-                OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport);
+            let lease = OperationLease::acquire(&gate, &cache, &processor);
             tokio::pin!(lease);
 
             assert!(
@@ -142,11 +131,10 @@ mod tests {
             );
 
             drop(active_cache);
-            let lease = tokio::time::timeout(Duration::from_secs(1), &mut lease)
+            tokio::time::timeout(Duration::from_secs(1), &mut lease)
                 .await
                 .expect("the lease starts when Cache reaches its safe endpoint")
                 .expect("the operation grant remains available");
-            assert_eq!(lease.mode(), OperationMode::NormalExport);
         });
     }
 
@@ -161,13 +149,12 @@ mod tests {
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
-            let lease =
-                OperationLease::acquire(&gate, &cache, &processor, OperationMode::BatchExclusive)
-                    .await
-                    .expect("the batch uses the common lease");
+            let lease = OperationLease::acquire(&gate, &cache, &processor)
+                .await
+                .expect("the attempt acquires the common lease");
 
             assert!(
-                OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport,)
+                OperationLease::acquire(&gate, &cache, &processor)
                     .await
                     .is_err(),
                 "another Export is refused without a queue"
@@ -195,7 +182,7 @@ mod tests {
                 .await
                 .expect("the Processor returns with the lease release")
                 .expect("the Processor remains healthy");
-            OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport)
+            OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .expect("the next Export acquires immediately");
         });
@@ -212,17 +199,16 @@ mod tests {
 
         let outcome = catch_unwind(AssertUnwindSafe(|| {
             tauri::async_runtime::block_on(async {
-                let _lease =
-                    OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport)
-                        .await
-                        .expect("the failed attempt acquires");
+                let _lease = OperationLease::acquire(&gate, &cache, &processor)
+                    .await
+                    .expect("the failed attempt acquires");
                 panic!("injected operation failure");
             });
         }));
         assert!(outcome.is_err(), "the injected failure must unwind");
 
         tauri::async_runtime::block_on(async {
-            OperationLease::acquire(&gate, &cache, &processor, OperationMode::NormalExport)
+            OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .expect("the successor acquires every resource after unwind");
         });
@@ -240,12 +226,7 @@ mod tests {
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let active_cache = cache.begin_work().await;
-            let mut pending = Box::pin(OperationLease::acquire(
-                &gate,
-                &cache,
-                &processor,
-                OperationMode::NormalExport,
-            ));
+            let mut pending = Box::pin(OperationLease::acquire(&gate, &cache, &processor));
 
             assert!(
                 tokio::time::timeout(Duration::from_millis(20), &mut pending)
@@ -255,7 +236,7 @@ mod tests {
             );
             drop(pending);
 
-            gate.try_acquire(OperationMode::BatchExclusive)
+            gate.try_acquire()
                 .expect("cancelling the pending future releases its partial gate grant");
             drop(active_cache);
         });
@@ -274,10 +255,10 @@ mod tests {
             let processor = ImagingProcessor::default();
             let active_cache = cache.begin_work().await;
 
-            let acquisition = OperationLease::begin(&gate, OperationMode::NormalExport)
+            let acquisition = OperationLease::begin(&gate)
                 .expect("the first caller resolves the gate immediately");
             assert!(
-                OperationLease::begin(&gate, OperationMode::NormalExport).is_err(),
+                OperationLease::begin(&gate).is_err(),
                 "a concurrent caller receives a conflict before progress can start"
             );
 
@@ -290,7 +271,7 @@ mod tests {
             );
             drop(completion);
 
-            OperationLease::begin(&gate, OperationMode::NormalExport)
+            OperationLease::begin(&gate)
                 .expect("cancelling the completion releases the partial gate grant");
             drop(active_cache);
         });
@@ -311,12 +292,7 @@ mod tests {
                 .reserve()
                 .await
                 .expect("the Processor can be reserved");
-            let mut pending = Box::pin(OperationLease::acquire(
-                &gate,
-                &cache,
-                &processor,
-                OperationMode::NormalExport,
-            ));
+            let mut pending = Box::pin(OperationLease::acquire(&gate, &cache, &processor));
 
             assert!(
                 tokio::time::timeout(Duration::from_millis(20), &mut pending)
@@ -326,7 +302,7 @@ mod tests {
             );
             drop(pending);
 
-            gate.try_acquire(OperationMode::CacheMaintenance)
+            gate.try_acquire()
                 .expect("cancelling the pending future releases its gate grant");
             tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
                 .await
@@ -353,7 +329,7 @@ mod tests {
             reservation.quarantine();
             drop(reservation);
 
-            let failure = OperationLease::begin(&gate, OperationMode::NormalExport)
+            let failure = OperationLease::begin(&gate)
                 .expect("the gate can be acquired")
                 .complete(&cache, &processor)
                 .await
@@ -364,7 +340,7 @@ mod tests {
                 "o Processador de Imagens está em quarentena porque o encerramento anterior não foi confirmado; reinicie o aplicativo antes de tentar novamente"
             );
             assert!(
-                OperationLease::begin(&gate, OperationMode::NormalExport).is_ok(),
+                OperationLease::begin(&gate).is_ok(),
                 "the failed completion releases the gate"
             );
             tokio::time::timeout(Duration::from_secs(1), cache.begin_work())

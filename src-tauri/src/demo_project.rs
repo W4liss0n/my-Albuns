@@ -32,7 +32,7 @@ pub(crate) fn open(app_paths: &AppPaths) -> Result<ProjectHost, String> {
 }
 
 fn materialize_media(app_paths: &AppPaths) -> Result<Vec<MediaSource>, String> {
-    let media_directory = app_paths.local_root().join("Demo").join("Media");
+    let media_directory = app_paths.state_dir().join("Demo").join("Media");
     std::fs::create_dir_all(&media_directory)
         .map_err(|error| format!("Não foi possível preparar as mídias da demonstração: {error}"))?;
     let source_path = media_directory.join("demo-image.png");
@@ -194,6 +194,19 @@ mod tests {
         let host = open(&paths).expect("the temporary demo project opens");
         let projection = host.projection().expect("the demo session is available");
 
+        assert!(
+            paths
+                .state_dir()
+                .join("Demo")
+                .join("Media")
+                .join("demo-image.png")
+                .is_file(),
+            "the demo source is materialized under the centralized State category"
+        );
+        assert!(
+            !paths.local_root().join("Demo").exists(),
+            "the demo does not create an application-root data category"
+        );
         assert_eq!(projection.state.project_id, PROJECT_ID);
         assert_eq!(projection.state.album.sheets.len(), SHEET_COUNT);
         assert_eq!(projection.composition.sheets.len(), SHEET_COUNT);

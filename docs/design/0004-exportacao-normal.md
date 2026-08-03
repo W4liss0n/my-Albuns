@@ -58,7 +58,7 @@ Ao acionar `Exportar`, placeholders e originais necessários ausentes ou indispo
 
 JPEG e PNG compartilham o namespace `{nome-do-projeto}_{NNN}` nos modos `Por lâmina` e `Por página`; o nome isolado não identifica o modo usado.
 
-Ao iniciar, a operação adquire um `OperationLease` com a concessão `NormalExport`; não existe fila de espera. O lease reserva em conjunto a concessão, a pausa do Cache e o Processador de Imagens, e garante a devolução das três em sucesso, falha, cancelamento ou queda — a Exportação não orquestra esses recursos individualmente. O contrato do lease está em [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md). Cancelamento e progresso continuam pertencendo somente à tentativa.
+Ao iniciar, a operação adquire o `OperationLease` exclusivo; não existe fila de espera. O lease reserva em conjunto a concessão global, a pausa do Cache e o Processador de Imagens, e garante a devolução dos três recursos em sucesso, falha, cancelamento ou queda — a Exportação não os orquestra individualmente. O contrato do lease está em [Propriedade de estado e módulos do núcleo](0012-propriedade-de-estado-e-modulos-do-nucleo.md). Cancelamento e progresso continuam pertencendo somente à tentativa.
 
 O `ExportPipeline` possui internamente planejamento, execução e `Publisher`. Primeiro recebe `RenderSnapshot` e opções e devolve o plano com todas as dependências e raízes necessárias. O proprietário captura então o `RootBindingPlan` definido pela [política de caminhos](0011-resolucao-e-politica-de-caminhos.md) e inicia a execução. Se host e Processador participarem da tentativa, ambos recebem o mesmo plano; todo original necessário ainda é aberto e verificado.
 

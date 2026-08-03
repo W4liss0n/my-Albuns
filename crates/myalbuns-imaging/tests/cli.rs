@@ -6,9 +6,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{EditableProject, ProjectCore, ProjectIntent, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    CacheArtifactFormat, CacheJob, CacheRequest, CacheResetRequest, IMAGING_PROTOCOL_VERSION,
-    ImagingCommand, ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse,
-    MediaSource, decode_event_stream, root_binding_plan_sha256,
+    CacheArtifactFormat, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
+    ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource,
+    decode_event_stream, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
     AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
@@ -39,23 +39,6 @@ impl TestCache {
             .project_cache(&project_data_namespace(&project_id))
             .expect("the isolated Cache plan is valid");
         Self { paths, project_id }
-    }
-
-    fn materialize(&self) {
-        let app_paths = AppPaths::discover().expect("the test can discover LocalAppData");
-        drop(
-            app_paths
-                .prepare_cache_storage(&self.paths)
-                .expect("the isolated Cache directory is materialized"),
-        );
-    }
-
-    fn project_root(&self) -> PathBuf {
-        self.paths
-            .metadata_file()
-            .parent()
-            .expect("the metadata belongs to the project Cache")
-            .to_path_buf()
     }
 }
 
@@ -693,33 +676,6 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
         Some(ImagingFailureStage::CacheProcessing.exit_code().into())
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"cache_processing\""));
-}
-
-#[test]
-fn processor_resets_only_native_project_cache_namespaces() {
-    let first = TestCache::new("reset-a");
-    let second = TestCache::new("reset-b");
-    first.materialize();
-    second.materialize();
-    let command = ImagingCommand::reset_cache(
-        CacheResetRequest::new(
-            "reset-cache",
-            vec![first.project_id.clone(), second.project_id.clone()],
-        )
-        .expect("the reset request is valid"),
-    );
-
-    let result = invoke_imaging_command(&command, None);
-
-    assert!(
-        result.status.success(),
-        "processor failed: {}",
-        String::from_utf8_lossy(&result.stderr)
-    );
-    let response = processor_response(&result.stdout);
-    assert_eq!(response.cache_reset_for("reset-cache"), Some(2));
-    assert!(!first.project_root().exists());
-    assert!(!second.project_root().exists());
 }
 
 #[test]

@@ -911,7 +911,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Eventos rápidos do mesmo caminho são consolidados; uma inspeção autoritativa só começa quando o arquivo estiver estável e legível. Depois da confirmação, o estado observado é atualizado e somente as representações de Cache afetadas são invalidadas.
 - Se a origem estiver acessível e a remoção ou renomeação persistir depois da estabilização, o item assume o estado de Arquivo ausente. Se a rede, o servidor, o compartilhamento ou a permissão impedir a confirmação, ele assume Arquivo indisponível sem alterar a referência. Quando o acesso ou o arquivo retornam ao caminho registrado, o estado e as prévias são restaurados automaticamente sem Religação.
 - A atualização externa não altera a referência persistida, não entra em Undo/Redo e não marca o Projeto como alterado.
-- O Cache de cada Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-id}`, usando a Identidade em vez de Nome ou caminho.
+- O Cache de cada Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-key}`, usando uma chave opaca derivada da Identidade em vez de Nome, caminho ou a Identidade bruta como componente do sistema de arquivos.
 - O baseline do spike para a pasta é `metadata.json` e `Media`, com uma representação reduzida por mídia e sem tiles ou previews de Lâmina persistidas em disco. Se as cenas e o Zoom representativos demonstrarem insuficiência, o relatório do spike revisa esse contrato antes da implementação ampla.
 - `metadata.json` é descartável e registra versão do schema, Identidade do Projeto, último uso e, por mídia, dimensões, formato, orientação EXIF, tamanho, datas, quantidade de páginas quando aplicável, perfil de cor básico e fingerprint.
 - Cada representação registra também uma versão de suas regras e uma geração única. Versão incompatível invalida a entrada.
@@ -945,7 +945,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Fechar uma sessão com mudanças pendentes oferece salvar e fechar, descartar e fechar, ou cancelar.
 - `Salvar como` grava o estado visível em um novo Projeto e faz a sessão passar a representar esse novo arquivo; o original permanece em sua última versão salva.
 - Recuperação de sessão usa estado temporário separado. Ao restaurar, o conteúdo continua não salvo até uma ação explícita.
-- A Recuperação de Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-id}.json`; a identidade de uma Cópia externa é resolvida antes de consultá-la.
+- A Recuperação de Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-key}.json`, usando a mesma chave opaca do Cache; a identidade de uma Cópia externa é resolvida antes de consultá-la.
 - Depois de `Salvar como` bem-sucedido, o checkpoint da Identidade anterior é removido; mudanças posteriores usam a nova Identidade. Cancelamento ou falha preserva a sessão e o checkpoint anteriores.
 - Cada ação criativa concluída agenda a atualização atômica da Recuperação. Ações muito próximas podem ser consolidadas em uma única escrita, e nenhum estado transitório de arraste ou redimensionamento é persistido.
 - Uma queda durante um gesto restaura o último estado concluído antes dele. `Salvar` sem novas mudanças e o fechamento normal confirmado removem a Recuperação temporária.

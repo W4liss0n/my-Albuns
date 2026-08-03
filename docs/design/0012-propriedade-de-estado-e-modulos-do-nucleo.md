@@ -158,13 +158,12 @@ A separação não é acidental. O terminal de uma tentativa devolve sua concess
 
 O Bloqueio de abertura também combina identidade física e Identidade persistida, que o `OperationGate` desconhece por completo. Ele pertence ao fluxo de abertura de Projeto, não a este módulo.
 
-`OperationGate` concede somente os modos de exclusividade necessários:
-
-- uma única Exportação normal global;
-- Modo de lote exclusivo;
-- manutenção total do Cache.
-
-`NormalExport` conflita com outra Exportação, lote e manutenção total, mas não bloqueia edição nas demais Janelas. `BatchExclusive` e `CacheMaintenance` aplicam os bloqueios mais fortes definidos pela SPEC. O gate não armazena progresso nem cancelamento e não vira um mutex universal.
+`OperationGate` concede uma única reserva exclusiva global, sem codificar rótulos
+de operações que ainda não possuem consumidores. Hoje a Exportação normal usa
+essa concessão. O futuro lote e a manutenção total do Cache devem adquirir a
+mesma concessão, enquanto seus proprietários aplicam as políticas adicionais
+definidas pela SPEC. O gate não armazena o tipo da operação, progresso,
+cancelamento ou estado criativo e não vira um coordenador universal.
 
 Cada tentativa possui seu próprio token de cancelamento e destino de progresso.
 
@@ -172,7 +171,7 @@ Toda Exportação precisa de três reservas antes de produzir saída: a concess�
 
 `OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. Como cada Projeto possui host e Processador de Imagens isolados, a pausa cobre o namespace do Projeto exportado.
 
-A Exportação normal adquire uma instância de `OperationLease(NormalExport)` por tentativa. O `BatchRunner` adquire uma única instância de `OperationLease(BatchExclusive)` para toda a tentativa do lote e executa todos os itens sob ela, sem liberar ou readquirir entre itens. Assim, os dois caminhos usam o mesmo mecanismo e não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
+A Exportação normal adquire uma instância de `OperationLease` por tentativa. O `BatchRunner` adquire uma única instância de `OperationLease` para toda a tentativa do lote e executa todos os itens sob ela, sem liberar ou readquirir entre itens. Assim, os dois caminhos usam o mesmo mecanismo e não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
 
 ## Persistência concreta e primitivas compartilhadas
 

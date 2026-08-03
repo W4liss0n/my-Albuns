@@ -123,6 +123,12 @@ try {
         })
     }
 
+    $advertisedProtocol = (& $processorPath --protocol-version).Trim()
+    if ($LASTEXITCODE -ne 0 -or $advertisedProtocol -notmatch '^\d+$') {
+        throw 'The freshly built Imaging sidecar did not advertise a valid protocol version.'
+    }
+    $expectedProtocol = [int] $advertisedProtocol
+
     $cacheEvidencePath = Join-Path $evidenceDirectory 'cache.json'
     $exportEvidencePath = Join-Path $evidenceDirectory 'export.json'
     if (-not (Test-Path -LiteralPath $cacheEvidencePath -PathType Leaf)) {
@@ -145,7 +151,7 @@ try {
         throw 'The observed Cache recovery evidence does not satisfy the gate.'
     }
     if ($exportEvidence.failedProcessId -eq $exportEvidence.retryProcessId `
-            -or $exportEvidence.protocolVersion -ne 10 `
+            -or $exportEvidence.protocolVersion -ne $expectedProtocol `
             -or $exportEvidence.processCountBeforeExplicitRetry -ne 1 `
             -or $exportEvidence.successResponseBeforeExplicitRetry `
             -or -not $exportEvidence.partialPreparationObserved `

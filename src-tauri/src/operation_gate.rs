@@ -12,29 +12,6 @@ use windows_sys::Win32::{
     System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum OperationMode {
-    NormalExport,
-    BatchExclusive,
-    CacheMaintenance,
-}
-
-impl OperationMode {
-    pub(crate) const ALL: [Self; 3] = [
-        Self::NormalExport,
-        Self::BatchExclusive,
-        Self::CacheMaintenance,
-    ];
-
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::NormalExport => "normal_export",
-            Self::BatchExclusive => "batch_exclusive",
-            Self::CacheMaintenance => "cache_maintenance",
-        }
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct OperationGate {
     mutex_name: Vec<u16>,
@@ -42,20 +19,14 @@ pub(crate) struct OperationGate {
 
 #[derive(Debug)]
 pub(crate) struct OperationGrant {
-    mode: OperationMode,
     release: Option<Sender<()>>,
     worker: Option<JoinHandle<()>>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum OperationGateError {
-    Conflict {
-        requested: OperationMode,
-    },
-    Unavailable {
-        requested: OperationMode,
-        reason: String,
-    },
+    Conflict,
+    Unavailable { reason: String },
 }
 
 enum WorkerAcquisition {
@@ -82,11 +53,7 @@ impl OperationGate {
         Self { mutex_name }
     }
 
-    pub(crate) fn try_acquire(
-        &self,
-        mode: OperationMode,
-    ) -> Result<OperationGrant, OperationGateError> {
-        debug_assert!(OperationMode::ALL.contains(&mode));
+    pub(crate) fn try_acquire(&self) -> Result<OperationGrant, OperationGateError> {
         let mutex_name = self.mutex_name.clone();
         let (acquisition_sender, acquisition_receiver) = mpsc::sync_channel(1);
         let (release_sender, release_receiver) = mpsc::channel();
@@ -127,31 +94,25 @@ impl OperationGate {
                 }
             })
             .map_err(|error| OperationGateError::Unavailable {
-                requested: mode,
                 reason: error.to_string(),
             })?;
 
         match acquisition_receiver.recv() {
             Ok(WorkerAcquisition::Acquired) => Ok(OperationGrant {
-                mode,
                 release: Some(release_sender),
                 worker: Some(worker),
             }),
             Ok(WorkerAcquisition::Conflict) => {
                 let _ = worker.join();
-                Err(OperationGateError::Conflict { requested: mode })
+                Err(OperationGateError::Conflict)
             }
             Ok(WorkerAcquisition::Unavailable(reason)) => {
                 let _ = worker.join();
-                Err(OperationGateError::Unavailable {
-                    requested: mode,
-                    reason,
-                })
+                Err(OperationGateError::Unavailable { reason })
             }
             Err(error) => {
                 let _ = worker.join();
                 Err(OperationGateError::Unavailable {
-                    requested: mode,
                     reason: error.to_string(),
                 })
             }
@@ -162,27 +123,15 @@ impl OperationGate {
 impl fmt::Display for OperationGateError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Conflict { requested } => write!(
-                formatter,
-                "outra operação exclusiva já está em andamento ({})",
-                requested.as_str()
-            ),
-            Self::Unavailable { requested, reason } => write!(
-                formatter,
-                "não foi possível reservar a operação {}: {reason}",
-                requested.as_str()
-            ),
+            Self::Conflict => write!(formatter, "outra operação exclusiva já está em andamento"),
+            Self::Unavailable { reason } => {
+                write!(formatter, "não foi possível reservar a operação: {reason}")
+            }
         }
     }
 }
 
 impl std::error::Error for OperationGateError {}
-
-impl OperationGrant {
-    pub(crate) const fn mode(&self) -> OperationMode {
-        self.mode
-    }
-}
 
 impl Drop for OperationGrant {
     fn drop(&mut self) {
@@ -207,7 +156,7 @@ mod tests {
     use myalbuns_paths::AppPaths;
     use tempfile::tempdir;
 
-    use super::{OperationGate, OperationGateError, OperationMode};
+    use super::{OperationGate, OperationGateError};
     use crate::{
         cache_engine::CacheEngine,
         imaging_processor::ImagingProcessor,
@@ -218,7 +167,7 @@ mod tests {
     const OWNER_READY_ENV: &str = "MYALBUNS_OPERATION_GATE_OWNER_READY";
 
     #[test]
-    fn same_host_window_callers_share_one_grant_without_queue_and_release_on_drop() {
+    fn same_process_callers_share_one_grant_without_queue_and_release_on_drop() {
         let root = tempdir().expect("the gate fixture exists");
         let paths =
             AppPaths::from_known_folders(&root.path().join("roaming"), &root.path().join("local"));
@@ -226,54 +175,17 @@ mod tests {
         let second_gate = OperationGate::new(&paths);
 
         let grant = first_gate
-            .try_acquire(OperationMode::NormalExport)
+            .try_acquire()
             .expect("the first caller acquires immediately");
         assert!(
-            matches!(
-                second_gate.try_acquire(OperationMode::NormalExport),
-                Err(OperationGateError::Conflict {
-                    requested: OperationMode::NormalExport,
-                })
-            ),
+            matches!(second_gate.try_acquire(), Err(OperationGateError::Conflict)),
             "a concurrent caller is refused instead of queued"
         );
 
         drop(grant);
         second_gate
-            .try_acquire(OperationMode::NormalExport)
+            .try_acquire()
             .expect("the grant is available immediately after its owner releases it");
-    }
-
-    #[test]
-    fn every_operation_mode_uses_the_same_small_global_exclusion_boundary() {
-        for owner_mode in OperationMode::ALL {
-            for requested_mode in OperationMode::ALL {
-                let root = tempdir().expect("the mode-matrix fixture exists");
-                let paths = AppPaths::from_known_folders(
-                    &root.path().join("roaming"),
-                    &root.path().join("local"),
-                );
-                let owner_gate = OperationGate::new(&paths);
-                let challenger_gate = OperationGate::new(&paths);
-                let owner = owner_gate
-                    .try_acquire(owner_mode)
-                    .expect("the matrix owner acquires its operation mode");
-
-                assert!(
-                    matches!(
-                        challenger_gate.try_acquire(requested_mode),
-                        Err(OperationGateError::Conflict { requested })
-                            if requested == requested_mode
-                    ),
-                    "{owner_mode:?} must conflict with {requested_mode:?}"
-                );
-
-                drop(owner);
-                challenger_gate
-                    .try_acquire(requested_mode)
-                    .expect("the requested mode becomes available after release");
-            }
-        }
     }
 
     #[test]
@@ -317,12 +229,9 @@ mod tests {
                     &OperationGate::new(&paths),
                     &challenger_cache,
                     &challenger_processor,
-                    OperationMode::BatchExclusive,
                 )
                 .await,
-                Err(OperationLeaseError::Gate(OperationGateError::Conflict {
-                    requested: OperationMode::BatchExclusive,
-                }))
+                Err(OperationLeaseError::Gate(OperationGateError::Conflict))
             ));
             owner.kill().expect("the owner process is terminated");
             owner.wait().expect("the terminated owner is reaped");
@@ -331,11 +240,10 @@ mod tests {
                 &OperationGate::new(&paths),
                 &challenger_cache,
                 &challenger_processor,
-                OperationMode::NormalExport,
             )
             .await
             .expect("the successor acquires the complete lease after owner death");
-            assert_eq!(recovered.mode(), OperationMode::NormalExport);
+            drop(recovered);
         });
     }
 
@@ -349,14 +257,9 @@ mod tests {
         tauri::async_runtime::block_on(async {
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
-            let _lease = OperationLease::acquire(
-                &OperationGate::new(&paths),
-                &cache,
-                &processor,
-                OperationMode::NormalExport,
-            )
-            .await
-            .expect("the child owns the complete operation lease");
+            let _lease = OperationLease::acquire(&OperationGate::new(&paths), &cache, &processor)
+                .await
+                .expect("the child owns the complete operation lease");
             std::fs::write(ready, b"owned").expect("the child signals lease ownership");
             thread::sleep(Duration::from_secs(120));
         });

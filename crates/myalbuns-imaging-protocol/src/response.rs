@@ -18,10 +18,6 @@ pub enum ImagingResponse {
         request_id: String,
         completion: CacheCompletion,
     },
-    CacheReset {
-        request_id: String,
-        removed_count: usize,
-    },
 }
 
 impl ImagingResponse {
@@ -36,13 +32,6 @@ impl ImagingResponse {
         Self::CacheCompleted {
             request_id: request_id.into(),
             completion,
-        }
-    }
-
-    pub fn cache_reset(request_id: impl Into<String>, removed_count: usize) -> Self {
-        Self::CacheReset {
-            request_id: request_id.into(),
-            removed_count,
         }
     }
 
@@ -66,21 +55,11 @@ impl ImagingResponse {
         }
     }
 
-    pub fn cache_reset_for(&self, expected_request_id: &str) -> Option<usize> {
-        match self {
-            Self::CacheReset {
-                request_id,
-                removed_count,
-            } if request_id == expected_request_id => Some(*removed_count),
-            _ => None,
-        }
-    }
-
     pub fn request_id(&self) -> &str {
         match self {
-            Self::Completed { request_id, .. }
-            | Self::CacheCompleted { request_id, .. }
-            | Self::CacheReset { request_id, .. } => request_id,
+            Self::Completed { request_id, .. } | Self::CacheCompleted { request_id, .. } => {
+                request_id
+            }
         }
     }
 }

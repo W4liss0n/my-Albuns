@@ -93,7 +93,7 @@ Nenhuma dessas preferências altera o Projeto, participa de Undo/Redo ou exige S
 
 ## Recuperação
 
-`RecoveryStore` mantém `Recovery\Projects\{project-id}.json` como um checkpoint atômico com:
+`RecoveryStore` mantém `Recovery\Projects\{project-key}.json` como um checkpoint atômico com:
 
 - schema e Identidade;
 - estado criativo consolidado ainda não salvo;
@@ -187,7 +187,7 @@ Não existe limite rígido, expiração automática por idade ou sequência de a
 - remove somente Cache de Projetos fechados;
 - preserva a pasta se não conseguir a reserva.
 
-`Limpar todo o Cache` executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão `CacheMaintenance` do `OperationGate`. Caso contrário, o usuário pode agendá-lo para a próxima inicialização, antes da abertura de Projetos. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo.
+`Limpar todo o Cache` executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, o usuário pode agendá-lo para a próxima inicialização, antes da abertura de Projetos. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo.
 
 Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperação, Layouts, preferências, Exportações ou originais.
 

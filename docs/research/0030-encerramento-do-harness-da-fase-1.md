@@ -40,6 +40,15 @@ e lança um host independente; ela não possui uma `ProjectSession`. O lote futu
 pertence ao processo global e reutiliza `ProjectCore`, `ExportPipeline` e
 `OperationLease`, sem conservar uma implementação paralela dentro do host.
 
+A convergência final retirou também dois contratos antecipados que não possuíam
+consumidor de produção. `OperationGate` passou a representar somente sua
+concessão exclusiva global; rótulos para lote e manutenção serão introduzidos
+apenas se alterarem uma política real. O comando IPC `ResetCache` foi removido do
+Processador de Imagens, enquanto a primitiva segura de limpeza permaneceu em
+`AppPaths` para o futuro fluxo que vier a possuí-la. A mídia do Projeto demo,
+ainda necessária enquanto criar/abrir não existe, passou a pertencer à categoria
+central `State\Demo\Media` em vez de criar uma raiz de dados própria.
+
 ## Verificações que continuam correntes
 
 As regressões úteis permanecem cobertas por testes alinhados à arquitetura

@@ -8,11 +8,11 @@ use image::{
     codecs::{jpeg::JpegEncoder, png::PngEncoder},
 };
 use myalbuns_imaging_protocol::{
-    CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheRequest, CacheResetRequest,
-    ImagingResponse, root_binding_plan_sha256,
+    CacheArtifact, CacheArtifactFormat, CacheCompletion, CacheRequest, ImagingResponse,
+    root_binding_plan_sha256,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, project_data_namespace};
+use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
 
 use crate::{
     source::{
@@ -20,46 +20,6 @@ use crate::{
     },
     write_response,
 };
-
-pub(crate) fn run_cache_reset(
-    request: CacheResetRequest,
-    app_paths: &AppPaths,
-) -> Result<(), String> {
-    let operation_id = safe_log_identifier(&request.request_id);
-    request.validate()?;
-    tracing::info!(
-        target: "myalbuns.imaging",
-        process_role = ProcessRole::Imaging.as_str(),
-        protocol_version = request.protocol_version,
-        operation_id,
-        project_count = request.project_ids.len(),
-        event = "cache_reset_started",
-    );
-    let mut removed_count = 0;
-    for project_id in &request.project_ids {
-        let paths = app_paths
-            .project_cache(&project_data_namespace(project_id))
-            .map_err(|error| error.to_string())?;
-        removed_count += usize::from(
-            app_paths
-                .clear_project_cache(&paths)
-                .map_err(|error| error.to_string())?,
-        );
-    }
-    tracing::info!(
-        target: "myalbuns.imaging",
-        process_role = ProcessRole::Imaging.as_str(),
-        protocol_version = request.protocol_version,
-        operation_id,
-        project_count = request.project_ids.len(),
-        removed_count,
-        event = "cache_reset_completed",
-    );
-    write_response(&ImagingResponse::cache_reset(
-        request.request_id,
-        removed_count,
-    ))
-}
 
 pub(crate) fn run_cache(request: CacheRequest, app_paths: &AppPaths) -> Result<(), String> {
     let operation_id = safe_log_identifier(&request.request_id);

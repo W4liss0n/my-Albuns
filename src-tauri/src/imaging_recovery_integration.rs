@@ -177,7 +177,6 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
                 .ok()
         }
         ImagingCommand::Render(request) => Some(request.prepared_output_path.clone()),
-        ImagingCommand::ResetCache(_) => None,
     }
 }
 

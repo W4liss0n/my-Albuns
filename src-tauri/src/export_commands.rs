@@ -17,7 +17,7 @@ use crate::{
         ExportProgressStagePayload, ExportProgressUnitsPayload, ExportResult,
     },
     logging::{LoggingState, log_imaging_failure},
-    operation_gate::{OperationGate, OperationGateError, OperationMode},
+    operation_gate::{OperationGate, OperationGateError},
     operation_lease::OperationLease,
     path_io,
     project_host::ProjectHost,
@@ -89,11 +89,11 @@ impl ExportCommandError {
 
     fn from_gate(error: OperationGateError) -> Self {
         match error {
-            OperationGateError::Conflict { .. } => Self {
+            OperationGateError::Conflict => Self {
                 code: ExportCommandErrorCode::Conflict,
                 message: "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.".into(),
             },
-            OperationGateError::Unavailable { reason, .. } => Self {
+            OperationGateError::Unavailable { reason } => Self {
                 code: ExportCommandErrorCode::Failed,
                 message: format!("Não foi possível reservar a Exportação: {reason}"),
             },
@@ -198,19 +198,18 @@ pub(crate) async fn export_preview(
         .into_iter()
         .map(|path| path.to_path_buf())
         .collect();
-    let acquisition =
-        OperationLease::begin(&operation_gate, OperationMode::NormalExport).map_err(|error| {
-            tracing::warn!(
-                target: "myalbuns.desktop",
-                process_role = ProcessRole::DesktopHost.as_str(),
-                operation_id = request_id.as_str(),
-                project_id = project_id.as_deref(),
-                window_label = window.label(),
-                reason = %error,
-                event = "export_start_rejected",
-            );
-            ExportCommandError::from_gate(error)
-        })?;
+    let acquisition = OperationLease::begin(&operation_gate).map_err(|error| {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            operation_id = request_id.as_str(),
+            project_id = project_id.as_deref(),
+            window_label = window.label(),
+            reason = %error,
+            event = "export_start_rejected",
+        );
+        ExportCommandError::from_gate(error)
+    })?;
     let attempt = attempts
         .begin(request_id.clone(), window.label())
         .map_err(|error| ExportCommandError::failed(error.to_string()))?;
@@ -302,7 +301,6 @@ pub(crate) async fn export_preview(
         process_role = ProcessRole::DesktopHost.as_str(),
         operation_id = request_id.as_str(),
         project_id = project_id.as_deref(),
-        operation_mode = lease.mode().as_str(),
         event = "operation_lease_acquired",
     );
     let mut transport = TauriImagingTransport::new(&app, &logging, lease.processor_reservation());
@@ -439,7 +437,7 @@ mod tests {
 
     use crate::{
         export_pipeline::{ExportProgress, ExportProgressStage, ExportProgressUnits},
-        operation_gate::{OperationGateError, OperationMode},
+        operation_gate::OperationGateError,
     };
 
     use crate::ipc_contract::{ExportCommandError, ExportEvent};
@@ -518,14 +516,10 @@ mod tests {
     }
 
     #[test]
-    fn gate_conflict_is_typed_without_exposing_the_internal_mode() {
+    fn gate_conflict_keeps_its_typed_ipc_result() {
         assert_eq!(
-            serde_json::to_value(ExportCommandError::from_gate(
-                OperationGateError::Conflict {
-                    requested: OperationMode::NormalExport,
-                },
-            ))
-            .expect("the command error serializes"),
+            serde_json::to_value(ExportCommandError::from_gate(OperationGateError::Conflict))
+                .expect("the command error serializes"),
             json!({
                 "code": "conflict",
                 "message": "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.",

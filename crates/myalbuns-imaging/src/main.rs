@@ -122,9 +122,6 @@ fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {
         ImagingCommand::BuildCache(request) => {
             cache::run_cache(request, app_paths).map_err(cache_failure)
         }
-        ImagingCommand::ResetCache(request) => {
-            cache::run_cache_reset(request, app_paths).map_err(cache_failure)
-        }
     }
 }
 
