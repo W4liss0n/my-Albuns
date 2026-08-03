@@ -113,7 +113,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     let owner_plan_digest =
         root_binding_plan_sha256(&root_bindings).expect("the frozen plan has a stable digest");
     assert_eq!(owner_plan_digest.len(), 64);
-    assert_eq!(command.root_bindings(), Some(&root_bindings));
+    assert_eq!(command.root_bindings(), &root_bindings);
     let command_payload = encode_command(&command).expect("command serializes");
     assert_eq!(command_payload.last(), Some(&b'\n'));
     let request_json: serde_json::Value =
@@ -155,12 +155,9 @@ fn host_and_processor_share_one_serialized_protocol() {
     let decoded_command = decode_command(&command_payload).expect("command decodes");
     assert_eq!(decoded_command, command);
     assert_eq!(
-        decoded_command
-            .root_bindings()
-            .map(root_binding_plan_sha256)
-            .transpose()
+        root_binding_plan_sha256(decoded_command.root_bindings())
             .expect("the received plan has a stable digest"),
-        Some(owner_plan_digest),
+        owner_plan_digest,
         "the Processor observes exactly the plan frozen by the operation owner"
     );
     let mut legacy_json = request_json.clone();

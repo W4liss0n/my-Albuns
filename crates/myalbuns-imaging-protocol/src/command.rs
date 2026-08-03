@@ -73,10 +73,10 @@ impl ImagingCommand {
 
     /// Returns the immutable path plan carried by commands that perform
     /// external I/O.
-    pub fn root_bindings(&self) -> Option<&RootBindingPlan> {
+    pub fn root_bindings(&self) -> &RootBindingPlan {
         match self {
-            Self::Render(request) => Some(&request.root_bindings),
-            Self::BuildCache(request) => Some(&request.root_bindings),
+            Self::Render(request) => &request.root_bindings,
+            Self::BuildCache(request) => &request.root_bindings,
         }
     }
 }

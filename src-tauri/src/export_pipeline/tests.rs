@@ -172,10 +172,10 @@ impl ImagingTransport for PlanObservingTransport {
     ) -> InvocationFuture<'a> {
         assert_eq!(operation, ImagingOperation::Export);
         assert_eq!(attempt, 1);
-        assert_eq!(command.root_bindings(), Some(&self.expected_root_bindings));
+        assert_eq!(command.root_bindings(), &self.expected_root_bindings);
         let payload = encode_command(command).expect("the real IPC command encodes");
         let decoded = decode_command(&payload).expect("the real IPC command decodes");
-        assert_eq!(decoded.root_bindings(), Some(&self.expected_root_bindings));
+        assert_eq!(decoded.root_bindings(), &self.expected_root_bindings);
         self.observed_round_trip = true;
         std::fs::write(&self.prepared_path, &self.prepared_bytes)
             .expect("the observed Processor writes its preparation");

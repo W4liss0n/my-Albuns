@@ -384,11 +384,8 @@ async fn invoke_once(
             format!("Não foi possível preparar a solicitação: {error}"),
         )
     })?;
-    let root_binding_plan_sha256 = command
-        .root_bindings()
-        .map(digest_root_binding_plan)
-        .transpose()
-        .map_err(|error| {
+    let root_binding_plan_sha256 =
+        digest_root_binding_plan(command.root_bindings()).map_err(|error| {
             InvocationFailure::at_stage(
                 InvocationFailureStage::EncodeRequest,
                 None,
@@ -433,7 +430,7 @@ async fn invoke_once(
         attempt,
         process_id = std::process::id(),
         imaging_process_id,
-        root_binding_plan_sha256 = root_binding_plan_sha256.as_deref(),
+        root_binding_plan_sha256,
         event = "imaging_process_spawned",
     );
     if let Err(error) = child.write(&payload) {
