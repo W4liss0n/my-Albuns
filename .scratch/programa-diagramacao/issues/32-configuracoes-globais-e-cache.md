@@ -18,7 +18,7 @@
 - [ ] Antes de remover um namespace fechado, reservá-lo atomicamente e desistir se ele adquirir proprietário/processo ativo; nunca confiar apenas no estado exibido pela interface.
 - [ ] Não limpar nem substituir ao vivo o Cache de Projeto aberto ou com processo ativo, inclusive quando o usuário solicita liberação de espaço.
 - [ ] Oferecer `Limpar todo o Cache` com confirmação. Executar imediatamente somente quando não houver Projeto nem processo relacionado ativo; caso contrário, oferecer agendar a limpeza para a próxima inicialização do aplicativo.
-- [ ] Fazer `CacheEngine` possuir jobs, índice, manutenção e reservas; a Limpeza total adquire `CacheMaintenance` no `OperationGate` e libera a concessão em sucesso, falha ou cancelamento.
+- [ ] Fazer `CacheEngine` possuir jobs, índice, manutenção e reservas; a Limpeza total adquire a concessão exclusiva única do `OperationGate` e a libera em sucesso, falha ou cancelamento, sem criar um modo próprio no Gate.
 - [ ] Na inicialização agendada, limpar antes de abrir Projetos ou iniciar Processadores; cancelar ou falhar preserva Projetos, vínculos e Arquivos originais.
 - [ ] Ambas as ações removem somente representações e metadados descartáveis e permitem reconstrução sob demanda; Cache nunca se torna fonte válida de Exportação nem mascara original ausente.
 - [ ] Projeto, mídia ou Destino em UNC ou unidade mapeada nunca desloca o Cache para a rede nem cria um cache persistente de resolução de caminhos.

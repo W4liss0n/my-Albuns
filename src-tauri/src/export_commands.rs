@@ -5,6 +5,7 @@ use std::{
 
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, root_binding_plan_sha256};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
+use myalbuns_paths::AppPaths;
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
 use crate::{
@@ -136,6 +137,7 @@ pub(crate) async fn export_preview(
     window: WebviewWindow,
     on_event: Channel<ExportEvent>,
     state: State<'_, ProjectHost>,
+    app_paths: State<'_, AppPaths>,
     logging: State<'_, LoggingState>,
     operation_gate: State<'_, OperationGate>,
     cache: State<'_, CacheEngine>,
@@ -151,12 +153,13 @@ pub(crate) async fn export_preview(
         })
         .map_err(ExportCommandError::failed)?;
 
-    let output_dir = std::env::temp_dir().join("MyAlbuns2").join("ExportPreview");
-    std::fs::create_dir_all(&output_dir).map_err(|error| {
-        ExportCommandError::failed(format!(
-            "Não foi possível preparar o Destino da Exportação: {error}"
-        ))
-    })?;
+    let output_dir = app_paths
+        .prepare_export_preview_directory()
+        .map_err(|error| {
+            ExportCommandError::failed(format!(
+                "Não foi possível preparar o Destino da Exportação: {error}"
+            ))
+        })?;
     let output_path = output_dir.join(format!(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()

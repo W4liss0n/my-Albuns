@@ -27,6 +27,22 @@ fn derives_temporary_application_roots_from_known_folders() {
 }
 
 #[test]
+fn prepares_the_export_preview_directory_through_the_central_path_policy() {
+    let root = tempfile::tempdir().expect("temporary known folders");
+    let paths = AppPaths::from_known_folders(root.path(), root.path());
+
+    let directory = paths
+        .prepare_export_preview_directory()
+        .expect("the central path policy prepares its preview directory");
+
+    assert_eq!(
+        directory,
+        std::env::temp_dir().join("MyAlbuns2").join("ExportPreview")
+    );
+    assert!(directory.is_dir());
+}
+
+#[test]
 fn exposes_each_data_category_under_its_approved_root() {
     let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 

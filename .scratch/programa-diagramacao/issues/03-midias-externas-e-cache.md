@@ -14,7 +14,7 @@
 - [ ] Definir normalização de orientação EXIF e o tratamento explícito de TIFF multipágina.
 - [ ] Definir identidade de um item importado, duplicação entre abas, substituição no mesmo caminho e detecção separada de Arquivo ausente e Arquivo indisponível.
 - [ ] Manter `MediaRef` persistente no Projeto; fazer `MediaResolver` inspecionar arquivos e produzir observações ou propostas imutáveis de Importação e Religação, `MediaRuntime` registrar os estados observados e `MediaMonitor` apenas sinalizar mudanças que exigem nova inspeção.
-- [ ] Manter o Cache por Projeto em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-id}`, usando a Identidade persistente e nunca o Nome ou o caminho do arquivo.
+- [ ] Manter o Cache por Projeto em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-key}`, usando a chave opaca central `project-{sha256}` derivada da Identidade persistente e nunca o Nome, o caminho ou a Identidade bruta como componente do sistema de arquivos.
 - [ ] Implementar o resultado do spike. O baseline a validar persiste apenas `metadata.json` e uma representação visual reduzida por Foto ou Decorativo em `Media`, sem tiles ou previews de Lâmina em disco e com miniaturas da Grade somente em memória; qualquer revisão exige evidência registrada no ticket 01.
 - [ ] Manter no índice descartável schema, versão das regras da representação, Identidade do Projeto, último uso e, por mídia, geração publicada, dimensões, formato, orientação EXIF, tamanho, datas do arquivo, quantidade de páginas aplicável, perfil de cor básico e fingerprint.
 - [ ] Manter no Projeto a identidade da mídia, o caminho original, sua categoria e decisões do usuário; metadados em Cache nunca substituem essas informações canônicas.

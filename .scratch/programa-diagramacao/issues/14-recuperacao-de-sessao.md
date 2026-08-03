@@ -11,7 +11,7 @@
 **Normative sources:** [Especificação do produto](../../../docs/specs/programa-de-diagramacao-de-albuns.md); [ADR 0002 — identificar Cópias externas](../../../docs/adr/0002-identificar-copias-externas.md); [armazenamento local e Cache](../../../docs/design/0010-armazenamento-local-e-cache.md); [propriedade de estado e módulos do núcleo](../../../docs/design/0012-propriedade-de-estado-e-modulos-do-nucleo.md).
 
 - [ ] Alterações relevantes da sessão geram dados temporários de recuperação sem realizar salvamento automático do Projeto.
-- [ ] Persistir esses dados pelo `RecoveryStore`, atomicamente e com schema sob `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-id}.json`, separados de Cache, recuperação de lotes, arquivos de Projeto e mídia original.
+- [ ] Persistir esses dados pelo `RecoveryStore`, atomicamente e com schema sob `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-key}.json`, usando a mesma chave opaca central `project-{sha256}` do Cache e mantendo-os separados de Cache, recuperação de lotes, arquivos de Projeto e mídia original.
 - [ ] Atualizar a Recuperação depois de cada ação concluída, com postergação curta para consolidar ações próximas; gestos contínuos permanecem somente em memória e geram um único checkpoint ao terminar.
 - [ ] Gravar cada checkpoint por substituição atômica, sem modificar o arquivo do Projeto; uma queda durante um gesto recupera o estado anterior ao início daquele gesto.
 - [ ] Remover o temporário depois de `Salvar` sem novas mudanças ou de fechamento normal confirmado.

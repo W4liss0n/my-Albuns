@@ -21,7 +21,7 @@
 - [ ] Ambas as religações procuram recursivamente por nome e extensão exatos e resolvem automaticamente somente uma correspondência única. Ausência ou ambiguidade continua como pendência.
 - [ ] Manter religações individual e global em mapas temporários separados por item e válidos somente para a execução; não regravar Projeto, não criar Undo/Redo e descartar os mapas ao concluir ou cancelar.
 - [ ] Exigir que cada item esteja corrigido ou explicitamente ignorado e que o usuário clique em `Continuar Exportação`; fechar antes disso cancela o lote.
-- [ ] Ao continuar, adquirir `BatchExclusive` no `OperationGate`, obter a pausa do `CacheEngine`, bloquear interação em todas as Janelas de Projeto e manter interativa somente a janela global de progresso/cancelamento.
+- [ ] Ao continuar, adquirir uma única concessão exclusiva do `OperationGate`, obter a pausa do `CacheEngine`, bloquear interação em todas as Janelas de Projeto e manter interativa somente a janela global de progresso/cancelamento; a política de lote pertence ao `BatchRunner`, não a um rótulo da concessão.
 - [ ] Processar exatamente um Projeto por vez e manter no máximo um `MyAlbuns.Imaging.exe` temporário ativo no lote. Calibração, perfil de desempenho e paralelismo entre Álbuns ficam fora do MVP.
 - [ ] Imediatamente antes de cada item, reabrir seu documento persistido com `ProjectCore`, registrar revisão/hash e repetir validação; qualquer mudança desde a pré-validação invalida o resultado anterior.
 - [ ] Revalidar revisão/hash imediatamente antes de criar o `RenderSnapshot`; se o arquivo mudou novamente, não usar o snapshot antigo e devolver o item à validação ou marcá-lo como falha acionável.

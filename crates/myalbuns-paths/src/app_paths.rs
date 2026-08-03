@@ -35,6 +35,7 @@ fn opaque_data_key(kind: &str, identity: &str) -> String {
 pub struct AppPaths {
     pub(crate) roaming_root: PathBuf,
     pub(crate) local_root: PathBuf,
+    temporary_root: PathBuf,
 }
 
 impl AppPaths {
@@ -50,6 +51,7 @@ impl AppPaths {
         Self {
             roaming_root: roaming_data.join(TEMPORARY_APP_DIRECTORY_NAME),
             local_root: local_data.join(TEMPORARY_APP_DIRECTORY_NAME),
+            temporary_root: std::env::temp_dir().join(TEMPORARY_APP_DIRECTORY_NAME),
         }
     }
 
@@ -133,6 +135,15 @@ impl AppPaths {
 
     pub fn logs_dir(&self) -> PathBuf {
         self.local_root.join("Logs")
+    }
+
+    pub fn prepare_export_preview_directory(&self) -> Result<PathBuf, AppPathsError> {
+        let directory = self.temporary_root.join("ExportPreview");
+        std::fs::create_dir_all(&directory).map_err(|_| AppPathsError::ExportStorageUnavailable)?;
+        if !directory.is_dir() {
+            return Err(AppPathsError::ExportStorageUnavailable);
+        }
+        Ok(directory)
     }
 }
 

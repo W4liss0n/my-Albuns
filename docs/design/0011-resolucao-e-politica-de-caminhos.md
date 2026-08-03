@@ -82,6 +82,8 @@ let worker_paths = OperationPathContext::from_plan(plan)?;
 
 `ResolvedPath` é um valor opaco. Ele conserva a forma escolhida para apresentação, a forma operacional nativa e a raiz classificada sem obrigar chamadores a conhecer regras de prefixo. Somente o módulo pode derivar caminhos filhos ou locais temporários a partir dele.
 
+A prova temporária da primeira versão também entra por `AppPaths`: o módulo prepara `%TEMP%\MyAlbuns2\ExportPreview` e entrega o diretório pronto ao comando de Exportação. O comando não conhece o namespace transitório do produto nem cria diretórios por conta própria. Esse local descartável não integra as árvores persistentes de `%APPDATA%` e `%LOCALAPPDATA%`.
+
 `RootBindingPlan` contém somente a raiz lógica, seu tipo, o binding operacional capturado e a representação nativa escolhida para I/O. Ele não contém existência, metadados ou identidade de arquivos individuais, capacidades genéricas do servidor nem promessa sobre o servidor físico que atenderá os acessos.
 
 Quando necessário, a comparação entre dois objetos existentes produz `Same`, `Different` ou `Indeterminate`; falha ao obter identidade física nunca é convertida em `Different`. O módulo fornece a evidência e não escolhe a política funcional do chamador.
