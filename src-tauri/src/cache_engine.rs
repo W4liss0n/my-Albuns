@@ -600,7 +600,7 @@ mod tests {
         let local = root.path().join("local");
         std::fs::create_dir_all(&roaming).expect("roaming root");
         std::fs::create_dir_all(&local).expect("local root");
-        let app_paths = AppPaths::from_known_folders(&roaming, &local);
+        let app_paths = AppPaths::from_roots(&roaming, &local, root.path());
         let cache_paths = app_paths
             .project_cache("project-test")
             .expect("valid cache plan");

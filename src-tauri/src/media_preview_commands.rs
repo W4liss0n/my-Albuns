@@ -198,7 +198,11 @@ mod tests {
 
     #[test]
     fn encodes_an_authorized_cache_artifact_for_the_tauri_asset_protocol() {
-        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let paths = AppPaths::from_roots(
+            Path::new(r"C:\Roaming"),
+            Path::new(r"C:\Local"),
+            Path::new(r"C:\Temp"),
+        );
         let preview = paths
             .project_cache("project-01")
             .expect("project namespace is safe")
@@ -218,7 +222,11 @@ mod tests {
 
     #[test]
     fn encodes_an_authorized_png_cache_artifact_for_the_tauri_asset_protocol() {
-        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let paths = AppPaths::from_roots(
+            Path::new(r"C:\Roaming"),
+            Path::new(r"C:\Local"),
+            Path::new(r"C:\Temp"),
+        );
         let preview = paths
             .project_cache("project-01")
             .expect("project namespace is safe")
@@ -238,7 +246,11 @@ mod tests {
 
     #[test]
     fn refuses_to_expose_a_file_outside_the_authorized_cache_root() {
-        let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+        let paths = AppPaths::from_roots(
+            Path::new(r"C:\Roaming"),
+            Path::new(r"C:\Local"),
+            Path::new(r"C:\Temp"),
+        );
 
         assert!(cache_asset_url(&paths, Path::new(r"C:\Photos\private.jpg")).is_err());
     }

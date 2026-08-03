@@ -96,6 +96,7 @@ impl Drop for OperationLease {
 mod tests {
     use std::{
         panic::{AssertUnwindSafe, catch_unwind},
+        path::Path,
         time::Duration,
     };
 
@@ -108,14 +109,15 @@ mod tests {
         operation_gate::OperationGate,
     };
 
+    fn app_paths(root: &Path) -> AppPaths {
+        AppPaths::from_roots(&root.join("roaming"), &root.join("local"), root)
+    }
+
     #[test]
     fn lease_waits_for_active_cache_before_it_reserves_the_operation() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the lease fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
@@ -142,10 +144,7 @@ mod tests {
     fn dropping_the_lease_releases_gate_cache_and_processor_together() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the release fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
@@ -191,8 +190,7 @@ mod tests {
     #[test]
     fn unwinding_an_attempt_does_not_leak_any_lease_resource() {
         let root = tempdir().expect("the unwind fixture exists");
-        let paths =
-            AppPaths::from_known_folders(&root.path().join("roaming"), &root.path().join("local"));
+        let paths = app_paths(root.path());
         let gate = OperationGate::new(&paths);
         let cache = CacheEngine::default();
         let processor = ImagingProcessor::default();
@@ -218,10 +216,7 @@ mod tests {
     fn cancelling_while_waiting_for_cache_releases_the_partial_gate_grant() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the cache-cancellation fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
@@ -246,10 +241,7 @@ mod tests {
     fn beginning_a_lease_resolves_the_global_conflict_before_waiting_for_cache() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the staged acquisition fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
@@ -281,10 +273,7 @@ mod tests {
     fn cancelling_while_waiting_for_processor_releases_gate_and_cache_pause() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the Processor-cancellation fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
@@ -315,10 +304,7 @@ mod tests {
     fn processor_quarantine_fails_the_lease_without_leaking_gate_or_cache_pause() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the quarantine fixture exists");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();

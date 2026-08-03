@@ -81,7 +81,7 @@ mod tests {
     fn product_runtime_has_one_stable_window() {
         assert_eq!(MAIN_WINDOW_LABEL, "main");
         let directory = tempfile::tempdir().expect("the temporary root exists");
-        let paths = AppPaths::from_known_folders(directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
         assert!(ProductRuntime::from_paths(paths).is_ok());
     }
 }

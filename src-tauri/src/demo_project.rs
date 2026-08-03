@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn demo_still_enters_through_project_core_as_one_editable_session() {
         let directory = tempfile::tempdir().expect("the temporary root exists");
-        let paths = AppPaths::from_known_folders(directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
         let host = open(&paths).expect("the temporary demo project opens");
         let projection = host.projection().expect("the demo session is available");
 

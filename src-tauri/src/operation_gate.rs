@@ -148,6 +148,7 @@ impl Drop for OperationGrant {
 mod tests {
     use std::{
         env,
+        path::Path,
         process::{Command, Stdio},
         thread,
         time::{Duration, Instant},
@@ -166,11 +167,14 @@ mod tests {
     const OWNER_ROOT_ENV: &str = "MYALBUNS_OPERATION_GATE_OWNER_ROOT";
     const OWNER_READY_ENV: &str = "MYALBUNS_OPERATION_GATE_OWNER_READY";
 
+    fn app_paths(root: &Path) -> AppPaths {
+        AppPaths::from_roots(&root.join("roaming"), &root.join("local"), root)
+    }
+
     #[test]
     fn same_process_callers_share_one_grant_without_queue_and_release_on_drop() {
         let root = tempdir().expect("the gate fixture exists");
-        let paths =
-            AppPaths::from_known_folders(&root.path().join("roaming"), &root.path().join("local"));
+        let paths = app_paths(root.path());
         let first_gate = OperationGate::new(&paths);
         let second_gate = OperationGate::new(&paths);
 
@@ -193,10 +197,7 @@ mod tests {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the process gate fixture exists");
             let ready = root.path().join("owner.ready");
-            let paths = AppPaths::from_known_folders(
-                &root.path().join("roaming"),
-                &root.path().join("local"),
-            );
+            let paths = app_paths(root.path());
             let mut owner = Command::new(env::current_exe().expect("the test executable is known"))
                 .arg("operation_gate::tests::operation_gate_owner_process")
                 .args(["--ignored", "--exact", "--nocapture"])
@@ -253,7 +254,7 @@ mod tests {
         let root = env::var_os(OWNER_ROOT_ENV).expect("the owner root is configured");
         let ready = env::var_os(OWNER_READY_ENV).expect("the owner ready path is configured");
         let root = std::path::PathBuf::from(root);
-        let paths = AppPaths::from_known_folders(&root.join("roaming"), &root.join("local"));
+        let paths = app_paths(&root);
         tauri::async_runtime::block_on(async {
             let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();

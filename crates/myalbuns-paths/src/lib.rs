@@ -12,7 +12,7 @@ mod project_file_lock;
 mod resolve;
 mod windows_path;
 
-pub use app_paths::{AppPaths, project_data_namespace};
+pub use app_paths::{AppPaths, PreparedExportPreviewDirectory, project_data_namespace};
 pub use cache::{
     CacheArtifactFormat, CachePathPlan, PendingCachePublication, PreparedCacheStorage,
     SynchronizedCachePublication,

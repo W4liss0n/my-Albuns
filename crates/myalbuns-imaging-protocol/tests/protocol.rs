@@ -306,9 +306,10 @@ fn processor_event_stream_rejects_regressive_progress() {
 
 #[test]
 fn media_identity_stays_opaque_across_the_protocol_and_cache_paths() {
-    let paths = AppPaths::from_known_folders(
+    let paths = AppPaths::from_roots(
         PathBuf::from(r"C:\Roaming").as_path(),
         PathBuf::from(r"C:\Local").as_path(),
+        PathBuf::from(r"C:\Temp").as_path(),
     );
     let source = MediaSource::new(
         "Foto/\u{00c1}rvore CON",
@@ -337,9 +338,10 @@ fn media_identity_stays_opaque_across_the_protocol_and_cache_paths() {
 
 #[test]
 fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
-    let cache_paths = AppPaths::from_known_folders(
+    let cache_paths = AppPaths::from_roots(
         PathBuf::from(r"C:\Roaming").as_path(),
         PathBuf::from(r"C:\Local").as_path(),
+        PathBuf::from(r"C:\Temp").as_path(),
     )
     .project_cache("project-42")
     .expect("the project Cache namespace is safe");

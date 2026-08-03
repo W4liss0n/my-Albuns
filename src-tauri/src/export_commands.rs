@@ -153,14 +153,14 @@ pub(crate) async fn export_preview(
         })
         .map_err(ExportCommandError::failed)?;
 
-    let output_dir = app_paths
+    let output_directory = app_paths
         .prepare_export_preview_directory()
         .map_err(|error| {
             ExportCommandError::failed(format!(
                 "Não foi possível preparar o Destino da Exportação: {error}"
             ))
         })?;
-    let output_path = output_dir.join(format!(
+    let output_path = output_directory.path().join(format!(
         "Album-Horizonte_{}_{export_sequence:03}.png",
         std::process::id()
     ));
