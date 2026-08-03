@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 use myalbuns_imaging_protocol::IMAGING_PROTOCOL_VERSION;
 use myalbuns_logging::{LoggingGuard, ProcessRole, init_local_logging, safe_log_identifier};
 use myalbuns_paths::AppPaths;
-use serde::Deserialize;
 use tauri::{App, Manager, Runtime};
+
+use crate::ipc_contract::{FrontendLogEvent, FrontendLogLevel};
 
 pub(crate) struct LoggingState {
     log_directory: PathBuf,
@@ -15,30 +16,6 @@ impl LoggingState {
     pub(crate) fn directory(&self) -> &Path {
         &self.log_directory
     }
-}
-
-#[derive(Clone, Copy, Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum FrontendLogLevel {
-    Debug,
-    Info,
-    Warn,
-    Error,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct FrontendLogEvent {
-    level: FrontendLogLevel,
-    component: String,
-    event: String,
-    project_id: Option<String>,
-    operation_id: Option<String>,
-    instance_id: Option<String>,
-    reason: Option<String>,
-    width: Option<u32>,
-    height: Option<u32>,
-    sheet_count: Option<usize>,
 }
 
 impl FrontendLogEvent {
@@ -156,7 +133,7 @@ pub(crate) fn log_imaging_failure(
 
 #[cfg(test)]
 mod tests {
-    use super::FrontendLogEvent;
+    use crate::ipc_contract::FrontendLogEvent;
 
     fn valid_event() -> FrontendLogEvent {
         serde_json::from_str(include_str!("../../tests/fixtures/frontend-log-event.json"))

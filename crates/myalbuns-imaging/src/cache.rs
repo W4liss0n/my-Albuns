@@ -12,7 +12,7 @@ use myalbuns_imaging_protocol::{
     ImagingResponse, root_binding_plan_sha256,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage};
+use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, project_data_namespace};
 
 use crate::{
     source::{
@@ -38,7 +38,7 @@ pub(crate) fn run_cache_reset(
     let mut removed_count = 0;
     for project_id in &request.project_ids {
         let paths = app_paths
-            .project_cache(project_id)
+            .project_cache(&project_data_namespace(project_id))
             .map_err(|error| error.to_string())?;
         removed_count += usize::from(
             app_paths

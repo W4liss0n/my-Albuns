@@ -4,14 +4,10 @@ import { Button } from "react-aria-components";
 import type { ExportPort } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
-import {
-  readInspectorSectionPreference,
-  writeInspectorSectionPreference,
-} from "../state/workspacePreferences";
 import { AlbumCanvas } from "./AlbumCanvas";
-import type { CanvasPerformanceProbeRequest } from "./albumCanvasContract";
 import { ExportPreviewControl } from "./ExportPreviewControl";
-import { SheetPreview } from "./SheetPreview";
+import { InspectorPanel } from "./InspectorPanel";
+import { MediaPanel } from "./MediaPanel";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import {
@@ -23,7 +19,6 @@ interface ProjectWorkspaceProps {
   projection: EditorProjection;
   exportPort: ExportPort;
   runProjectMutation: ProjectMutationRunner;
-  canvasPerformanceProbe?: CanvasPerformanceProbeRequest | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
@@ -33,7 +28,6 @@ export function ProjectWorkspace({
   projection,
   exportPort,
   runProjectMutation,
-  canvasPerformanceProbe = null,
   mediaPreviewUrls = {},
   onProjectionChange,
   onGraphicsUnavailable,
@@ -46,9 +40,6 @@ export function ProjectWorkspace({
     onProjectionChange,
   });
   const workspacePanels = useWorkspacePanelLayout();
-  const [activeMediaKind, setActiveMediaKind] = useState<
-    "photo" | "decorative"
-  >("photo");
   const {
     busy,
     message,
@@ -59,10 +50,6 @@ export function ProjectWorkspace({
     sheetCount,
     photoCount,
   } = controller;
-  const focusedSheetId = controller.canvasProps.focusedSheetId;
-  const mediaUsageById = new Map(
-    projection.mediaUsage.map((usage) => [usage.mediaId, usage.count]),
-  );
 
   return (
     <div className="app-shell">
@@ -126,14 +113,6 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
-            performanceProbe={
-              canvasPerformanceProbe
-                ? {
-                    ...canvasPerformanceProbe,
-                    navigateToSheet: controller.navigateToSheet,
-                  }
-                : null
-            }
             mediaPreviewUrls={mediaPreviewUrls}
             onGraphicsUnavailable={onGraphicsUnavailable}
           />
@@ -153,231 +132,29 @@ export function ProjectWorkspace({
           onResizeBy={workspacePanels.resizeBy}
         />
 
-        <aside
-          id="contextual-panel"
-          className="inspector"
-          aria-label="Painel contextual"
-        >
-          <div className="inspector-scroll">
-            {selectedFrame ? (
-              <>
-                <div className="context-heading">
-                  <span>Frame selecionado</span>
-                  <h2>{selectedComposedPhoto?.name ?? "Frame placeholder"}</h2>
-                </div>
-                <InspectorSection
-                  key="frame-photo-design"
-                  title="Design"
-                  preferenceKey="frame-photo.design"
-                  defaultOpen
-                >
-                  <PropertyRow
-                    label="Frame"
-                    value={selectedFrame.id
-                      .replace("frame-", "")
-                      .toUpperCase()}
-                  />
-                  <PropertyRow
-                    label="Pan horizontal"
-                    value={`${Math.round(displayedPhotoPanX * 100)}%`}
-                  />
-                  {selectedFrame.photo && selectedComposedPhoto && (
-                    <label className="photo-zoom-control">
-                      <span className="photo-zoom-label">
-                        <span>Zoom da Foto</span>
-                        <output>
-                          {Math.round(displayedPhotoZoom * 100)}%
-                        </output>
-                      </span>
-                      <input
-                        type="range"
-                        aria-label="Zoom da Foto"
-                        min={
-                          selectedComposedPhoto.placement.zoomRange.minimum *
-                          100
-                        }
-                        max={
-                          selectedComposedPhoto.placement.zoomRange.maximum *
-                          100
-                        }
-                        step="1"
-                        value={Math.round(displayedPhotoZoom * 100)}
-                        disabled={controller.zoomCommitting}
-                        onPointerDown={controller.beginZoomGesture}
-                        onChange={(event) =>
-                          controller.updateZoomGesture(
-                            Number(event.currentTarget.value) / 100,
-                          )
-                        }
-                        onPointerUp={controller.finishZoomGesture}
-                        onKeyDown={(event) => {
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                              "Home",
-                              "End",
-                              "PageUp",
-                              "PageDown",
-                            ].includes(event.key)
-                          ) {
-                            controller.beginZoomGesture();
-                          }
-                        }}
-                        onKeyUp={(event) => {
-                          if (
-                            [
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "ArrowUp",
-                              "ArrowDown",
-                              "Home",
-                              "End",
-                              "PageUp",
-                              "PageDown",
-                            ].includes(event.key)
-                          ) {
-                            void controller.finishZoomGesture();
-                          }
-                        }}
-                        onBlur={controller.finishZoomGesture}
-                      />
-                    </label>
-                  )}
-                </InspectorSection>
-              </>
-            ) : (
-              <>
-                <InspectorSection
-                  key="album-information"
-                  title="Informações do Álbum"
-                  preferenceKey="album.information"
-                  defaultOpen
-                >
-                  <PropertyRow label="Lâminas" value={String(sheetCount)} />
-                  <PropertyRow
-                    label="Fotos posicionadas"
-                    value={String(photoCount)}
-                  />
-                  <PropertyRow label="Dimensão" value="60 × 30 cm" />
-                  <PropertyRow label="Resolução" value="300 DPI" />
-                </InspectorSection>
-                <InspectorSection
-                  key="album-sheet-grid"
-                  title="Grade de Lâminas"
-                  preferenceKey="album.sheet-grid"
-                  defaultOpen
-                >
-                  <div className="sheet-grid">
-                    {projection.composition.sheets.map((sheet) => {
-                      return (
-                        <Button
-                          key={sheet.sheetId}
-                          className={
-                            sheet.sheetId === focusedSheetId
-                              ? "sheet-tile active"
-                              : "sheet-tile"
-                          }
-                          onPress={() =>
-                            controller.navigateToSheet(sheet.sheetId)
-                          }
-                        >
-                          <SheetPreview
-                            sheet={sheet}
-                            mediaPreviewUrls={mediaPreviewUrls}
-                          />
-                          <span>{String(sheet.number).padStart(2, "0")}</span>
-                        </Button>
-                      );
-                    })}
-                  </div>
-                </InspectorSection>
-              </>
-            )}
-          </div>
-        </aside>
+        <InspectorPanel
+          selectedFrame={selectedFrame}
+          selectedComposedPhoto={selectedComposedPhoto}
+          displayedPhotoZoom={displayedPhotoZoom}
+          displayedPhotoPanX={displayedPhotoPanX}
+          zoomCommitting={controller.zoomCommitting}
+          sheetCount={sheetCount}
+          photoCount={photoCount}
+          sheets={projection.composition.sheets}
+          focusedSheetId={controller.canvasProps.focusedSheetId}
+          mediaPreviewUrls={mediaPreviewUrls}
+          onBeginPhotoZoom={controller.beginZoomGesture}
+          onUpdatePhotoZoom={controller.updateZoomGesture}
+          onFinishPhotoZoom={controller.finishZoomGesture}
+          onNavigateToSheet={controller.navigateToSheet}
+        />
 
-        <section
-          id="media-panel"
-          className="media-panel"
-          aria-label="Painel de imagens"
-        >
-          <div className="media-panel-head">
-            <div className="media-tabs">
-              <button
-                className={activeMediaKind === "photo" ? "active" : undefined}
-                type="button"
-                onClick={() => setActiveMediaKind("photo")}
-              >
-                Fotos
-              </button>
-              <button
-                className={
-                  activeMediaKind === "decorative" ? "active" : undefined
-                }
-                type="button"
-                onClick={() => setActiveMediaKind("decorative")}
-              >
-                Decorativos
-              </button>
-            </div>
-            <label className="media-search">
-              <span aria-hidden="true">⌕</span>
-              <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
-            </label>
-          </div>
-          <div className="media-strip">
-            {projection.state.album.media
-              .filter((media) => media.kind === activeMediaKind)
-              .map((media) => (
-              <button
-                className="media-card"
-                type="button"
-                key={media.id}
-                onDoubleClick={
-                  media.kind === "photo"
-                    ? () => controller.fillMedia(media.id)
-                    : undefined
-                }
-                title={
-                  media.kind === "photo"
-                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                    : undefined
-                }
-              >
-                <span
-                  className="media-thumb"
-                  style={{
-                    background: `linear-gradient(135deg, ${media.palette[0]}, ${media.palette[1]} 56%, ${media.palette[2]})`,
-                  }}
-                >
-                  {mediaPreviewUrls[media.id] && (
-                    <img
-                      alt=""
-                      draggable="false"
-                      loading="lazy"
-                      src={mediaPreviewUrls[media.id]}
-                    />
-                  )}
-                </span>
-                <span className="media-meta">
-                  <strong>{media.name}</strong>
-                  <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
-                </span>
-              </button>
-              ))}
-            {activeMediaKind === "photo" && (
-              <div className="media-tip">
-                <kbd>2×</kbd>
-                <span>
-                  Preenche o placeholder mais à esquerda da Lâmina centralizada
-                </span>
-              </div>
-            )}
-          </div>
-        </section>
+        <MediaPanel
+          mediaItems={projection.state.album.media}
+          mediaUsage={projection.mediaUsage}
+          mediaPreviewUrls={mediaPreviewUrls}
+          onFillPhoto={controller.fillMedia}
+        />
       </div>
 
       {(busy || message) && (
@@ -388,9 +165,7 @@ export function ProjectWorkspace({
           {busy && <span className="toast-spinner" aria-hidden="true" />}
           <div>
             <strong>
-              {message
-                ? "A operação não foi concluída"
-                : busy}
+              {message ? "A operação não foi concluída" : busy}
             </strong>
             <span>{message ?? "Aguarde…"}</span>
           </div>
@@ -405,54 +180,6 @@ export function ProjectWorkspace({
           )}
         </div>
       )}
-    </div>
-  );
-}
-
-function InspectorSection({
-  title,
-  preferenceKey,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  preferenceKey: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(() =>
-    readInspectorSectionPreference(preferenceKey, defaultOpen),
-  );
-
-  function toggle() {
-    setOpen((current) => {
-      const next = !current;
-      writeInspectorSectionPreference(preferenceKey, next);
-      return next;
-    });
-  }
-
-  return (
-    <section className="inspector-section">
-      <button
-        type="button"
-        className="inspector-section-trigger"
-        aria-expanded={open}
-        onClick={toggle}
-      >
-        <span>{title}</span>
-        <span aria-hidden="true">{open ? "−" : "+"}</span>
-      </button>
-      {open && <div className="inspector-section-content">{children}</div>}
-    </section>
-  );
-}
-
-function PropertyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="property-row">
-      <span>{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

@@ -6,7 +6,7 @@ use std::{
 use directories::BaseDirs;
 use myalbuns_paths::{
     AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, OperationPathContext,
-    PathRootKind, RootBindingPlan,
+    PathRootKind, RootBindingPlan, project_data_namespace,
 };
 
 #[test]
@@ -77,6 +77,29 @@ fn derives_only_safe_webview_host_namespaces() {
 }
 
 #[test]
+fn project_identity_derives_stable_isolated_internal_namespaces() {
+    let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
+    let first = project_data_namespace("project-01");
+
+    assert_eq!(
+        first,
+        "project-deea8d493d4e6f5453e54b288cf92a4a91bd32c5dbc87f2150cfb33580e9f9cb"
+    );
+    assert_eq!(first, project_data_namespace("project-01"));
+    assert_ne!(first, project_data_namespace("project-02"));
+
+    for project_id in ["../escape", "CON", "album com espaco", "\u{00e1}lbum"] {
+        let namespace = project_data_namespace(project_id);
+        paths
+            .project_cache(&namespace)
+            .expect("an opaque Project namespace is safe for Cache");
+        paths
+            .webview_data_directory(&namespace)
+            .expect("an opaque Project namespace is safe for WebView2");
+    }
+}
+
+#[test]
 fn derives_only_safe_project_cache_namespaces() {
     let paths = AppPaths::from_known_folders(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
@@ -96,7 +119,7 @@ fn derives_only_safe_project_cache_namespaces() {
             )
             .expect("safe artifact identities are accepted"),
         Path::new(
-            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-001.0123456789abcdef-v1-1600.jpg"
+            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-ddedb0a5b1fd0e11bd569d4b06eec63d02c0e5a272186ce3e2ef6529439afafa.0123456789abcdef-v1-1600.jpg"
         )
     );
     assert_eq!(
@@ -109,7 +132,7 @@ fn derives_only_safe_project_cache_namespaces() {
             )
             .expect("temporary names are derived by the path module"),
         Path::new(
-            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-001.0123456789abcdef-v1-1600.jpg.tmp-42"
+            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-ddedb0a5b1fd0e11bd569d4b06eec63d02c0e5a272186ce3e2ef6529439afafa.0123456789abcdef-v1-1600.jpg.tmp-42"
         )
     );
     assert_eq!(
@@ -121,19 +144,43 @@ fn derives_only_safe_project_cache_namespaces() {
             )
             .expect("safe PNG artifact identities are accepted"),
         Path::new(
-            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\decorative-001.0123456789abcdef-v1-1600.png"
+            r"C:\Local\MyAlbuns2\Cache\project-01.ABC\Media\media-12a79c4913ad160c8f60a357adb14fa9ea6a07a156d2feee32b8312e9c00da19.0123456789abcdef-v1-1600.png"
         )
     );
     assert_eq!(
         cache.metadata_file(),
         Path::new(r"C:\Local\MyAlbuns2\Cache\project-01.ABC\metadata.json")
     );
-    for unsafe_artifact in ["", "../escape", r"nested\escape", "a.b", "álbum", "CON"] {
+    assert!(
+        cache
+            .preview_file("", "generation-01", CacheArtifactFormat::Jpeg)
+            .is_err(),
+        "an empty Media identity is invalid"
+    );
+    for opaque_media_id in [
+        "../escape",
+        r"nested\escape",
+        "a.b",
+        "album com espaco",
+        "CON",
+    ] {
+        let artifact = cache
+            .preview_file(opaque_media_id, "generation-01", CacheArtifactFormat::Jpeg)
+            .expect("a Media identity is converted to an opaque artifact key");
+        assert!(
+            artifact
+                .file_name()
+                .and_then(std::ffi::OsStr::to_str)
+                .is_some_and(|name| name.starts_with("media-")),
+            "{opaque_media_id:?} must be represented by an opaque artifact key"
+        );
+    }
+    for unsafe_generation in ["", "../escape", r"nested\escape", "a.b", "CON"] {
         assert!(
             cache
-                .preview_file(unsafe_artifact, "generation-01", CacheArtifactFormat::Jpeg,)
+                .preview_file("media-01", unsafe_generation, CacheArtifactFormat::Jpeg)
                 .is_err(),
-            "{unsafe_artifact:?} must not become an artifact path component"
+            "{unsafe_generation:?} must not become a generation path component"
         );
     }
     for unsafe_namespace in [

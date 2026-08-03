@@ -9,7 +9,7 @@ use std::{
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage, codecs::png::PngEncoder};
 use myalbuns_core::{ComposedDecorative, ComposedFrame};
 use myalbuns_imaging_protocol::{
-    ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion, RenderSourcePolicy,
+    ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion,
 };
 
 use crate::source::{decode_source, read_verified_source, sha256_file};
@@ -57,13 +57,7 @@ pub(crate) fn render_request(
         .map_err(|_| "a Lâmina contém Frames demais".to_string())?;
     progress(ImagingProgressStage::Composing, 0, frame_count)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
-        draw_frame(
-            &mut image,
-            frame,
-            pixels_per_micrometer,
-            request.source_policy,
-            &sources,
-        )?;
+        draw_frame(&mut image, frame, pixels_per_micrometer, &sources)?;
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
@@ -72,20 +66,13 @@ pub(crate) fn render_request(
     }
     draw_vertical_line(&mut image, width_px / 2, Rgba([129, 112, 91, 90]));
     if let Some(overlay) = &sheet.overlay {
-        match request.source_policy {
-            RenderSourcePolicy::LinkedOriginals => {
-                let source = sources.get(&overlay.media_id).ok_or_else(|| {
-                    format!(
-                        "a fonte do Decorativo {} não foi carregada",
-                        overlay.media_id
-                    )
-                })?;
-                draw_decorative(&mut image, overlay, pixels_per_micrometer, source);
-            }
-            RenderSourcePolicy::ProceduralFixture => {
-                draw_procedural_overlay(&mut image);
-            }
-        }
+        let source = sources.get(&overlay.media_id).ok_or_else(|| {
+            format!(
+                "a fonte do Decorativo {} não foi carregada",
+                overlay.media_id
+            )
+        })?;
+        draw_decorative(&mut image, overlay, pixels_per_micrometer, source);
     }
 
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
@@ -115,11 +102,6 @@ fn load_render_sources(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<(HashMap<String, RgbaImage>, u64), RenderFailure> {
-    if request.source_policy == RenderSourcePolicy::ProceduralFixture {
-        progress(ImagingProgressStage::LoadingSources, 1, 1)?;
-        return Ok((HashMap::new(), 0));
-    }
-
     let mut decoded = HashMap::with_capacity(request.sources.len());
     let mut source_bytes = 0_u64;
     let source_count = u32::try_from(request.sources.len())
@@ -233,7 +215,6 @@ fn draw_frame(
     image: &mut RgbaImage,
     frame: &ComposedFrame,
     pixels_per_micrometer: f64,
-    source_policy: RenderSourcePolicy,
     sources: &HashMap<String, RgbaImage>,
 ) -> Result<(), String> {
     let left = to_pixels_signed(frame.clip_rect.x, pixels_per_micrometer).max(0) as u32;
@@ -252,15 +233,9 @@ fn draw_frame(
     let bottom = bottom.min(image.height());
 
     if let Some(photo) = &frame.photo {
-        let colors = photo.palette.each_ref().map(|value| parse_hex_color(value));
-        let linked_source = match source_policy {
-            RenderSourcePolicy::LinkedOriginals => {
-                Some(sources.get(&photo.media_id).ok_or_else(|| {
-                    format!("a fonte da mídia {} não foi carregada", photo.media_id)
-                })?)
-            }
-            RenderSourcePolicy::ProceduralFixture => None,
-        };
+        let source = sources
+            .get(&photo.media_id)
+            .ok_or_else(|| format!("a fonte da mídia {} não foi carregada", photo.media_id))?;
         let draw_left = to_pixels_precise(photo.draw_rect.x, pixels_per_micrometer);
         let draw_top = to_pixels_precise(photo.draw_rect.y, pixels_per_micrometer);
         let draw_width = to_pixels_precise(photo.draw_rect.width, pixels_per_micrometer).max(1.0);
@@ -282,12 +257,7 @@ fn draw_frame(
                 }
                 let horizontal = (source_x + 0.5).clamp(0.0, 1.0) as f32;
                 let vertical = (source_y + 0.5).clamp(0.0, 1.0) as f32;
-                let pixel = if let Some(source) = linked_source {
-                    sample_bilinear(source, horizontal, vertical)
-                } else {
-                    let horizon = blend(colors[0], colors[1], horizontal);
-                    blend(horizon, colors[2], (vertical * 0.42).min(1.0))
-                };
+                let pixel = sample_bilinear(source, horizontal, vertical);
                 image.put_pixel(x, y, pixel);
             }
         }
@@ -341,18 +311,6 @@ fn draw_decorative(
             let horizontal = (x - left) as f32 / width.saturating_sub(1).max(1) as f32;
             let vertical = (y - top) as f32 / height.saturating_sub(1).max(1) as f32;
             blend_pixel(image, x, y, sample_bilinear(source, horizontal, vertical));
-        }
-    }
-}
-
-fn draw_procedural_overlay(image: &mut RgbaImage) {
-    let band = (image.height() / 18).max(2);
-    for y in 0..band {
-        let alpha = ((1.0 - y as f32 / band as f32) * 90.0) as u8;
-        for x in 0..image.width() {
-            blend_pixel(image, x, y, Rgba([23, 36, 45, alpha]));
-            let bottom_y = image.height() - 1 - y;
-            blend_pixel(image, x, bottom_y, Rgba([23, 36, 45, alpha]));
         }
     }
 }
@@ -415,17 +373,6 @@ fn blend(from: Rgba<u8>, to: Rgba<u8>, amount: f32) -> Rgba<u8> {
         (from[2] as f32 + (to[2] as f32 - from[2] as f32) * amount) as u8,
         (from[3] as f32 + (to[3] as f32 - from[3] as f32) * amount) as u8,
     ])
-}
-
-fn parse_hex_color(value: &str) -> Rgba<u8> {
-    let value = value.trim_start_matches('#');
-    if value.len() != 6 {
-        return Rgba([127, 127, 127, 255]);
-    }
-    let red = u8::from_str_radix(&value[0..2], 16).unwrap_or(127);
-    let green = u8::from_str_radix(&value[2..4], 16).unwrap_or(127);
-    let blue = u8::from_str_radix(&value[4..6], 16).unwrap_or(127);
-    Rgba([red, green, blue, 255])
 }
 
 fn to_pixels(value_um: i64, pixels_per_micrometer: f64) -> u32 {

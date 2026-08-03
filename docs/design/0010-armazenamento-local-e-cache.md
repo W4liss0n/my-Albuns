@@ -33,12 +33,12 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 
 %LOCALAPPDATA%\MyAlbuns\
 ├── Cache\
-│   └── {project-id}\
+│   └── {project-key}\
 │       ├── metadata.json
 │       └── Media\
 ├── Recovery\
 │   ├── Projects\
-│   │   └── {project-id}.json
+│   │   └── {project-key}.json
 │   └── Batches\
 │       └── {batch-id}.json
 ├── State\
@@ -69,6 +69,10 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
 `StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e as preferências de interface que dependem da tela.
+
+Os dados internos do WebView2 ficam em `State\WebView2\{project-key}`. Cada
+host de Projeto deriva uma chave opaca própria da Identidade persistida; hosts
+distintos nunca compartilham o mesmo diretório de perfil do navegador.
 
 A divisão entre as duas raízes segue o que a preferência representa:
 
@@ -110,25 +114,33 @@ Não contém estado criativo nem preparação parcial. Após interrupção, o it
 
 ## Namespace do Projeto
 
-Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-id}`. Nome e caminho do arquivo não participam desse namespace.
+Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-key}`. A mesma chave identifica o checkpoint futuro em `Recovery` e o perfil do WebView2. Nome e caminho do arquivo não participam desse namespace.
 
 - mover ou renomear preserva a pasta;
 - `Salvar como` começa em uma pasta nova e vazia;
 - uma Cópia externa recebe outra pasta;
 - Projetos diferentes nunca compartilham estado mutável de Cache.
 
-O formato textual definitivo da Identidade pertence ao documento de Projeto. Para o Cache, ela precisa ser estável, única e segura como nome de diretório.
+O formato textual definitivo da Identidade pertence ao documento de Projeto e
+não herda restrições de nomes do Windows. A implementação deriva
+`project-{sha256}` dos bytes UTF-8 da Identidade e usa a mesma chave opaca para
+Cache, Recuperação e WebView2. O valor original nunca vira componente de
+caminho.
 
 ## Conteúdo mínimo
 
 ```text
 Cache\
-└── {project-id}\
+└── {project-key}\
     ├── metadata.json
     └── Media\
-        ├── {media-id}.{generation-id}.{formato}
-        └── {media-id}.{generation-id}.tmp
+        ├── {media-key}.{generation-id}.{formato}
+        └── {media-key}.{generation-id}.tmp
 ```
+
+`{media-key}` é `media-{sha256}` derivado da Identidade da mídia. A Identidade
+original continua preservada no Projeto, no protocolo e em `metadata.json`;
+somente a chave opaca participa do nome do artefato.
 
 O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. Não existem tiles, pirâmides nem previews persistidos de Lâmina no MVP, salvo se o spike provar com medições que a representação única não atende.
 

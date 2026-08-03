@@ -8,9 +8,6 @@ import {
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
-import { runCanvasContextRecoveryProbe } from "./canvasContextRecoveryProbe";
-import { runCanvasNavigationPerformanceProbe } from "./canvasNavigationPerformanceProbe";
-import { runCanvasPerformanceProbe } from "./canvasPerformanceProbe";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -32,14 +29,9 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const latestPropsRef = useRef(props);
   latestPropsRef.current = props;
   const hostRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
   const materializedSceneRef = useRef<AlbumCanvasScene | null>(null);
-  const performanceRunRef = useRef<{
-    key: string;
-    controller: AbortController;
-  } | null>(null);
   const [graphicsState, setGraphicsState] = useState<
     "initializing" | "ready" | "recovering" | "failed"
   >("initializing");
@@ -154,9 +146,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         sceneInstanceIdRef.current = null;
         materializedSceneRef.current = null;
       }
-      if (canvasRef.current === app.canvas) {
-        canvasRef.current = null;
-      }
       ownedScene = null;
       app.destroy(true, { children: true });
       logger.write({
@@ -217,7 +206,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           "Canvas contínuo do Álbum. Use a roda para navegar e Alt mais roda para ajustar a Foto.",
         );
         app.canvas.tabIndex = 0;
-        canvasRef.current = app.canvas;
         hostRef.current.appendChild(app.canvas);
         ownedScene = new AlbumCanvasScene(
           app,
@@ -272,8 +260,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     return () => {
       disposed = true;
       setGraphicsState("initializing");
-      performanceRunRef.current?.controller.abort();
-      performanceRunRef.current = null;
       destroyInitializedApp("effect_cleanup");
     };
   }, [canvasGraphicsDiagnosticProbe, hasSheets, logger]);
@@ -309,139 +295,6 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
         sheetCount: props.composition.sheets.length,
       });
     }
-  });
-
-  useEffect(() => {
-    const request = props.performanceProbe;
-    const scene = sceneRef.current;
-    const canvas = canvasRef.current;
-    if (!ready || !request || !scene || !canvas) return;
-    if (performanceRunRef.current?.key === request.key) return;
-    const targetState = scene.performanceTarget();
-    if (targetState.status === "pending") return;
-
-    performanceRunRef.current?.controller.abort();
-    const controller = new AbortController();
-    performanceRunRef.current = {
-      key: request.key,
-      controller,
-    };
-    if (targetState.status === "failed") {
-      logger.write({
-        level: "error",
-        component: "canvas",
-        event: "canvas_performance_probe_failed",
-        projectId: props.projectId,
-        instanceId: sceneInstanceIdRef.current ?? undefined,
-        reason: targetState.reason,
-      });
-      void request.onFailed(targetState.reason);
-      return;
-    }
-    const target = targetState.target;
-    logger.write({
-      level: "info",
-      component: "canvas",
-      event: "canvas_performance_probe_started",
-      projectId: props.projectId,
-      instanceId: sceneInstanceIdRef.current ?? undefined,
-    });
-    void Promise.resolve(request.onReady())
-      .then(async () => {
-        const interaction = await runCanvasPerformanceProbe(
-          {
-            warmupFrames: request.config.warmupFrames,
-            panFrames: request.config.panFrames,
-            zoomFrames: request.config.zoomFrames,
-          },
-          target,
-          undefined,
-          controller.signal,
-        );
-        const navigationTarget = scene.navigationPerformanceTarget(
-          request.navigateToSheet,
-        );
-        if (!navigationTarget) {
-          throw new Error(
-            "O Canvas não disponibilizou o alvo de navegação.",
-          );
-        }
-        const navigation = await runCanvasNavigationPerformanceProbe(
-          { cycles: request.config.navigationCycles },
-          navigationTarget,
-          undefined,
-          controller.signal,
-        );
-        const graphics = await runCanvasContextRecoveryProbe(
-          {
-            canvas,
-            renderAfterRestore: async () => {
-              const restoredTargetState = scene.performanceTarget();
-              if (restoredTargetState.status !== "ready") {
-                throw new Error(
-                  "O Canvas não recuperou as texturas reais após restaurar o contexto.",
-                );
-              }
-              const restoredTarget = restoredTargetState.target;
-              try {
-                restoredTarget.previewPan(0.125);
-                const renderedAt =
-                  await restoredTarget.nextRenderedFrame();
-                return {
-                  renderedAt,
-                  textureBacked: restoredTarget.textureBacked,
-                  decorativeTextureBacked:
-                    restoredTarget.decorativeTextureBacked,
-                  testedTexture: restoredTarget.testedTexture,
-                };
-              } finally {
-                restoredTarget.reset();
-              }
-            },
-          },
-          undefined,
-          controller.signal,
-        );
-        return {
-          ...interaction,
-          navigation,
-          graphics,
-        };
-      })
-      .then(async (measurement) => {
-        if (
-          controller.signal.aborted ||
-          performanceRunRef.current?.controller !== controller
-        ) {
-          return;
-        }
-        await request.onCompleted(measurement);
-        logger.write({
-          level: "info",
-          component: "canvas",
-          event: "canvas_performance_probe_completed",
-          projectId: props.projectId,
-          instanceId: sceneInstanceIdRef.current ?? undefined,
-        });
-      })
-      .catch(async (error: unknown) => {
-        if (
-          controller.signal.aborted ||
-          (error instanceof DOMException && error.name === "AbortError")
-        ) {
-          return;
-        }
-        const reason = logReasonFromError(error);
-        logger.write({
-          level: "error",
-          component: "canvas",
-          event: "canvas_performance_probe_failed",
-          projectId: props.projectId,
-          instanceId: sceneInstanceIdRef.current ?? undefined,
-          reason,
-        });
-        await request.onFailed(reason);
-      });
   });
 
   if (!hasSheets) {

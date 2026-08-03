@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use directories::BaseDirs;
+use sha2::{Digest, Sha256};
 
 use crate::{
     AppPathsError, CachePathPlan, PreparedCacheStorage,
@@ -13,6 +14,22 @@ use crate::{
 /// A distribuição final voltará a usar `MyAlbuns` depois que a nova versão
 /// estiver concluída.
 const TEMPORARY_APP_DIRECTORY_NAME: &str = "MyAlbuns2";
+
+/// Deriva uma representação opaca, estável e segura da Identidade do Projeto
+/// para diretórios internos. A Identidade permanece um valor de domínio livre
+/// de restrições de nome de arquivo; somente esta representação chega ao disco.
+pub fn project_data_namespace(project_id: &str) -> String {
+    opaque_data_key("project", project_id)
+}
+
+pub(crate) fn media_cache_key(media_id: &str) -> String {
+    opaque_data_key("media", media_id)
+}
+
+fn opaque_data_key(kind: &str, identity: &str) -> String {
+    let digest = Sha256::digest(identity.as_bytes());
+    format!("{kind}-{digest:x}")
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AppPaths {

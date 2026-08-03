@@ -45,7 +45,7 @@ test("completes an Export attempt with the backend result", async () => {
     status: "completed",
     result,
   });
-  expect(invoke).toHaveBeenCalledWith("export_spike", {
+  expect(invoke).toHaveBeenCalledWith("export_preview", {
     onEvent: tauriBoundary.channels[0],
   });
 });
@@ -111,7 +111,7 @@ test("cancels an Export attempt using the operation id kept inside the adapter",
 
   await expect(firstCancellation).resolves.toBe("requested");
   await expect(repeatedCancellation).resolves.toBe("requested");
-  expect(invoke).toHaveBeenNthCalledWith(2, "cancel_export_spike", {
+  expect(invoke).toHaveBeenNthCalledWith(2, "cancel_export", {
     operationId: "export-42",
   });
   expect(invoke).toHaveBeenCalledTimes(2);
@@ -155,7 +155,7 @@ test("keeps a cancellation requested before started until the operation id arriv
   });
 
   await expect(cancellation).resolves.toBe("requested");
-  expect(invoke).toHaveBeenNthCalledWith(2, "cancel_export_spike", {
+  expect(invoke).toHaveBeenNthCalledWith(2, "cancel_export", {
     operationId: "export-delayed",
   });
 
@@ -195,7 +195,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   await tauriProjectSessionPort.redo();
   vi.mocked(invoke).mockResolvedValueOnce([
     {
-      mediaId: "benchmark-a-001",
+      mediaId: "media-a-001",
       url: "http://asset.localhost/cache-preview",
     },
   ]);

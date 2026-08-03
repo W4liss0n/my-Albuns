@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AppPaths, AppPathsError,
-    app_paths::{valid_cache_component, valid_namespace_component},
+    app_paths::{media_cache_key, valid_cache_component, valid_namespace_component},
     guarded_fs::{
         DirectoryGuard, GuardedFsError, ensure_direct_child, is_reparse_point, open_directory,
         open_existing_direct_child, remove_empty_directory, validate_open_file,
@@ -168,12 +168,14 @@ impl CachePathPlan {
         generation_id: &str,
         format: CacheArtifactFormat,
     ) -> Result<PathBuf, AppPathsError> {
-        if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
+        if media_id.trim().is_empty() || !valid_cache_component(generation_id) {
             return Err(AppPathsError::InvalidCacheArtifact);
         }
-        Ok(self
-            .media_directory()
-            .join(format!("{media_id}.{generation_id}.{}", format.extension())))
+        let media_key = media_cache_key(media_id);
+        Ok(self.media_directory().join(format!(
+            "{media_key}.{generation_id}.{}",
+            format.extension()
+        )))
     }
 
     pub fn preview_temporary_file(
@@ -183,11 +185,12 @@ impl CachePathPlan {
         format: CacheArtifactFormat,
         process_id: u32,
     ) -> Result<PathBuf, AppPathsError> {
-        if !valid_cache_component(media_id) || !valid_cache_component(generation_id) {
+        if media_id.trim().is_empty() || !valid_cache_component(generation_id) {
             return Err(AppPathsError::InvalidCacheArtifact);
         }
+        let media_key = media_cache_key(media_id);
         Ok(self.media_directory().join(format!(
-            "{media_id}.{generation_id}.{}.tmp-{process_id}",
+            "{media_key}.{generation_id}.{}.tmp-{process_id}",
             format.extension()
         )))
     }

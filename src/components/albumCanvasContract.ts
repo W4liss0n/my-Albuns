@@ -1,8 +1,6 @@
 import type { CompositionPlan } from "../domain/project";
 import type { GraphicsDiagnostic } from "../application/graphics";
-import type { CanvasPerformanceMeasurement } from "../application/topologyBenchmark";
 import type { ViewportState } from "../state/viewport";
-import type { CanvasPerformanceProbeConfig } from "./canvasPerformanceProbe";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 
 export interface PhotoZoomPreview {
@@ -29,23 +27,6 @@ export interface CanvasMetrics {
   scale: number;
 }
 
-export interface CanvasPerformanceProbeRequest {
-  key: string;
-  config: CanvasPerformanceProbeConfig & {
-    navigationCycles: number;
-  };
-  onReady(): Promise<void> | void;
-  onCompleted(
-    measurement: CanvasPerformanceMeasurement,
-  ): Promise<void> | void;
-  onFailed(reason: string): Promise<void> | void;
-}
-
-export interface BoundCanvasPerformanceProbeRequest
-  extends CanvasPerformanceProbeRequest {
-  navigateToSheet(sheetId: string): void;
-}
-
 export interface AlbumCanvasProps {
   projectId: string;
   composition: CompositionPlan;
@@ -56,7 +37,6 @@ export interface AlbumCanvasProps {
   centeredSheetId: string | null;
   viewport: ViewportState;
   photoZoomPreview?: PhotoZoomPreview | null;
-  performanceProbe?: BoundCanvasPerformanceProbeRequest | null;
   onSelectFrame(frameId: string | null): void;
   onFocusSheet(sheetId: string): void;
   onCenteredSheetChange(sheetId: string): void;

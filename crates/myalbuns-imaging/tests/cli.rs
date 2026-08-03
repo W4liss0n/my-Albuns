@@ -10,7 +10,9 @@ use myalbuns_imaging_protocol::{
     ImagingCommand, ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse,
     MediaSource, decode_event_stream, root_binding_plan_sha256,
 };
-use myalbuns_paths::{AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{
+    AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
+};
 use sha2::{Digest, Sha256};
 
 #[path = "../../../tests/support/sample_project.rs"]
@@ -34,7 +36,7 @@ impl TestCache {
             NEXT_CACHE_ID.fetch_add(1, Ordering::Relaxed)
         );
         let paths = app_paths
-            .project_cache(&project_id)
+            .project_cache(&project_data_namespace(&project_id))
             .expect("the isolated Cache plan is valid");
         Self { paths, project_id }
     }
@@ -113,6 +115,9 @@ fn processor_advertises_the_protocol_version_used_by_external_runners() {
 fn processor_renders_a_png_from_a_validated_snapshot_only() {
     let session = sample_session(SampleProject::Horizon, 12);
     let snapshot = session.render_snapshot();
+    let expected_source_count = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .count();
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("lamina-001.png");
     let result = invoke_processor(snapshot, &output_path, "request-001");
@@ -155,7 +160,8 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
         .expect("the response is correlated");
     assert_eq!((completion.width_px, completion.height_px), (591, 295));
     assert_eq!(completion.dpi, 25);
-    assert_eq!(completion.source_count, 0);
+    assert_eq!(completion.source_count, expected_source_count);
+    assert!(completion.source_bytes > 0);
 }
 
 #[test]
@@ -591,6 +597,31 @@ fn processor_identifies_source_verification_failures() {
 }
 
 #[test]
+fn processor_identifies_a_missing_original_as_a_source_verification_failure() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let log_dir = tempfile::tempdir().expect("temporary log directory");
+    let source_path = source_dir.path().join("missing-photo.jpg");
+    let output_path = output_dir.path().join("missing-original.png");
+    let request = single_photo_render_request(
+        output_path.clone(),
+        "missing-original",
+        &source_path,
+        1024,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+    );
+
+    let result = invoke_render_request(&request, Some(log_dir.path()));
+
+    assert_eq!(
+        result.status.code(),
+        Some(ImagingFailureStage::SourceVerification.exit_code().into())
+    );
+    assert!(!output_path.exists());
+    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
+}
+
+#[test]
 fn processor_identifies_source_decode_failures() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
@@ -725,16 +756,8 @@ fn processor_rejects_an_invalid_snapshot() {
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("invalid.png");
     let snapshot = session.render_snapshot();
-    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-    let request = ImagingRequest::procedural_fixture(
-        "invalid",
-        output_path.clone(),
-        snapshot,
-        sheet_id,
-        25,
-        root_bindings(&[&output_path]),
-    )
-    .expect("the baseline request is valid");
+    let (_source_dir, request) =
+        render_request_with_temp_originals(snapshot, &output_path, "invalid", 25);
     let mut request = serde_json::to_value(request).expect("request is serializable");
     request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
 
@@ -762,16 +785,8 @@ fn processor_rejects_a_render_root_omitted_by_the_operation_owner() {
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let output_path = output_dir.path().join("unbound.png");
     let snapshot = session.render_snapshot();
-    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-    let request = ImagingRequest::procedural_fixture(
-        "unbound-root",
-        output_path.clone(),
-        snapshot,
-        sheet_id,
-        25,
-        root_bindings(&[&output_path]),
-    )
-    .expect("the baseline request is valid");
+    let (_source_dir, request) =
+        render_request_with_temp_originals(snapshot, &output_path, "unbound-root", 25);
     let mut command =
         serde_json::to_value(ImagingCommand::render(request)).expect("the command is serializable");
     command["request"]["rootBindings"] = serde_json::json!({ "bindings": [] });
@@ -795,12 +810,15 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let output_path = output_dir.path().join("private-album-name.png");
 
-    let result = invoke_processor_with_log_dir(
+    let (_source_dir, request) = render_request_with_temp_originals(
         session.render_snapshot(),
         &output_path,
         "logged-request-001",
-        Some(log_dir.path()),
+        25,
     );
+    let expected_plan_sha256 =
+        root_binding_plan_sha256(&request.root_bindings).expect("the expected plan has a digest");
+    let result = invoke_render_request(&request, Some(log_dir.path()));
 
     assert!(
         result.status.success(),
@@ -829,8 +847,6 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
         completed["process_id"], started["process_id"],
         "the terminal event keeps the Processor PID used by the host correlation"
     );
-    let expected_plan_sha256 = root_binding_plan_sha256(&root_bindings(&[&output_path]))
-        .expect("the expected plan has a digest");
     assert!(
         logs.contains(&format!(
             "\"root_binding_plan_sha256\":\"{expected_plan_sha256}\""
@@ -950,6 +966,17 @@ fn invoke_processor_with_log_dir(
     request_id: &str,
     log_dir: Option<&Path>,
 ) -> std::process::Output {
+    let (_source_dir, request) =
+        render_request_with_temp_originals(snapshot, output_path, request_id, 25);
+    invoke_render_request(&request, log_dir)
+}
+
+fn render_request_with_temp_originals(
+    snapshot: RenderSnapshot,
+    output_path: &Path,
+    request_id: &str,
+    dpi: u32,
+) -> (tempfile::TempDir, ImagingRequest) {
     let sheet_id = snapshot
         .composition
         .sheets
@@ -957,16 +984,65 @@ fn invoke_processor_with_log_dir(
         .expect("the fixture contains a sheet")
         .sheet_id
         .clone();
-    let request = ImagingRequest::procedural_fixture(
+    let sheet = snapshot
+        .composition
+        .sheets
+        .first()
+        .expect("the fixture contains a sheet");
+    let overlay_id = sheet
+        .overlay
+        .as_ref()
+        .map(|overlay| overlay.media_id.as_str());
+    let mut media_ids = Vec::new();
+    for media_id in sheet.referenced_media_ids() {
+        if !media_ids.iter().any(|known| known == media_id) {
+            media_ids.push(media_id.to_owned());
+        }
+    }
+    let source_dir = tempfile::tempdir().expect("temporary original-source directory");
+    let mut sources = Vec::with_capacity(media_ids.len());
+    for (index, media_id) in media_ids.into_iter().enumerate() {
+        let source_path = source_dir.path().join(format!("original-{index}.png"));
+        let alpha = if overlay_id == Some(media_id.as_str()) {
+            144
+        } else {
+            u8::MAX
+        };
+        RgbaImage::from_fn(64, 48, |x, y| {
+            let horizontal = (x * 3) as u8;
+            let vertical = (y * 4) as u8;
+            let accent = (index as u8).wrapping_mul(53).wrapping_add(32);
+            Rgba([horizontal, vertical, accent, alpha])
+        })
+        .save_with_format(&source_path, ImageFormat::Png)
+        .expect("the temporary original is written");
+        let source_bytes = std::fs::read(&source_path).expect("the original is readable");
+        sources.push(
+            MediaSource::new(
+                media_id,
+                source_path,
+                source_bytes.len() as u64,
+                format!("{:x}", Sha256::digest(&source_bytes)),
+            )
+            .expect("the temporary original source is valid"),
+        );
+    }
+    let mut paths = Vec::with_capacity(sources.len() + 1);
+    paths.push(output_path);
+    paths.extend(sources.iter().map(MediaSource::source_path));
+    let bindings = root_bindings(&paths);
+    drop(paths);
+    let request = ImagingRequest::new(
         request_id,
         output_path.to_path_buf(),
         snapshot,
         sheet_id,
-        25,
-        root_bindings(&[output_path]),
+        dpi,
+        sources,
+        bindings,
     )
-    .expect("the procedural render request is valid");
-    invoke_render_request(&request, log_dir)
+    .expect("the original-only render request is valid");
+    (source_dir, request)
 }
 
 fn invoke_real_processor(

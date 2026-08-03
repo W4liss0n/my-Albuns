@@ -9,9 +9,12 @@ use std::{
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    CacheArtifactFormat, ImagingCommand, ImagingResponse, MediaSource, encode_command,
+    CacheArtifactFormat, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse, MediaSource,
+    encode_command,
 };
-use myalbuns_paths::{AppPaths, ExportPathPlan, OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{
+    AppPaths, ExportPathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
+};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -299,7 +302,7 @@ fn real_processor_recovery_flows_through_production_modules() {
         let app_paths = AppPaths::discover().expect("the application paths are discoverable");
         let project_id = format!("recovery-gate-{}", std::process::id());
         let cache_paths = app_paths
-            .project_cache(&project_id)
+            .project_cache(&project_data_namespace(&project_id))
             .expect("the Cache plan is valid");
         let cache_request_id = "cache-real-recovery";
         let cache_work = CacheWork::new(
@@ -418,7 +421,7 @@ fn real_processor_recovery_flows_through_production_modules() {
                 output_path.clone(),
                 sheet_id.clone(),
                 300,
-                Some(vec![export_source.clone()]),
+                vec![export_source.clone()],
             ),
         )
         .expect("the failed Export is planned");
@@ -461,7 +464,7 @@ fn real_processor_recovery_flows_through_production_modules() {
                 output_path.clone(),
                 sheet_id,
                 300,
-                Some(vec![export_source]),
+                vec![export_source],
             ),
         )
         .expect("the explicit retry is planned");
@@ -494,7 +497,7 @@ fn real_processor_recovery_flows_through_production_modules() {
             serde_json::json!({
                 "failedProcessId": failed_transport.process_ids[0],
                 "retryProcessId": retry_transport.process_ids[0],
-                "sourcePolicy": "linkedOriginals",
+                "protocolVersion": IMAGING_PROTOCOL_VERSION,
                 "processCountBeforeExplicitRetry": failed_transport.process_ids.len(),
                 "successResponseBeforeExplicitRetry": false,
                 "partialPreparationObserved":
@@ -566,7 +569,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
                 logical_exports.join("Album-unavailable.png"),
                 sheet_id.clone(),
                 300,
-                Some(vec![source.clone()]),
+                vec![source.clone()],
             ),
         )
         .expect("the unavailable UNC Export is planned");
@@ -617,7 +620,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
                 output_path.clone(),
                 sheet_id,
                 300,
-                Some(vec![source]),
+                vec![source],
             ),
         )
         .expect("the real UNC Export is planned");

@@ -219,15 +219,16 @@ fn real_windows_paths_freeze_mapped_bindings_and_keep_unc_export_recoverable() {
     let logical_project = PathBuf::from(format!(r"{drive}\Projeto.myalbum"));
     let unc_project = unc_a.join("Projeto.myalbum");
     std::fs::write(&local_project, b"project").expect("the Project file is writable");
-    let focus_plan = operation_plan(&[
+    let identity_plan = operation_plan(&[
         logical_project.as_path(),
         unc_project.as_path(),
         local_project.as_path(),
     ]);
     assert_eq!(
-        focus_plan.compare_existing(&logical_project, &unc_project, ExpectedObject::RegularFile,),
+        identity_plan
+            .compare_existing(&logical_project, &unc_project, ExpectedObject::RegularFile,),
         PhysicalIdentityEvidence::Same,
-        "mapped and UNC aliases provide Same evidence to the opening guardian"
+        "mapped and UNC aliases provide the same physical identity evidence"
     );
     let editable_lock = ProjectFileLock::try_acquire(&logical_project)
         .expect("the first editable session acquires a real file lock");

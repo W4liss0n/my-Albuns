@@ -7,9 +7,10 @@ use std::{
     },
 };
 
-use serde::Serialize;
-
-use crate::export_pipeline::{ExportCancellationResult, ExportExecutionControl};
+use crate::{
+    export_pipeline::{ExportCancellationResult, ExportExecutionControl},
+    ipc_contract::CancelDisposition,
+};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ExportAttempts {
@@ -35,15 +36,6 @@ pub(crate) struct ExportAttempt {
     generation: u64,
     attempts: Arc<ExportAttemptsInner>,
     control: Arc<ExportExecutionControl>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum CancelDisposition {
-    Requested,
-    AlreadyRequested,
-    TooLate,
-    NotFound,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -196,7 +188,8 @@ mod tests {
 
     use serde_json::json;
 
-    use super::{CancelDisposition, ExportAttempts};
+    use super::ExportAttempts;
+    use crate::ipc_contract::CancelDisposition;
 
     #[test]
     fn only_the_owning_window_can_cancel_its_active_export_attempt() {
@@ -207,7 +200,7 @@ mod tests {
                 .expect("the first Export attempt starts");
 
             assert_eq!(
-                attempts.request_cancel("export-17", "project-b"),
+                attempts.request_cancel("export-17", "other-window"),
                 CancelDisposition::NotFound
             );
             assert_eq!(
@@ -275,7 +268,7 @@ mod tests {
             .begin("export-window-a-2", "project-a")
             .expect("the second attempt starts");
         let other = attempts
-            .begin("export-window-b", "project-b")
+            .begin("export-window-b", "other-window")
             .expect("the other window attempt starts");
 
         assert_eq!(attempts.request_cancel_for_window("project-a"), 2);

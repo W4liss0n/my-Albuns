@@ -63,10 +63,10 @@ host retira as duas Janelas; o runner inicia outro host para `project-b` e só
 então autoriza a tentativa sucessora. O processo morto não coopera com a
 liberação e não escreve um terminal sintético.
 
-Essas regras estão implementadas em
-[`export_terminal_probe.rs`](../../src-tauri/src/export_terminal_probe.rs) e
-orquestradas por
-[`Test-OperationGate.ps1`](../../scripts/Test-OperationGate.ps1).
+Essas regras foram implementadas em `export_terminal_probe.rs` e orquestradas
+pelo runner histórico `Test-OperationGate.ps1`. Os dois foram retirados do
+produto depois da escolha da topologia; consulte o
+[encerramento do harness da Fase 1](0030-encerramento-do-harness-da-fase-1.md).
 
 ## Instrumento
 

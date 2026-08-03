@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type { LogEvent, Logger } from "../application/logging";
+import type { FrontendLogEvent } from "./generated/FrontendLogEvent";
 
 function writeToDevelopmentConsole(event: LogEvent) {
   if (!import.meta.env.DEV) return;
@@ -24,7 +25,8 @@ function writeToDevelopmentConsole(event: LogEvent) {
 export const tauriLogger: Logger = {
   write(event) {
     writeToDevelopmentConsole(event);
-    void invoke("frontend_log", { event }).catch(() => {
+    const ipcEvent = event satisfies FrontendLogEvent;
+    void invoke("frontend_log", { event: ipcEvent }).catch(() => {
       console.warn(
         "Não foi possível encaminhar um evento de diagnóstico ao host Tauri.",
       );

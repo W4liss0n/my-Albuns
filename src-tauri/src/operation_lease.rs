@@ -1,3 +1,4 @@
+#[cfg(test)]
 use std::fmt;
 
 use crate::{
@@ -18,6 +19,7 @@ pub(crate) struct OperationLeaseAcquisition {
     gate_grant: Option<OperationGrant>,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) enum OperationLeaseError {
     Gate(OperationGateError),
@@ -34,6 +36,7 @@ impl OperationLease {
         })
     }
 
+    #[cfg(test)]
     pub(crate) async fn acquire(
         gate: &OperationGate,
         cache: &CacheEngine,
@@ -77,6 +80,7 @@ impl OperationLeaseAcquisition {
     }
 }
 
+#[cfg(test)]
 impl fmt::Display for OperationLeaseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -86,6 +90,7 @@ impl fmt::Display for OperationLeaseError {
     }
 }
 
+#[cfg(test)]
 impl std::error::Error for OperationLeaseError {}
 
 impl Drop for OperationLease {

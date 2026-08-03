@@ -145,7 +145,7 @@ try {
         throw 'The observed Cache recovery evidence does not satisfy the gate.'
     }
     if ($exportEvidence.failedProcessId -eq $exportEvidence.retryProcessId `
-            -or $exportEvidence.sourcePolicy -ne 'linkedOriginals' `
+            -or $exportEvidence.protocolVersion -ne 10 `
             -or $exportEvidence.processCountBeforeExplicitRetry -ne 1 `
             -or $exportEvidence.successResponseBeforeExplicitRetry `
             -or -not $exportEvidence.partialPreparationObserved `

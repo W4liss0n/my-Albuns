@@ -15,14 +15,6 @@ import type {
   ProjectSessionPort,
 } from "./application/projectPorts";
 import type { EditorProjection } from "./domain/project";
-import {
-  disabledTopologyBenchmarkBridge,
-  type TopologyBenchmarkBridge,
-} from "./application/topologyBenchmark";
-import {
-  disabledTopologyFaultProbeBridge,
-  type TopologyFaultProbeBridge,
-} from "./application/topologyFaultProbe";
 import { LoggingProvider } from "./components/loggingContext";
 import {
   CanvasGraphicsDiagnosticProbeProvider,
@@ -30,8 +22,6 @@ import {
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { SafeApplicationShell } from "./components/SafeApplicationShell";
-import { useTopologyBenchmarkCoordinator } from "./components/useTopologyBenchmarkCoordinator";
-import { useTopologyFaultProbe } from "./components/useTopologyFaultProbe";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import "./App.css";
 
@@ -39,8 +29,6 @@ interface AppProps {
   exportPort: ExportPort;
   mediaPreviewPort: MediaPreviewPort;
   projectSessionPort: ProjectSessionPort;
-  topologyBenchmarkBridge?: TopologyBenchmarkBridge;
-  topologyFaultProbeBridge?: TopologyFaultProbeBridge;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
@@ -50,8 +38,6 @@ function App({
   exportPort,
   mediaPreviewPort,
   projectSessionPort,
-  topologyBenchmarkBridge = disabledTopologyBenchmarkBridge,
-  topologyFaultProbeBridge = disabledTopologyFaultProbeBridge,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
   logger,
@@ -65,8 +51,6 @@ function App({
   const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
     Readonly<Record<string, string>>
   >({});
-  const [mediaPreviewsReady, setMediaPreviewsReady] =
-    useState(false);
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -132,22 +116,8 @@ function App({
     projectId,
     projectSessionPort,
   );
-  useTopologyFaultProbe({
-    projection,
-    runProjectMutation,
-    topologyBridge: topologyFaultProbeBridge,
-    onProjectionChange: setProjection,
-  });
-  const canvasPerformanceProbe =
-    useTopologyBenchmarkCoordinator({
-      projectId: editorGraphics.supported ? projectId : "",
-      exportPort,
-      topologyBridge: topologyBenchmarkBridge,
-      mediaPreviewsReady,
-    });
   useEffect(() => {
     setMediaPreviewUrls({});
-    setMediaPreviewsReady(false);
     if (!projectId || !editorGraphics.supported) return;
 
     let active = true;
@@ -173,7 +143,6 @@ function App({
             ),
           );
         }
-        setMediaPreviewsReady(true);
         logger.write({
           level: "info",
           component: "media-cache",
@@ -234,7 +203,6 @@ function App({
           projection={projection}
           exportPort={exportPort}
           runProjectMutation={runProjectMutation}
-          canvasPerformanceProbe={canvasPerformanceProbe}
           mediaPreviewUrls={mediaPreviewUrls}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}

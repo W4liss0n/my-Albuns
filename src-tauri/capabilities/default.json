@@ -3,7 +3,7 @@
   "identifier": "default",
   "description": "Permissões mínimas da Janela do Projeto",
   "local": true,
-  "windows": ["main", "project-b"],
+  "windows": ["main"],
   "permissions": [
     "project-window-commands"
   ]

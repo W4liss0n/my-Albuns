@@ -10,15 +10,6 @@ const hmrPort = 1438;
 export default defineConfig(() => ({
   plugins: [react()],
 
-  build: {
-    rollupOptions: {
-      input: {
-        project: "index.html",
-        global: "global.html",
-      },
-    },
-  },
-
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

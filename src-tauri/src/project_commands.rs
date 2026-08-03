@@ -11,7 +11,7 @@ pub(crate) fn project_state(
     state: State<'_, ProjectHost>,
 ) -> Result<EditorProjection, String> {
     validate_optional_identifier("operationId", Some(&operation_id))?;
-    let projection = state.projection(window.label())?;
+    let projection = state.projection()?;
     tracing::debug!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -34,7 +34,7 @@ pub(crate) fn apply_project_intent(
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
     };
-    let projection = state.apply(window.label(), intent).inspect_err(|_| {
+    let projection = state.apply(intent).inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -60,7 +60,7 @@ pub(crate) fn undo_project(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<EditorProjection, String> {
-    let projection = state.undo(window.label())?;
+    let projection = state.undo()?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
@@ -77,7 +77,7 @@ pub(crate) fn redo_project(
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<EditorProjection, String> {
-    let projection = state.redo(window.label())?;
+    let projection = state.redo()?;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),

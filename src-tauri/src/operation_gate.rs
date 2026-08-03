@@ -277,7 +277,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "spawns and terminates a real owner process; executed by Test-OperationGate.ps1"]
     fn independent_hosts_share_one_grant_and_recover_after_owner_process_termination() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the process gate fixture exists");

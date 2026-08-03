@@ -242,6 +242,40 @@ fn keeps_distinct_sample_projects_isolated() {
 }
 
 #[test]
+fn keeps_project_and_media_identities_opaque_to_path_syntax() {
+    let source = SampleProject::Horizon
+        .persisted_source(2)
+        .expect("the sample project serializes")
+        .replace(
+            SampleProject::Horizon.project_id(),
+            "Projeto/\u{00c1}lbum CON",
+        )
+        .replace("media-costa", "Foto/\u{00c1}rvore CON");
+    let project = ProjectCore::new()
+        .open_editable_session(&source)
+        .expect("domain identities do not inherit filesystem restrictions");
+
+    assert_eq!(project.state().project_id, "Projeto/\u{00c1}lbum CON");
+    assert!(
+        project
+            .state()
+            .album
+            .media
+            .iter()
+            .any(|media| media.id == "Foto/\u{00c1}rvore CON")
+    );
+    assert!(
+        project
+            .render_snapshot()
+            .composition
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.referenced_media_ids())
+            .any(|media_id| media_id == "Foto/\u{00c1}rvore CON")
+    );
+}
+
+#[test]
 fn commits_one_domain_revision_for_a_completed_pan_gesture() {
     let mut session = horizon_project(12);
 

@@ -8,13 +8,13 @@ use std::{
 use myalbuns_core::MediaKind;
 use myalbuns_imaging_protocol::{CacheArtifactFormat, IMAGING_PROTOCOL_VERSION};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::AppPaths;
-use serde::Serialize;
+use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{AppHandle, State, WebviewWindow};
 
 use crate::{
     cache_engine::{self, CacheEngine, CacheWork},
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
+    ipc_contract::MediaPreview,
     logging::{LoggingState, log_imaging_failure},
     path_io,
     project_host::ProjectHost,
@@ -22,13 +22,6 @@ use crate::{
 
 static CACHE_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 const CACHE_PREVIEW_MAX_EDGE_PX: u32 = 1600;
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MediaPreview {
-    media_id: String,
-    url: String,
-}
 
 #[tauri::command]
 pub(crate) async fn prepare_media_previews(
@@ -42,7 +35,7 @@ pub(crate) async fn prepare_media_previews(
 ) -> Result<Option<Vec<MediaPreview>>, String> {
     let cache_sequence = CACHE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("cache-{}-{cache_sequence}", std::process::id());
-    let projection = state.projection(window.label())?;
+    let projection = state.projection()?;
     let decorative_media_ids = projection
         .state
         .album
@@ -53,9 +46,9 @@ pub(crate) async fn prepare_media_previews(
         .collect::<HashSet<_>>();
     let project_id = projection.state.project_id;
     let cache_paths = app_paths
-        .project_cache(&project_id)
+        .project_cache(&project_data_namespace(&project_id))
         .map_err(|error| error.to_string())?;
-    let Some(sources) = state.cache_sources(window.label())? else {
+    let Some(sources) = state.cache_sources() else {
         return Ok(None);
     };
     let mut operation_paths = Vec::with_capacity(sources.len() + 1);
@@ -219,7 +212,7 @@ mod tests {
         assert_eq!(
             cache_asset_url(&paths, &preview)
                 .expect("the authorized Cache path becomes an asset URL"),
-            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-001.0123456789abcdef-v1-1600.jpg"
+            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-ddedb0a5b1fd0e11bd569d4b06eec63d02c0e5a272186ce3e2ef6529439afafa.0123456789abcdef-v1-1600.jpg"
         );
     }
 
@@ -239,7 +232,7 @@ mod tests {
         assert_eq!(
             cache_asset_url(&paths, &preview)
                 .expect("the authorized PNG Cache path becomes an asset URL"),
-            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cdecorative-001.0123456789abcdef-v1-1600.png"
+            "http://asset.localhost/C%3A%5CLocal%5CMyAlbuns2%5CCache%5Cproject-01%5CMedia%5Cmedia-12a79c4913ad160c8f60a357adb14fa9ea6a07a156d2feee32b8312e9c00da19.0123456789abcdef-v1-1600.png"
         );
     }
 

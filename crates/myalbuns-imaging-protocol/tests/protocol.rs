@@ -7,7 +7,7 @@ use myalbuns_imaging_protocol::{
     ImagingRequest, ImagingResponse, MediaSource, RenderCompletion, decode_command,
     decode_event_stream, encode_command, encode_event, root_binding_plan_sha256,
 };
-use myalbuns_paths::{AppPaths, OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{AppPaths, CacheArtifactFormat, OperationPathContext, RootBindingPlan};
 
 #[path = "../../../tests/support/sample_project.rs"]
 mod sample_project;
@@ -117,6 +117,10 @@ fn host_and_processor_share_one_serialized_protocol() {
     );
     assert_eq!(request_json["request"]["sheetId"], "lamina-01");
     assert_eq!(request_json["request"]["dpi"], 300);
+    assert!(
+        request_json["request"].get("sourcePolicy").is_none(),
+        "the production protocol has one source contract: linked originals"
+    );
     assert_eq!(
         request_json["request"]["sources"][0]["mediaId"],
         "media-costa"
@@ -147,7 +151,7 @@ fn host_and_processor_share_one_serialized_protocol() {
         "the Processor observes exactly the plan frozen by the operation owner"
     );
     let mut legacy_json = request_json.clone();
-    legacy_json["request"]["protocolVersion"] = serde_json::json!(8);
+    legacy_json["request"]["protocolVersion"] = serde_json::json!(9);
     let legacy_command: ImagingCommand =
         serde_json::from_value(legacy_json).expect("the old wire remains syntactically JSON");
     let ImagingCommand::Render(legacy_request) = legacy_command else {
@@ -155,7 +159,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     };
     assert!(
         legacy_request.validate().is_err(),
-        "protocol 8 is rejected after the native path wire format changed"
+        "protocol 9 is rejected after the render contract became original-only"
     );
     let mut unbound_request = request.clone();
     unbound_request.root_bindings = RootBindingPlan::default();
@@ -164,12 +168,13 @@ fn host_and_processor_share_one_serialized_protocol() {
         "a worker must never resolve a root omitted by the operation owner"
     );
     assert!(
-        ImagingRequest::procedural_fixture(
+        ImagingRequest::new(
             r"C:\private\operation",
             PathBuf::from(r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.png"),
             request.snapshot.clone(),
             "lamina-01",
             25,
+            request.sources.clone(),
             root_bindings,
         )
         .is_err(),
@@ -287,6 +292,45 @@ fn processor_event_stream_rejects_regressive_progress() {
             "the stream-level progress invariant rejects regressions"
         );
     }
+}
+
+#[test]
+fn media_identity_stays_opaque_across_the_protocol_and_cache_paths() {
+    let paths = AppPaths::from_known_folders(
+        PathBuf::from(r"C:\Roaming").as_path(),
+        PathBuf::from(r"C:\Local").as_path(),
+    );
+    let source = MediaSource::new(
+        "Foto/\u{00c1}rvore CON",
+        PathBuf::from(r"C:\Photos\photo.jpg"),
+        1024,
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    .expect("the domain Media identity is not constrained by path syntax");
+    let artifact = paths
+        .project_cache("project-42")
+        .expect("the project Cache namespace is safe")
+        .preview_file(
+            source.media_id(),
+            "aaaaaaaaaaaaaaaa-v1-1600",
+            CacheArtifactFormat::Jpeg,
+        )
+        .expect("the path layer derives an opaque Media artifact key");
+    let artifact_name = artifact
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .expect("the artifact name is textual");
+
+    assert!(artifact_name.starts_with("media-"));
+    assert!(!artifact_name.contains(source.media_id()));
+}
+
+#[test]
+fn cache_reset_rejects_an_empty_project_identity() {
+    assert!(
+        CacheResetRequest::new("reset-empty", vec![" \t".into()]).is_err(),
+        "an impossible Project identity must not derive an internal namespace"
+    );
 }
 
 #[test]

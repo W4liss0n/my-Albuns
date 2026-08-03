@@ -43,32 +43,6 @@ export class ViewportTexturePool {
     return this.entries.get(url)?.texture;
   }
 
-  textureSize(url: string) {
-    const texture = this.entries.get(url)?.texture;
-    return texture ? exactTextureSize(texture) : null;
-  }
-
-  isSettled() {
-    for (const entry of this.entries.values()) {
-      if (entry.desired && !entry.texture && !entry.failed) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  residency() {
-    let count = 0;
-    let pixelCount = 0;
-    for (const entry of this.entries.values()) {
-      if (!entry.texture) continue;
-      count += 1;
-      const size = exactTextureSize(entry.texture);
-      if (size) pixelCount += size.widthPx * size.heightPx;
-    }
-    return { count, pixelCount };
-  }
-
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -115,29 +89,4 @@ export class ViewportTexturePool {
         });
     }
   }
-}
-
-function exactTextureSize(texture: Texture) {
-  const source = texture.source as
-    | {
-        pixelWidth?: unknown;
-        pixelHeight?: unknown;
-      }
-    | undefined;
-  const width = source?.pixelWidth;
-  const height = source?.pixelHeight;
-  if (
-    typeof width !== "number" ||
-    typeof height !== "number" ||
-    !Number.isSafeInteger(width) ||
-    !Number.isSafeInteger(height) ||
-    width <= 0 ||
-    height <= 0
-  ) {
-    return null;
-  }
-  const pixels = width * height;
-  return Number.isSafeInteger(pixels)
-    ? { widthPx: width, heightPx: height }
-    : null;
 }

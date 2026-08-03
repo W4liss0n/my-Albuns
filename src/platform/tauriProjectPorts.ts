@@ -5,41 +5,27 @@ import type {
   ProjectIntent,
 } from "../domain/project";
 import type {
-  ExportCancelStatus,
   ExportPort,
   ExportProgressEvent,
-  ExportProgressStage,
-  ExportProgressUnits,
-  ExportResult,
-  MediaPreview,
   MediaPreviewPort,
   ProjectSessionPort,
 } from "../application/projectPorts";
+import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
+import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
+import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
+import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
+import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 
-type TauriExportEvent =
-  | {
-      event: "started";
-      data: {
-        operationId: string;
-        cancellable: boolean;
-      };
-    }
-  | {
-      event: "progress";
-      data: {
-        operationId: string;
-        stage: ExportProgressStage;
-        units: ExportProgressUnits;
-        cancellable: boolean;
-      };
-    };
-
-function isCancelledExportError(error: unknown): boolean {
+function isCancelledExportError(
+  error: unknown,
+): error is IpcExportCommandError {
   return (
     typeof error === "object" &&
     error !== null &&
     "code" in error &&
-    error.code === "cancelled"
+    error.code === "cancelled" &&
+    "message" in error &&
+    typeof error.message === "string"
   );
 }
 
@@ -54,19 +40,19 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: () =>
-    invoke<MediaPreview[] | null>("prepare_media_previews"),
+    invoke<IpcMediaPreview[] | null>("prepare_media_previews"),
 };
 
 export const tauriExportPort: ExportPort = {
   startPreview: (emitEvent: (event: ExportProgressEvent) => void) => {
-    const onEvent = new Channel<TauriExportEvent>();
+    const onEvent = new Channel<IpcExportEvent>();
     let correlationSettled = false;
     let resolveCorrelation: (operationId: string | null) => void = () =>
       undefined;
     const correlation = new Promise<string | null>((resolve) => {
       resolveCorrelation = resolve;
     });
-    let cancellation: Promise<ExportCancelStatus> | undefined;
+    let cancellation: Promise<IpcCancelDisposition> | undefined;
     const settleCorrelation = (operationId: string | null) => {
       if (correlationSettled) {
         return;
@@ -93,7 +79,7 @@ export const tauriExportPort: ExportPort = {
         cancellable: event.data.cancellable,
       });
     };
-    const completion = invoke<ExportResult>("export_spike", { onEvent })
+    const completion = invoke<IpcExportResult>("export_preview", { onEvent })
       .then((result) => ({
         status: "completed" as const,
         result,
@@ -117,7 +103,7 @@ export const tauriExportPort: ExportPort = {
         cancellation ??= correlation.then((operationId) =>
           operationId === null
             ? "not_found"
-            : invoke<ExportCancelStatus>("cancel_export_spike", {
+            : invoke<IpcCancelDisposition>("cancel_export", {
                 operationId,
               }),
         );

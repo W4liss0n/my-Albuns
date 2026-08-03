@@ -11,15 +11,8 @@
           "undo_project",
           "redo_project",
           "prepare_media_previews",
-          "export_spike",
-          "cancel_export_spike",
-          "topology_benchmark_config",
-          "report_topology_canvas_ready",
-          "report_topology_canvas_benchmark",
-          "report_topology_benchmark_failure",
-          "topology_fault_probe_config",
-          "persist_topology_fault_probe",
-          "report_topology_fault_probe_failure"
+          "export_preview",
+          "cancel_export"
         ],
         "deny": []
       }

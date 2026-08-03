@@ -70,58 +70,30 @@ test("does not retain a texture whose sheet left the viewport while loading", as
   expect(onChange).not.toHaveBeenCalled();
 });
 
-test("settles only after every desired texture has loaded or failed", async () => {
+test("reports a desired texture failure without discarding loaded textures", async () => {
   const onChange = vi.fn();
   const onError = vi.fn();
   const pool = new ViewportTexturePool(onChange, onError);
 
-  expect(pool.isSettled()).toBe(true);
   pool.sync([
     "asset://cache/photo-a.jpg",
     "asset://cache/photo-b.jpg",
   ]);
-  expect(pool.isSettled()).toBe(false);
 
-  assets.pending[0].resolve({ label: "preview-texture" });
+  const texture = { label: "preview-texture" };
+  assets.pending[0].resolve(texture);
   await vi.waitFor(() => {
-    expect(pool.get("asset://cache/photo-a.jpg")).toBeDefined();
+    expect(pool.get("asset://cache/photo-a.jpg")).toBe(texture);
   });
-  expect(pool.isSettled()).toBe(false);
 
   assets.pending[1].reject(new Error("invalid texture"));
   await vi.waitFor(() => {
-    expect(pool.isSettled()).toBe(true);
+    expect(onError).toHaveBeenCalledOnce();
   });
-  expect(onError).toHaveBeenCalledOnce();
   expect(onChange).toHaveBeenCalledTimes(2);
-});
-
-test("reports loaded texture count and only exact valid source pixels", async () => {
-  const pool = new ViewportTexturePool(vi.fn());
-  pool.sync([
+  expect(pool.get("asset://cache/photo-a.jpg")).toBe(texture);
+  expect(assets.loads).toEqual([
     "asset://cache/photo-a.jpg",
     "asset://cache/photo-b.jpg",
-    "asset://cache/photo-c.jpg",
   ]);
-
-  assets.pending[0].resolve({
-    source: { pixelWidth: 1_600, pixelHeight: 1_200 },
-  });
-  assets.pending[1].resolve({
-    source: { pixelWidth: Number.NaN, pixelHeight: 800 },
-  });
-  assets.pending[2].resolve({ label: "source-metadata-unavailable" });
-
-  await vi.waitFor(() => {
-    expect(pool.residency()).toEqual({
-      count: 3,
-      pixelCount: 1_920_000,
-    });
-  });
-  expect(pool.textureSize("asset://cache/photo-a.jpg")).toEqual({
-    widthPx: 1_600,
-    heightPx: 1_200,
-  });
-  expect(pool.textureSize("asset://cache/photo-b.jpg")).toBeNull();
-  expect(pool.textureSize("asset://cache/photo-c.jpg")).toBeNull();
 });

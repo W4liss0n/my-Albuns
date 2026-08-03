@@ -139,30 +139,6 @@ try {
             arguments = @('test', '-p', 'myalbuns-paths', '--test', 'app_paths')
         },
         [ordered]@{
-            name = 'project-opening-guardian-contract'
-            arguments = @(
-                'test',
-                '-p',
-                'myalbuns-desktop',
-                '--lib',
-                'project_opening_guard::tests::'
-            )
-        },
-        [ordered]@{
-            name = 'project-opening-guardian-real-alias'
-            arguments = @(
-                'test',
-                '-p',
-                'myalbuns-desktop',
-                '--lib',
-                'project_opening_guard::tests::real_mapped_drive_and_unc_alias_focus_one_session',
-                '--',
-                '--ignored',
-                '--exact',
-                '--nocapture'
-            )
-        },
-        [ordered]@{
             name = 'real-mapped-unc'
             arguments = @(
                 'test',
@@ -392,12 +368,6 @@ $report = [ordered]@{
     evidence = [ordered]@{
         paths = $pathEvidence
         sidecar = $sidecarEvidence
-        openingGuardian = [ordered]@{
-            mappedAndUncFocusedExisting = $true
-            activeSessionCount = 1
-            indeterminateFailsClosed = $true
-            fileLockRemainsFinal = $true
-        }
         libraryBoundaries = [ordered]@{
             directories = [ordered]@{
                 responsibility = 'known_folder_discovery'
