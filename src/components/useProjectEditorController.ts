@@ -424,6 +424,12 @@ export function useProjectEditorController({
     beginZoomGesture,
     updateZoomGesture,
     finishZoomGesture,
+    applyDpi: async (dpi: number) => {
+      await commitInteraction({
+        kind: "setDpi",
+        dpi,
+      });
+    },
     undo: () =>
       void runWithGlobalFeedback("Desfazendo", (port) =>
         port.undo(),

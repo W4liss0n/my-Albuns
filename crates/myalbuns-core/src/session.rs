@@ -43,6 +43,9 @@ impl ProjectSession {
         };
 
         match intent {
+            ProjectIntent::SetDpi { .. } => {
+                return Err(CoreError::UnsupportedProjectIntent);
+            }
             ProjectIntent::TransformPhoto {
                 frame_id,
                 delta_pan_x,

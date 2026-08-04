@@ -96,6 +96,70 @@
   text-align: right;
 }
 
+.document-settings-group {
+  display: grid;
+  gap: 14px;
+}
+
+.document-settings-group h3 {
+  margin: 0;
+  color: #b7c0c6;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+
+.document-dpi-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.document-dpi-control label {
+  display: grid;
+  min-width: 0;
+  color: #8e989f;
+  font-size: 0.69rem;
+  gap: 6px;
+}
+
+.document-dpi-control input {
+  min-width: 0;
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid #39434b;
+  border-radius: 6px;
+  color: #d1d7db;
+  background: #192027;
+  font: inherit;
+}
+
+.document-dpi-control input[aria-invalid="true"] {
+  border-color: #b76c64;
+}
+
+.document-dpi-control button {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #4a5660;
+  border-radius: 6px;
+  color: #d7dde1;
+  background: #2a333b;
+  font-size: 0.68rem;
+}
+
+.document-dpi-control button:disabled {
+  opacity: 0.5;
+}
+
+.document-dpi-control [role="alert"] {
+  grid-column: 1 / -1;
+  color: #d5958d;
+  font-size: 0.65rem;
+  line-height: 1.35;
+}
+
 .photo-zoom-control {
   display: grid;
   padding-top: 16px;

@@ -1,14 +1,14 @@
 use std::{fs, path::Path};
 
 use myalbuns_core::{
-    ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectError,
+    ActiveSides, Background, BackgroundContent, CoreError, CreateAuthorization, CreateProjectError,
     CreateProjectRequest, DisplayUnit, DocumentFailure, EndSheetFormat, FrameBorder,
     InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
     InitialOverlayContent, InitialProject, InitialProjectConfiguration,
     InitialProjectPersonalization, InitialProjectValidationError as ValidationError,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
-    OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectLocation,
-    ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SheetRole,
+    OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectIntent,
+    ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -1679,6 +1679,234 @@ fn an_open_v1_project_exposes_the_initial_editor_projection_without_demo_content
     );
     assert_eq!(projection.composition.sheets.len(), 2);
     assert!(project.render_snapshot().validate().is_ok());
+}
+
+#[test]
+fn changing_dpi_updates_the_authoritative_projection_without_writing_the_project_file() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("DPI editável.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    let initial_projection = project.projection();
+    let persisted_before = fs::read(&project_path).expect("the initial revision is persisted");
+
+    let projection = project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("a valid DPI change is applied");
+
+    assert_eq!(projection.state.document.dpi, 240);
+    assert_eq!(projection.state.revision, 1);
+    assert_eq!(projection.state.saved_revision, 0);
+    assert!(projection.state.dirty);
+    assert!(projection.state.can_undo);
+    assert!(!projection.state.can_redo);
+    assert_eq!(
+        projection.state.document.display_unit,
+        initial_projection.state.document.display_unit
+    );
+    assert_eq!(
+        projection.state.document.sheet_width_um,
+        initial_projection.state.document.sheet_width_um
+    );
+    assert_eq!(
+        projection.state.document.sheet_height_um,
+        initial_projection.state.document.sheet_height_um
+    );
+    assert_eq!(
+        projection.state.document.bleed_um,
+        initial_projection.state.document.bleed_um
+    );
+    assert_eq!(
+        projection.state.document.safety_um,
+        initial_projection.state.document.safety_um
+    );
+    assert_eq!(projection.state.album, initial_projection.state.album);
+    assert_eq!(projection.composition, initial_projection.composition);
+    assert_eq!(project.project().document().dpi(), 240);
+    assert_eq!(
+        fs::read(&project_path).expect("the persisted revision remains readable"),
+        persisted_before,
+        "a creative action must not write before Save"
+    );
+}
+
+#[test]
+fn invalid_dpi_values_leave_the_session_history_and_project_file_unchanged() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let neutral_path = directory.path().join("DPI inválido.myalbuns");
+    let mut neutral = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&neutral_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the neutral Project opens");
+    let neutral_bytes = fs::read(&neutral_path).expect("the neutral revision is persisted");
+    neutral
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the fixture creates one history entry");
+    let neutral_projection = neutral
+        .undo()
+        .expect("the fixture exposes a Redo branch before invalid input");
+    assert!(neutral_projection.state.can_redo);
+
+    for dpi in [0, 1_201] {
+        assert_eq!(
+            neutral
+                .apply(ProjectIntent::SetDpi { dpi })
+                .expect_err("an out-of-range DPI is rejected"),
+            CoreError::InvalidDpi(dpi)
+        );
+        assert_eq!(neutral.projection(), neutral_projection);
+        assert_eq!(
+            fs::read(&neutral_path).expect("the neutral revision remains readable"),
+            neutral_bytes
+        );
+    }
+    let redone = neutral
+        .redo()
+        .expect("invalid input must not discard the Redo branch");
+    assert_eq!(redone.state.document.dpi, 240);
+    assert_eq!(redone.state.revision, 1);
+    neutral
+        .undo()
+        .expect("the fixture returns to the saved revision");
+    let branched = neutral
+        .apply(ProjectIntent::SetDpi { dpi: 600 })
+        .expect("invalid input must not consume revision identifiers");
+    assert_eq!(branched.state.revision, 2);
+
+    let wide_path = directory.path().join("DPI raster inválido.myalbuns");
+    let mut wide = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&wide_path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                2_000_000,
+                300_000,
+                300,
+                3_000,
+                3_000,
+                2,
+                EndSheetFormat::Double,
+                EndSheetFormat::Double,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the wide Project is structurally valid at its initial DPI");
+    let wide_projection = wide.projection();
+    let wide_bytes = fs::read(&wide_path).expect("the wide revision is persisted");
+
+    assert_eq!(
+        wide.apply(ProjectIntent::SetDpi { dpi: 1_200 })
+            .expect_err("the raster axis would exceed the structural limit"),
+        CoreError::InvalidDpi(1_200)
+    );
+    assert_eq!(wide.projection(), wide_projection);
+    assert_eq!(
+        fs::read(&wide_path).expect("the wide revision remains readable"),
+        wide_bytes
+    );
+}
+
+#[test]
+fn undo_redo_and_a_divergent_dpi_branch_restore_authoritative_revisions() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Histórico de DPI.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    let persisted_before = fs::read(&project_path).expect("the initial revision is persisted");
+
+    let changed = project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the first DPI change is applied");
+    assert_eq!(changed.state.revision, 1);
+
+    let undone = project.undo().expect("the DPI change can be undone");
+    assert_eq!(undone.state.document.dpi, 300);
+    assert_eq!(undone.state.revision, 0);
+    assert_eq!(undone.state.saved_revision, 0);
+    assert!(!undone.state.dirty);
+    assert!(!undone.state.can_undo);
+    assert!(undone.state.can_redo);
+
+    let redone = project.redo().expect("the DPI change can be redone");
+    assert_eq!(redone.state.document.dpi, 240);
+    assert_eq!(redone.state.revision, 1);
+    assert!(redone.state.dirty);
+    assert!(redone.state.can_undo);
+    assert!(!redone.state.can_redo);
+
+    project
+        .undo()
+        .expect("the history returns to its saved root");
+    let branched = project
+        .apply(ProjectIntent::SetDpi { dpi: 600 })
+        .expect("a divergent DPI change is applied");
+    assert_eq!(branched.state.document.dpi, 600);
+    assert_eq!(branched.state.revision, 2);
+    assert_eq!(branched.state.saved_revision, 0);
+    assert!(branched.state.dirty);
+    assert!(branched.state.can_undo);
+    assert!(!branched.state.can_redo);
+    assert!(
+        project.redo().is_none(),
+        "the abandoned branch is discarded"
+    );
+    assert_eq!(
+        fs::read(&project_path).expect("the persisted revision remains readable"),
+        persisted_before
+    );
+}
+
+#[test]
+fn exhausting_the_safe_revision_range_rejects_dpi_before_mutation() {
+    const MAX_SAFE_REVISION: u64 = 9_007_199_254_740_991;
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Revisão máxima.myalbuns");
+    let bytes = replace_literal_once(
+        NEUTRAL_PROJECT_V1,
+        "\"revision\": 0",
+        "\"revision\": 9007199254740991",
+    );
+    fs::write(&project_path, &bytes).expect("the maximal public revision is written");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the maximal public revision opens");
+
+    assert_eq!(
+        project
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect_err("the revision range is exhausted before mutation"),
+        CoreError::RevisionSpaceExhausted
+    );
+    let projection = project.projection();
+    assert_eq!(projection.state.document.dpi, 300);
+    assert_eq!(projection.state.revision, MAX_SAFE_REVISION);
+    assert_eq!(projection.state.saved_revision, MAX_SAFE_REVISION);
+    assert!(!projection.state.dirty);
+    assert!(!projection.state.can_undo);
+    assert!(!projection.state.can_redo);
+    assert!(project.render_snapshot().validate().is_ok());
+    assert_eq!(
+        fs::read(&project_path).expect("the maximal revision remains readable"),
+        bytes
+    );
 }
 
 #[test]

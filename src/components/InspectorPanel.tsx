@@ -13,6 +13,7 @@ import {
   readInspectorSectionPreference,
   writeInspectorSectionPreference,
 } from "../state/workspacePreferences";
+import { DocumentDpiControl } from "./DocumentDpiControl";
 import { SheetPreview } from "./SheetPreview";
 import "./InspectorPanel.css";
 
@@ -43,6 +44,7 @@ export interface InspectorPanelProps {
   onBeginPhotoZoom(): void;
   onUpdatePhotoZoom(value: number): void;
   onFinishPhotoZoom(): void | Promise<void>;
+  onApplyDpi(dpi: number): void | Promise<void>;
   onNavigateToSheet(sheetId: string): void;
 }
 
@@ -62,6 +64,7 @@ export function InspectorPanel({
   onBeginPhotoZoom,
   onUpdatePhotoZoom,
   onFinishPhotoZoom,
+  onApplyDpi,
   onNavigateToSheet,
 }: InspectorPanelProps) {
   return (
@@ -192,6 +195,19 @@ export function InspectorPanel({
                   document.displayUnit,
                 )}
               />
+            </InspectorSection>
+            <InspectorSection
+              key="album-design"
+              title="Design do Álbum"
+              preferenceKey="album.design"
+            >
+              <div className="document-settings-group">
+                <h3>Documento</h3>
+                <DocumentDpiControl
+                  dpi={document.dpi}
+                  onApplyDpi={onApplyDpi}
+                />
+              </div>
             </InspectorSection>
             <InspectorSection
               key="album-sheet-grid"

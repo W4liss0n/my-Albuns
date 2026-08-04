@@ -1,9 +1,13 @@
-use crate::project_document::{ProjectDocument, ProjectRevision};
+use crate::{
+    model::{CoreError, ProjectIntent},
+    project_document::{MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
+};
 use uuid::Uuid;
 
 #[derive(Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
+    latest_revision: u64,
     saved_revision: u64,
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
@@ -12,8 +16,10 @@ pub(crate) struct PersistentProjectSession {
 impl PersistentProjectSession {
     pub(crate) fn from_persisted(current: ProjectRevision) -> Self {
         let saved_revision = current.revision;
+        let latest_revision = current.revision;
         Self {
             current,
+            latest_revision,
             saved_revision,
             undo: Vec::new(),
             redo: Vec::new(),
@@ -46,5 +52,44 @@ impl PersistentProjectSession {
 
     pub(crate) fn can_redo(&self) -> bool {
         !self.redo.is_empty()
+    }
+
+    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<(), CoreError> {
+        let next_revision = self
+            .latest_revision
+            .checked_add(1)
+            .filter(|revision| *revision <= MAX_SAFE_INTEGER)
+            .ok_or(CoreError::RevisionSpaceExhausted)?;
+        let project = match intent {
+            ProjectIntent::SetDpi { dpi } => self
+                .current
+                .project
+                .with_dpi(dpi)
+                .map_err(|()| CoreError::InvalidDpi(dpi))?,
+            ProjectIntent::TransformPhoto { .. }
+            | ProjectIntent::FillLeftmostPlaceholder { .. } => {
+                return Err(CoreError::UnsupportedProjectIntent);
+            }
+        };
+
+        self.undo.push(self.current.clone());
+        self.redo.clear();
+        self.current = ProjectRevision::new(self.current.project_id, next_revision, project);
+        self.latest_revision = next_revision;
+        Ok(())
+    }
+
+    pub(crate) fn undo(&mut self) -> Option<()> {
+        let previous = self.undo.pop()?;
+        let current = std::mem::replace(&mut self.current, previous);
+        self.redo.push(current);
+        Some(())
+    }
+
+    pub(crate) fn redo(&mut self) -> Option<()> {
+        let next = self.redo.pop()?;
+        let current = std::mem::replace(&mut self.current, next);
+        self.undo.push(current);
+        Some(())
     }
 }

@@ -260,6 +260,13 @@ impl ProjectDocument {
             sheets,
         }
     }
+
+    pub(crate) fn with_dpi(&self, dpi: u32) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        candidate.document.dpi = dpi;
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -31,6 +31,7 @@ pub(crate) fn apply_project_intent(
     state: State<'_, ProjectHost>,
 ) -> Result<EditorProjection, String> {
     let intent_kind = match &intent {
+        ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
     };

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::{
     composition::build_render_snapshot,
-    model::{EditorProjection, RenderSnapshot},
+    model::{CoreError, EditorProjection, ProjectIntent, RenderSnapshot},
     persistent_projection,
     persistent_session::PersistentProjectSession,
     project::ProjectCore,
@@ -154,6 +154,21 @@ impl EditableProject {
             projection.state.revision,
             &projection.state.album,
         )
+    }
+
+    pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorProjection, CoreError> {
+        self.session.apply(intent)?;
+        Ok(self.projection())
+    }
+
+    pub fn undo(&mut self) -> Option<EditorProjection> {
+        self.session.undo()?;
+        Some(self.projection())
+    }
+
+    pub fn redo(&mut self) -> Option<EditorProjection> {
+        self.session.redo()?;
+        Some(self.projection())
     }
 }
 

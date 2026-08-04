@@ -147,6 +147,7 @@ export function ProjectWorkspace({
           onBeginPhotoZoom={controller.beginZoomGesture}
           onUpdatePhotoZoom={controller.updateZoomGesture}
           onFinishPhotoZoom={controller.finishZoomGesture}
+          onApplyDpi={controller.applyDpi}
           onNavigateToSheet={controller.navigateToSheet}
         />
 

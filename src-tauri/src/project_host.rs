@@ -22,16 +22,22 @@ impl ProjectHost {
         Ok(self.project()?.projection())
     }
 
-    pub(crate) fn apply(&self, _intent: ProjectIntent) -> Result<EditorProjection, String> {
-        Err("A edição criativa do Documento v1 entra nos próximos cortes da fase.".into())
+    pub(crate) fn apply(&self, intent: ProjectIntent) -> Result<EditorProjection, String> {
+        self.project()?
+            .apply(intent)
+            .map_err(|error| error.to_string())
     }
 
     pub(crate) fn undo(&self) -> Result<EditorProjection, String> {
-        Err("Não há uma ação produtiva para desfazer neste corte.".into())
+        self.project()?
+            .undo()
+            .ok_or_else(|| "Não há uma ação produtiva para desfazer neste corte.".into())
     }
 
     pub(crate) fn redo(&self) -> Result<EditorProjection, String> {
-        Err("Não há uma ação produtiva para refazer neste corte.".into())
+        self.project()?
+            .redo()
+            .ok_or_else(|| "Não há uma ação produtiva para refazer neste corte.".into())
     }
 
     pub(crate) fn render_snapshot(&self) -> Result<RenderSnapshot, String> {
@@ -82,7 +88,7 @@ mod tests {
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
         InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
-        ProjectCore, ProjectLocation,
+        ProjectCore, ProjectIntent, ProjectLocation,
     };
     use myalbuns_paths::OperationPathContext;
 
@@ -152,6 +158,41 @@ mod tests {
                 .expect("a neutral sheet needs no original sources"),
             Vec::new()
         );
+    }
+
+    #[test]
+    fn delegates_dpi_changes_and_history_to_the_productive_editable_project() {
+        let fixture = fixture();
+
+        let applied = fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the productive Host applies the DPI change");
+        assert_eq!(applied.state.document.dpi, 240);
+        assert_eq!(applied.state.revision, 1);
+        assert!(applied.state.dirty);
+        assert!(applied.state.can_undo);
+        assert!(!applied.state.can_redo);
+
+        let undone = fixture
+            .host
+            .undo()
+            .expect("the productive Host undoes the DPI change");
+        assert_eq!(undone.state.document.dpi, 300);
+        assert_eq!(undone.state.revision, 0);
+        assert!(!undone.state.dirty);
+        assert!(!undone.state.can_undo);
+        assert!(undone.state.can_redo);
+
+        let redone = fixture
+            .host
+            .redo()
+            .expect("the productive Host redoes the DPI change");
+        assert_eq!(redone.state.document.dpi, 240);
+        assert_eq!(redone.state.revision, 1);
+        assert!(redone.state.dirty);
+        assert!(redone.state.can_undo);
+        assert!(!redone.state.can_redo);
     }
 
     #[test]

@@ -360,6 +360,74 @@ test("shows the physical configuration projected from the opened Project", () =>
   );
 });
 
+test("applies one DPI change and renders the authoritative projection returned by the Project", async () => {
+  const initialProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: 0,
+      savedRevision: 0,
+      dirty: false,
+      canUndo: false,
+      canRedo: false,
+    },
+  };
+  const changedProjection: EditorProjection = {
+    ...initialProjection,
+    state: {
+      ...initialProjection.state,
+      document: {
+        ...initialProjection.state.document,
+        dpi: 600,
+      },
+      revision: 1,
+      dirty: true,
+      canUndo: true,
+    },
+  };
+  const apply = vi.fn(async () => changedProjection);
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  const onProjectionChange = vi.fn();
+
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={initialProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Design do Álbum" }));
+  const input = screen.getByRole("textbox", { name: "DPI" });
+  fireEvent.change(input, { target: { value: "600" } });
+  expect(apply).not.toHaveBeenCalled();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar DPI" }));
+    await Promise.resolve();
+  });
+
+  expect(apply).toHaveBeenCalledOnce();
+  expect(apply).toHaveBeenCalledWith({ kind: "setDpi", dpi: 600 });
+  expect(onProjectionChange).toHaveBeenCalledWith(changedProjection);
+
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={changedProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(screen.getByText("Resolução").parentElement).toHaveTextContent(
+    "600 DPI",
+  );
+  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
 test("renders each Grade item from its own composed sheet", () => {
   render(
     <ProjectWorkspace

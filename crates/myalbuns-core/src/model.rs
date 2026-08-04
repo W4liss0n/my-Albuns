@@ -470,6 +470,9 @@ impl RenderSnapshot {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    SetDpi {
+        dpi: u32,
+    },
     TransformPhoto {
         frame_id: String,
         delta_pan_x: f32,
@@ -484,6 +487,12 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("O DPI {0} não é válido para as dimensões atuais do Projeto")]
+    InvalidDpi(u32),
+    #[error("A Sessão do Projeto esgotou o intervalo seguro de Revisões")]
+    RevisionSpaceExhausted,
+    #[error("A intenção não é compatível com o Documento de Projeto v1")]
+    UnsupportedProjectIntent,
     #[error("Frame não encontrado: {0}")]
     FrameNotFound(String),
     #[error("O Frame não contém uma Foto: {0}")]
