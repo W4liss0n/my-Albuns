@@ -2,8 +2,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
+use crate::project_document::{DisplayUnit, DocumentSettings};
+
 pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 3;
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 2;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 3;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -133,6 +135,32 @@ pub enum SheetRole {
     Final,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectedDisplayUnit {
+    Mm,
+    Cm,
+    In,
+}
+
+impl ProjectedDisplayUnit {
+    fn from_domain(display_unit: DisplayUnit) -> Self {
+        match display_unit {
+            DisplayUnit::Mm => Self::Mm,
+            DisplayUnit::Cm => Self::Cm,
+            DisplayUnit::In => Self::In,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectedActiveSides {
+    Both,
+    Left,
+    Right,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum MediaKind {
@@ -146,6 +174,7 @@ pub struct SheetSnapshot {
     pub id: String,
     pub number: usize,
     pub role: SheetRole,
+    pub active_sides: ProjectedActiveSides,
     pub width_um: i64,
     pub height_um: i64,
     pub frames: Vec<FrameSnapshot>,
@@ -172,9 +201,38 @@ pub struct AlbumSnapshot {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct DocumentSnapshot {
+    pub display_unit: ProjectedDisplayUnit,
+    pub sheet_width_um: u64,
+    pub sheet_height_um: u64,
+    pub dpi: u32,
+    pub bleed_um: u64,
+    pub safety_um: u64,
+}
+
+impl DocumentSnapshot {
+    pub(crate) fn from_settings(settings: &DocumentSettings) -> Self {
+        Self {
+            display_unit: ProjectedDisplayUnit::from_domain(settings.display_unit()),
+            sheet_width_um: settings.sheet_width_um(),
+            sheet_height_um: settings.sheet_height_um(),
+            dpi: settings.dpi(),
+            bleed_um: settings.bleed_um(),
+            safety_um: settings.safety_um(),
+        }
+    }
+
+    pub(crate) fn neutral() -> Self {
+        Self::from_settings(&DocumentSettings::neutral())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct EditorState {
     pub project_id: String,
     pub project_name: String,
+    pub document: DocumentSnapshot,
     pub album: AlbumSnapshot,
     pub revision: u64,
     pub saved_revision: u64,
@@ -217,6 +275,7 @@ pub struct ComposedDecorative {
 pub struct ComposedSheet {
     pub sheet_id: String,
     pub number: usize,
+    pub active_sides: ProjectedActiveSides,
     pub width_um: i64,
     pub height_um: i64,
     pub overlay: Option<ComposedDecorative>,

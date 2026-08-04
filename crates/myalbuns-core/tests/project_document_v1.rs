@@ -2,10 +2,11 @@ use std::{fs, path::Path};
 
 use myalbuns_core::{
     ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectError,
-    CreateProjectRequest, DisplayUnit, DocumentFailure, FrameBorder, InitialProject,
+    CreateProjectRequest, DisplayUnit, DocumentFailure, EndSheetFormat, FrameBorder,
+    InitialProject, InitialProjectConfiguration, InitialProjectValidationError as ValidationError,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
     OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectLocation,
-    SheetRole,
+    ProjectedActiveSides, ProjectedDisplayUnit, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -728,6 +729,641 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
     assert_eq!(reopened.revision(), 0);
     assert_eq!(reopened.saved_revision(), 0);
     assert!(!reopened.has_unsaved_changes());
+}
+
+#[test]
+fn configured_project_round_trips_physical_settings_and_album_structure() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("configurado.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let configuration = InitialProjectConfiguration::new(
+        DisplayUnit::Cm,
+        508_000,
+        254_000,
+        240,
+        1_270,
+        2_540,
+        5,
+        EndSheetFormat::SinglePage,
+        EndSheetFormat::Double,
+    );
+
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::configured(configuration),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the configured Project is created");
+
+    assert_eq!(created.project().document().display_unit(), DisplayUnit::Cm);
+    assert_eq!(created.project().document().sheet_width_um(), 508_000);
+    assert_eq!(created.project().document().sheet_height_um(), 254_000);
+    assert_eq!(created.project().document().dpi(), 240);
+    assert_eq!(created.project().document().bleed_um(), 1_270);
+    assert_eq!(created.project().document().safety_um(), 2_540);
+    assert_eq!(created.project().sheets().len(), 5);
+    assert_eq!(
+        created.project().sheets()[0].active_sides(),
+        ActiveSides::Right
+    );
+    assert!(
+        created.project().sheets()[1..4]
+            .iter()
+            .all(|sheet| sheet.active_sides() == ActiveSides::Both)
+    );
+    assert_eq!(
+        created.project().sheets()[4].active_sides(),
+        ActiveSides::Both
+    );
+    let projection = created.projection();
+    assert_eq!(
+        projection.state.document.display_unit,
+        ProjectedDisplayUnit::Cm
+    );
+    assert_eq!(projection.state.document.sheet_width_um, 508_000);
+    assert_eq!(projection.state.document.sheet_height_um, 254_000);
+    assert_eq!(projection.state.document.dpi, 240);
+    assert_eq!(projection.state.document.bleed_um, 1_270);
+    assert_eq!(projection.state.document.safety_um, 2_540);
+    assert_eq!(
+        projection.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    assert_eq!(
+        projection.composition.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    assert_eq!(projection.composition.sheets[0].width_um, 508_000);
+    let projected_json = serde_json::to_value(&projection).expect("projection serializes");
+    assert_eq!(projected_json["state"]["document"]["displayUnit"], "cm");
+    assert_eq!(
+        projected_json["state"]["album"]["sheets"][0]["activeSides"],
+        "right"
+    );
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the configured Project reopens");
+    assert_eq!(
+        reopened.project().document().display_unit(),
+        DisplayUnit::Cm
+    );
+    assert_eq!(reopened.project().document().sheet_width_um(), 508_000);
+    assert_eq!(reopened.project().document().sheet_height_um(), 254_000);
+    assert_eq!(reopened.project().document().dpi(), 240);
+    assert_eq!(reopened.project().document().bleed_um(), 1_270);
+    assert_eq!(reopened.project().document().safety_um(), 2_540);
+    assert_eq!(
+        reopened
+            .project()
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.active_sides())
+            .collect::<Vec<_>>(),
+        vec![
+            ActiveSides::Right,
+            ActiveSides::Both,
+            ActiveSides::Both,
+            ActiveSides::Both,
+            ActiveSides::Both,
+        ]
+    );
+}
+
+#[test]
+fn configured_project_maps_every_end_sheet_combination_and_keeps_internal_sheets_double() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let cases = [
+        (
+            EndSheetFormat::Double,
+            EndSheetFormat::Double,
+            ActiveSides::Both,
+            ActiveSides::Both,
+        ),
+        (
+            EndSheetFormat::Double,
+            EndSheetFormat::SinglePage,
+            ActiveSides::Both,
+            ActiveSides::Left,
+        ),
+        (
+            EndSheetFormat::SinglePage,
+            EndSheetFormat::Double,
+            ActiveSides::Right,
+            ActiveSides::Both,
+        ),
+        (
+            EndSheetFormat::SinglePage,
+            EndSheetFormat::SinglePage,
+            ActiveSides::Right,
+            ActiveSides::Left,
+        ),
+    ];
+
+    for (index, (first_format, last_format, first_sides, last_sides)) in
+        cases.into_iter().enumerate()
+    {
+        let project_path = directory
+            .path()
+            .join(format!("extremidades-{index}.myalbuns"));
+        let project = ProjectCore::new()
+            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::configured(InitialProjectConfiguration::new(
+                    DisplayUnit::Mm,
+                    600_000,
+                    300_000,
+                    300,
+                    3_000,
+                    3_000,
+                    4,
+                    first_format,
+                    last_format,
+                )),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the end-sheet combination is valid");
+
+        assert_eq!(
+            project
+                .project()
+                .sheets()
+                .iter()
+                .map(|sheet| sheet.active_sides())
+                .collect::<Vec<_>>(),
+            vec![
+                first_sides,
+                ActiveSides::Both,
+                ActiveSides::Both,
+                last_sides
+            ]
+        );
+        let unique_ids = project
+            .project()
+            .sheets()
+            .iter()
+            .map(|sheet| sheet.id())
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(
+            unique_ids.len(),
+            4,
+            "the core owns sheet identity generation"
+        );
+    }
+}
+
+#[test]
+fn display_unit_does_not_change_authoritative_physical_values() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+
+    for (index, display_unit) in [DisplayUnit::Mm, DisplayUnit::Cm, DisplayUnit::In]
+        .into_iter()
+        .enumerate()
+    {
+        let project_path = directory.path().join(format!("unidade-{index}.myalbuns"));
+        let project = ProjectCore::new()
+            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::configured(InitialProjectConfiguration::new(
+                    display_unit,
+                    508_000,
+                    254_000,
+                    300,
+                    1_270,
+                    2_540,
+                    2,
+                    EndSheetFormat::Double,
+                    EndSheetFormat::Double,
+                )),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("displayUnit does not reinterpret micrometers");
+
+        assert_eq!(project.project().document().display_unit(), display_unit);
+        assert_eq!(project.project().document().sheet_width_um(), 508_000);
+        assert_eq!(project.project().document().sheet_height_um(), 254_000);
+        assert_eq!(project.project().document().bleed_um(), 1_270);
+        assert_eq!(project.project().document().safety_um(), 2_540);
+    }
+}
+
+#[test]
+fn bleed_and_safety_accept_zero_independently() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+
+    for (index, (bleed_um, safety_um)) in [(0, 3_000), (3_000, 0)].into_iter().enumerate() {
+        let project_path = directory.path().join(format!("margens-{index}.myalbuns"));
+        let project = ProjectCore::new()
+            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::configured(InitialProjectConfiguration::new(
+                    DisplayUnit::Mm,
+                    600_000,
+                    300_000,
+                    300,
+                    bleed_um,
+                    safety_um,
+                    2,
+                    EndSheetFormat::Double,
+                    EndSheetFormat::Double,
+                )),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("zero is valid for either technical area");
+
+        assert_eq!(
+            project.project().document().bleed_um(),
+            u64::try_from(bleed_um).expect("valid bleed")
+        );
+        assert_eq!(
+            project.project().document().safety_um(),
+            u64::try_from(safety_um).expect("valid safety")
+        );
+    }
+}
+
+#[test]
+fn invalid_initial_configuration_has_no_file_or_identity_lease_effects() {
+    const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let cases = [
+        (
+            "negative-width",
+            -1,
+            300_000,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetWidthNotPositive,
+        ),
+        (
+            "zero-width",
+            0,
+            300_000,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetWidthNotPositive,
+        ),
+        (
+            "width-above-safe-integer",
+            MAX_SAFE_INTEGER + 1,
+            300_000,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetWidthAboveSafeInteger,
+        ),
+        (
+            "odd-width",
+            600_001,
+            300_000,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetWidthNotEven,
+        ),
+        (
+            "sheet-raster-too-wide",
+            1_400_000,
+            300_000,
+            1_200,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetWidthRasterOutOfRange,
+        ),
+        (
+            "page-raster-is-zero",
+            12_700,
+            25_400,
+            1,
+            0,
+            0,
+            2,
+            ValidationError::SheetWidthRasterOutOfRange,
+        ),
+        (
+            "negative-height",
+            600_000,
+            -1,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetHeightNotPositive,
+        ),
+        (
+            "zero-height",
+            600_000,
+            0,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetHeightNotPositive,
+        ),
+        (
+            "height-above-safe-integer",
+            600_000,
+            MAX_SAFE_INTEGER + 1,
+            300,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetHeightAboveSafeInteger,
+        ),
+        (
+            "sheet-raster-too-tall",
+            600_000,
+            1_400_000,
+            1_200,
+            3_000,
+            3_000,
+            2,
+            ValidationError::SheetHeightRasterOutOfRange,
+        ),
+        (
+            "zero-dpi",
+            600_000,
+            300_000,
+            0,
+            3_000,
+            3_000,
+            2,
+            ValidationError::DpiOutOfRange,
+        ),
+        (
+            "dpi-above-v1",
+            600_000,
+            300_000,
+            1_201,
+            3_000,
+            3_000,
+            2,
+            ValidationError::DpiOutOfRange,
+        ),
+        (
+            "one-sheet",
+            600_000,
+            300_000,
+            300,
+            3_000,
+            3_000,
+            1,
+            ValidationError::SheetCountTooSmall,
+        ),
+        (
+            "negative-bleed",
+            600_000,
+            300_000,
+            300,
+            -1,
+            3_000,
+            2,
+            ValidationError::BleedNegative,
+        ),
+        (
+            "bleed-above-safe-integer",
+            600_000,
+            300_000,
+            300,
+            MAX_SAFE_INTEGER + 1,
+            3_000,
+            2,
+            ValidationError::BleedAboveSafeInteger,
+        ),
+        (
+            "bleed-eliminates-page",
+            600_000,
+            300_000,
+            300,
+            300_000,
+            0,
+            2,
+            ValidationError::BleedEliminatesCutArea,
+        ),
+        (
+            "bleed-eliminates-height",
+            600_000,
+            300_000,
+            300,
+            150_000,
+            0,
+            2,
+            ValidationError::BleedEliminatesCutArea,
+        ),
+        (
+            "negative-safety",
+            600_000,
+            300_000,
+            300,
+            3_000,
+            -1,
+            2,
+            ValidationError::SafetyNegative,
+        ),
+        (
+            "safety-above-safe-integer",
+            600_000,
+            300_000,
+            300,
+            3_000,
+            MAX_SAFE_INTEGER + 1,
+            2,
+            ValidationError::SafetyAboveSafeInteger,
+        ),
+        (
+            "safety-eliminates-page",
+            600_000,
+            300_000,
+            300,
+            3_000,
+            297_000,
+            2,
+            ValidationError::SafetyEliminatesSafeArea,
+        ),
+        (
+            "safety-eliminates-height",
+            600_000,
+            300_000,
+            300,
+            3_000,
+            147_000,
+            2,
+            ValidationError::SafetyEliminatesSafeArea,
+        ),
+    ];
+
+    for (
+        index,
+        (case, width_um, height_um, dpi, bleed_um, safety_um, sheet_count, expected_error),
+    ) in cases.into_iter().enumerate()
+    {
+        let project_path = directory.path().join(format!("invalid-{index}.myalbuns"));
+        let lease_root = directory.path().join(format!("leases-{index}"));
+        let configuration = InitialProjectConfiguration::new(
+            DisplayUnit::Mm,
+            width_um,
+            height_um,
+            dpi,
+            bleed_um,
+            safety_um,
+            sheet_count,
+            EndSheetFormat::Double,
+            EndSheetFormat::Double,
+        );
+        assert_eq!(
+            configuration.validation_errors(),
+            vec![expected_error],
+            "{case}"
+        );
+        let error = ProjectCore::new()
+            .with_identity_lease_root(lease_root.clone())
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::configured(configuration),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect_err(case);
+
+        assert_eq!(error, CreateProjectError::InvalidInitialProject, "{case}");
+        assert!(!project_path.exists(), "{case}: no Project is published");
+        assert!(
+            !lease_root.exists(),
+            "{case}: no identity lease root is created"
+        );
+    }
+}
+
+#[test]
+fn initial_configuration_reports_independent_field_errors_in_form_order() {
+    let configuration = InitialProjectConfiguration::new(
+        DisplayUnit::Mm,
+        -2,
+        -1,
+        0,
+        -3,
+        -4,
+        1,
+        EndSheetFormat::Double,
+        EndSheetFormat::Double,
+    );
+
+    assert_eq!(
+        configuration.validation_errors(),
+        vec![
+            ValidationError::SheetWidthNotPositive,
+            ValidationError::SheetHeightNotPositive,
+            ValidationError::DpiOutOfRange,
+            ValidationError::SheetCountTooSmall,
+            ValidationError::BleedNegative,
+            ValidationError::SafetyNegative,
+        ]
+    );
+}
+
+#[test]
+fn an_unreservable_sheet_count_is_rejected_without_inventing_a_functional_maximum() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("quantidade-irreservavel.myalbuns");
+    let lease_root = directory.path().join("leases");
+    let configuration = InitialProjectConfiguration::new(
+        DisplayUnit::Mm,
+        600_000,
+        300_000,
+        300,
+        3_000,
+        3_000,
+        i64::MAX,
+        EndSheetFormat::Double,
+        EndSheetFormat::Double,
+    );
+    assert!(configuration.validation_errors().is_empty());
+
+    assert_eq!(
+        ProjectCore::new()
+            .with_identity_lease_root(lease_root.clone())
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::configured(configuration),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect_err("the fallible reservation rejects an impossible capacity"),
+        CreateProjectError::InvalidInitialProject
+    );
+    assert!(!project_path.exists());
+    assert!(!lease_root.exists());
+}
+
+#[test]
+fn horizontal_technical_areas_may_reach_one_micrometer_before_the_page_center() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("limiar-horizontal.myalbuns");
+    let project = ProjectCore::new()
+        .with_identity_lease_root(directory.path().join("leases"))
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                600,
+                600,
+                1_200,
+                100,
+                199,
+                2,
+                EndSheetFormat::Double,
+                EndSheetFormat::Double,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("only the outer page edge receives technical areas");
+
+    assert_eq!(project.project().document().sheet_width_um() / 2, 300);
+    assert_eq!(project.project().document().bleed_um(), 100);
+    assert_eq!(project.project().document().safety_um(), 199);
+}
+
+#[test]
+fn structurally_valid_configuration_is_not_rejected_by_the_export_memory_guardrail() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("alta-resolucao.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Cm,
+                600_000,
+                300_000,
+                1_200,
+                3_000,
+                3_000,
+                2,
+                EndSheetFormat::Double,
+                EndSheetFormat::Double,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the document does not inherit a transient export memory limit");
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the structurally valid high-resolution document reopens");
+    assert_eq!(reopened.project().document().dpi(), 1_200);
+    assert_eq!(reopened.project().document().sheet_width_um(), 600_000);
+    assert_eq!(reopened.project().document().sheet_height_um(), 300_000);
 }
 
 #[test]

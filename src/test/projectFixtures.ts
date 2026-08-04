@@ -8,6 +8,14 @@ export const representativeProjection: EditorProjection = {
   state: {
     projectId: "project-spike-001",
     projectName: "Álbum Horizonte",
+    document: {
+      displayUnit: "mm",
+      sheetWidthUm: 600_000,
+      sheetHeightUm: 300_000,
+      dpi: 300,
+      bleedUm: 3_000,
+      safetyUm: 3_000,
+    },
     revision: 25,
     savedRevision: 0,
     dirty: true,
@@ -19,6 +27,7 @@ export const representativeProjection: EditorProjection = {
           id: "sheet-001",
           number: 1,
           role: "initial",
+          activeSides: "both",
           widthUm: 600_000,
           heightUm: 300_000,
           overlayMediaId: null,
@@ -80,6 +89,7 @@ export const representativeProjection: EditorProjection = {
       {
         sheetId: "sheet-001",
         number: 1,
+        activeSides: "both",
         widthUm: 600_000,
         heightUm: 300_000,
         overlay: null,

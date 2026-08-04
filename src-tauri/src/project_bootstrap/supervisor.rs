@@ -9,7 +9,7 @@ use std::{
 
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
-    InitialProjectPreset, TargetAuthority, TerminalValidationError, ValidatedTerminal,
+    InitialProjectConfiguration, TargetAuthority, TerminalValidationError, ValidatedTerminal,
     validate_terminal,
 };
 
@@ -62,13 +62,13 @@ impl ProjectHostBootstrap {
     pub(crate) fn create(
         &self,
         authority: TargetAuthority,
-        preset: InitialProjectPreset,
+        configuration: InitialProjectConfiguration,
         authorization: CreateWriteAuthorization,
     ) -> Result<ReadyHost, BootstrapFailure> {
         let request = new_request(
             authority,
             BootstrapIntent::CreateNew {
-                preset,
+                configuration,
                 authorization,
             },
         )?;
@@ -260,6 +260,11 @@ mod tests {
 
     use myalbuns_paths::{NativePathDto, OperationPathContext, RootBindingPlan};
 
+    use super::super::configuration::{
+        InitialDisplayUnit, InitialDocumentConfiguration, InitialSheetFormat,
+        InitialStructureConfiguration,
+    };
+
     use super::*;
 
     fn authority(path: PathBuf) -> TargetAuthority {
@@ -342,12 +347,27 @@ mod tests {
     }
 
     #[test]
-    fn create_request_freezes_its_preset_and_write_authorization() {
+    fn create_request_freezes_its_configuration_and_write_authorization() {
         let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Novo.myalbuns");
+        let configuration = InitialProjectConfiguration {
+            document: InitialDocumentConfiguration {
+                display_unit: InitialDisplayUnit::Cm,
+                sheet_width_um: 508_000,
+                sheet_height_um: 254_000,
+                dpi: 240,
+                bleed_um: 4_000,
+                safety_um: 7_500,
+            },
+            structure: InitialStructureConfiguration {
+                sheet_count: 3,
+                first_sheet: InitialSheetFormat::SinglePage,
+                last_sheet: InitialSheetFormat::Double,
+            },
+        };
         let request = new_request(
             authority(target.clone()),
             BootstrapIntent::CreateNew {
-                preset: InitialProjectPreset::NeutralV1,
+                configuration,
                 authorization: CreateWriteAuthorization::ReplaceConfirmed,
             },
         )
@@ -356,7 +376,7 @@ mod tests {
         assert_eq!(
             request.intent,
             BootstrapIntent::CreateNew {
-                preset: InitialProjectPreset::NeutralV1,
+                configuration,
                 authorization: CreateWriteAuthorization::ReplaceConfirmed,
             }
         );

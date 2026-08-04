@@ -136,7 +136,12 @@ export function GlobalShell({ projectPort }: GlobalShellProps) {
       {isCreating ? (
         <NewProjectFlow
           onCancel={() => setIsCreating(false)}
-          onCreate={(preset) => projectPort.createProject(preset)}
+          onCreate={(configuration) =>
+            projectPort.createProject(configuration)
+          }
+          onValidate={(configuration) =>
+            projectPort.validateProjectConfiguration(configuration)
+          }
         />
       ) : null}
     </>

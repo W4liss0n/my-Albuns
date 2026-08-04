@@ -123,15 +123,17 @@ export function createSheetRenderNode(
   label.position.set(2, -SHEET_LABEL_HEIGHT_PX);
   sheetContainer.addChild(label);
 
-  const centerLine = new Graphics()
-    .moveTo(width / 2, 0)
-    .lineTo(width / 2, height)
-    .stroke({
-      color: hexToNumber(SHEET_VISUAL_STYLE.centerLine.color),
-      width: SHEET_VISUAL_STYLE.centerLine.widthPx,
-      alpha: SHEET_VISUAL_STYLE.centerLine.opacity,
-    });
-  sheetContainer.addChild(centerLine);
+  if (sheet.activeSides === "both") {
+    const centerLine = new Graphics()
+      .moveTo(width / 2, 0)
+      .lineTo(width / 2, height)
+      .stroke({
+        color: hexToNumber(SHEET_VISUAL_STYLE.centerLine.color),
+        width: SHEET_VISUAL_STYLE.centerLine.widthPx,
+        alpha: SHEET_VISUAL_STYLE.centerLine.opacity,
+      });
+    sheetContainer.addChild(centerLine);
+  }
 
   const selectionOutlines = new Map<string, Graphics>();
   const photoNodes: PhotoRenderNode[] = [];
@@ -275,6 +277,22 @@ export function createSheetRenderNode(
       overlay.eventMode = "none";
       sheetContainer.addChild(overlay);
     }
+  }
+
+  if (sheet.activeSides !== "both") {
+    const inactiveX = sheet.activeSides === "right" ? 0 : width / 2;
+    const inactiveSide = new Graphics()
+      .rect(inactiveX, 0, width / 2, height)
+      .fill({
+        color: hexToNumber(SHEET_VISUAL_STYLE.inactiveSide.fill),
+        alpha: SHEET_VISUAL_STYLE.inactiveSide.opacity,
+      });
+    inactiveSide.label = `inactive-${
+      sheet.activeSides === "right" ? "left" : "right"
+    }-side`;
+    inactiveSide.eventMode = "static";
+    inactiveSide.cursor = "default";
+    sheetContainer.addChild(inactiveSide);
   }
 
   const focusOutline = new Graphics()

@@ -7,6 +7,7 @@ const threeSheets: CompositionPlan["sheets"] = [
   {
     sheetId: "sheet-001",
     number: 1,
+    activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
     overlay: null,
@@ -15,6 +16,7 @@ const threeSheets: CompositionPlan["sheets"] = [
   {
     sheetId: "sheet-002",
     number: 2,
+    activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
     overlay: null,
@@ -23,6 +25,7 @@ const threeSheets: CompositionPlan["sheets"] = [
   {
     sheetId: "sheet-003",
     number: 3,
+    activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
     overlay: null,

@@ -47,7 +47,6 @@ export function ProjectWorkspace({
     selectedComposedPhoto,
     displayedPhotoZoom,
     displayedPhotoPanX,
-    sheetCount,
     photoCount,
   } = controller;
 
@@ -138,8 +137,9 @@ export function ProjectWorkspace({
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}
           zoomCommitting={controller.zoomCommitting}
-          sheetCount={sheetCount}
           photoCount={photoCount}
+          document={projection.state.document}
+          sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviewUrls={mediaPreviewUrls}

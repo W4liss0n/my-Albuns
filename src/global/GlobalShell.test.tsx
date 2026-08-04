@@ -21,6 +21,7 @@ function createProjectPort(
   overrides: Partial<GlobalProjectPort> = {},
 ): GlobalProjectPort {
   return {
+    validateProjectConfiguration: async () => ({ status: "valid" }),
     createProject: async () => ({ status: "cancelled" }),
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
@@ -61,6 +62,35 @@ test("opens and cancels the creation assistant without reaching the native port"
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(createProject).not.toHaveBeenCalled();
+});
+
+test("forwards the completed dimensions configuration to creation", async () => {
+  const user = userEvent.setup();
+  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <GlobalShell projectPort={createProjectPort({ createProject })} />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(await screen.findByRole("button", { name: "Criar" }));
+
+  expect(createProject).toHaveBeenCalledWith({
+    document: {
+      displayUnit: "mm",
+      sheetWidthUm: 600_000,
+      sheetHeightUm: 300_000,
+      dpi: 300,
+      bleedUm: 3_000,
+      safetyUm: 3_000,
+    },
+    structure: {
+      sheetCount: 2,
+      firstSheet: "double",
+      lastSheet: "double",
+    },
+  });
 });
 
 test("starts one opening attempt and reports that it is in progress", async () => {

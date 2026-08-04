@@ -307,6 +307,57 @@ test("uses the documented compact chrome and collapsible contextual sections", (
   ).toBeInTheDocument();
 });
 
+test("shows the physical configuration projected from the opened Project", () => {
+  const configuredProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      document: {
+        displayUnit: "cm" as const,
+        sheetWidthUm: 508_000,
+        sheetHeightUm: 254_000,
+        dpi: 240,
+        bleedUm: 2_500,
+        safetyUm: 5_000,
+      },
+      album: {
+        ...projection.state.album,
+        sheets: projection.state.album.sheets.map((sheet) => ({
+          ...sheet,
+          activeSides: "both",
+        })),
+      },
+    },
+  };
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={configuredProjection}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => configuredProjection,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(screen.getByText("Dimensão da Lâmina").parentElement).toHaveTextContent(
+    "50,8 × 25,4 cm",
+  );
+  expect(screen.getByText("Dimensão da Página").parentElement).toHaveTextContent(
+    "25,4 × 25,4 cm",
+  );
+  expect(screen.getByText("Resolução").parentElement).toHaveTextContent(
+    "240 DPI",
+  );
+  expect(screen.getByText("Sangria").parentElement).toHaveTextContent(
+    "0,25 cm",
+  );
+  expect(screen.getByText("Área de segurança").parentElement).toHaveTextContent(
+    "0,5 cm",
+  );
+});
+
 test("renders each Grade item from its own composed sheet", () => {
   render(
     <ProjectWorkspace

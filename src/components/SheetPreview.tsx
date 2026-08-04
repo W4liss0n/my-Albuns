@@ -65,15 +65,17 @@ export function SheetPreview({
         strokeOpacity={surfaceStyle.outlineOpacity}
         strokeWidth={surfaceStyle.outlineWidthPx * unit}
       />
-      <line
-        x1={sheet.widthUm / 2}
-        y1="0"
-        x2={sheet.widthUm / 2}
-        y2={sheet.heightUm}
-        stroke={SHEET_VISUAL_STYLE.centerLine.color}
-        strokeOpacity={SHEET_VISUAL_STYLE.centerLine.opacity}
-        strokeWidth={SHEET_VISUAL_STYLE.centerLine.widthPx * unit}
-      />
+      {sheet.activeSides === "both" ? (
+        <line
+          x1={sheet.widthUm / 2}
+          y1="0"
+          x2={sheet.widthUm / 2}
+          y2={sheet.heightUm}
+          stroke={SHEET_VISUAL_STYLE.centerLine.color}
+          strokeOpacity={SHEET_VISUAL_STYLE.centerLine.opacity}
+          strokeWidth={SHEET_VISUAL_STYLE.centerLine.widthPx * unit}
+        />
+      ) : null}
 
       {frames.map((frame, index) => (
         <FramePreview
@@ -124,6 +126,18 @@ export function SheetPreview({
             }
           />
         ))}
+
+      {sheet.activeSides !== "both" ? (
+        <rect
+          data-preview-inactive-side={sheet.activeSides === "right" ? "left" : "right"}
+          x={sheet.activeSides === "right" ? 0 : sheet.widthUm / 2}
+          y="0"
+          width={sheet.widthUm / 2}
+          height={sheet.heightUm}
+          fill={SHEET_VISUAL_STYLE.inactiveSide.fill}
+          fillOpacity={SHEET_VISUAL_STYLE.inactiveSide.opacity}
+        />
+      ) : null}
     </svg>
   );
 }

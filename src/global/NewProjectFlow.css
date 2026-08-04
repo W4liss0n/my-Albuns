@@ -102,6 +102,71 @@
   gap: 12px;
 }
 
+.new-project-form-fields {
+  display: grid;
+  gap: 13px;
+}
+
+.new-project-field {
+  display: grid;
+  color: #9ca8b0;
+  font-size: 0.7rem;
+  gap: 6px;
+}
+
+.new-project-field input,
+.new-project-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 7px;
+  color: #e5eaed;
+  background: #192128;
+  font: inherit;
+}
+
+.new-project-field input:focus-visible,
+.new-project-field select:focus-visible {
+  border-color: #d3ab77;
+  outline: 2px solid rgb(211 171 119 / 28%);
+  outline-offset: 1px;
+}
+
+.new-project-field input[aria-invalid="true"] {
+  border-color: #d98278;
+}
+
+.new-project-input-with-suffix {
+  position: relative;
+  display: block;
+}
+
+.new-project-input-with-suffix > span {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: #78858e;
+  transform: translateY(-50%);
+}
+
+.new-project-input-with-suffix input {
+  padding-right: 38px;
+}
+
+.new-project-field-error {
+  color: #e3a099;
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.new-project-field-errors {
+  display: grid;
+  gap: 3px;
+}
+
 .new-project-value-group dt,
 .new-project-native-note {
   color: #8f9ba3;

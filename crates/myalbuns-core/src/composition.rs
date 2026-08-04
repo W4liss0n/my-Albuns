@@ -46,6 +46,7 @@ impl CompositionCore {
                     ComposedSheet {
                         sheet_id: sheet.id.clone(),
                         number: sheet.number,
+                        active_sides: sheet.active_sides,
                         width_um: sheet.width_um,
                         height_um: sheet.height_um,
                         overlay: sheet.overlay_media_id.as_ref().map(|media_id| {

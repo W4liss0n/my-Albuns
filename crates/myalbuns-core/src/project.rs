@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::composition::build_render_snapshot;
 use crate::model::{
-    AlbumSnapshot, CoreError, EditorState, PROJECT_DOCUMENT_SCHEMA_VERSION, RenderSnapshot,
+    AlbumSnapshot, CoreError, DocumentSnapshot, EditorState, PROJECT_DOCUMENT_SCHEMA_VERSION,
+    RenderSnapshot,
 };
 use crate::session::ProjectSession;
 use crate::validation::validate_album;
@@ -88,6 +89,7 @@ impl ProjectCore {
             session: ProjectSession::from_state(EditorState {
                 project_id: project.project_id,
                 project_name: project.project_name,
+                document: DocumentSnapshot::neutral(),
                 album: project.album,
                 revision: project.revision,
                 saved_revision: project.revision,

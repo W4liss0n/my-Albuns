@@ -9,7 +9,7 @@ use myalbuns_paths::AppPaths;
 
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, FailureCode, FailureStage,
-    HostTerminal, InitialProjectPreset,
+    HostTerminal, InitialProjectConfiguration, to_core_configuration,
 };
 
 #[derive(Debug)]
@@ -78,12 +78,12 @@ fn bootstrap_host_project_with_thread(
                 .open_editable(OpenProjectRequest::new(location))
                 .map_err(|error| (FailureStage::Open, map_open_error(error)))?,
             BootstrapIntent::CreateNew {
-                preset,
+                configuration,
                 authorization,
             } => core
                 .create_editable(CreateProjectRequest::new(
                     location,
-                    initial_project(preset),
+                    initial_project(configuration),
                     create_authorization(authorization),
                 ))
                 .map_err(|error| (FailureStage::Create, map_create_error(error)))?,
@@ -104,10 +104,8 @@ fn bootstrap_host_project_with_thread(
     }
 }
 
-fn initial_project(preset: InitialProjectPreset) -> InitialProject {
-    match preset {
-        InitialProjectPreset::NeutralV1 => InitialProject::neutral(),
-    }
+fn initial_project(configuration: InitialProjectConfiguration) -> InitialProject {
+    InitialProject::configured(to_core_configuration(configuration))
 }
 
 fn create_authorization(authorization: CreateWriteAuthorization) -> CreateAuthorization {
@@ -166,11 +164,35 @@ mod tests {
     };
 
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, InitialProject, ProjectCore, ProjectLocation,
+        ActiveSides, CreateAuthorization, CreateProjectRequest, DisplayUnit, InitialProject,
+        ProjectCore, ProjectLocation,
     };
     use myalbuns_paths::{AppPaths, NativePathDto, OperationPathContext};
 
+    use super::super::configuration::{
+        InitialDisplayUnit, InitialDocumentConfiguration, InitialSheetFormat,
+        InitialStructureConfiguration,
+    };
+
     use super::*;
+
+    fn configured_project() -> InitialProjectConfiguration {
+        InitialProjectConfiguration {
+            document: InitialDocumentConfiguration {
+                display_unit: InitialDisplayUnit::Cm,
+                sheet_width_um: 508_000,
+                sheet_height_um: 254_000,
+                dpi: 240,
+                bleed_um: 4_000,
+                safety_um: 7_500,
+            },
+            structure: InitialStructureConfiguration {
+                sheet_count: 3,
+                first_sheet: InitialSheetFormat::SinglePage,
+                last_sheet: InitialSheetFormat::Double,
+            },
+        }
+    }
 
     struct Fixture {
         _root: tempfile::TempDir,
@@ -218,7 +240,7 @@ mod tests {
                 attempt_id: "attempt-create".into(),
                 launch_nonce: "nonce-create".into(),
                 intent: BootstrapIntent::CreateNew {
-                    preset: InitialProjectPreset::NeutralV1,
+                    configuration: configured_project(),
                     authorization,
                 },
                 authority: super::super::TargetAuthority {
@@ -288,7 +310,7 @@ mod tests {
     }
 
     #[test]
-    fn the_host_creates_the_neutral_project_and_keeps_its_editable_session() {
+    fn the_host_converts_the_wire_configuration_and_keeps_its_editable_session() {
         let fixture = Fixture::new();
         let caller_thread = thread::current().id();
 
@@ -301,8 +323,19 @@ mod tests {
         assert_ne!(worker_thread, caller_thread);
         assert_eq!(created.project().revision(), 0);
         assert_eq!(created.project().saved_revision(), 0);
-        assert_eq!(created.project().project().sheets().len(), 2);
-        assert!(created.project().project().media().is_empty());
+        let document = created.project().project();
+        let settings = document.document();
+        assert_eq!(settings.display_unit(), DisplayUnit::Cm);
+        assert_eq!(settings.sheet_width_um(), 508_000);
+        assert_eq!(settings.sheet_height_um(), 254_000);
+        assert_eq!(settings.dpi(), 240);
+        assert_eq!(settings.bleed_um(), 4_000);
+        assert_eq!(settings.safety_um(), 7_500);
+        assert_eq!(document.sheets().len(), 3);
+        assert_eq!(document.sheets()[0].active_sides(), ActiveSides::Right);
+        assert_eq!(document.sheets()[1].active_sides(), ActiveSides::Both);
+        assert_eq!(document.sheets()[2].active_sides(), ActiveSides::Both);
+        assert!(document.media().is_empty());
         assert!(fixture.project_path.is_file());
         assert!(matches!(
             ProjectCore::new()

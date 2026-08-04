@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
+import type { NewProjectConfiguration } from "../application/globalProjectPort";
 import { tauriGlobalProjectPort } from "./tauriGlobalProjectPort";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -11,14 +12,79 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset();
 });
 
-test("starts creation with only the authoritative preset and no pathname or overwrite authority", async () => {
+const configuration: NewProjectConfiguration = {
+  document: {
+    displayUnit: "mm",
+    sheetWidthUm: 600_000,
+    sheetHeightUm: 300_000,
+    dpi: 300,
+    bleedUm: 3_000,
+    safetyUm: 3_000,
+  },
+  structure: {
+    sheetCount: 2,
+    firstSheet: "double",
+    lastSheet: "singlePage",
+  },
+};
+
+test("starts creation with exactly the normalized configuration and no pathname or overwrite authority", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
 
   await expect(
-    tauriGlobalProjectPort.createProject("neutralV1"),
+    tauriGlobalProjectPort.createProject(configuration),
   ).resolves.toEqual({ status: "cancelled" });
   expect(invoke).toHaveBeenCalledWith("create_project", {
-    preset: "neutralV1",
+    configuration,
+  });
+});
+
+test("validates the normalized configuration through the Core boundary", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ errors: [] });
+
+  await expect(
+    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+  ).resolves.toEqual({ status: "valid" });
+  expect(invoke).toHaveBeenCalledWith("validate_project_configuration", {
+    configuration,
+  });
+});
+
+test("preserves all structured Core validation codes", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    errors: [
+      "sheetWidthNotEven",
+      "safetyEliminatesSafeArea",
+    ],
+  });
+
+  await expect(
+    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+  ).resolves.toEqual({
+    status: "invalid",
+    errors: [
+      "sheetWidthNotEven",
+      "safetyEliminatesSafeArea",
+    ],
+  });
+});
+
+test("turns an unavailable Core validation into an actionable failure", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "validation_transport_failed",
+    message: "A validação não respondeu.",
+    action: "Tente novamente.",
+  });
+
+  await expect(
+    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+  ).resolves.toEqual({
+    status: "failed",
+    error: {
+      code: "validation_transport_failed",
+      message: "A validação não respondeu.",
+      action: "Tente novamente.",
+    },
   });
 });
 
@@ -26,7 +92,7 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
   vi.mocked(invoke).mockRejectedValueOnce(new Error("command unavailable"));
 
   await expect(
-    tauriGlobalProjectPort.createProject("neutralV1"),
+    tauriGlobalProjectPort.createProject(configuration),
   ).resolves.toEqual({
     status: "failed",
     error: {

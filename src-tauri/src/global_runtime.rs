@@ -14,7 +14,8 @@ use crate::{
     desktop_webview_policy, logging, native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
-        FailureStage, InitialProjectPreset, ProjectHostBootstrap, TargetAuthority,
+        FailureStage, InitialProjectConfiguration, ProjectConfigurationValidation,
+        ProjectHostBootstrap, TargetAuthority, validate_configuration,
     },
     recent_projects::{RecentProjectSummary, RecentProjectsStore},
 };
@@ -76,7 +77,7 @@ pub(crate) enum ProjectLaunchOutcome {
 enum ConfirmedLaunch {
     OpenExisting,
     CreateNew {
-        preset: InitialProjectPreset,
+        configuration: InitialProjectConfiguration,
         authorization: CreateWriteAuthorization,
     },
 }
@@ -130,7 +131,17 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
 }
 
 #[tauri::command]
-async fn create_project(app: AppHandle, preset: InitialProjectPreset) -> ProjectLaunchOutcome {
+fn validate_project_configuration(
+    configuration: InitialProjectConfiguration,
+) -> ProjectConfigurationValidation {
+    validate_configuration(configuration)
+}
+
+#[tauri::command]
+async fn create_project(
+    app: AppHandle,
+    configuration: InitialProjectConfiguration,
+) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
     let destination = match native_project_dialog::choose_project_destination(&app).await {
         Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
@@ -161,7 +172,7 @@ async fn create_project(app: AppHandle, preset: InitialProjectPreset) -> Project
         state,
         destination.0,
         ConfirmedLaunch::CreateNew {
-            preset,
+            configuration,
             authorization: destination.1,
         },
     )
@@ -245,9 +256,9 @@ async fn launch_confirmed_project(
         let ready = match launch {
             ConfirmedLaunch::OpenExisting => bootstrap.open(authority),
             ConfirmedLaunch::CreateNew {
-                preset,
+                configuration,
                 authorization,
-            } => bootstrap.create(authority, preset, authorization),
+            } => bootstrap.create(authority, configuration, authorization),
         }?;
         Ok::<_, BootstrapFailure>({
             let recent_result = recent_projects.promote(&ready.project_id, recent_path);
@@ -529,6 +540,7 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             recent_projects,
             open_recent_project,
             startup_open_failure,
+            validate_project_configuration,
         ])
         .run(tauri::generate_context!())?;
     Ok(())
@@ -537,6 +549,32 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validation_command_is_pure_and_returns_the_closed_wire_response() {
+        let configuration = serde_json::from_value(serde_json::json!({
+            "document": {
+                "displayUnit": "cm",
+                "sheetWidthUm": 508000,
+                "sheetHeightUm": 254000,
+                "dpi": 240,
+                "bleedUm": 4000,
+                "safetyUm": 7500
+            },
+            "structure": {
+                "sheetCount": 3,
+                "firstSheet": "singlePage",
+                "lastSheet": "double"
+            }
+        }))
+        .expect("the command accepts the closed configuration DTO");
+
+        assert_eq!(
+            serde_json::to_value(validate_project_configuration(configuration))
+                .expect("the validation response serializes"),
+            serde_json::json!({ "errors": [] })
+        );
+    }
 
     #[test]
     fn welcome_outcomes_never_contain_a_pathname() {

@@ -1,10 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 
-import type {
-  GlobalProjectPort,
-  ProjectLaunchFailure,
-  ProjectLaunchOutcome,
-  RecentProjectSummary,
+import {
+  PROJECT_CONFIGURATION_VALIDATION_CODES,
+  type GlobalProjectPort,
+  type ProjectConfigurationValidationCode,
+  type ProjectConfigurationValidationOutcome,
+  type ProjectLaunchFailure,
+  type ProjectLaunchOutcome,
+  type RecentProjectSummary,
 } from "../application/globalProjectPort";
 
 const openFallbackFailure: ProjectLaunchFailure = {
@@ -18,6 +21,16 @@ const createFallbackFailure: ProjectLaunchFailure = {
   message: "Não foi possível iniciar a criação do Projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
+
+const validationFallbackFailure: ProjectLaunchFailure = {
+  code: "project_configuration_validation_unavailable",
+  message: "Não foi possível validar as Dimensões do Projeto.",
+  action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+};
+
+const validationCodes = new Set<ProjectConfigurationValidationCode>(
+  PROJECT_CONFIGURATION_VALIDATION_CODES,
+);
 
 function toProjectLaunchFailure(
   error: unknown,
@@ -105,10 +118,47 @@ async function settleProjectLaunch(
   }
 }
 
+async function validateProjectConfiguration(
+  attempt: () => Promise<unknown>,
+): Promise<ProjectConfigurationValidationOutcome> {
+  try {
+    const result = await attempt();
+    if (typeof result !== "object" || result === null) {
+      return { status: "failed", error: validationFallbackFailure };
+    }
+    const candidate = result as Record<string, unknown>;
+    if (!Array.isArray(candidate.errors)) {
+      return { status: "failed", error: validationFallbackFailure };
+    }
+
+    const errors = candidate.errors.flatMap((code) => {
+      return typeof code === "string" &&
+        validationCodes.has(code as ProjectConfigurationValidationCode)
+        ? [code as ProjectConfigurationValidationCode]
+        : [];
+    });
+    if (errors.length !== candidate.errors.length) {
+      return { status: "failed", error: validationFallbackFailure };
+    }
+    return errors.length === 0
+      ? { status: "valid" }
+      : { status: "invalid", errors };
+  } catch (error) {
+    return {
+      status: "failed",
+      error: toProjectLaunchFailure(error, validationFallbackFailure),
+    };
+  }
+}
+
 export const tauriGlobalProjectPort: GlobalProjectPort = {
-  createProject: (preset) =>
+  validateProjectConfiguration: (configuration) =>
+    validateProjectConfiguration(() =>
+      invoke<unknown>("validate_project_configuration", { configuration }),
+    ),
+  createProject: (configuration) =>
     settleProjectLaunch(
-      () => invoke<unknown>("create_project", { preset }),
+      () => invoke<unknown>("create_project", { configuration }),
       createFallbackFailure,
     ),
   openProject: () =>

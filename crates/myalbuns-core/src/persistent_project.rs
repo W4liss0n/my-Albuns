@@ -190,21 +190,27 @@ impl ProjectCore {
         &self,
         request: CreateProjectRequest,
     ) -> Result<EditableProject, CreateProjectError> {
+        let CreateProjectRequest {
+            location,
+            initial_project,
+            authorization,
+        } = request;
+        let project = initial_project
+            .into_project()
+            .map_err(|_| CreateProjectError::InvalidInitialProject)?;
         let lease_root = self
             .identity_lease_root()
             .ok_or(CreateProjectError::Path(PathFailure::IoFailure))?;
-        let revision =
-            ProjectRevision::new(Uuid::new_v4(), 0, request.initial_project.into_project());
+        let revision = ProjectRevision::new(Uuid::new_v4(), 0, project);
         let identity_lease = ProjectIdentityLease::acquire(lease_root, revision.project_id)
             .map_err(map_new_identity_lease_error)?;
 
-        let store_result = match request.authorization {
+        let store_result = match authorization {
             CreateAuthorization::CreateOnly => {
-                project_store::create_only(request.location, &revision)
-                    .map_err(map_create_store_error)
+                project_store::create_only(location, &revision).map_err(map_create_store_error)
             }
             CreateAuthorization::ReplaceConfirmed => {
-                project_store::prepare_replacement(request.location, &revision)
+                project_store::prepare_replacement(location, &revision)
                     .map_err(map_create_store_error)
                     .and_then(|prepared| {
                         let _replaced_identity_lease = prepared

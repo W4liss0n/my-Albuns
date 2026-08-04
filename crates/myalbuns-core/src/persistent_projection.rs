@@ -2,8 +2,11 @@ use uuid::Uuid;
 
 use crate::{
     composition::CompositionCore,
-    model::{AlbumSnapshot, EditorProjection, EditorState, MediaUsage, SheetRole, SheetSnapshot},
-    project_document::ProjectDocument,
+    model::{
+        AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, MediaUsage,
+        ProjectedActiveSides, SheetRole, SheetSnapshot,
+    },
+    project_document::{ActiveSides, ProjectDocument},
 };
 
 pub(crate) fn editor_projection(
@@ -31,6 +34,7 @@ pub(crate) fn editor_projection(
                 } else {
                     SheetRole::Internal
                 },
+                active_sides: projected_active_sides(sheet.active_sides()),
                 width_um: settings.sheet_width_um() as i64,
                 height_um: settings.sheet_height_um() as i64,
                 frames: Vec::new(),
@@ -42,6 +46,7 @@ pub(crate) fn editor_projection(
     let state = EditorState {
         project_id: project_id.hyphenated().to_string(),
         project_name: "Projeto".into(),
+        document: DocumentSnapshot::from_settings(settings),
         revision,
         saved_revision,
         dirty: revision != saved_revision,
@@ -53,5 +58,13 @@ pub(crate) fn editor_projection(
         composition: CompositionCore::compose(&state.album),
         state,
         media_usage: Vec::<MediaUsage>::new(),
+    }
+}
+
+fn projected_active_sides(active_sides: ActiveSides) -> ProjectedActiveSides {
+    match active_sides {
+        ActiveSides::Both => ProjectedActiveSides::Both,
+        ActiveSides::Left => ProjectedActiveSides::Left,
+        ActiveSides::Right => ProjectedActiveSides::Right,
     }
 }

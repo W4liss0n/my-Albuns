@@ -1,6 +1,7 @@
 use myalbuns_core::{
-    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaKind, MediaTransform,
-    PhotoSnapshot, RectUm, SheetRole, SheetSnapshot,
+    AlbumSnapshot, DocumentSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaKind,
+    MediaTransform, PhotoSnapshot, ProjectedActiveSides, ProjectedDisplayUnit, RectUm, SheetRole,
+    SheetSnapshot,
 };
 
 const SHEET_WIDTH_UM: i64 = 600_000;
@@ -53,6 +54,14 @@ fn sample_editor_state(sheet_count: usize, sample_project: SampleProject) -> Edi
     EditorState {
         project_id: sample_project.project_id().into(),
         project_name: sample_project.project_name().into(),
+        document: DocumentSnapshot {
+            display_unit: ProjectedDisplayUnit::Mm,
+            sheet_width_um: SHEET_WIDTH_UM as u64,
+            sheet_height_um: SHEET_HEIGHT_UM as u64,
+            dpi: 300,
+            bleed_um: 3_000,
+            safety_um: 3_000,
+        },
         album: AlbumSnapshot {
             sheets,
             media: sample_media_catalog(),
@@ -80,6 +89,7 @@ fn sample_sheet(number: usize, sheet_count: usize) -> SheetSnapshot {
         id: format!("lamina-{number:02}"),
         number,
         role,
+        active_sides: ProjectedActiveSides::Both,
         width_um: SHEET_WIDTH_UM,
         height_um: SHEET_HEIGHT_UM,
         frames: vec![

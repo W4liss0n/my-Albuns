@@ -250,38 +250,149 @@ impl ProjectDocument {
             sheets,
         }
     }
+}
 
-    pub(crate) fn neutral() -> Self {
-        Self::new(
-            DocumentSettings::neutral(),
-            VisualDefaults::neutral(),
-            Vec::new(),
-            vec![
-                ProjectSheet::new(Uuid::new_v4(), ActiveSides::Both),
-                ProjectSheet::new(Uuid::new_v4(), ActiveSides::Both),
-            ],
-        )
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EndSheetFormat {
+    Double,
+    SinglePage,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum InitialProjectValidationError {
+    SheetWidthNotPositive,
+    SheetWidthAboveSafeInteger,
+    SheetWidthNotEven,
+    SheetWidthRasterOutOfRange,
+    SheetHeightNotPositive,
+    SheetHeightAboveSafeInteger,
+    SheetHeightRasterOutOfRange,
+    DpiOutOfRange,
+    SheetCountTooSmall,
+    BleedNegative,
+    BleedAboveSafeInteger,
+    BleedEliminatesCutArea,
+    SafetyNegative,
+    SafetyAboveSafeInteger,
+    SafetyEliminatesSafeArea,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InitialProjectConfiguration {
+    display_unit: DisplayUnit,
+    sheet_width_um: i64,
+    sheet_height_um: i64,
+    dpi: i64,
+    bleed_um: i64,
+    safety_um: i64,
+    sheet_count: i64,
+    first_sheet: EndSheetFormat,
+    last_sheet: EndSheetFormat,
+}
+
+impl InitialProjectConfiguration {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        display_unit: DisplayUnit,
+        sheet_width_um: i64,
+        sheet_height_um: i64,
+        dpi: i64,
+        bleed_um: i64,
+        safety_um: i64,
+        sheet_count: i64,
+        first_sheet: EndSheetFormat,
+        last_sheet: EndSheetFormat,
+    ) -> Self {
+        Self {
+            display_unit,
+            sheet_width_um,
+            sheet_height_um,
+            dpi,
+            bleed_um,
+            safety_um,
+            sheet_count,
+            first_sheet,
+            last_sheet,
+        }
+    }
+
+    pub fn validation_errors(&self) -> Vec<InitialProjectValidationError> {
+        validation_errors(InitialProjectValidationValues {
+            sheet_width_um: i128::from(self.sheet_width_um),
+            sheet_height_um: i128::from(self.sheet_height_um),
+            dpi: i128::from(self.dpi),
+            bleed_um: i128::from(self.bleed_um),
+            safety_um: i128::from(self.safety_um),
+            sheet_count: i128::from(self.sheet_count),
+        })
+    }
+
+    fn into_project(self) -> Result<ProjectDocument, ()> {
+        if !self.validation_errors().is_empty() {
+            return Err(());
+        }
+        let document = DocumentSettings::new(
+            self.display_unit,
+            u64::try_from(self.sheet_width_um).map_err(|_| ())?,
+            u64::try_from(self.sheet_height_um).map_err(|_| ())?,
+            u32::try_from(self.dpi).map_err(|_| ())?,
+            u64::try_from(self.bleed_um).map_err(|_| ())?,
+            u64::try_from(self.safety_um).map_err(|_| ())?,
+        );
+
+        let sheet_count = usize::try_from(self.sheet_count).map_err(|_| ())?;
+        let mut sheets = Vec::new();
+        sheets.try_reserve_exact(sheet_count).map_err(|_| ())?;
+        for index in 0..sheet_count {
+            let active_sides = if index == 0 {
+                match self.first_sheet {
+                    EndSheetFormat::Double => ActiveSides::Both,
+                    EndSheetFormat::SinglePage => ActiveSides::Right,
+                }
+            } else if index == sheet_count - 1 {
+                match self.last_sheet {
+                    EndSheetFormat::Double => ActiveSides::Both,
+                    EndSheetFormat::SinglePage => ActiveSides::Left,
+                }
+            } else {
+                ActiveSides::Both
+            };
+            sheets.push(ProjectSheet::new(Uuid::new_v4(), active_sides));
+        }
+
+        let project = ProjectDocument::new(document, VisualDefaults::neutral(), Vec::new(), sheets);
+        validate_project_state(&project)?;
+        Ok(project)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InitialProject {
-    project: ProjectDocument,
+    configuration: InitialProjectConfiguration,
 }
 
 impl InitialProject {
     pub fn neutral() -> Self {
-        Self {
-            project: ProjectDocument::neutral(),
-        }
+        let document = DocumentSettings::neutral();
+        Self::configured(InitialProjectConfiguration::new(
+            document.display_unit(),
+            i64::try_from(document.sheet_width_um()).expect("neutral width fits i64"),
+            i64::try_from(document.sheet_height_um()).expect("neutral height fits i64"),
+            i64::from(document.dpi()),
+            i64::try_from(document.bleed_um()).expect("neutral bleed fits i64"),
+            i64::try_from(document.safety_um()).expect("neutral safety fits i64"),
+            2,
+            EndSheetFormat::Double,
+            EndSheetFormat::Double,
+        ))
     }
 
-    pub fn project(&self) -> &ProjectDocument {
-        &self.project
+    pub fn configured(configuration: InitialProjectConfiguration) -> Self {
+        Self { configuration }
     }
 
-    pub(crate) fn into_project(self) -> ProjectDocument {
-        self.project
+    pub(crate) fn into_project(self) -> Result<ProjectDocument, ()> {
+        self.configuration.into_project()
     }
 }
 
@@ -304,11 +415,18 @@ impl ProjectRevision {
 
 pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()> {
     let settings = project.document();
-    if !settings.sheet_width_um().is_multiple_of(2)
-        || raster_pixels(settings.sheet_width_um(), settings.dpi()).is_none()
-        || raster_pixels(settings.sheet_height_um(), settings.dpi()).is_none()
-        || !margins_preserve_positive_areas(settings)
-    {
+    let configuration = InitialProjectConfiguration::new(
+        settings.display_unit(),
+        signed_persisted_value(settings.sheet_width_um()),
+        signed_persisted_value(settings.sheet_height_um()),
+        i64::from(settings.dpi()),
+        signed_persisted_value(settings.bleed_um()),
+        signed_persisted_value(settings.safety_um()),
+        i64::try_from(project.sheets().len()).map_err(|_| ())?,
+        EndSheetFormat::Double,
+        EndSheetFormat::Double,
+    );
+    if !configuration.validation_errors().is_empty() {
         return Err(());
     }
 
@@ -325,9 +443,6 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         }
     }
 
-    if project.sheets().len() < 2 {
-        return Err(());
-    }
     let mut sheet_ids = HashSet::new();
     for (index, sheet) in project.sheets().iter().enumerate() {
         if !sheet_ids.insert(sheet.id()) {
@@ -348,27 +463,112 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
     Ok(())
 }
 
-fn margins_preserve_positive_areas(settings: &DocumentSettings) -> bool {
-    let page_width = settings.sheet_width_um() / 2;
-    let bleed = settings.bleed_um();
-    let Some(total_inset) = bleed.checked_add(settings.safety_um()) else {
-        return false;
-    };
-    [bleed, total_inset].into_iter().all(|inset| {
-        inset
-            .checked_mul(2)
-            .is_some_and(|diameter| diameter < page_width && diameter < settings.sheet_height_um())
-    })
+#[derive(Clone, Copy)]
+struct InitialProjectValidationValues {
+    sheet_width_um: i128,
+    sheet_height_um: i128,
+    dpi: i128,
+    bleed_um: i128,
+    safety_um: i128,
+    sheet_count: i128,
 }
 
-fn raster_pixels(micrometers: u64, dpi: u32) -> Option<u32> {
-    let numerator = micrometers
-        .checked_mul(u64::from(dpi))?
-        .checked_add(12_700)?;
-    let pixels = numerator / 25_400;
-    u32::try_from(pixels)
-        .ok()
-        .filter(|pixels| (1..=65_535).contains(pixels))
+fn validation_errors(values: InitialProjectValidationValues) -> Vec<InitialProjectValidationError> {
+    use InitialProjectValidationError as Error;
+
+    let mut errors = Vec::new();
+    let safe_integer = i128::from(MAX_SAFE_INTEGER);
+    let dpi_is_valid = (1..=1_200).contains(&values.dpi);
+    let width_is_positive = values.sheet_width_um > 0;
+    let width_is_safe = values.sheet_width_um <= safe_integer;
+    let width_is_even = values.sheet_width_um % 2 == 0;
+    let height_is_positive = values.sheet_height_um > 0;
+    let height_is_safe = values.sheet_height_um <= safe_integer;
+
+    if !width_is_positive {
+        errors.push(Error::SheetWidthNotPositive);
+    } else if !width_is_safe {
+        errors.push(Error::SheetWidthAboveSafeInteger);
+    } else if !width_is_even {
+        errors.push(Error::SheetWidthNotEven);
+    } else if dpi_is_valid
+        && (!raster_axis_is_valid(values.sheet_width_um, values.dpi)
+            || !raster_axis_is_valid(values.sheet_width_um / 2, values.dpi))
+    {
+        errors.push(Error::SheetWidthRasterOutOfRange);
+    }
+
+    if !height_is_positive {
+        errors.push(Error::SheetHeightNotPositive);
+    } else if !height_is_safe {
+        errors.push(Error::SheetHeightAboveSafeInteger);
+    } else if dpi_is_valid && !raster_axis_is_valid(values.sheet_height_um, values.dpi) {
+        errors.push(Error::SheetHeightRasterOutOfRange);
+    }
+
+    if !dpi_is_valid {
+        errors.push(Error::DpiOutOfRange);
+    }
+    if values.sheet_count < 2 {
+        errors.push(Error::SheetCountTooSmall);
+    }
+
+    let bleed_is_nonnegative = values.bleed_um >= 0;
+    let bleed_is_safe = values.bleed_um <= safe_integer;
+    if !bleed_is_nonnegative {
+        errors.push(Error::BleedNegative);
+    } else if !bleed_is_safe {
+        errors.push(Error::BleedAboveSafeInteger);
+    }
+
+    let safety_is_nonnegative = values.safety_um >= 0;
+    let safety_is_safe = values.safety_um <= safe_integer;
+    if !safety_is_nonnegative {
+        errors.push(Error::SafetyNegative);
+    } else if !safety_is_safe {
+        errors.push(Error::SafetyAboveSafeInteger);
+    }
+
+    let dimensions_admit_margins =
+        width_is_positive && width_is_safe && width_is_even && height_is_positive && height_is_safe;
+    if dimensions_admit_margins && bleed_is_nonnegative && bleed_is_safe {
+        let page_width = values.sheet_width_um / 2;
+        let bleed_eliminates_cut_area = values.bleed_um >= page_width
+            || values
+                .bleed_um
+                .checked_mul(2)
+                .is_none_or(|vertical_inset| vertical_inset >= values.sheet_height_um);
+        if bleed_eliminates_cut_area {
+            errors.push(Error::BleedEliminatesCutArea);
+        } else if safety_is_nonnegative && safety_is_safe {
+            let safety_eliminates_safe_area = values
+                .bleed_um
+                .checked_add(values.safety_um)
+                .is_none_or(|total_inset| {
+                    total_inset >= page_width
+                        || total_inset
+                            .checked_mul(2)
+                            .is_none_or(|vertical_inset| vertical_inset >= values.sheet_height_um)
+                });
+            if safety_eliminates_safe_area {
+                errors.push(Error::SafetyEliminatesSafeArea);
+            }
+        }
+    }
+
+    errors
+}
+
+fn raster_axis_is_valid(micrometers: i128, dpi: i128) -> bool {
+    micrometers
+        .checked_mul(dpi)
+        .and_then(|numerator| numerator.checked_add(12_700))
+        .map(|numerator| numerator / 25_400)
+        .is_some_and(|pixels| (1..=65_535).contains(&pixels))
+}
+
+fn signed_persisted_value(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }
 
 fn referenced_media(defaults: &VisualDefaults) -> Vec<Uuid> {

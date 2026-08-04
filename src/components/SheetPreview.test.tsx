@@ -11,6 +11,7 @@ import { SheetPreview } from "./SheetPreview";
 const photoSheet: ComposedSheet = {
   sheetId: "sheet-001",
   number: 1,
+  activeSides: "both",
   widthUm: 600_000,
   heightUm: 300_000,
   overlay: null,
@@ -46,6 +47,7 @@ const photoSheet: ComposedSheet = {
 const placeholderSheet: ComposedSheet = {
   sheetId: "sheet-002",
   number: 2,
+  activeSides: "both",
   widthUm: 600_000,
   heightUm: 300_000,
   overlay: {
@@ -187,4 +189,31 @@ test("keeps preview strokes aligned with Canvas units at other sheet heights", (
   expect(
     preview.querySelector('[data-preview-frame-id="frame-002"]'),
   ).toHaveAttribute("stroke-width", "1000");
+});
+
+test("represents a single-page extremity with a neutral inactive side and no center divider", () => {
+  const singlePageSheet = {
+    ...placeholderSheet,
+    activeSides: "right" as const,
+    overlay: null,
+    frames: [],
+  } satisfies ComposedSheet;
+
+  const { rerender } = render(<SheetPreview sheet={singlePageSheet} />);
+
+  const preview = screen.getByRole("img", {
+    name: "Prévia da Lâmina 02",
+  });
+  expect(preview).toHaveAttribute("viewBox", "0 0 600000 300000");
+  expect(preview.querySelector("line")).not.toBeInTheDocument();
+  expect(
+    preview.querySelector('[data-preview-inactive-side="left"]'),
+  ).toHaveAttribute("x", "0");
+
+  rerender(
+    <SheetPreview sheet={{ ...singlePageSheet, activeSides: "left" }} />,
+  );
+  expect(
+    preview.querySelector('[data-preview-inactive-side="right"]'),
+  ).toHaveAttribute("x", "300000");
 });

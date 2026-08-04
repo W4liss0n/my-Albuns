@@ -9,6 +9,7 @@ export const composition: CompositionPlan = {
     {
       sheetId: "sheet-001",
       number: 1,
+      activeSides: "both",
       widthUm: 600_000,
       heightUm: 300_000,
       overlay: null,
@@ -20,6 +21,7 @@ export const threeSheetComposition: CompositionPlan = {
   sheets: [1, 2, 3].map((number) => ({
     sheetId: `sheet-00${number}`,
     number,
+    activeSides: "both" as const,
     widthUm: 600_000,
     heightUm: 300_000,
     overlay: null,
@@ -57,6 +59,7 @@ export const interactiveComposition: CompositionPlan = {
     {
       sheetId: "sheet-001",
       number: 1,
+      activeSides: "both",
       widthUm: 600_000,
       heightUm: 300_000,
       overlay: null,

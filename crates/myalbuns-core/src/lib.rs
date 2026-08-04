@@ -11,10 +11,10 @@ mod validation;
 
 pub use model::{
     AlbumSnapshot, ComposedDecorative, ComposedFrame, ComposedPhoto, ComposedSheet,
-    CompositionPlan, CoreError, EditorProjection, EditorState, FrameSnapshot, Matrix2,
-    MediaCatalogItem, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange,
-    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, RectUm, RenderSnapshot,
-    SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    CompositionPlan, CoreError, DocumentSnapshot, EditorProjection, EditorState, FrameSnapshot,
+    Matrix2, MediaCatalogItem, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange,
+    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, ProjectedActiveSides,
+    ProjectedDisplayUnit, RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
@@ -26,7 +26,8 @@ pub use project::{
 };
 pub use project_document::{
     ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
-    FrameBorder, InitialProject, Overlay, OverlayContent, ProjectDocument, ProjectSheet, Rgb,
+    EndSheetFormat, FrameBorder, InitialProject, InitialProjectConfiguration,
+    InitialProjectValidationError, Overlay, OverlayContent, ProjectDocument, ProjectSheet, Rgb,
     VisualDefaults,
 };
 pub use project_store::{

@@ -11,6 +11,10 @@ export const SHEET_VISUAL_STYLE = {
     opacity: 0.32,
     widthPx: 1,
   },
+  inactiveSide: {
+    fill: "#c8c6c1",
+    opacity: 0.88,
+  },
   photo: {
     stripeCount: 12,
     stripeOverlapPx: 1,

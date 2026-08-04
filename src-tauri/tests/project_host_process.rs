@@ -42,7 +42,7 @@ fn real_global_and_host_processes_preserve_ownership_and_lifetime_boundaries() {
 }
 
 #[test]
-fn real_host_process_creates_and_owns_a_neutral_project() {
+fn real_host_process_creates_and_owns_the_requested_project_configuration() {
     let fixture = ProjectFixture::new_uncreated("criacao");
     assert!(
         !fixture.project_path.exists(),
@@ -89,7 +89,7 @@ fn real_host_process_creates_and_owns_a_neutral_project() {
     assert_ne!(reopened.project_id(), uuid::Uuid::nil());
     assert_eq!(reopened.revision(), 0);
     assert_eq!(reopened.saved_revision(), 0);
-    assert_neutral_project(&reopened);
+    assert_configured_project(&reopened);
 }
 
 fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {
@@ -228,7 +228,7 @@ impl ProjectFixture {
 
     fn bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
         json!({
-            "protocolVersion": 2,
+            "protocolVersion": 3,
             "attemptId": attempt_id,
             "launchNonce": launch_nonce,
             "intent": { "kind": "openExisting" },
@@ -241,12 +241,26 @@ impl ProjectFixture {
 
     fn create_bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
         json!({
-            "protocolVersion": 2,
+            "protocolVersion": 3,
             "attemptId": attempt_id,
             "launchNonce": launch_nonce,
             "intent": {
                 "kind": "createNew",
-                "preset": "neutralV1",
+                "configuration": {
+                    "document": {
+                        "displayUnit": "cm",
+                        "sheetWidthUm": 508000,
+                        "sheetHeightUm": 254000,
+                        "dpi": 240,
+                        "bleedUm": 4000,
+                        "safetyUm": 7500,
+                    },
+                    "structure": {
+                        "sheetCount": 3,
+                        "firstSheet": "singlePage",
+                        "lastSheet": "double",
+                    },
+                },
                 "authorization": "createOnly",
             },
             "authority": {
@@ -315,15 +329,15 @@ fn spawn_host_and_read_terminal(fixture: &ProjectFixture, request: &Value) -> (C
     (host, terminal)
 }
 
-fn assert_neutral_project(project: &EditableProject) {
+fn assert_configured_project(project: &EditableProject) {
     let document = project.project();
     let settings = document.document();
-    assert_eq!(settings.display_unit(), DisplayUnit::Mm);
-    assert_eq!(settings.sheet_width_um(), 600_000);
-    assert_eq!(settings.sheet_height_um(), 300_000);
-    assert_eq!(settings.dpi(), 300);
-    assert_eq!(settings.bleed_um(), 3_000);
-    assert_eq!(settings.safety_um(), 3_000);
+    assert_eq!(settings.display_unit(), DisplayUnit::Cm);
+    assert_eq!(settings.sheet_width_um(), 508_000);
+    assert_eq!(settings.sheet_height_um(), 254_000);
+    assert_eq!(settings.dpi(), 240);
+    assert_eq!(settings.bleed_um(), 4_000);
+    assert_eq!(settings.safety_um(), 7_500);
     assert_eq!(
         document.visual_defaults().background(),
         &Background::BothSides {
@@ -339,13 +353,10 @@ fn assert_neutral_project(project: &EditableProject) {
         &FrameBorder::None
     );
     assert!(document.media().is_empty());
-    assert_eq!(document.sheets().len(), 2);
-    assert!(
-        document
-            .sheets()
-            .iter()
-            .all(|sheet| sheet.active_sides() == ActiveSides::Both)
-    );
+    assert_eq!(document.sheets().len(), 3);
+    assert_eq!(document.sheets()[0].active_sides(), ActiveSides::Right);
+    assert_eq!(document.sheets()[1].active_sides(), ActiveSides::Both);
+    assert_eq!(document.sheets()[2].active_sides(), ActiveSides::Both);
 }
 
 fn desktop_binary() -> &'static Path {

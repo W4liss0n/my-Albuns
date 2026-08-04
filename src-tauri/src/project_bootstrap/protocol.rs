@@ -3,7 +3,9 @@ use std::io::{Read, Write};
 use myalbuns_paths::{NativePathDto, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub(crate) const PROTOCOL_VERSION: u16 = 2;
+use super::configuration::InitialProjectConfiguration;
+
+pub(crate) const PROTOCOL_VERSION: u16 = 3;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -15,15 +17,9 @@ const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 pub(crate) enum BootstrapIntent {
     OpenExisting,
     CreateNew {
-        preset: InitialProjectPreset,
+        configuration: InitialProjectConfiguration,
         authorization: CreateWriteAuthorization,
     },
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) enum InitialProjectPreset {
-    NeutralV1,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -252,6 +248,11 @@ mod tests {
 
     use myalbuns_paths::OperationPathContext;
 
+    use super::super::configuration::{
+        InitialDisplayUnit, InitialDocumentConfiguration, InitialSheetFormat,
+        InitialStructureConfiguration,
+    };
+
     use super::*;
 
     fn request() -> BootstrapRequest {
@@ -273,23 +274,54 @@ mod tests {
     }
 
     #[test]
-    fn create_request_round_trip_preserves_the_neutral_preset_and_frozen_authorization() {
+    fn create_request_round_trip_preserves_the_closed_initial_configuration_and_authorization() {
         let base = request();
+        let configuration = InitialProjectConfiguration {
+            document: InitialDocumentConfiguration {
+                display_unit: InitialDisplayUnit::Cm,
+                sheet_width_um: 508_000,
+                sheet_height_um: 254_000,
+                dpi: 240,
+                bleed_um: 4_000,
+                safety_um: 7_500,
+            },
+            structure: InitialStructureConfiguration {
+                sheet_count: 3,
+                first_sheet: InitialSheetFormat::SinglePage,
+                last_sheet: InitialSheetFormat::Double,
+            },
+        };
         for authorization in [
             CreateWriteAuthorization::CreateOnly,
             CreateWriteAuthorization::ReplaceConfirmed,
         ] {
             let request = BootstrapRequest {
                 intent: BootstrapIntent::CreateNew {
-                    preset: InitialProjectPreset::NeutralV1,
+                    configuration,
                     authorization,
                 },
                 ..base.clone()
             };
 
             let encoded = serde_json::to_value(&request).expect("the request serializes");
+            assert_eq!(encoded["protocolVersion"], 3);
             assert_eq!(encoded["intent"]["kind"], "createNew");
-            assert_eq!(encoded["intent"]["preset"], "neutralV1");
+            assert_eq!(
+                encoded["intent"]["configuration"]["document"]["displayUnit"],
+                "cm"
+            );
+            assert_eq!(
+                encoded["intent"]["configuration"]["document"]["sheetWidthUm"],
+                508_000
+            );
+            assert_eq!(
+                encoded["intent"]["configuration"]["structure"]["firstSheet"],
+                "singlePage"
+            );
+            assert_eq!(
+                encoded["intent"]["configuration"]["structure"]["lastSheet"],
+                "double"
+            );
             assert_eq!(
                 encoded["intent"]["authorization"],
                 match authorization {
@@ -304,6 +336,74 @@ mod tests {
                 serde_json::from_value(encoded).expect("the request deserializes");
             assert_eq!(decoded, request);
         }
+    }
+
+    #[test]
+    fn initial_configuration_rejects_unknown_fields_at_every_object_boundary() {
+        let valid = serde_json::json!({
+            "document": {
+                "displayUnit": "mm",
+                "sheetWidthUm": 600000,
+                "sheetHeightUm": 300000,
+                "dpi": 300,
+                "bleedUm": 3000,
+                "safetyUm": 3000
+            },
+            "structure": {
+                "sheetCount": 2,
+                "firstSheet": "double",
+                "lastSheet": "double"
+            }
+        });
+
+        let mut unknown_root = valid.clone();
+        unknown_root["futureOption"] = serde_json::json!(true);
+        assert!(
+            serde_json::from_value::<InitialProjectConfiguration>(unknown_root).is_err(),
+            "the top-level configuration is a closed contract"
+        );
+
+        let mut unknown_document = valid.clone();
+        unknown_document["document"]["futureOption"] = serde_json::json!(true);
+        assert!(
+            serde_json::from_value::<InitialProjectConfiguration>(unknown_document).is_err(),
+            "the nested document configuration is also closed"
+        );
+
+        let mut unknown_structure = valid;
+        unknown_structure["structure"]["futureOption"] = serde_json::json!(true);
+        assert!(
+            serde_json::from_value::<InitialProjectConfiguration>(unknown_structure).is_err(),
+            "the nested structure configuration is also closed"
+        );
+    }
+
+    #[test]
+    fn initial_configuration_preserves_negative_numeric_intent_for_core_validation() {
+        let encoded = serde_json::json!({
+            "document": {
+                "displayUnit": "in",
+                "sheetWidthUm": -2,
+                "sheetHeightUm": -1,
+                "dpi": -1,
+                "bleedUm": -3,
+                "safetyUm": -4
+            },
+            "structure": {
+                "sheetCount": -5,
+                "firstSheet": "singlePage",
+                "lastSheet": "double"
+            }
+        });
+
+        let configuration: InitialProjectConfiguration = serde_json::from_value(encoded)
+            .expect("negative intent reaches the authoritative Core validator");
+        assert_eq!(configuration.document.sheet_width_um, -2);
+        assert_eq!(configuration.document.sheet_height_um, -1);
+        assert_eq!(configuration.document.dpi, -1);
+        assert_eq!(configuration.document.bleed_um, -3);
+        assert_eq!(configuration.document.safety_um, -4);
+        assert_eq!(configuration.structure.sheet_count, -5);
     }
 
     #[test]

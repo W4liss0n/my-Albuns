@@ -5,7 +5,8 @@ use crate::sample_project_fixture::SampleProject;
 use crate::{
     AlbumSnapshot, ComposedPhoto, DemoEditableProject as EditableProject, FrameSnapshot, Matrix2,
     MediaCatalogItem, MediaKind, MediaTransform, NormalizedPan, PhotoPlacement, PhotoPlacementPlan,
-    PhotoSnapshot, ProjectCore, ProjectIntent, RectUm, SheetRole, SheetSnapshot, VectorUm,
+    PhotoSnapshot, ProjectCore, ProjectIntent, ProjectedActiveSides, RectUm, SheetRole,
+    SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -456,7 +457,7 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
-    assert_eq!(snapshot.schema_version, 2);
+    assert_eq!(snapshot.schema_version, 3);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo
         .as_ref()
@@ -545,6 +546,7 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PlacementPhoto) -> Co
             id: "sheet-under-test".into(),
             number: 1,
             role: SheetRole::Internal,
+            active_sides: ProjectedActiveSides::Both,
             width_um: frame.x + frame.width,
             height_um: frame.y + frame.height,
             frames: vec![FrameSnapshot {
