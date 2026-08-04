@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import type { NewProjectConfiguration } from "../application/globalProjectPort";
+import type {
+  NewProjectConfiguration,
+  NewProjectCreationConfiguration,
+} from "../application/globalProjectPort";
 import { tauriGlobalProjectPort } from "./tauriGlobalProjectPort";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -28,15 +31,118 @@ const configuration: NewProjectConfiguration = {
   },
 };
 
+const creationConfiguration: NewProjectCreationConfiguration = {
+  ...configuration,
+  visualDefaults: {
+    background: {
+      scope: "perSide",
+      left: { kind: "color", rgb: "#F4F1EA" },
+      right: {
+        kind: "image",
+        selectionId: "selection-background-right",
+      },
+    },
+    overlay: {
+      scope: "bothSides",
+      both: { kind: "image", selectionId: "selection-overlay" },
+    },
+    frameBorder: { kind: "solid", rgb: "#123456", widthUm: 2_000 },
+  },
+};
+
 test("starts creation with exactly the normalized configuration and no pathname or overwrite authority", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
 
   await expect(
-    tauriGlobalProjectPort.createProject(configuration),
+    tauriGlobalProjectPort.createProject(creationConfiguration),
   ).resolves.toEqual({ status: "cancelled" });
   expect(invoke).toHaveBeenCalledWith("create_project", {
-    configuration,
+    configuration: creationConfiguration,
   });
+});
+
+test("chooses a provisional decorative without exposing native path data", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    selectionId: "selection-background",
+    displayName: "Textura.jpg",
+    previewUrl: "http://myalbuns-preview.localhost/selection-background",
+    pathname: "C:\\Acervo\\Textura.jpg",
+  });
+
+  await expect(
+    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+  ).resolves.toEqual({
+    status: "selected",
+    selection: {
+      selectionId: "selection-background",
+      displayName: "Textura.jpg",
+      previewUrl: "http://myalbuns-preview.localhost/selection-background",
+    },
+  });
+  expect(invoke).toHaveBeenCalledWith("choose_provisional_decorative");
+});
+
+test("keeps picker cancellation distinct from a malformed response", async () => {
+  vi.mocked(invoke)
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce({
+      selectionId: "../native-path",
+      displayName: "Textura.jpg",
+      previewUrl: "file:///C:/Acervo/Textura.jpg",
+    });
+
+  await expect(
+    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+  ).resolves.toEqual({ status: "cancelled" });
+  await expect(
+    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+  ).resolves.toEqual({
+    status: "failed",
+    error: {
+      code: "decorative_picker_unavailable",
+      message: "Não foi possível concluir o seletor de Imagem decorativa.",
+      action: "Tente novamente.",
+    },
+  });
+});
+
+test("preserves an actionable typed picker failure", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "unsupported_image",
+    message: "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+    action: "Escolha outro arquivo JPEG ou PNG.",
+    pathname: "C:\\Acervo\\Texto.txt",
+  });
+
+  await expect(
+    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+  ).resolves.toEqual({
+    status: "failed",
+    error: {
+      code: "unsupported_image",
+      message: "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+      action: "Escolha outro arquivo JPEG ou PNG.",
+    },
+  });
+});
+
+test("releases one opaque provisional selection and can clear the registry", async () => {
+  vi.mocked(invoke).mockResolvedValue(undefined);
+
+  await tauriGlobalProjectPort.releaseProvisionalDecorative(
+    "selection-background",
+  );
+  await tauriGlobalProjectPort.clearProvisionalDecoratives();
+
+  expect(invoke).toHaveBeenNthCalledWith(
+    1,
+    "release_provisional_decorative",
+    { selectionId: "selection-background" },
+  );
+  expect(invoke).toHaveBeenNthCalledWith(
+    2,
+    "clear_provisional_decoratives",
+  );
 });
 
 test("validates the normalized configuration through the Core boundary", async () => {
@@ -92,7 +198,7 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
   vi.mocked(invoke).mockRejectedValueOnce(new Error("command unavailable"));
 
   await expect(
-    tauriGlobalProjectPort.createProject(configuration),
+    tauriGlobalProjectPort.createProject(creationConfiguration),
   ).resolves.toEqual({
     status: "failed",
     error: {

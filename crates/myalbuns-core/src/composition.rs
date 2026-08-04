@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 use crate::model::{
-    AlbumSnapshot, ComposedDecorative, ComposedFrame, ComposedPhoto, ComposedSheet,
-    CompositionPlan, Matrix2, MediaCatalogItem, NormalizedPan, NumberRange, PHOTO_PAN_MAX,
-    PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan,
-    PhotoSnapshot, RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
+    AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
+    ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaUsage,
+    NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
+    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectedActiveSides, ProjectedBackground,
+    ProjectedBackgroundContent, ProjectedOverlay, ProjectedOverlayContent,
+    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
 };
 
 pub(crate) struct CompositionCore;
@@ -17,10 +19,13 @@ impl CompositionCore {
             .map(|media| (media.id.as_str(), media))
             .collect::<HashMap<_, _>>();
         CompositionPlan {
+            frame_border: album.visual_defaults.frame_border.clone(),
             sheets: album
                 .sheets
                 .iter()
                 .map(|sheet| {
+                    let surface =
+                        active_surface_rect(sheet.active_sides, sheet.width_um, sheet.height_um);
                     let mut frames = sheet
                         .frames
                         .iter()
@@ -47,29 +52,201 @@ impl CompositionCore {
                         sheet_id: sheet.id.clone(),
                         number: sheet.number,
                         active_sides: sheet.active_sides,
-                        width_um: sheet.width_um,
+                        width_um: surface.width,
                         height_um: sheet.height_um,
-                        overlay: sheet.overlay_media_id.as_ref().map(|media_id| {
-                            let media = media_by_id
-                                .get(media_id.as_str())
-                                .copied()
-                                .expect("validated Overlay media reference");
-                            ComposedDecorative {
-                                media_id: media.id.clone(),
-                                name: media.name.clone(),
-                                draw_rect: RectUm {
-                                    x: 0,
-                                    y: 0,
-                                    width: sheet.width_um,
-                                    height: sheet.height_um,
-                                },
-                            }
-                        }),
+                        base: ComposedColor {
+                            rgb: "#FFFFFF".into(),
+                            draw_rect: surface.clone(),
+                        },
+                        backgrounds: compose_backgrounds(
+                            &album.visual_defaults.background,
+                            sheet.active_sides,
+                            sheet.width_um,
+                            sheet.height_um,
+                            &media_by_id,
+                        ),
                         frames,
+                        overlays: compose_overlays(
+                            &album.visual_defaults.overlay,
+                            sheet.active_sides,
+                            sheet.width_um,
+                            sheet.height_um,
+                            &media_by_id,
+                        ),
                     }
                 })
                 .collect(),
         }
+    }
+}
+
+pub(crate) fn derive_media_usage(
+    album: &AlbumSnapshot,
+    composition: &CompositionPlan,
+) -> Vec<MediaUsage> {
+    let mut counts = HashMap::<&str, usize>::new();
+    for media_id in composition
+        .sheets
+        .iter()
+        .flat_map(ComposedSheet::referenced_media_ids)
+    {
+        *counts.entry(media_id).or_default() += 1;
+    }
+
+    album
+        .media
+        .iter()
+        .map(|media| MediaUsage {
+            media_id: media.id.clone(),
+            count: counts.get(media.id.as_str()).copied().unwrap_or_default(),
+        })
+        .collect()
+}
+
+fn active_surface_rect(
+    active_sides: ProjectedActiveSides,
+    full_width_um: i64,
+    height_um: i64,
+) -> RectUm {
+    RectUm {
+        x: 0,
+        y: 0,
+        width: match active_sides {
+            ProjectedActiveSides::Both => full_width_um,
+            ProjectedActiveSides::Left | ProjectedActiveSides::Right => full_width_um / 2,
+        },
+        height: height_um,
+    }
+}
+
+fn side_rects(full_width_um: i64, height_um: i64) -> [RectUm; 2] {
+    let left_width = full_width_um / 2;
+    [
+        RectUm {
+            x: 0,
+            y: 0,
+            width: left_width,
+            height: height_um,
+        },
+        RectUm {
+            x: left_width,
+            y: 0,
+            width: full_width_um - left_width,
+            height: height_um,
+        },
+    ]
+}
+
+fn compose_backgrounds(
+    background: &ProjectedBackground,
+    active_sides: ProjectedActiveSides,
+    full_width_um: i64,
+    height_um: i64,
+    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+) -> Vec<ComposedBackground> {
+    let surface = active_surface_rect(active_sides, full_width_um, height_um);
+    match background {
+        ProjectedBackground::BothSides { both } => {
+            vec![compose_background(both, surface, media_by_id)]
+        }
+        ProjectedBackground::PerSide { left, right } => match active_sides {
+            ProjectedActiveSides::Both => {
+                let [left_rect, right_rect] = side_rects(full_width_um, height_um);
+                vec![
+                    compose_background(left, left_rect, media_by_id),
+                    compose_background(right, right_rect, media_by_id),
+                ]
+            }
+            ProjectedActiveSides::Left => {
+                vec![compose_background(left, surface, media_by_id)]
+            }
+            ProjectedActiveSides::Right => {
+                vec![compose_background(right, surface, media_by_id)]
+            }
+        },
+    }
+}
+
+fn compose_background(
+    content: &ProjectedBackgroundContent,
+    draw_rect: RectUm,
+    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+) -> ComposedBackground {
+    match content {
+        ProjectedBackgroundContent::Color { rgb } => ComposedBackground::Color {
+            rgb: rgb.clone(),
+            draw_rect,
+        },
+        ProjectedBackgroundContent::Media { media_id } => {
+            let media = media_by_id
+                .get(media_id.as_str())
+                .copied()
+                .expect("validated Background media reference");
+            ComposedBackground::Media {
+                media_id: media.id.clone(),
+                name: media.name.clone(),
+                draw_rect,
+            }
+        }
+    }
+}
+
+fn compose_overlays(
+    overlay: &ProjectedOverlay,
+    active_sides: ProjectedActiveSides,
+    full_width_um: i64,
+    height_um: i64,
+    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+) -> Vec<ComposedDecorative> {
+    let surface = active_surface_rect(active_sides, full_width_um, height_um);
+    match overlay {
+        ProjectedOverlay::BothSides { both } => both
+            .as_ref()
+            .map(|content| compose_overlay(content, surface, media_by_id))
+            .into_iter()
+            .collect(),
+        ProjectedOverlay::PerSide { left, right } => match active_sides {
+            ProjectedActiveSides::Both => {
+                let [left_rect, right_rect] = side_rects(full_width_um, height_um);
+                [
+                    left.as_ref()
+                        .map(|content| compose_overlay(content, left_rect, media_by_id)),
+                    right
+                        .as_ref()
+                        .map(|content| compose_overlay(content, right_rect, media_by_id)),
+                ]
+                .into_iter()
+                .flatten()
+                .collect()
+            }
+            ProjectedActiveSides::Left => left
+                .as_ref()
+                .map(|content| compose_overlay(content, surface, media_by_id))
+                .into_iter()
+                .collect(),
+            ProjectedActiveSides::Right => right
+                .as_ref()
+                .map(|content| compose_overlay(content, surface, media_by_id))
+                .into_iter()
+                .collect(),
+        },
+    }
+}
+
+fn compose_overlay(
+    content: &ProjectedOverlayContent,
+    draw_rect: RectUm,
+    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+) -> ComposedDecorative {
+    let ProjectedOverlayContent::Media { media_id } = content;
+    let media = media_by_id
+        .get(media_id.as_str())
+        .copied()
+        .expect("validated Overlay media reference");
+    ComposedDecorative {
+        media_id: media.id.clone(),
+        name: media.name.clone(),
+        draw_rect,
     }
 }
 
@@ -97,8 +274,8 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     let sine = radians.sin();
     let frame_width = frame.width as f64;
     let frame_height = frame.height as f64;
-    let source_width = media.source_width_px as f64;
-    let source_height = media.source_height_px as f64;
+    let source_width = media.source_width_px.expect("validated Photo width") as f64;
+    let source_height = media.source_height_px.expect("validated Photo height") as f64;
     let required_width = cosine.abs() * frame_width + sine.abs() * frame_height;
     let required_height = sine.abs() * frame_width + cosine.abs() * frame_height;
     let fill_scale = (required_width / source_width).max(required_height / source_height);
@@ -172,7 +349,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
         placement,
         rotation_degrees,
         mirror_x: photo.transform.mirror_x,
-        palette: media.palette.clone(),
+        palette: media.palette.clone().expect("validated Photo palette"),
     }
 }
 

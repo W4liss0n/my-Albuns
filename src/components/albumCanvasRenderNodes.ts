@@ -9,7 +9,11 @@ import {
   type Texture,
 } from "pixi.js";
 
-import type { ComposedSheet, NormalizedPan } from "../domain/project";
+import type {
+  ComposedSheet,
+  NormalizedPan,
+  ProjectedFrameBorder,
+} from "../domain/project";
 import {
   MICROMETER_TO_CANVAS_PIXEL,
   SHEET_LABEL_HEIGHT_PX,
@@ -76,6 +80,7 @@ interface PhotoPreviewLayerOptions {
 
 export function createSheetRenderNode(
   sheet: ComposedSheet,
+  frameBorder: ProjectedFrameBorder,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
 ): SheetRenderNode {
@@ -102,13 +107,48 @@ export function createSheetRenderNode(
       height,
       SHEET_VISUAL_STYLE.surface.cornerRadiusPx,
     )
-    .fill({ color: hexToNumber(SHEET_VISUAL_STYLE.surface.fill) })
+    .fill({ color: hexToNumber(sheet.base.rgb) })
     .stroke({
       color: hexToNumber(SHEET_VISUAL_STYLE.surface.outline),
       width: SHEET_VISUAL_STYLE.surface.outlineWidthPx,
       alpha: SHEET_VISUAL_STYLE.surface.outlineOpacity,
     });
   sheetContainer.addChild(shadow, surface);
+
+  for (const background of sheet.backgrounds) {
+    const x = background.drawRect.x * MICROMETER_TO_CANVAS_PIXEL;
+    const y = background.drawRect.y * MICROMETER_TO_CANVAS_PIXEL;
+    const backgroundWidth =
+      background.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
+    const backgroundHeight =
+      background.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
+    if (background.kind === "color") {
+      const color = new Graphics()
+        .rect(x, y, backgroundWidth, backgroundHeight)
+        .fill({ color: hexToNumber(background.rgb) });
+      color.label = `background-color-${background.rgb}`;
+      color.eventMode = "none";
+      sheetContainer.addChild(color);
+      continue;
+    }
+    const previewTexture = callbacks.previewTextureFor(background.mediaId);
+    if (previewTexture) {
+      const sprite = new Sprite({ texture: previewTexture });
+      sprite.label = `background-media-${background.mediaId}`;
+      sprite.position.set(x, y);
+      sprite.width = backgroundWidth;
+      sprite.height = backgroundHeight;
+      sprite.eventMode = "none";
+      sheetContainer.addChild(sprite);
+    } else {
+      const fallback = new Graphics()
+        .rect(x, y, backgroundWidth, backgroundHeight)
+        .fill({ color: 0xd8dee2 });
+      fallback.label = `background-media-fallback-${background.mediaId}`;
+      fallback.eventMode = "none";
+      sheetContainer.addChild(fallback);
+    }
+  }
 
   const label = new Text({
     text: `LÂMINA ${String(sheet.number).padStart(2, "0")}`,
@@ -216,6 +256,21 @@ export function createSheetRenderNode(
         width: SHEET_VISUAL_STYLE.frame.outlineWidthPx,
         alpha: SHEET_VISUAL_STYLE.frame.outlineOpacity,
       });
+    const persistedBorder =
+      frameBorder.kind === "solid"
+        ? new Graphics()
+            .rect(0, 0, frameWidth, frameHeight)
+            .stroke({
+              color: hexToNumber(frameBorder.rgb),
+              width:
+                frameBorder.widthUm * MICROMETER_TO_CANVAS_PIXEL,
+              alpha: 1,
+            })
+        : null;
+    if (persistedBorder) {
+      persistedBorder.label = `frame-persisted-border-${frame.frameId}`;
+      persistedBorder.eventMode = "none";
+    }
     const selectionOutline = new Graphics()
       .rect(0, 0, frameWidth, frameHeight)
       .stroke({ color: 0xb8874f, width: 3, alpha: 1 });
@@ -223,7 +278,11 @@ export function createSheetRenderNode(
     selectionOutline.eventMode = "none";
     selectionOutline.visible = false;
     selectionOutlines.set(frame.frameId, selectionOutline);
-    frameContainer.addChild(outline, selectionOutline);
+    frameContainer.addChild(
+      outline,
+      ...(persistedBorder ? [persistedBorder] : []),
+      selectionOutline,
+    );
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
@@ -243,29 +302,31 @@ export function createSheetRenderNode(
     sheetContainer.addChild(frameContainer);
   }
 
-  if (sheet.overlay) {
-    const previewTexture = callbacks.previewTextureFor(sheet.overlay.mediaId);
+  for (const composedOverlay of sheet.overlays) {
+    const previewTexture = callbacks.previewTextureFor(
+      composedOverlay.mediaId,
+    );
     if (previewTexture) {
       const overlay = new Sprite({ texture: previewTexture });
-      overlay.label = `decorative-overlay-${sheet.overlay.mediaId}`;
+      overlay.label = `decorative-overlay-${composedOverlay.mediaId}`;
       overlay.position.set(
-        sheet.overlay.drawRect.x * MICROMETER_TO_CANVAS_PIXEL,
-        sheet.overlay.drawRect.y * MICROMETER_TO_CANVAS_PIXEL,
+        composedOverlay.drawRect.x * MICROMETER_TO_CANVAS_PIXEL,
+        composedOverlay.drawRect.y * MICROMETER_TO_CANVAS_PIXEL,
       );
       overlay.width =
-        sheet.overlay.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
+        composedOverlay.drawRect.width * MICROMETER_TO_CANVAS_PIXEL;
       overlay.height =
-        sheet.overlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
+        composedOverlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
       overlay.eventMode = "none";
       sheetContainer.addChild(overlay);
     } else {
       const overlayStyle = SHEET_VISUAL_STYLE.overlay;
       const overlay = new Graphics()
         .roundRect(
-          overlayStyle.insetPx,
-          overlayStyle.insetPx,
-          width - overlayStyle.insetPx * 2,
-          height - overlayStyle.insetPx * 2,
+          composedOverlay.drawRect.x * MICROMETER_TO_CANVAS_PIXEL,
+          composedOverlay.drawRect.y * MICROMETER_TO_CANVAS_PIXEL,
+          composedOverlay.drawRect.width * MICROMETER_TO_CANVAS_PIXEL,
+          composedOverlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL,
           overlayStyle.cornerRadiusPx,
         )
         .stroke({
@@ -273,26 +334,10 @@ export function createSheetRenderNode(
           width: overlayStyle.outlineWidthPx,
           alpha: overlayStyle.outlineOpacity,
         });
-      overlay.label = `decorative-overlay-fallback-${sheet.overlay.mediaId}`;
+      overlay.label = `decorative-overlay-fallback-${composedOverlay.mediaId}`;
       overlay.eventMode = "none";
       sheetContainer.addChild(overlay);
     }
-  }
-
-  if (sheet.activeSides !== "both") {
-    const inactiveX = sheet.activeSides === "right" ? 0 : width / 2;
-    const inactiveSide = new Graphics()
-      .rect(inactiveX, 0, width / 2, height)
-      .fill({
-        color: hexToNumber(SHEET_VISUAL_STYLE.inactiveSide.fill),
-        alpha: SHEET_VISUAL_STYLE.inactiveSide.opacity,
-      });
-    inactiveSide.label = `inactive-${
-      sheet.activeSides === "right" ? "left" : "right"
-    }-side`;
-    inactiveSide.eventMode = "static";
-    inactiveSide.cursor = "default";
-    sheetContainer.addChild(inactiveSide);
   }
 
   const focusOutline = new Graphics()

@@ -171,7 +171,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   const prepareMediaPreviews = vi.fn(async () => [
       {
         mediaId: "media-001",
-        url: "asset://localhost/cache/media-001.jpg",
+        url: "http://myalbuns-media.localhost/opaque-media-token",
       },
     ]);
 
@@ -202,10 +202,56 @@ test("prepares real media previews after opening without blocking the Workspace"
   expect(logEvents).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        component: "media-cache",
-        event: "media_cache_completed",
+        component: "media-preview",
+        event: "media_preview_completed",
         projectId: projection.state.projectId,
       }),
     ]),
+  );
+});
+
+test("logs the typed media preview failure code without replacing it with unknown_error", async () => {
+  const logEvents: LogEvent[] = [];
+  const logger: Logger = {
+    write: (event) => logEvents.push(event),
+  };
+  const failure = Object.assign(
+    new Error("A Imagem decorativa vinculada não está disponível."),
+    { code: "unavailable" },
+  );
+  const prepareMediaPreviews = vi.fn(async () => {
+    throw failure;
+  });
+
+  render(
+    <App
+      exportPort={exportPort}
+      mediaPreviewPort={{ prepareMediaPreviews }}
+      projectSessionPort={projectSessionPort}
+      logger={logger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(logEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          component: "media-preview",
+          event: "media_preview_failed",
+          reason: "unavailable",
+        }),
+      ]),
+    ),
   );
 });

@@ -57,11 +57,13 @@ const decorativeProjection: EditorProjection = {
     ...projection.state,
     album: {
       ...projection.state.album,
-      sheets: projection.state.album.sheets.map((sheet, index) => ({
-        ...sheet,
-        overlayMediaId:
-          index === 0 ? "decorative-overlay" : null,
-      })),
+      visualDefaults: {
+        ...projection.state.album.visualDefaults,
+        overlay: {
+          scope: "bothSides",
+          both: { kind: "media", mediaId: "decorative-overlay" },
+        },
+      },
       media: [
         ...projection.state.album.media,
         {
@@ -76,21 +78,21 @@ const decorativeProjection: EditorProjection = {
     },
   },
   composition: {
-    sheets: projection.composition.sheets.map((sheet, index) => ({
+    ...projection.composition,
+    sheets: projection.composition.sheets.map((sheet) => ({
       ...sheet,
-      overlay:
-        index === 0
-          ? {
-              mediaId: "decorative-overlay",
-              name: "Overlay translúcido.png",
-              drawRect: {
-                x: 0,
-                y: 0,
-                width: sheet.widthUm,
-                height: sheet.heightUm,
-              },
-            }
-          : null,
+      overlays: [
+        {
+          mediaId: "decorative-overlay",
+          name: "Overlay translúcido.png",
+          drawRect: {
+            x: 0,
+            y: 0,
+            width: sheet.widthUm,
+            height: sheet.heightUm,
+          },
+        },
+      ],
     })),
   },
   mediaUsage: [

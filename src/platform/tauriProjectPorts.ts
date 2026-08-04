@@ -4,17 +4,47 @@ import type {
   EditorProjection,
   ProjectIntent,
 } from "../domain/project";
-import type {
-  ExportPort,
-  ExportProgressEvent,
-  MediaPreviewPort,
-  ProjectSessionPort,
+import {
+  MediaPreviewError,
+  type ExportPort,
+  type ExportProgressEvent,
+  type MediaPreviewPort,
+  type ProjectSessionPort,
 } from "../application/projectPorts";
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
+import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+
+function isMediaPreviewCommandError(
+  error: unknown,
+): error is IpcMediaPreviewCommandError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "unavailable" ||
+      error.code === "unsupported_image" ||
+      error.code === "read_failed") &&
+    "message" in error &&
+    typeof error.message === "string"
+  );
+}
+
+function normalizeMediaPreviewError(error: unknown) {
+  if (isMediaPreviewCommandError(error)) {
+    return new MediaPreviewError(error.code, error.message);
+  }
+  if (error instanceof Error) {
+    return new MediaPreviewError("read_failed", error.message);
+  }
+  return new MediaPreviewError(
+    "read_failed",
+    "Não foi possível preparar as Prévias de mídia vinculada.",
+  );
+}
 
 function isCancelledExportError(
   error: unknown,
@@ -40,7 +70,11 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: () =>
-    invoke<IpcMediaPreview[] | null>("prepare_media_previews"),
+    invoke<IpcMediaPreview[] | null>("prepare_media_previews").catch(
+      (error: unknown) => {
+        throw normalizeMediaPreviewError(error);
+      },
+    ),
 };
 
 export const tauriExportPort: ExportPort = {

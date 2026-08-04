@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectIntent } from "../domain/project";
+import { MediaPreviewError } from "../application/projectPorts";
 import {
   tauriExportPort,
   tauriMediaPreviewPort,
@@ -211,4 +212,19 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
   expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews");
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
+});
+
+test("normalizes typed media preview failures without losing their code or message", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "unavailable",
+    message: "A Imagem decorativa vinculada não está disponível.",
+  });
+
+  const failure = tauriMediaPreviewPort.prepareMediaPreviews();
+
+  await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
+  await expect(failure).rejects.toMatchObject({
+    code: "unavailable",
+    message: "A Imagem decorativa vinculada não está disponível.",
+  });
 });

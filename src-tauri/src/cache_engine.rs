@@ -1,6 +1,5 @@
 use std::{
     io::Write,
-    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -11,7 +10,6 @@ use myalbuns_imaging_protocol::{
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan};
 use serde::Serialize;
-use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
@@ -21,35 +19,6 @@ use crate::imaging_processor::{
 const CACHE_REPRESENTATION_VERSION: u32 = 1;
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 2;
 const SOURCE_FINGERPRINT_VERSION: u32 = 1;
-
-#[derive(Debug, Default)]
-pub(crate) struct CacheEngine {
-    activity: Arc<RwLock<()>>,
-}
-
-#[derive(Debug)]
-pub(crate) struct CacheActivity {
-    _guard: OwnedRwLockReadGuard<()>,
-}
-
-#[derive(Debug)]
-pub(crate) struct CachePause {
-    _guard: OwnedRwLockWriteGuard<()>,
-}
-
-impl CacheEngine {
-    pub(crate) async fn begin_work(&self) -> CacheActivity {
-        CacheActivity {
-            _guard: self.activity.clone().read_owned().await,
-        }
-    }
-
-    pub(crate) async fn pause(&self) -> CachePause {
-        CachePause {
-            _guard: self.activity.clone().write_owned().await,
-        }
-    }
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,19 +93,6 @@ pub(crate) enum CacheFailureStage {
     ValidateResponse,
     VerifyArtifacts,
     PublishIndex,
-}
-
-impl CacheFailureStage {
-    pub(crate) const fn as_str(self) -> &'static str {
-        match self {
-            Self::Plan => "plan_request",
-            Self::Processor(stage) => stage.as_str(),
-            Self::RecoveryCleanup => "cache_recovery_cleanup",
-            Self::ValidateResponse => "validate_response",
-            Self::VerifyArtifacts => "verify_artifacts",
-            Self::PublishIndex => "publish_index",
-        }
-    }
 }
 
 pub(crate) type CacheFailure = OperationFailure<CacheFailureStage>;
@@ -524,7 +480,7 @@ fn unix_millis(time: SystemTime) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, io::Write, time::Duration};
+    use std::{collections::VecDeque, io::Write};
 
     use myalbuns_imaging_protocol::{
         CacheArtifact, CacheArtifactFormat, CacheCompletion, ImagingCommand, ImagingFailureStage,
@@ -532,7 +488,7 @@ mod tests {
     };
     use myalbuns_paths::{AppPaths, OperationPathContext};
 
-    use super::{CacheEngine, CacheFailureStage, CacheWork, execute, plan_request};
+    use super::{CacheFailureStage, CacheWork, execute, plan_request};
     use crate::imaging_processor::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFuture,
@@ -541,41 +497,6 @@ mod tests {
     struct ScriptedTransport {
         results: VecDeque<Result<ImagingResponse, InvocationFailure>>,
         attempts: Vec<u8>,
-    }
-
-    #[test]
-    fn pause_waits_for_active_work_and_blocks_new_work_until_release() {
-        tauri::async_runtime::block_on(async {
-            let engine = CacheEngine::default();
-            let active_work = engine.begin_work().await;
-            let pause = engine.pause();
-            tokio::pin!(pause);
-
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), &mut pause)
-                    .await
-                    .is_err(),
-                "the pause must wait for active Cache work to reach its safe endpoint"
-            );
-
-            drop(active_work);
-            let pause = tokio::time::timeout(Duration::from_secs(1), &mut pause)
-                .await
-                .expect("the pause starts after active work ends");
-            let new_work = engine.begin_work();
-            tokio::pin!(new_work);
-            assert!(
-                tokio::time::timeout(Duration::from_millis(20), &mut new_work)
-                    .await
-                    .is_err(),
-                "new Cache work remains paused while the guard is alive"
-            );
-
-            drop(pause);
-            tokio::time::timeout(Duration::from_secs(1), &mut new_work)
-                .await
-                .expect("Cache work resumes when the pause is released");
-        });
     }
 
     impl ImagingTransport for ScriptedTransport {

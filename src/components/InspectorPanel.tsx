@@ -6,6 +6,7 @@ import type {
   ComposedSheet,
   DocumentSnapshot,
   FrameSnapshot,
+  ProjectedFrameBorder,
   SheetSnapshot,
 } from "../domain/project";
 import {
@@ -36,6 +37,7 @@ export interface InspectorPanelProps {
   document: DocumentSnapshot;
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
+  frameBorder: ProjectedFrameBorder;
   focusedSheetId: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onBeginPhotoZoom(): void;
@@ -54,6 +56,7 @@ export function InspectorPanel({
   document,
   sheetStates,
   sheets,
+  frameBorder,
   focusedSheetId,
   mediaPreviewUrls = {},
   onBeginPhotoZoom,
@@ -208,6 +211,7 @@ export function InspectorPanel({
                     onPress={() => onNavigateToSheet(sheet.sheetId)}
                   >
                     <SheetPreview
+                      frameBorder={frameBorder}
                       sheet={sheet}
                       mediaPreviewUrls={mediaPreviewUrls}
                     />

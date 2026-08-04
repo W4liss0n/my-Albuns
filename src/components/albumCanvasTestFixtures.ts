@@ -5,6 +5,7 @@ import type {
 } from "../domain/project";
 
 export const composition: CompositionPlan = {
+  frameBorder: { kind: "none" },
   sheets: [
     {
       sheetId: "sheet-001",
@@ -12,19 +13,42 @@ export const composition: CompositionPlan = {
       activeSides: "both",
       widthUm: 600_000,
       heightUm: 300_000,
-      overlay: null,
+      base: {
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+      },
+      backgrounds: [
+        {
+          kind: "color",
+          rgb: "#FFFFFF",
+          drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+        },
+      ],
+      overlays: [],
       frames: [],
     },
   ],
 };
 export const threeSheetComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
   sheets: [1, 2, 3].map((number) => ({
     sheetId: `sheet-00${number}`,
     number,
     activeSides: "both" as const,
     widthUm: 600_000,
     heightUm: 300_000,
-    overlay: null,
+    base: {
+      rgb: "#FFFFFF",
+      drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+    },
+    backgrounds: [
+      {
+        kind: "color" as const,
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+      },
+    ],
+    overlays: [],
     frames: [],
   })),
 };
@@ -55,6 +79,7 @@ const horizontalPlacementPlan: PhotoPlacementPlan = {
 };
 
 export const interactiveComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
   sheets: [
     {
       sheetId: "sheet-001",
@@ -62,7 +87,18 @@ export const interactiveComposition: CompositionPlan = {
       activeSides: "both",
       widthUm: 600_000,
       heightUm: 300_000,
-      overlay: null,
+      base: {
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+      },
+      backgrounds: [
+        {
+          kind: "color",
+          rgb: "#FFFFFF",
+          drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+        },
+      ],
+      overlays: [],
       frames: [
         {
           frameId: "frame-001",
@@ -94,6 +130,7 @@ export const interactiveComposition: CompositionPlan = {
 };
 
 export const pannedInteractiveComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
   sheets: [
     {
       ...interactiveComposition.sheets[0],
@@ -122,6 +159,7 @@ export const pannedInteractiveComposition: CompositionPlan = {
 };
 
 export const rotatedInteractiveComposition: CompositionPlan = {
+  frameBorder: { kind: "none" },
   sheets: [
     {
       ...interactiveComposition.sheets[0],

@@ -9,7 +9,7 @@ use myalbuns_paths::AppPaths;
 
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, FailureCode, FailureStage,
-    HostTerminal, InitialProjectConfiguration, to_core_configuration,
+    HostTerminal, InitialProjectCreationConfiguration, to_core_initial_project,
 };
 
 #[derive(Debug)]
@@ -67,7 +67,7 @@ fn bootstrap_host_project_with_thread(
 
     let project_path = request.authority.logical_target.clone().into_path_buf();
     let root_bindings = request.authority.root_bindings.clone();
-    let intent = request.intent;
+    let intent = request.intent.clone();
     let identity_lease_root = app_paths.project_identity_leases_dir();
     let worker = std::thread::spawn(move || {
         let worker_thread = std::thread::current().id();
@@ -80,13 +80,16 @@ fn bootstrap_host_project_with_thread(
             BootstrapIntent::CreateNew {
                 configuration,
                 authorization,
-            } => core
-                .create_editable(CreateProjectRequest::new(
+            } => {
+                let initial = initial_project(*configuration)
+                    .map_err(|()| (FailureStage::Create, FailureCode::InvalidInitialProject))?;
+                core.create_editable(CreateProjectRequest::new(
                     location,
-                    initial_project(configuration),
+                    initial,
                     create_authorization(authorization),
                 ))
-                .map_err(|error| (FailureStage::Create, map_create_error(error)))?,
+                .map_err(|error| (FailureStage::Create, map_create_error(error)))?
+            }
         };
         Ok::<_, (FailureStage, FailureCode)>((project, worker_thread))
     });
@@ -104,8 +107,10 @@ fn bootstrap_host_project_with_thread(
     }
 }
 
-fn initial_project(configuration: InitialProjectConfiguration) -> InitialProject {
-    InitialProject::configured(to_core_configuration(configuration))
+fn initial_project(
+    configuration: InitialProjectCreationConfiguration,
+) -> Result<InitialProject, ()> {
+    to_core_initial_project(configuration).ok_or(())
 }
 
 fn create_authorization(authorization: CreateWriteAuthorization) -> CreateAuthorization {
@@ -170,14 +175,16 @@ mod tests {
     use myalbuns_paths::{AppPaths, NativePathDto, OperationPathContext};
 
     use super::super::configuration::{
-        InitialDisplayUnit, InitialDocumentConfiguration, InitialSheetFormat,
-        InitialStructureConfiguration,
+        InitialBackground, InitialBackgroundContent, InitialDisplayUnit,
+        InitialDocumentConfiguration, InitialFrameBorder, InitialOverlay,
+        InitialProjectCreationConfiguration, InitialSheetFormat, InitialStructureConfiguration,
+        InitialVisualDefaults,
     };
 
     use super::*;
 
-    fn configured_project() -> InitialProjectConfiguration {
-        InitialProjectConfiguration {
+    fn configured_project() -> InitialProjectCreationConfiguration {
+        InitialProjectCreationConfiguration {
             document: InitialDocumentConfiguration {
                 display_unit: InitialDisplayUnit::Cm,
                 sheet_width_um: 508_000,
@@ -190,6 +197,15 @@ mod tests {
                 sheet_count: 3,
                 first_sheet: InitialSheetFormat::SinglePage,
                 last_sheet: InitialSheetFormat::Double,
+            },
+            visual_defaults: InitialVisualDefaults {
+                background: InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Color {
+                        rgb: "#FFFFFF".into(),
+                    },
+                },
+                overlay: InitialOverlay::BothSides { both: None },
+                frame_border: InitialFrameBorder::None,
             },
         }
     }
@@ -240,7 +256,7 @@ mod tests {
                 attempt_id: "attempt-create".into(),
                 launch_nonce: "nonce-create".into(),
                 intent: BootstrapIntent::CreateNew {
-                    configuration: configured_project(),
+                    configuration: Box::new(configured_project()),
                     authorization,
                 },
                 authority: super::super::TargetAuthority {

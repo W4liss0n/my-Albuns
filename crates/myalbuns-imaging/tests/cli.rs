@@ -5,7 +5,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{
-    DemoEditableProject as EditableProject, ProjectCore, ProjectIntent, RenderSnapshot,
+    DemoEditableProject as EditableProject, ProjectCore, ProjectIntent, ProjectedFrameBorder,
+    RenderSnapshot,
 };
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
@@ -382,11 +383,11 @@ fn processor_keeps_an_opaque_png_source_in_the_jpeg_cache_baseline() {
 }
 
 #[test]
-fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
+fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let source_path = source_dir.path().join("photo.jpg");
-    let output_path = output_dir.path().join("real-sheet.png");
+    let output_path = output_dir.path().join("real-sheet-without-border.png");
     let mut source = RgbImage::new(40, 20);
     for (x, _, pixel) in source.enumerate_pixels_mut() {
         *pixel = if x < 20 {
@@ -401,10 +402,14 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
     let source_bytes = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
     let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
+    snapshot.composition.frame_border = ProjectedFrameBorder::None;
     let sheet = &mut snapshot.composition.sheets[0];
-    sheet.overlay = None;
+    sheet.overlays.clear();
     sheet.width_um = 25_400;
     sheet.height_um = 12_700;
+    sheet.base.draw_rect.width = sheet.width_um;
+    sheet.base.draw_rect.height = sheet.height_um;
+    sheet.backgrounds.clear();
     sheet.frames.truncate(1);
     let frame = &mut sheet.frames[0];
     frame.clip_rect.x = 0;
@@ -424,11 +429,11 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
     .expect("the linked source is valid");
 
     let result = invoke_real_processor(
-        snapshot,
+        snapshot.clone(),
         &output_path,
         "real-request-001",
         100,
-        vec![source],
+        vec![source.clone()],
     );
 
     assert!(
@@ -456,10 +461,42 @@ fn processor_renders_linked_original_pixels_at_the_requested_dpi() {
         .to_rgb8();
     let left = rendered.get_pixel(10, 25);
     let right = rendered.get_pixel(90, 25);
+    let edge_without_border = rendered.get_pixel(0, 25);
+    assert!(
+        u16::from(edge_without_border[0]) > u16::from(edge_without_border[2]) * 3,
+        "FrameBorder::None preserves the Photo at the Frame edge"
+    );
     assert!(left[0] > left[2] * 3, "the left source half remains red");
     assert!(
         right[2] > right[0] * 3,
         "the right source half remains blue"
+    );
+
+    snapshot.composition.frame_border = ProjectedFrameBorder::Solid {
+        rgb: "#00FF00".into(),
+        width_um: 1_270,
+    };
+    let bordered_output_path = output_dir.path().join("real-sheet-with-border.png");
+    let bordered_result = invoke_real_processor(
+        snapshot,
+        &bordered_output_path,
+        "real-request-002",
+        100,
+        vec![source],
+    );
+    assert!(
+        bordered_result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&bordered_result.stderr)
+    );
+    let bordered = image::open(&bordered_output_path)
+        .expect("the bordered output decodes")
+        .to_rgb8();
+    let border = bordered.get_pixel(1, 25);
+    assert!(
+        u16::from(border[1]) > u16::from(border[0]) * 3
+            && u16::from(border[1]) > u16::from(border[2]) * 3,
+        "the persisted Frame border remains green"
     );
 }
 
@@ -481,12 +518,16 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
 
     let mut snapshot = sample_session(SampleProject::Horizon, 3).render_snapshot();
     let overlay = snapshot.composition.sheets[0]
-        .overlay
-        .clone()
+        .overlays
+        .first()
+        .cloned()
         .expect("the representative fixture contains an Overlay");
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.width_um = 25_400;
     sheet.height_um = 12_700;
+    sheet.base.draw_rect.width = sheet.width_um;
+    sheet.base.draw_rect.height = sheet.height_um;
+    sheet.backgrounds.clear();
     sheet.frames.truncate(1);
     let (photo_media_id, draw_rect) = {
         let frame = &mut sheet.frames[0];
@@ -500,10 +541,10 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
         photo.mirror_x = false;
         (photo.media_id.clone(), frame.clip_rect.clone())
     };
-    sheet.overlay = Some(myalbuns_core::ComposedDecorative {
+    sheet.overlays = vec![myalbuns_core::ComposedDecorative {
         draw_rect,
         ..overlay
-    });
+    }];
 
     let photo_source = MediaSource::new(
         photo_media_id,
@@ -873,7 +914,7 @@ fn single_photo_render_request(
         .sheets
         .first_mut()
         .expect("the fixture contains a sheet");
-    sheet.overlay = None;
+    sheet.overlays.clear();
     sheet.frames.truncate(1);
     let media_id = sheet.frames[0]
         .photo
@@ -948,8 +989,8 @@ fn render_request_with_temp_originals(
         .first()
         .expect("the fixture contains a sheet");
     let overlay_id = sheet
-        .overlay
-        .as_ref()
+        .overlays
+        .first()
         .map(|overlay| overlay.media_id.as_str());
     let mut media_ids = Vec::new();
     for media_id in sheet.referenced_media_ids() {

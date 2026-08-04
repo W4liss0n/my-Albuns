@@ -3,6 +3,23 @@ import { expect, test } from "vitest";
 import type { CompositionPlan } from "../domain/project";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
 
+function neutralLayers() {
+  return {
+    base: {
+      rgb: "#FFFFFF",
+      drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+    },
+    backgrounds: [
+      {
+        kind: "color" as const,
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+      },
+    ],
+    overlays: [],
+  };
+}
+
 const threeSheets: CompositionPlan["sheets"] = [
   {
     sheetId: "sheet-001",
@@ -10,7 +27,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
-    overlay: null,
+    ...neutralLayers(),
     frames: [],
   },
   {
@@ -19,7 +36,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
-    overlay: null,
+    ...neutralLayers(),
     frames: [],
   },
   {
@@ -28,7 +45,7 @@ const threeSheets: CompositionPlan["sheets"] = [
     activeSides: "both",
     widthUm: 600_000,
     heightUm: 300_000,
-    overlay: null,
+    ...neutralLayers(),
     frames: [],
   },
 ];

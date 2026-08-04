@@ -112,19 +112,22 @@ test("materializes a transparent Decorative from the shared Cache URL", async ()
     "asset://localhost/cache/decorative-overlay.png";
   const texture = { label: "decorative-cache-preview" };
   const decorativeComposition: CompositionPlan = {
+    ...composition,
     sheets: [
       {
         ...composition.sheets[0],
-        overlay: {
-          mediaId: "decorative-overlay",
-          name: "Overlay translúcido.png",
-          drawRect: {
-            x: 0,
-            y: 0,
-            width: composition.sheets[0].widthUm,
-            height: composition.sheets[0].heightUm,
+        overlays: [
+          {
+            mediaId: "decorative-overlay",
+            name: "Overlay translúcido.png",
+            drawRect: {
+              x: 0,
+              y: 0,
+              width: composition.sheets[0].widthUm,
+              height: composition.sheets[0].heightUm,
+            },
           },
-        },
+        ],
       },
     ],
   };
@@ -152,24 +155,45 @@ test("materializes a transparent Decorative from the shared Cache URL", async ()
   });
 });
 
+test("materializes the persisted Frame border in the Canvas scene", async () => {
+  renderCanvas({
+    compositionPlan: {
+      ...interactiveComposition,
+      frameBorder: {
+        kind: "solid",
+        rgb: "#A0B0C0",
+        widthUm: 1_250,
+      },
+    },
+  });
+  await finishPixiInitialization();
+
+  expect(
+    displayWithLabel("frame-persisted-border-frame-001"),
+  ).toBeDefined();
+});
+
 test("materializes and releases only the viewport margin while navigating a long Album", async () => {
   const longComposition: CompositionPlan = {
+    ...interactiveComposition,
     sheets: Array.from({ length: 100 }, (_, index) => {
       const number = index + 1;
       return {
         ...interactiveComposition.sheets[0],
         sheetId: `sheet-${String(number).padStart(3, "0")}`,
         number,
-        overlay: {
-          mediaId: "decorative-overlay",
-          name: "Overlay translúcido.png",
-          drawRect: {
-            x: 0,
-            y: 0,
-            width: 600_000,
-            height: 300_000,
+        overlays: [
+          {
+            mediaId: "decorative-overlay",
+            name: "Overlay translúcido.png",
+            drawRect: {
+              x: 0,
+              y: 0,
+              width: 600_000,
+              height: 300_000,
+            },
           },
-        },
+        ],
         frames: [
           {
             ...interactiveComposition.sheets[0].frames[0],
@@ -324,6 +348,7 @@ test("reconciles only the composed sheet that changed", async () => {
     (first, second) => first.position.x - second.position.x,
   );
   const changedComposition: CompositionPlan = {
+    ...threeSheetComposition,
     sheets: threeSheetComposition.sheets.map((sheet, index) =>
       index === 1
         ? {

@@ -78,7 +78,7 @@ export function MediaPanel({
               <span
                 className="media-thumb"
                 style={{
-                  background: `linear-gradient(135deg, ${media.palette[0]}, ${media.palette[1]} 56%, ${media.palette[2]})`,
+                  background: mediaCardBackground(media),
                 }}
               >
                 {mediaPreviewUrls[media.id] && (
@@ -107,4 +107,9 @@ export function MediaPanel({
       </div>
     </section>
   );
+}
+
+function mediaCardBackground(media: MediaCatalogItem) {
+  const palette = media.palette ?? ["#26323A", "#53636D", "#A6B0B6"];
+  return `linear-gradient(135deg, ${palette[0]}, ${palette[1]} 56%, ${palette[2]})`;
 }

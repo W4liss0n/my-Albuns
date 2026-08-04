@@ -15,7 +15,7 @@ use super::{DecodeFailure, DocumentFailure, PathFailure};
 use crate::project_document::{
     ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
     FrameBorder, MAX_SAFE_INTEGER, Overlay, OverlayContent, ProjectDocument, ProjectRevision,
-    ProjectSheet, Rgb, VisualDefaults, validate_project_state,
+    ProjectSheet, Rgb, VisualDefaults, frame_border_width_is_valid, validate_project_state,
 };
 
 const DOCUMENT_TYPE: &str = "myalbuns.project";
@@ -142,7 +142,7 @@ fn map_visual_defaults(defaults: VisualDefaultsV1) -> Result<VisualDefaults, Dec
     let frame_border = match defaults.frame_border {
         FrameBorderV1::None => FrameBorder::None,
         FrameBorderV1::Solid { rgb, width_um } => {
-            if width_um == 0 || width_um > MAX_SAFE_INTEGER {
+            if !frame_border_width_is_valid(width_um) {
                 return Err(document_failure(DocumentFailure::InvalidProjectDocument));
             }
             FrameBorder::Solid {
@@ -198,20 +198,8 @@ fn parse_uuid_v4(source: &str) -> Result<Uuid, DecodeFailure> {
 }
 
 fn parse_rgb(source: &str) -> Result<Rgb, DecodeFailure> {
-    let bytes = source.as_bytes();
-    if bytes.len() != 7
-        || bytes[0] != b'#'
-        || !bytes[1..]
-            .iter()
-            .all(|byte| byte.is_ascii_digit() || (b'A'..=b'F').contains(byte))
-    {
-        return Err(document_failure(DocumentFailure::InvalidProjectDocument));
-    }
-    let channel = |start| {
-        u8::from_str_radix(&source[start..start + 2], 16)
-            .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))
-    };
-    Ok(Rgb::new([channel(1)?, channel(3)?, channel(5)?]))
+    Rgb::parse_canonical(source)
+        .ok_or_else(|| document_failure(DocumentFailure::InvalidProjectDocument))
 }
 
 fn document_failure(failure: DocumentFailure) -> DecodeFailure {
@@ -621,6 +609,5 @@ impl From<ActiveSides> for ActiveSidesV1 {
 }
 
 fn format_rgb(rgb: Rgb) -> String {
-    let [red, green, blue] = rgb.channels();
-    format!("#{red:02X}{green:02X}{blue:02X}")
+    rgb.canonical_hex()
 }

@@ -6,8 +6,10 @@
 //! `ProjectCore`, exatamente como um Projeto persistido.
 
 use myalbuns_core::{
-    AlbumSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaKind, MediaTransform,
-    PhotoSnapshot, ProjectCore, RectUm, SheetRole, SheetSnapshot,
+    AlbumSnapshot, DocumentSnapshot, EditorState, FrameSnapshot, MediaCatalogItem, MediaKind,
+    MediaTransform, PhotoSnapshot, ProjectCore, ProjectedBackground, ProjectedBackgroundContent,
+    ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
+    ProjectedVisualDefaults, RectUm, SheetRole, SheetSnapshot,
 };
 use myalbuns_imaging_protocol::MediaSource;
 use myalbuns_paths::AppPaths;
@@ -63,7 +65,7 @@ fn materialize_media(app_paths: &AppPaths) -> Result<Vec<MediaSource>, String> {
 fn persisted_source() -> Result<String, serde_json::Error> {
     let state = editor_state();
     serde_json::to_string_pretty(&serde_json::json!({
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "projectId": state.project_id,
         "projectName": state.project_name,
         "revision": state.revision,
@@ -75,9 +77,30 @@ fn editor_state() -> EditorState {
     EditorState {
         project_id: PROJECT_ID.into(),
         project_name: PROJECT_NAME.into(),
+        document: DocumentSnapshot {
+            display_unit: ProjectedDisplayUnit::Mm,
+            sheet_width_um: SHEET_WIDTH_UM as u64,
+            sheet_height_um: SHEET_HEIGHT_UM as u64,
+            dpi: 300,
+            bleed_um: 3_000,
+            safety_um: 3_000,
+        },
         album: AlbumSnapshot {
             sheets: (1..=SHEET_COUNT).map(sheet).collect(),
             media: media_catalog(),
+            visual_defaults: ProjectedVisualDefaults {
+                background: ProjectedBackground::BothSides {
+                    both: ProjectedBackgroundContent::Color {
+                        rgb: "#FFFFFF".into(),
+                    },
+                },
+                overlay: ProjectedOverlay::BothSides {
+                    both: Some(ProjectedOverlayContent::Media {
+                        media_id: "decorative-overlay".into(),
+                    }),
+                },
+                frame_border: ProjectedFrameBorder::None,
+            },
         },
         revision: 0,
         saved_revision: 0,
@@ -128,7 +151,6 @@ fn sheet(number: usize) -> SheetSnapshot {
                 photo: right_photo,
             },
         ],
-        overlay_media_id: (number == 1).then(|| "decorative-overlay".into()),
     }
 }
 
@@ -150,33 +172,33 @@ fn media_catalog() -> Vec<MediaCatalogItem> {
             id: "media-serra".into(),
             kind: MediaKind::Photo,
             name: "Serra ao amanhecer.jpg".into(),
-            source_width_px: 6_000,
-            source_height_px: 4_000,
-            palette: ["#153448".into(), "#3c7a89".into(), "#f1c27d".into()],
+            source_width_px: Some(6_000),
+            source_height_px: Some(4_000),
+            palette: Some(["#153448".into(), "#3c7a89".into(), "#f1c27d".into()]),
         },
         MediaCatalogItem {
             id: "media-costa".into(),
             kind: MediaKind::Photo,
             name: "Costa dourada.jpg".into(),
-            source_width_px: 6_000,
-            source_height_px: 4_000,
-            palette: ["#11212d".into(), "#5b7c8d".into(), "#dca15d".into()],
+            source_width_px: Some(6_000),
+            source_height_px: Some(4_000),
+            palette: Some(["#11212d".into(), "#5b7c8d".into(), "#dca15d".into()]),
         },
         MediaCatalogItem {
             id: "media-campo".into(),
             kind: MediaKind::Photo,
             name: "Campo de inverno.jpg".into(),
-            source_width_px: 6_000,
-            source_height_px: 4_000,
-            palette: ["#26352e".into(), "#8a9a71".into(), "#e7dcc3".into()],
+            source_width_px: Some(6_000),
+            source_height_px: Some(4_000),
+            palette: Some(["#26352e".into(), "#8a9a71".into(), "#e7dcc3".into()]),
         },
         MediaCatalogItem {
             id: "decorative-overlay".into(),
             kind: MediaKind::Decorative,
             name: "Overlay translúcido.png".into(),
-            source_width_px: 2_400,
-            source_height_px: 1_800,
-            palette: ["#17344a".into(), "#88b7c5".into(), "#d4a15e".into()],
+            source_width_px: Some(2_400),
+            source_height_px: Some(1_800),
+            palette: Some(["#17344a".into(), "#88b7c5".into(), "#d4a15e".into()]),
         },
     ]
 }

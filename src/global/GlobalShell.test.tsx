@@ -23,6 +23,9 @@ function createProjectPort(
   return {
     validateProjectConfiguration: async () => ({ status: "valid" }),
     createProject: async () => ({ status: "cancelled" }),
+    chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
+    releaseProvisionalDecorative: async () => undefined,
+    clearProvisionalDecoratives: async () => undefined,
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
     openRecentProject: async () => ({ status: "cancelled" }),
@@ -48,12 +51,18 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 
-test("opens and cancels the creation assistant without reaching the native port", async () => {
+test("opens and cancels the creation assistant without starting Project creation", async () => {
   const user = userEvent.setup();
   const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  const clearProvisionalDecoratives = vi.fn(async () => undefined);
 
   render(
-    <GlobalShell projectPort={createProjectPort({ createProject })} />,
+    <GlobalShell
+      projectPort={createProjectPort({
+        createProject,
+        clearProvisionalDecoratives,
+      })}
+    />,
   );
 
   await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
@@ -62,6 +71,48 @@ test("opens and cancels the creation assistant without reaching the native port"
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(createProject).not.toHaveBeenCalled();
+  expect(clearProvisionalDecoratives).toHaveBeenCalledOnce();
+});
+
+test("connects provisional selection and owns final registry cleanup in Global", async () => {
+  const user = userEvent.setup();
+  const selection = {
+    selectionId: "selection-background",
+    displayName: "Textura.jpg",
+    previewUrl: "myalbuns-preview://localhost/selection-background",
+  };
+  const chooseProvisionalDecorative = vi.fn(async () => ({
+    status: "selected" as const,
+    selection,
+  }));
+  const releaseProvisionalDecorative = vi.fn(async () => undefined);
+  const clearProvisionalDecoratives = vi.fn(async () => undefined);
+
+  render(
+    <GlobalShell
+      projectPort={createProjectPort({
+        chooseProvisionalDecorative,
+        releaseProvisionalDecorative,
+        clearProvisionalDecoratives,
+      })}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  await user.click(screen.getByRole("button", { name: /Pr.*ximo/ }));
+  await user.click(
+    await screen.findByRole("button", {
+      name: "Escolher imagem de Background",
+    }),
+  );
+
+  expect(chooseProvisionalDecorative).toHaveBeenCalledOnce();
+  expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+
+  expect(releaseProvisionalDecorative).not.toHaveBeenCalled();
+  expect(clearProvisionalDecoratives).toHaveBeenCalledOnce();
 });
 
 test("forwards the completed dimensions configuration to creation", async () => {
@@ -89,6 +140,14 @@ test("forwards the completed dimensions configuration to creation", async () => 
       sheetCount: 2,
       firstSheet: "double",
       lastSheet: "double",
+    },
+    visualDefaults: {
+      background: {
+        scope: "bothSides",
+        both: { kind: "color", rgb: "#FFFFFF" },
+      },
+      overlay: { scope: "bothSides", both: null },
+      frameBorder: { kind: "none" },
     },
   });
 });

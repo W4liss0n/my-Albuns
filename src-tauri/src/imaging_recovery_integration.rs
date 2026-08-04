@@ -245,7 +245,7 @@ fn export_snapshot() -> (
     let mut snapshot = session.render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
     sheet.frames.truncate(1);
-    sheet.overlay = None;
+    sheet.overlays.clear();
     let sheet_id = sheet.sheet_id.clone();
     (session, snapshot, sheet_id)
 }
@@ -338,7 +338,7 @@ fn real_processor_recovery_flows_through_production_modules() {
         let cache_execution =
             cache_engine::execute(&mut cache_transport, &app_paths, cache_work, &cache_context)
                 .await
-                .expect("CacheEngine restarts the real sidecar once");
+                .expect("the Cache operation restarts the real sidecar once");
         let cache_recovery = cache_execution
             .recovery
             .expect("the successful Cache records its recovery");

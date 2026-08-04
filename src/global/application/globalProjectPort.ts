@@ -32,6 +32,47 @@ export interface NewProjectConfiguration {
   };
 }
 
+export interface ProvisionalDecorativeSelection {
+  selectionId: string;
+  displayName: string;
+  previewUrl: string;
+}
+
+export type ProvisionalDecorativeSelectionOutcome =
+  | {
+      status: "selected";
+      selection: ProvisionalDecorativeSelection;
+    }
+  | { status: "cancelled" }
+  | { status: "failed"; error: ProjectLaunchFailure };
+
+export type InitialBackgroundContent =
+  | { kind: "color"; rgb: string }
+  | { kind: "image"; selectionId: string };
+
+export type InitialOverlayContent =
+  | { kind: "image"; selectionId: string }
+  | null;
+
+export type InitialScopedContent<T> =
+  | { scope: "bothSides"; both: T }
+  | { scope: "perSide"; left: T; right: T };
+
+export type InitialFrameBorder =
+  | { kind: "none" }
+  | { kind: "solid"; rgb: string; widthUm: number };
+
+export interface InitialVisualDefaults {
+  background: InitialScopedContent<InitialBackgroundContent>;
+  overlay: InitialScopedContent<InitialOverlayContent>;
+  frameBorder: InitialFrameBorder;
+}
+
+export interface NewProjectCreationConfiguration
+  extends NewProjectConfiguration {
+  visualDefaults: InitialVisualDefaults;
+}
+
 export const PROJECT_CONFIGURATION_VALIDATION_CODES = [
   "sheetWidthNotPositive",
   "sheetWidthAboveSafeInteger",
@@ -71,8 +112,11 @@ export interface GlobalProjectPort {
     configuration: NewProjectConfiguration,
   ): Promise<ProjectConfigurationValidationOutcome>;
   createProject(
-    configuration: NewProjectConfiguration,
+    configuration: NewProjectCreationConfiguration,
   ): Promise<ProjectLaunchOutcome>;
+  chooseProvisionalDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
+  releaseProvisionalDecorative(selectionId: string): Promise<void>;
+  clearProvisionalDecoratives(): Promise<void>;
   openProject(): Promise<OpenProjectOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;

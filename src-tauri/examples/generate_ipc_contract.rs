@@ -2,7 +2,7 @@ use std::{env, path::PathBuf};
 
 use myalbuns_desktop_lib::ipc_contract::{
     CancelDisposition, ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent,
-    MediaPreview,
+    MediaPreview, MediaPreviewCommandError,
 };
 use ts_rs::{Config, TS};
 
@@ -22,4 +22,6 @@ fn main() {
     ExportResult::export_all(&config).expect("export result bindings should be generated");
     FrontendLogEvent::export_all(&config).expect("frontend log bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
+    MediaPreviewCommandError::export_all(&config)
+        .expect("media preview error bindings should be generated");
 }

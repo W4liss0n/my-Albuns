@@ -7,6 +7,7 @@ import type {
   ProjectEndSheetFormat,
   ProjectLaunchFailure,
   ProjectLaunchOutcome,
+  ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
 import {
   changeDisplayUnit,
@@ -22,27 +23,42 @@ import {
   type NewProjectDimensionsDraft,
   type PhysicalFieldName,
 } from "./application/newProjectDimensions";
+import {
+  createDefaultPersonalizationDraft,
+  provisionalSelections,
+  toCreationConfiguration,
+  type NewProjectCreationConfiguration,
+  type NewProjectPersonalizationDraft,
+} from "./application/newProjectPersonalization";
+import { PersonalizationStep } from "./PersonalizationStep";
 import "./NewProjectFlow.css";
 
 interface NewProjectFlowProps {
   onCancel(): void;
+  onChooseDecorative?(): Promise<ProvisionalDecorativeSelectionOutcome>;
   onCreate(
-    configuration: NewProjectConfiguration,
+    configuration: NewProjectCreationConfiguration,
   ): Promise<ProjectLaunchOutcome>;
   onValidate(
     configuration: NewProjectConfiguration,
   ): Promise<ProjectConfigurationValidationOutcome>;
+  onReleaseDecorative?(selectionId: string): Promise<void> | void;
 }
 
 type CreationStep = "dimensions" | "personalization";
 
 export function NewProjectFlow({
   onCancel,
+  onChooseDecorative = noDecorativeSelection,
   onCreate,
+  onReleaseDecorative = ignoreReleasedDecorative,
   onValidate,
 }: NewProjectFlowProps) {
   const [step, setStep] = useState<CreationStep>("dimensions");
   const [draft, setDraft] = useState(createDefaultDimensionsDraft);
+  const [personalization, setPersonalization] = useState(
+    createDefaultPersonalizationDraft,
+  );
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [failure, setFailure] = useState<ProjectLaunchFailure | null>(null);
@@ -148,6 +164,22 @@ export function NewProjectFlow({
     onCancel();
   };
 
+  const updatePersonalization = (
+    nextPersonalization: NewProjectPersonalizationDraft,
+  ) => {
+    const retainedIds = new Set(
+      provisionalSelections(nextPersonalization).map(
+        (selection) => selection.selectionId,
+      ),
+    );
+    for (const selection of provisionalSelections(personalization)) {
+      if (!retainedIds.has(selection.selectionId)) {
+        void onReleaseDecorative(selection.selectionId);
+      }
+    }
+    setPersonalization(nextPersonalization);
+  };
+
   const createProject = async () => {
     const configuration = validatedConfiguration;
     if (!configuration) {
@@ -158,7 +190,9 @@ export function NewProjectFlow({
     }
     setIsCreating(true);
     setFailure(null);
-    const outcome = await onCreate(configuration);
+    const outcome = await onCreate(
+      toCreationConfiguration(configuration, personalization),
+    );
     if (outcome.status === "failed") {
       setFailure(outcome.error);
     }
@@ -205,8 +239,12 @@ export function NewProjectFlow({
           />
         ) : (
           <PersonalizationStep
-            aspectRatio={`${draft.sheetWidth.valueUm} / ${draft.sheetHeight.valueUm}`}
             failure={failure}
+            heightUm={draft.sheetHeight.valueUm}
+            onChange={updatePersonalization}
+            onChooseDecorative={onChooseDecorative}
+            personalization={personalization}
+            widthUm={draft.sheetWidth.valueUm}
           />
         )}
 
@@ -251,6 +289,12 @@ export function NewProjectFlow({
     </div>
   );
 }
+
+function noDecorativeSelection() {
+  return Promise.resolve({ status: "cancelled" as const });
+}
+
+function ignoreReleasedDecorative() {}
 
 function mergeLiveValidationErrors(
   currentErrors: DimensionsErrors,
@@ -411,47 +455,6 @@ function DimensionsStep({
   );
 }
 
-function PersonalizationStep({
-  aspectRatio,
-  failure,
-}: {
-  aspectRatio: string;
-  failure: ProjectLaunchFailure | null;
-}) {
-  return (
-    <div className="new-project-content new-project-personalization">
-      <div aria-label="Reprodução da Lâmina" className="new-project-preview">
-        <div
-          aria-label="Prévia do formato da Lâmina"
-          className="new-project-preview-sheet"
-          style={{ aspectRatio }}
-        >
-          <span />
-          <span />
-        </div>
-      </div>
-      <div className="new-project-visual-values">
-        <ValueGroup title="Padrões visuais">
-          <Value label="Background" value="Background branco" />
-          <Value label="Overlay" value="Sem Overlay" />
-          <Value label="Padrão dos Frames" value="Sem borda" />
-          <Value label="Composição inicial" value="Sem Frames ou mídias" />
-        </ValueGroup>
-        <p className="new-project-native-note">
-          Nome e Localização serão escolhidos no diálogo do Windows ao criar.
-        </p>
-        {failure ? (
-          <section className="global-open-error" role="alert">
-            <h2>Não foi possível criar o Projeto</h2>
-            <p>{failure.message}</p>
-            {failure.action ? <p>{failure.action}</p> : null}
-          </section>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
 function FormGroup({
   children,
   title,
@@ -540,29 +543,5 @@ function SelectField({
         <option value="singlePage">Página única</option>
       </select>
     </label>
-  );
-}
-
-function ValueGroup({
-  children,
-  title,
-}: {
-  children: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <section className="new-project-value-group">
-      <h2>{title}</h2>
-      <dl>{children}</dl>
-    </section>
-  );
-}
-
-function Value({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
   );
 }

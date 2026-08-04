@@ -1,9 +1,11 @@
 import { useId } from "react";
 
 import type {
+  ComposedBackground,
   ComposedFrame,
   ComposedPhoto,
   ComposedSheet,
+  ProjectedFrameBorder,
 } from "../domain/project";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
@@ -13,11 +15,13 @@ import {
 
 interface SheetPreviewProps {
   sheet: ComposedSheet;
+  frameBorder?: ProjectedFrameBorder;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
 }
 
 export function SheetPreview({
   sheet,
+  frameBorder = { kind: "none" },
   mediaPreviewUrls = {},
 }: SheetPreviewProps) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -60,11 +64,22 @@ export function SheetPreview({
         width={sheet.widthUm}
         height={sheet.heightUm}
         rx={surfaceStyle.cornerRadiusPx * unit}
-        fill={surfaceStyle.fill}
+        fill={sheet.base.rgb}
         stroke={surfaceStyle.outline}
         strokeOpacity={surfaceStyle.outlineOpacity}
         strokeWidth={surfaceStyle.outlineWidthPx * unit}
       />
+      {sheet.backgrounds.map((background, index) => (
+        <BackgroundPreview
+          background={background}
+          key={`${background.kind}-${index}`}
+          previewUrl={
+            background.kind === "media"
+              ? mediaPreviewUrls[background.mediaId]
+              : undefined
+          }
+        />
+      ))}
       {sheet.activeSides === "both" ? (
         <line
           x1={sheet.widthUm / 2}
@@ -81,6 +96,7 @@ export function SheetPreview({
         <FramePreview
           clipId={clipId(instanceId, frame, index)}
           frame={frame}
+          frameBorder={frameBorder}
           key={frame.frameId}
           previewUrl={
             frame.photo
@@ -91,32 +107,26 @@ export function SheetPreview({
         />
       ))}
 
-      {sheet.overlay &&
-        (mediaPreviewUrls[sheet.overlay.mediaId] ? (
+      {sheet.overlays.map((overlay) =>
+        mediaPreviewUrls[overlay.mediaId] ? (
           <image
-            data-preview-overlay-id={sheet.overlay.mediaId}
-            href={mediaPreviewUrls[sheet.overlay.mediaId]}
-            x={sheet.overlay.drawRect.x}
-            y={sheet.overlay.drawRect.y}
-            width={sheet.overlay.drawRect.width}
-            height={sheet.overlay.drawRect.height}
+            data-preview-overlay-id={overlay.mediaId}
+            href={mediaPreviewUrls[overlay.mediaId]}
+            key={overlay.mediaId}
+            x={overlay.drawRect.x}
+            y={overlay.drawRect.y}
+            width={overlay.drawRect.width}
+            height={overlay.drawRect.height}
             preserveAspectRatio="none"
           />
         ) : (
           <rect
-            data-preview-overlay-id={sheet.overlay.mediaId}
-            x={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
-            y={SHEET_VISUAL_STYLE.overlay.insetPx * unit}
-            width={Math.max(
-              0,
-              sheet.widthUm -
-                SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
-            )}
-            height={Math.max(
-              0,
-              sheet.heightUm -
-                SHEET_VISUAL_STYLE.overlay.insetPx * 2 * unit,
-            )}
+            data-preview-overlay-id={overlay.mediaId}
+            key={overlay.mediaId}
+            x={overlay.drawRect.x}
+            y={overlay.drawRect.y}
+            width={overlay.drawRect.width}
+            height={overlay.drawRect.height}
             rx={SHEET_VISUAL_STYLE.overlay.cornerRadiusPx * unit}
             fill="none"
             stroke={SHEET_VISUAL_STYLE.overlay.outline}
@@ -125,25 +135,57 @@ export function SheetPreview({
               SHEET_VISUAL_STYLE.overlay.outlineWidthPx * unit
             }
           />
-        ))}
-
-      {sheet.activeSides !== "both" ? (
-        <rect
-          data-preview-inactive-side={sheet.activeSides === "right" ? "left" : "right"}
-          x={sheet.activeSides === "right" ? 0 : sheet.widthUm / 2}
-          y="0"
-          width={sheet.widthUm / 2}
-          height={sheet.heightUm}
-          fill={SHEET_VISUAL_STYLE.inactiveSide.fill}
-          fillOpacity={SHEET_VISUAL_STYLE.inactiveSide.opacity}
-        />
-      ) : null}
+        ),
+      )}
     </svg>
+  );
+}
+
+function BackgroundPreview({
+  background,
+  previewUrl,
+}: {
+  background: ComposedBackground;
+  previewUrl?: string;
+}) {
+  const { drawRect } = background;
+  if (background.kind === "color") {
+    return (
+      <rect
+        data-preview-background-color={background.rgb}
+        fill={background.rgb}
+        x={drawRect.x}
+        y={drawRect.y}
+        width={drawRect.width}
+        height={drawRect.height}
+      />
+    );
+  }
+  return previewUrl ? (
+    <image
+      data-preview-background-id={background.mediaId}
+      href={previewUrl}
+      preserveAspectRatio="none"
+      x={drawRect.x}
+      y={drawRect.y}
+      width={drawRect.width}
+      height={drawRect.height}
+    />
+  ) : (
+    <rect
+      data-preview-background-id={background.mediaId}
+      fill="#D8DEE2"
+      x={drawRect.x}
+      y={drawRect.y}
+      width={drawRect.width}
+      height={drawRect.height}
+    />
   );
 }
 
 interface FramePreviewProps {
   frame: ComposedFrame;
+  frameBorder: ProjectedFrameBorder;
   clipId: string;
   previewUrl?: string;
   unit: number;
@@ -151,6 +193,7 @@ interface FramePreviewProps {
 
 function FramePreview({
   frame,
+  frameBorder,
   clipId: frameClipId,
   previewUrl,
   unit,
@@ -227,6 +270,19 @@ function FramePreview({
         strokeOpacity={SHEET_VISUAL_STYLE.frame.outlineOpacity}
         strokeWidth={SHEET_VISUAL_STYLE.frame.outlineWidthPx * unit}
       />
+      {frameBorder.kind === "solid" ? (
+        <rect
+          data-preview-frame-border-id={frame.frameId}
+          fill="none"
+          height={clipRect.height}
+          pointerEvents="none"
+          stroke={frameBorder.rgb}
+          strokeWidth={frameBorder.widthUm}
+          width={clipRect.width}
+          x={clipRect.x}
+          y={clipRect.y}
+        />
+      ) : null}
     </g>
   );
 }

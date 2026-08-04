@@ -30,7 +30,6 @@ export const representativeProjection: EditorProjection = {
           activeSides: "both",
           widthUm: 600_000,
           heightUm: 300_000,
-          overlayMediaId: null,
           frames: [
             {
               id: "frame-001",
@@ -82,9 +81,18 @@ export const representativeProjection: EditorProjection = {
           palette: ["#123e52", "#428596", "#e7bd76"],
         },
       ],
+      visualDefaults: {
+        background: {
+          scope: "bothSides",
+          both: { kind: "color", rgb: "#FFFFFF" },
+        },
+        overlay: { scope: "bothSides", both: null },
+        frameBorder: { kind: "none" },
+      },
     },
   },
   composition: {
+    frameBorder: { kind: "none" },
     sheets: [
       {
         sheetId: "sheet-001",
@@ -92,7 +100,17 @@ export const representativeProjection: EditorProjection = {
         activeSides: "both",
         widthUm: 600_000,
         heightUm: 300_000,
-        overlay: null,
+        base: {
+          rgb: "#FFFFFF",
+          drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+        },
+        backgrounds: [
+          {
+            kind: "color",
+            rgb: "#FFFFFF",
+            drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+          },
+        ],
         frames: [
           {
             frameId: "frame-001",
@@ -120,6 +138,7 @@ export const representativeProjection: EditorProjection = {
             },
           },
         ],
+        overlays: [],
       },
     ],
   },
@@ -141,9 +160,11 @@ export function createEmptyProjection(): EditorProjection {
       album: {
         sheets: [],
         media: [],
+        visualDefaults: representativeProjection.state.album.visualDefaults,
       },
     },
     composition: {
+      frameBorder: { kind: "none" },
       sheets: [],
     },
     mediaUsage: [],
@@ -169,6 +190,7 @@ export function createTwoSheetProjection(): EditorProjection {
       },
     },
     composition: {
+      frameBorder: representativeProjection.composition.frameBorder,
       sheets: [
         representativeProjection.composition.sheets[0],
         {

@@ -5,7 +5,6 @@ use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Manager, WebviewWindowBuilder};
 
 use crate::{
-    cache_engine::CacheEngine,
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
@@ -36,12 +35,27 @@ pub(crate) fn run(
 
     let (request, project) = opened.into_parts();
     let project_host = ProjectHost::new(project);
+    let linked_media_previews =
+        crate::linked_media_previews::LinkedMediaPreviewRegistry::new(PROJECT_WINDOW_LABEL);
+    let media_protocol_registry = linked_media_previews.clone();
     let setup_paths = app_paths.clone();
     let terminal = PendingHostTerminal::new(request);
 
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(
+            crate::linked_media_previews::PROJECT_MEDIA_PROTOCOL_SCHEME,
+            move |context, request, responder| {
+                crate::linked_media_previews::respond_to_media_request(
+                    media_protocol_registry.clone(),
+                    context,
+                    request,
+                    responder,
+                );
+            },
+        )
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
+        .manage(linked_media_previews)
         .manage(ExportAttempts::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -115,7 +129,6 @@ fn setup_host(
         app_paths.webview_data_directory(&project_data_namespace(&projection.state.project_id))?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
     app.manage(OperationGate::new(&app_paths));
-    app.manage(CacheEngine::default());
     app.manage(ImagingProcessor::default());
     app.manage(app_paths);
 

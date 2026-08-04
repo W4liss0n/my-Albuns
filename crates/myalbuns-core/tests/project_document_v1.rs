@@ -3,10 +3,12 @@ use std::{fs, path::Path};
 use myalbuns_core::{
     ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectError,
     CreateProjectRequest, DisplayUnit, DocumentFailure, EndSheetFormat, FrameBorder,
-    InitialProject, InitialProjectConfiguration, InitialProjectValidationError as ValidationError,
+    InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+    InitialOverlayContent, InitialProject, InitialProjectConfiguration,
+    InitialProjectPersonalization, InitialProjectValidationError as ValidationError,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
     OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectLocation,
-    ProjectedActiveSides, ProjectedDisplayUnit, SheetRole,
+    ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -794,7 +796,7 @@ fn configured_project_round_trips_physical_settings_and_album_structure() {
         projection.composition.sheets[0].active_sides,
         ProjectedActiveSides::Right
     );
-    assert_eq!(projection.composition.sheets[0].width_um, 508_000);
+    assert_eq!(projection.composition.sheets[0].width_um, 254_000);
     let projected_json = serde_json::to_value(&projection).expect("projection serializes");
     assert_eq!(projected_json["state"]["document"]["displayUnit"], "cm");
     assert_eq!(
@@ -830,6 +832,277 @@ fn configured_project_round_trips_physical_settings_and_album_structure() {
             ActiveSides::Both,
         ]
     );
+}
+
+#[cfg(windows)]
+#[test]
+fn creates_and_reopens_a_project_with_both_sides_visual_defaults() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("personalizado.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let background_path = std::path::PathBuf::from(r"C:\Decorativos\background.png");
+    let overlay_path = std::path::PathBuf::from(r"C:\Decorativos\overlay.png");
+    let personalization = InitialProjectPersonalization::new(
+        InitialBackground::BothSides {
+            both: InitialBackgroundContent::Media {
+                path: background_path.clone(),
+            },
+        },
+        InitialOverlay::BothSides {
+            both: Some(InitialOverlayContent::Media {
+                path: overlay_path.clone(),
+            }),
+        },
+        InitialFrameBorder::Solid {
+            rgb: Rgb::parse_canonical("#AABBCC").expect("canonical color"),
+            width_um: 1_000,
+        },
+    );
+
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral().with_personalization(personalization),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the personalized Project is created");
+
+    assert_eq!(
+        created
+            .project()
+            .media()
+            .iter()
+            .map(|media| media.path())
+            .collect::<Vec<_>>(),
+        vec![background_path.as_path(), overlay_path.as_path()]
+    );
+    let background_id = created.project().media()[0].id();
+    let overlay_id = created.project().media()[1].id();
+    assert!(matches!(
+        created.project().visual_defaults().background(),
+        Background::BothSides {
+            both: BackgroundContent::Media { media_id }
+        } if *media_id == background_id
+    ));
+    assert!(matches!(
+        created.project().visual_defaults().overlay(),
+        Overlay::BothSides {
+            both: Some(OverlayContent::Media { media_id })
+        } if *media_id == overlay_id
+    ));
+    assert!(matches!(
+        created.project().visual_defaults().frame_border(),
+        FrameBorder::Solid { rgb, width_um }
+            if rgb.channels() == [0xAA, 0xBB, 0xCC] && *width_um == 1_000
+    ));
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the personalized Project reopens");
+    assert_eq!(reopened.project().media()[0].path(), background_path);
+    assert_eq!(reopened.project().media()[1].path(), overlay_path);
+    assert!(matches!(
+        reopened.project().visual_defaults().background(),
+        Background::BothSides {
+            both: BackgroundContent::Media { media_id }
+        } if *media_id == background_id
+    ));
+    assert!(matches!(
+        reopened.project().visual_defaults().overlay(),
+        Overlay::BothSides {
+            both: Some(OverlayContent::Media { media_id })
+        } if *media_id == overlay_id
+    ));
+}
+
+#[cfg(windows)]
+#[test]
+fn per_side_personalization_preserves_reference_order_and_deduplicates_native_paths() {
+    use std::{
+        ffi::OsString,
+        os::windows::ffi::{OsStrExt, OsStringExt},
+        path::PathBuf,
+    };
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("por-lado.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let background_path = PathBuf::from(OsString::from_wide(&[
+        67, 58, 92, 68, 101, 99, 111, 114, 97, 116, 105, 118, 111, 115, 92, 99, 97, 112, 97,
+        0xD800, 46, 112, 110, 103,
+    ]));
+    let overlay_path = PathBuf::from(r"\\servidor\Albuns\overlay.png");
+    let personalization = InitialProjectPersonalization::new(
+        InitialBackground::PerSide {
+            left: InitialBackgroundContent::Media {
+                path: background_path.clone(),
+            },
+            right: InitialBackgroundContent::Color {
+                rgb: Rgb::parse_canonical("#102030").expect("canonical color"),
+            },
+        },
+        InitialOverlay::PerSide {
+            left: Some(InitialOverlayContent::Media {
+                path: overlay_path.clone(),
+            }),
+            right: Some(InitialOverlayContent::Media {
+                path: background_path.clone(),
+            }),
+        },
+        InitialFrameBorder::None,
+    );
+
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral().with_personalization(personalization),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the per-side Project is created");
+
+    assert_eq!(created.project().media().len(), 2);
+    assert_eq!(created.project().media()[0].path(), background_path);
+    assert_eq!(created.project().media()[1].path(), overlay_path);
+    let background_id = created.project().media()[0].id();
+    let overlay_id = created.project().media()[1].id();
+    assert_ne!(background_id, overlay_id);
+    match created.project().visual_defaults().background() {
+        Background::PerSide { left, right } => {
+            assert!(matches!(
+                left,
+                BackgroundContent::Media { media_id } if *media_id == background_id
+            ));
+            assert!(matches!(
+                right,
+                BackgroundContent::Color { rgb } if rgb.channels() == [0x10, 0x20, 0x30]
+            ));
+        }
+        other => panic!("expected a per-side Background, received {other:?}"),
+    }
+    match created.project().visual_defaults().overlay() {
+        Overlay::PerSide { left, right } => {
+            assert!(matches!(
+                left,
+                Some(OverlayContent::Media { media_id }) if *media_id == overlay_id
+            ));
+            assert!(matches!(
+                right,
+                Some(OverlayContent::Media { media_id }) if *media_id == background_id
+            ));
+        }
+        other => panic!("expected a per-side Overlay, received {other:?}"),
+    }
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the per-side Project reopens");
+    assert_eq!(reopened.project().media().len(), 2);
+    assert_eq!(
+        reopened.project().media()[0]
+            .path()
+            .as_os_str()
+            .encode_wide()
+            .collect::<Vec<_>>(),
+        background_path
+            .as_os_str()
+            .encode_wide()
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(reopened.project().media()[1].path(), overlay_path);
+}
+
+#[test]
+fn invalid_initial_personalization_has_no_file_or_identity_lease_effects() {
+    const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let valid_color = Rgb::parse_canonical("#AABBCC").expect("canonical color");
+    let cases = [
+        (
+            "relative-media-path",
+            InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: std::path::PathBuf::from("relative.png"),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ),
+        ),
+        (
+            "zero-border-width",
+            InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Color { rgb: valid_color },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::Solid {
+                    rgb: valid_color,
+                    width_um: 0,
+                },
+            ),
+        ),
+        (
+            "negative-border-width",
+            InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Color { rgb: valid_color },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::Solid {
+                    rgb: valid_color,
+                    width_um: -1,
+                },
+            ),
+        ),
+        (
+            "border-width-above-safe-integer",
+            InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Color { rgb: valid_color },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::Solid {
+                    rgb: valid_color,
+                    width_um: MAX_SAFE_INTEGER + 1,
+                },
+            ),
+        ),
+    ];
+
+    for (case, personalization) in cases {
+        let project_path = directory.path().join(format!("{case}.myalbuns"));
+        let lease_root = directory.path().join(format!("leases-{case}"));
+        let error = ProjectCore::new()
+            .with_identity_lease_root(lease_root.clone())
+            .create_editable(CreateProjectRequest::new(
+                project_location(&project_path),
+                InitialProject::neutral().with_personalization(personalization),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect_err(case);
+
+        assert_eq!(error, CreateProjectError::InvalidInitialProject, "{case}");
+        assert!(!project_path.exists(), "{case}: no Project is published");
+        assert!(
+            !lease_root.exists(),
+            "{case}: no identity lease root is created"
+        );
+    }
+}
+
+#[test]
+fn rgb_accepts_only_the_canonical_persisted_color_form() {
+    assert_eq!(
+        Rgb::parse_canonical("#A1B2C3").map(Rgb::channels),
+        Some([0xA1, 0xB2, 0xC3])
+    );
+    for invalid in ["A1B2C3", "#a1b2c3", "#A1B2C", "#GG0000", "#A1B2C3FF"] {
+        assert!(Rgb::parse_canonical(invalid).is_none(), "{invalid}");
+    }
 }
 
 #[test]

@@ -1,6 +1,7 @@
 use myalbuns_paths::{
     ExpectedObject, ExportPathPlan, OperationPathContext, PhysicalIdentityEvidence, ResolveError,
 };
+use std::io::Read;
 
 #[test]
 fn resolves_existing_objects_through_the_frozen_plan_and_checks_their_type() {
@@ -130,6 +131,34 @@ fn reads_a_regular_file_through_the_resolved_handle_after_path_replacement() {
         "revisão original",
         "reading a resolved object must not follow a later pathname replacement"
     );
+}
+
+#[test]
+fn reopens_a_binary_reader_from_the_resolved_handle_after_path_replacement() {
+    let root = tempfile::tempdir().expect("temporary handle-bound binary read root");
+    let image = root.path().join("Background.png");
+    let archived = root.path().join("Background-anterior.png");
+    let replacement = root.path().join("Background-novo.png");
+    let original = b"\x89PNG\r\n\x1a\noriginal";
+    std::fs::write(&image, original).expect("the original image fixture is writable");
+    std::fs::write(&replacement, b"\xff\xd8\xffreplacement")
+        .expect("the replacement image fixture is writable");
+
+    let mut owner = OperationPathContext::new();
+    let resolved = owner
+        .resolve_existing(&image, ExpectedObject::RegularFile)
+        .expect("the original image resolves by handle");
+    std::fs::rename(&image, &archived).expect("the original path can move while shared");
+    std::fs::rename(&replacement, &image).expect("the replacement takes the original path");
+
+    let mut readable = resolved
+        .reopen_for_read()
+        .expect("the resolved handle can be reopened for binary reads");
+    let mut bytes = Vec::new();
+    readable
+        .read_to_end(&mut bytes)
+        .expect("the original resolved image remains readable");
+    assert_eq!(bytes, original);
 }
 
 #[cfg(windows)]

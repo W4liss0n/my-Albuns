@@ -1,10 +1,8 @@
-use std::collections::HashMap;
-
-use crate::composition::{CompositionCore, build_render_snapshot};
+use crate::composition::{CompositionCore, build_render_snapshot, derive_media_usage};
 use crate::model::{
     AlbumSnapshot, CompositionPlan, CoreError, EditorProjection, EditorState, FrameSnapshot,
-    MediaKind, MediaUsage, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    PhotoSnapshot, ProjectIntent, RenderSnapshot,
+    MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoSnapshot,
+    ProjectIntent, RenderSnapshot,
 };
 use crate::project::serialize_persisted_revision;
 
@@ -129,10 +127,11 @@ impl ProjectSession {
     }
 
     pub(crate) fn projection(&self) -> EditorProjection {
+        let composition = self.composition_plan();
         EditorProjection {
             state: self.state(),
-            composition: self.composition_plan(),
-            media_usage: derive_media_usage(&self.state.album),
+            media_usage: derive_media_usage(&self.state.album, &composition),
+            composition,
         }
     }
 
@@ -169,34 +168,6 @@ impl ProjectSession {
         self.state.can_redo = !self.redo.is_empty();
         self.state.dirty = self.state.revision != self.state.saved_revision;
     }
-}
-
-fn derive_media_usage(album: &AlbumSnapshot) -> Vec<MediaUsage> {
-    let mut counts = HashMap::<&str, usize>::new();
-    for photo in album
-        .sheets
-        .iter()
-        .flat_map(|sheet| &sheet.frames)
-        .filter_map(|frame| frame.photo.as_ref())
-    {
-        *counts.entry(photo.media_id.as_str()).or_default() += 1;
-    }
-    for media_id in album
-        .sheets
-        .iter()
-        .filter_map(|sheet| sheet.overlay_media_id.as_deref())
-    {
-        *counts.entry(media_id).or_default() += 1;
-    }
-
-    album
-        .media
-        .iter()
-        .map(|media| MediaUsage {
-            media_id: media.id.clone(),
-            count: counts.get(media.id.as_str()).copied().unwrap_or_default(),
-        })
-        .collect()
 }
 
 fn find_frame_mut<'a>(

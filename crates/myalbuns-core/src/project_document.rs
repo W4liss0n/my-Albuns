@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use myalbuns_paths::validate_external_path;
 use uuid::Uuid;
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
@@ -26,6 +27,25 @@ pub struct Rgb([u8; 3]);
 
 impl Rgb {
     pub const WHITE: Self = Self([255, 255, 255]);
+
+    pub fn parse_canonical(source: &str) -> Option<Self> {
+        let bytes = source.as_bytes();
+        if bytes.len() != 7
+            || bytes[0] != b'#'
+            || !bytes[1..]
+                .iter()
+                .all(|byte| byte.is_ascii_digit() || (b'A'..=b'F').contains(byte))
+        {
+            return None;
+        }
+        let channel = |start| u8::from_str_radix(&source[start..start + 2], 16).ok();
+        Some(Self::new([channel(1)?, channel(3)?, channel(5)?]))
+    }
+
+    pub fn canonical_hex(self) -> String {
+        let [red, green, blue] = self.channels();
+        format!("#{red:02X}{green:02X}{blue:02X}")
+    }
 
     pub fn channels(self) -> [u8; 3] {
         self.0
@@ -101,16 +121,6 @@ impl VisualDefaults {
             overlay,
             frame_border,
         }
-    }
-
-    pub(crate) fn neutral() -> Self {
-        Self::new(
-            Background::BothSides {
-                both: BackgroundContent::Color { rgb: Rgb::WHITE },
-            },
-            Overlay::BothSides { both: None },
-            FrameBorder::None,
-        )
     }
 }
 
@@ -258,6 +268,162 @@ pub enum EndSheetFormat {
     SinglePage,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InitialBackgroundContent {
+    Color { rgb: Rgb },
+    Media { path: PathBuf },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InitialBackground {
+    BothSides {
+        both: InitialBackgroundContent,
+    },
+    PerSide {
+        left: InitialBackgroundContent,
+        right: InitialBackgroundContent,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InitialOverlayContent {
+    Media { path: PathBuf },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InitialOverlay {
+    BothSides {
+        both: Option<InitialOverlayContent>,
+    },
+    PerSide {
+        left: Option<InitialOverlayContent>,
+        right: Option<InitialOverlayContent>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum InitialFrameBorder {
+    None,
+    Solid { rgb: Rgb, width_um: i64 },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InitialProjectPersonalization {
+    background: InitialBackground,
+    overlay: InitialOverlay,
+    frame_border: InitialFrameBorder,
+}
+
+impl InitialProjectPersonalization {
+    pub fn new(
+        background: InitialBackground,
+        overlay: InitialOverlay,
+        frame_border: InitialFrameBorder,
+    ) -> Self {
+        Self {
+            background,
+            overlay,
+            frame_border,
+        }
+    }
+
+    pub fn neutral() -> Self {
+        Self::new(
+            InitialBackground::BothSides {
+                both: InitialBackgroundContent::Color { rgb: Rgb::WHITE },
+            },
+            InitialOverlay::BothSides { both: None },
+            InitialFrameBorder::None,
+        )
+    }
+
+    fn into_domain(self) -> Result<(VisualDefaults, Vec<DecorativeMedia>), ()> {
+        let mut media = InitialMediaCatalog::default();
+        let background = match self.background {
+            InitialBackground::BothSides { both } => Background::BothSides {
+                both: initial_background_content(both, &mut media)?,
+            },
+            InitialBackground::PerSide { left, right } => Background::PerSide {
+                left: initial_background_content(left, &mut media)?,
+                right: initial_background_content(right, &mut media)?,
+            },
+        };
+        let overlay = match self.overlay {
+            InitialOverlay::BothSides { both } => Overlay::BothSides {
+                both: both
+                    .map(|content| initial_overlay_content(content, &mut media))
+                    .transpose()?,
+            },
+            InitialOverlay::PerSide { left, right } => Overlay::PerSide {
+                left: left
+                    .map(|content| initial_overlay_content(content, &mut media))
+                    .transpose()?,
+                right: right
+                    .map(|content| initial_overlay_content(content, &mut media))
+                    .transpose()?,
+            },
+        };
+        let frame_border = match self.frame_border {
+            InitialFrameBorder::None => FrameBorder::None,
+            InitialFrameBorder::Solid { rgb, width_um } => {
+                let width_um = u64::try_from(width_um).map_err(|_| ())?;
+                if !frame_border_width_is_valid(width_um) {
+                    return Err(());
+                }
+                FrameBorder::Solid { rgb, width_um }
+            }
+        };
+        Ok((
+            VisualDefaults::new(background, overlay, frame_border),
+            media.into_items(),
+        ))
+    }
+}
+
+#[derive(Default)]
+struct InitialMediaCatalog {
+    items: Vec<DecorativeMedia>,
+}
+
+impl InitialMediaCatalog {
+    fn id_for_path(&mut self, path: PathBuf) -> Result<Uuid, ()> {
+        validate_external_path(&path).map_err(|_| ())?;
+        if let Some(existing) = self.items.iter().find(|media| media.path() == path) {
+            return Ok(existing.id());
+        }
+        let id = Uuid::new_v4();
+        self.items.push(DecorativeMedia::new(id, path));
+        Ok(id)
+    }
+
+    fn into_items(self) -> Vec<DecorativeMedia> {
+        self.items
+    }
+}
+
+fn initial_background_content(
+    content: InitialBackgroundContent,
+    media: &mut InitialMediaCatalog,
+) -> Result<BackgroundContent, ()> {
+    match content {
+        InitialBackgroundContent::Color { rgb } => Ok(BackgroundContent::Color { rgb }),
+        InitialBackgroundContent::Media { path } => Ok(BackgroundContent::Media {
+            media_id: media.id_for_path(path)?,
+        }),
+    }
+}
+
+fn initial_overlay_content(
+    content: InitialOverlayContent,
+    media: &mut InitialMediaCatalog,
+) -> Result<OverlayContent, ()> {
+    match content {
+        InitialOverlayContent::Media { path } => Ok(OverlayContent::Media {
+            media_id: media.id_for_path(path)?,
+        }),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InitialProjectValidationError {
     SheetWidthNotPositive,
@@ -327,7 +493,10 @@ impl InitialProjectConfiguration {
         })
     }
 
-    fn into_project(self) -> Result<ProjectDocument, ()> {
+    fn into_project(
+        self,
+        personalization: InitialProjectPersonalization,
+    ) -> Result<ProjectDocument, ()> {
         if !self.validation_errors().is_empty() {
             return Err(());
         }
@@ -360,7 +529,8 @@ impl InitialProjectConfiguration {
             sheets.push(ProjectSheet::new(Uuid::new_v4(), active_sides));
         }
 
-        let project = ProjectDocument::new(document, VisualDefaults::neutral(), Vec::new(), sheets);
+        let (visual_defaults, media) = personalization.into_domain()?;
+        let project = ProjectDocument::new(document, visual_defaults, media, sheets);
         validate_project_state(&project)?;
         Ok(project)
     }
@@ -369,6 +539,7 @@ impl InitialProjectConfiguration {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InitialProject {
     configuration: InitialProjectConfiguration,
+    personalization: InitialProjectPersonalization,
 }
 
 impl InitialProject {
@@ -388,11 +559,19 @@ impl InitialProject {
     }
 
     pub fn configured(configuration: InitialProjectConfiguration) -> Self {
-        Self { configuration }
+        Self {
+            configuration,
+            personalization: InitialProjectPersonalization::neutral(),
+        }
+    }
+
+    pub fn with_personalization(mut self, personalization: InitialProjectPersonalization) -> Self {
+        self.personalization = personalization;
+        self
     }
 
     pub(crate) fn into_project(self) -> Result<ProjectDocument, ()> {
-        self.configuration.into_project()
+        self.configuration.into_project(self.personalization)
     }
 }
 
@@ -433,7 +612,10 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
     let mut media_ids = HashSet::new();
     let mut media_paths = HashSet::new();
     for media in project.media() {
-        if !media_ids.insert(media.id()) || !media_paths.insert(media.path().to_path_buf()) {
+        if validate_external_path(media.path()).is_err()
+            || !media_ids.insert(media.id())
+            || !media_paths.insert(media.path().to_path_buf())
+        {
             return Err(());
         }
     }
@@ -441,6 +623,11 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         if !media_ids.contains(&media_id) {
             return Err(());
         }
+    }
+    if let FrameBorder::Solid { width_um, .. } = project.visual_defaults().frame_border()
+        && !frame_border_width_is_valid(*width_um)
+    {
+        return Err(());
     }
 
     let mut sheet_ids = HashSet::new();
@@ -569,6 +756,10 @@ fn raster_axis_is_valid(micrometers: i128, dpi: i128) -> bool {
 
 fn signed_persisted_value(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
+}
+
+pub(crate) fn frame_border_width_is_valid(width_um: u64) -> bool {
+    (1..=MAX_SAFE_INTEGER).contains(&width_um)
 }
 
 fn referenced_media(defaults: &VisualDefaults) -> Vec<Uuid> {

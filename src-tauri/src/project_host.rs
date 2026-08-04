@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::{path::PathBuf, sync::Mutex};
 
 use myalbuns_core::{EditableProject, EditorProjection, ProjectIntent, RenderSnapshot};
 use myalbuns_imaging_protocol::MediaSource;
@@ -38,8 +38,19 @@ impl ProjectHost {
         Ok(self.project()?.render_snapshot())
     }
 
-    pub(crate) fn cache_sources(&self) -> Option<Vec<MediaSource>> {
-        None
+    pub(crate) fn linked_media_sources(&self) -> Result<Vec<(String, PathBuf)>, String> {
+        Ok(self
+            .project()?
+            .project()
+            .media()
+            .iter()
+            .map(|media| {
+                (
+                    media.id().hyphenated().to_string(),
+                    media.path().to_path_buf(),
+                )
+            })
+            .collect())
     }
 
     pub(crate) fn export_sources(
@@ -69,7 +80,9 @@ impl ProjectHost {
 #[cfg(test)]
 mod tests {
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, InitialProject, ProjectCore, ProjectLocation,
+        CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
+        InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
+        ProjectCore, ProjectLocation,
     };
     use myalbuns_paths::OperationPathContext;
 
@@ -142,9 +155,46 @@ mod tests {
     }
 
     #[test]
-    fn does_not_materialize_or_invent_media_sources() {
-        let fixture = fixture();
+    fn exposes_persisted_linked_media_to_the_host_without_projecting_pathnames() {
+        let root = tempfile::tempdir().expect("temporary linked-media Host fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let background_path = root.path().join("Background.png");
+        std::fs::write(&background_path, b"\x89PNG\r\n\x1a\nbackground")
+            .expect("the linked background fixture is writable");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the fixture root is captured");
+        let initial =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: background_path.clone(),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ));
+        let project = ProjectCore::new()
+            .with_identity_lease_root(root.path().join("leases"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                initial,
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the personalized Project is created");
+        let host = ProjectHost::new(project);
 
-        assert!(fixture.host.cache_sources().is_none());
+        let sources = host
+            .linked_media_sources()
+            .expect("the Host can resolve its persisted media catalog");
+        let projection = host.projection().expect("the Project remains available");
+
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0].0, projection.state.album.media[0].id);
+        assert_eq!(sources[0].1, background_path);
+        let frontend_projection =
+            serde_json::to_string(&projection).expect("the editor projection serializes");
+        assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));
     }
 }

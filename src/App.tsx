@@ -121,11 +121,11 @@ function App({
     if (!projectId || !editorGraphics.supported) return;
 
     let active = true;
-    const operationId = createLogInstanceId("media-cache");
+    const operationId = createLogInstanceId("media-preview");
     logger.write({
       level: "info",
-      component: "media-cache",
-      event: "media_cache_started",
+      component: "media-preview",
+      event: "media_preview_started",
       operationId,
       projectId,
     });
@@ -145,8 +145,8 @@ function App({
         }
         logger.write({
           level: "info",
-          component: "media-cache",
-          event: "media_cache_completed",
+          component: "media-preview",
+          event: "media_preview_completed",
           operationId,
           projectId,
         });
@@ -155,8 +155,8 @@ function App({
         if (!active) return;
         logger.write({
           level: "warn",
-          component: "media-cache",
-          event: "media_cache_failed",
+          component: "media-preview",
+          event: "media_preview_failed",
           operationId,
           projectId,
           reason: logReasonFromError(error),

@@ -141,6 +141,7 @@ export function ProjectWorkspace({
           document={projection.state.document}
           sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
+          frameBorder={projection.composition.frameBorder}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviewUrls={mediaPreviewUrls}
           onBeginPhotoZoom={controller.beginZoomGesture}

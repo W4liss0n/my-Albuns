@@ -145,6 +145,18 @@ impl ResolvedObject {
         &self.file
     }
 
+    /// Reopens this already-resolved regular file for content reads without
+    /// resolving its pathname a second time.
+    pub fn reopen_for_read(&self) -> std::io::Result<File> {
+        if self.object_type != ExpectedObject::RegularFile {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "o objeto resolvido não é um arquivo regular",
+            ));
+        }
+        reopen_file_for_read(&self.file)
+    }
+
     pub fn compare_physical(&self, other: &Self) -> PhysicalIdentityEvidence {
         compare_file_identity(&self.file, &other.file)
     }
@@ -160,13 +172,11 @@ impl ResolvedObject {
     /// Reads a resolved regular file through the physical handle already used
     /// for identity, without resolving its pathname a second time.
     pub fn read_to_string(&self) -> std::io::Result<String> {
-        if self.object_type != ExpectedObject::RegularFile {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "o objeto resolvido não é um arquivo regular",
-            ));
-        }
-        read_file_handle_to_string(&self.file)
+        let mut readable = self.reopen_for_read()?;
+        readable.seek(SeekFrom::Start(0))?;
+        let mut source = String::new();
+        readable.read_to_string(&mut source)?;
+        Ok(source)
     }
 }
 

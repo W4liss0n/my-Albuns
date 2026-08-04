@@ -29,8 +29,17 @@ export function createLogInstanceId(prefix: string) {
 }
 
 export function logReasonFromError(error: unknown) {
-  if (!(error instanceof Error)) return "unknown_error";
-  const reason = error.name
+  const rawReason =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : error instanceof Error
+        ? error.name
+        : null;
+  if (rawReason === null) return "unknown_error";
+  const reason = rawReason
     .replace(/([a-z])([A-Z])/g, "$1_$2")
     .replace(/[^a-zA-Z0-9_.-]/g, "_")
     .toLowerCase()

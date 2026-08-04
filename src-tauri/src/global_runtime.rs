@@ -14,8 +14,13 @@ use crate::{
     desktop_webview_policy, logging, native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
-        FailureStage, InitialProjectConfiguration, ProjectConfigurationValidation,
-        ProjectHostBootstrap, TargetAuthority, validate_configuration,
+        FailureStage, InitialProjectConfiguration, InitialProjectCreationConfiguration,
+        ProjectConfigurationValidation, ProjectHostBootstrap, TargetAuthority,
+        validate_configuration,
+    },
+    provisional_decoratives::{
+        ProvisionalDecorativeError, ProvisionalDecorativeRegistry,
+        ProvisionalProjectCreationConfiguration,
     },
     recent_projects::{RecentProjectSummary, RecentProjectsStore},
 };
@@ -73,11 +78,11 @@ pub(crate) enum ProjectLaunchOutcome {
     Failed { error: ProjectLaunchFailure },
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum ConfirmedLaunch {
     OpenExisting,
     CreateNew {
-        configuration: InitialProjectConfiguration,
+        configuration: Box<InitialProjectCreationConfiguration>,
         authorization: CreateWriteAuthorization,
     },
 }
@@ -140,9 +145,32 @@ fn validate_project_configuration(
 #[tauri::command]
 async fn create_project(
     app: AppHandle,
-    configuration: InitialProjectConfiguration,
+    configuration: ProvisionalProjectCreationConfiguration,
 ) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    let provisional_decoratives = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
+    let resolution_registry = provisional_decoratives.clone();
+    let configuration = match tauri::async_runtime::spawn_blocking(move || {
+        resolution_registry.resolve_creation_configuration(configuration)
+    })
+    .await
+    {
+        Ok(Ok(configuration)) => configuration,
+        Ok(Err(error)) => {
+            return ProjectLaunchOutcome::Failed {
+                error: decorative_resolution_failure(error),
+            };
+        }
+        Err(_) => {
+            return ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "decorative_resolution_unavailable",
+                    "N\u{e3}o foi poss\u{ed}vel preparar as Imagens decorativas.",
+                    "Tente novamente.",
+                ),
+            };
+        }
+    };
     let destination = match native_project_dialog::choose_project_destination(&app).await {
         Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
             return ProjectLaunchOutcome::Cancelled;
@@ -172,12 +200,13 @@ async fn create_project(
         state,
         destination.0,
         ConfirmedLaunch::CreateNew {
-            configuration,
+            configuration: Box::new(configuration),
             authorization: destination.1,
         },
     )
     .await;
     if outcome == ProjectLaunchOutcome::Opened {
+        provisional_decoratives.clear();
         app.exit(0);
     }
     outcome
@@ -377,6 +406,36 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
     staged_failure(code, stage, message, action)
 }
 
+fn decorative_resolution_failure(error: ProvisionalDecorativeError) -> ProjectLaunchFailure {
+    match error {
+        ProvisionalDecorativeError::UnknownSelection => simple_failure(
+            "image_selection_expired",
+            "Uma Imagem decorativa selecionada n\u{e3}o est\u{e1} mais dispon\u{ed}vel.",
+            "Escolha novamente a imagem antes de criar o Projeto.",
+        ),
+        ProvisionalDecorativeError::InvalidPath => simple_failure(
+            "invalid_image_path",
+            "O caminho de uma Imagem decorativa n\u{e3}o \u{e9} v\u{e1}lido.",
+            "Escolha novamente a imagem.",
+        ),
+        ProvisionalDecorativeError::Unavailable => simple_failure(
+            "image_unavailable",
+            "Uma Imagem decorativa n\u{e3}o est\u{e1} dispon\u{ed}vel.",
+            "Reconecte o local ou escolha novamente a imagem.",
+        ),
+        ProvisionalDecorativeError::UnsupportedImage => simple_failure(
+            "unsupported_image",
+            "Uma Imagem decorativa deixou de ser JPEG ou PNG.",
+            "Escolha novamente a imagem.",
+        ),
+        ProvisionalDecorativeError::ReadFailed => simple_failure(
+            "image_read_failed",
+            "N\u{e3}o foi poss\u{ed}vel ler uma Imagem decorativa.",
+            "Confirme o acesso ao arquivo ou escolha novamente a imagem.",
+        ),
+    }
+}
+
 fn binding_failure(error: AppPathsError) -> ProjectLaunchFailure {
     let public_code = match error {
         AppPathsError::InvalidOperationPath | AppPathsError::UnsupportedOperationNamespace => {
@@ -503,9 +562,24 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
     let app_paths = AppPaths::discover()?;
     let state = GlobalRuntimeState::new(&app_paths)?;
     let setup_state = state.clone();
+    let provisional_decoratives =
+        crate::provisional_decoratives::ProvisionalDecorativeRegistry::default();
+    let preview_registry = provisional_decoratives.clone();
     tauri::Builder::default()
+        .register_asynchronous_uri_scheme_protocol(
+            crate::provisional_decoratives::PREVIEW_PROTOCOL_SCHEME,
+            move |context, request, responder| {
+                crate::provisional_decoratives::respond_to_preview_request(
+                    preview_registry.clone(),
+                    context,
+                    request,
+                    responder,
+                );
+            },
+        )
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
+        .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
             let app_handle = app.handle().clone();
@@ -541,6 +615,9 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             open_recent_project,
             startup_open_failure,
             validate_project_configuration,
+            crate::provisional_decoratives::choose_provisional_decorative,
+            crate::provisional_decoratives::release_provisional_decorative,
+            crate::provisional_decoratives::clear_provisional_decoratives,
         ])
         .run(tauri::generate_context!())?;
     Ok(())

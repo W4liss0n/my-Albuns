@@ -1,3 +1,4 @@
+#[cfg(test)]
 mod cache_engine;
 mod desktop_webview_policy;
 mod export_attempts;
@@ -8,9 +9,11 @@ mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
 pub mod ipc_contract;
+mod linked_media_previews;
 mod logging;
 mod media_preview_commands;
 mod native_project_dialog;
+mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
@@ -18,6 +21,7 @@ mod product_runtime;
 mod project_bootstrap;
 mod project_commands;
 mod project_host;
+mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
 #[cfg(test)]
@@ -132,6 +136,16 @@ mod tests {
             allowed_commands(&project_permission)
                 .is_disjoint(&allowed_commands(&global_permission))
         );
+        let global_commands = allowed_commands(&global_permission);
+        let project_commands = allowed_commands(&project_permission);
+        for command in [
+            "choose_provisional_decorative",
+            "release_provisional_decorative",
+            "clear_provisional_decoratives",
+        ] {
+            assert!(global_commands.contains(command));
+            assert!(!project_commands.contains(command));
+        }
     }
 
     #[test]
@@ -207,6 +221,32 @@ mod tests {
                     .split_whitespace()
                     .any(|value| value == "http://asset.localhost")
             );
+            for image_only_scheme in ["myalbuns-preview", "myalbuns-media"] {
+                assert!(
+                    !connect_sources.contains(image_only_scheme),
+                    "opaque image protocols are image-only"
+                );
+            }
+            let image_sources = policy
+                .split(';')
+                .find(|directive| directive.trim_start().starts_with("img-src "))
+                .expect("the CSP defines img-src");
+            for preview_origin in ["http://myalbuns-preview.localhost", "myalbuns-preview:"] {
+                assert!(
+                    image_sources
+                        .split_whitespace()
+                        .any(|value| value == preview_origin),
+                    "the global preview protocol is allowed only as an image source"
+                );
+            }
+            for media_origin in ["http://myalbuns-media.localhost", "myalbuns-media:"] {
+                assert!(
+                    image_sources
+                        .split_whitespace()
+                        .any(|value| value == media_origin),
+                    "the Project media protocol is allowed only as an image source"
+                );
+            }
         }
         assert!(
             !security["csp"]

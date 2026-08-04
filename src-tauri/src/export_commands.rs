@@ -9,7 +9,6 @@ use myalbuns_paths::AppPaths;
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
 use crate::{
-    cache_engine::CacheEngine,
     export_attempts::ExportAttempts,
     export_pipeline,
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
@@ -140,7 +139,6 @@ pub(crate) async fn export_preview(
     app_paths: State<'_, AppPaths>,
     logging: State<'_, LoggingState>,
     operation_gate: State<'_, OperationGate>,
-    cache: State<'_, CacheEngine>,
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
@@ -276,7 +274,7 @@ pub(crate) async fn export_preview(
     );
 
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
-    let lease_completion = acquisition.complete(&cache, &processor);
+    let lease_completion = acquisition.complete(&processor);
     tokio::pin!(lease_completion);
     let lease = tokio::select! {
         lease = &mut lease_completion => lease.map_err(|error| {

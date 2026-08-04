@@ -7,6 +7,7 @@ import {
   type ProjectConfigurationValidationOutcome,
   type ProjectLaunchFailure,
   type ProjectLaunchOutcome,
+  type ProvisionalDecorativeSelection,
   type RecentProjectSummary,
 } from "../application/globalProjectPort";
 
@@ -26,6 +27,12 @@ const validationFallbackFailure: ProjectLaunchFailure = {
   code: "project_configuration_validation_unavailable",
   message: "Não foi possível validar as Dimensões do Projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+};
+
+const decorativePickerFallbackFailure: ProjectLaunchFailure = {
+  code: "decorative_picker_unavailable",
+  message: "Não foi possível concluir o seletor de Imagem decorativa.",
+  action: "Tente novamente.",
 };
 
 const validationCodes = new Set<ProjectConfigurationValidationCode>(
@@ -104,6 +111,35 @@ function toRecentProjectSummaries(
   });
 }
 
+function toProvisionalDecorativeSelection(
+  result: unknown,
+): ProvisionalDecorativeSelection | null {
+  if (result === null) return null;
+  if (typeof result !== "object") return null;
+  const candidate = result as Record<string, unknown>;
+  if (
+    typeof candidate.selectionId !== "string" ||
+    candidate.selectionId.length === 0 ||
+    candidate.selectionId.includes("/") ||
+    typeof candidate.displayName !== "string" ||
+    candidate.displayName.length === 0 ||
+    typeof candidate.previewUrl !== "string" ||
+    !(
+      candidate.previewUrl.startsWith(
+        "http://myalbuns-preview.localhost/",
+      ) ||
+      candidate.previewUrl.startsWith("myalbuns-preview://localhost/")
+    )
+  ) {
+    return null;
+  }
+  return {
+    selectionId: candidate.selectionId,
+    displayName: candidate.displayName,
+    previewUrl: candidate.previewUrl,
+  };
+}
+
 async function settleProjectLaunch(
   attempt: () => Promise<unknown>,
   fallback: ProjectLaunchFailure,
@@ -161,6 +197,44 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
       () => invoke<unknown>("create_project", { configuration }),
       createFallbackFailure,
     ),
+  chooseProvisionalDecorative: async () => {
+    try {
+      const result = await invoke<unknown>(
+        "choose_provisional_decorative",
+      );
+      if (result === null) {
+        return { status: "cancelled" };
+      }
+      const selection = toProvisionalDecorativeSelection(result);
+      return selection
+        ? { status: "selected", selection }
+        : { status: "failed", error: decorativePickerFallbackFailure };
+    } catch (error) {
+      return {
+        status: "failed",
+        error: toProjectLaunchFailure(
+          error,
+          decorativePickerFallbackFailure,
+        ),
+      };
+    }
+  },
+  releaseProvisionalDecorative: async (selectionId) => {
+    try {
+      await invoke<unknown>("release_provisional_decorative", {
+        selectionId,
+      });
+    } catch {
+      // The process-scoped registry is also discarded when Global exits.
+    }
+  },
+  clearProvisionalDecoratives: async () => {
+    try {
+      await invoke<unknown>("clear_provisional_decoratives");
+    } catch {
+      // A fresh Global process starts with an empty registry.
+    }
+  },
   openProject: () =>
     settleProjectLaunch(
       () => invoke<unknown>("open_project"),

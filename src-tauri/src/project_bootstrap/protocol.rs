@@ -3,12 +3,12 @@ use std::io::{Read, Write};
 use myalbuns_paths::{NativePathDto, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-use super::configuration::InitialProjectConfiguration;
+use super::configuration::InitialProjectCreationConfiguration;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 3;
+pub(crate) const PROTOCOL_VERSION: u16 = 4;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(
     rename_all = "camelCase",
     rename_all_fields = "camelCase",
@@ -17,7 +17,7 @@ const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 pub(crate) enum BootstrapIntent {
     OpenExisting,
     CreateNew {
-        configuration: InitialProjectConfiguration,
+        configuration: Box<InitialProjectCreationConfiguration>,
         authorization: CreateWriteAuthorization,
     },
 }
@@ -249,8 +249,10 @@ mod tests {
     use myalbuns_paths::OperationPathContext;
 
     use super::super::configuration::{
-        InitialDisplayUnit, InitialDocumentConfiguration, InitialSheetFormat,
-        InitialStructureConfiguration,
+        InitialBackground, InitialBackgroundContent, InitialDisplayUnit,
+        InitialDocumentConfiguration, InitialFrameBorder, InitialOverlay, InitialOverlayContent,
+        InitialProjectConfiguration, InitialProjectCreationConfiguration, InitialSheetFormat,
+        InitialStructureConfiguration, InitialVisualDefaults,
     };
 
     use super::*;
@@ -276,7 +278,7 @@ mod tests {
     #[test]
     fn create_request_round_trip_preserves_the_closed_initial_configuration_and_authorization() {
         let base = request();
-        let configuration = InitialProjectConfiguration {
+        let configuration = InitialProjectCreationConfiguration {
             document: InitialDocumentConfiguration {
                 display_unit: InitialDisplayUnit::Cm,
                 sheet_width_um: 508_000,
@@ -290,6 +292,27 @@ mod tests {
                 first_sheet: InitialSheetFormat::SinglePage,
                 last_sheet: InitialSheetFormat::Double,
             },
+            visual_defaults: InitialVisualDefaults {
+                background: InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Color {
+                        rgb: "#102030".into(),
+                    },
+                    right: InitialBackgroundContent::Image {
+                        native_path: NativePathDto::from(PathBuf::from(
+                            "C:\\Imagens\\Fundo 🌳.png",
+                        )),
+                    },
+                },
+                overlay: InitialOverlay::BothSides {
+                    both: Some(InitialOverlayContent::Image {
+                        native_path: NativePathDto::from(PathBuf::from("C:\\Imagens\\Overlay.png")),
+                    }),
+                },
+                frame_border: InitialFrameBorder::Solid {
+                    rgb: "#A0B0C0".into(),
+                    width_um: 1_250,
+                },
+            },
         };
         for authorization in [
             CreateWriteAuthorization::CreateOnly,
@@ -297,14 +320,14 @@ mod tests {
         ] {
             let request = BootstrapRequest {
                 intent: BootstrapIntent::CreateNew {
-                    configuration,
+                    configuration: Box::new(configuration.clone()),
                     authorization,
                 },
                 ..base.clone()
             };
 
             let encoded = serde_json::to_value(&request).expect("the request serializes");
-            assert_eq!(encoded["protocolVersion"], 3);
+            assert_eq!(encoded["protocolVersion"], PROTOCOL_VERSION);
             assert_eq!(encoded["intent"]["kind"], "createNew");
             assert_eq!(
                 encoded["intent"]["configuration"]["document"]["displayUnit"],
@@ -321,6 +344,15 @@ mod tests {
             assert_eq!(
                 encoded["intent"]["configuration"]["structure"]["lastSheet"],
                 "double"
+            );
+            assert_eq!(
+                encoded["intent"]["configuration"]["visualDefaults"]["background"]["scope"],
+                "perSide"
+            );
+            assert!(
+                encoded["intent"]["configuration"]["visualDefaults"]["background"]["right"]
+                    ["nativePath"]
+                    .is_object()
             );
             assert_eq!(
                 encoded["intent"]["authorization"],

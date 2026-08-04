@@ -8,6 +8,21 @@ export interface MediaPreview {
   url: string;
 }
 
+export type MediaPreviewErrorCode =
+  | "unavailable"
+  | "unsupported_image"
+  | "read_failed";
+
+export class MediaPreviewError extends Error {
+  constructor(
+    readonly code: MediaPreviewErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "MediaPreviewError";
+  }
+}
+
 export interface ExportResult {
   outputPath: string;
   widthPx: number;

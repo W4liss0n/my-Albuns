@@ -14,7 +14,18 @@ const photoSheet: ComposedSheet = {
   activeSides: "both",
   widthUm: 600_000,
   heightUm: 300_000,
-  overlay: null,
+  base: {
+    rgb: "#FFFFFF",
+    drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+  },
+  backgrounds: [
+    {
+      kind: "color",
+      rgb: "#FFFFFF",
+      drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+    },
+  ],
+  overlays: [],
   frames: [
     {
       frameId: "frame-001",
@@ -50,16 +61,29 @@ const placeholderSheet: ComposedSheet = {
   activeSides: "both",
   widthUm: 600_000,
   heightUm: 300_000,
-  overlay: {
-    mediaId: "decorative-overlay",
-    name: "Overlay translúcido.png",
-    drawRect: {
-      x: 0,
-      y: 0,
-      width: 600_000,
-      height: 300_000,
-    },
+  base: {
+    rgb: "#FFFFFF",
+    drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
   },
+  backgrounds: [
+    {
+      kind: "color",
+      rgb: "#FFFFFF",
+      drawRect: { x: 0, y: 0, width: 600_000, height: 300_000 },
+    },
+  ],
+  overlays: [
+    {
+      mediaId: "decorative-overlay",
+      name: "Overlay translúcido.png",
+      drawRect: {
+        x: 0,
+        y: 0,
+        width: 600_000,
+        height: 300_000,
+      },
+    },
+  ],
   frames: [
     {
       frameId: "frame-002",
@@ -173,6 +197,21 @@ test("preserves the canonical visual stack supplied by CompositionCore", () => {
   ).toEqual(["frame-top", "frame-bottom"]);
 });
 
+test("renders the persisted solid Frame border on top of Frame content", () => {
+  render(
+    <SheetPreview
+      frameBorder={{ kind: "solid", rgb: "#A0B0C0", widthUm: 1_250 }}
+      sheet={photoSheet}
+    />,
+  );
+
+  const border = screen
+    .getByRole("img", { name: /01/ })
+    .querySelector('[data-preview-frame-border-id="frame-001"]');
+  expect(border).toHaveAttribute("stroke", "#A0B0C0");
+  expect(border).toHaveAttribute("stroke-width", "1250");
+});
+
 test("keeps preview strokes aligned with Canvas units at other sheet heights", () => {
   render(
     <SheetPreview
@@ -191,11 +230,23 @@ test("keeps preview strokes aligned with Canvas units at other sheet heights", (
   ).toHaveAttribute("stroke-width", "1000");
 });
 
-test("represents a single-page extremity with a neutral inactive side and no center divider", () => {
+test("represents a single-page extremity as the normalized active surface", () => {
   const singlePageSheet = {
     ...placeholderSheet,
     activeSides: "right" as const,
-    overlay: null,
+    widthUm: 300_000,
+    base: {
+      rgb: "#FFFFFF",
+      drawRect: { x: 0, y: 0, width: 300_000, height: 300_000 },
+    },
+    backgrounds: [
+      {
+        kind: "color" as const,
+        rgb: "#FFFFFF",
+        drawRect: { x: 0, y: 0, width: 300_000, height: 300_000 },
+      },
+    ],
+    overlays: [],
     frames: [],
   } satisfies ComposedSheet;
 
@@ -204,16 +255,12 @@ test("represents a single-page extremity with a neutral inactive side and no cen
   const preview = screen.getByRole("img", {
     name: "Prévia da Lâmina 02",
   });
-  expect(preview).toHaveAttribute("viewBox", "0 0 600000 300000");
+  expect(preview).toHaveAttribute("viewBox", "0 0 300000 300000");
   expect(preview.querySelector("line")).not.toBeInTheDocument();
-  expect(
-    preview.querySelector('[data-preview-inactive-side="left"]'),
-  ).toHaveAttribute("x", "0");
+  expect(preview.querySelector("[data-preview-inactive-side]")).toBeNull();
 
   rerender(
     <SheetPreview sheet={{ ...singlePageSheet, activeSides: "left" }} />,
   );
-  expect(
-    preview.querySelector('[data-preview-inactive-side="right"]'),
-  ).toHaveAttribute("x", "300000");
+  expect(preview.querySelector("[data-preview-inactive-side]")).toBeNull();
 });

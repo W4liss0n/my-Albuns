@@ -63,11 +63,11 @@ fn projects_a_real_decorative_overlay_from_the_canonical_catalog() {
         .composition
         .sheets
         .iter()
-        .find(|sheet| sheet.overlay.is_some())
+        .find(|sheet| !sheet.overlays.is_empty())
         .expect("the representative Album contains a composed Overlay");
     let overlay = sheet
-        .overlay
-        .as_ref()
+        .overlays
+        .first()
         .expect("the composed Overlay remains present");
 
     assert_eq!(overlay.media_id, "decorative-overlay");
@@ -83,7 +83,7 @@ fn projects_a_real_decorative_overlay_from_the_canonical_catalog() {
     );
     assert_eq!(
         media_usage_count(&projection, "decorative-overlay"),
-        Some(1)
+        Some(12)
     );
     assert_eq!(
         session.render_snapshot().composition,
@@ -190,7 +190,8 @@ fn rejects_media_categories_in_the_wrong_visual_role() {
         .expect("the representative Project serializes");
     let mut photo_as_overlay: serde_json::Value =
         serde_json::from_str(&persisted).expect("the Project JSON is valid");
-    photo_as_overlay["album"]["sheets"][0]["overlayMediaId"] = serde_json::json!("media-serra");
+    photo_as_overlay["album"]["visualDefaults"]["overlay"]["both"]["mediaId"] =
+        serde_json::json!("media-serra");
 
     let error = ProjectCore::new()
         .open_demo_editable_session(
@@ -457,7 +458,7 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
-    assert_eq!(snapshot.schema_version, 3);
+    assert_eq!(snapshot.schema_version, 4);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo
         .as_ref()
@@ -558,16 +559,16 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PlacementPhoto) -> Co
                     transform: photo.transform.clone(),
                 }),
             }],
-            overlay_media_id: None,
         }],
         media: vec![MediaCatalogItem {
             id: photo.media_id.clone(),
             kind: MediaKind::Photo,
             name: photo.name.clone(),
-            source_width_px: photo.source_width_px,
-            source_height_px: photo.source_height_px,
-            palette: photo.palette.clone(),
+            source_width_px: Some(photo.source_width_px),
+            source_height_px: Some(photo.source_height_px),
+            palette: Some(photo.palette.clone()),
         }],
+        visual_defaults: Default::default(),
     };
 
     CompositionCore::compose(&album).sheets[0].frames[0]

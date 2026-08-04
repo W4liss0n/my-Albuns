@@ -77,6 +77,7 @@ impl std::error::Error for ProcessorUnavailable {}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ImagingOperation {
+    #[cfg(test)]
     Cache,
     Export,
 }
@@ -84,6 +85,7 @@ pub(crate) enum ImagingOperation {
 impl ImagingOperation {
     const fn as_str(self) -> &'static str {
         match self {
+            #[cfg(test)]
             Self::Cache => "cache",
             Self::Export => "export",
         }
@@ -125,8 +127,10 @@ impl InvocationFailureStage {
 pub(crate) struct InvocationFailure {
     pub(crate) stage: InvocationFailureStage,
     pub(crate) exit_code: Option<i32>,
+    #[cfg(test)]
     pub(crate) process_id: Option<u32>,
     pub(crate) message: String,
+    #[cfg(test)]
     termination_observed: bool,
 }
 
@@ -161,19 +165,21 @@ impl<Stage> OperationFailure<Stage> {
 impl InvocationFailure {
     pub(crate) fn at_stage(
         stage: InvocationFailureStage,
-        process_id: Option<u32>,
+        _process_id: Option<u32>,
         message: impl Into<String>,
     ) -> Self {
         Self {
             stage,
             exit_code: None,
-            process_id,
+            #[cfg(test)]
+            process_id: _process_id,
             message: message.into(),
+            #[cfg(test)]
             termination_observed: false,
         }
     }
 
-    pub(crate) fn terminated(process_id: u32, exit_code: Option<i32>) -> Self {
+    pub(crate) fn terminated(_process_id: u32, exit_code: Option<i32>) -> Self {
         let stage = exit_code
             .and_then(ImagingFailureStage::from_exit_code)
             .map_or(
@@ -183,31 +189,37 @@ impl InvocationFailure {
         Self {
             stage,
             exit_code,
-            process_id: Some(process_id),
+            #[cfg(test)]
+            process_id: Some(_process_id),
             message: format!(
                 "O Processador de Imagens terminou com o código {:?}.",
                 exit_code
             ),
+            #[cfg(test)]
             termination_observed: true,
         }
     }
 
-    pub(crate) fn cancelled(process_id: u32) -> Self {
+    pub(crate) fn cancelled(_process_id: u32) -> Self {
         Self {
             stage: InvocationFailureStage::Cancelled,
             exit_code: None,
-            process_id: Some(process_id),
+            #[cfg(test)]
+            process_id: Some(_process_id),
             message: "A operação do Processador de Imagens foi cancelada.".into(),
+            #[cfg(test)]
             termination_observed: false,
         }
     }
 
-    pub(crate) fn termination_unconfirmed(process_id: u32, message: impl Into<String>) -> Self {
+    pub(crate) fn termination_unconfirmed(_process_id: u32, message: impl Into<String>) -> Self {
         Self {
             stage: InvocationFailureStage::TerminationUnconfirmed,
             exit_code: None,
-            process_id: Some(process_id),
+            #[cfg(test)]
+            process_id: Some(_process_id),
             message: message.into(),
+            #[cfg(test)]
             termination_observed: false,
         }
     }
@@ -220,6 +232,7 @@ impl InvocationFailure {
         self.stage == InvocationFailureStage::TerminationUnconfirmed
     }
 
+    #[cfg(test)]
     pub(crate) fn is_unexpected_termination(&self) -> bool {
         self.termination_observed
             && self
@@ -267,6 +280,7 @@ pub(crate) struct InvocationControl<'a> {
 }
 
 impl<'a> InvocationControl<'a> {
+    #[cfg(test)]
     pub(crate) const fn uncontrolled() -> Self {
         Self {
             cancellation: None,
@@ -515,8 +529,10 @@ async fn invoke_once(
         return Err(InvocationFailure {
             stage: InvocationFailureStage::ReadResponse,
             exit_code,
+            #[cfg(test)]
             process_id: Some(imaging_process_id),
             message: format!("Não foi possível receber a resposta do Processador: {error}"),
+            #[cfg(test)]
             termination_observed: true,
         });
     }

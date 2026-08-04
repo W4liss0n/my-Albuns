@@ -7,7 +7,7 @@ use std::{
 };
 
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage, codecs::png::PngEncoder};
-use myalbuns_core::{ComposedDecorative, ComposedFrame};
+use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
     ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion,
 };
@@ -51,28 +51,59 @@ pub(crate) fn render_request(
     let width_px = to_pixels(sheet.width_um, pixels_per_micrometer).max(1);
     let height_px = to_pixels(sheet.height_um, pixels_per_micrometer).max(1);
     let (sources, source_bytes) = load_render_sources(request, progress)?;
-    let mut image = RgbaImage::from_pixel(width_px, height_px, Rgba([239, 232, 218, 255]));
+    let mut image = RgbaImage::from_pixel(width_px, height_px, opaque_rgb(&sheet.base.rgb));
+
+    for background in &sheet.backgrounds {
+        match background {
+            ComposedBackground::Color { rgb, draw_rect } => fill_composed_rect(
+                &mut image,
+                draw_rect,
+                pixels_per_micrometer,
+                opaque_rgb(rgb),
+            ),
+            ComposedBackground::Media {
+                media_id,
+                draw_rect,
+                ..
+            } => {
+                let source = sources
+                    .get(media_id)
+                    .ok_or_else(|| format!("a fonte do Background {media_id} não foi carregada"))?;
+                draw_stretched_media(&mut image, draw_rect, pixels_per_micrometer, source);
+            }
+        }
+    }
 
     let frame_count = u32::try_from(sheet.frames.len())
         .map_err(|_| "a Lâmina contém Frames demais".to_string())?;
     progress(ImagingProgressStage::Composing, 0, frame_count)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
         draw_frame(&mut image, frame, pixels_per_micrometer, &sources)?;
+        draw_frame_border(
+            &mut image,
+            &frame.clip_rect,
+            &request.snapshot.composition.frame_border,
+            pixels_per_micrometer,
+        );
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
             frame_count,
         )?;
     }
-    draw_vertical_line(&mut image, width_px / 2, Rgba([129, 112, 91, 90]));
-    if let Some(overlay) = &sheet.overlay {
+    for overlay in &sheet.overlays {
         let source = sources.get(&overlay.media_id).ok_or_else(|| {
             format!(
                 "a fonte do Decorativo {} não foi carregada",
                 overlay.media_id
             )
         })?;
-        draw_decorative(&mut image, overlay, pixels_per_micrometer, source);
+        draw_stretched_media(
+            &mut image,
+            &overlay.draw_rect,
+            pixels_per_micrometer,
+            source,
+        );
     }
 
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
@@ -265,7 +296,6 @@ fn draw_frame(
         fill_rect(image, left, top, right, bottom, Rgba([214, 207, 194, 255]));
     }
 
-    stroke_rect(image, left, top, right, bottom, Rgba([255, 255, 255, 220]));
     Ok(())
 }
 
@@ -283,24 +313,18 @@ fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8
     blend(top, bottom, y_amount)
 }
 
-fn draw_decorative(
+fn draw_stretched_media(
     image: &mut RgbaImage,
-    decorative: &ComposedDecorative,
+    draw_rect: &RectUm,
     pixels_per_micrometer: f64,
     source: &RgbaImage,
 ) {
-    let left = to_pixels_signed(decorative.draw_rect.x, pixels_per_micrometer).max(0) as u32;
-    let top = to_pixels_signed(decorative.draw_rect.y, pixels_per_micrometer).max(0) as u32;
-    let right = to_pixels_signed(
-        decorative.draw_rect.x + decorative.draw_rect.width,
-        pixels_per_micrometer,
-    )
-    .max(0) as u32;
-    let bottom = to_pixels_signed(
-        decorative.draw_rect.y + decorative.draw_rect.height,
-        pixels_per_micrometer,
-    )
-    .max(0) as u32;
+    let left = to_pixels_signed(draw_rect.x, pixels_per_micrometer).max(0) as u32;
+    let top = to_pixels_signed(draw_rect.y, pixels_per_micrometer).max(0) as u32;
+    let right =
+        to_pixels_signed(draw_rect.x + draw_rect.width, pixels_per_micrometer).max(0) as u32;
+    let bottom =
+        to_pixels_signed(draw_rect.y + draw_rect.height, pixels_per_micrometer).max(0) as u32;
     let right = right.min(image.width());
     let bottom = bottom.min(image.height());
     let width = right.saturating_sub(left).max(1);
@@ -315,41 +339,83 @@ fn draw_decorative(
     }
 }
 
+fn fill_composed_rect(
+    image: &mut RgbaImage,
+    draw_rect: &RectUm,
+    pixels_per_micrometer: f64,
+    color: Rgba<u8>,
+) {
+    let left = to_pixels_signed(draw_rect.x, pixels_per_micrometer).max(0) as u32;
+    let top = to_pixels_signed(draw_rect.y, pixels_per_micrometer).max(0) as u32;
+    let right =
+        to_pixels_signed(draw_rect.x + draw_rect.width, pixels_per_micrometer).max(0) as u32;
+    let bottom =
+        to_pixels_signed(draw_rect.y + draw_rect.height, pixels_per_micrometer).max(0) as u32;
+    fill_rect(
+        image,
+        left,
+        top,
+        right.min(image.width()),
+        bottom.min(image.height()),
+        color,
+    );
+}
+
+fn draw_frame_border(
+    image: &mut RgbaImage,
+    frame: &RectUm,
+    border: &ProjectedFrameBorder,
+    pixels_per_micrometer: f64,
+) {
+    let ProjectedFrameBorder::Solid { rgb, width_um } = border else {
+        return;
+    };
+    let left = (to_pixels_signed(frame.x, pixels_per_micrometer).max(0) as u32).min(image.width());
+    let top = (to_pixels_signed(frame.y, pixels_per_micrometer).max(0) as u32).min(image.height());
+    let right = (to_pixels_signed(frame.x + frame.width, pixels_per_micrometer).max(0) as u32)
+        .min(image.width());
+    let bottom = (to_pixels_signed(frame.y + frame.height, pixels_per_micrometer).max(0) as u32)
+        .min(image.height());
+    if right <= left || bottom <= top {
+        return;
+    }
+    let stroke = ((*width_um as f64 * pixels_per_micrometer).round().max(1.0) as u32)
+        .min(right - left)
+        .min(bottom - top);
+    let color = opaque_rgb(rgb);
+    fill_rect(image, left, top, right, (top + stroke).min(bottom), color);
+    fill_rect(
+        image,
+        left,
+        bottom.saturating_sub(stroke),
+        right,
+        bottom,
+        color,
+    );
+    fill_rect(image, left, top, (left + stroke).min(right), bottom, color);
+    fill_rect(
+        image,
+        right.saturating_sub(stroke),
+        top,
+        right,
+        bottom,
+        color,
+    );
+}
+
+fn opaque_rgb(value: &str) -> Rgba<u8> {
+    let channel = |start| {
+        u8::from_str_radix(&value[start..start + 2], 16)
+            .expect("CompositionCore provides canonical RGB")
+    };
+    Rgba([channel(1), channel(3), channel(5), 255])
+}
+
 fn fill_rect(image: &mut RgbaImage, left: u32, top: u32, right: u32, bottom: u32, color: Rgba<u8>) {
     for y in top..bottom {
         for x in left..right {
             image.put_pixel(x, y, color);
         }
-    }
-}
-
-fn stroke_rect(
-    image: &mut RgbaImage,
-    left: u32,
-    top: u32,
-    right: u32,
-    bottom: u32,
-    color: Rgba<u8>,
-) {
-    if right <= left || bottom <= top {
-        return;
-    }
-    for x in left..right {
-        image.put_pixel(x, top, color);
-        image.put_pixel(x, bottom - 1, color);
-    }
-    for y in top..bottom {
-        image.put_pixel(left, y, color);
-        image.put_pixel(right - 1, y, color);
-    }
-}
-
-fn draw_vertical_line(image: &mut RgbaImage, x: u32, color: Rgba<u8>) {
-    if x >= image.width() {
-        return;
-    }
-    for y in 0..image.height() {
-        blend_pixel(image, x, y, color);
     }
 }
 

@@ -1,7 +1,12 @@
 use myalbuns_core::{
-    DisplayUnit, EndSheetFormat, InitialProjectConfiguration as CoreProjectConfiguration,
-    InitialProjectValidationError as CoreValidationError,
+    DisplayUnit, EndSheetFormat, InitialBackground as CoreInitialBackground,
+    InitialBackgroundContent as CoreInitialBackgroundContent,
+    InitialFrameBorder as CoreInitialFrameBorder, InitialOverlay as CoreInitialOverlay,
+    InitialOverlayContent as CoreInitialOverlayContent, InitialProject,
+    InitialProjectConfiguration as CoreProjectConfiguration, InitialProjectPersonalization,
+    InitialProjectValidationError as CoreValidationError, Rgb,
 };
+use myalbuns_paths::NativePathDto;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -43,6 +48,100 @@ pub(crate) struct InitialStructureConfiguration {
 pub(crate) struct InitialProjectConfiguration {
     pub(crate) document: InitialDocumentConfiguration,
     pub(crate) structure: InitialStructureConfiguration,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum InitialBackgroundContent {
+    Color { rgb: String },
+    Image { native_path: NativePathDto },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(
+    tag = "scope",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum InitialBackground {
+    BothSides {
+        both: InitialBackgroundContent,
+    },
+    PerSide {
+        left: InitialBackgroundContent,
+        right: InitialBackgroundContent,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum InitialOverlayContent {
+    Image { native_path: NativePathDto },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(
+    tag = "scope",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum InitialOverlay {
+    BothSides {
+        both: Option<InitialOverlayContent>,
+    },
+    PerSide {
+        left: Option<InitialOverlayContent>,
+        right: Option<InitialOverlayContent>,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum InitialFrameBorder {
+    None,
+    Solid { rgb: String, width_um: i64 },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct InitialVisualDefaults {
+    pub(crate) background: InitialBackground,
+    pub(crate) overlay: InitialOverlay,
+    pub(crate) frame_border: InitialFrameBorder,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct InitialProjectCreationConfiguration {
+    pub(crate) document: InitialDocumentConfiguration,
+    pub(crate) structure: InitialStructureConfiguration,
+    pub(crate) visual_defaults: InitialVisualDefaults,
+}
+
+impl InitialProjectCreationConfiguration {
+    pub(crate) fn dimensions(&self) -> InitialProjectConfiguration {
+        InitialProjectConfiguration {
+            document: self.document,
+            structure: self.structure,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -98,6 +197,73 @@ pub(crate) fn to_core_configuration(
         end_sheet_format(structure.first_sheet),
         end_sheet_format(structure.last_sheet),
     )
+}
+
+pub(crate) fn to_core_initial_project(
+    configuration: InitialProjectCreationConfiguration,
+) -> Option<InitialProject> {
+    let dimensions = configuration.dimensions();
+    let personalization = to_core_personalization(configuration.visual_defaults)?;
+    Some(
+        InitialProject::configured(to_core_configuration(dimensions))
+            .with_personalization(personalization),
+    )
+}
+
+fn to_core_personalization(
+    visual_defaults: InitialVisualDefaults,
+) -> Option<InitialProjectPersonalization> {
+    let background = match visual_defaults.background {
+        InitialBackground::BothSides { both } => CoreInitialBackground::BothSides {
+            both: to_core_background_content(both)?,
+        },
+        InitialBackground::PerSide { left, right } => CoreInitialBackground::PerSide {
+            left: to_core_background_content(left)?,
+            right: to_core_background_content(right)?,
+        },
+    };
+    let overlay = match visual_defaults.overlay {
+        InitialOverlay::BothSides { both } => CoreInitialOverlay::BothSides {
+            both: both.map(to_core_overlay_content),
+        },
+        InitialOverlay::PerSide { left, right } => CoreInitialOverlay::PerSide {
+            left: left.map(to_core_overlay_content),
+            right: right.map(to_core_overlay_content),
+        },
+    };
+    let frame_border = match visual_defaults.frame_border {
+        InitialFrameBorder::None => CoreInitialFrameBorder::None,
+        InitialFrameBorder::Solid { rgb, width_um } => CoreInitialFrameBorder::Solid {
+            rgb: Rgb::parse_canonical(&rgb)?,
+            width_um,
+        },
+    };
+    Some(InitialProjectPersonalization::new(
+        background,
+        overlay,
+        frame_border,
+    ))
+}
+
+fn to_core_background_content(
+    content: InitialBackgroundContent,
+) -> Option<CoreInitialBackgroundContent> {
+    Some(match content {
+        InitialBackgroundContent::Color { rgb } => CoreInitialBackgroundContent::Color {
+            rgb: Rgb::parse_canonical(&rgb)?,
+        },
+        InitialBackgroundContent::Image { native_path } => CoreInitialBackgroundContent::Media {
+            path: native_path.into_path_buf(),
+        },
+    })
+}
+
+fn to_core_overlay_content(content: InitialOverlayContent) -> CoreInitialOverlayContent {
+    match content {
+        InitialOverlayContent::Image { native_path } => CoreInitialOverlayContent::Media {
+            path: native_path.into_path_buf(),
+        },
+    }
 }
 
 fn display_unit(unit: InitialDisplayUnit) -> DisplayUnit {
@@ -161,6 +327,8 @@ fn validation_error(error: CoreValidationError) -> ProjectConfigurationValidatio
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use serde_json::json;
 
     use super::*;
@@ -183,12 +351,68 @@ mod tests {
         }
     }
 
+    fn personalized_creation() -> InitialProjectCreationConfiguration {
+        let dimensions = valid_configuration();
+        InitialProjectCreationConfiguration {
+            document: dimensions.document,
+            structure: dimensions.structure,
+            visual_defaults: InitialVisualDefaults {
+                background: InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Color {
+                        rgb: "#102030".into(),
+                    },
+                    right: InitialBackgroundContent::Image {
+                        native_path: NativePathDto::from(PathBuf::from(r"C:\Imagens\Fundo 🌳.png")),
+                    },
+                },
+                overlay: InitialOverlay::BothSides {
+                    both: Some(InitialOverlayContent::Image {
+                        native_path: NativePathDto::from(PathBuf::from(
+                            "C:\\Imagens\\Sobreposi\u{e7}\u{e3}o.png",
+                        )),
+                    }),
+                },
+                frame_border: InitialFrameBorder::Solid {
+                    rgb: "#A0B0C0".into(),
+                    width_um: 1_250,
+                },
+            },
+        }
+    }
+
     #[test]
     fn valid_configuration_has_no_structural_errors() {
         assert_eq!(
             validate_configuration(valid_configuration()),
             ProjectConfigurationValidation { errors: vec![] }
         );
+    }
+
+    #[test]
+    fn creation_configuration_keeps_reversible_native_paths_and_maps_to_core() {
+        let configuration = personalized_creation();
+        let encoded = serde_json::to_value(&configuration)
+            .expect("the personalized configuration serializes");
+
+        assert!(
+            encoded["visualDefaults"]["background"]["right"]["nativePath"].is_object(),
+            "native pathnames must never be flattened into lossy strings"
+        );
+        let decoded: InitialProjectCreationConfiguration =
+            serde_json::from_value(encoded).expect("the personalized configuration round-trips");
+        assert_eq!(decoded, configuration);
+        assert!(to_core_initial_project(decoded).is_some());
+    }
+
+    #[test]
+    fn creation_configuration_rejects_non_canonical_colors_before_core_creation() {
+        let mut configuration = personalized_creation();
+        configuration.visual_defaults.frame_border = InitialFrameBorder::Solid {
+            rgb: "#a0b0c0".into(),
+            width_um: 1_250,
+        };
+
+        assert!(to_core_initial_project(configuration).is_none());
     }
 
     #[test]

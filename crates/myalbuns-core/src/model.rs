@@ -4,8 +4,8 @@ use ts_rs::TS;
 
 use crate::project_document::{DisplayUnit, DocumentSettings};
 
-pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 3;
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 3;
+pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 4;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -168,6 +168,97 @@ pub enum MediaKind {
     Decorative,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectedBackgroundContent {
+    Color { rgb: String },
+    Media { media_id: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "scope",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "scope")]
+pub enum ProjectedBackground {
+    BothSides {
+        both: ProjectedBackgroundContent,
+    },
+    PerSide {
+        left: ProjectedBackgroundContent,
+        right: ProjectedBackgroundContent,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectedOverlayContent {
+    Media { media_id: String },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "scope",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "scope")]
+pub enum ProjectedOverlay {
+    BothSides {
+        both: Option<ProjectedOverlayContent>,
+    },
+    PerSide {
+        left: Option<ProjectedOverlayContent>,
+        right: Option<ProjectedOverlayContent>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectedFrameBorder {
+    None,
+    Solid { rgb: String, width_um: u64 },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectedVisualDefaults {
+    pub background: ProjectedBackground,
+    pub overlay: ProjectedOverlay,
+    pub frame_border: ProjectedFrameBorder,
+}
+
+impl Default for ProjectedVisualDefaults {
+    fn default() -> Self {
+        Self {
+            background: ProjectedBackground::BothSides {
+                both: ProjectedBackgroundContent::Color {
+                    rgb: "#FFFFFF".into(),
+                },
+            },
+            overlay: ProjectedOverlay::BothSides { both: None },
+            frame_border: ProjectedFrameBorder::None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct SheetSnapshot {
@@ -178,7 +269,6 @@ pub struct SheetSnapshot {
     pub width_um: i64,
     pub height_um: i64,
     pub frames: Vec<FrameSnapshot>,
-    pub overlay_media_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -187,9 +277,9 @@ pub struct MediaCatalogItem {
     pub id: String,
     pub kind: MediaKind,
     pub name: String,
-    pub source_width_px: u32,
-    pub source_height_px: u32,
-    pub palette: [String; 3],
+    pub source_width_px: Option<u32>,
+    pub source_height_px: Option<u32>,
+    pub palette: Option<[String; 3]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -197,6 +287,7 @@ pub struct MediaCatalogItem {
 pub struct AlbumSnapshot {
     pub sheets: Vec<SheetSnapshot>,
     pub media: Vec<MediaCatalogItem>,
+    pub visual_defaults: ProjectedVisualDefaults,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -272,29 +363,70 @@ pub struct ComposedDecorative {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+pub struct ComposedColor {
+    pub rgb: String,
+    pub draw_rect: RectUm,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ComposedBackground {
+    Color {
+        rgb: String,
+        draw_rect: RectUm,
+    },
+    Media {
+        media_id: String,
+        name: String,
+        draw_rect: RectUm,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub struct ComposedSheet {
     pub sheet_id: String,
     pub number: usize,
     pub active_sides: ProjectedActiveSides,
     pub width_um: i64,
     pub height_um: i64,
-    pub overlay: Option<ComposedDecorative>,
+    pub base: ComposedColor,
+    pub backgrounds: Vec<ComposedBackground>,
     pub frames: Vec<ComposedFrame>,
+    pub overlays: Vec<ComposedDecorative>,
 }
 
 impl ComposedSheet {
     pub fn referenced_media_ids(&self) -> impl Iterator<Item = &str> {
-        self.frames
+        self.backgrounds
             .iter()
-            .filter_map(|frame| frame.photo.as_ref())
-            .map(|photo| photo.media_id.as_str())
-            .chain(self.overlay.iter().map(|overlay| overlay.media_id.as_str()))
+            .filter_map(|background| match background {
+                ComposedBackground::Color { .. } => None,
+                ComposedBackground::Media { media_id, .. } => Some(media_id.as_str()),
+            })
+            .chain(
+                self.frames
+                    .iter()
+                    .filter_map(|frame| frame.photo.as_ref())
+                    .map(|photo| photo.media_id.as_str()),
+            )
+            .chain(
+                self.overlays
+                    .iter()
+                    .map(|overlay| overlay.media_id.as_str()),
+            )
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct CompositionPlan {
+    pub frame_border: ProjectedFrameBorder,
     pub sheets: Vec<ComposedSheet>,
 }
 

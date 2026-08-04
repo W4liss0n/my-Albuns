@@ -88,6 +88,21 @@ pub struct MediaPreview {
     pub(crate) url: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaPreviewCommandErrorCode {
+    Unavailable,
+    UnsupportedImage,
+    ReadFailed,
+}
+
+#[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaPreviewCommandError {
+    pub(crate) code: MediaPreviewCommandErrorCode,
+    pub(crate) message: String,
+}
+
 #[derive(Clone, Copy, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum FrontendLogLevel {

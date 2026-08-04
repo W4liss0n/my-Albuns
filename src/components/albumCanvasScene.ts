@@ -213,16 +213,36 @@ export class AlbumCanvasScene {
         if (url) desiredPreviewUrls.add(url);
         return url ? [url, this.previewTextures.get(url) !== undefined] : null;
       });
-      const overlayUrl = sheet.overlay
-        ? (this.input?.mediaPreviewUrls?.[sheet.overlay.mediaId] ?? null)
-        : null;
-      if (overlayUrl) desiredPreviewUrls.add(overlayUrl);
-      const overlayPreviewState = overlayUrl
-        ? [overlayUrl, this.previewTextures.get(overlayUrl) !== undefined]
-        : null;
+      const backgroundPreviewStates = sheet.backgrounds.flatMap(
+        (background) => {
+          if (background.kind !== "media") return [];
+          const url =
+            this.input?.mediaPreviewUrls?.[background.mediaId] ?? null;
+          if (url) desiredPreviewUrls.add(url);
+          return [
+            url
+              ? [url, this.previewTextures.get(url) !== undefined]
+              : null,
+          ];
+        },
+      );
+      const overlayPreviewStates = sheet.overlays.map((overlay) => {
+        const url =
+          this.input?.mediaPreviewUrls?.[overlay.mediaId] ?? null;
+        if (url) desiredPreviewUrls.add(url);
+        return url
+          ? [url, this.previewTextures.get(url) !== undefined]
+          : null;
+      });
       signatures.set(
         sheet.sheetId,
-        JSON.stringify([sheet, previewStates, overlayPreviewState]),
+        JSON.stringify([
+          sheet,
+          this.input.composition.frameBorder,
+          previewStates,
+          backgroundPreviewStates,
+          overlayPreviewStates,
+        ]),
       );
     }
 
@@ -268,25 +288,30 @@ export class AlbumCanvasScene {
     sheet: ComposedSheet,
     signature: string,
   ): SheetRenderNode {
-    const node = createSheetRenderNode(sheet, signature, {
-      previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
-      onSheetTap: (sheetId) => {
-        if (!this.input) return;
-        this.input.onSelectFrame(null);
-        this.input.onFocusSheet(sheetId);
+    const node = createSheetRenderNode(
+      sheet,
+      this.input?.composition.frameBorder ?? { kind: "none" },
+      signature,
+      {
+        previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
+        onSheetTap: (sheetId) => {
+          if (!this.input) return;
+          this.input.onSelectFrame(null);
+          this.input.onFocusSheet(sheetId);
+        },
+        onFrameTap: (sheetId, frameId) => {
+          if (!this.input) return;
+          this.input.onSelectFrame(frameId);
+          this.input.onFocusSheet(sheetId);
+        },
+        onPhotoPanStart: (frameContainer, photoNode, event) => {
+          this.photoInteractions.startPan(frameContainer, photoNode, event);
+        },
+        onPhotoWheel: (photoNode, event) => {
+          this.photoInteractions.handleWheel(photoNode, event);
+        },
       },
-      onFrameTap: (sheetId, frameId) => {
-        if (!this.input) return;
-        this.input.onSelectFrame(frameId);
-        this.input.onFocusSheet(sheetId);
-      },
-      onPhotoPanStart: (frameContainer, photoNode, event) => {
-        this.photoInteractions.startPan(frameContainer, photoNode, event);
-      },
-      onPhotoWheel: (photoNode, event) => {
-        this.photoInteractions.handleWheel(photoNode, event);
-      },
-    });
+    );
     for (const photoNode of node.photoNodes) {
       this.photoNodes.set(photoNode.frameId, photoNode);
     }

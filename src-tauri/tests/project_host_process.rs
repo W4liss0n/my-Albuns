@@ -89,7 +89,7 @@ fn real_host_process_creates_and_owns_the_requested_project_configuration() {
     assert_ne!(reopened.project_id(), uuid::Uuid::nil());
     assert_eq!(reopened.revision(), 0);
     assert_eq!(reopened.saved_revision(), 0);
-    assert_configured_project(&reopened);
+    assert_configured_project(&reopened, &fixture);
 }
 
 fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {
@@ -176,6 +176,8 @@ struct ProjectFixture {
     project_id: Option<String>,
     identity_lease_root: PathBuf,
     process_data_root: PathBuf,
+    background_path: PathBuf,
+    overlay_path: PathBuf,
 }
 
 impl ProjectFixture {
@@ -209,6 +211,12 @@ impl ProjectFixture {
             &process_data_root.join("Temporary"),
         );
         let identity_lease_root = app_paths.project_identity_leases_dir();
+        let background_path = directory.path().join("Fundo \u{e1}rvore.png");
+        let overlay_path = directory.path().join("Overlay.png");
+        fs::write(&background_path, b"\x89PNG\r\n\x1a\nbackground")
+            .expect("the linked background fixture is writable");
+        fs::write(&overlay_path, b"\x89PNG\r\n\x1a\noverlay")
+            .expect("the linked overlay fixture is writable");
 
         Self {
             _directory: directory,
@@ -217,6 +225,8 @@ impl ProjectFixture {
             project_id: None,
             identity_lease_root,
             process_data_root,
+            background_path,
+            overlay_path,
         }
     }
 
@@ -228,7 +238,7 @@ impl ProjectFixture {
 
     fn bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
         json!({
-            "protocolVersion": 3,
+            "protocolVersion": 4,
             "attemptId": attempt_id,
             "launchNonce": launch_nonce,
             "intent": { "kind": "openExisting" },
@@ -241,7 +251,7 @@ impl ProjectFixture {
 
     fn create_bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
         json!({
-            "protocolVersion": 3,
+            "protocolVersion": 4,
             "attemptId": attempt_id,
             "launchNonce": launch_nonce,
             "intent": {
@@ -259,6 +269,31 @@ impl ProjectFixture {
                         "sheetCount": 3,
                         "firstSheet": "singlePage",
                         "lastSheet": "double",
+                    },
+                    "visualDefaults": {
+                        "background": {
+                            "scope": "perSide",
+                            "left": {
+                                "kind": "image",
+                                "nativePath": NativePathDto::from(self.background_path.clone()),
+                            },
+                            "right": {
+                                "kind": "color",
+                                "rgb": "#102030",
+                            },
+                        },
+                        "overlay": {
+                            "scope": "bothSides",
+                            "both": {
+                                "kind": "image",
+                                "nativePath": NativePathDto::from(self.overlay_path.clone()),
+                            },
+                        },
+                        "frameBorder": {
+                            "kind": "solid",
+                            "rgb": "#A0B0C0",
+                            "widthUm": 1250,
+                        },
                     },
                 },
                 "authorization": "createOnly",
@@ -329,7 +364,7 @@ fn spawn_host_and_read_terminal(fixture: &ProjectFixture, request: &Value) -> (C
     (host, terminal)
 }
 
-fn assert_configured_project(project: &EditableProject) {
+fn assert_configured_project(project: &EditableProject, fixture: &ProjectFixture) {
     let document = project.project();
     let settings = document.document();
     assert_eq!(settings.display_unit(), DisplayUnit::Cm);
@@ -338,21 +373,37 @@ fn assert_configured_project(project: &EditableProject) {
     assert_eq!(settings.dpi(), 240);
     assert_eq!(settings.bleed_um(), 4_000);
     assert_eq!(settings.safety_um(), 7_500);
+    assert_eq!(document.media().len(), 2);
+    assert_eq!(document.media()[0].path(), fixture.background_path);
+    assert_eq!(document.media()[1].path(), fixture.overlay_path);
+    let background_id = document.media()[0].id();
+    let overlay_id = document.media()[1].id();
     assert_eq!(
         document.visual_defaults().background(),
-        &Background::BothSides {
-            both: BackgroundContent::Color { rgb: Rgb::WHITE },
+        &Background::PerSide {
+            left: BackgroundContent::Media {
+                media_id: background_id,
+            },
+            right: BackgroundContent::Color {
+                rgb: Rgb::parse_canonical("#102030").expect("canonical test color"),
+            },
         }
     );
     assert_eq!(
         document.visual_defaults().overlay(),
-        &Overlay::BothSides { both: None }
+        &Overlay::BothSides {
+            both: Some(myalbuns_core::OverlayContent::Media {
+                media_id: overlay_id,
+            }),
+        }
     );
     assert_eq!(
         document.visual_defaults().frame_border(),
-        &FrameBorder::None
+        &FrameBorder::Solid {
+            rgb: Rgb::parse_canonical("#A0B0C0").expect("canonical test color"),
+            width_um: 1_250,
+        }
     );
-    assert!(document.media().is_empty());
     assert_eq!(document.sheets().len(), 3);
     assert_eq!(document.sheets()[0].active_sides(), ActiveSides::Right);
     assert_eq!(document.sheets()[1].active_sides(), ActiveSides::Both);

@@ -135,9 +135,18 @@ export function GlobalShell({ projectPort }: GlobalShellProps) {
       </main>
       {isCreating ? (
         <NewProjectFlow
-          onCancel={() => setIsCreating(false)}
+          onCancel={() => {
+            void projectPort.clearProvisionalDecoratives();
+            setIsCreating(false);
+          }}
+          onChooseDecorative={() =>
+            projectPort.chooseProvisionalDecorative()
+          }
           onCreate={(configuration) =>
             projectPort.createProject(configuration)
+          }
+          onReleaseDecorative={(selectionId) =>
+            projectPort.releaseProvisionalDecorative(selectionId)
           }
           onValidate={(configuration) =>
             projectPort.validateProjectConfiguration(configuration)
