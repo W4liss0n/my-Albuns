@@ -164,6 +164,17 @@ button {
   background: #d7aa70;
 }
 
+.global-primary-actions > .global-secondary-action {
+  color: #dce2e7;
+  border-color: rgb(255 255 255 / 14%);
+  background: #253039;
+  box-shadow: none;
+}
+
+.global-primary-actions > .global-secondary-action:hover:not(:disabled) {
+  background: #2d3943;
+}
+
 .global-primary-actions > button:focus-visible {
   outline: 2px solid #e9c99f;
   outline-offset: 3px;

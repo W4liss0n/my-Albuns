@@ -2,20 +2,29 @@ import { invoke } from "@tauri-apps/api/core";
 
 import type {
   GlobalProjectPort,
-  OpenProjectFailure,
-  OpenProjectOutcome,
+  ProjectLaunchFailure,
+  ProjectLaunchOutcome,
   RecentProjectSummary,
 } from "../application/globalProjectPort";
 
-const fallbackFailure: OpenProjectFailure = {
+const openFallbackFailure: ProjectLaunchFailure = {
   code: "open_project_unavailable",
   message: "Não foi possível iniciar a abertura do Projeto.",
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
-function toOpenProjectFailure(error: unknown): OpenProjectFailure {
+const createFallbackFailure: ProjectLaunchFailure = {
+  code: "create_project_unavailable",
+  message: "Não foi possível iniciar a criação do Projeto.",
+  action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+};
+
+function toProjectLaunchFailure(
+  error: unknown,
+  fallback: ProjectLaunchFailure,
+): ProjectLaunchFailure {
   if (typeof error !== "object" || error === null) {
-    return fallbackFailure;
+    return fallback;
   }
 
   const candidate = error as Record<string, unknown>;
@@ -23,7 +32,7 @@ function toOpenProjectFailure(error: unknown): OpenProjectFailure {
     typeof candidate.code !== "string" ||
     typeof candidate.message !== "string"
   ) {
-    return fallbackFailure;
+    return fallback;
   }
 
   return {
@@ -38,9 +47,12 @@ function toOpenProjectFailure(error: unknown): OpenProjectFailure {
   };
 }
 
-function toOpenProjectOutcome(result: unknown): OpenProjectOutcome {
+function toProjectLaunchOutcome(
+  result: unknown,
+  fallback: ProjectLaunchFailure,
+): ProjectLaunchOutcome {
   if (typeof result !== "object" || result === null) {
-    return { status: "failed", error: fallbackFailure };
+    return { status: "failed", error: fallback };
   }
 
   const candidate = result as Record<string, unknown>;
@@ -50,11 +62,11 @@ function toOpenProjectOutcome(result: unknown): OpenProjectOutcome {
   if (candidate.status === "failed") {
     return {
       status: "failed",
-      error: toOpenProjectFailure(candidate.error),
+      error: toProjectLaunchFailure(candidate.error, fallback),
     };
   }
 
-  return { status: "failed", error: fallbackFailure };
+  return { status: "failed", error: fallback };
 }
 
 function toRecentProjectSummaries(
@@ -79,22 +91,31 @@ function toRecentProjectSummaries(
   });
 }
 
-async function settleProjectOpening(
+async function settleProjectLaunch(
   attempt: () => Promise<unknown>,
-): Promise<OpenProjectOutcome> {
+  fallback: ProjectLaunchFailure,
+): Promise<ProjectLaunchOutcome> {
   try {
-    return toOpenProjectOutcome(await attempt());
+    return toProjectLaunchOutcome(await attempt(), fallback);
   } catch (error) {
     return {
       status: "failed",
-      error: toOpenProjectFailure(error),
+      error: toProjectLaunchFailure(error, fallback),
     };
   }
 }
 
 export const tauriGlobalProjectPort: GlobalProjectPort = {
+  createProject: (preset) =>
+    settleProjectLaunch(
+      () => invoke<unknown>("create_project", { preset }),
+      createFallbackFailure,
+    ),
   openProject: () =>
-    settleProjectOpening(() => invoke<unknown>("open_project")),
+    settleProjectLaunch(
+      () => invoke<unknown>("open_project"),
+      openFallbackFailure,
+    ),
   listRecentProjects: async () => {
     try {
       return toRecentProjectSummaries(
@@ -105,13 +126,16 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
     }
   },
   openRecentProject: (id) =>
-    settleProjectOpening(() =>
-      invoke<unknown>("open_recent_project", { projectId: id }),
+    settleProjectLaunch(
+      () => invoke<unknown>("open_recent_project", { projectId: id }),
+      openFallbackFailure,
     ),
   startupOpenFailure: async () => {
     try {
       const result = await invoke<unknown>("startup_open_failure");
-      return result === null ? null : toOpenProjectFailure(result);
+      return result === null
+        ? null
+        : toProjectLaunchFailure(result, openFallbackFailure);
     } catch {
       return null;
     }

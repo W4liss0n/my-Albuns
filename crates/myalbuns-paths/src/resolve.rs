@@ -6,6 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::guarded_fs::{GuardedFsError, is_direct_physical_child, physical_path_from_file};
 use crate::{AppPathsError, OperationPathContext, RootBindingPlan};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -60,6 +61,71 @@ pub struct ResolvedObject {
     operational_path: PathBuf,
     object_type: ExpectedObject,
     file: File,
+}
+
+/// A single, validated file name beneath an existing directory retained by
+/// handle for the lifetime of a publication attempt.
+#[derive(Debug)]
+pub struct PreparedFileDestination {
+    logical_path: PathBuf,
+    operational_path: PathBuf,
+    parent: ResolvedObject,
+}
+
+impl PreparedFileDestination {
+    pub fn logical_path(&self) -> &Path {
+        &self.logical_path
+    }
+
+    pub fn operational_path(&self) -> &Path {
+        &self.operational_path
+    }
+
+    /// Derives a unique staging file beside this validated destination. The
+    /// caller owns publication semantics but never constructs a child path.
+    pub fn sibling_temporary_path(&self) -> PathBuf {
+        self.operational_path.with_file_name(format!(
+            ".myalbuns-create-{}.tmp",
+            uuid::Uuid::new_v4().hyphenated()
+        ))
+    }
+
+    /// Resolves an object currently occupying the destination and proves that
+    /// its final physical path is a direct child of the retained parent.
+    pub fn resolve_existing(&self) -> Result<Option<ResolvedObject>, ResolveError> {
+        let child = match resolve_existing_operational(
+            &self.logical_path,
+            &self.operational_path,
+            self.parent.operational_path(),
+            ExpectedObject::RegularFile,
+        ) {
+            Ok(child) => child,
+            Err(ResolveError::NotFound) => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        self.validate_containment(&child)?;
+        Ok(Some(child))
+    }
+
+    pub fn resolve_created(&self) -> Result<ResolvedObject, ResolveError> {
+        self.resolve_existing()?.ok_or(ResolveError::NotFound)
+    }
+
+    fn validate_containment(&self, child: &ResolvedObject) -> Result<(), ResolveError> {
+        let parent_path =
+            physical_path_from_file(self.parent.file(), self.parent.operational_path())
+                .map_err(map_guarded_error)?;
+        let child_path = physical_path_from_file(child.file(), child.operational_path())
+            .map_err(map_guarded_error)?;
+        let expected_name = self
+            .operational_path
+            .file_name()
+            .ok_or(ResolveError::InvalidPath)?;
+        if !is_direct_physical_child(&parent_path, &child_path, expected_name) {
+            return Err(ResolveError::InvalidPath);
+        }
+        Ok(())
+    }
 }
 
 impl ResolvedObject {
@@ -161,26 +227,32 @@ impl RootBindingPlan {
         let operational_root = self
             .operational_root_for(logical_path)
             .map_err(resolve_plan_error)?;
-        let file = open_object(&operational_path)
-            .map_err(|error| classify_open_error(error, operational_root))?;
-        let metadata = file.metadata().map_err(classify_io_error)?;
-        let actual = if metadata.is_file() {
-            ExpectedObject::RegularFile
-        } else if metadata.is_dir() {
-            ExpectedObject::Directory
-        } else {
-            return Err(ResolveError::UnexpectedObjectType { expected });
-        };
-        if actual != expected {
-            return Err(ResolveError::UnexpectedObjectType { expected });
-        }
-        validate_disk_handle(&file, expected)?;
+        resolve_existing_operational(logical_path, &operational_path, operational_root, expected)
+    }
 
-        Ok(ResolvedObject {
+    /// Prepares one new regular-file destination beneath an existing parent.
+    /// The parent handle remains retained so the final object can be checked
+    /// physically after publication instead of trusting pathname text.
+    pub fn prepare_file_destination(
+        &self,
+        logical_path: &Path,
+    ) -> Result<PreparedFileDestination, ResolveError> {
+        let operational_path = self.resolve(logical_path).map_err(resolve_plan_error)?;
+        let logical_parent = logical_path.parent().ok_or(ResolveError::InvalidPath)?;
+        let operational_parent = operational_path.parent().ok_or(ResolveError::InvalidPath)?;
+        let operational_root = self
+            .operational_root_for(logical_path)
+            .map_err(resolve_plan_error)?;
+        let parent = resolve_existing_operational(
+            logical_parent,
+            operational_parent,
+            operational_root,
+            ExpectedObject::Directory,
+        )?;
+        Ok(PreparedFileDestination {
             logical_path: logical_path.to_path_buf(),
             operational_path,
-            object_type: actual,
-            file,
+            parent,
         })
     }
 
@@ -197,6 +269,42 @@ impl RootBindingPlan {
             return PhysicalIdentityEvidence::Indeterminate;
         };
         left.compare_physical(&right)
+    }
+}
+
+fn resolve_existing_operational(
+    logical_path: &Path,
+    operational_path: &Path,
+    operational_root: &Path,
+    expected: ExpectedObject,
+) -> Result<ResolvedObject, ResolveError> {
+    let file = open_object(operational_path)
+        .map_err(|error| classify_open_error(error, operational_root))?;
+    let metadata = file.metadata().map_err(classify_io_error)?;
+    let actual = if metadata.is_file() {
+        ExpectedObject::RegularFile
+    } else if metadata.is_dir() {
+        ExpectedObject::Directory
+    } else {
+        return Err(ResolveError::UnexpectedObjectType { expected });
+    };
+    if actual != expected {
+        return Err(ResolveError::UnexpectedObjectType { expected });
+    }
+    validate_disk_handle(&file, expected)?;
+
+    Ok(ResolvedObject {
+        logical_path: logical_path.to_path_buf(),
+        operational_path: operational_path.to_path_buf(),
+        object_type: actual,
+        file,
+    })
+}
+
+fn map_guarded_error(error: GuardedFsError) -> ResolveError {
+    match error {
+        GuardedFsError::OutsideRoot => ResolveError::InvalidPath,
+        GuardedFsError::Unavailable => ResolveError::IoFailure,
     }
 }
 

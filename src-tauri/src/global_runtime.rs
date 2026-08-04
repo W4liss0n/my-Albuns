@@ -11,10 +11,10 @@ use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    desktop_webview_policy, logging, path_io,
+    desktop_webview_policy, logging, native_project_dialog, path_io,
     project_bootstrap::{
-        BootstrapFailure, BootstrapFailureKind, FailureCode, FailureStage, ProjectHostBootstrap,
-        TargetAuthority,
+        BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
+        FailureStage, InitialProjectPreset, ProjectHostBootstrap, TargetAuthority,
     },
     recent_projects::{RecentProjectSummary, RecentProjectsStore},
 };
@@ -26,7 +26,7 @@ const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
     recent_projects: RecentProjectsStore,
-    startup_failure: Arc<Mutex<Option<OpenProjectFailure>>>,
+    startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
 }
 
 impl GlobalRuntimeState {
@@ -38,14 +38,14 @@ impl GlobalRuntimeState {
         })
     }
 
-    fn startup_failure(&self) -> Option<OpenProjectFailure> {
+    fn startup_failure(&self) -> Option<ProjectLaunchFailure> {
         self.startup_failure
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
 
-    fn record_startup_failure(&self, failure: OpenProjectFailure) {
+    fn record_startup_failure(&self, failure: ProjectLaunchFailure) {
         *self
             .startup_failure
             .lock()
@@ -55,7 +55,7 @@ impl GlobalRuntimeState {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct OpenProjectFailure {
+pub(crate) struct ProjectLaunchFailure {
     code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     stage: Option<FailureStage>,
@@ -66,14 +66,23 @@ pub(crate) struct OpenProjectFailure {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "status")]
-pub(crate) enum OpenProjectOutcome {
+pub(crate) enum ProjectLaunchOutcome {
     Opened,
     Cancelled,
-    Failed { error: OpenProjectFailure },
+    Failed { error: ProjectLaunchFailure },
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ConfirmedLaunch {
+    OpenExisting,
+    CreateNew {
+        preset: InitialProjectPreset,
+        authorization: CreateWriteAuthorization,
+    },
 }
 
 #[tauri::command]
-async fn open_project(app: AppHandle) -> OpenProjectOutcome {
+async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
@@ -84,8 +93,14 @@ async fn open_project(app: AppHandle) -> OpenProjectOutcome {
         });
     let selection = match receiver.await {
         Ok(selection) => selection,
-        Err(_) => {
-            return OpenProjectOutcome::Failed {
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "project_open_dialog_failed",
+            );
+            return ProjectLaunchOutcome::Failed {
                 error: simple_failure(
                     "dialog_unavailable",
                     "Não foi possível concluir o diálogo de abertura.",
@@ -95,10 +110,10 @@ async fn open_project(app: AppHandle) -> OpenProjectOutcome {
         }
     };
     let Some(selection) = selection else {
-        return OpenProjectOutcome::Cancelled;
+        return ProjectLaunchOutcome::Cancelled;
     };
     let FilePath::Path(path) = selection else {
-        return OpenProjectOutcome::Failed {
+        return ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "invalid_path",
                 "O local escolhido não é um arquivo do Windows válido.",
@@ -107,8 +122,51 @@ async fn open_project(app: AppHandle) -> OpenProjectOutcome {
         };
     };
 
-    let outcome = open_confirmed_project(state, path).await;
-    if outcome == OpenProjectOutcome::Opened {
+    let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
+    if outcome == ProjectLaunchOutcome::Opened {
+        app.exit(0);
+    }
+    outcome
+}
+
+#[tauri::command]
+async fn create_project(app: AppHandle, preset: InitialProjectPreset) -> ProjectLaunchOutcome {
+    let state = app.state::<GlobalRuntimeState>().inner().clone();
+    let destination = match native_project_dialog::choose_project_destination(&app).await {
+        Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
+            return ProjectLaunchOutcome::Cancelled;
+        }
+        Ok(native_project_dialog::ProjectSaveDialogOutcome::Selected {
+            path,
+            authorization,
+        }) => (path, authorization),
+        Err(error) => {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "project_creation_dialog_failed",
+            );
+            return ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "dialog_unavailable",
+                    "Não foi possível concluir o diálogo de criação.",
+                    "Tente novamente.",
+                ),
+            };
+        }
+    };
+
+    let outcome = launch_confirmed_project(
+        state,
+        destination.0,
+        ConfirmedLaunch::CreateNew {
+            preset,
+            authorization: destination.1,
+        },
+    )
+    .await;
+    if outcome == ProjectLaunchOutcome::Opened {
         app.exit(0);
     }
     outcome
@@ -117,7 +175,7 @@ async fn open_project(app: AppHandle) -> OpenProjectOutcome {
 #[tauri::command]
 async fn recent_projects(
     state: tauri::State<'_, GlobalRuntimeState>,
-) -> Result<Vec<RecentProjectSummary>, OpenProjectFailure> {
+) -> Result<Vec<RecentProjectSummary>, ProjectLaunchFailure> {
     let store = state.recent_projects.clone();
     tauri::async_runtime::spawn_blocking(move || store.list())
         .await
@@ -126,7 +184,7 @@ async fn recent_projects(
 }
 
 #[tauri::command]
-async fn open_recent_project(app: AppHandle, project_id: String) -> OpenProjectOutcome {
+async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
     let store = state.recent_projects.clone();
     let lookup_id = project_id.clone();
@@ -134,7 +192,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> OpenProjectO
     {
         Ok(Ok(Some(path))) => path.into_path_buf(),
         Ok(Ok(None)) => {
-            return OpenProjectOutcome::Failed {
+            return ProjectLaunchOutcome::Failed {
                 error: simple_failure(
                     "recent_project_missing",
                     "Este Projeto não está mais na lista de recentes.",
@@ -143,31 +201,34 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> OpenProjectO
             };
         }
         Ok(Err(_)) | Err(_) => {
-            return OpenProjectOutcome::Failed {
+            return ProjectLaunchOutcome::Failed {
                 error: state_failure(),
             };
         }
     };
-    let outcome = open_confirmed_project(state, path).await;
-    if outcome == OpenProjectOutcome::Opened {
+    let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
+    if outcome == ProjectLaunchOutcome::Opened {
         app.exit(0);
     }
     outcome
 }
 
 #[tauri::command]
-fn startup_open_failure(state: tauri::State<'_, GlobalRuntimeState>) -> Option<OpenProjectFailure> {
+fn startup_open_failure(
+    state: tauri::State<'_, GlobalRuntimeState>,
+) -> Option<ProjectLaunchFailure> {
     state.startup_failure()
 }
 
-async fn open_confirmed_project(
+async fn launch_confirmed_project(
     state: GlobalRuntimeState,
     project_path: PathBuf,
-) -> OpenProjectOutcome {
+    launch: ConfirmedLaunch,
+) -> ProjectLaunchOutcome {
     let root_bindings = match path_io::capture_root_bindings(vec![project_path.clone()]).await {
         Ok(root_bindings) => root_bindings,
         Err(error) => {
-            return OpenProjectOutcome::Failed {
+            return ProjectLaunchOutcome::Failed {
                 error: binding_failure(error),
             };
         }
@@ -181,7 +242,14 @@ async fn open_confirmed_project(
     let bootstrap = state.bootstrap;
     let recent_projects = state.recent_projects;
     match tauri::async_runtime::spawn_blocking(move || {
-        bootstrap.open(authority).map(|ready| {
+        let ready = match launch {
+            ConfirmedLaunch::OpenExisting => bootstrap.open(authority),
+            ConfirmedLaunch::CreateNew {
+                preset,
+                authorization,
+            } => bootstrap.create(authority, preset, authorization),
+        }?;
+        Ok::<_, BootstrapFailure>({
             let recent_result = recent_projects.promote(&ready.project_id, recent_path);
             (ready, recent_result)
         })
@@ -197,12 +265,12 @@ async fn open_confirmed_project(
                     event = "recent_project_promotion_failed",
                 );
             }
-            OpenProjectOutcome::Opened
+            ProjectLaunchOutcome::Opened
         }
-        Ok(Err(failure)) => OpenProjectOutcome::Failed {
+        Ok(Err(failure)) => ProjectLaunchOutcome::Failed {
             error: bootstrap_failure(failure),
         },
-        Err(_) => OpenProjectOutcome::Failed {
+        Err(_) => ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "host_unavailable",
                 "Não foi possível iniciar a Janela do Projeto.",
@@ -212,7 +280,7 @@ async fn open_confirmed_project(
     }
 }
 
-fn bootstrap_failure(failure: BootstrapFailure) -> OpenProjectFailure {
+fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
     let stage = failure.stage;
     if failure.code == Some(FailureCode::ProjectInUse) {
         return staged_failure(
@@ -229,6 +297,21 @@ fn bootstrap_failure(failure: BootstrapFailure) -> OpenProjectFailure {
         return path_failure;
     }
     let (code, message, action) = match (failure.kind, failure.code) {
+        (_, Some(FailureCode::DestinationConflict)) => (
+            "destination_conflict",
+            "O destino mudou antes da criação do Projeto.",
+            "Escolha novamente o destino para confirmar o estado atual do arquivo.",
+        ),
+        (_, Some(FailureCode::CreateStateIndeterminate)) => (
+            "create_state_indeterminate",
+            "Não foi possível confirmar se a criação do Projeto terminou.",
+            "Não repita a criação agora. Verifique o arquivo escolhido e tente abri-lo antes de decidir o próximo passo.",
+        ),
+        (_, Some(FailureCode::InvalidInitialProject)) => (
+            "invalid_initial_project",
+            "O estado inicial do Projeto não é válido.",
+            "Feche e abra o MyAlbuns antes de tentar novamente.",
+        ),
         (_, Some(FailureCode::InvalidDocumentType)) => (
             "invalid_document_type",
             "O arquivo escolhido não é um Documento de Projeto MyAlbuns.",
@@ -283,7 +366,7 @@ fn bootstrap_failure(failure: BootstrapFailure) -> OpenProjectFailure {
     staged_failure(code, stage, message, action)
 }
 
-fn binding_failure(error: AppPathsError) -> OpenProjectFailure {
+fn binding_failure(error: AppPathsError) -> ProjectLaunchFailure {
     let public_code = match error {
         AppPathsError::InvalidOperationPath | AppPathsError::UnsupportedOperationNamespace => {
             Some(FailureCode::InvalidPath)
@@ -307,7 +390,7 @@ fn binding_failure(error: AppPathsError) -> OpenProjectFailure {
 fn public_path_failure(
     code: FailureCode,
     stage: Option<FailureStage>,
-) -> Option<OpenProjectFailure> {
+) -> Option<ProjectLaunchFailure> {
     let (code, message, action) = match code {
         FailureCode::NotFound => (
             "not_found",
@@ -349,7 +432,7 @@ fn public_path_failure(
     Some(staged_failure(code, stage, message, action))
 }
 
-fn state_failure() -> OpenProjectFailure {
+fn state_failure() -> ProjectLaunchFailure {
     simple_failure(
         "recent_projects_unavailable",
         "A lista de Projetos recentes está indisponível.",
@@ -357,7 +440,7 @@ fn state_failure() -> OpenProjectFailure {
     )
 }
 
-fn simple_failure(code: &str, message: &str, action: &str) -> OpenProjectFailure {
+fn simple_failure(code: &str, message: &str, action: &str) -> ProjectLaunchFailure {
     staged_failure(code, None, message, action)
 }
 
@@ -366,8 +449,8 @@ fn staged_failure(
     stage: Option<FailureStage>,
     message: &str,
     action: &str,
-) -> OpenProjectFailure {
-    OpenProjectFailure {
+) -> ProjectLaunchFailure {
+    ProjectLaunchFailure {
         code: code.into(),
         stage,
         message: message.into(),
@@ -418,13 +501,19 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             if let Some(project_path) = direct_project {
                 let direct_state = setup_state.clone();
                 tauri::async_runtime::spawn(async move {
-                    match open_confirmed_project(direct_state.clone(), project_path).await {
-                        OpenProjectOutcome::Opened => app_handle.exit(0),
-                        OpenProjectOutcome::Failed { error } => {
+                    match launch_confirmed_project(
+                        direct_state.clone(),
+                        project_path,
+                        ConfirmedLaunch::OpenExisting,
+                    )
+                    .await
+                    {
+                        ProjectLaunchOutcome::Opened => app_handle.exit(0),
+                        ProjectLaunchOutcome::Failed { error } => {
                             direct_state.record_startup_failure(error);
                             show_global_window_or_exit(app_handle).await;
                         }
-                        OpenProjectOutcome::Cancelled => {
+                        ProjectLaunchOutcome::Cancelled => {
                             show_global_window_or_exit(app_handle).await;
                         }
                     }
@@ -435,6 +524,7 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            create_project,
             open_project,
             recent_projects,
             open_recent_project,
@@ -451,14 +541,14 @@ mod tests {
     #[test]
     fn welcome_outcomes_never_contain_a_pathname() {
         assert_eq!(
-            serde_json::to_value(OpenProjectOutcome::Opened).expect("outcome serializes"),
+            serde_json::to_value(ProjectLaunchOutcome::Opened).expect("outcome serializes"),
             serde_json::json!({ "status": "opened" })
         );
         assert_eq!(
-            serde_json::to_value(OpenProjectOutcome::Cancelled).expect("outcome serializes"),
+            serde_json::to_value(ProjectLaunchOutcome::Cancelled).expect("outcome serializes"),
             serde_json::json!({ "status": "cancelled" })
         );
-        let encoded = serde_json::to_value(OpenProjectOutcome::Failed {
+        let encoded = serde_json::to_value(ProjectLaunchOutcome::Failed {
             error: simple_failure("project_in_use", "Em uso.", "Use a outra janela."),
         })
         .expect("failure serializes");
@@ -531,5 +621,44 @@ mod tests {
             assert!(encoded.get("pathname").is_none());
             assert!(encoded.get("path").is_none());
         }
+    }
+
+    #[test]
+    fn creation_failures_keep_conflict_invalid_state_and_indeterminate_state_distinct() {
+        let cases = [
+            (FailureCode::DestinationConflict, "destination_conflict"),
+            (
+                FailureCode::InvalidInitialProject,
+                "invalid_initial_project",
+            ),
+            (
+                FailureCode::CreateStateIndeterminate,
+                "create_state_indeterminate",
+            ),
+        ];
+
+        for (failure_code, expected_public_code) in cases {
+            let failure = bootstrap_failure(BootstrapFailure {
+                kind: BootstrapFailureKind::HostFailed,
+                stage: Some(FailureStage::Create),
+                code: Some(failure_code),
+            });
+
+            assert_eq!(failure.code, expected_public_code);
+            assert_eq!(failure.stage, Some(FailureStage::Create));
+            assert!(failure.action.is_some());
+        }
+
+        let indeterminate = bootstrap_failure(BootstrapFailure {
+            kind: BootstrapFailureKind::HostFailed,
+            stage: Some(FailureStage::Create),
+            code: Some(FailureCode::CreateStateIndeterminate),
+        });
+        assert!(
+            indeterminate
+                .action
+                .as_deref()
+                .is_some_and(|action| action.contains("Não repita"))
+        );
     }
 }

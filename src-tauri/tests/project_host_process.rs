@@ -1,6 +1,7 @@
 #![cfg(windows)]
 
 use std::{
+    fs,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
@@ -10,8 +11,9 @@ use std::{
 };
 
 use myalbuns_core::{
-    CreateAuthorization, CreateProjectRequest, EditableProject, InitialProject, OpenProjectError,
-    OpenProjectRequest, ProjectCore, ProjectLocation,
+    ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectRequest,
+    DisplayUnit, EditableProject, FrameBorder, InitialProject, OpenProjectError,
+    OpenProjectRequest, Overlay, ProjectCore, ProjectLocation, Rgb,
 };
 use myalbuns_paths::{AppPaths, NativePathDto, OperationPathContext, RootBindingPlan};
 use serde_json::{Value, json};
@@ -39,39 +41,63 @@ fn real_global_and_host_processes_preserve_ownership_and_lifetime_boundaries() {
     prove_host_outlives_the_global_parent(&associated);
 }
 
+#[test]
+fn real_host_process_creates_and_owns_a_neutral_project() {
+    let fixture = ProjectFixture::new_uncreated("criacao");
+    assert!(
+        !fixture.project_path.exists(),
+        "the create gate starts from an absent destination"
+    );
+
+    let attempt_id = format!("create-attempt-{}", uuid::Uuid::new_v4().simple());
+    let launch_nonce = uuid::Uuid::new_v4().simple().to_string();
+    let request = fixture.create_bootstrap_request(&attempt_id, &launch_nonce);
+    let (mut host, terminal) = spawn_host_and_read_terminal(&fixture, &request);
+    let host_pid = host.id();
+
+    assert_eq!(
+        terminal["state"], "ready",
+        "the real Host rejected the creation request: {terminal}"
+    );
+    assert_eq!(terminal["attemptId"], attempt_id);
+    assert_eq!(terminal["launchNonce"], launch_nonce);
+    assert_eq!(terminal["hostPid"], host_pid);
+    assert_eq!(terminal["revision"], 0);
+    assert_ne!(host_pid, std::process::id());
+    assert!(process_is_alive(host_pid));
+
+    let project_id = terminal["projectId"]
+        .as_str()
+        .expect("Ready includes the created project identity")
+        .to_owned();
+    uuid::Uuid::parse_str(&project_id).expect("the created project identity is a UUID");
+    let published = fs::metadata(&fixture.project_path)
+        .expect("Ready is emitted only after the project file is published");
+    assert!(published.is_file());
+    assert!(published.len() > 0);
+    assert_eq!(
+        fixture
+            .try_open()
+            .expect_err("the creating Host owns the only editable Session"),
+        OpenProjectError::ProjectInUse
+    );
+
+    assert_eq!(host.id(), host_pid);
+    host.terminate();
+    let reopened = fixture.wait_until_open(PROCESS_TIMEOUT);
+    assert_eq!(reopened.project_id().hyphenated().to_string(), project_id);
+    assert_ne!(reopened.project_id(), uuid::Uuid::nil());
+    assert_eq!(reopened.revision(), 0);
+    assert_eq!(reopened.saved_revision(), 0);
+    assert_neutral_project(&reopened);
+}
+
 fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {
     let attempt_id = format!("gate-attempt-{}", uuid::Uuid::new_v4().simple());
     let launch_nonce = uuid::Uuid::new_v4().simple().to_string();
     let request = fixture.bootstrap_request(&attempt_id, &launch_nonce);
-    let mut host = ChildGuard::spawn(
-        Command::new(desktop_binary())
-            .arg(PROJECT_HOST_ARGUMENT)
-            .env(PROCESS_GATE_ROOT_ENV, &fixture.process_data_root)
-            .env(PROCESS_GATE_HEADLESS_ENV, "1")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit()),
-    );
+    let (mut host, terminal) = spawn_host_and_read_terminal(fixture, &request);
     let host_pid = host.id();
-
-    let mut stdin = host
-        .child_mut()
-        .stdin
-        .take()
-        .expect("the real Host exposes its one-shot request input");
-    serde_json::to_writer(&mut stdin, &request).expect("the bootstrap request serializes");
-    stdin
-        .write_all(b"\n")
-        .expect("the bootstrap request is terminated");
-    stdin.flush().expect("the bootstrap request is flushed");
-    drop(stdin);
-
-    let stdout = host
-        .child_mut()
-        .stdout
-        .take()
-        .expect("the real Host exposes its terminal output");
-    let terminal = read_terminal_with_timeout(stdout, PROCESS_TIMEOUT);
 
     assert_eq!(
         terminal["state"], "ready",
@@ -80,7 +106,7 @@ fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {
     assert_eq!(terminal["attemptId"], attempt_id);
     assert_eq!(terminal["launchNonce"], launch_nonce);
     assert_eq!(terminal["hostPid"], host_pid);
-    assert_eq!(terminal["projectId"], fixture.project_id);
+    assert_eq!(terminal["projectId"], fixture.project_id());
     assert_eq!(terminal["revision"], 0);
     assert_ne!(host_pid, std::process::id());
     assert!(process_is_alive(host_pid));
@@ -147,13 +173,28 @@ struct ProjectFixture {
     _directory: TempDir,
     project_path: PathBuf,
     root_bindings: RootBindingPlan,
-    project_id: String,
+    project_id: Option<String>,
     identity_lease_root: PathBuf,
     process_data_root: PathBuf,
 }
 
 impl ProjectFixture {
     fn new(label: &str) -> Self {
+        let mut fixture = Self::new_uncreated(label);
+        let project = ProjectCore::new()
+            .with_identity_lease_root(fixture.identity_lease_root.clone())
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(fixture.project_path.clone(), fixture.root_bindings.clone()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("a productive v1 project fixture is created");
+        fixture.project_id = Some(project.project_id().hyphenated().to_string());
+        drop(project);
+        fixture
+    }
+
+    fn new_uncreated(label: &str) -> Self {
         let directory = tempfile::tempdir().expect("a temporary process-gate directory exists");
         let project_path = directory.path().join(format!("Álbum {label}.myalbuns"));
         let mut context = OperationPathContext::new();
@@ -168,33 +209,46 @@ impl ProjectFixture {
             &process_data_root.join("Temporary"),
         );
         let identity_lease_root = app_paths.project_identity_leases_dir();
-        let project = ProjectCore::new()
-            .with_identity_lease_root(identity_lease_root.clone())
-            .create_editable(CreateProjectRequest::new(
-                ProjectLocation::new(project_path.clone(), root_bindings.clone()),
-                InitialProject::neutral(),
-                CreateAuthorization::CreateOnly,
-            ))
-            .expect("a productive v1 project fixture is created");
-        let project_id = project.project_id().hyphenated().to_string();
-        drop(project);
 
         Self {
             _directory: directory,
             project_path,
             root_bindings,
-            project_id,
+            project_id: None,
             identity_lease_root,
             process_data_root,
         }
     }
 
+    fn project_id(&self) -> &str {
+        self.project_id
+            .as_deref()
+            .expect("the existing-project fixture has a project identity")
+    }
+
     fn bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
         json!({
-            "protocolVersion": 1,
+            "protocolVersion": 2,
             "attemptId": attempt_id,
             "launchNonce": launch_nonce,
-            "intent": "openExisting",
+            "intent": { "kind": "openExisting" },
+            "authority": {
+                "logicalTarget": NativePathDto::from(self.project_path.clone()),
+                "rootBindings": self.root_bindings,
+            },
+        })
+    }
+
+    fn create_bootstrap_request(&self, attempt_id: &str, launch_nonce: &str) -> Value {
+        json!({
+            "protocolVersion": 2,
+            "attemptId": attempt_id,
+            "launchNonce": launch_nonce,
+            "intent": {
+                "kind": "createNew",
+                "preset": "neutralV1",
+                "authorization": "createOnly",
+            },
             "authority": {
                 "logicalTarget": NativePathDto::from(self.project_path.clone()),
                 "rootBindings": self.root_bindings,
@@ -212,13 +266,14 @@ impl ProjectFixture {
     }
 
     fn wait_until_released(&self, timeout: Duration) {
+        drop(self.wait_until_open(timeout));
+    }
+
+    fn wait_until_open(&self, timeout: Duration) -> EditableProject {
         let deadline = Instant::now() + timeout;
         loop {
             match self.try_open() {
-                Ok(project) => {
-                    drop(project);
-                    return;
-                }
+                Ok(project) => return project,
                 Err(OpenProjectError::ProjectInUse) if Instant::now() < deadline => {
                     thread::sleep(Duration::from_millis(25));
                 }
@@ -226,6 +281,71 @@ impl ProjectFixture {
             }
         }
     }
+}
+
+fn spawn_host_and_read_terminal(fixture: &ProjectFixture, request: &Value) -> (ChildGuard, Value) {
+    let mut host = ChildGuard::spawn(
+        Command::new(desktop_binary())
+            .arg(PROJECT_HOST_ARGUMENT)
+            .env(PROCESS_GATE_ROOT_ENV, &fixture.process_data_root)
+            .env(PROCESS_GATE_HEADLESS_ENV, "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit()),
+    );
+
+    let mut stdin = host
+        .child_mut()
+        .stdin
+        .take()
+        .expect("the real Host exposes its one-shot request input");
+    serde_json::to_writer(&mut stdin, request).expect("the bootstrap request serializes");
+    stdin
+        .write_all(b"\n")
+        .expect("the bootstrap request is terminated");
+    stdin.flush().expect("the bootstrap request is flushed");
+    drop(stdin);
+
+    let stdout = host
+        .child_mut()
+        .stdout
+        .take()
+        .expect("the real Host exposes its terminal output");
+    let terminal = read_terminal_with_timeout(stdout, PROCESS_TIMEOUT);
+    (host, terminal)
+}
+
+fn assert_neutral_project(project: &EditableProject) {
+    let document = project.project();
+    let settings = document.document();
+    assert_eq!(settings.display_unit(), DisplayUnit::Mm);
+    assert_eq!(settings.sheet_width_um(), 600_000);
+    assert_eq!(settings.sheet_height_um(), 300_000);
+    assert_eq!(settings.dpi(), 300);
+    assert_eq!(settings.bleed_um(), 3_000);
+    assert_eq!(settings.safety_um(), 3_000);
+    assert_eq!(
+        document.visual_defaults().background(),
+        &Background::BothSides {
+            both: BackgroundContent::Color { rgb: Rgb::WHITE },
+        }
+    );
+    assert_eq!(
+        document.visual_defaults().overlay(),
+        &Overlay::BothSides { both: None }
+    );
+    assert_eq!(
+        document.visual_defaults().frame_border(),
+        &FrameBorder::None
+    );
+    assert!(document.media().is_empty());
+    assert_eq!(document.sheets().len(), 2);
+    assert!(
+        document
+            .sheets()
+            .iter()
+            .all(|sheet| sheet.active_sides() == ActiveSides::Both)
+    );
 }
 
 fn desktop_binary() -> &'static Path {

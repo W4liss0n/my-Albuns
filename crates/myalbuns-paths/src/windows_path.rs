@@ -10,6 +10,53 @@ use std::{
 #[cfg(windows)]
 use crate::{AppPathsError, PathRootKind};
 
+/// Encodes an absolute disk/UNC pathname for Win32 file APIs without the
+/// legacy `MAX_PATH` interpretation. Logical and persisted spellings remain
+/// unchanged; this representation exists only at the native call boundary.
+#[cfg(windows)]
+pub fn wide_api_path(path: &Path) -> Vec<u16> {
+    use std::path::{Component, Prefix};
+
+    let units = path.as_os_str().encode_wide().collect::<Vec<_>>();
+    let prefix = match path.components().next() {
+        Some(Component::Prefix(prefix)) => prefix.kind(),
+        _ => return units.into_iter().chain(Some(0)).collect(),
+    };
+    let mut result = match prefix {
+        Prefix::Disk(_) => r"\\?\".encode_utf16().collect::<Vec<_>>(),
+        Prefix::UNC(_, _) => {
+            let mut value = r"\\?\UNC\".encode_utf16().collect::<Vec<_>>();
+            value.extend(
+                units
+                    .iter()
+                    .skip(2)
+                    .copied()
+                    .map(normalize_windows_separator),
+            );
+            value.push(0);
+            return value;
+        }
+        Prefix::VerbatimDisk(_) | Prefix::VerbatimUNC(_, _) => {
+            return units.into_iter().chain(Some(0)).collect();
+        }
+        Prefix::Verbatim(_) | Prefix::DeviceNS(_) => {
+            return units.into_iter().chain(Some(0)).collect();
+        }
+    };
+    result.extend(units.into_iter().map(normalize_windows_separator));
+    result.push(0);
+    result
+}
+
+#[cfg(windows)]
+fn normalize_windows_separator(unit: u16) -> u16 {
+    if unit == u16::from(b'/') {
+        u16::from(b'\\')
+    } else {
+        unit
+    }
+}
+
 #[cfg(windows)]
 pub(crate) fn current_operational_base(
     logical_root: &Path,

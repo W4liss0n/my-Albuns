@@ -12,7 +12,7 @@ use crate::{
     logging,
     operation_gate::OperationGate,
     project_bootstrap::{
-        BootstrapRequest, FailureCode, FailureStage, HostTerminal, OpenedHostProject,
+        BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
         write_host_terminal,
     },
     project_host::ProjectHost,
@@ -26,7 +26,7 @@ const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
 const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
 
 pub(crate) fn run(
-    opened: OpenedHostProject,
+    opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(debug_assertions)]
@@ -79,7 +79,9 @@ pub(crate) fn run(
 /// WebView2. Release builds do not contain this path, and normal development
 /// still reaches the productive Tauri composition root below.
 #[cfg(debug_assertions)]
-fn run_headless_process_gate(opened: OpenedHostProject) -> Result<(), Box<dyn std::error::Error>> {
+fn run_headless_process_gate(
+    opened: BootstrappedHostProject,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (request, project) = opened.into_parts();
     let project_host = ProjectHost::new(project);
     let projection = project_host.projection().map_err(io::Error::other)?;

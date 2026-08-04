@@ -11,6 +11,33 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset();
 });
 
+test("starts creation with only the authoritative preset and no pathname or overwrite authority", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
+
+  await expect(
+    tauriGlobalProjectPort.createProject("neutralV1"),
+  ).resolves.toEqual({ status: "cancelled" });
+  expect(invoke).toHaveBeenCalledWith("create_project", {
+    preset: "neutralV1",
+  });
+});
+
+test("keeps an unavailable creation distinct from an unavailable opening", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce(new Error("command unavailable"));
+
+  await expect(
+    tauriGlobalProjectPort.createProject("neutralV1"),
+  ).resolves.toEqual({
+    status: "failed",
+    error: {
+      code: "create_project_unavailable",
+      message: "Não foi possível iniciar a criação do Projeto.",
+      action:
+        "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+    },
+  });
+});
+
 test.each(["opened", "cancelled"] as const)(
   "opens through the native backend and returns the %s terminal without a pathname",
   async (status) => {

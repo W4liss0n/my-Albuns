@@ -1,20 +1,24 @@
 use std::thread::ThreadId;
 
 use myalbuns_core::{
-    DocumentFailure, EditableProject, OpenProjectError, OpenProjectRequest, PathFailure,
+    CreateAuthorization, CreateProjectError, CreateProjectRequest, DocumentFailure,
+    EditableProject, InitialProject, OpenProjectError, OpenProjectRequest, PathFailure,
     ProjectCore, ProjectLocation,
 };
 use myalbuns_paths::AppPaths;
 
-use super::{BootstrapIntent, BootstrapRequest, FailureCode, FailureStage, HostTerminal};
+use super::{
+    BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, FailureCode, FailureStage,
+    HostTerminal, InitialProjectPreset,
+};
 
 #[derive(Debug)]
-pub(crate) struct OpenedHostProject {
+pub(crate) struct BootstrappedHostProject {
     request: BootstrapRequest,
     project: EditableProject,
 }
 
-impl OpenedHostProject {
+impl BootstrappedHostProject {
     #[cfg(test)]
     pub(crate) fn project(&self) -> &EditableProject {
         &self.project
@@ -34,21 +38,20 @@ impl OpenedHostProject {
     }
 }
 
-pub(crate) fn open_host_project(
+pub(crate) fn bootstrap_host_project(
     request: BootstrapRequest,
     app_paths: &AppPaths,
-) -> Result<OpenedHostProject, HostTerminal> {
-    open_host_project_with_thread(request, app_paths).map(|(opened, _)| opened)
+) -> Result<BootstrappedHostProject, HostTerminal> {
+    bootstrap_host_project_with_thread(request, app_paths).map(|(opened, _)| opened)
 }
 
-fn open_host_project_with_thread(
+fn bootstrap_host_project_with_thread(
     request: BootstrapRequest,
     app_paths: &AppPaths,
-) -> Result<(OpenedHostProject, ThreadId), HostTerminal> {
+) -> Result<(BootstrappedHostProject, ThreadId), HostTerminal> {
     if request.protocol_version != super::protocol::PROTOCOL_VERSION
         || request.attempt_id.is_empty()
         || request.launch_nonce.is_empty()
-        || request.intent != BootstrapIntent::OpenExisting
         || request.authority.root_bindings.validate().is_err()
         || !request
             .authority
@@ -64,24 +67,35 @@ fn open_host_project_with_thread(
 
     let project_path = request.authority.logical_target.clone().into_path_buf();
     let root_bindings = request.authority.root_bindings.clone();
+    let intent = request.intent;
     let identity_lease_root = app_paths.project_identity_leases_dir();
     let worker = std::thread::spawn(move || {
         let worker_thread = std::thread::current().id();
-        let project = ProjectCore::new()
-            .with_identity_lease_root(identity_lease_root)
-            .open_editable(OpenProjectRequest::new(ProjectLocation::new(
-                project_path,
-                root_bindings,
-            )))
-            .map_err(map_open_error)?;
-        Ok::<_, FailureCode>((project, worker_thread))
+        let core = ProjectCore::new().with_identity_lease_root(identity_lease_root);
+        let location = ProjectLocation::new(project_path, root_bindings);
+        let project = match intent {
+            BootstrapIntent::OpenExisting => core
+                .open_editable(OpenProjectRequest::new(location))
+                .map_err(|error| (FailureStage::Open, map_open_error(error)))?,
+            BootstrapIntent::CreateNew {
+                preset,
+                authorization,
+            } => core
+                .create_editable(CreateProjectRequest::new(
+                    location,
+                    initial_project(preset),
+                    create_authorization(authorization),
+                ))
+                .map_err(|error| (FailureStage::Create, map_create_error(error)))?,
+        };
+        Ok::<_, (FailureStage, FailureCode)>((project, worker_thread))
     });
 
     match worker.join() {
         Ok(Ok((project, worker_thread))) => {
-            Ok((OpenedHostProject { request, project }, worker_thread))
+            Ok((BootstrappedHostProject { request, project }, worker_thread))
         }
-        Ok(Err(code)) => Err(HostTerminal::failed(&request, FailureStage::Open, code)),
+        Ok(Err((stage, code))) => Err(HostTerminal::failed(&request, stage, code)),
         Err(_) => Err(HostTerminal::failed(
             &request,
             FailureStage::Initialize,
@@ -90,17 +104,33 @@ fn open_host_project_with_thread(
     }
 }
 
+fn initial_project(preset: InitialProjectPreset) -> InitialProject {
+    match preset {
+        InitialProjectPreset::NeutralV1 => InitialProject::neutral(),
+    }
+}
+
+fn create_authorization(authorization: CreateWriteAuthorization) -> CreateAuthorization {
+    match authorization {
+        CreateWriteAuthorization::CreateOnly => CreateAuthorization::CreateOnly,
+        CreateWriteAuthorization::ReplaceConfirmed => CreateAuthorization::ReplaceConfirmed,
+    }
+}
+
+fn map_create_error(error: CreateProjectError) -> FailureCode {
+    match error {
+        CreateProjectError::InvalidInitialProject => FailureCode::InvalidInitialProject,
+        CreateProjectError::Path(error) => map_path_error(error),
+        CreateProjectError::DestinationConflict => FailureCode::DestinationConflict,
+        CreateProjectError::ProjectInUse => FailureCode::ProjectInUse,
+        CreateProjectError::IdentityIndeterminate => FailureCode::IdentityIndeterminate,
+        CreateProjectError::CreateStateIndeterminate => FailureCode::CreateStateIndeterminate,
+    }
+}
+
 fn map_open_error(error: OpenProjectError) -> FailureCode {
     match error {
-        OpenProjectError::Path(error) => match error {
-            PathFailure::NotFound => FailureCode::NotFound,
-            PathFailure::Unavailable => FailureCode::Unavailable,
-            PathFailure::AccessDenied => FailureCode::AccessDenied,
-            PathFailure::InvalidPath => FailureCode::InvalidPath,
-            PathFailure::UnexpectedObjectType => FailureCode::UnexpectedObjectType,
-            PathFailure::Conflict => FailureCode::Conflict,
-            PathFailure::IoFailure => FailureCode::IoFailure,
-        },
+        OpenProjectError::Path(error) => map_path_error(error),
         OpenProjectError::Document(error) => match error {
             DocumentFailure::InvalidDocumentType => FailureCode::InvalidDocumentType,
             DocumentFailure::UnsupportedFutureSchema { .. } => FailureCode::UnsupportedFutureSchema,
@@ -113,6 +143,18 @@ fn map_open_error(error: OpenProjectError) -> FailureCode {
             FailureCode::ExternalCopyRequiresInteractiveResolution
         }
         OpenProjectError::IdentityIndeterminate => FailureCode::IdentityIndeterminate,
+    }
+}
+
+fn map_path_error(error: PathFailure) -> FailureCode {
+    match error {
+        PathFailure::NotFound => FailureCode::NotFound,
+        PathFailure::Unavailable => FailureCode::Unavailable,
+        PathFailure::AccessDenied => FailureCode::AccessDenied,
+        PathFailure::InvalidPath => FailureCode::InvalidPath,
+        PathFailure::UnexpectedObjectType => FailureCode::UnexpectedObjectType,
+        PathFailure::Conflict => FailureCode::Conflict,
+        PathFailure::IoFailure => FailureCode::IoFailure,
     }
 }
 
@@ -170,6 +212,22 @@ mod tests {
             self.request_for(self.project_path.clone(), self.bindings())
         }
 
+        fn create_request(&self, authorization: CreateWriteAuthorization) -> BootstrapRequest {
+            BootstrapRequest {
+                protocol_version: super::super::protocol::PROTOCOL_VERSION,
+                attempt_id: "attempt-create".into(),
+                launch_nonce: "nonce-create".into(),
+                intent: BootstrapIntent::CreateNew {
+                    preset: InitialProjectPreset::NeutralV1,
+                    authorization,
+                },
+                authority: super::super::TargetAuthority {
+                    logical_target: NativePathDto::from(self.project_path.clone()),
+                    root_bindings: self.bindings(),
+                },
+            }
+        }
+
         fn request_for(
             &self,
             logical_target: PathBuf,
@@ -208,7 +266,7 @@ mod tests {
         let caller_thread = thread::current().id();
 
         let (opened, worker_thread) =
-            open_host_project_with_thread(fixture.request(), &fixture.paths)
+            bootstrap_host_project_with_thread(fixture.request(), &fixture.paths)
                 .expect("the Host opens the v1 document");
 
         assert_ne!(worker_thread, caller_thread);
@@ -230,13 +288,90 @@ mod tests {
     }
 
     #[test]
+    fn the_host_creates_the_neutral_project_and_keeps_its_editable_session() {
+        let fixture = Fixture::new();
+        let caller_thread = thread::current().id();
+
+        let (created, worker_thread) = bootstrap_host_project_with_thread(
+            fixture.create_request(CreateWriteAuthorization::CreateOnly),
+            &fixture.paths,
+        )
+        .expect("the Host creates the v1 document");
+
+        assert_ne!(worker_thread, caller_thread);
+        assert_eq!(created.project().revision(), 0);
+        assert_eq!(created.project().saved_revision(), 0);
+        assert_eq!(created.project().project().sheets().len(), 2);
+        assert!(created.project().project().media().is_empty());
+        assert!(fixture.project_path.is_file());
+        assert!(matches!(
+            ProjectCore::new()
+                .with_identity_lease_root(fixture.paths.project_identity_leases_dir())
+                .open_editable(OpenProjectRequest::new(ProjectLocation::new(
+                    fixture.project_path.clone(),
+                    fixture.bindings(),
+                ))),
+            Err(OpenProjectError::ProjectInUse)
+        ));
+        assert!(matches!(
+            created.ready_terminal(),
+            HostTerminal::Ready {
+                attempt_id,
+                launch_nonce,
+                revision: 0,
+                ..
+            } if attempt_id == "attempt-create" && launch_nonce == "nonce-create"
+        ));
+    }
+
+    #[test]
+    fn host_creation_preserves_destination_conflict_and_project_in_use() {
+        let conflict = Fixture::new();
+        std::fs::write(&conflict.project_path, b"concorrente")
+            .expect("the concurrent destination is materialized");
+        assert!(matches!(
+            bootstrap_host_project(
+                conflict.create_request(CreateWriteAuthorization::CreateOnly),
+                &conflict.paths,
+            ),
+            Err(HostTerminal::Failed {
+                stage: FailureStage::Create,
+                code: FailureCode::DestinationConflict,
+                ..
+            })
+        ));
+
+        let protected = Fixture::new();
+        let owner = ProjectCore::new()
+            .with_identity_lease_root(protected.paths.project_identity_leases_dir())
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(protected.project_path.clone(), protected.bindings()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the existing Project is protected");
+        assert!(matches!(
+            bootstrap_host_project(
+                protected.create_request(CreateWriteAuthorization::ReplaceConfirmed),
+                &protected.paths,
+            ),
+            Err(HostTerminal::Failed {
+                stage: FailureStage::Create,
+                code: FailureCode::ProjectInUse,
+                ..
+            })
+        ));
+        drop(owner);
+    }
+
+    #[test]
     fn a_second_host_receives_project_in_use_without_disturbing_the_owner() {
         let fixture = Fixture::new();
         fixture.create_project();
-        let owner = open_host_project(fixture.request(), &fixture.paths)
+        let owner = bootstrap_host_project(fixture.request(), &fixture.paths)
             .expect("the first Host owns the Project");
 
-        let failure = open_host_project(fixture.request(), &fixture.paths)
+        let failure = bootstrap_host_project(fixture.request(), &fixture.paths)
             .expect_err("a second editable Host is rejected");
 
         assert_eq!(
@@ -251,7 +386,7 @@ mod tests {
         );
         assert_eq!(owner.project().revision(), 0);
         drop(owner);
-        assert!(open_host_project(fixture.request(), &fixture.paths).is_ok());
+        assert!(bootstrap_host_project(fixture.request(), &fixture.paths).is_ok());
     }
 
     #[test]
@@ -260,7 +395,7 @@ mod tests {
         std::fs::write(&fixture.project_path, b"not a project")
             .expect("the invalid fixture is writable");
 
-        let failure = open_host_project(fixture.request(), &fixture.paths)
+        let failure = bootstrap_host_project(fixture.request(), &fixture.paths)
             .expect_err("invalid JSON cannot become Ready");
 
         assert!(matches!(
@@ -290,7 +425,7 @@ mod tests {
             context
                 .capture_with_binding(&logical_target, fixture._root.path())
                 .expect("the owner captures the authoritative operational root");
-            let opened = open_host_project(
+            let opened = bootstrap_host_project(
                 fixture.request_for(logical_target.clone(), context.freeze()),
                 &fixture.paths,
             )
@@ -328,7 +463,7 @@ mod tests {
         std::fs::write(&fixture.project_path, document)
             .expect("the valid v1 document is copied to the long pathname");
 
-        let opened = open_host_project(fixture.request(), &fixture.paths)
+        let opened = bootstrap_host_project(fixture.request(), &fixture.paths)
             .expect("the Host opens the long native Project pathname");
 
         assert_eq!(
@@ -341,7 +476,7 @@ mod tests {
     fn missing_and_wrong_type_targets_fail_with_distinct_terminal_codes() {
         let missing = Fixture::new();
         assert!(matches!(
-            open_host_project(missing.request(), &missing.paths),
+            bootstrap_host_project(missing.request(), &missing.paths),
             Err(HostTerminal::Failed {
                 stage: FailureStage::Open,
                 code: FailureCode::NotFound,
@@ -353,7 +488,7 @@ mod tests {
         std::fs::create_dir(&directory.project_path)
             .expect("the wrong-type target is materialized as a directory");
         assert!(matches!(
-            open_host_project(directory.request(), &directory.paths),
+            bootstrap_host_project(directory.request(), &directory.paths),
             Err(HostTerminal::Failed {
                 stage: FailureStage::Open,
                 code: FailureCode::UnexpectedObjectType,
@@ -376,7 +511,7 @@ mod tests {
         let bindings = context.freeze();
         std::fs::remove_dir(&operational_root).expect("the source becomes unavailable");
 
-        let failure = open_host_project(
+        let failure = bootstrap_host_project(
             fixture.request_for(logical_target, bindings),
             &fixture.paths,
         )

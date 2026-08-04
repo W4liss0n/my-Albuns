@@ -170,7 +170,10 @@ pub(crate) fn open_directory(path: &Path) -> Result<DirectoryGuard, GuardedFsErr
 }
 
 #[cfg(windows)]
-fn physical_path_from_file(file: &File, _logical_path: &Path) -> Result<PathBuf, GuardedFsError> {
+pub(crate) fn physical_path_from_file(
+    file: &File,
+    _logical_path: &Path,
+) -> Result<PathBuf, GuardedFsError> {
     use std::{
         ffi::OsString,
         os::windows::{ffi::OsStringExt, io::AsRawHandle},
@@ -221,7 +224,10 @@ pub(crate) fn open_directory(path: &Path) -> Result<DirectoryGuard, GuardedFsErr
 }
 
 #[cfg(not(windows))]
-fn physical_path_from_file(_file: &File, logical_path: &Path) -> Result<PathBuf, GuardedFsError> {
+pub(crate) fn physical_path_from_file(
+    _file: &File,
+    logical_path: &Path,
+) -> Result<PathBuf, GuardedFsError> {
     fs::canonicalize(logical_path).map_err(|_| GuardedFsError::Unavailable)
 }
 

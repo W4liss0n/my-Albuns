@@ -8,8 +8,9 @@ use std::{
 };
 
 use super::{
-    BootstrapIntent, BootstrapRequest, HostTerminal, TargetAuthority, TerminalValidationError,
-    ValidatedTerminal, validate_terminal,
+    BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
+    InitialProjectPreset, TargetAuthority, TerminalValidationError, ValidatedTerminal,
+    validate_terminal,
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
@@ -55,12 +56,39 @@ impl ProjectHostBootstrap {
 
     pub(crate) fn open(&self, authority: TargetAuthority) -> Result<ReadyHost, BootstrapFailure> {
         let request = new_open_request(authority)?;
+        self.launch(request)
+    }
+
+    pub(crate) fn create(
+        &self,
+        authority: TargetAuthority,
+        preset: InitialProjectPreset,
+        authorization: CreateWriteAuthorization,
+    ) -> Result<ReadyHost, BootstrapFailure> {
+        let request = new_request(
+            authority,
+            BootstrapIntent::CreateNew {
+                preset,
+                authorization,
+            },
+        )?;
+        self.launch(request)
+    }
+
+    fn launch(&self, request: BootstrapRequest) -> Result<ReadyHost, BootstrapFailure> {
         let child = spawn_host(&self.executable)?;
         supervise_child(child, &request, self.terminal_timeout)
     }
 }
 
 fn new_open_request(authority: TargetAuthority) -> Result<BootstrapRequest, BootstrapFailure> {
+    new_request(authority, BootstrapIntent::OpenExisting)
+}
+
+fn new_request(
+    authority: TargetAuthority,
+    intent: BootstrapIntent,
+) -> Result<BootstrapRequest, BootstrapFailure> {
     if authority.root_bindings.validate().is_err()
         || !authority
             .root_bindings
@@ -77,7 +105,7 @@ fn new_open_request(authority: TargetAuthority) -> Result<BootstrapRequest, Boot
         protocol_version: super::protocol::PROTOCOL_VERSION,
         attempt_id: uuid::Uuid::new_v4().hyphenated().to_string(),
         launch_nonce: uuid::Uuid::new_v4().simple().to_string(),
-        intent: BootstrapIntent::OpenExisting,
+        intent,
         authority,
     })
 }
@@ -311,6 +339,28 @@ mod tests {
         .expect_err("authority without its root is invalid");
 
         assert_eq!(error.kind, BootstrapFailureKind::InvalidAuthority);
+    }
+
+    #[test]
+    fn create_request_freezes_its_preset_and_write_authorization() {
+        let target = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Novo.myalbuns");
+        let request = new_request(
+            authority(target.clone()),
+            BootstrapIntent::CreateNew {
+                preset: InitialProjectPreset::NeutralV1,
+                authorization: CreateWriteAuthorization::ReplaceConfirmed,
+            },
+        )
+        .expect("valid create bootstrap fixture");
+
+        assert_eq!(
+            request.intent,
+            BootstrapIntent::CreateNew {
+                preset: InitialProjectPreset::NeutralV1,
+                authorization: CreateWriteAuthorization::ReplaceConfirmed,
+            }
+        );
+        assert_eq!(request.authority.logical_target.as_path(), target);
     }
 
     #[test]

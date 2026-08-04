@@ -10,6 +10,7 @@ mod imaging_recovery_integration;
 pub mod ipc_contract;
 mod logging;
 mod media_preview_commands;
+mod native_project_dialog;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
@@ -38,7 +39,7 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
     use std::io;
 
     use project_bootstrap::{
-        FailureCode, FailureStage, HostTerminal, open_host_project, read_bootstrap_request,
+        FailureCode, FailureStage, HostTerminal, bootstrap_host_project, read_bootstrap_request,
         write_host_terminal,
     };
 
@@ -62,7 +63,7 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    match open_host_project(request, &app_paths) {
+    match bootstrap_host_project(request, &app_paths) {
         Ok(opened) => product_runtime::run(opened, app_paths),
         Err(terminal) => {
             write_host_terminal(io::stdout().lock(), &terminal)?;

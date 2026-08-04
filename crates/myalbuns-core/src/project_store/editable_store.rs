@@ -2,14 +2,14 @@ use std::{fs, io, path::PathBuf};
 
 #[cfg(windows)]
 use myalbuns_paths::{
-    ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, ProjectFileLock,
-    ProjectFileLockError, ResolveError,
+    ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
+    ProjectFileLock, ProjectFileLockError, ResolveError,
 };
 use uuid::Uuid;
 
 use super::{
     DecodeFailure, DocumentFailure, PathFailure, ProjectLocation, decode, encode, map_path_failure,
-    windows_publish::{publish_new, replace_existing, sibling_temporary, write_synced_new},
+    windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
 
@@ -82,7 +82,7 @@ pub(crate) struct PreparedReplacement {
     expected_revision: ProjectRevision,
     expected_bytes: Vec<u8>,
     temporary: TemporaryPublication,
-    operational_path: PathBuf,
+    destination: PreparedFileDestination,
     replaced_project_id: Option<Uuid>,
     #[cfg(windows)]
     replaced_lock: Option<ProjectFileLock>,
@@ -94,27 +94,73 @@ impl PreparedReplacement {
     }
 
     #[cfg(windows)]
-    pub(crate) fn publish(mut self) -> Result<ProjectStore, CreateStoreError> {
-        let publish_result = if self.replaced_lock.is_some() {
-            replace_existing(self.temporary.path(), &self.operational_path)
+    pub(crate) fn publish(self) -> Result<ProjectStore, CreateStoreError> {
+        let target_still_exists = self.target_still_matches_preparation()?;
+        let publish_result = if target_still_exists {
+            replace_existing(self.temporary.path(), self.destination.operational_path())
         } else {
-            publish_new(self.temporary.path(), &self.operational_path)
+            publish_new(self.temporary.path(), self.destination.operational_path())
         };
-        publish_result.map_err(|error| {
-            if is_destination_conflict(&error) {
-                CreateStoreError::DestinationConflict
-            } else {
-                CreateStoreError::Path(map_io_path(error))
-            }
-        })?;
-        self.temporary.mark_published();
-        drop(self.replaced_lock.take());
-        verify_created(
+        match publish_result {
+            Ok(()) => verify_created(
+                &self.location,
+                &self.destination,
+                &self.expected_bytes,
+                &self.expected_revision,
+            )
+            .map_err(|_| CreateStoreError::StateIndeterminate),
+            Err(error) => self.reconcile_publish_error(error, target_still_exists),
+        }
+    }
+
+    #[cfg(windows)]
+    fn reconcile_publish_error(
+        &self,
+        error: io::Error,
+        target_existed_before_publish: bool,
+    ) -> Result<ProjectStore, CreateStoreError> {
+        if !target_existed_before_publish && is_destination_conflict(&error) {
+            return Err(CreateStoreError::DestinationConflict);
+        }
+        if let Ok(store) = verify_created(
             &self.location,
+            &self.destination,
             &self.expected_bytes,
             &self.expected_revision,
-        )
-        .map_err(|_| CreateStoreError::StateIndeterminate)
+        ) {
+            return Ok(store);
+        }
+
+        if target_existed_before_publish {
+            return match self.target_still_matches_preparation() {
+                Ok(true) => Err(CreateStoreError::Path(map_io_path(error))),
+                Ok(false) | Err(_) => Err(CreateStoreError::StateIndeterminate),
+            };
+        }
+
+        match self.destination.resolve_existing() {
+            Ok(None) => Err(CreateStoreError::Path(map_io_path(error))),
+            Ok(Some(_)) | Err(_) => Err(CreateStoreError::StateIndeterminate),
+        }
+    }
+
+    #[cfg(windows)]
+    fn target_still_matches_preparation(&self) -> Result<bool, CreateStoreError> {
+        let Some(expected_lock) = &self.replaced_lock else {
+            return Ok(false);
+        };
+        let Some(current) = self
+            .destination
+            .resolve_existing()
+            .map_err(|error| CreateStoreError::Path(map_path_failure(error)))?
+        else {
+            return Ok(false);
+        };
+        match expected_lock.compare_physical(&current) {
+            PhysicalIdentityEvidence::Same => Ok(true),
+            PhysicalIdentityEvidence::Different => Err(CreateStoreError::DestinationConflict),
+            PhysicalIdentityEvidence::Indeterminate => Err(CreateStoreError::IdentityIndeterminate),
+        }
     }
 
     #[cfg(not(windows))]
@@ -163,20 +209,48 @@ pub(crate) fn create_only(
     location: ProjectLocation,
     revision: &ProjectRevision,
 ) -> Result<ProjectStore, CreateStoreError> {
-    let operational_path = location
-        .operational_path()
+    let destination = location
+        .prepare_file_destination()
         .map_err(CreateStoreError::Path)?;
     let bytes = encode(revision).map_err(map_create_decode_error)?;
-    let mut temporary = prepare_temporary(&operational_path, &bytes)?;
-    publish_new(temporary.path(), &operational_path).map_err(|error| {
-        if is_destination_conflict(&error) {
-            CreateStoreError::DestinationConflict
-        } else {
-            CreateStoreError::Path(map_io_path(error))
-        }
-    })?;
-    temporary.mark_published();
-    verify_created(&location, &bytes, revision).map_err(|_| CreateStoreError::StateIndeterminate)
+    let temporary = prepare_temporary(&destination, &bytes)?;
+    match publish_new(temporary.path(), destination.operational_path()) {
+        Ok(()) => verify_created(&location, &destination, &bytes, revision)
+            .map_err(|_| CreateStoreError::StateIndeterminate),
+        Err(error) => reconcile_create_only_error(error, &location, &destination, &bytes, revision),
+    }
+}
+
+#[cfg(windows)]
+fn reconcile_create_only_error(
+    error: io::Error,
+    location: &ProjectLocation,
+    destination: &PreparedFileDestination,
+    expected_bytes: &[u8],
+    expected_revision: &ProjectRevision,
+) -> Result<ProjectStore, CreateStoreError> {
+    if is_destination_conflict(&error) {
+        return Err(CreateStoreError::DestinationConflict);
+    }
+    if let Ok(store) = verify_created(location, destination, expected_bytes, expected_revision) {
+        return Ok(store);
+    }
+
+    match destination.resolve_existing() {
+        Ok(None) => Err(CreateStoreError::Path(map_io_path(error))),
+        Ok(Some(_)) | Err(_) => Err(CreateStoreError::StateIndeterminate),
+    }
+}
+
+#[cfg(not(windows))]
+fn reconcile_create_only_error(
+    _error: io::Error,
+    _location: &ProjectLocation,
+    _destination: &PreparedFileDestination,
+    _expected_bytes: &[u8],
+    _expected_revision: &ProjectRevision,
+) -> Result<ProjectStore, CreateStoreError> {
+    Err(CreateStoreError::StateIndeterminate)
 }
 
 #[cfg(windows)]
@@ -184,18 +258,14 @@ pub(crate) fn prepare_replacement(
     location: ProjectLocation,
     revision: &ProjectRevision,
 ) -> Result<PreparedReplacement, CreateStoreError> {
-    let operational_path = location
-        .operational_path()
+    let destination = location
+        .prepare_file_destination()
         .map_err(CreateStoreError::Path)?;
     let expected_bytes = encode(revision).map_err(map_create_decode_error)?;
-    let temporary = prepare_temporary(&operational_path, &expected_bytes)?;
+    let temporary = prepare_temporary(&destination, &expected_bytes)?;
 
-    let resolved = match location
-        .root_bindings()
-        .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
-    {
-        Ok(resolved) => Some(resolved),
-        Err(ResolveError::NotFound) => None,
+    let resolved = match destination.resolve_existing() {
+        Ok(resolved) => resolved,
         Err(ResolveError::UnexpectedObjectType { .. }) => {
             return Err(CreateStoreError::DestinationConflict);
         }
@@ -232,7 +302,7 @@ pub(crate) fn prepare_replacement(
         expected_revision: revision.clone(),
         expected_bytes,
         temporary,
-        operational_path,
+        destination,
         replaced_project_id,
         replaced_lock,
     })
@@ -247,11 +317,10 @@ pub(crate) fn prepare_replacement(
 }
 
 fn prepare_temporary(
-    operational_path: &std::path::Path,
+    destination: &PreparedFileDestination,
     bytes: &[u8],
 ) -> Result<TemporaryPublication, CreateStoreError> {
-    let temporary_path = sibling_temporary(operational_path)
-        .map_err(|error| CreateStoreError::Path(map_io_path(error)))?;
+    let temporary_path = destination.sibling_temporary_path();
     let temporary = TemporaryPublication::new(temporary_path);
     write_synced_new(temporary.path(), bytes)
         .map_err(|error| CreateStoreError::Path(map_io_path(error)))?;
@@ -261,13 +330,11 @@ fn prepare_temporary(
 #[cfg(windows)]
 fn verify_created(
     location: &ProjectLocation,
+    destination: &PreparedFileDestination,
     expected_bytes: &[u8],
     expected_revision: &ProjectRevision,
 ) -> Result<ProjectStore, ()> {
-    let resolved = location
-        .root_bindings()
-        .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
-        .map_err(|_| ())?;
+    let resolved = destination.resolve_created().map_err(|_| ())?;
     let lock = ProjectFileLock::try_acquire(resolved.operational_path()).map_err(|_| ())?;
     if lock.compare_physical(&resolved) != PhysicalIdentityEvidence::Same {
         return Err(());
@@ -286,6 +353,7 @@ fn verify_created(
 #[cfg(not(windows))]
 fn verify_created(
     _location: &ProjectLocation,
+    _destination: &PreparedFileDestination,
     _expected_bytes: &[u8],
     _expected_revision: &ProjectRevision,
 ) -> Result<ProjectStore, ()> {
@@ -323,30 +391,20 @@ fn is_destination_conflict(error: &io::Error) -> bool {
 #[derive(Debug)]
 struct TemporaryPublication {
     path: PathBuf,
-    published: bool,
 }
 
 impl TemporaryPublication {
     fn new(path: PathBuf) -> Self {
-        Self {
-            path,
-            published: false,
-        }
+        Self { path }
     }
 
     fn path(&self) -> &std::path::Path {
         &self.path
     }
-
-    fn mark_published(&mut self) {
-        self.published = true;
-    }
 }
 
 impl Drop for TemporaryPublication {
     fn drop(&mut self) {
-        if !self.published {
-            let _ = fs::remove_file(&self.path);
-        }
+        let _ = fs::remove_file(&self.path);
     }
 }

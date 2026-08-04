@@ -100,7 +100,7 @@ impl RecentProjectsStore {
             return Err(RecentProjectsError::InvalidState);
         }
         let mut projects = self.load_records()?;
-        projects.retain(|project| project.project_id != project_id);
+        projects.retain(|project| project.project_id != project_id && project.path != path);
         projects.insert(
             0,
             RecentProjectRecord {
@@ -284,6 +284,31 @@ mod tests {
                     name: "Aurora".into(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn replacing_a_project_at_the_same_native_path_removes_the_previous_identity() {
+        let roaming = tempfile::tempdir().expect("temporary roaming root");
+        let local = tempfile::tempdir().expect("temporary local root");
+        let temporary = tempfile::tempdir().expect("temporary data root");
+        let paths = AppPaths::from_roots(roaming.path(), local.path(), temporary.path());
+        let store = RecentProjectsStore::new(&paths);
+        let path = NativePathDto::from(PathBuf::from(r"C:\Albuns\Horizonte.myalbuns"));
+
+        store
+            .promote("old-project", path.clone())
+            .expect("the previous Project is persisted");
+        store
+            .promote("replacement-project", path)
+            .expect("the replacement Project is promoted");
+
+        assert_eq!(
+            store.list().expect("the replacement remains readable"),
+            vec![RecentProjectSummary {
+                id: "replacement-project".into(),
+                name: "Horizonte".into(),
+            }]
         );
     }
 }

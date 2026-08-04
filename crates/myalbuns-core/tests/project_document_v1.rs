@@ -4,7 +4,8 @@ use myalbuns_core::{
     ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectError,
     CreateProjectRequest, DisplayUnit, DocumentFailure, FrameBorder, InitialProject,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
-    OpenProjectRequest, Overlay, OverlayContent, ProjectCore, ProjectLocation, SheetRole,
+    OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectLocation,
+    SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -777,7 +778,8 @@ fn create_only_never_replaces_an_object_that_already_occupies_the_destination() 
     let project_path = directory.path().join("conflito.myalbuns");
     let original = b"conteudo preexistente";
     fs::write(&project_path, original).expect("the destination exists");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let lease_root = directory.path().join("leases");
+    let core = ProjectCore::new().with_identity_lease_root(lease_root.clone());
 
     assert_eq!(
         core.create_editable(CreateProjectRequest::new(
@@ -792,6 +794,153 @@ fn create_only_never_replaces_an_object_that_already_occupies_the_destination() 
         fs::read(&project_path).expect("destination remains"),
         original
     );
+    assert_eq!(
+        fs::read_dir(lease_root)
+            .expect("the private lease root exists")
+            .count(),
+        0,
+        "a conclusively failed creation leaves no private identity artifacts"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn concurrent_create_only_attempts_publish_exactly_one_complete_project() {
+    use std::sync::{Arc, Barrier};
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("corrida.myalbuns");
+    let lease_root = directory.path().join("leases");
+    let barrier = Arc::new(Barrier::new(6));
+    let workers = (0..6)
+        .map(|_| {
+            let barrier = Arc::clone(&barrier);
+            let project_path = project_path.clone();
+            let lease_root = lease_root.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                ProjectCore::new()
+                    .with_identity_lease_root(lease_root)
+                    .create_editable(CreateProjectRequest::new(
+                        project_location(&project_path),
+                        InitialProject::neutral(),
+                        CreateAuthorization::CreateOnly,
+                    ))
+                    .map(|project| project.project_id())
+            })
+        })
+        .collect::<Vec<_>>();
+    let results = workers
+        .into_iter()
+        .map(|worker| worker.join().expect("the creation worker completes"))
+        .collect::<Vec<_>>();
+
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+    assert!(
+        results
+            .iter()
+            .filter_map(|result| result.as_ref().err())
+            .all(|error| *error == CreateProjectError::DestinationConflict)
+    );
+    let loaded = ProjectCore::new()
+        .load_persisted_revision(load_request(&project_path))
+        .expect("the winning candidate is a complete v1 document");
+    assert_eq!(loaded.revision(), 0);
+    assert_eq!(loaded.project().sheets().len(), 2);
+}
+
+#[cfg(windows)]
+#[test]
+fn creation_rejects_unsafe_children_through_the_public_core_boundary() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let valid_path = directory.path().join("válido.myalbuns");
+    let mut paths = OperationPathContext::new();
+    paths
+        .capture(&valid_path)
+        .expect("the valid fixture root is captured");
+    let bindings = paths.freeze();
+    let unsafe_paths = [
+        directory.path().join("..").join("escape.myalbuns"),
+        directory.path().join("NUL.myalbuns"),
+        directory.path().join("*.myalbuns"),
+        directory.path().join("fluxo.myalbuns:alternativo"),
+    ];
+
+    for unsafe_path in unsafe_paths {
+        let error = ProjectCore::new()
+            .with_identity_lease_root(directory.path().join("leases"))
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(unsafe_path.clone(), bindings.clone()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect_err("an unsafe child must never reach publication");
+        assert_eq!(
+            error,
+            CreateProjectError::Path(PathFailure::InvalidPath),
+            "unexpected result for {unsafe_path:?}"
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn creates_and_reopens_a_non_ascii_project_beyond_the_legacy_path_limit() {
+    use std::os::windows::ffi::OsStrExt;
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let mut parent = directory.path().to_path_buf();
+    for index in 0..9 {
+        parent.push(format!("segmento-não-ascii-{index:02}-complementar"));
+    }
+    std::fs::create_dir_all(&parent).expect("the long parent is materialized");
+    let project_path = parent.join("Álbum de família.myalbuns");
+    assert!(project_path.as_os_str().encode_wide().count() > 260);
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the long native pathname is created");
+    let project_id = created.project_id();
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the created long-path document reopens");
+    assert_eq!(reopened.project_id(), project_id);
+    assert_eq!(reopened.revision(), 0);
+}
+
+#[cfg(windows)]
+#[test]
+fn creates_and_reopens_through_an_accepted_forward_slash_windows_path() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let native_path = directory.path().join("Álbum com barras.myalbuns");
+    let forward_slash_path =
+        std::path::PathBuf::from(native_path.to_string_lossy().replace('\\', "/"));
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+
+    let created = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&forward_slash_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the accepted disk spelling publishes through the Win32 boundary");
+    let project_id = created.project_id();
+    drop(created);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(
+            &forward_slash_path,
+        )))
+        .expect("the published Project reopens through the same accepted spelling");
+    assert_eq!(reopened.project_id(), project_id);
+    assert_eq!(reopened.revision(), 0);
 }
 
 #[test]

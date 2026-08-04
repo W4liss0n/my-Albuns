@@ -198,24 +198,35 @@ impl ProjectCore {
         let identity_lease = ProjectIdentityLease::acquire(lease_root, revision.project_id)
             .map_err(map_new_identity_lease_error)?;
 
-        let store = match request.authorization {
+        let store_result = match request.authorization {
             CreateAuthorization::CreateOnly => {
                 project_store::create_only(request.location, &revision)
-                    .map_err(map_create_store_error)?
+                    .map_err(map_create_store_error)
             }
             CreateAuthorization::ReplaceConfirmed => {
-                let prepared = project_store::prepare_replacement(request.location, &revision)
-                    .map_err(map_create_store_error)?;
-                let _replaced_identity_lease = prepared
-                    .replaced_project_id()
-                    .map(|project_id| ProjectIdentityLease::acquire(lease_root, project_id))
-                    .transpose()
-                    .map_err(map_replaced_identity_lease_error)?;
-                prepared.publish().map_err(map_create_store_error)?
+                project_store::prepare_replacement(request.location, &revision)
+                    .map_err(map_create_store_error)
+                    .and_then(|prepared| {
+                        let _replaced_identity_lease = prepared
+                            .replaced_project_id()
+                            .map(|project_id| ProjectIdentityLease::acquire(lease_root, project_id))
+                            .transpose()
+                            .map_err(map_replaced_identity_lease_error)?;
+                        prepared.publish().map_err(map_create_store_error)
+                    })
             }
         };
-        bind_identity_target(&identity_lease, &store)
-            .map_err(|_| CreateProjectError::IdentityIndeterminate)?;
+        let store = match store_result {
+            Ok(store) => store,
+            Err(error) => {
+                identity_lease.discard_unpublished();
+                return Err(error);
+            }
+        };
+        if bind_identity_target(&identity_lease, &store).is_err() {
+            identity_lease.discard_unpublished();
+            return Err(CreateProjectError::IdentityIndeterminate);
+        }
 
         Ok(EditableProject {
             session: PersistentProjectSession::from_persisted(revision),

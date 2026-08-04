@@ -27,7 +27,11 @@ pub(crate) struct ProjectIdentityLease {
     #[cfg(windows)]
     _lock: ProjectFileLock,
     #[cfg(windows)]
+    lease_path: PathBuf,
+    #[cfg(windows)]
     target_path: PathBuf,
+    #[cfg(windows)]
+    created_for_attempt: bool,
 }
 
 impl ProjectIdentityLease {
@@ -35,7 +39,7 @@ impl ProjectIdentityLease {
     pub(crate) fn acquire(root: &Path, project_id: Uuid) -> Result<Self, IdentityLeaseError> {
         fs::create_dir_all(root).map_err(|_| IdentityLeaseError::Unavailable)?;
         let lease_path = lease_path(root, project_id);
-        match OpenOptions::new()
+        let created_for_attempt = match OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&lease_path)
@@ -50,18 +54,41 @@ impl ProjectIdentityLease {
                     let _ = fs::remove_file(&lease_path);
                     return Err(IdentityLeaseError::Unavailable);
                 }
+                true
             }
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
             Err(_) => return Err(IdentityLeaseError::Unavailable),
-        }
-        let lock = ProjectFileLock::try_acquire(&lease_path).map_err(|error| match error {
-            ProjectFileLockError::Conflict => IdentityLeaseError::Conflict,
-            ProjectFileLockError::Unavailable { .. } => IdentityLeaseError::Unavailable,
-        })?;
+        };
+        let lock = match ProjectFileLock::try_acquire(&lease_path) {
+            Ok(lock) => lock,
+            Err(error) => {
+                if created_for_attempt {
+                    let _ = fs::remove_file(&lease_path);
+                }
+                return Err(match error {
+                    ProjectFileLockError::Conflict => IdentityLeaseError::Conflict,
+                    ProjectFileLockError::Unavailable { .. } => IdentityLeaseError::Unavailable,
+                });
+            }
+        };
         Ok(Self {
             _lock: lock,
+            lease_path,
             target_path: target_path(root, project_id),
+            created_for_attempt,
         })
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn discard_unpublished(self) {
+        if !self.created_for_attempt {
+            return;
+        }
+        let lease_path = self.lease_path.clone();
+        let target_path = self.target_path.clone();
+        drop(self);
+        let _ = fs::remove_file(target_path);
+        let _ = fs::remove_file(lease_path);
     }
 
     #[cfg(windows)]
@@ -133,6 +160,9 @@ impl ProjectIdentityLease {
     pub(crate) fn acquire(_root: &Path, _project_id: Uuid) -> Result<Self, IdentityLeaseError> {
         Err(IdentityLeaseError::Unavailable)
     }
+
+    #[cfg(not(windows))]
+    pub(crate) fn discard_unpublished(self) {}
 
     #[cfg(not(windows))]
     pub(crate) fn bind_target(

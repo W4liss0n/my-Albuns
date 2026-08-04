@@ -26,5 +26,8 @@ pub use operation::{
 #[cfg(windows)]
 pub use project_file_lock::{ProjectFileLock, ProjectFileLockError};
 pub use resolve::{
-    ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, ResolveError, ResolvedObject,
+    ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
+    ResolveError, ResolvedObject,
 };
+#[cfg(windows)]
+pub use windows_path::wide_api_path;

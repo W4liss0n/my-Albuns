@@ -5,7 +5,9 @@ mod windows_publish;
 
 use std::path::{Path, PathBuf};
 
-use myalbuns_paths::{ExpectedObject, PhysicalFileIdentity, ResolveError, RootBindingPlan};
+use myalbuns_paths::{
+    ExpectedObject, PhysicalFileIdentity, PreparedFileDestination, ResolveError, RootBindingPlan,
+};
 
 use crate::project_document::ProjectRevision;
 
@@ -58,10 +60,10 @@ impl ProjectLocation {
         &self.root_bindings
     }
 
-    pub(crate) fn operational_path(&self) -> Result<PathBuf, PathFailure> {
+    pub(crate) fn prepare_file_destination(&self) -> Result<PreparedFileDestination, PathFailure> {
         self.root_bindings
-            .resolve(&self.project_path)
-            .map_err(|_| PathFailure::InvalidPath)
+            .prepare_file_destination(&self.project_path)
+            .map_err(map_path_failure)
     }
 }
 

@@ -21,6 +21,7 @@ function createProjectPort(
   overrides: Partial<GlobalProjectPort> = {},
 ): GlobalProjectPort {
   return {
+    createProject: async () => ({ status: "cancelled" }),
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
     openRecentProject: async () => ({ status: "cancelled" }),
@@ -38,9 +39,28 @@ test("shows the global welcome surface without a Project workspace", () => {
     screen.getByRole("heading", { name: "Projetos recentes" }),
   ).toBeInTheDocument();
   expect(
+    screen.getByRole("button", { name: "Novo Projeto" }),
+  ).toBeEnabled();
+  expect(
     screen.getByRole("button", { name: "Abrir Projeto" }),
   ).toBeEnabled();
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
+});
+
+test("opens and cancels the creation assistant without reaching the native port", async () => {
+  const user = userEvent.setup();
+  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <GlobalShell projectPort={createProjectPort({ createProject })} />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  expect(screen.getByRole("dialog")).toHaveAccessibleName("Dimensões");
+
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(createProject).not.toHaveBeenCalled();
 });
 
 test("starts one opening attempt and reports that it is in progress", async () => {

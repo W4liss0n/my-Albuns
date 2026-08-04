@@ -1,21 +1,8 @@
 use std::{
-    ffi::OsString,
     fs::OpenOptions,
     io::{self, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
-
-use uuid::Uuid;
-
-pub(crate) fn sibling_temporary(target: &Path) -> Result<PathBuf, io::Error> {
-    let file_name = target
-        .file_name()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing file name"))?;
-    let mut temporary_name = OsString::from(".");
-    temporary_name.push(file_name);
-    temporary_name.push(format!(".create-{}.tmp", Uuid::new_v4().hyphenated()));
-    Ok(target.with_file_name(temporary_name))
-}
 
 pub(crate) fn write_synced_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     #[cfg(windows)]
@@ -85,7 +72,5 @@ pub(crate) fn replace_existing(prepared: &Path, target: &Path) -> io::Result<()>
 
 #[cfg(windows)]
 fn wide_path(path: &Path) -> Vec<u16> {
-    use std::os::windows::ffi::OsStrExt;
-
-    path.as_os_str().encode_wide().chain(Some(0)).collect()
+    myalbuns_paths::wide_api_path(path)
 }

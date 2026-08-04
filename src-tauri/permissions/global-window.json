@@ -2,9 +2,10 @@
   "permission": [
     {
       "identifier": "global-window-commands",
-      "description": "Permite somente abrir Projetos e consultar o estado local da Tela de Boas-vindas.",
+      "description": "Permite criar ou abrir Projetos e consultar o estado local da Tela de Boas-vindas.",
       "commands": {
         "allow": [
+          "create_project",
           "open_project",
           "recent_projects",
           "open_recent_project",

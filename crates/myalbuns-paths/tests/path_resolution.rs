@@ -54,6 +54,59 @@ fn operation_owner_resolves_and_accumulates_a_binding_before_freeze() {
 }
 
 #[test]
+fn prepares_a_new_file_from_its_parent_handle_and_verifies_the_created_child() {
+    let root = tempfile::tempdir().expect("temporary destination root");
+    let logical_target = if cfg!(windows) {
+        std::path::PathBuf::from(r"R:\Álbuns\Novo Projeto.myalbuns")
+    } else {
+        std::path::PathBuf::from("/Álbuns/Novo Projeto.myalbuns")
+    };
+    let operational_parent = root.path().join("Álbuns");
+    std::fs::create_dir(&operational_parent).expect("the authorized parent exists");
+
+    let mut owner = OperationPathContext::new();
+    owner
+        .capture_with_binding(&logical_target, root.path())
+        .expect("the logical root is frozen to the fixture root");
+    let destination = owner
+        .freeze()
+        .prepare_file_destination(&logical_target)
+        .expect("the new file destination is prepared from its existing parent");
+
+    assert_eq!(destination.logical_path(), logical_target);
+    assert_eq!(
+        destination.operational_path(),
+        operational_parent.join("Novo Projeto.myalbuns")
+    );
+    let temporary = destination.sibling_temporary_path();
+    assert_eq!(temporary.parent(), destination.operational_path().parent());
+    assert_ne!(temporary, destination.operational_path());
+    assert!(
+        temporary
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(".myalbuns-create-") && name.ends_with(".tmp"))
+    );
+    assert!(
+        destination
+            .resolve_existing()
+            .expect("the missing child is conclusive")
+            .is_none()
+    );
+
+    std::fs::write(destination.operational_path(), b"project")
+        .expect("the direct child is materialized");
+    let created = destination
+        .resolve_created()
+        .expect("the final handle proves physical containment");
+    assert_eq!(created.object_type(), ExpectedObject::RegularFile);
+    assert_eq!(
+        created.read_to_string().expect("the child is readable"),
+        "project"
+    );
+}
+
+#[test]
 fn reads_a_regular_file_through_the_resolved_handle_after_path_replacement() {
     let root = tempfile::tempdir().expect("temporary handle-bound read root");
     let project = root.path().join("Projeto.myalbum");

@@ -3,13 +3,34 @@ use std::io::{Read, Write};
 use myalbuns_paths::{NativePathDto, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
-pub(crate) const PROTOCOL_VERSION: u16 = 1;
+pub(crate) const PROTOCOL_VERSION: u16 = 2;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
 pub(crate) enum BootstrapIntent {
     OpenExisting,
+    CreateNew {
+        preset: InitialProjectPreset,
+        authorization: CreateWriteAuthorization,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum InitialProjectPreset {
+    NeutralV1,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CreateWriteAuthorization {
+    CreateOnly,
+    ReplaceConfirmed,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -35,6 +56,7 @@ pub(crate) enum FailureStage {
     Decode,
     Resolve,
     Open,
+    Create,
     Initialize,
     Transport,
     Protocol,
@@ -59,6 +81,9 @@ pub(crate) enum FailureCode {
     ProjectInUse,
     ExternalCopyRequiresInteractiveResolution,
     IdentityIndeterminate,
+    InvalidInitialProject,
+    DestinationConflict,
+    CreateStateIndeterminate,
     HostExitedBeforeReady,
     CorrelationMismatch,
 }
@@ -248,12 +273,46 @@ mod tests {
     }
 
     #[test]
+    fn create_request_round_trip_preserves_the_neutral_preset_and_frozen_authorization() {
+        let base = request();
+        for authorization in [
+            CreateWriteAuthorization::CreateOnly,
+            CreateWriteAuthorization::ReplaceConfirmed,
+        ] {
+            let request = BootstrapRequest {
+                intent: BootstrapIntent::CreateNew {
+                    preset: InitialProjectPreset::NeutralV1,
+                    authorization,
+                },
+                ..base.clone()
+            };
+
+            let encoded = serde_json::to_value(&request).expect("the request serializes");
+            assert_eq!(encoded["intent"]["kind"], "createNew");
+            assert_eq!(encoded["intent"]["preset"], "neutralV1");
+            assert_eq!(
+                encoded["intent"]["authorization"],
+                match authorization {
+                    CreateWriteAuthorization::CreateOnly => "createOnly",
+                    CreateWriteAuthorization::ReplaceConfirmed => "replaceConfirmed",
+                }
+            );
+            assert!(encoded["authority"]["logicalTarget"].is_object());
+            assert!(encoded["authority"]["rootBindings"].is_object());
+
+            let decoded: BootstrapRequest =
+                serde_json::from_value(encoded).expect("the request deserializes");
+            assert_eq!(decoded, request);
+        }
+    }
+
+    #[test]
     fn request_round_trip_preserves_native_authority_without_a_unicode_path_string() {
         let request = request();
         let encoded = serde_json::to_value(&request).expect("the request serializes");
 
         assert_eq!(encoded["protocolVersion"], PROTOCOL_VERSION);
-        assert_eq!(encoded["intent"], "openExisting");
+        assert_eq!(encoded["intent"]["kind"], "openExisting");
         assert!(
             encoded["authority"]["logicalTarget"]
                 .get("encoding")
