@@ -4,7 +4,9 @@ use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
-use myalbuns_core::{EditableProject, ProjectCore, ProjectIntent, RenderSnapshot};
+use myalbuns_core::{
+    DemoEditableProject as EditableProject, ProjectCore, ProjectIntent, RenderSnapshot,
+};
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
     ImagingFailureStage, ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource,
@@ -73,7 +75,7 @@ fn sample_session(sample: SampleProject, sheet_count: usize) -> EditableProject 
         .persisted_source(sheet_count)
         .expect("the sample project serializes");
     ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the sample project opens through ProjectCore")
 }
 

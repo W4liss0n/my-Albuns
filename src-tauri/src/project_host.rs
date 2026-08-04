@@ -1,6 +1,8 @@
 use std::{collections::BTreeSet, sync::Mutex};
 
-use myalbuns_core::{EditableProject, EditorProjection, ProjectIntent, RenderSnapshot};
+use myalbuns_core::{
+    DemoEditableProject as EditableProject, EditorProjection, ProjectIntent, RenderSnapshot,
+};
 use myalbuns_imaging_protocol::MediaSource;
 
 /// Owns the single editable Project Session of this desktop host.
@@ -99,7 +101,7 @@ impl ProjectHost {
 mod tests {
     use std::path::PathBuf;
 
-    use myalbuns_core::{EditableProject, ProjectCore, ProjectIntent};
+    use myalbuns_core::{DemoEditableProject as EditableProject, ProjectCore, ProjectIntent};
     use myalbuns_imaging_protocol::MediaSource;
 
     use super::ProjectHost;
@@ -109,7 +111,7 @@ mod tests {
         let source = SampleProject::Horizon
             .persisted_source(12)
             .expect("the sample project serializes");
-        core.open_editable_session(&source)
+        core.open_demo_editable_session(&source)
             .expect("the sample project opens through ProjectCore")
     }
 

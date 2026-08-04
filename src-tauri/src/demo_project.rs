@@ -26,7 +26,7 @@ pub(crate) fn open(app_paths: &AppPaths) -> Result<ProjectHost, String> {
     let core = ProjectCore::new();
     let source = persisted_source().map_err(|error| error.to_string())?;
     let session = core
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .map_err(|error| error.to_string())?;
     Ok(ProjectHost::new(session, materialize_media(app_paths)?))
 }

@@ -1851,10 +1851,14 @@ dependencies = [
 name = "myalbuns-core"
 version = "0.1.0"
 dependencies = [
+ "myalbuns-paths",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.19",
  "ts-rs",
+ "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -19,7 +19,11 @@ pub use cache::{
 };
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, PreparedExportStorage};
-pub use operation::{OperationPathContext, PathRootKind, RootBinding, RootBindingPlan};
+pub use operation::{
+    OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,
+};
 #[cfg(windows)]
 pub use project_file_lock::{ProjectFileLock, ProjectFileLockError};
-pub use resolve::{ExpectedObject, PhysicalIdentityEvidence, ResolveError, ResolvedObject};
+pub use resolve::{
+    ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, ResolveError, ResolvedObject,
+};

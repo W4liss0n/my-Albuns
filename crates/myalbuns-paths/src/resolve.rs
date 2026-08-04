@@ -83,6 +83,14 @@ impl ResolvedObject {
         compare_file_identity(&self.file, &other.file)
     }
 
+    /// Returns the opaque, operating-system identity of this opened object.
+    ///
+    /// The value is local evidence only: it is not a pathname, a Project
+    /// identity, or a portable identifier for interchange between machines.
+    pub fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
+        file_identity(&self.file)
+    }
+
     /// Reads a resolved regular file through the physical handle already used
     /// for identity, without resolving its pathname a second time.
     pub fn read_to_string(&self) -> std::io::Result<String> {
@@ -306,13 +314,46 @@ fn validate_disk_handle(_file: &File, _expected: ExpectedObject) -> Result<(), R
 
 #[cfg(windows)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PhysicalFileIdentity {
+pub struct PhysicalFileIdentity {
     volume: u64,
     file_id: [u8; 16],
 }
 
 #[cfg(windows)]
-fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
+impl PhysicalFileIdentity {
+    const TOKEN_PREFIX: &'static str = "windows-file-id-v1:";
+
+    /// Serializes this identity for local process-coordination metadata.
+    pub fn to_local_token(self) -> String {
+        let mut token = format!("{}{:016x}:", Self::TOKEN_PREFIX, self.volume);
+        for byte in self.file_id {
+            use std::fmt::Write as _;
+            write!(&mut token, "{byte:02x}").expect("writing to a String cannot fail");
+        }
+        token
+    }
+
+    /// Restores local process-coordination evidence written by this platform.
+    pub fn from_local_token(token: &str) -> Option<Self> {
+        let payload = token.strip_prefix(Self::TOKEN_PREFIX)?;
+        let (volume, file_id) = payload.split_once(':')?;
+        if volume.len() != 16 || file_id.len() != 32 {
+            return None;
+        }
+        let volume = u64::from_str_radix(volume, 16).ok()?;
+        let mut identifier = [0_u8; 16];
+        for (index, byte) in identifier.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&file_id[index * 2..index * 2 + 2], 16).ok()?;
+        }
+        Some(Self {
+            volume,
+            file_id: identifier,
+        })
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
     use std::{ffi::c_void, mem::size_of, os::windows::io::AsRawHandle};
     use windows_sys::Win32::{
         Foundation::HANDLE,
@@ -336,13 +377,39 @@ fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
 
 #[cfg(unix)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct PhysicalFileIdentity {
+pub struct PhysicalFileIdentity {
     device: u64,
     inode: u64,
 }
 
 #[cfg(unix)]
-fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
+impl PhysicalFileIdentity {
+    const TOKEN_PREFIX: &'static str = "unix-file-id-v1:";
+
+    pub fn to_local_token(self) -> String {
+        format!(
+            "{}{:016x}:{:016x}",
+            Self::TOKEN_PREFIX,
+            self.device,
+            self.inode
+        )
+    }
+
+    pub fn from_local_token(token: &str) -> Option<Self> {
+        let payload = token.strip_prefix(Self::TOKEN_PREFIX)?;
+        let (device, inode) = payload.split_once(':')?;
+        if device.len() != 16 || inode.len() != 16 {
+            return None;
+        }
+        Some(Self {
+            device: u64::from_str_radix(device, 16).ok()?,
+            inode: u64::from_str_radix(inode, 16).ok()?,
+        })
+    }
+}
+
+#[cfg(unix)]
+pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
     use std::os::unix::fs::MetadataExt;
 
     let metadata = file.metadata().ok()?;

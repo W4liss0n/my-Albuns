@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    PhysicalIdentityEvidence, ResolvedObject,
-    resolve::{compare_file_identity, read_file_handle_to_string},
+    PhysicalFileIdentity, PhysicalIdentityEvidence, ResolvedObject,
+    resolve::{compare_file_identity, file_identity, read_file_handle_to_string},
 };
 
 use windows_sys::Win32::{
@@ -72,6 +72,10 @@ impl ProjectFileLock {
     /// resolved by the opening policy.
     pub fn compare_physical(&self, resolved: &ResolvedObject) -> PhysicalIdentityEvidence {
         compare_file_identity(&self.file, resolved.file())
+    }
+
+    pub fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
+        file_identity(&self.file)
     }
 
     /// Reads the persisted revision through the handle that owns the lock, so

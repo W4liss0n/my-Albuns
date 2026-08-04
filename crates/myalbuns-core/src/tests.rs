@@ -3,9 +3,9 @@ use serde::Deserialize;
 use crate::composition::CompositionCore;
 use crate::sample_project_fixture::SampleProject;
 use crate::{
-    AlbumSnapshot, ComposedPhoto, EditableProject, FrameSnapshot, Matrix2, MediaCatalogItem,
-    MediaKind, MediaTransform, NormalizedPan, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot,
-    ProjectCore, ProjectIntent, RectUm, SheetRole, SheetSnapshot, VectorUm,
+    AlbumSnapshot, ComposedPhoto, DemoEditableProject as EditableProject, FrameSnapshot, Matrix2,
+    MediaCatalogItem, MediaKind, MediaTransform, NormalizedPan, PhotoPlacement, PhotoPlacementPlan,
+    PhotoSnapshot, ProjectCore, ProjectIntent, RectUm, SheetRole, SheetSnapshot, VectorUm,
 };
 
 #[derive(Deserialize)]
@@ -43,7 +43,7 @@ fn sample_project(sample: SampleProject, sheet_count: usize) -> EditableProject 
         .persisted_source(sheet_count)
         .expect("the sample project serializes");
     ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the sample project opens through ProjectCore")
 }
 
@@ -116,7 +116,7 @@ fn opens_an_editable_session_through_the_project_core_seam() {
         .expect("the fixture revision serializes");
 
     let session = ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the persisted project opens");
     let state = session.state();
 
@@ -139,14 +139,14 @@ fn project_core_admits_only_one_editable_session_per_project_until_drop() {
         .expect("the Aurora fixture serializes");
 
     let first = core
-        .open_editable_session(&horizon)
+        .open_demo_editable_session(&horizon)
         .expect("the first editable session is admitted");
     let duplicate = core
-        .open_editable_session(&horizon)
+        .open_demo_editable_session(&horizon)
         .err()
         .expect("the same Project cannot acquire a second mutable owner");
     let other = core
-        .open_editable_session(&aurora)
+        .open_demo_editable_session(&aurora)
         .expect("a distinct Project remains independent");
 
     assert_eq!(
@@ -158,7 +158,7 @@ fn project_core_admits_only_one_editable_session_per_project_until_drop() {
     assert_eq!(other.state().project_id, SampleProject::Aurora.project_id());
 
     drop(first);
-    core.open_editable_session(&horizon)
+    core.open_demo_editable_session(&horizon)
         .expect("dropping the owner releases the Project identity");
 }
 
@@ -173,7 +173,7 @@ fn rejects_the_previous_project_schema_after_media_categories_became_required() 
     document["schemaVersion"] = serde_json::json!(2);
 
     let error = ProjectCore::new()
-        .open_editable_session(
+        .open_demo_editable_session(
             &serde_json::to_string(&document).expect("the old project JSON serializes"),
         )
         .err()
@@ -192,7 +192,7 @@ fn rejects_media_categories_in_the_wrong_visual_role() {
     photo_as_overlay["album"]["sheets"][0]["overlayMediaId"] = serde_json::json!("media-serra");
 
     let error = ProjectCore::new()
-        .open_editable_session(
+        .open_demo_editable_session(
             &serde_json::to_string(&photo_as_overlay).expect("the invalid Project serializes"),
         )
         .err()
@@ -208,7 +208,7 @@ fn rejects_media_categories_in_the_wrong_visual_role() {
         serde_json::json!("decorative-overlay");
 
     let error = ProjectCore::new()
-        .open_editable_session(
+        .open_demo_editable_session(
             &serde_json::to_string(&decorative_as_photo).expect("the invalid Project serializes"),
         )
         .err()
@@ -252,7 +252,7 @@ fn keeps_project_and_media_identities_opaque_to_path_syntax() {
         )
         .replace("media-costa", "Foto/\u{00c1}rvore CON");
     let project = ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("domain identities do not inherit filesystem restrictions");
 
     assert_eq!(project.state().project_id, "Projeto/\u{00c1}lbum CON");
@@ -663,7 +663,7 @@ fn loads_a_persisted_revision_for_rendering_without_an_editable_session() {
         .expect("sample project can be serialized");
 
     let loaded = ProjectCore::new()
-        .load_persisted_revision(&persisted)
+        .load_demo_persisted_revision(&persisted)
         .expect("persisted revision can be loaded read-only");
 
     assert_eq!(loaded.render_snapshot(), session.render_snapshot());
@@ -677,7 +677,7 @@ fn persisted_revision_stays_saved_while_an_editable_session_has_unsaved_changes(
         .persisted_source(12)
         .expect("the persisted fixture serializes");
     let mut editable = core
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the persisted Project opens for editing");
 
     editable
@@ -689,7 +689,7 @@ fn persisted_revision_stays_saved_while_an_editable_session_has_unsaved_changes(
         })
         .expect("the editable session accepts an unsaved command");
     let loaded = core
-        .load_persisted_revision(&source)
+        .load_demo_persisted_revision(&source)
         .expect("read-only loading coexists with the dirty editable session");
     let first_snapshot = loaded.render_snapshot();
     let mut detached_snapshot = first_snapshot.clone();
@@ -798,7 +798,7 @@ fn filling_a_placeholder_uses_the_catalog_intrinsic_dimensions() {
     portrait["sourceHeightPx"] = serde_json::json!(5_000);
 
     let mut session = ProjectCore::new()
-        .open_editable_session(
+        .open_demo_editable_session(
             &serde_json::to_string(&document).expect("the modified project serializes"),
         )
         .expect("the project with a portrait Photo opens");
@@ -841,7 +841,7 @@ fn composition_uses_the_catalog_as_the_single_source_of_media_metadata() {
     media["sourceHeightPx"] = serde_json::json!(5_000);
 
     let session = ProjectCore::new()
-        .open_editable_session(
+        .open_demo_editable_session(
             &serde_json::to_string(&document).expect("the modified project serializes"),
         )
         .expect("the project with updated catalog metadata opens");
@@ -933,7 +933,9 @@ fn persisted_revision_rejects_invalid_media_dimensions() {
     document["album"]["media"][0]["sourceWidthPx"] = serde_json::json!(0);
 
     let error = ProjectCore::new()
-        .load_persisted_revision(&serde_json::to_string(&document).expect("modified JSON is valid"))
+        .load_demo_persisted_revision(
+            &serde_json::to_string(&document).expect("modified JSON is valid"),
+        )
         .err()
         .expect("invalid dimensions must be rejected");
 
@@ -954,7 +956,9 @@ fn persisted_revision_rejects_an_album_with_fewer_than_two_sheets() {
         .truncate(1);
 
     let error = ProjectCore::new()
-        .load_persisted_revision(&serde_json::to_string(&document).expect("modified JSON is valid"))
+        .load_demo_persisted_revision(
+            &serde_json::to_string(&document).expect("modified JSON is valid"),
+        )
         .err()
         .expect("an Álbum needs at least two Lâminas");
 

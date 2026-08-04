@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -42,6 +43,7 @@ pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String
 #[derive(Clone, Default)]
 pub struct ProjectCore {
     open_projects: Arc<Mutex<HashSet<String>>>,
+    pub(crate) identity_lease_root: Option<PathBuf>,
 }
 
 pub struct EditableProject {
@@ -59,7 +61,18 @@ impl ProjectCore {
         Self::default()
     }
 
-    pub fn open_editable_session(&self, source: &str) -> Result<EditableProject, CoreError> {
+    /// Configures the process-independent ownership directory used by the
+    /// productive create/open seam. Read-only loading does not require it.
+    pub fn with_identity_lease_root(mut self, root: PathBuf) -> Self {
+        self.identity_lease_root = Some(root);
+        self
+    }
+
+    pub(crate) fn identity_lease_root(&self) -> Option<&Path> {
+        self.identity_lease_root.as_deref()
+    }
+
+    pub fn open_demo_editable_session(&self, source: &str) -> Result<EditableProject, CoreError> {
         let project = parse_persisted_project(source)?;
         let project_id = project.project_id.clone();
         let mut open_projects = self
@@ -89,7 +102,7 @@ impl ProjectCore {
         })
     }
 
-    pub fn load_persisted_revision(
+    pub fn load_demo_persisted_revision(
         &self,
         source: &str,
     ) -> Result<LoadedProjectRevision, CoreError> {

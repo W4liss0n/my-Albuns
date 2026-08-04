@@ -204,7 +204,7 @@ fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
         .expect("the sample project serializes");
     let core = ProjectCore::new();
     let snapshot = core
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the sample project opens")
         .render_snapshot();
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
@@ -277,7 +277,7 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
         .persisted_source(2)
         .expect("the sample project serializes");
     let snapshot = ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the sample project opens")
         .render_snapshot();
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();

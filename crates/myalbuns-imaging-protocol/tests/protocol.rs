@@ -60,7 +60,7 @@ fn host_and_processor_share_one_serialized_protocol() {
         .persisted_source(2)
         .expect("the sample project serializes");
     let snapshot = ProjectCore::new()
-        .open_editable_session(&source)
+        .open_demo_editable_session(&source)
         .expect("the sample project opens through ProjectCore")
         .render_snapshot();
     let prepared_output_path =

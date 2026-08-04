@@ -170,7 +170,12 @@ impl OperationPathContext {
     }
 }
 
-pub(crate) fn validate_external_path(path: &Path) -> Result<PathRootKind, AppPathsError> {
+/// Validates the native spelling of an external application path without
+/// opening it or resolving aliases.
+///
+/// Persisted path codecs use this after lossless decoding so that syntax
+/// policy remains centralized in `myalbuns-paths`.
+pub fn validate_external_path(path: &Path) -> Result<PathRootKind, AppPathsError> {
     let (_, kind) = external_path_root(path)?;
     let mut normal_component_count = 0;
     for component in path.components() {

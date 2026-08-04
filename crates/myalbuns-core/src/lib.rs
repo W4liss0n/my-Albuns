@@ -1,6 +1,10 @@
 mod composition;
 mod model;
+mod persistent_project;
+mod persistent_session;
 mod project;
+mod project_document;
+mod project_store;
 mod session;
 mod validation;
 
@@ -11,7 +15,22 @@ pub use model::{
     PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, RectUm, RenderSnapshot,
     SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
-pub use project::{EditableProject, LoadedProjectRevision, ProjectCore};
+pub use persistent_project::{
+    CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
+    LoadedProjectRevision, OpenProjectError, OpenProjectRequest,
+};
+pub use project::{
+    EditableProject as DemoEditableProject, LoadedProjectRevision as DemoLoadedProjectRevision,
+    ProjectCore,
+};
+pub use project_document::{
+    ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
+    FrameBorder, InitialProject, Overlay, OverlayContent, ProjectDocument, ProjectSheet, Rgb,
+    VisualDefaults,
+};
+pub use project_store::{
+    DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,
+};
 
 #[cfg(test)]
 extern crate self as myalbuns_core;
