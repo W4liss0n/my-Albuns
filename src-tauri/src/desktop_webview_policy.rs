@@ -4,32 +4,26 @@ use tauri::WebviewWindow;
 
 #[cfg(windows)]
 use {
-    std::sync::{Arc, Mutex},
-    webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3,
-    windows::core::Interface,
+    webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3, windows::core::Interface,
 };
 
-pub(crate) fn enforce(window: &WebviewWindow) -> Result<(), Box<dyn Error>> {
+pub(crate) async fn enforce(window: &WebviewWindow) -> Result<(), Box<dyn Error + Send + Sync>> {
     #[cfg(windows)]
     {
-        let callback_result = Arc::new(Mutex::new(None));
-        let callback_result_writer = Arc::clone(&callback_result);
-
+        let (sender, receiver) = tokio::sync::oneshot::channel();
         window.with_webview(move |webview| {
-            let result = enforce_windows_policy(&webview);
-            *callback_result_writer
-                .lock()
-                .expect("the native WebView policy result is not poisoned") = Some(result);
+            let result = enforce_windows_policy(&webview).map_err(|error| error.to_string());
+            let _ = sender.send(result);
         })?;
 
-        let result = callback_result
-            .lock()
+        receiver
+            .await
             .map_err(|_| std::io::Error::other("a política nativa da WebView ficou indisponível"))?
-            .take()
-            .ok_or_else(|| {
-                std::io::Error::other("a política nativa da WebView não foi aplicada")
+            .map_err(|error| {
+                std::io::Error::other(format!(
+                    "não foi possível aplicar a política nativa da WebView: {error}"
+                ))
             })?;
-        result?;
     }
 
     #[cfg(not(windows))]

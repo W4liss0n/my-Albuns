@@ -1,6 +1,7 @@
 mod composition;
 mod model;
 mod persistent_project;
+mod persistent_projection;
 mod persistent_session;
 mod project;
 mod project_document;

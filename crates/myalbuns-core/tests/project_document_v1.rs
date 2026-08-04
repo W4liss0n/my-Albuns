@@ -4,7 +4,7 @@ use myalbuns_core::{
     ActiveSides, Background, BackgroundContent, CreateAuthorization, CreateProjectError,
     CreateProjectRequest, DisplayUnit, DocumentFailure, FrameBorder, InitialProject,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
-    OpenProjectRequest, Overlay, OverlayContent, ProjectCore, ProjectLocation,
+    OpenProjectRequest, Overlay, OverlayContent, ProjectCore, ProjectLocation, SheetRole,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -727,6 +727,48 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
     assert_eq!(reopened.revision(), 0);
     assert_eq!(reopened.saved_revision(), 0);
     assert!(!reopened.has_unsaved_changes());
+}
+
+#[test]
+fn an_open_v1_project_exposes_the_initial_editor_projection_without_demo_content() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Projeto produtivo.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+
+    let projection = project.projection();
+
+    assert_eq!(
+        projection.state.project_id,
+        project.project_id().to_string()
+    );
+    assert_eq!(projection.state.project_name, "Projeto");
+    assert_eq!(projection.state.revision, 0);
+    assert_eq!(projection.state.saved_revision, 0);
+    assert!(!projection.state.dirty);
+    assert!(!projection.state.can_undo);
+    assert!(!projection.state.can_redo);
+    assert!(projection.state.album.media.is_empty());
+    assert!(projection.media_usage.is_empty());
+    assert_eq!(projection.state.album.sheets.len(), 2);
+    assert_eq!(projection.state.album.sheets[0].role, SheetRole::Initial);
+    assert_eq!(projection.state.album.sheets[1].role, SheetRole::Final);
+    assert!(
+        projection
+            .state
+            .album
+            .sheets
+            .iter()
+            .all(|sheet| sheet.frames.is_empty())
+    );
+    assert_eq!(projection.composition.sheets.len(), 2);
+    assert!(project.render_snapshot().validate().is_ok());
 }
 
 #[test]

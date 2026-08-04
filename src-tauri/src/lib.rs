@@ -1,9 +1,9 @@
 mod cache_engine;
-mod demo_project;
 mod desktop_webview_policy;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;
+mod global_runtime;
 mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
@@ -14,125 +14,128 @@ mod operation_gate;
 mod operation_lease;
 mod path_io;
 mod product_runtime;
+mod project_bootstrap;
 mod project_commands;
 mod project_host;
+mod recent_projects;
+mod runtime_role;
 #[cfg(test)]
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
 
-use myalbuns_logging::ProcessRole;
-use tauri::Manager;
-
-use export_attempts::ExportAttempts;
-use export_commands::{cancel_export, export_preview};
-use logging::frontend_log;
-use media_preview_commands::prepare_media_previews;
-use product_runtime::ProductRuntime;
-use project_commands::{apply_project_intent, project_state, redo_project, undo_project};
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let ProductRuntime {
-        project_host,
-        app_paths,
-    } = ProductRuntime::initialize()
-        .unwrap_or_else(|error| panic!("não foi possível iniciar o runtime do produto: {error}"));
+    let result = match runtime_role::parse_runtime_role(std::env::args_os()) {
+        runtime_role::RuntimeRole::Global { direct_project } => global_runtime::run(direct_project),
+        runtime_role::RuntimeRole::ProjectHost => run_project_host(),
+    };
+    if let Err(error) = result {
+        eprintln!("não foi possível executar o MyAlbuns: {error}");
+    }
+}
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
-        .manage(project_host)
-        .manage(ExportAttempts::default())
-        .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::Destroyed) {
-                let cancelled_attempts = window
-                    .state::<ExportAttempts>()
-                    .request_cancel_for_window(window.label());
-                if cancelled_attempts > 0 {
-                    tracing::info!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        window_label = window.label(),
-                        cancelled_attempts,
-                        event = "window_export_attempts_cancelled",
-                    );
-                }
-            }
-        })
-        .setup(move |app| product_runtime::setup(app, app_paths))
-        .invoke_handler(tauri::generate_handler![
-            frontend_log,
-            project_state,
-            apply_project_intent,
-            undo_project,
-            redo_project,
-            prepare_media_previews,
-            export_preview,
-            cancel_export,
-        ])
-        .run(tauri::generate_context!())
-        .expect("erro ao executar o MyAlbuns");
+fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
+    use std::io;
+
+    use project_bootstrap::{
+        FailureCode, FailureStage, HostTerminal, open_host_project, read_bootstrap_request,
+        write_host_terminal,
+    };
+
+    let request = match read_bootstrap_request(io::stdin().lock()) {
+        Ok(request) => request,
+        Err(_) => {
+            write_host_terminal(
+                io::stdout().lock(),
+                &HostTerminal::uncorrelated_failure(
+                    FailureStage::Decode,
+                    FailureCode::InvalidRequest,
+                ),
+            )?;
+            return Ok(());
+        }
+    };
+    let app_paths = match myalbuns_paths::AppPaths::discover() {
+        Ok(paths) => paths,
+        Err(_) => {
+            emit_host_start_failure(&request, FailureStage::Initialize, FailureCode::IoFailure)?;
+            return Ok(());
+        }
+    };
+    match open_host_project(request, &app_paths) {
+        Ok(opened) => product_runtime::run(opened, app_paths),
+        Err(terminal) => {
+            write_host_terminal(io::stdout().lock(), &terminal)?;
+            Ok(())
+        }
+    }
+}
+
+fn emit_host_start_failure(
+    request: &project_bootstrap::BootstrapRequest,
+    stage: project_bootstrap::FailureStage,
+    code: project_bootstrap::FailureCode,
+) -> Result<(), std::io::Error> {
+    project_bootstrap::write_host_terminal(
+        std::io::stdout().lock(),
+        &project_bootstrap::HostTerminal::failed(request, stage, code),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
 
-    #[test]
-    fn main_window_receives_only_product_commands() {
-        let capability: serde_json::Value =
-            serde_json::from_str(include_str!("../capabilities/default.json"))
-                .expect("valid project-window capability");
-        let windows = capability["windows"]
-            .as_array()
-            .expect("the capability targets explicit windows")
-            .iter()
-            .map(|label| label.as_str().expect("window labels are textual"))
-            .collect::<BTreeSet<_>>();
-        let permission_manifest: serde_json::Value =
-            serde_json::from_str(include_str!("../permissions/project-window.json"))
-                .expect("valid project-window permission manifest");
-        let project_window_permission = &permission_manifest["permission"][0];
-        let allowed_commands = project_window_permission["commands"]["allow"]
-            .as_array()
-            .expect("the project-window permission has an explicit command allow-list")
-            .iter()
-            .map(|command| command.as_str().expect("command names are textual"))
-            .collect::<BTreeSet<_>>();
+    fn config() -> serde_json::Value {
+        serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config")
+    }
 
-        assert_eq!(capability["local"], true);
-        assert!(capability.get("remote").is_none());
-        assert_eq!(windows, BTreeSet::from(["main"]));
+    fn allowed_commands(manifest: &serde_json::Value) -> BTreeSet<&str> {
+        manifest["permission"][0]["commands"]["allow"]
+            .as_array()
+            .expect("the permission has an explicit allow-list")
+            .iter()
+            .map(|command| command.as_str().expect("commands are textual"))
+            .collect()
+    }
+
+    #[test]
+    fn global_and_project_windows_have_disjoint_minimal_capabilities() {
+        let project_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json"))
+                .expect("valid project capability");
+        let global_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/global.json"))
+                .expect("valid global capability");
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+
         assert_eq!(
-            capability["permissions"],
+            project_capability["windows"],
+            serde_json::json!(["project"])
+        );
+        assert_eq!(global_capability["windows"], serde_json::json!(["global"]));
+        assert_eq!(
+            project_capability["permissions"],
             serde_json::json!(["project-window-commands"])
         );
         assert_eq!(
-            project_window_permission["identifier"],
-            "project-window-commands"
+            global_capability["permissions"],
+            serde_json::json!(["global-window-commands"])
         );
-        assert_eq!(
-            allowed_commands,
-            BTreeSet::from([
-                "apply_project_intent",
-                "cancel_export",
-                "export_preview",
-                "frontend_log",
-                "prepare_media_previews",
-                "project_state",
-                "redo_project",
-                "undo_project",
-            ])
-        );
-        assert_eq!(
-            project_window_permission["commands"]["deny"],
-            serde_json::json!([])
+        assert!(
+            allowed_commands(&project_permission)
+                .is_disjoint(&allowed_commands(&global_permission))
         );
     }
 
     #[test]
     fn windows_bundle_uses_current_user_nsis_and_evergreen_webview2() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let config = config();
         let bundle = &config["bundle"];
         let windows = &bundle["windows"];
 
@@ -148,9 +151,21 @@ mod tests {
     }
 
     #[test]
+    fn bundle_associates_only_the_product_project_extension() {
+        assert_eq!(
+            config()["bundle"]["fileAssociations"],
+            serde_json::json!([{
+                "ext": ["myalbuns"],
+                "name": "Projeto MyAlbuns",
+                "description": "Projeto MyAlbuns",
+                "role": "Editor"
+            }])
+        );
+    }
+
+    #[test]
     fn asset_protocol_serves_only_published_media_previews() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let config = config();
         let scope = config["app"]["security"]["assetProtocol"]["scope"]
             .as_array()
             .expect("the asset protocol has an explicit scope")
@@ -170,8 +185,7 @@ mod tests {
 
     #[test]
     fn csp_allows_scoped_assets_without_unsafe_eval_in_production() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
+        let config = config();
         let security = &config["app"]["security"];
 
         for policy_name in ["csp", "devCsp"] {
@@ -202,32 +216,32 @@ mod tests {
     }
 
     #[test]
-    fn main_window_is_created_by_the_product_composition_root() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
-        let windows = config["app"]["windows"]
+    fn composition_roots_create_hidden_global_and_project_windows() {
+        let windows = config()["app"]["windows"]
             .as_array()
-            .expect("the window list is explicit");
+            .expect("the window list is explicit")
+            .clone();
 
-        assert_eq!(windows.len(), 1);
-        assert_eq!(windows[0]["label"], "main");
-        assert_eq!(windows[0]["create"], false);
+        assert_eq!(windows.len(), 2);
+        assert_eq!(windows[0]["label"], "global");
+        assert_eq!(windows[0]["url"], "global.html");
+        assert_eq!(windows[1]["label"], "project");
+        assert_eq!(windows[1]["url"], "index.html");
+        assert!(windows.iter().all(|window| window["create"] == false));
+        assert!(windows.iter().all(|window| window["visible"] == false));
     }
 
     #[test]
-    fn main_window_disables_native_browser_controls() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).expect("valid Tauri config");
-        let main_window = &config["app"]["windows"][0];
+    fn project_window_disables_native_browser_controls() {
+        let config = config();
+        let project_window = config["app"]["windows"]
+            .as_array()
+            .expect("the windows are explicit")
+            .iter()
+            .find(|window| window["label"] == "project")
+            .expect("project window exists");
 
-        assert_eq!(main_window["devtools"], false);
-        assert_eq!(main_window["zoomHotkeysEnabled"], false);
-    }
-
-    #[test]
-    fn product_runtime_applies_the_native_webview_policy() {
-        let runtime_source = include_str!("product_runtime.rs");
-
-        assert!(runtime_source.contains("desktop_webview_policy::enforce(&main_window)?;"));
+        assert_eq!(project_window["devtools"], false);
+        assert_eq!(project_window["zoomHotkeysEnabled"], false);
     }
 }

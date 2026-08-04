@@ -3,6 +3,9 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::{
+    composition::build_render_snapshot,
+    model::{EditorProjection, RenderSnapshot},
+    persistent_projection,
     persistent_session::PersistentProjectSession,
     project::ProjectCore,
     project_document::{InitialProject, ProjectDocument, ProjectRevision},
@@ -126,6 +129,31 @@ impl EditableProject {
 
     pub fn can_redo(&self) -> bool {
         self.session.can_redo()
+    }
+
+    /// Initial read-only editor view of the productive v1 document.
+    ///
+    /// Creative mutations are added by the following vertical slices; this
+    /// projection intentionally contains no content from the temporary demo.
+    pub fn projection(&self) -> EditorProjection {
+        persistent_projection::editor_projection(
+            self.project_id(),
+            self.revision(),
+            self.saved_revision(),
+            self.can_undo(),
+            self.can_redo(),
+            self.project(),
+        )
+    }
+
+    pub fn render_snapshot(&self) -> RenderSnapshot {
+        let projection = self.projection();
+        build_render_snapshot(
+            &projection.state.project_id,
+            &projection.state.project_name,
+            projection.state.revision,
+            &projection.state.album,
+        )
     }
 }
 

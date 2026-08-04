@@ -56,6 +56,15 @@ impl PreparedExportPreviewDirectory {
 
 impl AppPaths {
     pub fn discover() -> Result<Self, AppPathsError> {
+        #[cfg(debug_assertions)]
+        if let Some(root) = debug_process_gate_root()? {
+            return Ok(Self::from_roots(
+                &root.join("Roaming"),
+                &root.join("Local"),
+                &root.join("Temporary"),
+            ));
+        }
+
         let known_folders = BaseDirs::new().ok_or(AppPathsError::KnownFoldersUnavailable)?;
         Ok(Self::from_roots(
             known_folders.data_dir(),
@@ -143,6 +152,14 @@ impl AppPaths {
         self.local_root.join("State")
     }
 
+    pub fn recent_projects_file(&self) -> PathBuf {
+        self.state_dir().join("recent-projects.json")
+    }
+
+    pub fn project_identity_leases_dir(&self) -> PathBuf {
+        self.state_dir().join("ProjectIdentityLeases")
+    }
+
     pub fn webview_data_directory(&self, host_namespace: &str) -> Result<PathBuf, AppPathsError> {
         if !valid_namespace_component(host_namespace) {
             return Err(AppPathsError::InvalidStateNamespace);
@@ -174,6 +191,24 @@ impl AppPaths {
             preview,
         })
     }
+}
+
+/// Isolates real-process integration gates from the user's application data.
+///
+/// This override is intentionally absent from release builds. It configures
+/// only internal data roots controlled by the test runner; Project pathnames
+/// continue to cross their native DTO boundary unchanged.
+#[cfg(debug_assertions)]
+fn debug_process_gate_root() -> Result<Option<PathBuf>, AppPathsError> {
+    const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
+
+    let Some(root) = std::env::var_os(PROCESS_GATE_ROOT_ENV).map(PathBuf::from) else {
+        return Ok(None);
+    };
+    if !root.is_absolute() {
+        return Err(AppPathsError::KnownFoldersUnavailable);
+    }
+    Ok(Some(root))
 }
 
 fn export_preview_storage_error(error: GuardedFsError) -> AppPathsError {

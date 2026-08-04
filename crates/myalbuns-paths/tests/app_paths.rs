@@ -75,6 +75,34 @@ fn exposes_each_data_category_under_its_approved_root() {
 }
 
 #[test]
+fn derives_the_recent_projects_state_file_from_the_central_local_root() {
+    let paths = AppPaths::from_roots(
+        Path::new(r"C:\Roaming"),
+        Path::new(r"C:\Local"),
+        Path::new(r"C:\Temp"),
+    );
+
+    assert_eq!(
+        paths.recent_projects_file(),
+        Path::new(r"C:\Local\MyAlbuns2\State\recent-projects.json")
+    );
+}
+
+#[test]
+fn derives_the_project_identity_lease_root_from_the_central_local_state() {
+    let paths = AppPaths::from_roots(
+        Path::new(r"C:\Roaming"),
+        Path::new(r"C:\Local"),
+        Path::new(r"C:\Temp"),
+    );
+
+    assert_eq!(
+        paths.project_identity_leases_dir(),
+        Path::new(r"C:\Local\MyAlbuns2\State\ProjectIdentityLeases")
+    );
+}
+
+#[test]
 fn derives_only_safe_webview_host_namespaces() {
     let paths = AppPaths::from_roots(
         Path::new(r"C:\Roaming"),

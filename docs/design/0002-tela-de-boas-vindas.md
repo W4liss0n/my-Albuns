@@ -47,18 +47,26 @@ O protótipo definirá proporções, espaçamentos e dimensões finais sem alter
 
 ## Projetos recentes
 
-Os Projetos recentes aparecem em uma lista textual. Cada item contém somente:
-
-- o Nome do Projeto em destaque;
-- o caminho completo do arquivo logo abaixo, em tamanho visual menor.
+Os Projetos recentes aparecem em uma lista textual. Cada item expõe ao frontend
+somente o Nome do Projeto e uma Identidade opaca usada para solicitar sua
+reabertura. O pathname nativo permanece no armazenamento do backend e nunca é
+transportado como string Unicode para a interface.
 
 Não há miniatura ou data no item da primeira versão. Clicar em qualquer ponto da linha abre o Projeto correspondente.
 
-A lista usa a abertura mais recente como ordenação decrescente. Sempre que um Projeto é aberto por qualquer fluxo do aplicativo, sua entrada passa imediatamente para o topo.
+A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
+para o topo somente depois que o Host independente confirma `Ready`; cancelamento
+ou falha anterior não cria nem reordena o item.
 
 ## Relação com as Janelas de Projeto
 
-Cada Projeto permanece em uma Janela e Sessão do Projeto isoladas, hospedadas por um processo `MyAlbuns.Project.exe` próprio. O Processador de Imagens também fica separado do host interativo e dos demais Projetos. Abrir o primeiro Projeto oculta a Tela de Boas-vindas sem encerrar o componente global; uma ação em qualquer Janela de Projeto pode exibi-la novamente. Quando a última Janela de Projeto é fechada, a Tela reaparece.
+Cada Projeto permanece em uma Janela e Sessão do Projeto isoladas, hospedadas por
+um processo próprio no papel interno de Host. O Processador de Imagens também
+fica separado do host interativo e dos demais Projetos. O processo global é um
+ponto de entrada descartável: depois de um terminal `Ready` válido, ele pode
+encerrar sem afetar o Host ou possuir estado criativo. Uma nova entrada global
+pode ser iniciada quando outra ação de abertura ou criação precisar dela; não há
+coordenador global de Sessões.
 
 Abrir diretamente um arquivo pelo Windows pode iniciar sua Janela de Projeto sem mostrar antes a Tela de Boas-vindas.
 

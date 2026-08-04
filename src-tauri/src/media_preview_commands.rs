@@ -58,7 +58,9 @@ pub(crate) async fn prepare_media_previews(
             .iter()
             .map(|source| source.source_path().to_path_buf()),
     );
-    let root_bindings = path_io::capture_root_bindings(operation_paths).await?;
+    let root_bindings = path_io::capture_root_bindings(operation_paths)
+        .await
+        .map_err(|error| error.to_string())?;
     let work = CacheWork::new(
         request_id.clone(),
         project_id.clone(),

@@ -250,7 +250,7 @@ pub(crate) async fn export_preview(
                 "capture_root_bindings",
                 None,
             );
-            ExportCommandError::failed(error)
+            ExportCommandError::failed(error.to_string())
         })?,
         () = attempt.cancelled() => {
             log_export_cancelled(

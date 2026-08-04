@@ -91,9 +91,13 @@ pub(crate) fn frontend_log(event: FrontendLogEvent) -> Result<(), String> {
     Ok(())
 }
 
-pub(crate) fn initialize<R: Runtime>(app: &mut App<R>, app_paths: &AppPaths) {
+pub(crate) fn initialize<R: Runtime>(
+    app: &mut App<R>,
+    app_paths: &AppPaths,
+    process_role: ProcessRole,
+) {
     let log_directory = app_paths.logs_dir();
-    let guard = match init_local_logging(&log_directory, ProcessRole::DesktopHost) {
+    let guard = match init_local_logging(&log_directory, process_role) {
         Ok(guard) => Some(guard),
         Err(error) => {
             eprintln!("logging indisponível: {error}");
@@ -106,7 +110,7 @@ pub(crate) fn initialize<R: Runtime>(app: &mut App<R>, app_paths: &AppPaths) {
     });
     tracing::info!(
         target: "myalbuns.desktop",
-        process_role = ProcessRole::DesktopHost.as_str(),
+        process_role = process_role.as_str(),
         protocol_version = IMAGING_PROTOCOL_VERSION,
         event = "application_started",
     );

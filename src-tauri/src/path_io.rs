@@ -1,8 +1,10 @@
 use std::{path::PathBuf, thread::ThreadId};
 
-use myalbuns_paths::{OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{AppPathsError, OperationPathContext, RootBindingPlan};
 
-pub(crate) async fn capture_root_bindings(paths: Vec<PathBuf>) -> Result<RootBindingPlan, String> {
+pub(crate) async fn capture_root_bindings(
+    paths: Vec<PathBuf>,
+) -> Result<RootBindingPlan, AppPathsError> {
     capture_root_bindings_with_thread(paths)
         .await
         .map(|(bindings, _)| bindings)
@@ -10,16 +12,16 @@ pub(crate) async fn capture_root_bindings(paths: Vec<PathBuf>) -> Result<RootBin
 
 async fn capture_root_bindings_with_thread(
     paths: Vec<PathBuf>,
-) -> Result<(RootBindingPlan, ThreadId), String> {
+) -> Result<(RootBindingPlan, ThreadId), AppPathsError> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut owner = OperationPathContext::new();
         for path in paths {
-            owner.capture(&path).map_err(|error| error.to_string())?;
+            owner.capture(&path)?;
         }
         Ok((owner.freeze(), std::thread::current().id()))
     })
     .await
-    .map_err(|error| format!("A tarefa de resolução de caminhos falhou: {error}"))?
+    .map_err(|_| AppPathsError::OperationPathIoFailure)?
 }
 
 #[cfg(test)]

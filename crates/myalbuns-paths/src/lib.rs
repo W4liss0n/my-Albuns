@@ -19,6 +19,7 @@ pub use cache::{
 };
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, PreparedExportStorage};
+pub use native_path_serde::NativePathDto;
 pub use operation::{
     OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,
 };

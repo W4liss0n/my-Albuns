@@ -12,9 +12,25 @@
   "app": {
     "windows": [
       {
-        "label": "main",
+        "label": "global",
+        "url": "global.html",
         "create": false,
-        "title": "MyAlbuns — Álbum Horizonte",
+        "visible": false,
+        "title": "MyAlbuns",
+        "width": 980,
+        "height": 640,
+        "minWidth": 760,
+        "minHeight": 520,
+        "resizable": true,
+        "devtools": false,
+        "zoomHotkeysEnabled": false
+      },
+      {
+        "label": "project",
+        "url": "index.html",
+        "create": false,
+        "visible": false,
+        "title": "MyAlbuns",
         "width": 1440,
         "height": 900,
         "minWidth": 1080,
@@ -39,6 +55,14 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "fileAssociations": [
+      {
+        "ext": ["myalbuns"],
+        "name": "Projeto MyAlbuns",
+        "description": "Projeto MyAlbuns",
+        "role": "Editor"
+      }
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper",

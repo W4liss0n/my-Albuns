@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "global",
+  "description": "Permissões mínimas da Tela de Boas-vindas",
+  "local": true,
+  "windows": ["global"],
+  "permissions": [
+    "global-window-commands"
+  ]
+}
