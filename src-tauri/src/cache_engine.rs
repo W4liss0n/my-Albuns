@@ -119,9 +119,9 @@ pub(crate) async fn execute<T: ImagingTransport>(
     let command = ImagingCommand::build_cache(request.clone());
     let (response, recovery) =
         invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context).await?;
-    if let Some(stage) = response.failure_for(&work.request_id) {
+    if let Some(failure) = response.failure_for(&work.request_id) {
         return Err(CacheFailure::new(
-            CacheFailureStage::Processor(InvocationFailureStage::Processor(stage)),
+            CacheFailureStage::Processor(InvocationFailureStage::Processor(failure.code.stage())),
             "O Processador recusou o trabalho de Cache.",
         ));
     }
@@ -665,6 +665,8 @@ mod tests {
                 .expect_err("the recovery cleanup failure remains visible");
 
             assert_eq!(failure.stage, CacheFailureStage::RecoveryCleanup);
+            assert_eq!(failure.exit_code, Some(-1));
+            assert!(!failure.message.is_empty());
             assert_eq!(transport.attempts, [1]);
         });
     }

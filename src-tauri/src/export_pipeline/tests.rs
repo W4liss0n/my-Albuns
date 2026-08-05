@@ -9,8 +9,8 @@ use std::{
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    ImagingCommand, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingResponse,
-    MediaSource, RenderCompletion, decode_command, encode_command,
+    ImagingCommand, ImagingFailureCode, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
+    ImagingResponse, MediaSource, RenderCompletion, decode_command, encode_command,
 };
 use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -261,11 +261,28 @@ fn export_plan_with_authorization(
             .expect("the test original source is valid"),
         );
     }
+    let source_dependencies = sources
+        .iter()
+        .map(|source| {
+            (
+                source.media_id().to_owned(),
+                source.source_path().to_path_buf(),
+            )
+        })
+        .collect();
     plan(
         snapshot,
-        ExportOptions::new(request_id, output, authorization, sheet_id, sources),
+        ExportOptions::new(
+            request_id,
+            output,
+            authorization,
+            sheet_id,
+            source_dependencies,
+        ),
     )
     .expect("the Export request is valid")
+    .bind_sources(sources)
+    .expect("the frozen originals bind to the Export plan")
 }
 
 fn root_bindings(plan: &ExportPlan) -> RootBindingPlan {
@@ -311,6 +328,62 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
         ),
     )
     .expect_err("an Export without linked originals is rejected");
+
+    assert_eq!(failure.stage, ExportFailureStage::Plan);
+}
+
+#[test]
+fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
+    let source = SampleProject::Horizon
+        .persisted_source(2)
+        .expect("the sample project serializes");
+    let snapshot = ProjectCore::new()
+        .open_demo_editable_session(&source)
+        .expect("the sample project opens")
+        .render_snapshot();
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let root = tempfile::tempdir().expect("temporary dependency-plan fixture");
+    let source_dependencies = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .enumerate()
+        .map(|(index, media_id)| {
+            (
+                media_id.to_owned(),
+                root.path().join(format!("planned-{index}.jpg")),
+            )
+        })
+        .collect::<Vec<_>>();
+    let planned = plan(
+        snapshot,
+        ExportOptions::new(
+            "dependency-plan",
+            root.path().join("Album.jpg"),
+            ExportWriteAuthorization::CreateOnly,
+            sheet_id,
+            source_dependencies.clone(),
+        ),
+    )
+    .expect("planning needs identities and paths but no source I/O");
+    assert_eq!(planned.source_dependencies(), source_dependencies);
+
+    let mismatched_sources = source_dependencies
+        .iter()
+        .enumerate()
+        .map(|(index, (media_id, _))| {
+            MediaSource::new(
+                media_id,
+                root.path().join(format!("different-{index}.jpg")),
+                0,
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            )
+            .expect("an empty fingerprint remains structurally valid")
+        })
+        .collect();
+    let failure = planned
+        .bind_sources(mismatched_sources)
+        .expect_err("fingerprints from paths outside the frozen plan are rejected");
 
     assert_eq!(failure.stage, ExportFailureStage::Plan);
 }
@@ -623,7 +696,9 @@ fn a_known_processor_failure_uses_the_structured_terminal_without_an_exit_code()
             prepared_bytes: b"incomplete".to_vec(),
             result: Some(Ok(ImagingResponse::failed(
                 "export-known-failure",
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
+                None::<String>,
+                None,
             ))),
             invocations: 0,
         };

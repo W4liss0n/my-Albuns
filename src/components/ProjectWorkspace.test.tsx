@@ -1210,6 +1210,37 @@ test("uses the Canvas-centered sheet for a media double click", () => {
   });
 });
 
+test("exports the Canvas-centered sheet even while focus remains on another sheet", () => {
+  const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
+    completion: Promise.resolve({
+      status: "completed",
+      result: { widthPx: 600, heightPx: 300 },
+    }),
+    cancel: async () => "not_found",
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPort={{ startSheet }}
+      projection={twoSheetProjection}
+      projectSessionPort={projectSessionPortWithApply(async () =>
+        twoSheetProjection
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
+  });
+  expect(useEditorView.getState().focusedSheetId).toBe("sheet-001");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
+  );
+
+  expect(startSheet).toHaveBeenCalledWith("sheet-002", expect.any(Function));
+});
+
 test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
   const apply = vi.fn(async () => projection);
 

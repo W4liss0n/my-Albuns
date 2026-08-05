@@ -23,6 +23,7 @@ pub(crate) struct RasterPlan {
     pub(crate) width_px: u32,
     pub(crate) height_px: u32,
     pixel_count: u64,
+    dpi: u32,
 }
 
 impl RasterPlan {
@@ -41,7 +42,19 @@ impl RasterPlan {
             width_px,
             height_px,
             pixel_count,
+            dpi,
         })
+    }
+
+    pub(crate) fn edge_px(self, micrometers: i64) -> Result<i64, JpegFailure> {
+        let scaled = i128::from(micrometers)
+            .checked_mul(i128::from(self.dpi))
+            .ok_or_else(|| resource_failure("a conversão de uma borda excedeu o intervalo"))?;
+        let rounded = scaled
+            .checked_add(ROUNDING_OFFSET)
+            .map(|value| value.div_euclid(MICROMETERS_PER_INCH))
+            .ok_or_else(|| resource_failure("a conversão de uma borda excedeu o intervalo"))?;
+        i64::try_from(rounded).map_err(|_| resource_failure("uma borda raster excedeu o intervalo"))
     }
 
     pub(crate) fn allocate_rgba(self, color: Rgba<u8>) -> Result<RgbaImage, JpegFailure> {
@@ -90,6 +103,10 @@ pub(crate) fn write_verified(
     dpi: u32,
 ) -> Result<VerifiedJpeg, JpegFailure> {
     let rgb = opaque_rgb_bytes(image)?;
+    let icc_profile = fallible_copy(
+        SRGB_2014,
+        "não há memória suficiente para incorporar o perfil sRGB",
+    )?;
     let density = u16::try_from(dpi).map_err(|_| {
         JpegFailure::new(
             ImagingFailureStage::OutputEncode,
@@ -112,14 +129,12 @@ pub(crate) fn write_verified(
         let mut writer = BufWriter::new(file);
         let mut encoder = JpegEncoder::new_with_quality(&mut writer, 100);
         encoder.set_pixel_density(PixelDensity::dpi(density));
-        encoder
-            .set_icc_profile(SRGB_2014.to_vec())
-            .map_err(|error| {
-                JpegFailure::new(
-                    ImagingFailureStage::OutputEncode,
-                    format!("não foi possível incorporar o perfil sRGB: {error}"),
-                )
-            })?;
+        encoder.set_icc_profile(icc_profile).map_err(|error| {
+            JpegFailure::new(
+                ImagingFailureStage::OutputEncode,
+                format!("não foi possível incorporar o perfil sRGB: {error}"),
+            )
+        })?;
         encoder
             .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
             .map_err(|error| {
@@ -233,9 +248,16 @@ fn verify_prepared_jpeg(
             continue;
         }
 
-        if header.len().saturating_add(read) > MAX_JPEG_HEADER_BYTES {
+        let header_length = header
+            .len()
+            .checked_add(read)
+            .ok_or_else(|| verify_failure("o cabeçalho JPEG excedeu o intervalo seguro"))?;
+        if header_length > MAX_JPEG_HEADER_BYTES {
             return Err(verify_failure("o cabeçalho JPEG excedeu o limite seguro"));
         }
+        header
+            .try_reserve_exact(read)
+            .map_err(|_| resource_failure("não há memória suficiente para verificar o JPEG"))?;
         header.extend_from_slice(chunk);
         if let HeaderInspection::Complete { entropy_offset } =
             inspect_header(&header, width, height, dpi)?
@@ -348,6 +370,9 @@ fn inspect_header(
                 if payload.len() < 14 || !payload.starts_with(b"ICC_PROFILE\0") {
                     return Err(verify_failure("o APP2 não contém o perfil ICC controlado"));
                 }
+                icc_chunks.try_reserve(1).map_err(|_| {
+                    resource_failure("não há memória suficiente para verificar o perfil ICC")
+                })?;
                 icc_chunks.push((payload[12], payload[13], &payload[14..]));
             }
             0xE3..=0xEF => {
@@ -402,8 +427,14 @@ fn validate_header_contract(
     {
         return Err(verify_failure("a sequência do perfil ICC é inválida"));
     }
-    let mut profile = Vec::with_capacity(SRGB_2014.len());
+    let mut profile = Vec::new();
+    profile
+        .try_reserve_exact(SRGB_2014.len())
+        .map_err(|_| resource_failure("não há memória suficiente para verificar o perfil ICC"))?;
     for (_, _, chunk) in icc_chunks.iter() {
+        if profile.len().saturating_add(chunk.len()) > SRGB_2014.len() {
+            return Err(verify_failure("o perfil ICC excedeu o tamanho controlado"));
+        }
         profile.extend_from_slice(chunk);
     }
     if profile != SRGB_2014 {
@@ -463,6 +494,15 @@ fn resource_failure(message: impl Into<String>) -> JpegFailure {
     JpegFailure::new(ImagingFailureStage::ResourceLimitExceeded, message)
 }
 
+fn fallible_copy(bytes: &[u8], message: &'static str) -> Result<Vec<u8>, JpegFailure> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(bytes.len())
+        .map_err(|_| resource_failure(message))?;
+    copied.extend_from_slice(bytes);
+    Ok(copied)
+}
+
 fn verify_failure(message: impl Into<String>) -> JpegFailure {
     JpegFailure::new(ImagingFailureStage::OutputVerify, message)
 }
@@ -490,5 +530,34 @@ mod tests {
             .expect_err("the oversized output must be rejected");
         assert_eq!(failure.stage.as_str(), "resource_limit_exceeded");
         assert!(failure.message.contains(&MAX_OUTPUT_PIXELS.to_string()));
+    }
+
+    #[test]
+    fn every_composed_edge_uses_the_same_checked_integer_conversion() {
+        let raster = RasterPlan::new(600_000, 300_000, 300).expect("the raster is valid");
+
+        assert_eq!(raster.edge_px(0).expect("zero is exact"), 0);
+        assert_eq!(raster.edge_px(300_000).expect("the center is valid"), 3_543);
+        assert_eq!(
+            raster.edge_px(600_000).expect("the far edge is valid"),
+            7_087
+        );
+        assert_eq!(
+            raster.edge_px(-300_000).expect("negative crops are valid"),
+            -3_543
+        );
+
+        let exact_half = RasterPlan::new(25_400, 25_400, 100).expect("the raster is valid");
+        assert_eq!(
+            exact_half.edge_px(-127).expect("a negative half is valid"),
+            0,
+            "the normative formula rounds an exact negative half toward positive infinity"
+        );
+        assert_eq!(
+            exact_half
+                .edge_px(-128)
+                .expect("a value beyond the negative half is valid"),
+            -1
+        );
     }
 }

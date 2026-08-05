@@ -174,6 +174,10 @@ impl ExportAttempt {
         self.control.cancelled().await;
     }
 
+    pub(crate) fn cancellation_token(&self) -> Arc<std::sync::atomic::AtomicBool> {
+        self.control.cancellation_token()
+    }
+
     pub(crate) fn request_cancel(&self) -> CancelDisposition {
         self.control.request_cancel().into()
     }

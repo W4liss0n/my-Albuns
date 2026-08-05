@@ -15,6 +15,8 @@ pub fn has_jpeg_extension(path: &std::path::Path) -> bool {
 pub struct ImagingRequest {
     pub protocol_version: u32,
     pub request_id: String,
+    pub project_id: String,
+    pub revision: u64,
     pub prepared_output_path: NativePathDto,
     pub unit: ComposedOutputUnit,
     pub dpi: u32,
@@ -23,8 +25,11 @@ pub struct ImagingRequest {
 }
 
 impl ImagingRequest {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         request_id: impl Into<String>,
+        project_id: impl Into<String>,
+        revision: u64,
         prepared_output_path: NativePathDto,
         unit: ComposedOutputUnit,
         dpi: u32,
@@ -34,6 +39,8 @@ impl ImagingRequest {
         let request = Self {
             protocol_version: IMAGING_PROTOCOL_VERSION,
             request_id: request_id.into(),
+            project_id: project_id.into(),
+            revision,
             prepared_output_path,
             unit,
             dpi,
@@ -57,6 +64,12 @@ impl ImagingRequest {
         }
         if !is_safe_identifier(&self.request_id) {
             return Err("a Identidade da solicitação é inválida".into());
+        }
+        if self.project_id.trim().is_empty() {
+            return Err("a Identidade do Projeto está vazia".into());
+        }
+        if self.revision > 9_007_199_254_740_991 {
+            return Err("a Revisão visível está fora do intervalo interoperável".into());
         }
         if !self.prepared_output_path().is_absolute() {
             return Err("o caminho da preparação não é absoluto".into());
@@ -161,9 +174,6 @@ impl MediaSource {
                 "o caminho da mídia {} não é absoluto",
                 self.media_id
             ));
-        }
-        if self.source_bytes == 0 {
-            return Err(format!("a mídia {} está vazia", self.media_id));
         }
         if self.source_sha256.len() != 64
             || !self

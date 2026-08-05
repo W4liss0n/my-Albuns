@@ -7,8 +7,6 @@ use myalbuns_core::{
     EditableProject, EditorProjection, ProjectIntent, RenderSnapshot, SaveProjectError,
     SaveProjectOutcome,
 };
-use myalbuns_imaging_protocol::MediaSource;
-
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
 /// Owns the single productive editable Project of this Host process.
@@ -29,6 +27,12 @@ enum ProjectHostState {
 pub(crate) struct ProjectHostSaveResult {
     pub(crate) outcome: SaveProjectOutcome,
     pub(crate) projection: EditorProjection,
+}
+
+#[derive(Debug)]
+pub(crate) struct FrozenSheetExport {
+    pub(crate) snapshot: RenderSnapshot,
+    pub(crate) source_paths: Vec<(String, PathBuf)>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -192,10 +196,6 @@ impl ProjectHost {
         }
     }
 
-    pub(crate) fn render_snapshot(&self) -> Result<RenderSnapshot, String> {
-        Ok(self.project()?.render_snapshot())
-    }
-
     pub(crate) fn linked_media_sources(&self) -> Result<Vec<(String, PathBuf)>, String> {
         Ok(self
             .project()?
@@ -211,21 +211,39 @@ impl ProjectHost {
             .collect())
     }
 
-    pub(crate) fn export_sources(
-        &self,
-        snapshot: &RenderSnapshot,
-        sheet_id: &str,
-    ) -> Result<Vec<MediaSource>, String> {
+    pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
+        let project = self.project()?;
+        let snapshot = project.render_snapshot();
         let sheet = snapshot
             .composition
             .sheets
             .iter()
             .find(|sheet| sheet.sheet_id == sheet_id)
             .ok_or_else(|| "A Lâmina solicitada não existe no snapshot.".to_string())?;
-        if sheet.referenced_media_ids().next().is_none() {
-            return Ok(Vec::new());
+        let mut source_paths = Vec::new();
+        for media_id in sheet.referenced_media_ids() {
+            if source_paths
+                .iter()
+                .any(|(known_id, _)| known_id == media_id)
+            {
+                continue;
+            }
+            let media = project
+                .project()
+                .media()
+                .iter()
+                .find(|media| media.id().hyphenated().to_string() == media_id)
+                .ok_or_else(|| {
+                    format!(
+                        "A fonte original da mídia {media_id} não pertence à mesma revisão do Projeto."
+                    )
+                })?;
+            source_paths.push((media_id.to_owned(), media.path().to_path_buf()));
         }
-        Err("As fontes originais das mídias ainda não estão disponíveis neste corte.".into())
+        Ok(FrozenSheetExport {
+            snapshot,
+            source_paths,
+        })
     }
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
@@ -272,15 +290,22 @@ impl std::ops::DerefMut for ActiveProject<'_> {
 mod tests {
     use std::path::{Path, PathBuf};
 
+    use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
         InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
         OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
         SaveProjectOutcome,
     };
-    use myalbuns_paths::OperationPathContext;
+    use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
 
     use super::{ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError};
+    use crate::{
+        export_pipeline, imaging_processor::InvocationContext,
+        imaging_recovery_integration::RealProcessTransport, path_io,
+    };
+
+    const TEST_PROCESSOR_ENV: &str = "MYALBUNS_TEST_IMAGING_PROCESSOR";
 
     struct Fixture {
         _root: tempfile::TempDir,
@@ -289,7 +314,7 @@ mod tests {
         host: ProjectHost,
     }
 
-    fn fixture() -> Fixture {
+    fn fixture_with_initial(initial: InitialProject) -> Fixture {
         let root = tempfile::tempdir().expect("temporary Project Host fixture");
         let project_path = root.path().join("Projeto.myalbuns");
         let identity_lease_root = root.path().join("leases");
@@ -301,7 +326,7 @@ mod tests {
             .with_identity_lease_root(identity_lease_root.clone())
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(project_path.clone(), context.freeze()),
-                InitialProject::neutral(),
+                initial,
                 CreateAuthorization::CreateOnly,
             ))
             .expect("the productive Project is created");
@@ -311,6 +336,10 @@ mod tests {
             identity_lease_root,
             host: ProjectHost::new(project),
         }
+    }
+
+    fn fixture() -> Fixture {
+        fixture_with_initial(InitialProject::neutral())
     }
 
     fn open_project(project_path: &Path, identity_lease_root: &Path) -> ProjectHost {
@@ -353,19 +382,238 @@ mod tests {
     #[test]
     fn productive_projection_yields_a_valid_neutral_render_snapshot() {
         let fixture = fixture();
-        let snapshot = fixture
+        let frozen = fixture
             .host
-            .render_snapshot()
-            .expect("the neutral snapshot is available");
+            .freeze_sheet_export(
+                &fixture
+                    .host
+                    .projection()
+                    .expect("the neutral projection is available")
+                    .composition
+                    .sheets[0]
+                    .sheet_id,
+            )
+            .expect("the neutral Export is frozen");
 
-        assert!(snapshot.validate().is_ok());
+        assert!(frozen.snapshot.validate().is_ok());
+        assert!(frozen.source_paths.is_empty());
+    }
+
+    #[test]
+    fn freezes_one_visible_sheet_unsaved_dpi_and_its_exact_originals_without_mutating_project() {
+        let root = tempfile::tempdir().expect("temporary decorative media fixture");
+        let shared_path = root.path().join("shared.png");
+        let right_path = root.path().join("right.png");
+        std::fs::write(&shared_path, b"shared original").expect("the shared original is writable");
+        std::fs::write(&right_path, b"right original").expect("the right original is writable");
+        let personalized =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Media {
+                        path: shared_path.clone(),
+                    },
+                    right: InitialBackgroundContent::Media {
+                        path: right_path.clone(),
+                    },
+                },
+                InitialOverlay::BothSides {
+                    both: Some(myalbuns_core::InitialOverlayContent::Media {
+                        path: shared_path.clone(),
+                    }),
+                },
+                InitialFrameBorder::None,
+            ));
+        let fixture = fixture_with_initial(personalized);
+        let dirty = fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the current unsaved DPI is applied");
+        let persisted_before =
+            std::fs::read(&fixture.project_path).expect("the Project baseline is readable");
+        let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
+
+        let frozen = fixture
+            .host
+            .freeze_sheet_export(&sheet_id)
+            .expect("the noninitial visible sheet is frozen atomically");
+
+        assert_eq!(frozen.snapshot.revision, dirty.state.revision);
+        assert_eq!(frozen.snapshot.dpi, 240);
+        assert_eq!(
+            frozen
+                .snapshot
+                .output_unit(&sheet_id)
+                .expect("the selected sheet remains in the frozen snapshot")
+                .sheet
+                .sheet_id,
+            sheet_id
+        );
         assert_eq!(
             fixture
                 .host
-                .export_sources(&snapshot, &snapshot.composition.sheets[0].sheet_id)
-                .expect("a neutral sheet needs no original sources"),
-            Vec::new()
+                .projection()
+                .expect("the Project remains readable"),
+            dirty
         );
+        assert_eq!(
+            std::fs::read(&fixture.project_path).expect("the Project remains persisted"),
+            persisted_before
+        );
+
+        let frozen_paths = frozen
+            .source_paths
+            .iter()
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(frozen_paths, [shared_path, right_path]);
+        assert_eq!(
+            frozen.source_paths.len(),
+            2,
+            "a reused original is listed once"
+        );
+
+        fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 180 })
+            .expect("the live Project may advance after freezing");
+        assert_eq!(frozen.snapshot.dpi, 240);
+        assert_eq!(frozen.snapshot.revision, dirty.state.revision);
+    }
+
+    #[test]
+    #[ignore = "executed by scripts/Test-Rust.ps1 with the freshly built real sidecar"]
+    fn reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor() {
+        tauri::async_runtime::block_on(async {
+            let executable = PathBuf::from(
+                std::env::var_os(TEST_PROCESSOR_ENV)
+                    .expect("the real imaging executable path is configured"),
+            );
+            assert!(executable.is_file(), "the real imaging executable exists");
+
+            let media_root = tempfile::tempdir().expect("temporary E2E media fixture");
+            let shared_path = media_root.path().join("shared-overlay.png");
+            let right_path = media_root.path().join("right-background.jpg");
+            RgbaImage::from_pixel(48, 32, Rgba([240, 10, 10, 128]))
+                .save_with_format(&shared_path, ImageFormat::Png)
+                .expect("the transparent shared original is written");
+            RgbImage::from_pixel(48, 32, Rgb([10, 20, 240]))
+                .save_with_format(&right_path, ImageFormat::Jpeg)
+                .expect("the right Background original is written");
+            let personalized =
+                InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                    InitialBackground::PerSide {
+                        left: InitialBackgroundContent::Media {
+                            path: shared_path.clone(),
+                        },
+                        right: InitialBackgroundContent::Media {
+                            path: right_path.clone(),
+                        },
+                    },
+                    InitialOverlay::BothSides {
+                        both: Some(myalbuns_core::InitialOverlayContent::Media {
+                            path: shared_path,
+                        }),
+                    },
+                    InitialFrameBorder::None,
+                ));
+            let Fixture {
+                _root: project_root,
+                project_path,
+                identity_lease_root,
+                host,
+            } = fixture_with_initial(personalized);
+            assert_eq!(
+                host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            );
+            let host = open_project(&project_path, &identity_lease_root);
+            let persisted_before =
+                std::fs::read(&project_path).expect("the reopened Project is readable");
+            let dirty = host
+                .apply(ProjectIntent::SetDpi { dpi: 25 })
+                .expect("the current unsaved DPI is applied");
+            let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
+            let frozen = host
+                .freeze_sheet_export(&sheet_id)
+                .expect("the visible noninitial Sheet is frozen by the Host");
+            let expected_dpi = frozen.snapshot.dpi;
+            let expected_revision = frozen.snapshot.revision;
+            let output_path = project_root.path().join("visible-sheet.jpg");
+            let request_id = "host-pipeline-real-processor";
+            let planned = export_pipeline::plan(
+                frozen.snapshot,
+                export_pipeline::ExportOptions::new(
+                    request_id,
+                    output_path.clone(),
+                    ExportWriteAuthorization::CreateOnly,
+                    sheet_id,
+                    frozen.source_paths,
+                ),
+            )
+            .expect("the Host snapshot owns the exact Export dependencies");
+            let operation_paths = planned
+                .required_paths()
+                .into_iter()
+                .map(Path::to_path_buf)
+                .collect();
+            let root_bindings = path_io::capture_root_bindings(operation_paths)
+                .await
+                .expect("the Export roots are captured once");
+            let sources = path_io::fingerprint_media_sources(
+                root_bindings.clone(),
+                planned.source_dependencies().to_vec(),
+            )
+            .await
+            .expect("the planned originals are fingerprinted");
+            let plan = planned
+                .bind_sources(sources)
+                .expect("the fingerprints bind only to their frozen dependencies");
+            let log_directory = project_root.path().join("processor-logs");
+            std::fs::create_dir(&log_directory).expect("the processor log directory exists");
+            let mut transport = RealProcessTransport::stable(executable, log_directory);
+            let published = export_pipeline::execute(
+                &mut transport,
+                plan,
+                &root_bindings,
+                &export_pipeline::ExportExecutionControl::default(),
+                &|_| {},
+                &InvocationContext::new(request_id, Some(dirty.state.project_id.clone())),
+            )
+            .await
+            .expect("the real processor publishes the frozen visible Sheet");
+
+            assert_eq!(published.completion.dpi, expected_dpi);
+            assert_eq!(published.completion.source_count, 2);
+            assert_eq!(expected_revision, dirty.state.revision);
+            let rendered = image::open(&output_path).expect("the published JPEG decodes");
+            assert_eq!(
+                rendered.dimensions(),
+                (
+                    published.completion.width_px,
+                    published.completion.height_px
+                )
+            );
+            let rendered = rendered.to_rgb8();
+            let left = rendered.get_pixel(rendered.width() / 4, rendered.height() / 2);
+            let right = rendered.get_pixel(rendered.width() * 3 / 4, rendered.height() / 2);
+            assert!(
+                left[0] > left[2] * 2,
+                "the left Background and translucent Overlay remain visibly red"
+            );
+            assert!(
+                right[0] > right[1] * 3 && right[2] > right[1] * 3,
+                "the red translucent Overlay is composed over the blue right Background"
+            );
+            assert_eq!(
+                host.projection().expect("the Project remains available"),
+                dirty
+            );
+            assert_eq!(
+                std::fs::read(&project_path).expect("the Project remains readable"),
+                persisted_before,
+                "Export does not save or mutate the Project"
+            );
+        });
     }
 
     #[test]

@@ -1,9 +1,12 @@
 use std::{
+    path::Path,
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
 
-use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, root_binding_plan_sha256};
+use myalbuns_imaging_protocol::{
+    IMAGING_PROTOCOL_VERSION, ImagingFailureCode, ImagingPathCode, root_binding_plan_sha256,
+};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
@@ -13,7 +16,7 @@ use crate::{
     export_pipeline,
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
     ipc_contract::{
-        CancelDisposition, ExportCommandError, ExportCommandErrorCode, ExportEvent,
+        CancelDisposition, ExportCommandError, ExportCommandErrorCode, ExportEvent, ExportPathCode,
         ExportProgressStagePayload, ExportProgressUnitsPayload, ExportResult,
     },
     logging::{LoggingState, log_imaging_failure},
@@ -78,6 +81,8 @@ impl ExportCommandError {
         Self {
             code: ExportCommandErrorCode::Cancelled,
             message: "A Exportação foi cancelada.".into(),
+            media_id: None,
+            path_code: None,
         }
     }
 
@@ -85,6 +90,8 @@ impl ExportCommandError {
         Self {
             code: ExportCommandErrorCode::Failed,
             message: message.into(),
+            media_id: None,
+            path_code: None,
         }
     }
 
@@ -93,26 +100,83 @@ impl ExportCommandError {
             OperationGateError::Conflict => Self {
                 code: ExportCommandErrorCode::Conflict,
                 message: "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.".into(),
+                media_id: None,
+                path_code: None,
             },
             OperationGateError::Unavailable { reason } => Self {
                 code: ExportCommandErrorCode::Failed,
                 message: format!("Não foi possível reservar a Exportação: {reason}"),
+                media_id: None,
+                path_code: None,
             },
         }
     }
 
     fn from_pipeline(failure: export_pipeline::ExportFailure) -> Self {
+        if let Some(processor) = failure.processor_failure {
+            return Self {
+                code: processor.code.into(),
+                message: failure.message,
+                media_id: processor.media_id,
+                path_code: processor.path_code.map(Into::into),
+            };
+        }
         match failure.stage {
             export_pipeline::ExportFailureStage::Cancelled => Self::cancelled(),
             export_pipeline::ExportFailureStage::ExportConflict => Self {
                 code: ExportCommandErrorCode::ExportConflict,
                 message: failure.message,
+                media_id: None,
+                path_code: None,
             },
             export_pipeline::ExportFailureStage::Publish { .. } => Self {
                 code: ExportCommandErrorCode::PublicationFailed,
                 message: failure.message,
+                media_id: None,
+                path_code: None,
             },
             _ => Self::failed(failure.message),
+        }
+    }
+
+    fn from_source_fingerprint(error: path_io::SourceFingerprintFailure) -> Self {
+        Self {
+            code: error.code.into(),
+            message: error.message,
+            media_id: error.media_id,
+            path_code: error.path_code.map(Into::into),
+        }
+    }
+}
+
+impl From<ImagingFailureCode> for ExportCommandErrorCode {
+    fn from(code: ImagingFailureCode) -> Self {
+        match code {
+            ImagingFailureCode::InvalidRenderRequest => Self::InvalidRenderRequest,
+            ImagingFailureCode::SourceUnavailable => Self::SourceUnavailable,
+            ImagingFailureCode::UnsupportedSourceFormat => Self::UnsupportedSourceFormat,
+            ImagingFailureCode::UnsupportedSourceVariant => Self::UnsupportedSourceVariant,
+            ImagingFailureCode::UnsupportedColorModel => Self::UnsupportedColorModel,
+            ImagingFailureCode::UnsupportedColorProfile => Self::UnsupportedColorProfile,
+            ImagingFailureCode::DecodeFailed => Self::DecodeFailed,
+            ImagingFailureCode::CompositionFailed => Self::CompositionFailed,
+            ImagingFailureCode::ResourceLimitExceeded => Self::ResourceLimitExceeded,
+            ImagingFailureCode::EncodeFailed => Self::EncodeFailed,
+            ImagingFailureCode::VerificationFailed => Self::VerificationFailed,
+        }
+    }
+}
+
+impl From<ImagingPathCode> for ExportPathCode {
+    fn from(code: ImagingPathCode) -> Self {
+        match code {
+            ImagingPathCode::NotFound => Self::NotFound,
+            ImagingPathCode::Unavailable => Self::Unavailable,
+            ImagingPathCode::AccessDenied => Self::AccessDenied,
+            ImagingPathCode::InvalidPath => Self::InvalidPath,
+            ImagingPathCode::UnexpectedObjectType => Self::UnexpectedObjectType,
+            ImagingPathCode::Conflict => Self::Conflict,
+            ImagingPathCode::IoFailure => Self::IoFailure,
         }
     }
 }
@@ -151,16 +215,17 @@ pub(crate) async fn export_sheet(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
-    let snapshot = state
-        .render_snapshot()
+    let frozen = state
+        .freeze_sheet_export(&sheet_id)
         .map_err(ExportCommandError::failed)?;
-    let sheet = snapshot
+    let sheet = frozen
+        .snapshot
         .composition
         .sheets
         .iter()
         .find(|sheet| sheet.sheet_id == sheet_id)
         .ok_or_else(|| ExportCommandError::failed("A Lâmina selecionada não existe."))?;
-    let suggested_filename = suggested_export_filename(&snapshot.project_name, sheet.number);
+    let suggested_filename = suggested_export_filename(&frozen.snapshot.project_name, sheet.number);
     let destination = native_project_dialog::choose_export_destination(&window, suggested_filename)
         .await
         .map_err(|error| {
@@ -178,18 +243,15 @@ pub(crate) async fn export_sheet(
 
     let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("export-{}-{export_sequence}", std::process::id());
-    let sources = state
-        .export_sources(&snapshot, &sheet_id)
-        .map_err(ExportCommandError::failed)?;
-    let project_id = safe_log_identifier(&snapshot.project_id).map(str::to_owned);
-    let plan = export_pipeline::plan(
-        snapshot,
+    let project_id = safe_log_identifier(&frozen.snapshot.project_id).map(str::to_owned);
+    let planned_export = export_pipeline::plan(
+        frozen.snapshot,
         export_pipeline::ExportOptions::new(
             request_id.clone(),
             output_path,
             authorization,
             sheet_id,
-            sources,
+            frozen.source_paths,
         ),
     )
     .map_err(|failure| {
@@ -202,10 +264,10 @@ pub(crate) async fn export_sheet(
         );
         ExportCommandError::from_pipeline(failure)
     })?;
-    let operation_paths = plan
+    let operation_paths = planned_export
         .required_paths()
         .into_iter()
-        .map(|path| path.to_path_buf())
+        .map(Path::to_path_buf)
         .collect();
     let acquisition = OperationLease::begin(&operation_gate).map_err(|error| {
         tracing::warn!(
@@ -259,6 +321,7 @@ pub(crate) async fn export_sheet(
             ExportCommandError::failed(error.to_string())
         })?,
         () = attempt.cancelled() => {
+            let _ = root_bindings_completion.as_mut().await;
             log_export_cancelled(
                 &request_id,
                 project_id.as_deref(),
@@ -280,6 +343,57 @@ pub(crate) async fn export_sheet(
         root_binding_plan_sha256,
         event = "root_binding_plan_captured",
     );
+
+    let source_fingerprints = path_io::fingerprint_media_sources_cancellable(
+        root_bindings.clone(),
+        planned_export.source_dependencies().to_vec(),
+        attempt.cancellation_token(),
+    );
+    tokio::pin!(source_fingerprints);
+    let sources = tokio::select! {
+        sources = &mut source_fingerprints => match sources {
+            Ok(sources) => sources,
+            Err(path_io::SourceFingerprintError::Cancelled) => {
+                log_export_cancelled(
+                    &request_id,
+                    project_id.as_deref(),
+                    window.label(),
+                    "fingerprint_sources",
+                );
+                return Err(ExportCommandError::cancelled());
+            }
+            Err(path_io::SourceFingerprintError::Failed(error)) => {
+                log_imaging_failure(
+                    "export_failed",
+                    &request_id,
+                    project_id.as_deref(),
+                    error.code.stage().as_str(),
+                    None,
+                );
+                return Err(ExportCommandError::from_source_fingerprint(error));
+            }
+        },
+        () = attempt.cancelled() => {
+            let _ = source_fingerprints.as_mut().await;
+            log_export_cancelled(
+                &request_id,
+                project_id.as_deref(),
+                window.label(),
+                "fingerprint_sources",
+            );
+            return Err(ExportCommandError::cancelled());
+        },
+    };
+    let plan = planned_export.bind_sources(sources).map_err(|failure| {
+        log_imaging_failure(
+            "export_failed",
+            &request_id,
+            project_id.as_deref(),
+            failure.stage.as_str(),
+            failure.exit_code,
+        );
+        ExportCommandError::from_pipeline(failure)
+    })?;
 
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let lease_completion = acquisition.complete(&cache, &processor);
@@ -449,6 +563,9 @@ fn suggested_export_filename(project_name: &str, sheet_number: usize) -> String 
 mod tests {
     use std::sync::{Arc, Mutex};
 
+    use myalbuns_imaging_protocol::{
+        ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
+    };
     use serde_json::json;
     use tauri::ipc::{Channel, InvokeResponseBody};
 
@@ -584,6 +701,34 @@ mod tests {
             json!({
                 "code": "publication_failed",
                 "message": "A Publicação não pôde ser confirmada.",
+            })
+        );
+    }
+
+    #[test]
+    fn processor_failure_keeps_actionable_media_and_path_context_over_ipc() {
+        let failure = ExportCommandError::from_pipeline(ExportFailure {
+            stage: ExportFailureStage::Processor(
+                crate::imaging_processor::InvocationFailureStage::Processor(
+                    ImagingFailureStage::SourceVerification,
+                ),
+            ),
+            exit_code: None,
+            message: "O original não está mais disponível.".into(),
+            processor_failure: Some(ImagingFailure {
+                code: ImagingFailureCode::SourceUnavailable,
+                media_id: Some("media-cover".into()),
+                path_code: Some(ImagingPathCode::NotFound),
+            }),
+        });
+
+        assert_eq!(
+            serde_json::to_value(failure).expect("the processor failure serializes"),
+            json!({
+                "code": "source_unavailable",
+                "message": "O original não está mais disponível.",
+                "mediaId": "media-cover",
+                "pathCode": "not_found",
             })
         );
     }

@@ -3,25 +3,62 @@ use std::collections::HashMap;
 use image::{Rgba, RgbaImage};
 use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
-    ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion,
+    ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgressStage,
+    ImagingRequest, RenderCompletion,
 };
+use myalbuns_paths::ExpectedObject;
 
 use crate::{
     jpeg_output::{JpegFailure, RasterPlan, write_verified},
-    source::{decode_source, read_verified_source},
+    source::{MAX_DECODED_SOURCE_PIXELS_TOTAL, open_render_source},
 };
 
 const MICROMETERS_PER_INCH: f64 = 25_400.0;
 
 pub(crate) struct RenderFailure {
     pub(crate) stage: ImagingFailureStage,
+    pub(crate) failure: ImagingFailure,
     _message: String,
 }
 
 impl RenderFailure {
     fn new(stage: ImagingFailureStage, message: impl Into<String>) -> Self {
+        let code = match stage {
+            ImagingFailureStage::InvalidRenderRequest => ImagingFailureCode::InvalidRenderRequest,
+            ImagingFailureStage::SourceVerification => ImagingFailureCode::SourceUnavailable,
+            ImagingFailureStage::SourceDecode => ImagingFailureCode::DecodeFailed,
+            ImagingFailureStage::Composition => ImagingFailureCode::CompositionFailed,
+            ImagingFailureStage::ResourceLimitExceeded => ImagingFailureCode::ResourceLimitExceeded,
+            ImagingFailureStage::OutputPrepare | ImagingFailureStage::OutputEncode => {
+                ImagingFailureCode::EncodeFailed
+            }
+            ImagingFailureStage::OutputVerify => ImagingFailureCode::VerificationFailed,
+            ImagingFailureStage::CacheProcessing => ImagingFailureCode::DecodeFailed,
+        };
         Self {
             stage,
+            failure: ImagingFailure {
+                code,
+                media_id: None,
+                path_code: None,
+            },
+            _message: message.into(),
+        }
+    }
+
+    pub(crate) fn typed(
+        code: ImagingFailureCode,
+        media_id: Option<String>,
+        path_code: Option<ImagingPathCode>,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            stage: code.stage(),
+            failure: ImagingFailure {
+                code,
+                media_id,
+                path_code,
+            },
             _message: message.into(),
         }
     }
@@ -51,12 +88,9 @@ pub(crate) fn render_request(
 
     for background in &sheet.backgrounds {
         match background {
-            ComposedBackground::Color { rgb, draw_rect } => fill_composed_rect(
-                &mut image,
-                draw_rect,
-                pixels_per_micrometer,
-                opaque_rgb(rgb),
-            ),
+            ComposedBackground::Color { rgb, draw_rect } => {
+                fill_composed_rect(&mut image, draw_rect, raster, opaque_rgb(rgb))?
+            }
             ComposedBackground::Media {
                 media_id,
                 draw_rect,
@@ -65,7 +99,7 @@ pub(crate) fn render_request(
                 let source = sources
                     .get(media_id)
                     .ok_or_else(|| format!("a fonte do Background {media_id} não foi carregada"))?;
-                draw_stretched_media(&mut image, draw_rect, pixels_per_micrometer, source);
+                draw_stretched_media(&mut image, draw_rect, raster, source)?;
             }
         }
     }
@@ -98,12 +132,7 @@ pub(crate) fn render_request(
                 overlay.media_id
             )
         })?;
-        draw_stretched_media(
-            &mut image,
-            &overlay.draw_rect,
-            pixels_per_micrometer,
-            source,
-        );
+        draw_stretched_media(&mut image, &overlay.draw_rect, raster, source)?;
     }
 
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
@@ -133,38 +162,102 @@ fn load_render_sources(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<(HashMap<String, RgbaImage>, u64), RenderFailure> {
-    let mut decoded = HashMap::with_capacity(request.sources.len());
+    let mut opened = Vec::new();
+    opened
+        .try_reserve_exact(request.sources.len())
+        .map_err(|_| {
+            RenderFailure::typed(
+                ImagingFailureCode::ResourceLimitExceeded,
+                None,
+                None,
+                "não há memória suficiente para planejar as fontes da Exportação",
+            )
+        })?;
     let mut source_bytes = 0_u64;
+    let mut source_pixels = 0_u64;
     let source_count = u32::try_from(request.sources.len())
         .map_err(|_| "a Exportação contém fontes demais".to_string())?;
     let loading_units = source_count.max(1);
     progress(ImagingProgressStage::LoadingSources, 0, loading_units)?;
-    for (index, source) in request.sources.iter().enumerate() {
-        let operational_source = request
+    for source in &request.sources {
+        let resolved = request
             .root_bindings
-            .resolve(source.source_path())
+            .resolve_existing(source.source_path(), ExpectedObject::RegularFile)
             .map_err(|error| {
-                RenderFailure::new(
-                    ImagingFailureStage::SourceVerification,
+                RenderFailure::typed(
+                    ImagingFailureCode::SourceUnavailable,
+                    Some(source.media_id().to_owned()),
+                    Some(ImagingPathCode::from_resolve_error(error)),
                     format!("não foi possível aplicar o plano de caminhos: {error}"),
                 )
             })?;
-        let verified = read_verified_source(source, &operational_source)
-            .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceVerification, error))?;
+        let opened_source = open_render_source(source, &resolved).map_err(|failure| {
+            RenderFailure::typed(
+                failure.code,
+                Some(source.media_id().to_owned()),
+                failure.path_code,
+                failure.message,
+            )
+        })?;
         source_bytes = source_bytes
             .checked_add(source.source_bytes())
             .ok_or_else(|| {
-                RenderFailure::new(
-                    ImagingFailureStage::SourceVerification,
+                RenderFailure::typed(
+                    ImagingFailureCode::ResourceLimitExceeded,
+                    Some(source.media_id().to_owned()),
+                    None,
                     "o tamanho total das fontes excedeu o limite",
                 )
             })?;
-        decoded.insert(
-            source.media_id().to_owned(),
-            decode_source(source.media_id(), &verified)
-                .map_err(|error| RenderFailure::new(ImagingFailureStage::SourceDecode, error))?
-                .image,
-        );
+        source_pixels = source_pixels
+            .checked_add(opened_source.pixel_count().map_err(|failure| {
+                RenderFailure::typed(
+                    failure.code,
+                    Some(source.media_id().to_owned()),
+                    failure.path_code,
+                    failure.message,
+                )
+            })?)
+            .ok_or_else(|| {
+                RenderFailure::typed(
+                    ImagingFailureCode::ResourceLimitExceeded,
+                    Some(source.media_id().to_owned()),
+                    None,
+                    "a soma dos pixels das fontes excedeu o intervalo seguro",
+                )
+            })?;
+        if source_pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
+            return Err(RenderFailure::typed(
+                ImagingFailureCode::ResourceLimitExceeded,
+                Some(source.media_id().to_owned()),
+                None,
+                format!(
+                    "as fontes teriam {source_pixels} pixels e excedem o limite de {MAX_DECODED_SOURCE_PIXELS_TOTAL}"
+                ),
+            ));
+        }
+        opened.push((source.media_id().to_owned(), opened_source));
+    }
+
+    let mut decoded = HashMap::new();
+    decoded.try_reserve(request.sources.len()).map_err(|_| {
+        RenderFailure::typed(
+            ImagingFailureCode::ResourceLimitExceeded,
+            None,
+            None,
+            "não há memória suficiente para indexar as fontes decodificadas",
+        )
+    })?;
+    for (index, (media_id, opened_source)) in opened.into_iter().enumerate() {
+        let image = opened_source.decode().map_err(|failure| {
+            RenderFailure::typed(
+                failure.code,
+                Some(media_id.clone()),
+                failure.path_code,
+                failure.message,
+            )
+        })?;
+        decoded.insert(media_id, image);
         progress(
             ImagingProgressStage::LoadingSources,
             u32::try_from(index + 1)
@@ -252,17 +345,10 @@ fn sample_bilinear(image: &RgbaImage, horizontal: f32, vertical: f32) -> Rgba<u8
 fn draw_stretched_media(
     image: &mut RgbaImage,
     draw_rect: &RectUm,
-    pixels_per_micrometer: f64,
+    raster: RasterPlan,
     source: &RgbaImage,
-) {
-    let left = to_pixels_signed(draw_rect.x, pixels_per_micrometer).max(0) as u32;
-    let top = to_pixels_signed(draw_rect.y, pixels_per_micrometer).max(0) as u32;
-    let right =
-        to_pixels_signed(draw_rect.x + draw_rect.width, pixels_per_micrometer).max(0) as u32;
-    let bottom =
-        to_pixels_signed(draw_rect.y + draw_rect.height, pixels_per_micrometer).max(0) as u32;
-    let right = right.min(image.width());
-    let bottom = bottom.min(image.height());
+) -> Result<(), RenderFailure> {
+    let (left, top, right, bottom) = raster_rect(image, draw_rect, raster)?;
     let width = right.saturating_sub(left).max(1);
     let height = bottom.saturating_sub(top).max(1);
 
@@ -273,28 +359,51 @@ fn draw_stretched_media(
             blend_pixel(image, x, y, sample_bilinear(source, horizontal, vertical));
         }
     }
+    Ok(())
 }
 
 fn fill_composed_rect(
     image: &mut RgbaImage,
     draw_rect: &RectUm,
-    pixels_per_micrometer: f64,
+    raster: RasterPlan,
     color: Rgba<u8>,
-) {
-    let left = to_pixels_signed(draw_rect.x, pixels_per_micrometer).max(0) as u32;
-    let top = to_pixels_signed(draw_rect.y, pixels_per_micrometer).max(0) as u32;
-    let right =
-        to_pixels_signed(draw_rect.x + draw_rect.width, pixels_per_micrometer).max(0) as u32;
-    let bottom =
-        to_pixels_signed(draw_rect.y + draw_rect.height, pixels_per_micrometer).max(0) as u32;
-    fill_rect(
-        image,
-        left,
-        top,
+) -> Result<(), RenderFailure> {
+    let (left, top, right, bottom) = raster_rect(image, draw_rect, raster)?;
+    fill_rect(image, left, top, right, bottom, color);
+    Ok(())
+}
+
+fn raster_rect(
+    image: &RgbaImage,
+    draw_rect: &RectUm,
+    raster: RasterPlan,
+) -> Result<(u32, u32, u32, u32), RenderFailure> {
+    let far_x = draw_rect.x.checked_add(draw_rect.width).ok_or_else(|| {
+        RenderFailure::typed(
+            ImagingFailureCode::ResourceLimitExceeded,
+            None,
+            None,
+            "a borda horizontal da composição excedeu o intervalo seguro",
+        )
+    })?;
+    let far_y = draw_rect.y.checked_add(draw_rect.height).ok_or_else(|| {
+        RenderFailure::typed(
+            ImagingFailureCode::ResourceLimitExceeded,
+            None,
+            None,
+            "a borda vertical da composição excedeu o intervalo seguro",
+        )
+    })?;
+    let left = u32::try_from(raster.edge_px(draw_rect.x)?.max(0)).unwrap_or(u32::MAX);
+    let top = u32::try_from(raster.edge_px(draw_rect.y)?.max(0)).unwrap_or(u32::MAX);
+    let right = u32::try_from(raster.edge_px(far_x)?.max(0)).unwrap_or(u32::MAX);
+    let bottom = u32::try_from(raster.edge_px(far_y)?.max(0)).unwrap_or(u32::MAX);
+    Ok((
+        left.min(image.width()),
+        top.min(image.height()),
         right.min(image.width()),
         bottom.min(image.height()),
-        color,
-    );
+    ))
 }
 
 fn draw_frame_border(

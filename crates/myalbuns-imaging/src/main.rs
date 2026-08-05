@@ -9,9 +9,9 @@ use std::{
 };
 
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
-    ImagingProgressStage, ImagingRequest, ImagingResponse, decode_command, encode_event,
-    root_binding_plan_sha256,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureCode,
+    ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingRequest, ImagingResponse,
+    decode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -134,7 +134,8 @@ fn cache_failure(_: String) -> ProcessFailure {
 
 fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
     let operation_id = safe_log_identifier(&request.request_id);
-    let project_id = Option::<&str>::None;
+    let project_id = safe_log_identifier(&request.project_id);
+    let revision = request.revision;
     if request.validate().is_err() {
         tracing::warn!(
             target: "myalbuns.imaging",
@@ -142,6 +143,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
+            revision,
             event = "imaging_request_rejected",
         );
         if operation_id.is_none() {
@@ -151,7 +153,9 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         }
         write_response(&ImagingResponse::failed(
             request.request_id,
-            ImagingFailureStage::InvalidRenderRequest,
+            ImagingFailureCode::InvalidRenderRequest,
+            None::<String>,
+            None,
         ))?;
         return Ok(());
     }
@@ -163,6 +167,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        revision,
         process_id = std::process::id(),
         root_binding_plan_sha256,
         event = "imaging_request_started",
@@ -181,10 +186,16 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
                 protocol_version = request.protocol_version,
                 operation_id,
                 project_id,
+                revision,
                 stage = failure.stage.as_str(),
                 event = "imaging_render_failed",
             );
-            write_response(&ImagingResponse::failed(request.request_id, failure.stage))?;
+            write_response(&ImagingResponse::failed(
+                request.request_id,
+                failure.failure.code,
+                failure.failure.media_id,
+                failure.failure.path_code,
+            ))?;
             return Ok(());
         }
     };
@@ -196,6 +207,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
+            revision,
             event = "imaging_response_write_failed",
         );
     })?;
@@ -205,6 +217,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        revision,
         process_id = std::process::id(),
         root_binding_plan_sha256,
         event = "imaging_request_completed",

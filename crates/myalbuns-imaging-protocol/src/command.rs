@@ -1,9 +1,122 @@
-use myalbuns_paths::RootBindingPlan;
+use myalbuns_paths::{ResolveError, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::cache::CacheRequest;
 use crate::render::ImagingRequest;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImagingFailureCode {
+    InvalidRenderRequest,
+    SourceUnavailable,
+    UnsupportedSourceFormat,
+    UnsupportedSourceVariant,
+    UnsupportedColorModel,
+    UnsupportedColorProfile,
+    DecodeFailed,
+    CompositionFailed,
+    ResourceLimitExceeded,
+    EncodeFailed,
+    VerificationFailed,
+}
+
+impl ImagingFailureCode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidRenderRequest => "invalid_render_request",
+            Self::SourceUnavailable => "source_unavailable",
+            Self::UnsupportedSourceFormat => "unsupported_source_format",
+            Self::UnsupportedSourceVariant => "unsupported_source_variant",
+            Self::UnsupportedColorModel => "unsupported_color_model",
+            Self::UnsupportedColorProfile => "unsupported_color_profile",
+            Self::DecodeFailed => "decode_failed",
+            Self::CompositionFailed => "composition_failed",
+            Self::ResourceLimitExceeded => "resource_limit_exceeded",
+            Self::EncodeFailed => "encode_failed",
+            Self::VerificationFailed => "verification_failed",
+        }
+    }
+
+    pub const fn stage(self) -> ImagingFailureStage {
+        match self {
+            Self::InvalidRenderRequest => ImagingFailureStage::InvalidRenderRequest,
+            Self::SourceUnavailable => ImagingFailureStage::SourceVerification,
+            Self::UnsupportedSourceFormat
+            | Self::UnsupportedSourceVariant
+            | Self::UnsupportedColorModel
+            | Self::UnsupportedColorProfile
+            | Self::DecodeFailed => ImagingFailureStage::SourceDecode,
+            Self::CompositionFailed => ImagingFailureStage::Composition,
+            Self::ResourceLimitExceeded => ImagingFailureStage::ResourceLimitExceeded,
+            Self::EncodeFailed => ImagingFailureStage::OutputEncode,
+            Self::VerificationFailed => ImagingFailureStage::OutputVerify,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ImagingPathCode {
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidPath,
+    UnexpectedObjectType,
+    Conflict,
+    IoFailure,
+}
+
+impl ImagingPathCode {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::NotFound => "not_found",
+            Self::Unavailable => "unavailable",
+            Self::AccessDenied => "access_denied",
+            Self::InvalidPath => "invalid_path",
+            Self::UnexpectedObjectType => "unexpected_object_type",
+            Self::Conflict => "conflict",
+            Self::IoFailure => "io_failure",
+        }
+    }
+
+    pub fn from_resolve_error(error: ResolveError) -> Self {
+        match error {
+            ResolveError::NotFound => Self::NotFound,
+            ResolveError::AccessDenied => Self::AccessDenied,
+            ResolveError::Unavailable => Self::Unavailable,
+            ResolveError::UnexpectedObjectType { .. } => Self::UnexpectedObjectType,
+            ResolveError::InvalidPath
+            | ResolveError::UnsupportedNamespace
+            | ResolveError::UnboundRoot => Self::InvalidPath,
+            ResolveError::IoFailure => Self::IoFailure,
+        }
+    }
+
+    pub fn from_io_error(error: &std::io::Error) -> Self {
+        match error.kind() {
+            std::io::ErrorKind::NotFound => Self::NotFound,
+            std::io::ErrorKind::PermissionDenied => Self::AccessDenied,
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::InvalidFilename => {
+                Self::InvalidPath
+            }
+            std::io::ErrorKind::WouldBlock
+            | std::io::ErrorKind::TimedOut
+            | std::io::ErrorKind::Interrupted => Self::Unavailable,
+            _ => Self::IoFailure,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImagingFailure {
+    pub code: ImagingFailureCode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path_code: Option<ImagingPathCode>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,6 +179,7 @@ impl ImagingFailureStage {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)]
 pub enum ImagingCommand {
     Render(ImagingRequest),
     BuildCache(CacheRequest),

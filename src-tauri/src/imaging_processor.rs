@@ -134,6 +134,7 @@ pub(crate) struct InvocationFailure {
     termination_observed: bool,
 }
 
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) struct OperationFailure<Stage> {
     pub(crate) stage: Stage,
@@ -141,6 +142,7 @@ pub(crate) struct OperationFailure<Stage> {
     pub(crate) message: String,
 }
 
+#[cfg(test)]
 impl<Stage> OperationFailure<Stage> {
     pub(crate) fn new(stage: Stage, message: impl Into<String>) -> Self {
         Self {

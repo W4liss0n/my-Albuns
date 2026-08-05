@@ -42,5 +42,5 @@ windows = { version = "0.61", features = [
 windows-core = "0.61"
 
 [dev-dependencies]
-image = { workspace = true, features = ["jpeg"] }
+image = { workspace = true, features = ["jpeg", "png"] }
 tempfile.workspace = true
