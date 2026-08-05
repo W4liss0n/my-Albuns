@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -6,9 +12,14 @@ import type {
   ExportOutcome,
   ExportPort,
   ExportProgressEvent,
+  ProjectCloseResolution,
   ProjectSessionPort,
+  ProjectWindowPort,
 } from "../application/projectPorts";
-import { SaveProjectError } from "../application/projectPorts";
+import {
+  ProjectCloseError,
+  SaveProjectError,
+} from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
@@ -124,6 +135,32 @@ const exportPort: ExportPort = {
   }),
 };
 
+const inertProjectWindowPort: ProjectWindowPort = {
+  onCloseRequested: async () => () => undefined,
+  requestClose: async () => ({ kind: "closed" }),
+  resolveClose: async () => ({ kind: "closed" }),
+};
+
+function projectWindowHarness() {
+  let closeRequested: (() => void) | null = null;
+  const port: ProjectWindowPort = {
+    onCloseRequested: async (listener) => {
+      closeRequested = listener;
+      return () => {
+        closeRequested = null;
+      };
+    },
+    requestClose: vi.fn(async () => ({
+      kind: "confirmationRequired" as const,
+    })),
+    resolveClose: vi.fn(async () => ({ kind: "closed" as const })),
+  };
+  return {
+    port,
+    emitCloseRequested: () => closeRequested?.(),
+  };
+}
+
 function projectSessionPortWithApply(
   apply: ProjectSessionPort["apply"],
 ): ProjectSessionPort {
@@ -140,13 +177,15 @@ function projectSessionPortWithApply(
 
 type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
-  "runProjectMutation"
+  "runProjectMutation" | "projectWindowPort"
 > & {
   projectSessionPort: ProjectSessionPort;
+  projectWindowPort?: ProjectWindowPort;
 };
 
 function ProjectWorkspace({
   projectSessionPort,
+  projectWindowPort = inertProjectWindowPort,
   projection,
   ...props
 }: TestProjectWorkspaceProps) {
@@ -158,6 +197,7 @@ function ProjectWorkspace({
     <ProjectWorkspaceView
       {...props}
       projection={projection}
+      projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
     />
   );
@@ -173,6 +213,193 @@ beforeEach(() => {
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
   });
+});
+
+test("offers the three close choices for a native request and Cancel keeps the Project", async () => {
+  const harness = projectWindowHarness();
+  const dirtyProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+    },
+  };
+  harness.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection: dirtyProjection,
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={dirtyProjection}
+      projectSessionPort={projectSessionPortWithApply(async () =>
+        dirtyProjection
+      )}
+      projectWindowPort={harness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() => {
+    expect(harness.emitCloseRequested()).toBeUndefined();
+    expect(
+      screen.getByRole("dialog", {
+        name: "Salvar alterações antes de fechar?",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  expect(
+    screen.getByRole("button", { name: "Salvar e fechar" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Descartar e fechar" }),
+  ).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: "Desfazer", hidden: true }),
+  ).toBeDisabled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+  await waitFor(() => {
+    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
+test("uses the same close decision for the application command and blocks it while resolving", async () => {
+  const harness = projectWindowHarness();
+  let finish!: () => void;
+  harness.port.resolveClose = vi.fn(
+    () =>
+      new Promise<ProjectCloseResolution>((resolve) => {
+        finish = () => resolve({ kind: "closed" });
+      }),
+  );
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={{
+        ...projection,
+        state: { ...projection.state, dirty: true },
+      }}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectWindowPort={harness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+  expect(harness.port.requestClose).toHaveBeenCalledOnce();
+  expect(
+    await screen.findByRole("dialog", {
+      name: "Salvar alterações antes de fechar?",
+    }),
+  ).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+  expect(harness.port.resolveClose).toHaveBeenCalledWith("saveAndClose");
+  expect(screen.getByRole("button", { name: "Salvar e fechar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Descartar e fechar" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Exportar prova", hidden: true }),
+  ).toBeDisabled();
+
+  await act(async () => finish());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+});
+
+test("sends Discard and resumes the unchanged Project after a conclusive save failure", async () => {
+  const discardHarness = projectWindowHarness();
+  const { unmount } = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectWindowPort={discardHarness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() => {
+    discardHarness.emitCloseRequested();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Descartar e fechar" }),
+  );
+  expect(discardHarness.port.resolveClose).toHaveBeenCalledWith(
+    "discardAndClose",
+  );
+  unmount();
+
+  const failureHarness = projectWindowHarness();
+  failureHarness.port.resolveClose = vi.fn(async () => {
+    throw new ProjectCloseError(
+      "persisted_baseline_conflict",
+      "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+    );
+  });
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectWindowPort={failureHarness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() => {
+    failureHarness.emitCloseRequested();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+
+  expect(
+    await screen.findByText(
+      "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
+test("never resumes or reports success after an indeterminate close save", async () => {
+  const harness = projectWindowHarness();
+  harness.port.resolveClose = vi.fn(async () => {
+    throw new ProjectCloseError(
+      "save_state_indeterminate",
+      "Não foi possível confirmar qual revisão ficou no arquivo.",
+    );
+  });
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectWindowPort={harness.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() => {
+    harness.emitCloseRequested();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+
+  expect(
+    await screen.findByText(
+      "Não foi possível confirmar qual revisão ficou no arquivo.",
+    ),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Exportar prova" })).toBeDisabled();
 });
 
 test("blocks only Project commands while its Export attempt is active", async () => {

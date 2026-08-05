@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "react-aria-components";
 
-import type { ExportPort } from "../application/projectPorts";
+import type {
+  ExportPort,
+  ProjectWindowPort,
+} from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { ExportPreviewControl } from "./ExportPreviewControl";
 import { InspectorPanel } from "./InspectorPanel";
 import { MediaPanel } from "./MediaPanel";
+import { ProjectCloseDialog } from "./ProjectCloseDialog";
+import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import {
@@ -18,6 +23,7 @@ import {
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
   exportPort: ExportPort;
+  projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onProjectionChange(projection: EditorProjection): void;
@@ -27,14 +33,30 @@ interface ProjectWorkspaceProps {
 export function ProjectWorkspace({
   projection,
   exportPort,
+  projectWindowPort,
   runProjectMutation,
   mediaPreviewUrls = {},
   onProjectionChange,
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const reportCloseError = useCallback((value: string) => {
+    setCloseMessage(value);
+  }, []);
+  const projectClose = useProjectCloseController({
+    projectWindowPort,
+    onProjectionChange,
+    onError: reportCloseError,
+  });
+  useEffect(() => {
+    if (projectClose.interactionBlocked) {
+      setFileMenuOpen(false);
+    }
+  }, [projectClose.interactionBlocked]);
   const controller = useProjectEditorController({
-    interactionBlocked: exportActive,
+    interactionBlocked: exportActive || projectClose.interactionBlocked,
     projection,
     runProjectMutation,
     onProjectionChange,
@@ -54,7 +76,31 @@ export function ProjectWorkspace({
     <div className="app-shell">
       <header className="titlebar">
         <nav className="app-menu" aria-label="Menu principal">
-          <button type="button">Arquivo</button>
+          <div className="app-menu-entry">
+            <button
+              aria-expanded={fileMenuOpen}
+              aria-haspopup="menu"
+              type="button"
+              onClick={() => setFileMenuOpen((open) => !open)}
+            >
+              Arquivo
+            </button>
+            {fileMenuOpen && (
+              <div className="app-menu-popup" role="menu">
+                <button
+                  disabled={projectClose.interactionBlocked}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setFileMenuOpen(false);
+                    void projectClose.requestClose();
+                  }}
+                >
+                  Fechar Projeto
+                </button>
+              </div>
+            )}
+          </div>
           <button type="button">Editar</button>
           <button type="button">Lâmina</button>
           <button type="button">Exibir</button>
@@ -68,7 +114,9 @@ export function ProjectWorkspace({
           <Button
             className="icon-command"
             aria-label="Salvar"
-            isDisabled={Boolean(busy) || exportActive}
+            isDisabled={
+              Boolean(busy) || exportActive || projectClose.interactionBlocked
+            }
             onPress={controller.save}
           >
             ⇩
@@ -77,7 +125,10 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Desfazer"
             isDisabled={
-              !projection.state.canUndo || Boolean(busy) || exportActive
+              !projection.state.canUndo ||
+              Boolean(busy) ||
+              exportActive ||
+              projectClose.interactionBlocked
             }
             onPress={controller.undo}
           >
@@ -87,7 +138,10 @@ export function ProjectWorkspace({
             className="icon-command"
             aria-label="Refazer"
             isDisabled={
-              !projection.state.canRedo || Boolean(busy) || exportActive
+              !projection.state.canRedo ||
+              Boolean(busy) ||
+              exportActive ||
+              projectClose.interactionBlocked
             }
             onPress={controller.redo}
           >
@@ -101,7 +155,7 @@ export function ProjectWorkspace({
         </div>
         <div className="command-spacer" />
         <ExportPreviewControl
-          disabled={Boolean(busy)}
+          disabled={Boolean(busy) || projectClose.interactionBlocked}
           exportPort={exportPort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
@@ -167,28 +221,40 @@ export function ProjectWorkspace({
         />
       </div>
 
-      {(busy || message) && (
+      {(busy || message || closeMessage) && (
         <div
-          className={`operation-toast ${message ? "error" : ""}`}
-          role={message ? "alert" : "status"}
+          className={`operation-toast ${message || closeMessage ? "error" : ""}`}
+          role={message || closeMessage ? "alert" : "status"}
         >
           {busy && <span className="toast-spinner" aria-hidden="true" />}
           <div>
             <strong>
-              {message ? "A operação não foi concluída" : busy}
+              {message || closeMessage
+                ? "A operação não foi concluída"
+                : busy}
             </strong>
-            <span>{message ?? "Aguarde…"}</span>
+            <span>{closeMessage ?? message ?? "Aguarde…"}</span>
           </div>
           {!busy && (
             <button
               type="button"
               aria-label="Fechar mensagem"
-              onClick={controller.dismissFeedback}
+              onClick={() => {
+                setCloseMessage(null);
+                controller.dismissFeedback();
+              }}
             >
               ×
             </button>
           )}
         </div>
+      )}
+
+      {projectClose.confirmationVisible && (
+        <ProjectCloseDialog
+          busy={projectClose.resolving}
+          onChoose={(choice) => void projectClose.resolveClose(choice)}
+        />
       )}
     </div>
   );

@@ -12,7 +12,7 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
-  project: ["./tauriProjectPorts.ts"],
+  project: ["./tauriProjectPorts.ts", "./tauriProjectWindowPort.ts"],
   global: ["../global/platform/tauriGlobalProjectPort.ts"],
 } as const;
 
@@ -55,7 +55,11 @@ function parseSurfaceContract(capabilitySource: string, permissionSource: string
 
   expect(permissionManifest.permission).toHaveLength(1);
   const permission = permissionManifest.permission[0];
-  expect(capability.permissions).toEqual([permission.identifier]);
+  expect(
+    capability.permissions.filter((identifier) =>
+      identifier.endsWith("-window-commands"),
+    ),
+  ).toEqual([permission.identifier]);
   expect(permission.commands.deny).toEqual([]);
 
   return { capability, allowedCommands: new Set(permission.commands.allow) };
@@ -116,6 +120,11 @@ test("keeps the project-window capability aligned with the invoked commands", ()
   );
 
   expect(capability.windows).toEqual(["project"]);
+  expect(capability.permissions).toEqual([
+    "project-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+  ]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
 });
 
@@ -137,7 +146,7 @@ test("keeps the global-window capability isolated from project commands", () => 
   ).toEqual([]);
 });
 
-test("uses only the Tauri core bridge", () => {
+test("uses only the minimal Tauri core and event bridges", () => {
   const tauriPackages = new Set(
     Object.values(sourceFiles).flatMap((source) =>
       Array.from(
@@ -147,6 +156,9 @@ test("uses only the Tauri core bridge", () => {
     ),
   );
 
-  expect([...tauriPackages]).toEqual(["@tauri-apps/api/core"]);
+  expect([...tauriPackages].sort()).toEqual([
+    "@tauri-apps/api/core",
+    "@tauri-apps/api/event",
+  ]);
   expect(projectWindowCapability).not.toContain("dialog:");
 });

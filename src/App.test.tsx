@@ -12,6 +12,7 @@ import type {
   ExportPort,
   MediaPreviewPort,
   ProjectSessionPort,
+  ProjectWindowPort,
 } from "./application/projectPorts";
 import { createEmptyProjection } from "./test/projectFixtures";
 
@@ -46,6 +47,11 @@ const exportPort: ExportPort = {
     cancel: async () => "not_found",
   }),
 };
+const projectWindowPort: ProjectWindowPort = {
+  onCloseRequested: async () => () => undefined,
+  requestClose: async () => ({ kind: "closed" }),
+  resolveClose: async () => ({ kind: "closed" }),
+};
 const canvasGraphicsDiagnosticProbe = () =>
   ({
     supported: true,
@@ -65,6 +71,7 @@ test("keeps diagnostics available when hardware WebGL2 is unavailable", async ()
   render(
     <App
       exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews }}
       projectSessionPort={{ ...projectSessionPort, load }}
       logger={silentLogger}
@@ -121,6 +128,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   render(
     <App
       exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
       mediaPreviewPort={mediaPreviewPort}
       projectSessionPort={{ ...projectSessionPort, load }}
       logger={logger}
@@ -181,6 +189,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   render(
     <App
       exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews }}
       projectSessionPort={projectSessionPort}
       logger={logger}
@@ -229,6 +238,7 @@ test("logs the typed media preview failure code without replacing it with unknow
   render(
     <App
       exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews }}
       projectSessionPort={projectSessionPort}
       logger={logger}

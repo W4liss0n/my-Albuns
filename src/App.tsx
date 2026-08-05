@@ -13,6 +13,7 @@ import type {
   ExportPort,
   MediaPreviewPort,
   ProjectSessionPort,
+  ProjectWindowPort,
 } from "./application/projectPorts";
 import type { EditorProjection } from "./domain/project";
 import { LoggingProvider } from "./components/loggingContext";
@@ -29,6 +30,7 @@ interface AppProps {
   exportPort: ExportPort;
   mediaPreviewPort: MediaPreviewPort;
   projectSessionPort: ProjectSessionPort;
+  projectWindowPort: ProjectWindowPort;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
@@ -38,6 +40,7 @@ function App({
   exportPort,
   mediaPreviewPort,
   projectSessionPort,
+  projectWindowPort,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
   logger,
@@ -202,6 +205,7 @@ function App({
         <ProjectWorkspace
           projection={projection}
           exportPort={exportPort}
+          projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
           mediaPreviewUrls={mediaPreviewUrls}
           onProjectionChange={setProjection}

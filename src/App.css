@@ -252,6 +252,11 @@ button {
   align-items: stretch;
 }
 
+.app-menu-entry {
+  position: relative;
+  display: flex;
+}
+
 .app-menu button {
   padding: 0 9px;
   border: 0;
@@ -264,6 +269,30 @@ button {
 .app-menu button:hover {
   color: #fff;
   background: rgb(255 255 255 / 5%);
+}
+
+.app-menu-popup {
+  position: absolute;
+  top: calc(100% - 1px);
+  left: 0;
+  display: grid;
+  width: 180px;
+  padding: 4px;
+  border: 1px solid #3a444d;
+  border-radius: 5px;
+  background: #20282f;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 36%);
+  z-index: 30;
+}
+
+.app-menu-popup button {
+  min-height: 30px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.app-menu-popup button:disabled {
+  opacity: 0.45;
 }
 
 .commandbar {
@@ -526,6 +555,80 @@ kbd {
   color: #9ca9a1;
   background: transparent;
   font-size: 1.1rem;
+}
+
+.project-close-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgb(10 14 17 / 66%);
+  z-index: 100;
+}
+
+.project-close-dialog {
+  display: grid;
+  width: 100%;
+  padding: 22px;
+  border: 1px solid #46515a;
+  border-radius: 10px;
+  color: #dce2e7;
+  background: #222a31;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 48%);
+  gap: 12px;
+}
+
+.project-close-modal {
+  width: min(440px, 100%);
+  outline: none;
+}
+
+.project-close-dialog h2,
+.project-close-dialog p {
+  margin: 0;
+}
+
+.project-close-dialog h2 {
+  font-family: Georgia, serif;
+  font-size: 1.15rem;
+}
+
+.project-close-dialog p {
+  color: #9ea9b1;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.project-close-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.project-close-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #46515a;
+  border-radius: 6px;
+  color: #dce2e7;
+  background: #2b343c;
+}
+
+.project-close-actions button:hover:not(:disabled) {
+  background: #35404a;
+}
+
+.project-close-actions button:disabled {
+  opacity: 0.55;
+}
+
+.project-close-actions .project-close-primary {
+  border-color: #d5aa73;
+  color: #1b242b;
+  background: #c99a5d;
+  font-weight: 700;
 }
 
 .toast-spinner {

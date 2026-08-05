@@ -123,6 +123,37 @@ export class SaveProjectError extends Error {
   }
 }
 
+export type ProjectCloseChoice =
+  | "saveAndClose"
+  | "discardAndClose"
+  | "cancel";
+
+export type ProjectCloseRequestOutcome =
+  | { kind: "closed" }
+  | { kind: "confirmationRequired" };
+
+export type ProjectCloseResolution =
+  | { kind: "closed" }
+  | { kind: "cancelled"; projection: EditorProjection };
+
+export type ProjectCloseErrorCode = SaveProjectErrorCode | "close_unavailable";
+
+export class ProjectCloseError extends Error {
+  constructor(
+    readonly code: ProjectCloseErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ProjectCloseError";
+  }
+}
+
+export interface ProjectWindowPort {
+  onCloseRequested(listener: () => void): Promise<() => void>;
+  requestClose(): Promise<ProjectCloseRequestOutcome>;
+  resolveClose(choice: ProjectCloseChoice): Promise<ProjectCloseResolution>;
+}
+
 export interface ProjectSessionPort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;

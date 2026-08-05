@@ -2,8 +2,8 @@ use std::{env, path::PathBuf};
 
 use myalbuns_desktop_lib::ipc_contract::{
     CancelDisposition, ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent,
-    MediaPreview, MediaPreviewCommandError, SaveProjectCommandError, SaveProjectOutcome,
-    SaveProjectResult,
+    MediaPreview, MediaPreviewCommandError, ProjectCloseChoice, ProjectCloseRequestOutcome,
+    ProjectCloseResolution, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
 };
 use ts_rs::{Config, TS};
 
@@ -25,6 +25,12 @@ fn main() {
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewCommandError::export_all(&config)
         .expect("media preview error bindings should be generated");
+    ProjectCloseChoice::export_all(&config)
+        .expect("Project close choice bindings should be generated");
+    ProjectCloseRequestOutcome::export_all(&config)
+        .expect("Project close request outcome bindings should be generated");
+    ProjectCloseResolution::export_all(&config)
+        .expect("Project close resolution bindings should be generated");
     SaveProjectCommandError::export_all(&config)
         .expect("Save Project error bindings should be generated");
     SaveProjectOutcome::export_all(&config)

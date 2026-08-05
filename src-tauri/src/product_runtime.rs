@@ -2,7 +2,7 @@ use std::io;
 
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
-use tauri::{Manager, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
     desktop_webview_policy,
@@ -14,7 +14,12 @@ use crate::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
         write_host_terminal,
     },
+    project_host::ProjectCloseRequestOutcome,
     project_host::ProjectHost,
+    project_window_lifecycle::{
+        PROJECT_CLOSE_CONFIRMATION_EVENT, complete_project_close,
+        request_window_export_cancellation,
+    },
 };
 
 pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
@@ -58,19 +63,42 @@ pub(crate) fn run(
         .manage(linked_media_previews)
         .manage(ExportAttempts::default())
         .on_window_event(|window, event| {
-            if matches!(event, tauri::WindowEvent::Destroyed) {
-                let cancelled_attempts = window
-                    .state::<ExportAttempts>()
-                    .request_cancel_for_window(window.label());
-                if cancelled_attempts > 0 {
-                    tracing::info!(
-                        target: "myalbuns.desktop",
-                        process_role = ProcessRole::DesktopHost.as_str(),
-                        window_label = window.label(),
-                        cancelled_attempts,
-                        event = "window_export_attempts_cancelled",
-                    );
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() != PROJECT_WINDOW_LABEL {
+                    return;
                 }
+                api.prevent_close();
+                match window.state::<ProjectHost>().begin_close() {
+                    Ok(ProjectCloseRequestOutcome::CloseImmediately) => {
+                        complete_project_close(window);
+                    }
+                    Ok(ProjectCloseRequestOutcome::ConfirmationRequired) => {
+                        if let Err(error) = window.emit(PROJECT_CLOSE_CONFIRMATION_EVENT, ()) {
+                            let _ = window.state::<ProjectHost>().cancel_close();
+                            tracing::error!(
+                                target: "myalbuns.desktop",
+                                process_role = ProcessRole::DesktopHost.as_str(),
+                                window_label = window.label(),
+                                error = %error,
+                                event = "project_close_confirmation_emit_failed",
+                            );
+                        }
+                    }
+                    Err(error) => {
+                        tracing::error!(
+                            target: "myalbuns.desktop",
+                            process_role = ProcessRole::DesktopHost.as_str(),
+                            window_label = window.label(),
+                            error = %error,
+                            event = "project_close_state_unavailable",
+                        );
+                        complete_project_close(window);
+                    }
+                }
+                return;
+            }
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                request_window_export_cancellation(window);
             }
         })
         .setup(move |app| setup_host(app, setup_paths, terminal))
@@ -81,6 +109,8 @@ pub(crate) fn run(
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,
             crate::project_commands::save_project,
+            crate::project_close_commands::request_project_close,
+            crate::project_close_commands::resolve_project_close,
             crate::media_preview_commands::prepare_media_previews,
             crate::export_commands::export_preview,
             crate::export_commands::cancel_export,

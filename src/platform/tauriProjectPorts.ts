@@ -11,7 +11,6 @@ import {
   type ExportProgressEvent,
   type MediaPreviewPort,
   type ProjectSessionPort,
-  type SaveProjectFailureCode,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
@@ -21,9 +20,9 @@ import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
-import type { SaveProjectCommandError as IpcSaveProjectCommandError } from "./generated/SaveProjectCommandError";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
+import { parseProjectSaveFailure } from "./projectSaveFailure";
 
 function isMediaPreviewCommandError(
   error: unknown,
@@ -74,118 +73,20 @@ function isRevision(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
-const saveProjectErrorMapping: Readonly<
-  Record<
-    IpcSaveProjectCommandError["code"],
-    { code: SaveProjectFailureCode; message: string }
-  >
-> = {
-  stale_revision: {
-    code: "stale_revision",
-    message:
-      "A revisão visível ficou desatualizada. Atualize o Projeto e tente salvar novamente.",
-  },
-  persisted_baseline_conflict: {
-    code: "persisted_baseline_conflict",
-    message:
-      "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
-  },
-  save_state_indeterminate: {
-    code: "save_state_indeterminate",
-    message:
-      "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
-  },
-  session_unavailable: {
-    code: "session_unavailable",
-    message:
-      "A Sessão do Projeto não está mais disponível. Reabra o Projeto para continuar.",
-  },
-  not_found: {
-    code: "not_found",
-    message:
-      "O arquivo do Projeto não foi encontrado. Confirme se ele foi movido ou removido.",
-  },
-  unavailable: {
-    code: "unavailable",
-    message:
-      "O local do Projeto está indisponível. Reconecte a unidade ou o compartilhamento e tente novamente.",
-  },
-  access_denied: {
-    code: "access_denied",
-    message:
-      "O Windows negou acesso ao arquivo do Projeto. Verifique as permissões e tente novamente.",
-  },
-  invalid_path: {
-    code: "invalid_path",
-    message: "O caminho do arquivo do Projeto não é válido.",
-  },
-  unexpected_object_type: {
-    code: "unexpected_object_type",
-    message: "O destino do Projeto deixou de ser um arquivo regular.",
-  },
-  conflict: {
-    code: "conflict",
-    message:
-      "O arquivo do Projeto mudou durante o Salvamento. Tente novamente.",
-  },
-  io_failure: {
-    code: "io_failure",
-    message: "O Windows não conseguiu concluir o Salvamento do Projeto.",
-  },
-};
-
-function parseIpcSaveProjectCommandError(
-  error: unknown,
-): IpcSaveProjectCommandError | null {
-  if (!isRecord(error) || typeof error.code !== "string") {
-    return null;
-  }
-
-  switch (error.code) {
-    case "stale_revision":
-      return isRevision(error.expectedRevision) &&
-        isRevision(error.currentRevision)
-        ? {
-            code: error.code,
-            expectedRevision: error.expectedRevision,
-            currentRevision: error.currentRevision,
-          }
-        : null;
-    case "persisted_baseline_conflict":
-    case "save_state_indeterminate":
-    case "session_unavailable":
-    case "not_found":
-    case "unavailable":
-    case "access_denied":
-    case "invalid_path":
-    case "unexpected_object_type":
-    case "conflict":
-    case "io_failure":
-      return { code: error.code };
-    default:
-      return null;
-  }
-}
-
 function toSaveProjectError(error: unknown): SaveProjectError {
-  const ipcError = parseIpcSaveProjectCommandError(error);
-  if (!ipcError) {
+  const failure = parseProjectSaveFailure(error);
+  if (!failure) {
     return new SaveProjectError(
       "save_unavailable",
       "Não foi possível iniciar o Salvamento do Projeto.",
     );
   }
 
-  const mapping = saveProjectErrorMapping[ipcError.code];
-
-  if (ipcError.code === "stale_revision") {
-    return new SaveProjectError(mapping.code, mapping.message, {
-      expected: ipcError.expectedRevision,
-      current: ipcError.currentRevision,
-    });
-  }
-
-  return new SaveProjectError(mapping.code, mapping.message);
+  return new SaveProjectError(
+    failure.code,
+    failure.message,
+    failure.context,
+  );
 }
 
 function invalidSaveResponse() {

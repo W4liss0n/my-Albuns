@@ -172,7 +172,7 @@ fn map_save_project_outcome(outcome: CoreSaveProjectOutcome) -> SaveProjectOutco
     }
 }
 
-fn map_save_project_error(error: ProjectHostSaveError) -> SaveProjectCommandError {
+pub(crate) fn map_save_project_error(error: ProjectHostSaveError) -> SaveProjectCommandError {
     match error {
         ProjectHostSaveError::Project(SaveProjectError::StaleRevision { expected, current }) => {
             SaveProjectCommandError::StaleRevision {

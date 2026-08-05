@@ -148,6 +148,37 @@ pub enum SaveProjectCommandError {
     SessionUnavailable,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectCloseChoice {
+    SaveAndClose,
+    DiscardAndClose,
+    Cancel,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind")]
+pub enum ProjectCloseRequestOutcome {
+    Closed,
+    ConfirmationRequired,
+}
+
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectCloseResolution {
+    Closed,
+    Cancelled {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: Box<EditorProjection>,
+    },
+}
+
 #[cfg(test)]
 mod save_contract_tests {
     use serde_json::json;
@@ -185,6 +216,36 @@ mod save_contract_tests {
             })
         );
         assert!(serialized.get("message").is_none());
+    }
+}
+
+#[cfg(test)]
+mod close_contract_tests {
+    use serde_json::json;
+
+    use super::{ProjectCloseRequestOutcome, ProjectCloseResolution};
+
+    #[test]
+    fn close_outcomes_keep_the_decision_and_cancel_projection_explicit() {
+        assert_eq!(
+            serde_json::to_value(ProjectCloseRequestOutcome::ConfirmationRequired)
+                .expect("the request outcome serializes"),
+            json!({ "kind": "confirmationRequired" })
+        );
+        assert_eq!(
+            serde_json::to_value(ProjectCloseRequestOutcome::Closed)
+                .expect("the closed outcome serializes"),
+            json!({ "kind": "closed" })
+        );
+    }
+
+    #[test]
+    fn a_closed_resolution_has_no_creative_payload() {
+        assert_eq!(
+            serde_json::to_value(ProjectCloseResolution::Closed)
+                .expect("the resolution serializes"),
+            json!({ "kind": "closed" })
+        );
     }
 }
 

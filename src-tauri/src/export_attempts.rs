@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt,
     sync::{
         Arc, Mutex,
@@ -11,6 +11,7 @@ use crate::{
     export_pipeline::{ExportCancellationResult, ExportExecutionControl},
     ipc_contract::CancelDisposition,
 };
+use tokio::sync::Notify;
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ExportAttempts {
@@ -19,8 +20,15 @@ pub(crate) struct ExportAttempts {
 
 #[derive(Debug, Default)]
 struct ExportAttemptsInner {
-    registrations: Mutex<HashMap<String, AttemptRegistration>>,
+    registry: Mutex<ExportRegistry>,
     next_generation: AtomicU64,
+    attempt_finished: Notify,
+}
+
+#[derive(Debug, Default)]
+struct ExportRegistry {
+    registrations: HashMap<String, AttemptRegistration>,
+    closing_windows: HashSet<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,8 +47,9 @@ pub(crate) struct ExportAttempt {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub(crate) struct BeginExportAttemptError {
-    operation_id: String,
+pub(crate) enum BeginExportAttemptError {
+    DuplicateOperation(String),
+    WindowClosing(String),
 }
 
 impl ExportAttempts {
@@ -50,23 +59,29 @@ impl ExportAttempts {
         window_label: impl Into<String>,
     ) -> Result<ExportAttempt, BeginExportAttemptError> {
         let operation_id = operation_id.into();
+        let window_label = window_label.into();
         let generation = self.inner.next_generation.fetch_add(1, Ordering::Relaxed);
         let control = Arc::new(ExportExecutionControl::default());
         let registration = AttemptRegistration {
             generation,
-            window_label: window_label.into(),
+            window_label: window_label.clone(),
             control: Arc::clone(&control),
         };
-        let mut registrations = self
+        let mut registry = self
             .inner
-            .registrations
+            .registry
             .lock()
             .expect("the Export attempt registry remains available");
-        if registrations.contains_key(&operation_id) {
-            return Err(BeginExportAttemptError { operation_id });
+        if registry.closing_windows.contains(&window_label) {
+            return Err(BeginExportAttemptError::WindowClosing(window_label));
         }
-        registrations.insert(operation_id.clone(), registration);
-        drop(registrations);
+        if registry.registrations.contains_key(&operation_id) {
+            return Err(BeginExportAttemptError::DuplicateOperation(operation_id));
+        }
+        registry
+            .registrations
+            .insert(operation_id.clone(), registration);
+        drop(registry);
 
         Ok(ExportAttempt {
             operation_id,
@@ -82,12 +97,12 @@ impl ExportAttempts {
         window_label: &str,
     ) -> CancelDisposition {
         let control = {
-            let registrations = self
+            let registry = self
                 .inner
-                .registrations
+                .registry
                 .lock()
                 .expect("the Export attempt registry remains available");
-            let Some(registration) = registrations.get(operation_id) else {
+            let Some(registration) = registry.registrations.get(operation_id) else {
                 return CancelDisposition::NotFound;
             };
             if registration.window_label != window_label {
@@ -98,14 +113,16 @@ impl ExportAttempts {
         control.request_cancel().into()
     }
 
-    pub(crate) fn request_cancel_for_window(&self, window_label: &str) -> usize {
+    pub(crate) fn begin_window_close(&self, window_label: &str) -> usize {
         let controls = {
-            let registrations = self
+            let mut registry = self
                 .inner
-                .registrations
+                .registry
                 .lock()
                 .expect("the Export attempt registry remains available");
-            registrations
+            registry.closing_windows.insert(window_label.to_owned());
+            registry
+                .registrations
                 .values()
                 .filter(|registration| registration.window_label == window_label)
                 .map(|registration| Arc::clone(&registration.control))
@@ -122,6 +139,24 @@ impl ExportAttempts {
                 )
             })
             .count()
+    }
+
+    pub(crate) async fn wait_for_window_to_finish(&self, window_label: &str) {
+        loop {
+            let attempt_finished = self.inner.attempt_finished.notified();
+            let has_active_attempt = self
+                .inner
+                .registry
+                .lock()
+                .expect("the Export attempt registry remains available")
+                .registrations
+                .values()
+                .any(|registration| registration.window_label == window_label);
+            if !has_active_attempt {
+                return;
+            }
+            attempt_finished.await;
+        }
     }
 }
 
@@ -146,16 +181,24 @@ impl ExportAttempt {
 
 impl Drop for ExportAttempt {
     fn drop(&mut self) {
-        let mut registrations = self
+        let mut registry = self
             .attempts
-            .registrations
+            .registry
             .lock()
             .expect("the Export attempt registry remains available");
-        if registrations
+        let removed = if registry
+            .registrations
             .get(&self.operation_id)
             .is_some_and(|registration| registration.generation == self.generation)
         {
-            registrations.remove(&self.operation_id);
+            registry.registrations.remove(&self.operation_id);
+            true
+        } else {
+            false
+        };
+        drop(registry);
+        if removed {
+            self.attempts.attempt_finished.notify_waiters();
         }
     }
 }
@@ -172,11 +215,16 @@ impl From<ExportCancellationResult> for CancelDisposition {
 
 impl fmt::Display for BeginExportAttemptError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "a tentativa de Exportação {} já está registrada",
-            self.operation_id
-        )
+        match self {
+            Self::DuplicateOperation(operation_id) => write!(
+                formatter,
+                "a tentativa de Exportação {operation_id} já está registrada"
+            ),
+            Self::WindowClosing(window_label) => write!(
+                formatter,
+                "a janela {window_label} já iniciou seu encerramento"
+            ),
+        }
     }
 }
 
@@ -271,9 +319,49 @@ mod tests {
             .begin("export-window-b", "other-window")
             .expect("the other window attempt starts");
 
-        assert_eq!(attempts.request_cancel_for_window("project-a"), 2);
+        assert_eq!(attempts.begin_window_close("project-a"), 2);
         assert!(first.is_cancelled());
         assert!(second.is_cancelled());
         assert!(!other.is_cancelled());
+    }
+
+    #[test]
+    fn closing_fence_rejects_late_attempts_for_only_that_window() {
+        let attempts = ExportAttempts::default();
+
+        assert_eq!(attempts.begin_window_close("project"), 0);
+        assert!(matches!(
+            attempts.begin("export-late", "project"),
+            Err(super::BeginExportAttemptError::WindowClosing(window)) if window == "project"
+        ));
+        assert!(attempts.begin("export-other", "other-window").is_ok());
+    }
+
+    #[test]
+    fn close_waits_until_the_window_attempt_releases_its_resources() {
+        tauri::async_runtime::block_on(async {
+            let attempts = ExportAttempts::default();
+            let closing = attempts
+                .begin("export-closing", "project")
+                .expect("the closing window attempt starts");
+            let other = attempts
+                .begin("export-other", "other-window")
+                .expect("the other window attempt starts");
+            let waiter_attempts = attempts.clone();
+            let waiter = tokio::spawn(async move {
+                waiter_attempts.wait_for_window_to_finish("project").await;
+            });
+
+            assert_eq!(attempts.begin_window_close("project"), 1);
+            tokio::task::yield_now().await;
+            assert!(!waiter.is_finished());
+
+            drop(closing);
+            tokio::time::timeout(Duration::from_secs(1), waiter)
+                .await
+                .expect("the close waiter wakes after resource ownership ends")
+                .expect("the close waiter task succeeds");
+            assert!(!other.is_cancelled());
+        });
     }
 }

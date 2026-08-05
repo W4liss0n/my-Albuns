@@ -11,6 +11,8 @@
           "undo_project",
           "redo_project",
           "save_project",
+          "request_project_close",
+          "resolve_project_close",
           "prepare_media_previews",
           "export_preview",
           "cancel_export"

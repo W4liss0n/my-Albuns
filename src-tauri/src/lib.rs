@@ -19,8 +19,10 @@ mod operation_lease;
 mod path_io;
 mod product_runtime;
 mod project_bootstrap;
+mod project_close_commands;
 mod project_commands;
 mod project_host;
+mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
@@ -126,7 +128,11 @@ mod tests {
         assert_eq!(global_capability["windows"], serde_json::json!(["global"]));
         assert_eq!(
             project_capability["permissions"],
-            serde_json::json!(["project-window-commands"])
+            serde_json::json!([
+                "project-window-commands",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten"
+            ])
         );
         assert_eq!(
             global_capability["permissions"],

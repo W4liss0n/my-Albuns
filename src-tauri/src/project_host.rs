@@ -17,12 +17,24 @@ const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponí
 /// Project, and the operating-system process lifetime owns its locks.
 #[derive(Clone)]
 pub(crate) struct ProjectHost {
-    project: Arc<Mutex<Option<EditableProject>>>,
+    state: Arc<Mutex<ProjectHostState>>,
+}
+
+enum ProjectHostState {
+    Active(EditableProject),
+    ClosePending(EditableProject),
+    Consumed,
 }
 
 pub(crate) struct ProjectHostSaveResult {
     pub(crate) outcome: SaveProjectOutcome,
     pub(crate) projection: EditorProjection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProjectCloseRequestOutcome {
+    CloseImmediately,
+    ConfirmationRequired,
 }
 
 #[derive(Debug)]
@@ -34,12 +46,21 @@ pub(crate) enum ProjectHostSaveError {
 impl ProjectHost {
     pub(crate) fn new(project: EditableProject) -> Self {
         Self {
-            project: Arc::new(Mutex::new(Some(project))),
+            state: Arc::new(Mutex::new(ProjectHostState::Active(project))),
         }
     }
 
     pub(crate) fn projection(&self) -> Result<EditorProjection, String> {
-        Ok(self.project()?.projection())
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        match &*state {
+            ProjectHostState::Active(project) | ProjectHostState::ClosePending(project) => {
+                Ok(project.projection())
+            }
+            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
+        }
     }
 
     pub(crate) fn apply(&self, intent: ProjectIntent) -> Result<EditorProjection, String> {
@@ -64,32 +85,111 @@ impl ProjectHost {
         &self,
         expected_revision: u64,
     ) -> Result<ProjectHostSaveResult, ProjectHostSaveError> {
-        let mut slot = self
-            .project
+        let mut state = self
+            .state
             .lock()
             .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
-        let result = slot
-            .as_mut()
-            .ok_or(ProjectHostSaveError::SessionUnavailable)?
-            .save(expected_revision);
-        let outcome = match result {
-            Ok(outcome) => outcome,
-            Err(SaveProjectError::SaveStateIndeterminate) => {
-                slot.take();
-                return Err(ProjectHostSaveError::Project(
-                    SaveProjectError::SaveStateIndeterminate,
-                ));
+        let result = match &mut *state {
+            ProjectHostState::Active(project) => project.save(expected_revision),
+            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+                return Err(ProjectHostSaveError::SessionUnavailable);
             }
-            Err(error) => return Err(ProjectHostSaveError::Project(error)),
         };
-        let projection = slot
-            .as_ref()
-            .ok_or(ProjectHostSaveError::SessionUnavailable)?
-            .projection();
-        Ok(ProjectHostSaveResult {
-            outcome,
-            projection,
-        })
+        match result {
+            Ok(outcome) => {
+                let ProjectHostState::Active(project) = &*state else {
+                    unreachable!("saving an active Project preserves its state")
+                };
+                Ok(ProjectHostSaveResult {
+                    outcome,
+                    projection: project.projection(),
+                })
+            }
+            Err(SaveProjectError::SaveStateIndeterminate) => {
+                *state = ProjectHostState::Consumed;
+                Err(ProjectHostSaveError::Project(
+                    SaveProjectError::SaveStateIndeterminate,
+                ))
+            }
+            Err(error) => Err(ProjectHostSaveError::Project(error)),
+        }
+    }
+
+    pub(crate) fn begin_close(&self) -> Result<ProjectCloseRequestOutcome, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
+        match current {
+            ProjectHostState::Active(project) if project.has_unsaved_changes() => {
+                *state = ProjectHostState::ClosePending(project);
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            }
+            ProjectHostState::Active(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
+            ProjectHostState::ClosePending(project) => {
+                *state = ProjectHostState::ClosePending(project);
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            }
+            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
+        }
+    }
+
+    pub(crate) fn cancel_close(&self) -> Result<EditorProjection, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
+        match current {
+            ProjectHostState::ClosePending(project) => {
+                let projection = project.projection();
+                *state = ProjectHostState::Active(project);
+                Ok(projection)
+            }
+            other => {
+                *state = other;
+                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+            }
+        }
+    }
+
+    pub(crate) fn discard_close(&self) -> Result<(), String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
+        match current {
+            ProjectHostState::ClosePending(_) => Ok(()),
+            other => {
+                *state = other;
+                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+            }
+        }
+    }
+
+    pub(crate) fn save_and_close(&self) -> Result<SaveProjectOutcome, ProjectHostSaveError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
+        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
+        let ProjectHostState::ClosePending(mut project) = current else {
+            *state = current;
+            return Err(ProjectHostSaveError::SessionUnavailable);
+        };
+        let revision = project.revision();
+        match project.save(revision) {
+            Ok(outcome) => Ok(outcome),
+            Err(SaveProjectError::SaveStateIndeterminate) => Err(ProjectHostSaveError::Project(
+                SaveProjectError::SaveStateIndeterminate,
+            )),
+            Err(error) => {
+                *state = ProjectHostState::Active(project);
+                Err(ProjectHostSaveError::Project(error))
+            }
+        }
     }
 
     pub(crate) fn render_snapshot(&self) -> Result<RenderSnapshot, String> {
@@ -130,10 +230,10 @@ impl ProjectHost {
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
         let guard = self
-            .project
+            .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        if guard.is_none() {
+        if !matches!(*guard, ProjectHostState::Active(_)) {
             return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
         }
         Ok(ActiveProject { guard })
@@ -141,24 +241,30 @@ impl ProjectHost {
 }
 
 struct ActiveProject<'a> {
-    guard: MutexGuard<'a, Option<EditableProject>>,
+    guard: MutexGuard<'a, ProjectHostState>,
 }
 
 impl std::ops::Deref for ActiveProject<'_> {
     type Target = EditableProject;
 
     fn deref(&self) -> &Self::Target {
-        self.guard
-            .as_ref()
-            .expect("an ActiveProject guard always contains its Project")
+        match &*self.guard {
+            ProjectHostState::Active(project) => project,
+            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+                unreachable!("an ActiveProject guard always contains an active Project")
+            }
+        }
     }
 }
 
 impl std::ops::DerefMut for ActiveProject<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.guard
-            .as_mut()
-            .expect("an ActiveProject guard always contains its Project")
+        match &mut *self.guard {
+            ProjectHostState::Active(project) => project,
+            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+                unreachable!("an ActiveProject guard always contains an active Project")
+            }
+        }
     }
 }
 
@@ -169,11 +275,12 @@ mod tests {
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
         InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
-        OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectOutcome,
+        OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
+        SaveProjectOutcome,
     };
     use myalbuns_paths::OperationPathContext;
 
-    use super::ProjectHost;
+    use super::{ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError};
 
     struct Fixture {
         _root: tempfile::TempDir,
@@ -294,6 +401,194 @@ mod tests {
         assert!(redone.state.dirty);
         assert!(redone.state.can_undo);
         assert!(!redone.state.can_redo);
+    }
+
+    #[test]
+    fn clean_close_consumes_the_session_and_releases_editable_ownership() {
+        let Fixture {
+            _root,
+            project_path,
+            identity_lease_root,
+            host,
+        } = fixture();
+
+        assert_eq!(
+            host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::CloseImmediately)
+        );
+        assert!(host.projection().is_err());
+
+        let reopened = open_project(&project_path, &identity_lease_root);
+        let projection = reopened
+            .projection()
+            .expect("closing releases the Project for a new editable Session");
+        assert_eq!(projection.state.revision, 0);
+        assert!(!projection.state.dirty);
+    }
+
+    #[test]
+    fn dirty_close_requires_a_decision_and_blocks_creative_commands() {
+        let fixture = fixture();
+        let dirty = fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing");
+
+        assert_eq!(
+            fixture.host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+        assert!(
+            fixture
+                .host
+                .apply(ProjectIntent::SetDpi { dpi: 180 })
+                .is_err()
+        );
+        assert!(fixture.host.undo().is_err());
+        assert!(fixture.host.redo().is_err());
+        assert!(fixture.host.save(dirty.state.revision).is_err());
+
+        let pending = fixture
+            .host
+            .projection()
+            .expect("the pending decision keeps a readable projection");
+        assert_eq!(pending.state.document.dpi, 240);
+        assert_eq!(pending.state.revision, dirty.state.revision);
+        assert!(pending.state.dirty);
+    }
+
+    #[test]
+    fn cancelling_close_preserves_the_session_history_and_persisted_bytes() {
+        let fixture = fixture();
+        let persisted_before =
+            std::fs::read(&fixture.project_path).expect("the persisted baseline is readable");
+        let dirty = fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing");
+        assert_eq!(
+            fixture.host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+
+        let cancelled = fixture
+            .host
+            .cancel_close()
+            .expect("cancelling keeps the editable Session");
+
+        assert_eq!(cancelled, dirty);
+        assert_eq!(
+            std::fs::read(&fixture.project_path).expect("the persisted file remains readable"),
+            persisted_before
+        );
+        let undone = fixture
+            .host
+            .undo()
+            .expect("the original History remains available after cancelling");
+        assert_eq!(undone.state.document.dpi, 300);
+        assert!(!undone.state.dirty);
+    }
+
+    #[test]
+    fn discarding_close_consumes_the_session_without_persisting_changes() {
+        let Fixture {
+            _root,
+            project_path,
+            identity_lease_root,
+            host,
+        } = fixture();
+        host.apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing");
+        assert_eq!(
+            host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+
+        host.discard_close()
+            .expect("discarding consumes the editable Session");
+        assert!(host.projection().is_err());
+
+        let reopened = open_project(&project_path, &identity_lease_root);
+        let projection = reopened
+            .projection()
+            .expect("discarding releases ownership for a fresh Session");
+        assert_eq!(projection.state.document.dpi, 300);
+        assert_eq!(projection.state.revision, 0);
+        assert_eq!(projection.state.saved_revision, 0);
+        assert!(!projection.state.dirty);
+        assert!(!projection.state.can_undo);
+        assert!(!projection.state.can_redo);
+    }
+
+    #[test]
+    fn saving_close_persists_the_current_revision_then_consumes_the_session() {
+        let Fixture {
+            _root,
+            project_path,
+            identity_lease_root,
+            host,
+        } = fixture();
+        let dirty = host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing");
+        assert_eq!(dirty.state.revision, 1);
+        assert_eq!(
+            host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+
+        assert_eq!(
+            host.save_and_close()
+                .expect("Save and close confirms the current revision"),
+            SaveProjectOutcome::Saved { revision: 1 }
+        );
+        assert!(host.projection().is_err());
+
+        let reopened = open_project(&project_path, &identity_lease_root);
+        let projection = reopened
+            .projection()
+            .expect("the confirmed revision reopens in a fresh Session");
+        assert_eq!(projection.state.document.dpi, 240);
+        assert_eq!(projection.state.revision, 1);
+        assert_eq!(projection.state.saved_revision, 1);
+        assert!(!projection.state.dirty);
+        assert!(!projection.state.can_undo);
+        assert!(!projection.state.can_redo);
+    }
+
+    #[test]
+    fn a_conclusive_save_failure_keeps_the_dirty_session_and_reenables_history() {
+        let fixture = fixture();
+        let dirty = fixture
+            .host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing");
+        assert_eq!(
+            fixture.host.begin_close(),
+            Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        );
+        std::fs::write(&fixture.project_path, b"externally replaced")
+            .expect("an external writer changes the persisted baseline");
+
+        assert!(matches!(
+            fixture.host.save_and_close(),
+            Err(ProjectHostSaveError::Project(
+                SaveProjectError::PersistedBaselineConflict
+            ))
+        ));
+
+        assert_eq!(
+            fixture
+                .host
+                .projection()
+                .expect("a conclusive failure preserves the Session"),
+            dirty
+        );
+        let undone = fixture
+            .host
+            .undo()
+            .expect("creative commands resume after the conclusive failure");
+        assert_eq!(undone.state.document.dpi, 300);
     }
 
     #[test]

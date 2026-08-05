@@ -5,6 +5,8 @@
   "local": true,
   "windows": ["project"],
   "permissions": [
-    "project-window-commands"
+    "project-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }
