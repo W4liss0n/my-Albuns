@@ -1,0 +1,25 @@
+---
+status: accepted
+date: 2026-08-03
+---
+
+# Adotar `.myalbuns` como arquivo JSON versionado de Projeto
+
+O Arquivo de Projeto será um único documento JSON UTF-8 com extensão `.myalbuns`, identificação interna de tipo e versão explícita de esquema. A extensão será associada ao MyAlbuns no Windows, de modo que o arquivo funcione como a entrada direta do Projeto, enquanto o formato interno permanece legível para diagnóstico, mas sem suporte a edição manual.
+
+## Decisão
+
+O primeiro contrato público começa em `schemaVersion: 1` e não promete compatibilidade com os schemas e extensões usados pelas fixtures dos spikes. O envelope identifica o tipo `myalbuns.project`, a Identidade do Projeto, a Revisão do Projeto confirmada e o payload persistente. Caminhos Windows usam exclusivamente o DTO reversível `windowsUtf16`; Nome, Localização, Histórico, estado transitório, Cache e Recuperação não são duplicados no conteúdo.
+
+Cada versão possui DTO fechado e rejeita campos desconhecidos. Versões públicas antigas suportadas são migradas sequencialmente apenas em memória; o arquivo só recebe o esquema atual em um Salvamento explícito. Versões futuras ou inválidas são recusadas sem modificar o arquivo. `ProjectStore` possui JSON, detecção, migração e escrita, enquanto `ProjectDomain` recebe somente o modelo atual já validado.
+
+## Alternativas consideradas
+
+ZIP, SQLite e formatos binários foram rejeitados porque as mídias permanecem externas e o primeiro fluxo não precisa de múltiplos artefatos internos, consultas parciais ou escrita incremental. Promover o `schemaVersion: 3` dos spikes também foi rejeitado: ele não contém caminhos nativos nem DPI e inclui campos derivados que não pertencem ao contrato público.
+
+## Consequências
+
+- Acrescentar ou alterar campos persistidos exige uma nova Versão do esquema do Projeto e uma migração explícita quando houver compatibilidade.
+- A extensão ajuda o Windows a encaminhar o arquivo, mas a identificação interna continua obrigatória e autoritativa.
+- O escritor pode produzir JSON determinístico e legível; leitores não dependem de espaços, quebras de linha ou ordem de propriedades.
+- A implementação deve manter DTOs persistentes separados dos tipos de domínio e das representações de IPC.
