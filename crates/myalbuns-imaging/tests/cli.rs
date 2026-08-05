@@ -982,7 +982,10 @@ fn processor_identifies_a_missing_original_as_a_source_verification_failure() {
         Some(ImagingPathCode::NotFound)
     );
     assert!(!output_path.exists());
-    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
+    let logs = read_logs(log_dir.path());
+    assert!(logs.contains("\"stage\":\"source_verification\""));
+    assert!(logs.contains("\"failure_code\":\"source_unavailable\""));
+    assert!(logs.contains("\"path_code\":\"not_found\""));
 }
 
 #[test]
@@ -1008,6 +1011,60 @@ fn processor_identifies_source_decode_failures() {
         ImagingFailureStage::SourceDecode
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_decode\""));
+}
+
+#[test]
+fn processor_decodes_a_supported_progressive_jpeg_in_the_isolated_worker() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let source_path = source_dir.path().join("progressive.jpg");
+    let output_path = output_dir.path().join("progressive-output.jpg");
+    let bytes = include_bytes!("fixtures/progressive-420-dri.jpg");
+    std::fs::write(&source_path, bytes).expect("the progressive JPEG fixture is written");
+    let request = single_photo_render_request(
+        output_path.clone(),
+        "progressive-worker",
+        &source_path,
+        bytes.len() as u64,
+        format!("{:x}", Sha256::digest(bytes)),
+    );
+
+    let result = invoke_render_request(&request, None);
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    processor_response(&result.stdout)
+        .completed_for("progressive-worker")
+        .expect("the successful terminal is correlated");
+    image::open(output_path).expect("the exported JPEG decodes");
+}
+
+#[test]
+fn processor_rejects_a_progressive_jpeg_decoder_budget_before_publication() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let source_path = source_dir.path().join("hostile-progressive.jpg");
+    let output_path = output_dir.path().join("hostile-progressive-output.jpg");
+    let bytes = progressive_jpeg_header(12_000, 10_000);
+    std::fs::write(&source_path, &bytes).expect("the hostile progressive header is written");
+    let request = single_photo_render_request(
+        output_path.clone(),
+        "progressive-budget",
+        &source_path,
+        bytes.len() as u64,
+        format!("{:x}", Sha256::digest(&bytes)),
+    );
+
+    let result = invoke_render_request(&request, None);
+
+    assert_eq!(
+        render_failure(&result, "progressive-budget").code,
+        ImagingFailureCode::ResourceLimitExceeded
+    );
+    assert!(!output_path.exists());
 }
 
 #[test]
@@ -1384,6 +1441,8 @@ fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_render_failed"));
     assert!(logs.contains("\"stage\":\"output_prepare\""));
+    assert!(logs.contains("\"failure_code\":\"encode_failed\""));
+    assert!(logs.contains("\"reason\":"));
     assert!(logs.contains(request_id));
     assert!(!logs.contains(r"c:\users\person\private-project"));
     assert!(!logs.contains(&output_path.to_string_lossy().into_owned()));
@@ -1610,6 +1669,15 @@ fn insert_png_chunk_after_ihdr(bytes: &mut Vec<u8>, kind: [u8; 4], data: &[u8]) 
     crc_input.extend_from_slice(data);
     chunk.extend_from_slice(&crc32(&crc_input).to_be_bytes());
     bytes.splice(33..33, chunk);
+}
+
+fn progressive_jpeg_header(width: u16, height: u16) -> Vec<u8> {
+    let mut bytes = vec![0xff, 0xd8, 0xff, 0xc2, 0, 17, 8];
+    bytes.extend_from_slice(&height.to_be_bytes());
+    bytes.extend_from_slice(&width.to_be_bytes());
+    bytes.extend_from_slice(&[3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0]);
+    bytes.extend_from_slice(&[0xff, 0xda, 0, 12, 3, 1, 0, 2, 0x11, 3, 0x11, 0, 63, 0]);
+    bytes
 }
 
 fn set_png_dimensions(bytes: &mut [u8], width: u32, height: u32) {

@@ -18,7 +18,7 @@ const MICROMETERS_PER_INCH: f64 = 25_400.0;
 pub(crate) struct RenderFailure {
     pub(crate) stage: ImagingFailureStage,
     pub(crate) failure: ImagingFailure,
-    _message: String,
+    pub(crate) message: String,
 }
 
 impl RenderFailure {
@@ -42,7 +42,7 @@ impl RenderFailure {
                 media_id: None,
                 path_code: None,
             },
-            _message: message.into(),
+            message: message.into(),
         }
     }
 
@@ -59,7 +59,7 @@ impl RenderFailure {
                 media_id,
                 path_code,
             },
-            _message: message.into(),
+            message: message.into(),
         }
     }
 }

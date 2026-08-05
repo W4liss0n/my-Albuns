@@ -25,6 +25,7 @@ use crate::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFailureStage, InvocationFuture, complete_invocation,
     },
+    path_io::FrozenMediaSource,
     sample_project::SampleProject,
 };
 
@@ -62,12 +63,7 @@ fn export_plan(
 ) -> export_pipeline::ExportPlan {
     let source_dependencies = sources
         .iter()
-        .map(|source| {
-            (
-                source.media_id().to_owned(),
-                source.source_path().to_path_buf(),
-            )
-        })
+        .map(|source| FrozenMediaSource::new(source.media_id(), source.source_path().to_path_buf()))
         .collect();
     export_pipeline::plan(
         snapshot,

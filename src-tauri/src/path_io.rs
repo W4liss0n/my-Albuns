@@ -12,6 +12,33 @@ use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode, MediaSource
 use myalbuns_paths::{AppPathsError, ExpectedObject, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct FrozenMediaSource {
+    media_id: String,
+    source_path: PathBuf,
+}
+
+impl FrozenMediaSource {
+    pub(crate) fn new(media_id: impl Into<String>, source_path: PathBuf) -> Self {
+        Self {
+            media_id: media_id.into(),
+            source_path,
+        }
+    }
+
+    pub(crate) fn media_id(&self) -> &str {
+        &self.media_id
+    }
+
+    pub(crate) fn source_path(&self) -> &std::path::Path {
+        &self.source_path
+    }
+
+    fn into_parts(self) -> (String, PathBuf) {
+        (self.media_id, self.source_path)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct SourceFingerprintFailure {
     pub(crate) code: ImagingFailureCode,
@@ -51,7 +78,7 @@ async fn capture_root_bindings_with_thread(
 #[cfg(test)]
 pub(crate) async fn fingerprint_media_sources(
     bindings: RootBindingPlan,
-    frozen_sources: Vec<(String, PathBuf)>,
+    frozen_sources: Vec<FrozenMediaSource>,
 ) -> Result<Vec<MediaSource>, SourceFingerprintFailure> {
     match fingerprint_media_sources_cancellable(
         bindings,
@@ -70,7 +97,7 @@ pub(crate) async fn fingerprint_media_sources(
 
 pub(crate) async fn fingerprint_media_sources_cancellable(
     bindings: RootBindingPlan,
-    frozen_sources: Vec<(String, PathBuf)>,
+    frozen_sources: Vec<FrozenMediaSource>,
     cancelled: Arc<AtomicBool>,
 ) -> Result<Vec<MediaSource>, SourceFingerprintError> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -89,7 +116,7 @@ pub(crate) async fn fingerprint_media_sources_cancellable(
 
 fn fingerprint_sources<F>(
     bindings: &RootBindingPlan,
-    frozen_sources: Vec<(String, PathBuf)>,
+    frozen_sources: Vec<FrozenMediaSource>,
     cancelled: &AtomicBool,
     mut on_chunk: F,
 ) -> Result<Vec<MediaSource>, SourceFingerprintError>
@@ -109,7 +136,8 @@ where
                     .into(),
             })
         })?;
-    for (media_id, source_path) in frozen_sources {
+    for frozen_source in frozen_sources {
+        let (media_id, source_path) = frozen_source.into_parts();
         ensure_not_cancelled(cancelled)?;
         let resolved = bindings
             .resolve_existing(&source_path, ExpectedObject::RegularFile)
@@ -191,6 +219,10 @@ mod tests {
 
     use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode};
 
+    fn frozen(media_id: &str, source_path: PathBuf) -> super::FrozenMediaSource {
+        super::FrozenMediaSource::new(media_id, source_path)
+    }
+
     #[test]
     fn path_binding_capture_runs_on_the_blocking_pool() {
         let root = tempfile::tempdir().expect("temporary path-I/O fixture");
@@ -225,8 +257,8 @@ mod tests {
         let sources = tauri::async_runtime::block_on(super::fingerprint_media_sources(
             bindings,
             vec![
-                ("media-first".into(), first.clone()),
-                ("media-second".into(), second.clone()),
+                frozen("media-first", first.clone()),
+                frozen("media-second", second.clone()),
             ],
         ))
         .expect("the frozen originals are fingerprinted");
@@ -251,7 +283,7 @@ mod tests {
 
         let sources = tauri::async_runtime::block_on(super::fingerprint_media_sources(
             bindings,
-            vec![("media-empty".into(), source_path)],
+            vec![frozen("media-empty", source_path)],
         ))
         .expect("the empty original is fingerprinted before processor classification");
 
@@ -275,7 +307,7 @@ mod tests {
 
         let failure = super::fingerprint_sources(
             &bindings,
-            vec![("media-large".into(), source_path)],
+            vec![frozen("media-large", source_path)],
             &cancelled,
             || cancelled.store(true, Ordering::Release),
         )
@@ -293,7 +325,7 @@ mod tests {
 
         let failure = tauri::async_runtime::block_on(super::fingerprint_media_sources(
             bindings,
-            vec![("media-missing".into(), missing)],
+            vec![frozen("media-missing", missing)],
         ))
         .expect_err("the unavailable original is refused");
 

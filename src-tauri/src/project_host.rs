@@ -7,6 +7,8 @@ use myalbuns_core::{
     EditableProject, EditorProjection, ProjectIntent, RenderSnapshot, SaveProjectError,
     SaveProjectOutcome,
 };
+
+use crate::path_io::FrozenMediaSource;
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
 /// Owns the single productive editable Project of this Host process.
@@ -32,7 +34,7 @@ pub(crate) struct ProjectHostSaveResult {
 #[derive(Debug)]
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
-    pub(crate) source_paths: Vec<(String, PathBuf)>,
+    pub(crate) source_paths: Vec<FrozenMediaSource>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -224,7 +226,7 @@ impl ProjectHost {
         for media_id in sheet.referenced_media_ids() {
             if source_paths
                 .iter()
-                .any(|(known_id, _)| known_id == media_id)
+                .any(|source: &FrozenMediaSource| source.media_id() == media_id)
             {
                 continue;
             }
@@ -238,7 +240,7 @@ impl ProjectHost {
                         "A fonte original da mídia {media_id} não pertence à mesma revisão do Projeto."
                     )
                 })?;
-            source_paths.push((media_id.to_owned(), media.path().to_path_buf()));
+            source_paths.push(FrozenMediaSource::new(media_id, media.path().to_path_buf()));
         }
         Ok(FrozenSheetExport {
             snapshot,
@@ -292,10 +294,10 @@ mod tests {
 
     use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
-        InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
-        OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
-        SaveProjectOutcome,
+        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
+        InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
+        InitialProjectConfiguration, InitialProjectPersonalization, OpenProjectRequest,
+        ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError, SaveProjectOutcome,
     };
     use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
 
@@ -463,7 +465,7 @@ mod tests {
         let frozen_paths = frozen
             .source_paths
             .iter()
-            .map(|(_, path)| path.clone())
+            .map(|source| source.source_path().to_path_buf())
             .collect::<Vec<_>>();
         assert_eq!(frozen_paths, [shared_path, right_path]);
         assert_eq!(
@@ -499,23 +501,31 @@ mod tests {
             RgbImage::from_pixel(48, 32, Rgb([10, 20, 240]))
                 .save_with_format(&right_path, ImageFormat::Jpeg)
                 .expect("the right Background original is written");
-            let personalized =
-                InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
-                    InitialBackground::PerSide {
-                        left: InitialBackgroundContent::Media {
-                            path: shared_path.clone(),
-                        },
-                        right: InitialBackgroundContent::Media {
-                            path: right_path.clone(),
-                        },
+            let personalized = InitialProject::configured(InitialProjectConfiguration::new(
+                DisplayUnit::Mm,
+                600_000,
+                300_000,
+                300,
+                3_000,
+                3_000,
+                3,
+                EndSheetFormat::SinglePage,
+                EndSheetFormat::SinglePage,
+            ))
+            .with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Media {
+                        path: shared_path.clone(),
                     },
-                    InitialOverlay::BothSides {
-                        both: Some(myalbuns_core::InitialOverlayContent::Media {
-                            path: shared_path,
-                        }),
+                    right: InitialBackgroundContent::Media {
+                        path: right_path.clone(),
                     },
-                    InitialFrameBorder::None,
-                ));
+                },
+                InitialOverlay::BothSides {
+                    both: Some(myalbuns_core::InitialOverlayContent::Media { path: shared_path }),
+                },
+                InitialFrameBorder::None,
+            ));
             let Fixture {
                 _root: project_root,
                 project_path,
@@ -532,6 +542,10 @@ mod tests {
             let dirty = host
                 .apply(ProjectIntent::SetDpi { dpi: 25 })
                 .expect("the current unsaved DPI is applied");
+            assert_ne!(
+                dirty.composition.sheets[0].active_sides, dirty.composition.sheets[1].active_sides,
+                "the initial and visible noninitial Sheets must be semantically distinguishable"
+            );
             let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
             let frozen = host
                 .freeze_sheet_export(&sheet_id)
@@ -584,6 +598,14 @@ mod tests {
 
             assert_eq!(published.completion.dpi, expected_dpi);
             assert_eq!(published.completion.source_count, 2);
+            assert_eq!(
+                (
+                    published.completion.width_px,
+                    published.completion.height_px
+                ),
+                (591, 295),
+                "the visible internal double Sheet is exported; the initial right-only Sheet would be 295 × 295"
+            );
             assert_eq!(expected_revision, dirty.state.revision);
             let rendered = image::open(&output_path).expect("the published JPEG decodes");
             assert_eq!(

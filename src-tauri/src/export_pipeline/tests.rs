@@ -25,6 +25,7 @@ use crate::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFuture,
     },
+    path_io::FrozenMediaSource,
     sample_project::SampleProject,
 };
 
@@ -263,12 +264,7 @@ fn export_plan_with_authorization(
     }
     let source_dependencies = sources
         .iter()
-        .map(|source| {
-            (
-                source.media_id().to_owned(),
-                source.source_path().to_path_buf(),
-            )
-        })
+        .map(|source| FrozenMediaSource::new(source.media_id(), source.source_path().to_path_buf()))
         .collect();
     plan(
         snapshot,
@@ -349,7 +345,7 @@ fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
         .into_iter()
         .enumerate()
         .map(|(index, media_id)| {
-            (
+            FrozenMediaSource::new(
                 media_id.to_owned(),
                 root.path().join(format!("planned-{index}.jpg")),
             )
@@ -371,9 +367,9 @@ fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
     let mismatched_sources = source_dependencies
         .iter()
         .enumerate()
-        .map(|(index, (media_id, _))| {
+        .map(|(index, source)| {
             MediaSource::new(
-                media_id,
+                source.media_id(),
                 root.path().join(format!("different-{index}.jpg")),
                 0,
                 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

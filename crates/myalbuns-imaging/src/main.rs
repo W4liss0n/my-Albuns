@@ -10,8 +10,8 @@ use std::{
 
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureCode,
-    ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingRequest, ImagingResponse,
-    decode_command, encode_event, root_binding_plan_sha256,
+    ImagingFailureStage, ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest,
+    ImagingResponse, decode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
@@ -39,7 +39,11 @@ impl From<RenderFailure> for ProcessFailure {
 }
 
 fn main() -> ExitCode {
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
+    let mode = std::env::args_os().nth(1);
+    if mode.as_deref() == Some(std::ffi::OsStr::new(source::JPEG_WORKER_MODE)) {
+        return source::run_jpeg_worker(std::env::args_os().nth(2));
+    }
+    if mode.as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
         println!("{IMAGING_PROTOCOL_VERSION}");
         return ExitCode::SUCCESS;
     }
@@ -188,6 +192,9 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
                 project_id,
                 revision,
                 stage = failure.stage.as_str(),
+                failure_code = failure.failure.code.as_str(),
+                path_code = failure.failure.path_code.map(ImagingPathCode::as_str),
+                reason = failure.message.as_str(),
                 event = "imaging_render_failed",
             );
             write_response(&ImagingResponse::failed(

@@ -27,6 +27,7 @@ use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
     InvocationFailureStage,
 };
+use crate::path_io::FrozenMediaSource;
 
 #[derive(Debug)]
 struct ExportPlanCore {
@@ -41,7 +42,7 @@ struct ExportPlanCore {
 #[derive(Debug)]
 pub(crate) struct PlannedExport {
     core: ExportPlanCore,
-    source_dependencies: Vec<(String, PathBuf)>,
+    source_dependencies: Vec<FrozenMediaSource>,
 }
 
 #[derive(Debug)]
@@ -56,7 +57,7 @@ pub(crate) struct ExportOptions {
     output_path: PathBuf,
     authorization: ExportWriteAuthorization,
     sheet_id: String,
-    source_dependencies: Vec<(String, PathBuf)>,
+    source_dependencies: Vec<FrozenMediaSource>,
 }
 
 impl ExportOptions {
@@ -65,7 +66,7 @@ impl ExportOptions {
         output_path: PathBuf,
         authorization: ExportWriteAuthorization,
         sheet_id: impl Into<String>,
-        source_dependencies: Vec<(String, PathBuf)>,
+        source_dependencies: Vec<FrozenMediaSource>,
     ) -> Self {
         Self {
             request_id: request_id.into(),
@@ -84,12 +85,12 @@ impl PlannedExport {
         paths.extend(
             self.source_dependencies
                 .iter()
-                .map(|(_, source_path)| source_path.as_path()),
+                .map(FrozenMediaSource::source_path),
         );
         paths
     }
 
-    pub(crate) fn source_dependencies(&self) -> &[(String, PathBuf)] {
+    pub(crate) fn source_dependencies(&self) -> &[FrozenMediaSource] {
         &self.source_dependencies
     }
 
@@ -110,7 +111,7 @@ impl PlannedExport {
         let planned = self
             .source_dependencies
             .iter()
-            .map(|(media_id, source_path)| (media_id.as_str(), source_path.as_path()))
+            .map(|source| (source.media_id(), source.source_path()))
             .collect::<HashSet<_>>();
         if supplied != planned || sources.len() != self.source_dependencies.len() {
             return Err(ExportFailure::new(
@@ -450,7 +451,7 @@ pub(crate) fn plan(
 fn validate_source_dependencies(
     unit: &ComposedOutputUnit,
     dpi: u32,
-    source_dependencies: &[(String, PathBuf)],
+    source_dependencies: &[FrozenMediaSource],
 ) -> Result<(), ExportFailure> {
     if !(1..=1_200).contains(&dpi) {
         return Err(ExportFailure::new(
@@ -466,14 +467,14 @@ fn validate_source_dependencies(
     })?;
     let required_media = unit.sheet.referenced_media_ids().collect::<HashSet<_>>();
     let mut supplied_media = HashSet::new();
-    for (media_id, source_path) in source_dependencies {
-        if media_id.trim().is_empty() || !source_path.is_absolute() {
+    for source in source_dependencies {
+        if source.media_id().trim().is_empty() || !source.source_path().is_absolute() {
             return Err(ExportFailure::new(
                 ExportFailureStage::Plan,
                 "O plano contém uma fonte original inválida.",
             ));
         }
-        if !supplied_media.insert(media_id.as_str()) {
+        if !supplied_media.insert(source.media_id()) {
             return Err(ExportFailure::new(
                 ExportFailureStage::Plan,
                 "O plano contém uma fonte original duplicada.",
