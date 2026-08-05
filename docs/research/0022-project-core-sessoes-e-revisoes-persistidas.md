@@ -69,7 +69,7 @@ mesmo `ProjectHost`.
 ## Instrumento
 
 A evidência bruta está em
-[`artifacts/0013-project-core-session-revision.json`](artifacts/0013-project-core-session-revision.json).
+`docs/research/artifacts/0013-project-core-session-revision.json`, publicada com a branch de plataforma.
 O runner `Test-ProjectCoreGate.ps1` executou:
 
 1. validação sintática do runner e parsers JSON de schema fechado;
@@ -134,7 +134,7 @@ Dois pontos avaliados foram mantidos fora deste gate:
 - o registro de `ProjectCore` garante unicidade dentro do proprietário
   compartilhado pelo host; entre hosts e processos, `ProjectFileLock` continua
   sendo a proteção final demonstrada em
-  [`0021`](0021-operation-gate-e-bloqueio-de-abertura.md), enquanto identidade
+  `docs/research/0021-operation-gate-e-bloqueio-de-abertura.md`, enquanto identidade
   física, aliases e foco/reuso pertencem ao ticket 13;
 - reabrir cada caminho e revalidar hash/revisão imediatamente antes de criar o
   snapshot pertence à pré-validação e execução produtiva do lote no ticket 31.
