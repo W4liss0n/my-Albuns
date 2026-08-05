@@ -14,10 +14,10 @@ Product documentation is written in Portuguese; process scaffolding is written i
 **English** — everything that exists to be parsed or acted on by a tool or an agent:
 
 - this file and the documents under `docs/agents/`;
-- the tracker entry at `.scratch/<feature-slug>/spec.md`;
+- GitHub issue structural fields, states, and labels;
 - structural ticket labels: `What to build:`, `Blocked by:`, `Type:`, `Status:`, `Normative sources:`;
 - frontmatter keys (`status`, `document`, `date`, `updated`, `ticket`, `platform`, `implementation-readiness`);
-- frontmatter and triage values (`accepted`, `proposed`, `superseded`, `historical`, `current`, `ready-for-agent`, `ready-for-human`, `needs-triage`, `needs-info`, `wontfix`, `spike`, `decision`, `design`, `implementation`).
+- frontmatter, triage, ticket-type and wayfinding values (`accepted`, `proposed`, `superseded`, `historical`, `current`, `ready-for-agent`, `ready-for-human`, `needs-triage`, `needs-info`, `wontfix`, `spike`, `decision`, `design`, `implementation`, `research`, `prototype`, `grilling`, `task`, `claimed`, `resolved`).
 
 A ticket therefore mixes both: English labels and states around a Portuguese title and Portuguese criteria. That is intentional — the labels are an interface, the criteria are prose.
 
@@ -25,9 +25,13 @@ Do not translate an identifier that another document or skill matches on. When a
 
 ## Agent skills
 
+### Workflow routing
+
+When the appropriate skill or flow is unclear, use `$ask-matt` before proceeding.
+
 ### Issue tracker
 
-Issues are tracked as local Markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+Issues are tracked as GitHub issues in `W4liss0n/my-Albuns` via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
