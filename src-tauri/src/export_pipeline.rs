@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     fs::File,
     io::{BufReader, Read},
     path::PathBuf,
@@ -12,7 +11,7 @@ use std::{
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingProgress,
-    ImagingProgressStage, ImagingRequest, MediaSource, RenderCompletion, has_jpeg_extension,
+    ImagingProgressStage, ImagingRequest, RenderCompletion, RenderSource, has_jpeg_extension,
     validate_render_content,
 };
 use myalbuns_logging::ProcessRole;
@@ -27,8 +26,6 @@ use crate::imaging_processor::{
     ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
     InvocationFailureStage,
 };
-use crate::path_io::FrozenMediaSource;
-
 #[derive(Debug)]
 struct ExportPlanCore {
     unit: ComposedOutputUnit,
@@ -40,15 +37,9 @@ struct ExportPlanCore {
 }
 
 #[derive(Debug)]
-pub(crate) struct PlannedExport {
-    core: ExportPlanCore,
-    source_dependencies: Vec<FrozenMediaSource>,
-}
-
-#[derive(Debug)]
 pub(crate) struct ExportPlan {
     core: ExportPlanCore,
-    sources: Vec<MediaSource>,
+    sources: Vec<RenderSource>,
 }
 
 #[derive(Clone, Debug)]
@@ -57,7 +48,7 @@ pub(crate) struct ExportOptions {
     output_path: PathBuf,
     authorization: ExportWriteAuthorization,
     sheet_id: String,
-    source_dependencies: Vec<FrozenMediaSource>,
+    sources: Vec<RenderSource>,
 }
 
 impl ExportOptions {
@@ -66,75 +57,27 @@ impl ExportOptions {
         output_path: PathBuf,
         authorization: ExportWriteAuthorization,
         sheet_id: impl Into<String>,
-        source_dependencies: Vec<FrozenMediaSource>,
+        sources: Vec<RenderSource>,
     ) -> Self {
         Self {
             request_id: request_id.into(),
             output_path,
             authorization,
             sheet_id: sheet_id.into(),
-            source_dependencies,
-        }
-    }
-}
-
-impl PlannedExport {
-    pub(crate) fn required_paths(&self) -> Vec<&std::path::Path> {
-        let mut paths = Vec::with_capacity(self.source_dependencies.len() + 1);
-        paths.push(self.core.path_plan.output_path());
-        paths.extend(
-            self.source_dependencies
-                .iter()
-                .map(FrozenMediaSource::source_path),
-        );
-        paths
-    }
-
-    pub(crate) fn source_dependencies(&self) -> &[FrozenMediaSource] {
-        &self.source_dependencies
-    }
-
-    pub(crate) fn bind_sources(
-        self,
-        sources: Vec<MediaSource>,
-    ) -> Result<ExportPlan, ExportFailure> {
-        validate_render_content(&self.core.unit, self.core.dpi, &sources).map_err(|error| {
-            ExportFailure::new(
-                ExportFailureStage::Plan,
-                format!("Não foi possível planejar a Exportação: {error}"),
-            )
-        })?;
-        let supplied = sources
-            .iter()
-            .map(|source| (source.media_id(), source.source_path()))
-            .collect::<HashSet<_>>();
-        let planned = self
-            .source_dependencies
-            .iter()
-            .map(|source| (source.media_id(), source.source_path()))
-            .collect::<HashSet<_>>();
-        if supplied != planned || sources.len() != self.source_dependencies.len() {
-            return Err(ExportFailure::new(
-                ExportFailureStage::Plan,
-                "Os fingerprints das fontes não correspondem ao plano congelado.",
-            ));
-        }
-        Ok(ExportPlan {
-            core: self.core,
             sources,
-        })
+        }
     }
 }
 
-#[cfg(test)]
 impl ExportPlan {
     pub(crate) fn required_paths(&self) -> Vec<&std::path::Path> {
         let mut paths = Vec::with_capacity(self.sources.len() + 1);
         paths.push(self.core.path_plan.output_path());
-        paths.extend(self.sources.iter().map(MediaSource::source_path));
+        paths.extend(self.sources.iter().map(RenderSource::source_path));
         paths
     }
 
+    #[cfg(test)]
     fn path_plan(&self) -> &ExportPathPlan {
         &self.core.path_plan
     }
@@ -339,10 +282,6 @@ impl ExportExecutionControl {
     fn cancellation_flag(&self) -> &AtomicBool {
         self.cancelled.as_ref()
     }
-
-    pub(crate) fn cancellation_token(&self) -> std::sync::Arc<AtomicBool> {
-        std::sync::Arc::clone(&self.cancelled)
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -401,13 +340,13 @@ impl ExportProgress {
 pub(crate) fn plan(
     snapshot: RenderSnapshot,
     options: ExportOptions,
-) -> Result<PlannedExport, ExportFailure> {
+) -> Result<ExportPlan, ExportFailure> {
     let ExportOptions {
         request_id,
         output_path,
         authorization,
         sheet_id,
-        source_dependencies,
+        sources,
     } = options;
     let path_plan = ExportPathPlan::new_authorized(output_path.clone(), &request_id, authorization)
         .map_err(|error| {
@@ -434,8 +373,13 @@ pub(crate) fn plan(
             format!("Não foi possível selecionar a Lâmina da Exportação: {error}"),
         )
     })?;
-    validate_source_dependencies(&unit, snapshot.dpi, &source_dependencies)?;
-    Ok(PlannedExport {
+    validate_render_content(&unit, snapshot.dpi, &sources).map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível planejar a Exportação: {error}"),
+        )
+    })?;
+    Ok(ExportPlan {
         core: ExportPlanCore {
             unit,
             dpi: snapshot.dpi,
@@ -444,50 +388,8 @@ pub(crate) fn plan(
             request_id,
             path_plan,
         },
-        source_dependencies,
+        sources,
     })
-}
-
-fn validate_source_dependencies(
-    unit: &ComposedOutputUnit,
-    dpi: u32,
-    source_dependencies: &[FrozenMediaSource],
-) -> Result<(), ExportFailure> {
-    if !(1..=1_200).contains(&dpi) {
-        return Err(ExportFailure::new(
-            ExportFailureStage::Plan,
-            "A resolução da Exportação é inválida.",
-        ));
-    }
-    unit.validate().map_err(|error| {
-        ExportFailure::new(
-            ExportFailureStage::Plan,
-            format!("Não foi possível planejar a Lâmina: {error}"),
-        )
-    })?;
-    let required_media = unit.sheet.referenced_media_ids().collect::<HashSet<_>>();
-    let mut supplied_media = HashSet::new();
-    for source in source_dependencies {
-        if source.media_id().trim().is_empty() || !source.source_path().is_absolute() {
-            return Err(ExportFailure::new(
-                ExportFailureStage::Plan,
-                "O plano contém uma fonte original inválida.",
-            ));
-        }
-        if !supplied_media.insert(source.media_id()) {
-            return Err(ExportFailure::new(
-                ExportFailureStage::Plan,
-                "O plano contém uma fonte original duplicada.",
-            ));
-        }
-    }
-    if supplied_media != required_media {
-        return Err(ExportFailure::new(
-            ExportFailureStage::Plan,
-            "As fontes planejadas não correspondem às mídias da Lâmina.",
-        ));
-    }
-    Ok(())
 }
 
 pub(crate) async fn execute<T: ImagingTransport>(

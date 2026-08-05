@@ -10,7 +10,7 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse, MediaSource,
-    encode_command,
+    RenderSource, encode_command,
 };
 use myalbuns_paths::{
     AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
@@ -25,7 +25,6 @@ use crate::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFailureStage, InvocationFuture, complete_invocation,
     },
-    path_io::FrozenMediaSource,
     sample_project::SampleProject,
 };
 
@@ -59,12 +58,8 @@ fn export_plan(
     output_path: PathBuf,
     authorization: ExportWriteAuthorization,
     sheet_id: String,
-    sources: Vec<MediaSource>,
+    sources: Vec<RenderSource>,
 ) -> export_pipeline::ExportPlan {
-    let source_dependencies = sources
-        .iter()
-        .map(|source| FrozenMediaSource::new(source.media_id(), source.source_path().to_path_buf()))
-        .collect();
     export_pipeline::plan(
         snapshot,
         export_pipeline::ExportOptions::new(
@@ -72,12 +67,10 @@ fn export_plan(
             output_path,
             authorization,
             sheet_id,
-            source_dependencies,
+            sources,
         ),
     )
     .expect("the Export is planned")
-    .bind_sources(sources)
-    .expect("the frozen original fingerprints match the Export plan")
 }
 
 pub(crate) struct RealProcessTransport {
@@ -428,13 +421,8 @@ fn real_processor_recovery_flows_through_production_modules() {
             .expect("the recovery frame contains a Photo")
             .media_id
             .clone();
-        let export_source = MediaSource::new(
-            export_media_id,
-            source.source_path().to_path_buf(),
-            source.source_bytes(),
-            source.source_sha256(),
-        )
-        .expect("the Export source matches the recovery frame");
+        let export_source = RenderSource::new(export_media_id, source.source_path().to_path_buf())
+            .expect("the Export source matches the recovery frame");
         let project_before = session
             .persisted_revision()
             .expect("the Project revision serializes before failure");
@@ -586,13 +574,8 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             .expect("the Export frame contains a Photo")
             .media_id
             .clone();
-        let source = MediaSource::new(
-            media_id,
-            source.source_path().to_path_buf(),
-            source.source_bytes(),
-            source.source_sha256(),
-        )
-        .expect("the mapped source matches the Export frame");
+        let source = RenderSource::new(media_id, source.source_path().to_path_buf())
+            .expect("the mapped source matches the Export frame");
         let output_path = logical_exports.join("Album-path-gate.jpg");
         let unavailable_request_id = "export-real-unc-unavailable";
         let unavailable_plan = export_plan(

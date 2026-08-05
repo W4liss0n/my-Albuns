@@ -10,7 +10,7 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     ImagingCommand, ImagingFailureCode, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
-    ImagingResponse, MediaSource, RenderCompletion, decode_command, encode_command,
+    ImagingResponse, RenderCompletion, RenderSource, decode_command, encode_command,
 };
 use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -25,7 +25,6 @@ use crate::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFuture,
     },
-    path_io::FrozenMediaSource,
     sample_project::SampleProject,
 };
 
@@ -251,34 +250,15 @@ fn export_plan_with_authorization(
         })
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the test original is written");
-        let source_bytes = std::fs::read(&source_path).expect("the test original is readable");
         sources.push(
-            MediaSource::new(
-                media_id,
-                source_path,
-                source_bytes.len() as u64,
-                format!("{:x}", Sha256::digest(&source_bytes)),
-            )
-            .expect("the test original source is valid"),
+            RenderSource::new(media_id, source_path).expect("the test original source is valid"),
         );
     }
-    let source_dependencies = sources
-        .iter()
-        .map(|source| FrozenMediaSource::new(source.media_id(), source.source_path().to_path_buf()))
-        .collect();
     plan(
         snapshot,
-        ExportOptions::new(
-            request_id,
-            output,
-            authorization,
-            sheet_id,
-            source_dependencies,
-        ),
+        ExportOptions::new(request_id, output, authorization, sheet_id, sources),
     )
     .expect("the Export request is valid")
-    .bind_sources(sources)
-    .expect("the frozen originals bind to the Export plan")
 }
 
 fn root_bindings(plan: &ExportPlan) -> RootBindingPlan {
@@ -329,7 +309,7 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
 }
 
 #[test]
-fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
+fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
     let source = SampleProject::Horizon
         .persisted_source(2)
         .expect("the sample project serializes");
@@ -339,16 +319,17 @@ fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
         .render_snapshot();
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let root = tempfile::tempdir().expect("temporary dependency-plan fixture");
-    let source_dependencies = snapshot.composition.sheets[0]
+    let sources = snapshot.composition.sheets[0]
         .referenced_media_ids()
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .enumerate()
         .map(|(index, media_id)| {
-            FrozenMediaSource::new(
+            RenderSource::new(
                 media_id.to_owned(),
                 root.path().join(format!("planned-{index}.jpg")),
             )
+            .expect("the planned source descriptor is valid")
         })
         .collect::<Vec<_>>();
     let planned = plan(
@@ -358,30 +339,18 @@ fn frozen_dependency_plan_precedes_and_constrains_source_fingerprints() {
             root.path().join("Album.jpg"),
             ExportWriteAuthorization::CreateOnly,
             sheet_id,
-            source_dependencies.clone(),
+            sources.clone(),
         ),
     )
     .expect("planning needs identities and paths but no source I/O");
-    assert_eq!(planned.source_dependencies(), source_dependencies);
-
-    let mismatched_sources = source_dependencies
-        .iter()
-        .enumerate()
-        .map(|(index, source)| {
-            MediaSource::new(
-                source.media_id(),
-                root.path().join(format!("different-{index}.jpg")),
-                0,
-                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            )
-            .expect("an empty fingerprint remains structurally valid")
-        })
-        .collect();
-    let failure = planned
-        .bind_sources(mismatched_sources)
-        .expect_err("fingerprints from paths outside the frozen plan are rejected");
-
-    assert_eq!(failure.stage, ExportFailureStage::Plan);
+    assert_eq!(planned.sources, sources);
+    assert!(
+        planned
+            .sources
+            .iter()
+            .all(|source| !source.source_path().exists()),
+        "planning freezes descriptors without opening their originals"
+    );
 }
 
 #[test]

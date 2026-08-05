@@ -1,5 +1,6 @@
 mod cache;
 mod jpeg_output;
+mod process_tree;
 mod render;
 mod source;
 
@@ -18,8 +19,6 @@ use myalbuns_logging::{
 };
 use myalbuns_paths::AppPaths;
 
-use render::RenderFailure;
-
 struct ProcessFailure {
     stage: Option<ImagingFailureStage>,
 }
@@ -27,14 +26,6 @@ struct ProcessFailure {
 impl From<String> for ProcessFailure {
     fn from(_: String) -> Self {
         Self { stage: None }
-    }
-}
-
-impl From<RenderFailure> for ProcessFailure {
-    fn from(failure: RenderFailure) -> Self {
-        Self {
-            stage: Some(failure.stage),
-        }
     }
 }
 
@@ -46,6 +37,10 @@ fn main() -> ExitCode {
     if mode.as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
         println!("{IMAGING_PROTOCOL_VERSION}");
         return ExitCode::SUCCESS;
+    }
+    if let Err(error) = process_tree::install_kill_on_parent_exit() {
+        eprintln!("ciclo de vida do Processador indisponível: {error}");
+        return ExitCode::FAILURE;
     }
 
     let process_role = ProcessRole::Imaging;
@@ -191,7 +186,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
                 operation_id,
                 project_id,
                 revision,
-                stage = failure.stage.as_str(),
+                stage = failure.failure.code.stage().as_str(),
                 failure_code = failure.failure.code.as_str(),
                 path_code = failure.failure.path_code.map(ImagingPathCode::as_str),
                 reason = failure.message.as_str(),

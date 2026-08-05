@@ -15,11 +15,12 @@ pub use event_stream::{
 };
 pub use myalbuns_paths::CacheArtifactFormat;
 pub use render::{
-    ImagingRequest, MediaSource, RenderCompletion, has_jpeg_extension, validate_render_content,
+    ImagingRequest, MediaSource, RenderCompletion, RenderSource, has_jpeg_extension,
+    validate_render_content,
 };
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 15;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 16;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

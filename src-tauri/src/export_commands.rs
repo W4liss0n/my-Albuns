@@ -138,15 +138,6 @@ impl ExportCommandError {
             _ => Self::failed(failure.message),
         }
     }
-
-    fn from_source_fingerprint(error: path_io::SourceFingerprintFailure) -> Self {
-        Self {
-            code: error.code.into(),
-            message: error.message,
-            media_id: error.media_id,
-            path_code: error.path_code.map(Into::into),
-        }
-    }
 }
 
 impl From<ImagingFailureCode> for ExportCommandErrorCode {
@@ -244,14 +235,14 @@ pub(crate) async fn export_sheet(
     let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let request_id = format!("export-{}-{export_sequence}", std::process::id());
     let project_id = safe_log_identifier(&frozen.snapshot.project_id).map(str::to_owned);
-    let planned_export = export_pipeline::plan(
+    let plan = export_pipeline::plan(
         frozen.snapshot,
         export_pipeline::ExportOptions::new(
             request_id.clone(),
             output_path,
             authorization,
             sheet_id,
-            frozen.source_paths,
+            frozen.sources,
         ),
     )
     .map_err(|failure| {
@@ -264,7 +255,7 @@ pub(crate) async fn export_sheet(
         );
         ExportCommandError::from_pipeline(failure)
     })?;
-    let operation_paths = planned_export
+    let operation_paths = plan
         .required_paths()
         .into_iter()
         .map(Path::to_path_buf)
@@ -343,58 +334,6 @@ pub(crate) async fn export_sheet(
         root_binding_plan_sha256,
         event = "root_binding_plan_captured",
     );
-
-    let source_fingerprints = path_io::fingerprint_media_sources_cancellable(
-        root_bindings.clone(),
-        planned_export.source_dependencies().to_vec(),
-        attempt.cancellation_token(),
-    );
-    tokio::pin!(source_fingerprints);
-    let sources = tokio::select! {
-        sources = &mut source_fingerprints => match sources {
-            Ok(sources) => sources,
-            Err(path_io::SourceFingerprintError::Cancelled) => {
-                log_export_cancelled(
-                    &request_id,
-                    project_id.as_deref(),
-                    window.label(),
-                    "fingerprint_sources",
-                );
-                return Err(ExportCommandError::cancelled());
-            }
-            Err(path_io::SourceFingerprintError::Failed(error)) => {
-                log_imaging_failure(
-                    "export_failed",
-                    &request_id,
-                    project_id.as_deref(),
-                    error.code.stage().as_str(),
-                    None,
-                );
-                return Err(ExportCommandError::from_source_fingerprint(error));
-            }
-        },
-        () = attempt.cancelled() => {
-            let _ = source_fingerprints.as_mut().await;
-            log_export_cancelled(
-                &request_id,
-                project_id.as_deref(),
-                window.label(),
-                "fingerprint_sources",
-            );
-            return Err(ExportCommandError::cancelled());
-        },
-    };
-    let plan = planned_export.bind_sources(sources).map_err(|failure| {
-        log_imaging_failure(
-            "export_failed",
-            &request_id,
-            project_id.as_deref(),
-            failure.stage.as_str(),
-            failure.exit_code,
-        );
-        ExportCommandError::from_pipeline(failure)
-    })?;
-
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
     let lease_completion = acquisition.complete(&cache, &processor);
     tokio::pin!(lease_completion);

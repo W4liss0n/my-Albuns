@@ -7,8 +7,8 @@ use myalbuns_core::{
     EditableProject, EditorProjection, ProjectIntent, RenderSnapshot, SaveProjectError,
     SaveProjectOutcome,
 };
+use myalbuns_imaging_protocol::RenderSource;
 
-use crate::path_io::FrozenMediaSource;
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
 /// Owns the single productive editable Project of this Host process.
@@ -34,7 +34,7 @@ pub(crate) struct ProjectHostSaveResult {
 #[derive(Debug)]
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
-    pub(crate) source_paths: Vec<FrozenMediaSource>,
+    pub(crate) sources: Vec<RenderSource>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -222,11 +222,11 @@ impl ProjectHost {
             .iter()
             .find(|sheet| sheet.sheet_id == sheet_id)
             .ok_or_else(|| "A Lâmina solicitada não existe no snapshot.".to_string())?;
-        let mut source_paths = Vec::new();
+        let mut sources = Vec::new();
         for media_id in sheet.referenced_media_ids() {
-            if source_paths
+            if sources
                 .iter()
-                .any(|source: &FrozenMediaSource| source.media_id() == media_id)
+                .any(|source: &RenderSource| source.media_id() == media_id)
             {
                 continue;
             }
@@ -240,12 +240,12 @@ impl ProjectHost {
                         "A fonte original da mídia {media_id} não pertence à mesma revisão do Projeto."
                     )
                 })?;
-            source_paths.push(FrozenMediaSource::new(media_id, media.path().to_path_buf()));
+            sources.push(
+                RenderSource::new(media_id, media.path().to_path_buf())
+                    .map_err(|error| format!("A fonte original congelada é inválida: {error}"))?,
+            );
         }
-        Ok(FrozenSheetExport {
-            snapshot,
-            source_paths,
-        })
+        Ok(FrozenSheetExport { snapshot, sources })
     }
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
@@ -398,7 +398,7 @@ mod tests {
             .expect("the neutral Export is frozen");
 
         assert!(frozen.snapshot.validate().is_ok());
-        assert!(frozen.source_paths.is_empty());
+        assert!(frozen.sources.is_empty());
     }
 
     #[test]
@@ -463,16 +463,12 @@ mod tests {
         );
 
         let frozen_paths = frozen
-            .source_paths
+            .sources
             .iter()
             .map(|source| source.source_path().to_path_buf())
             .collect::<Vec<_>>();
         assert_eq!(frozen_paths, [shared_path, right_path]);
-        assert_eq!(
-            frozen.source_paths.len(),
-            2,
-            "a reused original is listed once"
-        );
+        assert_eq!(frozen.sources.len(), 2, "a reused original is listed once");
 
         fixture
             .host
@@ -561,7 +557,7 @@ mod tests {
                     output_path.clone(),
                     ExportWriteAuthorization::CreateOnly,
                     sheet_id,
-                    frozen.source_paths,
+                    frozen.sources,
                 ),
             )
             .expect("the Host snapshot owns the exact Export dependencies");
@@ -573,21 +569,12 @@ mod tests {
             let root_bindings = path_io::capture_root_bindings(operation_paths)
                 .await
                 .expect("the Export roots are captured once");
-            let sources = path_io::fingerprint_media_sources(
-                root_bindings.clone(),
-                planned.source_dependencies().to_vec(),
-            )
-            .await
-            .expect("the planned originals are fingerprinted");
-            let plan = planned
-                .bind_sources(sources)
-                .expect("the fingerprints bind only to their frozen dependencies");
             let log_directory = project_root.path().join("processor-logs");
             std::fs::create_dir(&log_directory).expect("the processor log directory exists");
             let mut transport = RealProcessTransport::stable(executable, log_directory);
             let published = export_pipeline::execute(
                 &mut transport,
-                plan,
+                planned,
                 &root_bindings,
                 &export_pipeline::ExportExecutionControl::default(),
                 &|_| {},

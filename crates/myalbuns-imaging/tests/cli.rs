@@ -2,6 +2,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(windows)]
+use std::time::{Duration, Instant};
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{
@@ -14,13 +16,19 @@ use myalbuns_core::{
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
     ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgressStage,
-    ImagingRequest, ImagingResponse, MediaSource, decode_event_stream, root_binding_plan_sha256,
+    ImagingRequest, ImagingResponse, MediaSource, RenderSource, decode_event_stream,
+    root_binding_plan_sha256,
 };
 use myalbuns_paths::{
     AppPaths, CachePathPlan, NativePathDto, OperationPathContext, RootBindingPlan,
     project_data_namespace,
 };
 use sha2::{Digest, Sha256};
+#[cfg(windows)]
+use windows_sys::Win32::{
+    Foundation::{CloseHandle, STILL_ACTIVE},
+    System::Threading::{GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+};
 
 #[path = "../../../tests/support/sample_project.rs"]
 mod sample_project;
@@ -298,20 +306,14 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
                 .iter()
                 .find(|media| media.id().hyphenated().to_string() == media_id)
                 .expect("every composed Decorative belongs to the frozen revision");
-            let bytes = std::fs::read(media.path()).expect("the exact original is readable");
             sources.push(
-                MediaSource::new(
-                    media_id,
-                    media.path().to_path_buf(),
-                    bytes.len() as u64,
-                    format!("{:x}", Sha256::digest(&bytes)),
-                )
-                .expect("the exact original descriptor is valid"),
+                RenderSource::new(media_id, media.path().to_path_buf())
+                    .expect("the exact original descriptor is valid"),
             );
         }
         let mut paths = Vec::with_capacity(sources.len() + 1);
         paths.push(output_path.as_path());
-        paths.extend(sources.iter().map(MediaSource::source_path));
+        paths.extend(sources.iter().map(RenderSource::source_path));
         let bindings = root_bindings(&paths);
         let request = ImagingRequest::new(
             format!("visible-revision-{index}"),
@@ -734,7 +736,6 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the linked JPEG is written");
     let source_bytes = std::fs::read(&source_path).expect("the source is readable");
-    let source_sha256 = format!("{:x}", Sha256::digest(&source_bytes));
     let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
     snapshot.composition.frame_border = ProjectedFrameBorder::None;
     let sheet = &mut snapshot.composition.sheets[0];
@@ -754,13 +755,8 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
     photo.draw_rect = frame.clip_rect.clone();
     photo.rotation_degrees = 0.0;
     photo.mirror_x = false;
-    let source = MediaSource::new(
-        photo.media_id.clone(),
-        source_path,
-        source_bytes.len() as u64,
-        source_sha256,
-    )
-    .expect("the linked source is valid");
+    let source =
+        RenderSource::new(photo.media_id.clone(), source_path).expect("the linked source is valid");
 
     let result = invoke_real_processor(
         snapshot.clone(),
@@ -847,7 +843,6 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
     RgbaImage::from_pixel(40, 20, Rgba([220, 20, 20, 128]))
         .save_with_format(&decorative_path, ImageFormat::Png)
         .expect("the transparent Decorative is written");
-    let photo_bytes = std::fs::read(&photo_path).expect("the Photo is readable");
     let decorative_bytes = std::fs::read(&decorative_path).expect("the Decorative is readable");
 
     let mut snapshot = sample_session(SampleProject::Horizon, 3).render_snapshot();
@@ -880,20 +875,10 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
         ..overlay
     }];
 
-    let photo_source = MediaSource::new(
-        photo_media_id,
-        photo_path,
-        photo_bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&photo_bytes)),
-    )
-    .expect("the Photo source is valid");
-    let decorative_source = MediaSource::new(
-        "decorative-overlay",
-        decorative_path.clone(),
-        decorative_bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&decorative_bytes)),
-    )
-    .expect("the Decorative source is valid");
+    let photo_source =
+        RenderSource::new(photo_media_id, photo_path).expect("the Photo source is valid");
+    let decorative_source = RenderSource::new("decorative-overlay", decorative_path.clone())
+        .expect("the Decorative source is valid");
 
     let result = invoke_real_processor(
         snapshot,
@@ -927,7 +912,7 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
 }
 
 #[test]
-fn processor_identifies_source_verification_failures() {
+fn processor_opens_the_current_original_once_and_classifies_its_content() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
@@ -940,8 +925,6 @@ fn processor_identifies_source_verification_failures() {
         output_dir.path().join("source-verification.jpg"),
         "source-verification",
         &source_path,
-        original.len() as u64,
-        format!("{:x}", Sha256::digest(&original)),
     );
     let mut changed = original;
     changed[0] ^= 0xff;
@@ -951,9 +934,9 @@ fn processor_identifies_source_verification_failures() {
 
     assert_eq!(
         render_failure_stage(&result, "source-verification"),
-        ImagingFailureStage::SourceVerification
+        ImagingFailureStage::SourceDecode
     );
-    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
+    assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_decode\""));
 }
 
 #[test]
@@ -963,13 +946,8 @@ fn processor_identifies_a_missing_original_as_a_source_verification_failure() {
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let source_path = source_dir.path().join("missing-photo.jpg");
     let output_path = output_dir.path().join("missing-original.jpg");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "missing-original",
-        &source_path,
-        1024,
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
-    );
+    let request =
+        single_photo_render_request(output_path.clone(), "missing-original", &source_path);
 
     let result = invoke_render_request(&request, Some(log_dir.path()));
 
@@ -1000,8 +978,6 @@ fn processor_identifies_source_decode_failures() {
         output_dir.path().join("source-decode.jpg"),
         "source-decode",
         &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(bytes)),
     );
 
     let result = invoke_render_request(&request, Some(log_dir.path()));
@@ -1021,13 +997,8 @@ fn processor_decodes_a_supported_progressive_jpeg_in_the_isolated_worker() {
     let output_path = output_dir.path().join("progressive-output.jpg");
     let bytes = include_bytes!("fixtures/progressive-420-dri.jpg");
     std::fs::write(&source_path, bytes).expect("the progressive JPEG fixture is written");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "progressive-worker",
-        &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(bytes)),
-    );
+    let request =
+        single_photo_render_request(output_path.clone(), "progressive-worker", &source_path);
 
     let result = invoke_render_request(&request, None);
 
@@ -1042,6 +1013,46 @@ fn processor_decodes_a_supported_progressive_jpeg_in_the_isolated_worker() {
     image::open(output_path).expect("the exported JPEG decodes");
 }
 
+#[cfg(windows)]
+#[test]
+fn cancelling_processor_during_progressive_decode_leaves_no_worker_process() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let barrier_dir = tempfile::tempdir().expect("temporary worker barrier directory");
+    let source_path = source_dir.path().join("progressive.jpg");
+    let output_path = output_dir.path().join("cancelled-progressive.jpg");
+    let barrier_path = barrier_dir.path().join("worker.pid");
+    let bytes = include_bytes!("fixtures/progressive-420-dri.jpg");
+    std::fs::write(&source_path, bytes).expect("the progressive JPEG fixture is written");
+    let request =
+        single_photo_render_request(output_path, "cancel-progressive-worker", &source_path);
+    let command = ImagingCommand::render(request);
+    let mut processor = spawn_imaging_command_with_barrier(&command, &barrier_path);
+    let worker_pid = wait_for_worker_pid(&barrier_path);
+    assert!(
+        process_is_running(worker_pid),
+        "the worker reached progressive decode"
+    );
+
+    processor
+        .kill()
+        .expect("cancellation terminates the Processor");
+    processor.wait().expect("the cancelled Processor is reaped");
+    let worker_stopped = wait_for_process_exit(worker_pid, Duration::from_secs(2));
+
+    let _ = std::fs::remove_file(&barrier_path);
+    if !worker_stopped {
+        assert!(
+            wait_for_process_exit(worker_pid, Duration::from_secs(5)),
+            "the orphaned worker must exit after test cleanup"
+        );
+    }
+    assert!(
+        worker_stopped,
+        "cancelling the Processor must terminate its progressive JPEG worker"
+    );
+}
+
 #[test]
 fn processor_rejects_a_progressive_jpeg_decoder_budget_before_publication() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
@@ -1050,13 +1061,8 @@ fn processor_rejects_a_progressive_jpeg_decoder_budget_before_publication() {
     let output_path = output_dir.path().join("hostile-progressive-output.jpg");
     let bytes = progressive_jpeg_header(12_000, 10_000);
     std::fs::write(&source_path, &bytes).expect("the hostile progressive header is written");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "progressive-budget",
-        &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&bytes)),
-    );
+    let request =
+        single_photo_render_request(output_path.clone(), "progressive-budget", &source_path);
 
     let result = invoke_render_request(&request, None);
 
@@ -1078,8 +1084,6 @@ fn processor_rejects_tiff_by_detected_content_with_a_stable_code() {
         output_dir.path().join("unsupported-format.jpg"),
         "unsupported-format",
         &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(bytes)),
     );
     let media_id = request.sources[0].media_id().to_owned();
 
@@ -1106,8 +1110,6 @@ fn processor_classifies_a_short_unknown_source_by_format_not_decoder_failure() {
         output_dir.path().join("short-unknown.jpg"),
         "short-unknown",
         &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(bytes)),
     );
 
     let result = invoke_render_request(&request, None);
@@ -1125,13 +1127,7 @@ fn processor_classifies_an_empty_source_by_detected_format() {
     let source_path = source_dir.path().join("empty.png");
     std::fs::write(&source_path, []).expect("the empty source is written");
     let output_path = output_dir.path().join("empty-source.jpg");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "empty-source",
-        &source_path,
-        0,
-        format!("{:x}", Sha256::digest([])),
-    );
+    let request = single_photo_render_request(output_path.clone(), "empty-source", &source_path);
 
     let result = invoke_render_request(&request, None);
 
@@ -1157,8 +1153,6 @@ fn processor_rejects_apng_before_choosing_a_frame() {
         output_dir.path().join("animated.jpg"),
         "animated-source",
         &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&bytes)),
     );
 
     let result = invoke_render_request(&request, None);
@@ -1181,13 +1175,7 @@ fn processor_rejects_a_malformed_png_profile_before_publication() {
     insert_png_chunk_after_ihdr(&mut bytes, *b"iCCP", b"broken\0\0not-zlib");
     std::fs::write(&source_path, &bytes).expect("the malformed profile is written");
     let output_path = output_dir.path().join("bad-profile.jpg");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "bad-profile",
-        &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&bytes)),
-    );
+    let request = single_photo_render_request(output_path.clone(), "bad-profile", &source_path);
 
     let result = invoke_render_request(&request, None);
 
@@ -1210,13 +1198,7 @@ fn processor_checks_unique_source_pixels_separately_from_output_pixels() {
     set_png_dimensions(&mut bytes, 16_384, 16_384);
     std::fs::write(&source_path, &bytes).expect("the oversized header is written");
     let output_path = output_dir.path().join("source-limit.jpg");
-    let request = single_photo_render_request(
-        output_path.clone(),
-        "source-limit",
-        &source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&bytes)),
-    );
+    let request = single_photo_render_request(output_path.clone(), "source-limit", &source_path);
 
     let result = invoke_render_request(&request, None);
 
@@ -1440,7 +1422,7 @@ fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
     let logs = read_logs(log_dir.path());
     assert!(logs.contains("imaging_request_started"));
     assert!(logs.contains("imaging_render_failed"));
-    assert!(logs.contains("\"stage\":\"output_prepare\""));
+    assert!(logs.contains("\"stage\":\"output_encode\""));
     assert!(logs.contains("\"failure_code\":\"encode_failed\""));
     assert!(logs.contains("\"reason\":"));
     assert!(logs.contains(request_id));
@@ -1461,8 +1443,6 @@ fn single_photo_render_request(
     output_path: PathBuf,
     request_id: &str,
     source_path: &Path,
-    source_bytes: u64,
-    source_sha256: String,
 ) -> ImagingRequest {
     let mut snapshot = sample_session(SampleProject::Horizon, 2).render_snapshot();
     let sheet = snapshot
@@ -1479,13 +1459,8 @@ fn single_photo_render_request(
         .media_id
         .clone();
     let sheet_id = sheet.sheet_id.clone();
-    let source = MediaSource::new(
-        media_id,
-        source_path.to_path_buf(),
-        source_bytes,
-        source_sha256,
-    )
-    .expect("the linked source is valid");
+    let source =
+        RenderSource::new(media_id, source_path.to_path_buf()).expect("the linked source is valid");
     let bindings = root_bindings(&[&output_path, source.source_path()]);
     let unit = snapshot
         .output_unit(&sheet_id)
@@ -1575,20 +1550,14 @@ fn render_request_with_temp_originals(
         })
         .save_with_format(&source_path, ImageFormat::Png)
         .expect("the temporary original is written");
-        let source_bytes = std::fs::read(&source_path).expect("the original is readable");
         sources.push(
-            MediaSource::new(
-                media_id,
-                source_path,
-                source_bytes.len() as u64,
-                format!("{:x}", Sha256::digest(&source_bytes)),
-            )
-            .expect("the temporary original source is valid"),
+            RenderSource::new(media_id, source_path)
+                .expect("the temporary original source is valid"),
         );
     }
     let mut paths = Vec::with_capacity(sources.len() + 1);
     paths.push(output_path);
-    paths.extend(sources.iter().map(MediaSource::source_path));
+    paths.extend(sources.iter().map(RenderSource::source_path));
     let bindings = root_bindings(&paths);
     drop(paths);
     let unit = snapshot
@@ -1613,7 +1582,7 @@ fn invoke_real_processor(
     output_path: &Path,
     request_id: &str,
     dpi: u32,
-    sources: Vec<MediaSource>,
+    sources: Vec<RenderSource>,
 ) -> std::process::Output {
     let sheet_id = snapshot
         .composition
@@ -1624,7 +1593,7 @@ fn invoke_real_processor(
         .clone();
     let mut paths = Vec::with_capacity(sources.len() + 1);
     paths.push(output_path);
-    paths.extend(sources.iter().map(MediaSource::source_path));
+    paths.extend(sources.iter().map(RenderSource::source_path));
     let bindings = root_bindings(&paths);
     drop(paths);
     let unit = snapshot
@@ -1744,6 +1713,19 @@ fn invoke_imaging_command(
 }
 
 fn spawn_imaging_command(command: &ImagingCommand, log_dir: Option<&Path>) -> Child {
+    spawn_imaging_command_with_options(command, log_dir, None)
+}
+
+#[cfg(windows)]
+fn spawn_imaging_command_with_barrier(command: &ImagingCommand, barrier: &Path) -> Child {
+    spawn_imaging_command_with_options(command, None, Some(barrier))
+}
+
+fn spawn_imaging_command_with_options(
+    command: &ImagingCommand,
+    log_dir: Option<&Path>,
+    progressive_decode_barrier: Option<&Path>,
+) -> Child {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
     process
         .stdin(Stdio::piped())
@@ -1751,6 +1733,9 @@ fn spawn_imaging_command(command: &ImagingCommand, log_dir: Option<&Path>) -> Ch
         .stderr(Stdio::piped());
     if let Some(log_dir) = log_dir {
         process.env("MYALBUNS_LOG_DIR", log_dir);
+    }
+    if let Some(barrier) = progressive_decode_barrier {
+        process.env("MYALBUNS_TEST_PROGRESSIVE_DECODE_BARRIER", barrier);
     }
     let mut child = process.spawn().expect("processor starts");
     let mut payload = serde_json::to_vec(command).expect("command is serializable");
@@ -1762,4 +1747,48 @@ fn spawn_imaging_command(command: &ImagingCommand, log_dir: Option<&Path>) -> Ch
         .write_all(&payload)
         .expect("command is sent");
     child
+}
+
+#[cfg(windows)]
+fn wait_for_worker_pid(barrier: &Path) -> u32 {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Ok(pid) = std::fs::read_to_string(barrier)
+            && let Ok(pid) = pid.parse()
+        {
+            return pid;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "the progressive worker did not reach the decode barrier"
+        );
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[cfg(windows)]
+fn wait_for_process_exit(process_id: u32, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    while Instant::now() < deadline {
+        if !process_is_running(process_id) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    !process_is_running(process_id)
+}
+
+#[cfg(windows)]
+fn process_is_running(process_id: u32) -> bool {
+    // SAFETY: the handle is checked before use and closed on every path.
+    unsafe {
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+        if process.is_null() {
+            return false;
+        }
+        let mut exit_code = 0;
+        let queried = GetExitCodeProcess(process, &mut exit_code) != 0;
+        CloseHandle(process);
+        queried && exit_code == STILL_ACTIVE as u32
+    }
 }

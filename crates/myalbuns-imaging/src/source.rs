@@ -1,36 +1,32 @@
+mod cache;
+mod progressive_jpeg;
+
+pub(crate) use cache::{
+    cache_source_orientation, decode_source, read_verified_source, verify_source_current,
+};
+pub(crate) use progressive_jpeg::{JPEG_WORKER_MODE, run_jpeg_worker};
+
 use std::{
-    ffi::OsString,
-    fs,
     fs::File,
-    io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom, Write},
-    path::Path,
-    process::ExitCode,
+    io::{BufRead, BufReader, Read, Seek, SeekFrom},
 };
 
 use image::{
-    ColorType, DynamicImage, ImageDecoder, ImageError, ImageFormat, ImageReader, Limits, RgbaImage,
+    ColorType, ImageDecoder, ImageError, Limits, RgbaImage,
     codecs::{jpeg::JpegDecoder, png::PngDecoder},
     metadata::Orientation,
 };
-use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode, MediaSource};
+use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode};
 use myalbuns_paths::ResolvedObject;
-use sha2::{Digest, Sha256};
 
 pub(crate) const MAX_DECODED_SOURCE_PIXELS_TOTAL: u64 = 134_217_728;
-const MAX_JPEG_PROGRESSIVE_WORKING_BYTES: u64 = 512 * 1024 * 1024;
-const JPEG_PROGRESSIVE_AUXILIARY_I16S_PER_STRIDE: u64 = 320;
 const MAX_ALLOWED_ICC_PROFILE_BYTES: usize = 60_988;
 const MAX_PNG_ICCP_CHUNK_BYTES: usize = 1024 * 1024;
 const PNG_SRGB_GAMMA: u32 = 45_455;
 const PNG_SRGB_CHROMATICITIES: [u32; 8] = [
     31_270, 32_900, 64_000, 33_000, 30_000, 60_000, 15_000, 6_000,
 ];
-pub(crate) const JPEG_WORKER_MODE: &str = "--decode-progressive-jpeg";
-const JPEG_WORKER_MAGIC: [u8; 4] = *b"MAJ1";
-const JPEG_WORKER_HEADER_BYTES: usize = 21;
-const JPEG_WORKER_COMPLETED: u8 = 0;
-const JPEG_WORKER_RESOURCE_LIMIT: u8 = 1;
-const JPEG_WORKER_DECODE_FAILED: u8 = 2;
+const PNG_SRGB_CICP: [u8; 4] = [0x01, 0x0d, 0x00, 0x01];
 const SRGB_2014: &[u8] = include_bytes!("../assets/sRGB2014.icc");
 const SRGB_V4_PREFERENCE: &[u8] = include_bytes!("../assets/sRGB_v4_ICC_preference.icc");
 const SRGB_V4_PREFERENCE_DISPLAY: &[u8] =
@@ -66,6 +62,7 @@ impl SourceFailure {
 pub(crate) struct OpenRenderSource {
     reader: BufReader<File>,
     preflight: SourcePreflight,
+    source_bytes: u64,
 }
 
 enum SourcePreflight {
@@ -103,6 +100,10 @@ struct PngPreflight {
 }
 
 impl OpenRenderSource {
+    pub(crate) fn byte_count(&self) -> u64 {
+        self.source_bytes
+    }
+
     pub(crate) fn pixel_count(&self) -> Result<u64, SourceFailure> {
         let (width, height) = match &self.preflight {
             SourcePreflight::Jpeg(preflight) => (preflight.width, preflight.height),
@@ -127,7 +128,6 @@ impl OpenRenderSource {
 }
 
 pub(crate) fn open_render_source(
-    source: &MediaSource,
     resolved: &ResolvedObject,
 ) -> Result<OpenRenderSource, SourceFailure> {
     let file = resolved.reopen_for_read().map_err(|error| {
@@ -148,35 +148,16 @@ pub(crate) fn open_render_source(
             "a fonte original não é um arquivo regular",
         ));
     }
-    if metadata.len() != source.source_bytes() {
-        return Err(SourceFailure::path(
-            ImagingPathCode::Conflict,
-            "a fonte original mudou desde o planejamento",
-        ));
-    }
-
+    let source_bytes = metadata.len();
     let mut reader = BufReader::new(file);
-    let digest = sha256_reader(&mut reader).map_err(|error| {
-        SourceFailure::path(
-            ImagingPathCode::from_io_error(&error),
-            format!("não foi possível verificar a fonte original: {error}"),
-        )
-    })?;
-    if !digest.eq_ignore_ascii_case(source.source_sha256()) {
-        return Err(SourceFailure::path(
-            ImagingPathCode::Conflict,
-            "a fonte original mudou desde o planejamento",
-        ));
-    }
-    rewind(&mut reader)?;
     let mut signature = [0_u8; 8];
     let signature_length = read_signature(&mut reader, &mut signature)?;
     rewind(&mut reader)?;
     let preflight = if signature_length >= 2 && signature.starts_with(&[0xff, 0xd8]) {
-        SourcePreflight::Jpeg(preflight_jpeg(&mut reader, source.source_bytes())?)
+        SourcePreflight::Jpeg(preflight_jpeg(&mut reader, source_bytes)?)
     } else if signature_length == signature.len() && signature == [137, 80, 78, 71, 13, 10, 26, 10]
     {
-        SourcePreflight::Png(preflight_png(&mut reader, source.source_bytes())?)
+        SourcePreflight::Png(preflight_png(&mut reader, source_bytes)?)
     } else {
         return Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedSourceFormat,
@@ -184,7 +165,11 @@ pub(crate) fn open_render_source(
         ));
     };
     rewind(&mut reader)?;
-    Ok(OpenRenderSource { reader, preflight })
+    Ok(OpenRenderSource {
+        reader,
+        preflight,
+        source_bytes,
+    })
 }
 
 fn read_signature(reader: &mut impl Read, signature: &mut [u8]) -> Result<usize, SourceFailure> {
@@ -203,19 +188,6 @@ fn read_signature(reader: &mut impl Read, signature: &mut [u8]) -> Result<usize,
         }
     }
     Ok(filled)
-}
-
-fn sha256_reader(reader: &mut impl Read) -> std::io::Result<String> {
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = reader.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn rewind(reader: &mut impl Seek) -> Result<(), SourceFailure> {
@@ -365,21 +337,13 @@ fn preflight_jpeg(
             }
             let progressive = marker == 0xc2;
             if progressive {
-                let working_bytes = jpeg_progressive_working_bytes(
+                progressive_jpeg::validate_working_budget(
                     width,
                     height,
                     components,
                     &payload,
                     source_bytes,
                 )?;
-                if working_bytes > MAX_JPEG_PROGRESSIVE_WORKING_BYTES {
-                    return Err(SourceFailure::new(
-                        ImagingFailureCode::ResourceLimitExceeded,
-                        format!(
-                            "o JPEG progressivo exigiria {working_bytes} bytes de trabalho e excede o limite de {MAX_JPEG_PROGRESSIVE_WORKING_BYTES}"
-                        ),
-                    ));
-                }
             }
             component_layout = Some(detected_layout);
             is_progressive = Some(progressive);
@@ -473,118 +437,6 @@ fn classify_jpeg_color_model(
             "o transform Adobe não corresponde a um modelo JPEG aceito",
         )),
     }
-}
-
-fn jpeg_progressive_working_bytes(
-    width: u32,
-    height: u32,
-    component_count: u8,
-    sof_payload: &[u8],
-    compressed_bytes: u64,
-) -> Result<u64, SourceFailure> {
-    let mut factors = [(0_u64, 0_u64); 4];
-    let mut horizontal_max = 0_u64;
-    let mut vertical_max = 0_u64;
-    for (index, factor) in factors
-        .iter_mut()
-        .take(usize::from(component_count))
-        .enumerate()
-    {
-        let sampling = sof_payload[7 + index * 3];
-        let horizontal = u64::from(sampling >> 4);
-        let vertical = u64::from(sampling & 0x0f);
-        if horizontal == 0 || vertical == 0 || horizontal > 4 || vertical > 4 {
-            return Err(SourceFailure::new(
-                ImagingFailureCode::DecodeFailed,
-                "os fatores de amostragem JPEG são inválidos",
-            ));
-        }
-        *factor = (horizontal, vertical);
-        horizontal_max = horizontal_max.max(horizontal);
-        vertical_max = vertical_max.max(vertical);
-    }
-
-    let mcu_width = u64::from(width)
-        .checked_add(horizontal_max * 8 - 1)
-        .and_then(|value| value.checked_div(horizontal_max * 8))
-        .ok_or_else(jpeg_working_range_failure)?;
-    let mcu_height = u64::from(height)
-        .checked_add(vertical_max * 8 - 1)
-        .and_then(|value| value.checked_div(vertical_max * 8))
-        .ok_or_else(jpeg_working_range_failure)?;
-    let mcu_count = mcu_width
-        .checked_mul(mcu_height)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let coefficient_elements = factors
-        .iter()
-        .take(usize::from(component_count))
-        .try_fold(0_u64, |total, (horizontal, vertical)| {
-            horizontal
-                .checked_mul(*vertical)
-                .and_then(|sampling| sampling.checked_mul(64))
-                .and_then(|per_mcu| per_mcu.checked_mul(mcu_count))
-                .and_then(|component| total.checked_add(component))
-        })
-        .ok_or_else(jpeg_working_range_failure)?;
-    let coefficient_bytes = coefficient_elements
-        .checked_mul(2)
-        .ok_or_else(jpeg_working_range_failure)?;
-    // zune-jpeg 0.5.15 allocates progressive coefficient planes plus per-component
-    // raw, row, upsampling, and scratch buffers with infallible `vec!`/`resize`.
-    // Sampling factors are capped at four, so 320 i16 values per padded stride
-    // conservatively covers every auxiliary row allocation, including the generic
-    // 4x4 upsampler and its doubled compatibility destination.
-    let auxiliary_elements = factors
-        .iter()
-        .take(usize::from(component_count))
-        .try_fold(0_u64, |total, (horizontal, vertical)| {
-            mcu_width
-                .checked_mul(*horizontal)
-                .and_then(|stride_blocks| stride_blocks.checked_mul(8))
-                .and_then(|stride| stride.checked_mul(*vertical))
-                .and_then(|rows| rows.checked_mul(JPEG_PROGRESSIVE_AUXILIARY_I16S_PER_STRIDE))
-                .and_then(|component| total.checked_add(component))
-        })
-        .ok_or_else(jpeg_working_range_failure)?;
-    let auxiliary_bytes = auxiliary_elements
-        .checked_mul(2)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let pixels = u64::from(width)
-        .checked_mul(u64::from(height))
-        .ok_or_else(jpeg_working_range_failure)?;
-    let decoded_components = if component_count == 1 { 1 } else { 3 };
-    let raw_bytes = pixels
-        .checked_mul(decoded_components)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let normalized_bytes = pixels
-        .checked_mul(4)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let decoder_peak = compressed_bytes
-        .checked_mul(2)
-        .and_then(|value| value.checked_add(raw_bytes))
-        .and_then(|value| value.checked_add(coefficient_bytes))
-        .and_then(|value| value.checked_add(auxiliary_bytes))
-        .ok_or_else(jpeg_working_range_failure)?;
-    let normalization_peak = raw_bytes
-        .checked_add(normalized_bytes)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let transport_peak = normalized_bytes
-        .checked_mul(2)
-        .ok_or_else(jpeg_working_range_failure)?;
-    let input_transfer_peak = compressed_bytes
-        .checked_mul(2)
-        .ok_or_else(jpeg_working_range_failure)?;
-    Ok(decoder_peak
-        .max(normalization_peak)
-        .max(transport_peak)
-        .max(input_transfer_peak))
-}
-
-fn jpeg_working_range_failure() -> SourceFailure {
-    SourceFailure::new(
-        ImagingFailureCode::ResourceLimitExceeded,
-        "as estruturas internas do decoder JPEG excederam o intervalo seguro",
-    )
 }
 
 fn read_jpeg_marker(reader: &mut impl Read) -> Result<u8, SourceFailure> {
@@ -760,6 +612,7 @@ fn preflight_png(
     let mut has_srgb = false;
     let mut gamma = None;
     let mut chromaticities = None;
+    let mut cicp = None;
     let mut found_iend = false;
     loop {
         let mut header = [0_u8; 8];
@@ -859,6 +712,21 @@ fn preflight_png(
                     let start = index * 4;
                     u32::from_be_bytes(payload[start..start + 4].try_into().expect("quatro bytes"))
                 }));
+            }
+            b"cICP" => {
+                if cicp.is_some() || length != PNG_SRGB_CICP.len() {
+                    return Err(unsupported_profile("a declaração cICP do PNG é inválida"));
+                }
+                let payload = read_segment(reader, length)?;
+                let declaration: [u8; 4] = payload
+                    .try_into()
+                    .expect("o comprimento cICP foi validado acima");
+                if declaration != PNG_SRGB_CICP {
+                    return Err(unsupported_profile(
+                        "a declaração cICP do PNG não descreve sRGB full-range",
+                    ));
+                }
+                cicp = Some(declaration);
             }
             b"IEND" => {
                 if length != 0 {
@@ -1058,7 +926,7 @@ fn decode_render_jpeg(
 ) -> Result<RgbaImage, SourceFailure> {
     if preflight.is_progressive {
         #[cfg(not(test))]
-        return decode_progressive_jpeg_in_worker(reader, preflight);
+        return progressive_jpeg::decode_in_worker(reader, preflight);
     }
     decode_render_jpeg_in_process(reader, preflight)
 }
@@ -1104,253 +972,6 @@ fn decode_render_jpeg_in_process<R: BufRead + Seek>(
     let raw = decode_raw(decoder)?;
     let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
     apply_orientation(image, preflight.orientation)
-}
-
-#[cfg(not(test))]
-fn decode_progressive_jpeg_in_worker(
-    mut reader: BufReader<File>,
-    preflight: JpegPreflight,
-) -> Result<RgbaImage, SourceFailure> {
-    let compressed = read_segment(&mut reader, preflight.compressed_bytes)?;
-    let executable = std::env::current_exe().map_err(|error| {
-        SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            format!("não foi possível localizar o worker JPEG: {error}"),
-        )
-    })?;
-    let mut child = std::process::Command::new(executable)
-        .arg(JPEG_WORKER_MODE)
-        .arg(preflight.compressed_bytes.to_string())
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|error| {
-            SourceFailure::new(
-                ImagingFailureCode::DecodeFailed,
-                format!("não foi possível iniciar o worker JPEG: {error}"),
-            )
-        })?;
-    let mut stdin = child
-        .stdin
-        .take()
-        .expect("the JPEG worker stdin was configured as piped");
-    let write_result = stdin.write_all(&compressed);
-    drop(stdin);
-    drop(compressed);
-
-    let mut stdout = child
-        .stdout
-        .take()
-        .expect("the JPEG worker stdout was configured as piped");
-    let mut header = [0_u8; JPEG_WORKER_HEADER_BYTES];
-    let header_result = stdout.read_exact(&mut header);
-    if write_result.is_err() || header_result.is_err() {
-        return Err(worker_transport_failure(child));
-    }
-    if header[..4] != JPEG_WORKER_MAGIC {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o worker JPEG respondeu com um cabeçalho inválido",
-        ));
-    }
-    match header[4] {
-        JPEG_WORKER_RESOURCE_LIMIT => {
-            let _ = child.wait();
-            return Err(SourceFailure::new(
-                ImagingFailureCode::ResourceLimitExceeded,
-                "o worker JPEG não conseguiu reservar memória para a fonte progressiva",
-            ));
-        }
-        JPEG_WORKER_DECODE_FAILED => {
-            let _ = child.wait();
-            return Err(SourceFailure::new(
-                ImagingFailureCode::DecodeFailed,
-                "o worker JPEG recusou a fonte progressiva",
-            ));
-        }
-        JPEG_WORKER_COMPLETED => {}
-        _ => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(SourceFailure::new(
-                ImagingFailureCode::DecodeFailed,
-                "o worker JPEG respondeu com um estado inválido",
-            ));
-        }
-    }
-
-    let width = u32::from_be_bytes(header[5..9].try_into().expect("four bytes"));
-    let height = u32::from_be_bytes(header[9..13].try_into().expect("four bytes"));
-    let raw_length = u64::from_be_bytes(header[13..21].try_into().expect("eight bytes"));
-    let expected_dimensions = oriented_dimensions(&preflight);
-    let expected_length = u64::from(expected_dimensions.0)
-        .checked_mul(u64::from(expected_dimensions.1))
-        .and_then(|pixels| pixels.checked_mul(4))
-        .ok_or_else(jpeg_working_range_failure)?;
-    if (width, height) != expected_dimensions || raw_length != expected_length {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o worker JPEG produziu dimensões inesperadas",
-        ));
-    }
-    let raw_length = match usize::try_from(raw_length) {
-        Ok(raw_length) => raw_length,
-        Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(jpeg_working_range_failure());
-        }
-    };
-    let mut raw = Vec::new();
-    if raw.try_reserve_exact(raw_length).is_err() {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(SourceFailure::new(
-            ImagingFailureCode::ResourceLimitExceeded,
-            "não há memória suficiente para receber o raster JPEG progressivo",
-        ));
-    }
-    raw.resize(raw_length, 0);
-    if stdout.read_exact(&mut raw).is_err() {
-        return Err(worker_transport_failure(child));
-    }
-    let mut trailing = [0_u8; 1];
-    if stdout.read(&mut trailing).unwrap_or(1) != 0 {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o worker JPEG produziu bytes além do raster esperado",
-        ));
-    }
-    let status = child.wait().map_err(|error| {
-        SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            format!("não foi possível aguardar o worker JPEG: {error}"),
-        )
-    })?;
-    if !status.success() {
-        return Err(SourceFailure::new(
-            ImagingFailureCode::ResourceLimitExceeded,
-            "o worker JPEG terminou durante a decodificação progressiva",
-        ));
-    }
-    RgbaImage::from_raw(width, height, raw).ok_or_else(|| {
-        SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o raster do worker JPEG não corresponde às dimensões declaradas",
-        )
-    })
-}
-
-#[cfg(not(test))]
-fn worker_transport_failure(mut child: std::process::Child) -> SourceFailure {
-    let status = child.wait().ok();
-    let code = if status.is_some_and(|status| status.success()) {
-        ImagingFailureCode::DecodeFailed
-    } else {
-        ImagingFailureCode::ResourceLimitExceeded
-    };
-    SourceFailure::new(code, "o worker JPEG não concluiu sua resposta")
-}
-
-#[cfg(not(test))]
-fn oriented_dimensions(preflight: &JpegPreflight) -> (u32, u32) {
-    if matches!(
-        preflight.orientation,
-        Orientation::Rotate90
-            | Orientation::Rotate270
-            | Orientation::Rotate90FlipH
-            | Orientation::Rotate270FlipH
-    ) {
-        (preflight.height, preflight.width)
-    } else {
-        (preflight.width, preflight.height)
-    }
-}
-
-pub(crate) fn run_jpeg_worker(total_bytes: Option<OsString>) -> ExitCode {
-    let Some(total_bytes) = total_bytes
-        .and_then(|value| value.into_string().ok())
-        .and_then(|value| value.parse::<usize>().ok())
-    else {
-        return ExitCode::FAILURE;
-    };
-    let outcome = std::panic::catch_unwind(|| decode_worker_jpeg(total_bytes));
-    let response = match outcome {
-        Ok(Ok(image)) => write_worker_image(image),
-        Ok(Err(failure)) if failure.code == ImagingFailureCode::ResourceLimitExceeded => {
-            write_worker_header(JPEG_WORKER_RESOURCE_LIMIT, 0, 0, 0)
-        }
-        Ok(Err(_)) | Err(_) => write_worker_header(JPEG_WORKER_DECODE_FAILED, 0, 0, 0),
-    };
-    if response.is_ok() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
-    }
-}
-
-fn decode_worker_jpeg(total_bytes: usize) -> Result<RgbaImage, SourceFailure> {
-    let mut compressed = Vec::new();
-    compressed.try_reserve_exact(total_bytes).map_err(|_| {
-        SourceFailure::new(
-            ImagingFailureCode::ResourceLimitExceeded,
-            "não há memória suficiente para receber a fonte JPEG progressiva",
-        )
-    })?;
-    compressed.resize(total_bytes, 0);
-    std::io::stdin()
-        .lock()
-        .read_exact(&mut compressed)
-        .map_err(|error| {
-            SourceFailure::new(
-                ImagingFailureCode::DecodeFailed,
-                format!("não foi possível receber a fonte JPEG progressiva: {error}"),
-            )
-        })?;
-    let mut reader = BufReader::new(Cursor::new(compressed));
-    let preflight = preflight_jpeg(&mut reader, total_bytes as u64)?;
-    if !preflight.is_progressive {
-        return Err(SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o worker recebeu um JPEG que não é progressivo",
-        ));
-    }
-    rewind(&mut reader)?;
-    decode_render_jpeg_in_process(reader, preflight)
-}
-
-fn write_worker_image(image: RgbaImage) -> std::io::Result<()> {
-    let width = image.width();
-    let height = image.height();
-    let raw = image.into_raw();
-    write_worker_header(JPEG_WORKER_COMPLETED, width, height, raw.len() as u64)?;
-    let mut stdout = std::io::stdout().lock();
-    stdout.write_all(&raw)?;
-    stdout.flush()
-}
-
-fn write_worker_header(
-    status: u8,
-    width: u32,
-    height: u32,
-    raw_length: u64,
-) -> std::io::Result<()> {
-    let mut header = [0_u8; JPEG_WORKER_HEADER_BYTES];
-    header[..4].copy_from_slice(&JPEG_WORKER_MAGIC);
-    header[4] = status;
-    header[5..9].copy_from_slice(&width.to_be_bytes());
-    header[9..13].copy_from_slice(&height.to_be_bytes());
-    header[13..21].copy_from_slice(&raw_length.to_be_bytes());
-    let mut stdout = std::io::stdout().lock();
-    stdout.write_all(&header)?;
-    stdout.flush()
 }
 
 fn decode_render_png(
@@ -1634,158 +1255,6 @@ fn apply_orientation(
     Ok(output)
 }
 
-pub(crate) struct DecodedJpeg {
-    pub(crate) image: RgbaImage,
-    pub(crate) exif_orientation: u8,
-}
-
-pub(crate) struct DecodedSource {
-    pub(crate) image: RgbaImage,
-    pub(crate) exif_orientation: Option<u8>,
-}
-
-pub(crate) fn read_verified_source(
-    source: &MediaSource,
-    operational_path: &Path,
-) -> Result<Vec<u8>, String> {
-    let metadata = fs::metadata(operational_path).map_err(|error| {
-        format!(
-            "não foi possível abrir a mídia {}: {error}",
-            source.media_id()
-        )
-    })?;
-    if !metadata.is_file() || metadata.len() != source.source_bytes() {
-        return Err(source_changed_error(source));
-    }
-    let bytes = fs::read(operational_path)
-        .map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
-    if bytes.len() as u64 != source.source_bytes()
-        || !format!("{:x}", Sha256::digest(&bytes)).eq_ignore_ascii_case(source.source_sha256())
-    {
-        return Err(source_changed_error(source));
-    }
-    Ok(bytes)
-}
-
-pub(crate) fn sha256_file(path: &Path) -> Result<String, String> {
-    let file =
-        File::open(path).map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
-    let mut reader = BufReader::new(file);
-    sha256_reader(&mut reader)
-        .map_err(|error| format!("não foi possível verificar a Foto: {error}"))
-}
-
-pub(crate) fn verify_source_current(
-    source: &MediaSource,
-    operational_path: &Path,
-) -> Result<(), String> {
-    let metadata = fs::metadata(operational_path).map_err(|_| source_changed_error(source))?;
-    if !metadata.is_file()
-        || metadata.len() != source.source_bytes()
-        || !sha256_file(operational_path)?.eq_ignore_ascii_case(source.source_sha256())
-    {
-        return Err(source_changed_error(source));
-    }
-    Ok(())
-}
-
-pub(crate) fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<DecodedJpeg, String> {
-    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
-    let orientation = decoder
-        .orientation()
-        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
-    let exif_orientation = orientation.to_exif();
-    let mut decoded = DynamicImage::from_decoder(decoder)
-        .map_err(|error| format!("não foi possível decodificar a Foto: {error}"))?;
-    decoded.apply_orientation(orientation);
-    Ok(DecodedJpeg {
-        image: decoded.to_rgba8(),
-        exif_orientation,
-    })
-}
-
-pub(crate) fn cache_source_orientation(
-    media_id: &str,
-    verified_bytes: &[u8],
-) -> Result<Option<u8>, String> {
-    match source_format(media_id, verified_bytes)? {
-        ImageFormat::Jpeg => jpeg_orientation(media_id, verified_bytes).map(Some),
-        ImageFormat::Png => Ok(None),
-        _ => Err(format!(
-            "a mídia {media_id} não usa um formato aceito pelo Cache"
-        )),
-    }
-}
-
-pub(crate) fn decode_source(
-    media_id: &str,
-    verified_bytes: &[u8],
-) -> Result<DecodedSource, String> {
-    match source_format(media_id, verified_bytes)? {
-        ImageFormat::Jpeg => {
-            let decoded = decode_jpeg(media_id, verified_bytes)?;
-            Ok(DecodedSource {
-                image: decoded.image,
-                exif_orientation: Some(decoded.exif_orientation),
-            })
-        }
-        ImageFormat::Png => {
-            let decoded = ImageReader::new(Cursor::new(verified_bytes))
-                .with_guessed_format()
-                .map_err(|error| {
-                    format!("não foi possível inspecionar a mídia {media_id}: {error}")
-                })?
-                .decode()
-                .map_err(|error| format!("não foi possível decodificar a mídia: {error}"))?;
-            Ok(DecodedSource {
-                image: decoded.to_rgba8(),
-                exif_orientation: None,
-            })
-        }
-        _ => Err(format!(
-            "a mídia {media_id} não usa um formato aceito pelo Cache"
-        )),
-    }
-}
-
-fn jpeg_orientation(media_id: &str, verified_bytes: &[u8]) -> Result<u8, String> {
-    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
-    decoder
-        .orientation()
-        .map(|orientation| orientation.to_exif())
-        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))
-}
-
-fn source_format(media_id: &str, verified_bytes: &[u8]) -> Result<ImageFormat, String> {
-    ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a mídia {media_id}: {error}"))?
-        .format()
-        .ok_or_else(|| format!("não foi possível identificar o formato da mídia {media_id}"))
-}
-
-fn jpeg_decoder<'a>(
-    media_id: &str,
-    verified_bytes: &'a [u8],
-) -> Result<impl ImageDecoder + 'a, String> {
-    let reader = ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
-    if reader.format() != Some(ImageFormat::Jpeg) {
-        return Err(format!("a mídia {media_id} não é JPEG"));
-    }
-    reader
-        .into_decoder()
-        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))
-}
-
-fn source_changed_error(source: &MediaSource) -> String {
-    format!(
-        "a mídia {} mudou desde o planejamento da operação",
-        source.media_id()
-    )
-}
-
 #[cfg(test)]
 mod render_source_tests {
     use std::io::Read as _;
@@ -1793,7 +1262,7 @@ mod render_source_tests {
     use image::{
         ExtendedColorType, ImageEncoder, ImageError, Rgb, RgbImage, codecs::jpeg::JpegEncoder,
     };
-    use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode, MediaSource};
+    use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode};
     use myalbuns_paths::{ExpectedObject, OperationPathContext};
     use sha2::{Digest, Sha256};
 
@@ -1988,6 +1457,63 @@ mod render_source_tests {
     }
 
     #[test]
+    fn png_cicp_accepts_only_full_range_srgb_and_rejects_conflicts() {
+        let srgb_cicp = [0x01, 0x0d, 0x00, 0x01];
+        let srgb_intent = [0_u8];
+        let srgb_gamma = 45_455_u32.to_be_bytes();
+        let srgb_chromaticities = png_chromaticities([
+            31_270, 32_900, 64_000, 33_000, 30_000, 60_000, 15_000, 6_000,
+        ]);
+
+        for chunks in [
+            vec![(b"cICP", srgb_cicp.as_slice())],
+            vec![
+                (b"cICP", srgb_cicp.as_slice()),
+                (b"sRGB", srgb_intent.as_slice()),
+                (b"gAMA", srgb_gamma.as_slice()),
+                (b"cHRM", srgb_chromaticities.as_slice()),
+            ],
+        ] {
+            let png = png_fixture(8, 2, &[0, 10, 20, 30], &chunks);
+            assert!(
+                decode_fixture(&png).is_ok(),
+                "full-range sRGB cICP is compatible with canonical sRGB declarations"
+            );
+        }
+
+        let display_p3 = [0x0c, 0x0d, 0x00, 0x01];
+        let pq = [0x09, 0x10, 0x00, 0x01];
+        let hlg = [0x09, 0x12, 0x00, 0x01];
+        let malformed = [0x01, 0x0d, 0x00];
+        let non_rgb_matrix = [0x01, 0x0d, 0x01, 0x01];
+        let narrow_range = [0x01, 0x0d, 0x00, 0x00];
+        for chunks in [
+            vec![(b"cICP", display_p3.as_slice())],
+            vec![(b"cICP", pq.as_slice())],
+            vec![(b"cICP", hlg.as_slice())],
+            vec![(b"cICP", malformed.as_slice())],
+            vec![(b"cICP", non_rgb_matrix.as_slice())],
+            vec![(b"cICP", narrow_range.as_slice())],
+            vec![
+                (b"cICP", srgb_cicp.as_slice()),
+                (b"cICP", srgb_cicp.as_slice()),
+            ],
+            vec![
+                (b"cICP", display_p3.as_slice()),
+                (b"sRGB", srgb_intent.as_slice()),
+            ],
+        ] {
+            let png = png_fixture(8, 2, &[0, 10, 20, 30], &chunks);
+            assert_eq!(
+                decode_fixture(&png)
+                    .expect_err("a non-sRGB or contradictory cICP declaration is rejected")
+                    .code,
+                ImagingFailureCode::UnsupportedColorProfile
+            );
+        }
+    }
+
+    #[test]
     fn jpeg_rgb_grayscale_and_exif_orientation_are_normalized_once() {
         let rgb = jpeg_fixture(None, ExtendedColorType::Rgb8, &[10, 20, 30]);
         assert!(decode_fixture(&rgb).is_ok());
@@ -2122,20 +1648,13 @@ mod render_source_tests {
         let root = tempfile::tempdir().expect("temporary render-source fixture");
         let path = root.path().join("original.bin");
         std::fs::write(&path, bytes).expect("the render-source fixture is writable");
-        let source = MediaSource::new(
-            "media-test",
-            path.clone(),
-            bytes.len() as u64,
-            format!("{:x}", Sha256::digest(bytes)),
-        )
-        .expect("the source descriptor is valid");
         let mut context = OperationPathContext::new();
         context.capture(&path).expect("the source root is captured");
         let resolved = context
             .freeze()
             .resolve_existing(&path, ExpectedObject::RegularFile)
             .expect("the source is resolved once");
-        open_render_source(&source, &resolved)
+        open_render_source(&resolved)
     }
 
     fn jpeg_fixture(profile: Option<&[u8]>, color: ExtendedColorType, pixels: &[u8]) -> Vec<u8> {

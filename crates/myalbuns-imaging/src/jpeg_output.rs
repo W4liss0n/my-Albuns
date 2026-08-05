@@ -8,7 +8,7 @@ use image::{
     ExtendedColorType, ImageEncoder, Rgba, RgbaImage,
     codecs::jpeg::{JpegEncoder, PixelDensity},
 };
-use myalbuns_imaging_protocol::ImagingFailureStage;
+use myalbuns_imaging_protocol::ImagingFailureCode;
 use sha2::{Digest, Sha256};
 
 const MICROMETERS_PER_INCH: i128 = 25_400;
@@ -84,14 +84,14 @@ pub(crate) struct VerifiedJpeg {
 
 #[derive(Debug)]
 pub(crate) struct JpegFailure {
-    pub(crate) stage: ImagingFailureStage,
+    pub(crate) code: ImagingFailureCode,
     pub(crate) message: String,
 }
 
 impl JpegFailure {
-    fn new(stage: ImagingFailureStage, message: impl Into<String>) -> Self {
+    fn new(code: ImagingFailureCode, message: impl Into<String>) -> Self {
         Self {
-            stage,
+            code,
             message: message.into(),
         }
     }
@@ -109,7 +109,7 @@ pub(crate) fn write_verified(
     )?;
     let density = u16::try_from(dpi).map_err(|_| {
         JpegFailure::new(
-            ImagingFailureStage::OutputEncode,
+            ImagingFailureCode::EncodeFailed,
             "o DPI não pode ser representado pelo JFIF",
         )
     })?;
@@ -121,7 +121,7 @@ pub(crate) fn write_verified(
             .open(prepared_output_path)
             .map_err(|error| {
                 JpegFailure::new(
-                    ImagingFailureStage::OutputPrepare,
+                    ImagingFailureCode::EncodeFailed,
                     format!("não foi possível criar a preparação da Exportação: {error}"),
                 )
             })?;
@@ -131,7 +131,7 @@ pub(crate) fn write_verified(
         encoder.set_pixel_density(PixelDensity::dpi(density));
         encoder.set_icc_profile(icc_profile).map_err(|error| {
             JpegFailure::new(
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
                 format!("não foi possível incorporar o perfil sRGB: {error}"),
             )
         })?;
@@ -139,26 +139,26 @@ pub(crate) fn write_verified(
             .encode(&rgb, image.width(), image.height(), ExtendedColorType::Rgb8)
             .map_err(|error| {
                 JpegFailure::new(
-                    ImagingFailureStage::OutputEncode,
+                    ImagingFailureCode::EncodeFailed,
                     format!("não foi possível codificar a imagem exportada: {error}"),
                 )
             })?;
         drop(encoder);
         writer.flush().map_err(|error| {
             JpegFailure::new(
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
                 format!("não foi possível finalizar a imagem exportada: {error}"),
             )
         })?;
         let file = writer.into_inner().map_err(|error| {
             JpegFailure::new(
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
                 format!("não foi possível finalizar a imagem exportada: {error}"),
             )
         })?;
         file.sync_all().map_err(|error| {
             JpegFailure::new(
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
                 format!("não foi possível sincronizar a imagem exportada: {error}"),
             )
         })?;
@@ -174,7 +174,7 @@ pub(crate) fn write_verified(
 fn raster_axis(micrometers: i64, dpi: u32) -> Result<u32, JpegFailure> {
     if micrometers <= 0 {
         return Err(JpegFailure::new(
-            ImagingFailureStage::Composition,
+            ImagingFailureCode::CompositionFailed,
             "a dimensão física da Lâmina precisa ser positiva",
         ));
     }
@@ -205,7 +205,7 @@ fn opaque_rgb_bytes(image: &RgbaImage) -> Result<Vec<u8>, JpegFailure> {
     for pixel in image.pixels() {
         if pixel[3] != u8::MAX {
             return Err(JpegFailure::new(
-                ImagingFailureStage::Composition,
+                ImagingFailureCode::CompositionFailed,
                 "a composição final ainda contém transparência",
             ));
         }
@@ -491,7 +491,7 @@ impl EntropyScanner {
 }
 
 fn resource_failure(message: impl Into<String>) -> JpegFailure {
-    JpegFailure::new(ImagingFailureStage::ResourceLimitExceeded, message)
+    JpegFailure::new(ImagingFailureCode::ResourceLimitExceeded, message)
 }
 
 fn fallible_copy(bytes: &[u8], message: &'static str) -> Result<Vec<u8>, JpegFailure> {
@@ -504,7 +504,7 @@ fn fallible_copy(bytes: &[u8], message: &'static str) -> Result<Vec<u8>, JpegFai
 }
 
 fn verify_failure(message: impl Into<String>) -> JpegFailure {
-    JpegFailure::new(ImagingFailureStage::OutputVerify, message)
+    JpegFailure::new(ImagingFailureCode::VerificationFailed, message)
 }
 
 fn verify_io_failure(error: std::io::Error) -> JpegFailure {
@@ -528,7 +528,7 @@ mod tests {
     fn resource_guard_rejects_output_before_allocation() {
         let failure = RasterPlan::new(600_000, 300_000, 1_200)
             .expect_err("the oversized output must be rejected");
-        assert_eq!(failure.stage.as_str(), "resource_limit_exceeded");
+        assert_eq!(failure.code.as_str(), "resource_limit_exceeded");
         assert!(failure.message.contains(&MAX_OUTPUT_PIXELS.to_string()));
     }
 

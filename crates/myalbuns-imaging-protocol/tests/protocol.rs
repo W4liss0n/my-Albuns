@@ -5,8 +5,8 @@ use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
     ImagingEvent, ImagingEventStreamDecoder, ImagingFailureCode, ImagingFailureStage,
     ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest, ImagingResponse,
-    MediaSource, RenderCompletion, decode_command, decode_event_stream, encode_command,
-    encode_event, root_binding_plan_sha256,
+    MediaSource, RenderCompletion, RenderSource, decode_command, decode_event_stream,
+    encode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
     AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, ResolveError,
@@ -188,25 +188,13 @@ fn host_and_processor_share_one_serialized_protocol() {
     let prepared_output_path =
         PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.jpg");
     let sources = vec![
-        MediaSource::new(
-            "media-costa",
-            PathBuf::from(r"C:\Photos\costa.jpg"),
-            1024,
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
-        .expect("the first native source is valid"),
-        MediaSource::new(
-            "media-campo",
-            PathBuf::from(r"C:\Photos\campo.jpg"),
-            2048,
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        )
-        .expect("the second native source is valid"),
-        MediaSource::new(
+        RenderSource::new("media-costa", PathBuf::from(r"C:\Photos\costa.jpg"))
+            .expect("the first native source is valid"),
+        RenderSource::new("media-campo", PathBuf::from(r"C:\Photos\campo.jpg"))
+            .expect("the second native source is valid"),
+        RenderSource::new(
             "decorative-overlay",
             PathBuf::from(r"C:\Photos\overlay.png"),
-            512,
-            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         )
         .expect("the Decorative source is valid"),
     ];
@@ -284,6 +272,18 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert_eq!(
         request_json["request"]["sources"][0]["mediaId"],
         "media-costa"
+    );
+    assert!(
+        request_json["request"]["sources"][0]
+            .get("sourceBytes")
+            .is_none(),
+        "Render opens and validates the original itself instead of receiving a Host measurement"
+    );
+    assert!(
+        request_json["request"]["sources"][0]
+            .get("sourceSha256")
+            .is_none(),
+        "Render must not require the Host to read and hash the original first"
     );
     assert_eq!(
         request_json["request"]["rootBindings"]["bindings"][0]["kind"],

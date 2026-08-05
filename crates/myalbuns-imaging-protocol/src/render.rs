@@ -20,7 +20,7 @@ pub struct ImagingRequest {
     pub prepared_output_path: NativePathDto,
     pub unit: ComposedOutputUnit,
     pub dpi: u32,
-    pub sources: Vec<MediaSource>,
+    pub sources: Vec<RenderSource>,
     pub root_bindings: RootBindingPlan,
 }
 
@@ -33,7 +33,7 @@ impl ImagingRequest {
         prepared_output_path: NativePathDto,
         unit: ComposedOutputUnit,
         dpi: u32,
-        sources: Vec<MediaSource>,
+        sources: Vec<RenderSource>,
         root_bindings: RootBindingPlan,
     ) -> Result<Self, String> {
         let request = Self {
@@ -99,7 +99,7 @@ impl ImagingRequest {
 pub fn validate_render_content(
     unit: &ComposedOutputUnit,
     dpi: u32,
-    sources: &[MediaSource],
+    sources: &[RenderSource],
 ) -> Result<(), String> {
     if !(1..=1_200).contains(&dpi) {
         return Err("a resolução da Exportação é inválida".into());
@@ -121,6 +121,39 @@ pub fn validate_render_content(
         return Err("as fontes da Exportação não correspondem às mídias da Lâmina".into());
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderSource {
+    media_id: String,
+    source_path: NativePathDto,
+}
+
+impl RenderSource {
+    pub fn new(
+        media_id: impl Into<String>,
+        source_path: impl Into<NativePathDto>,
+    ) -> Result<Self, String> {
+        let source = Self {
+            media_id: media_id.into(),
+            source_path: source_path.into(),
+        };
+        source.validate()?;
+        Ok(source)
+    }
+
+    pub fn media_id(&self) -> &str {
+        &self.media_id
+    }
+
+    pub fn source_path(&self) -> &std::path::Path {
+        self.source_path.as_path()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        validate_media_identity_path(&self.media_id, self.source_path())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -166,15 +199,7 @@ impl MediaSource {
     }
 
     pub(crate) fn validate(&self) -> Result<(), String> {
-        if self.media_id.trim().is_empty() {
-            return Err("a identidade de mídia é inválida".into());
-        }
-        if !self.source_path().is_absolute() {
-            return Err(format!(
-                "o caminho da mídia {} não é absoluto",
-                self.media_id
-            ));
-        }
+        validate_media_identity_path(&self.media_id, self.source_path())?;
         if self.source_sha256.len() != 64
             || !self
                 .source_sha256
@@ -188,6 +213,19 @@ impl MediaSource {
         }
         Ok(())
     }
+}
+
+fn validate_media_identity_path(
+    media_id: &str,
+    source_path: &std::path::Path,
+) -> Result<(), String> {
+    if media_id.trim().is_empty() {
+        return Err("a identidade de mídia é inválida".into());
+    }
+    if !source_path.is_absolute() {
+        return Err(format!("o caminho da mídia {media_id} não é absoluto"));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

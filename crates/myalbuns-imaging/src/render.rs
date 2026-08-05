@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use image::{Rgba, RgbaImage};
 use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
-    ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgressStage,
-    ImagingRequest, RenderCompletion,
+    ImagingFailure, ImagingFailureCode, ImagingPathCode, ImagingProgressStage, ImagingRequest,
+    RenderCompletion,
 };
 use myalbuns_paths::ExpectedObject;
 
@@ -16,27 +16,13 @@ use crate::{
 const MICROMETERS_PER_INCH: f64 = 25_400.0;
 
 pub(crate) struct RenderFailure {
-    pub(crate) stage: ImagingFailureStage,
     pub(crate) failure: ImagingFailure,
     pub(crate) message: String,
 }
 
 impl RenderFailure {
-    fn new(stage: ImagingFailureStage, message: impl Into<String>) -> Self {
-        let code = match stage {
-            ImagingFailureStage::InvalidRenderRequest => ImagingFailureCode::InvalidRenderRequest,
-            ImagingFailureStage::SourceVerification => ImagingFailureCode::SourceUnavailable,
-            ImagingFailureStage::SourceDecode => ImagingFailureCode::DecodeFailed,
-            ImagingFailureStage::Composition => ImagingFailureCode::CompositionFailed,
-            ImagingFailureStage::ResourceLimitExceeded => ImagingFailureCode::ResourceLimitExceeded,
-            ImagingFailureStage::OutputPrepare | ImagingFailureStage::OutputEncode => {
-                ImagingFailureCode::EncodeFailed
-            }
-            ImagingFailureStage::OutputVerify => ImagingFailureCode::VerificationFailed,
-            ImagingFailureStage::CacheProcessing => ImagingFailureCode::DecodeFailed,
-        };
+    fn new(code: ImagingFailureCode, message: impl Into<String>) -> Self {
         Self {
-            stage,
             failure: ImagingFailure {
                 code,
                 media_id: None,
@@ -53,7 +39,6 @@ impl RenderFailure {
         message: impl Into<String>,
     ) -> Self {
         Self {
-            stage: code.stage(),
             failure: ImagingFailure {
                 code,
                 media_id,
@@ -66,13 +51,13 @@ impl RenderFailure {
 
 impl From<String> for RenderFailure {
     fn from(message: String) -> Self {
-        Self::new(ImagingFailureStage::Composition, message)
+        Self::new(ImagingFailureCode::CompositionFailed, message)
     }
 }
 
 impl From<JpegFailure> for RenderFailure {
     fn from(failure: JpegFailure) -> Self {
-        Self::new(failure.stage, failure.message)
+        Self::new(failure.code, failure.message)
     }
 }
 
@@ -141,7 +126,7 @@ pub(crate) fn render_request(
         .resolve(request.prepared_output_path())
         .map_err(|error| {
             RenderFailure::new(
-                ImagingFailureStage::OutputPrepare,
+                ImagingFailureCode::EncodeFailed,
                 format!("não foi possível aplicar o plano de caminhos: {error}"),
             )
         })?;
@@ -191,7 +176,7 @@ fn load_render_sources(
                     format!("não foi possível aplicar o plano de caminhos: {error}"),
                 )
             })?;
-        let opened_source = open_render_source(source, &resolved).map_err(|failure| {
+        let opened_source = open_render_source(&resolved).map_err(|failure| {
             RenderFailure::typed(
                 failure.code,
                 Some(source.media_id().to_owned()),
@@ -200,7 +185,7 @@ fn load_render_sources(
             )
         })?;
         source_bytes = source_bytes
-            .checked_add(source.source_bytes())
+            .checked_add(opened_source.byte_count())
             .ok_or_else(|| {
                 RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
