@@ -1,5 +1,5 @@
 #[cfg(windows)]
-pub(crate) fn install_kill_on_parent_exit() -> Result<(), String> {
+pub(crate) fn install_descendant_cleanup_on_exit() -> Result<(), String> {
     use std::{ffi::c_void, io, mem::size_of, ptr};
 
     use windows_sys::Win32::{
@@ -57,6 +57,6 @@ pub(crate) fn install_kill_on_parent_exit() -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-pub(crate) fn install_kill_on_parent_exit() -> Result<(), String> {
+pub(crate) fn install_descendant_cleanup_on_exit() -> Result<(), String> {
     Ok(())
 }

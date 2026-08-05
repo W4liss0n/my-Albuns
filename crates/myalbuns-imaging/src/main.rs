@@ -38,7 +38,7 @@ fn main() -> ExitCode {
         println!("{IMAGING_PROTOCOL_VERSION}");
         return ExitCode::SUCCESS;
     }
-    if let Err(error) = process_tree::install_kill_on_parent_exit() {
+    if let Err(error) = process_tree::install_descendant_cleanup_on_exit() {
         eprintln!("ciclo de vida do Processador indisponível: {error}");
         return ExitCode::FAILURE;
     }
