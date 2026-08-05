@@ -10,6 +10,7 @@
           "apply_project_intent",
           "undo_project",
           "redo_project",
+          "save_project",
           "prepare_media_previews",
           "export_preview",
           "cancel_export"

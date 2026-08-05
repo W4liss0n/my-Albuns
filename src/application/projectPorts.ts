@@ -80,11 +80,55 @@ export interface ExportAttempt {
   cancel(): Promise<ExportCancelStatus>;
 }
 
+export type SaveProjectOutcome =
+  | { kind: "saved"; revision: number }
+  | { kind: "alreadyCurrent"; revision: number };
+
+export interface SaveProjectResult {
+  outcome: SaveProjectOutcome;
+  projection: EditorProjection;
+}
+
+export type SaveProjectFailureCode =
+  | "stale_revision"
+  | "persisted_baseline_conflict"
+  | "save_state_indeterminate"
+  | "session_unavailable"
+  | "not_found"
+  | "unavailable"
+  | "access_denied"
+  | "invalid_path"
+  | "unexpected_object_type"
+  | "conflict"
+  | "io_failure";
+
+export type SaveProjectErrorCode =
+  | SaveProjectFailureCode
+  | "invalid_response"
+  | "save_unavailable";
+
+export interface SaveProjectErrorContext {
+  expected: number;
+  current: number;
+}
+
+export class SaveProjectError extends Error {
+  constructor(
+    readonly code: SaveProjectErrorCode,
+    message: string,
+    readonly context?: SaveProjectErrorContext,
+  ) {
+    super(message);
+    this.name = "SaveProjectError";
+  }
+}
+
 export interface ProjectSessionPort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
+  save(expectedRevision: number): Promise<SaveProjectResult>;
 }
 
 export interface MediaPreviewPort {

@@ -1,3 +1,4 @@
+use myalbuns_core::EditorProjection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -101,6 +102,90 @@ pub enum MediaPreviewCommandErrorCode {
 pub struct MediaPreviewCommandError {
     pub(crate) code: MediaPreviewCommandErrorCode,
     pub(crate) message: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum SaveProjectOutcome {
+    Saved { revision: u64 },
+    AlreadyCurrent { revision: u64 },
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveProjectResult {
+    pub(crate) outcome: SaveProjectOutcome,
+    #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+    pub(crate) projection: EditorProjection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "code",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "code")]
+pub enum SaveProjectCommandError {
+    StaleRevision {
+        expected_revision: u64,
+        current_revision: u64,
+    },
+    PersistedBaselineConflict,
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidPath,
+    UnexpectedObjectType,
+    Conflict,
+    IoFailure,
+    SaveStateIndeterminate,
+    SessionUnavailable,
+}
+
+#[cfg(test)]
+mod save_contract_tests {
+    use serde_json::json;
+
+    use super::{SaveProjectCommandError, SaveProjectOutcome};
+
+    #[test]
+    fn save_outcomes_use_a_camel_case_kind_and_structured_revision() {
+        assert_eq!(
+            serde_json::to_value(SaveProjectOutcome::Saved { revision: 7 })
+                .expect("the Saved outcome serializes"),
+            json!({ "kind": "saved", "revision": 7 })
+        );
+        assert_eq!(
+            serde_json::to_value(SaveProjectOutcome::AlreadyCurrent { revision: 7 })
+                .expect("the AlreadyCurrent outcome serializes"),
+            json!({ "kind": "alreadyCurrent", "revision": 7 })
+        );
+    }
+
+    #[test]
+    fn save_errors_carry_stable_codes_and_context_without_a_localized_message() {
+        let serialized = serde_json::to_value(SaveProjectCommandError::StaleRevision {
+            expected_revision: 3,
+            current_revision: 4,
+        })
+        .expect("the stale-revision error serializes");
+
+        assert_eq!(
+            serialized,
+            json!({
+                "code": "stale_revision",
+                "expectedRevision": 3,
+                "currentRevision": 4
+            })
+        );
+        assert!(serialized.get("message").is_none());
+    }
 }
 
 #[derive(Clone, Copy, Deserialize, TS)]

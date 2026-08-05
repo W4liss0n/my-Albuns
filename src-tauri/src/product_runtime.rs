@@ -80,6 +80,7 @@ pub(crate) fn run(
             crate::project_commands::apply_project_intent,
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,
+            crate::project_commands::save_project,
             crate::media_preview_commands::prepare_media_previews,
             crate::export_commands::export_preview,
             crate::export_commands::cancel_export,

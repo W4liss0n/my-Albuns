@@ -33,6 +33,9 @@ function projectSessionPort(): ProjectSessionPort {
     apply: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,
+    save: async () => {
+      throw new Error("Salvamento não configurado neste teste.");
+    },
   };
 }
 

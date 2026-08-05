@@ -1,20 +1,40 @@
-use std::{path::PathBuf, sync::Mutex};
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
-use myalbuns_core::{EditableProject, EditorProjection, ProjectIntent, RenderSnapshot};
+use myalbuns_core::{
+    EditableProject, EditorProjection, ProjectIntent, RenderSnapshot, SaveProjectError,
+    SaveProjectOutcome,
+};
 use myalbuns_imaging_protocol::MediaSource;
+
+const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
 /// Owns the single productive editable Project of this Host process.
 ///
 /// There is deliberately no window/session selector: one process owns one
 /// Project, and the operating-system process lifetime owns its locks.
+#[derive(Clone)]
 pub(crate) struct ProjectHost {
-    project: Mutex<EditableProject>,
+    project: Arc<Mutex<Option<EditableProject>>>,
+}
+
+pub(crate) struct ProjectHostSaveResult {
+    pub(crate) outcome: SaveProjectOutcome,
+    pub(crate) projection: EditorProjection,
+}
+
+#[derive(Debug)]
+pub(crate) enum ProjectHostSaveError {
+    Project(SaveProjectError),
+    SessionUnavailable,
 }
 
 impl ProjectHost {
     pub(crate) fn new(project: EditableProject) -> Self {
         Self {
-            project: Mutex::new(project),
+            project: Arc::new(Mutex::new(Some(project))),
         }
     }
 
@@ -38,6 +58,38 @@ impl ProjectHost {
         self.project()?
             .redo()
             .ok_or_else(|| "Não há uma ação produtiva para refazer neste corte.".into())
+    }
+
+    pub(crate) fn save(
+        &self,
+        expected_revision: u64,
+    ) -> Result<ProjectHostSaveResult, ProjectHostSaveError> {
+        let mut slot = self
+            .project
+            .lock()
+            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
+        let result = slot
+            .as_mut()
+            .ok_or(ProjectHostSaveError::SessionUnavailable)?
+            .save(expected_revision);
+        let outcome = match result {
+            Ok(outcome) => outcome,
+            Err(SaveProjectError::SaveStateIndeterminate) => {
+                slot.take();
+                return Err(ProjectHostSaveError::Project(
+                    SaveProjectError::SaveStateIndeterminate,
+                ));
+            }
+            Err(error) => return Err(ProjectHostSaveError::Project(error)),
+        };
+        let projection = slot
+            .as_ref()
+            .ok_or(ProjectHostSaveError::SessionUnavailable)?
+            .projection();
+        Ok(ProjectHostSaveResult {
+            outcome,
+            projection,
+        })
     }
 
     pub(crate) fn render_snapshot(&self) -> Result<RenderSnapshot, String> {
@@ -76,19 +128,48 @@ impl ProjectHost {
         Err("As fontes originais das mídias ainda não estão disponíveis neste corte.".into())
     }
 
-    fn project(&self) -> Result<std::sync::MutexGuard<'_, EditableProject>, String> {
-        self.project
+    fn project(&self) -> Result<ActiveProject<'_>, String> {
+        let guard = self
+            .project
             .lock()
-            .map_err(|_| "A Sessão do Projeto ficou indisponível.".to_string())
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        if guard.is_none() {
+            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
+        }
+        Ok(ActiveProject { guard })
+    }
+}
+
+struct ActiveProject<'a> {
+    guard: MutexGuard<'a, Option<EditableProject>>,
+}
+
+impl std::ops::Deref for ActiveProject<'_> {
+    type Target = EditableProject;
+
+    fn deref(&self) -> &Self::Target {
+        self.guard
+            .as_ref()
+            .expect("an ActiveProject guard always contains its Project")
+    }
+}
+
+impl std::ops::DerefMut for ActiveProject<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.guard
+            .as_mut()
+            .expect("an ActiveProject guard always contains its Project")
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
         InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization,
-        ProjectCore, ProjectIntent, ProjectLocation,
+        OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectOutcome,
     };
     use myalbuns_paths::OperationPathContext;
 
@@ -96,28 +177,48 @@ mod tests {
 
     struct Fixture {
         _root: tempfile::TempDir,
+        project_path: PathBuf,
+        identity_lease_root: PathBuf,
         host: ProjectHost,
     }
 
     fn fixture() -> Fixture {
         let root = tempfile::tempdir().expect("temporary Project Host fixture");
         let project_path = root.path().join("Projeto.myalbuns");
+        let identity_lease_root = root.path().join("leases");
         let mut context = OperationPathContext::new();
         context
             .capture(&project_path)
             .expect("the fixture root is captured");
         let project = ProjectCore::new()
-            .with_identity_lease_root(root.path().join("leases"))
+            .with_identity_lease_root(identity_lease_root.clone())
             .create_editable(CreateProjectRequest::new(
-                ProjectLocation::new(project_path, context.freeze()),
+                ProjectLocation::new(project_path.clone(), context.freeze()),
                 InitialProject::neutral(),
                 CreateAuthorization::CreateOnly,
             ))
             .expect("the productive Project is created");
         Fixture {
             _root: root,
+            project_path,
+            identity_lease_root,
             host: ProjectHost::new(project),
         }
+    }
+
+    fn open_project(project_path: &Path, identity_lease_root: &Path) -> ProjectHost {
+        let mut context = OperationPathContext::new();
+        context
+            .capture(project_path)
+            .expect("the reopened fixture root is captured");
+        let project = ProjectCore::new()
+            .with_identity_lease_root(identity_lease_root.to_path_buf())
+            .open_editable(OpenProjectRequest::new(ProjectLocation::new(
+                project_path.to_path_buf(),
+                context.freeze(),
+            )))
+            .expect("the saved Project reopens in a new editable Session");
+        ProjectHost::new(project)
     }
 
     #[test]
@@ -193,6 +294,51 @@ mod tests {
         assert!(redone.state.dirty);
         assert!(redone.state.can_undo);
         assert!(!redone.state.can_redo);
+    }
+
+    #[test]
+    fn saves_the_visible_revision_preserves_history_and_reopens_it_in_a_fresh_host() {
+        let Fixture {
+            _root,
+            project_path,
+            identity_lease_root,
+            host,
+        } = fixture();
+        let applied = host
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the visible revision is created");
+
+        let saved = host
+            .save(applied.state.revision)
+            .expect("the visible revision is saved");
+
+        assert_eq!(saved.outcome, SaveProjectOutcome::Saved { revision: 1 });
+        assert_eq!(saved.projection.state.document.dpi, 240);
+        assert_eq!(saved.projection.state.revision, 1);
+        assert_eq!(saved.projection.state.saved_revision, 1);
+        assert!(!saved.projection.state.dirty);
+        assert!(saved.projection.state.can_undo);
+        assert!(!saved.projection.state.can_redo);
+
+        let undone = host.undo().expect("Undo remains available after Save");
+        assert_eq!(undone.state.document.dpi, 300);
+        assert!(undone.state.dirty);
+        let redone = host.redo().expect("Redo remains available after Save");
+        assert_eq!(redone.state.document.dpi, 240);
+        assert!(!redone.state.dirty);
+
+        drop(host);
+        let reopened = open_project(&project_path, &identity_lease_root);
+        let projection = reopened
+            .projection()
+            .expect("the persisted revision is projected by the new Host");
+
+        assert_eq!(projection.state.document.dpi, 240);
+        assert_eq!(projection.state.revision, 1);
+        assert_eq!(projection.state.saved_revision, 1);
+        assert!(!projection.state.dirty);
+        assert!(!projection.state.can_undo);
+        assert!(!projection.state.can_redo);
     }
 
     #[test]

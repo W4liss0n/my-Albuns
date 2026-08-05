@@ -9,6 +9,8 @@ mod native_path_serde;
 mod operation;
 #[cfg(windows)]
 mod project_file_lock;
+#[cfg(windows)]
+mod project_transition_barrier;
 mod resolve;
 mod windows_path;
 
@@ -25,6 +27,8 @@ pub use operation::{
 };
 #[cfg(windows)]
 pub use project_file_lock::{ProjectFileLock, ProjectFileLockError};
+#[cfg(windows)]
+pub use project_transition_barrier::{ProjectTransitionBarrier, ProjectTransitionBarrierError};
 pub use resolve::{
     ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
     ResolveError, ResolvedObject,

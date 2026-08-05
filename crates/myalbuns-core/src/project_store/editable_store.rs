@@ -3,15 +3,27 @@ use std::{fs, io, path::PathBuf};
 #[cfg(windows)]
 use myalbuns_paths::{
     ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
-    ProjectFileLock, ProjectFileLockError, ResolveError,
+    ProjectFileLock, ProjectFileLockError, ProjectTransitionBarrier, ProjectTransitionBarrierError,
+    ResolveError,
 };
 use uuid::Uuid;
 
 use super::{
-    DecodeFailure, DocumentFailure, PathFailure, ProjectLocation, decode, encode, map_path_failure,
+    DecodeFailure, DocumentFailure, PathFailure, ProjectIdentityLease, ProjectLocation, decode,
+    encode, map_path_failure,
     windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
+
+mod save_protocol;
+
+use save_protocol::PersistedBaseline;
+pub(crate) use save_protocol::{SaveStoreError, SaveStoreResult};
+#[cfg(test)]
+pub(crate) use save_protocol::{
+    inject_post_publication_indeterminate_for_current_thread,
+    release_post_publication_indeterminate_for_current_thread,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum OpenStoreError {
@@ -34,14 +46,7 @@ pub(crate) enum CreateStoreError {
 #[derive(Debug)]
 pub(crate) struct ProjectStore {
     location: ProjectLocation,
-    _baseline: PersistedBaseline,
-}
-
-#[derive(Debug)]
-struct PersistedBaseline {
-    #[cfg(windows)]
-    lock: ProjectFileLock,
-    _bytes: Vec<u8>,
+    baseline: Option<PersistedBaseline>,
 }
 
 impl ProjectStore {
@@ -51,7 +56,7 @@ impl ProjectStore {
 
     #[cfg(windows)]
     pub(crate) fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
-        self._baseline.lock.physical_identity()
+        self.baseline.as_ref()?.physical_identity()
     }
 
     #[cfg(not(windows))]
@@ -63,11 +68,20 @@ impl ProjectStore {
     fn from_verified(location: ProjectLocation, lock: ProjectFileLock, bytes: Vec<u8>) -> Self {
         Self {
             location,
-            _baseline: PersistedBaseline {
-                lock,
-                _bytes: bytes,
-            },
+            baseline: Some(PersistedBaseline::new(lock, bytes)),
         }
+    }
+
+    pub(crate) fn save(
+        &mut self,
+        candidate: ProjectRevision,
+        identity_lease: &ProjectIdentityLease,
+    ) -> SaveStoreResult {
+        save_protocol::save(self, candidate, identity_lease)
+    }
+
+    pub(crate) fn invalidate(&mut self) {
+        self.baseline = None;
     }
 }
 
@@ -171,6 +185,24 @@ impl PreparedReplacement {
 
 #[cfg(windows)]
 pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, OpenStoreError> {
+    let initial = location
+        .root_bindings()
+        .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
+        .map_err(|error| OpenStoreError::Path(map_path_failure(error)))?;
+    let initial_bytes = initial
+        .read_bytes()
+        .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
+    let initial_revision = decode(&initial_bytes).map_err(map_open_decode_error)?;
+    let _barrier = ProjectTransitionBarrier::try_acquire(
+        initial.operational_path(),
+        &initial_revision.project_id.hyphenated().to_string(),
+    )
+    .map_err(|error| match error {
+        ProjectTransitionBarrierError::Conflict => OpenStoreError::ProjectInUse,
+        ProjectTransitionBarrierError::Unavailable => {
+            OpenStoreError::Path(PathFailure::Unavailable)
+        }
+    })?;
     let resolved = location
         .root_bindings()
         .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
@@ -185,15 +217,13 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
     if lock.compare_physical(&resolved) != PhysicalIdentityEvidence::Same {
         return Err(OpenStoreError::IdentityIndeterminate);
     }
-    let source = lock.read_to_string().map_err(|error| {
-        if error.kind() == io::ErrorKind::InvalidData {
-            OpenStoreError::Document(DocumentFailure::InvalidProjectDocument)
-        } else {
-            OpenStoreError::Path(map_io_path(error))
-        }
-    })?;
-    let bytes = source.into_bytes();
+    let bytes = lock
+        .read_bytes()
+        .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
     let revision = decode(&bytes).map_err(map_open_decode_error)?;
+    if revision.project_id != initial_revision.project_id {
+        return Err(OpenStoreError::IdentityIndeterminate);
+    }
     Ok(OpenedProject {
         revision,
         store: ProjectStore::from_verified(location, lock, bytes),

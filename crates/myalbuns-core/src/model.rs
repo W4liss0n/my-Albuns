@@ -487,6 +487,8 @@ pub enum ProjectIntent {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum CoreError {
+    #[error("A Sessão editável do Projeto foi invalidada e precisa ser reaberta")]
+    EditableSessionInvalidated,
     #[error("O DPI {0} não é válido para as dimensões atuais do Projeto")]
     InvalidDpi(u32),
     #[error("A Sessão do Projeto esgotou o intervalo seguro de Revisões")]

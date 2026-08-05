@@ -8,6 +8,7 @@ import type {
   ExportProgressEvent,
   ProjectSessionPort,
 } from "../application/projectPorts";
+import { SaveProjectError } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
@@ -131,6 +132,9 @@ function projectSessionPortWithApply(
     apply,
     undo: async () => projection,
     redo: async () => projection,
+    save: async () => {
+      throw new Error("Salvamento não configurado neste teste.");
+    },
   };
 }
 
@@ -426,6 +430,127 @@ test("applies one DPI change and renders the authoritative projection returned b
   );
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
+test("saves the visible revision and applies the authoritative saved projection", async () => {
+  const savedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      savedRevision: projection.state.revision,
+      dirty: false,
+      canUndo: true,
+    },
+  };
+  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+    outcome: {
+      kind: "saved",
+      revision: savedProjection.state.revision,
+    },
+    projection: savedProjection,
+  }));
+  const projectSessionPort = projectSessionPortWithApply(
+    async () => projection,
+  );
+  projectSessionPort.save = save;
+  const onProjectionChange = vi.fn();
+
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await Promise.resolve();
+  });
+
+  expect(save).toHaveBeenCalledWith(projection.state.revision);
+  expect(onProjectionChange).toHaveBeenCalledWith(savedProjection);
+
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={savedProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
+test("uses Ctrl+S for Project save and prevents the browser default", async () => {
+  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+    outcome: { kind: "saved", revision: projection.state.revision },
+    projection: {
+      ...projection,
+      state: {
+        ...projection.state,
+        savedRevision: projection.state.revision,
+        dirty: false,
+      },
+    },
+  }));
+  const projectSessionPort = projectSessionPortWithApply(
+    async () => projection,
+  );
+  projectSessionPort.save = save;
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const shortcut = new KeyboardEvent("keydown", {
+    bubbles: true,
+    cancelable: true,
+    ctrlKey: true,
+    key: "s",
+  });
+
+  await act(async () => {
+    window.dispatchEvent(shortcut);
+    await Promise.resolve();
+  });
+
+  expect(shortcut.defaultPrevented).toBe(true);
+  expect(save).toHaveBeenCalledOnce();
+  expect(save).toHaveBeenCalledWith(projection.state.revision);
+});
+
+test("shows the localized Project save failure", async () => {
+  const projectSessionPort = projectSessionPortWithApply(
+    async () => projection,
+  );
+  projectSessionPort.save = vi.fn(async () => {
+    throw new SaveProjectError(
+      "persisted_baseline_conflict",
+      "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+    );
+  });
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await Promise.resolve();
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+  );
 });
 
 test("renders each Grade item from its own composed sheet", () => {

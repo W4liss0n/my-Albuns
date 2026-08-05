@@ -103,7 +103,11 @@ impl PreparedFileDestination {
             Err(ResolveError::NotFound) => return Ok(None),
             Err(error) => return Err(error),
         };
-        self.validate_containment(&child)?;
+        let expected_name = self
+            .operational_path
+            .file_name()
+            .ok_or(ResolveError::InvalidPath)?;
+        self.validate_containment(&child, expected_name)?;
         Ok(Some(child))
     }
 
@@ -111,16 +115,47 @@ impl PreparedFileDestination {
         self.resolve_existing()?.ok_or(ResolveError::NotFound)
     }
 
-    fn validate_containment(&self, child: &ResolvedObject) -> Result<(), ResolveError> {
+    /// Opens an existing regular-file sibling whose path is already in the
+    /// operational namespace retained by this destination.
+    ///
+    /// Unlike `RootBindingPlan::resolve_existing`, this does not reinterpret
+    /// the supplied path as logical input. It is intended for staging paths
+    /// returned by [`Self::sibling_temporary_path`].
+    pub fn resolve_existing_sibling(
+        &self,
+        operational_path: &Path,
+    ) -> Result<ResolvedObject, ResolveError> {
+        let operational_parent = self
+            .operational_path
+            .parent()
+            .ok_or(ResolveError::InvalidPath)?;
+        if operational_path.parent() != Some(operational_parent) {
+            return Err(ResolveError::InvalidPath);
+        }
+        let expected_name = operational_path
+            .file_name()
+            .ok_or(ResolveError::InvalidPath)?;
+        let logical_path = self.logical_path.with_file_name(expected_name);
+        let sibling = resolve_existing_operational(
+            &logical_path,
+            operational_path,
+            self.parent.operational_path(),
+            ExpectedObject::RegularFile,
+        )?;
+        self.validate_containment(&sibling, expected_name)?;
+        Ok(sibling)
+    }
+
+    fn validate_containment(
+        &self,
+        child: &ResolvedObject,
+        expected_name: &std::ffi::OsStr,
+    ) -> Result<(), ResolveError> {
         let parent_path =
             physical_path_from_file(self.parent.file(), self.parent.operational_path())
                 .map_err(map_guarded_error)?;
         let child_path = physical_path_from_file(child.file(), child.operational_path())
             .map_err(map_guarded_error)?;
-        let expected_name = self
-            .operational_path
-            .file_name()
-            .ok_or(ResolveError::InvalidPath)?;
         if !is_direct_physical_child(&parent_path, &child_path, expected_name) {
             return Err(ResolveError::InvalidPath);
         }
@@ -178,6 +213,10 @@ impl ResolvedObject {
         readable.read_to_string(&mut source)?;
         Ok(source)
     }
+
+    pub fn read_bytes(&self) -> std::io::Result<Vec<u8>> {
+        read_file_handle_to_bytes(&self.file)
+    }
 }
 
 pub(crate) fn compare_file_identity(left: &File, right: &File) -> PhysicalIdentityEvidence {
@@ -194,6 +233,14 @@ pub(crate) fn read_file_handle_to_string(file: &File) -> std::io::Result<String>
     let mut source = String::new();
     readable.read_to_string(&mut source)?;
     Ok(source)
+}
+
+pub(crate) fn read_file_handle_to_bytes(file: &File) -> std::io::Result<Vec<u8>> {
+    let mut readable = reopen_file_for_read(file)?;
+    readable.seek(SeekFrom::Start(0))?;
+    let mut bytes = Vec::new();
+    readable.read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 #[cfg(windows)]

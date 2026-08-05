@@ -8,9 +8,10 @@ use myalbuns_core::{
     InitialProjectPersonalization, InitialProjectValidationError as ValidationError,
     LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
     OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectIntent,
-    ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SheetRole,
+    ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SaveProjectError,
+    SaveProjectOutcome, SheetRole,
 };
-use myalbuns_paths::OperationPathContext;
+use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier};
 
 const NEUTRAL_PROJECT_V1: &str = r##"{
   "documentType": "myalbuns.project",
@@ -1734,6 +1735,366 @@ fn changing_dpi_updates_the_authoritative_projection_without_writing_the_project
         persisted_before,
         "a creative action must not write before Save"
     );
+}
+
+#[test]
+fn saving_the_current_revision_returns_already_current_without_touching_the_project_file() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Projeto atual.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    fs::remove_file(&project_path)
+        .expect("the fixture removes the pathname while the authoritative handle remains open");
+
+    assert_eq!(
+        project
+            .save(0)
+            .expect("an already-current Save performs no file I/O"),
+        SaveProjectOutcome::AlreadyCurrent { revision: 0 }
+    );
+    assert_eq!(project.saved_revision(), 0);
+    assert!(!project.has_unsaved_changes());
+}
+
+#[test]
+fn a_stale_save_request_is_rejected_before_file_io_and_preserves_the_session() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Pedido obsoleto.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    fs::remove_file(&project_path)
+        .expect("the fixture removes the pathname while the authoritative handle remains open");
+
+    assert_eq!(
+        project
+            .save(0)
+            .expect_err("the stale request is rejected before consulting the missing pathname"),
+        SaveProjectError::StaleRevision {
+            expected: 0,
+            current: 1,
+        }
+    );
+    let projection = project.projection();
+    assert_eq!(projection.state.revision, 1);
+    assert_eq!(projection.state.saved_revision, 0);
+    assert!(projection.state.dirty);
+    assert!(projection.state.can_undo);
+}
+
+#[test]
+fn saving_the_visible_revision_publishes_it_and_preserves_session_history() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("RevisÃ£o confirmada.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect("the visible revision is published and verified"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+    let saved = project.projection();
+    assert_eq!(saved.state.revision, 1);
+    assert_eq!(saved.state.saved_revision, 1);
+    assert!(!saved.state.dirty);
+    assert!(saved.state.can_undo);
+    assert!(!saved.state.can_redo);
+
+    let persisted = core
+        .load_persisted_revision(load_request(&project_path))
+        .expect("the active identity lease follows the newly published physical object");
+    assert_eq!(persisted.revision(), 1);
+    assert_eq!(persisted.project().document().dpi(), 240);
+
+    let undone = project
+        .undo()
+        .expect("Save does not erase the creative history");
+    assert_eq!(undone.state.revision, 0);
+    assert_eq!(undone.state.saved_revision, 1);
+    assert_eq!(undone.state.document.dpi, 300);
+    assert!(undone.state.dirty);
+    assert!(undone.state.can_redo);
+}
+
+#[cfg(windows)]
+#[test]
+fn saving_reuses_the_captured_mapped_drive_binding_for_its_temporary_sibling() {
+    let directory = tempfile::tempdir().expect("temporary operational root");
+    let logical_path = std::path::PathBuf::from(r"R:\Albuns\Projeto mapeado.myalbuns");
+    fs::create_dir(directory.path().join("Albuns")).expect("the operational parent exists");
+    let mut context = OperationPathContext::new();
+    context
+        .capture_with_binding(&logical_path, directory.path())
+        .expect("the mapped drive binding is captured for the attempt");
+    let location = ProjectLocation::new(logical_path, context.freeze());
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            location.clone(),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the Project is created through the captured binding");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect("the operational temporary remains inside the captured binding"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+    let persisted = core
+        .load_persisted_revision(LoadProjectRequest::new(location))
+        .expect("the saved revision loads through the same captured binding");
+    assert_eq!(persisted.revision(), 1);
+    assert_eq!(persisted.project().document().dpi(), 240);
+}
+
+#[test]
+fn reopening_a_saved_revision_starts_a_clean_session_with_empty_history() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Reabertura confirmada.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    project
+        .save(1)
+        .expect("the visible revision is published and verified");
+    drop(project);
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the saved Project reopens in a new Session");
+    let projection = reopened.projection();
+    assert_eq!(projection.state.revision, 1);
+    assert_eq!(projection.state.saved_revision, 1);
+    assert_eq!(projection.state.document.dpi, 240);
+    assert!(!projection.state.dirty);
+    assert!(!projection.state.can_undo);
+    assert!(!projection.state.can_redo);
+}
+
+#[test]
+fn opening_an_editable_project_respects_its_stable_transition_barrier() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Barreira de abertura.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project is created");
+    let project_id = project.project_id().hyphenated().to_string();
+    drop(project);
+    let _barrier = ProjectTransitionBarrier::try_acquire(&project_path, &project_id)
+        .expect("the competing transition owns the stable sibling barrier");
+
+    assert_eq!(
+        core.open_editable(OpenProjectRequest::new(project_location(&project_path)))
+            .expect_err("an opener cannot cross an active publication handoff"),
+        OpenProjectError::ProjectInUse
+    );
+}
+
+#[test]
+fn a_conclusive_save_failure_preserves_the_editable_session_for_retry() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Falha conclusiva.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    let barrier = ProjectTransitionBarrier::try_acquire(
+        &project_path,
+        &project.project_id().hyphenated().to_string(),
+    )
+    .expect("a competing transition acquires the stable sibling barrier");
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect_err("the occupied barrier fails before publication"),
+        SaveProjectError::Path(PathFailure::Conflict)
+    );
+    let unchanged = project.projection();
+    assert_eq!(unchanged.state.revision, 1);
+    assert_eq!(unchanged.state.saved_revision, 0);
+    assert_eq!(unchanged.state.document.dpi, 240);
+    assert!(unchanged.state.dirty);
+    assert!(unchanged.state.can_undo);
+
+    drop(barrier);
+    assert_eq!(
+        project
+            .save(1)
+            .expect("the preserved Session can retry after the conclusive failure"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_replace_failure_reacquires_the_exact_baseline_and_allows_retry() {
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    use windows_sys::Win32::Storage::FileSystem::{FILE_SHARE_READ, FILE_SHARE_WRITE};
+
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Replace bloqueado.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    let external_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .open(&project_path)
+        .expect("the external reader intentionally denies delete sharing");
+
+    assert!(matches!(project.save(1), Err(SaveProjectError::Path(_))));
+    let unchanged = project.projection();
+    assert_eq!(unchanged.state.revision, 1);
+    assert_eq!(unchanged.state.saved_revision, 0);
+    assert_eq!(unchanged.state.document.dpi, 240);
+    assert!(unchanged.state.dirty);
+    assert!(unchanged.state.can_undo);
+
+    drop(external_handle);
+    assert_eq!(
+        project
+            .save(1)
+            .expect("the reacquired exact baseline remains retryable"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+}
+
+#[test]
+fn save_rejects_persisted_bytes_that_diverge_even_with_the_same_revision() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Baseline divergente.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    let mut external_bytes = fs::read(&project_path).expect("the baseline is readable");
+    external_bytes.extend_from_slice(b" ");
+    fs::write(&project_path, &external_bytes)
+        .expect("an external writer changes bytes without changing the declared revision");
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect_err("the numeric revision does not replace exact baseline evidence"),
+        SaveProjectError::PersistedBaselineConflict
+    );
+    assert_eq!(
+        fs::read(&project_path).expect("the divergent destination remains untouched"),
+        external_bytes
+    );
+    let projection = project.projection();
+    assert_eq!(projection.state.revision, 1);
+    assert_eq!(projection.state.saved_revision, 0);
+    assert_eq!(projection.state.document.dpi, 240);
+    assert!(projection.state.dirty);
+    assert!(projection.state.can_undo);
+}
+
+#[test]
+fn save_rejects_a_different_physical_object_even_when_its_bytes_are_identical() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Objeto fisico divergente.myalbuns");
+    let displaced_path = directory.path().join("baseline-deslocado.myalbuns");
+    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 240 })
+        .expect("the visible revision advances");
+    let baseline_bytes = fs::read(&project_path).expect("the baseline is readable");
+    fs::rename(&project_path, &displaced_path)
+        .expect("the external actor moves the physical baseline object");
+    fs::write(&project_path, &baseline_bytes)
+        .expect("the external actor creates a byte-identical object at the pathname");
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect_err("byte equality cannot replace physical baseline identity"),
+        SaveProjectError::PersistedBaselineConflict
+    );
+    assert_eq!(
+        fs::read(&project_path).expect("the byte-identical external object remains untouched"),
+        baseline_bytes
+    );
+    let projection = project.projection();
+    assert_eq!(projection.state.revision, 1);
+    assert_eq!(projection.state.saved_revision, 0);
+    assert!(projection.state.dirty);
+    assert!(projection.state.can_undo);
 }
 
 #[test]

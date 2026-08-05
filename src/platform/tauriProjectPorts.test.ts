@@ -2,7 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectIntent } from "../domain/project";
-import { MediaPreviewError } from "../application/projectPorts";
+import {
+  MediaPreviewError,
+  SaveProjectError,
+} from "../application/projectPorts";
+import { representativeProjection } from "../test/projectFixtures";
 import {
   tauriExportPort,
   tauriMediaPreviewPort,
@@ -213,6 +217,166 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews");
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
 });
+
+test("returns the authoritative projection from a confirmed Project save", async () => {
+  const savedProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      savedRevision: 25,
+      dirty: false,
+      canUndo: true,
+    },
+  };
+  const result = {
+    outcome: { kind: "saved" as const, revision: 25 },
+    projection: savedProjection,
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(result);
+
+  await expect(tauriProjectSessionPort.save(25)).resolves.toEqual(
+    result,
+  );
+  expect(invoke).toHaveBeenCalledWith("save_project", {
+    expectedRevision: 25,
+  });
+});
+
+test("accepts an already-current Project save envelope", async () => {
+  const currentProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      savedRevision: 25,
+      dirty: false,
+    },
+  };
+  const result = {
+    outcome: { kind: "alreadyCurrent" as const, revision: 25 },
+    projection: currentProjection,
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(result);
+
+  await expect(tauriProjectSessionPort.save(25)).resolves.toEqual(
+    result,
+  );
+});
+
+test("rejects a Project save envelope whose projection does not confirm its outcome", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: { kind: "saved", revision: 25 },
+    projection: {
+      ...representativeProjection,
+      state: {
+        ...representativeProjection.state,
+        savedRevision: 24,
+      },
+    },
+  });
+
+  await expect(tauriProjectSessionPort.save(25)).rejects.toMatchObject({
+    code: "invalid_response",
+    message: "Não foi possível confirmar o resultado do Salvamento.",
+  });
+});
+
+test("rejects malformed stale-revision context as an unavailable save", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "stale_revision",
+    expectedRevision: "24",
+    currentRevision: 25,
+  });
+
+  await expect(tauriProjectSessionPort.save(25)).rejects.toMatchObject({
+    code: "save_unavailable",
+    message: "Não foi possível iniciar o Salvamento do Projeto.",
+  });
+});
+
+test.each([
+  {
+    wire: {
+      code: "stale_revision",
+      expectedRevision: 24,
+      currentRevision: 25,
+    },
+    code: "stale_revision",
+    message:
+      "A revisão visível ficou desatualizada. Atualize o Projeto e tente salvar novamente.",
+    context: { expected: 24, current: 25 },
+  },
+  {
+    wire: { code: "persisted_baseline_conflict" },
+    code: "persisted_baseline_conflict",
+    message:
+      "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+  },
+  {
+    wire: { code: "save_state_indeterminate" },
+    code: "save_state_indeterminate",
+    message:
+      "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
+  },
+  {
+    wire: { code: "session_unavailable" },
+    code: "session_unavailable",
+    message:
+      "A Sessão do Projeto não está mais disponível. Reabra o Projeto para continuar.",
+  },
+  {
+    wire: { code: "not_found" },
+    code: "not_found",
+    message:
+      "O arquivo do Projeto não foi encontrado. Confirme se ele foi movido ou removido.",
+  },
+  {
+    wire: { code: "unavailable" },
+    code: "unavailable",
+    message:
+      "O local do Projeto está indisponível. Reconecte a unidade ou o compartilhamento e tente novamente.",
+  },
+  {
+    wire: { code: "access_denied" },
+    code: "access_denied",
+    message:
+      "O Windows negou acesso ao arquivo do Projeto. Verifique as permissões e tente novamente.",
+  },
+  {
+    wire: { code: "invalid_path" },
+    code: "invalid_path",
+    message: "O caminho do arquivo do Projeto não é válido.",
+  },
+  {
+    wire: { code: "unexpected_object_type" },
+    code: "unexpected_object_type",
+    message: "O destino do Projeto deixou de ser um arquivo regular.",
+  },
+  {
+    wire: { code: "conflict" },
+    code: "conflict",
+    message:
+      "O arquivo do Projeto mudou durante o Salvamento. Tente novamente.",
+  },
+  {
+    wire: { code: "io_failure" },
+    code: "io_failure",
+    message: "O Windows não conseguiu concluir o Salvamento do Projeto.",
+  },
+] as const)(
+  "localizes the structured $code Project save failure",
+  async ({ wire, code, message, ...expected }) => {
+    vi.mocked(invoke).mockRejectedValueOnce(wire);
+
+    const failure = tauriProjectSessionPort.save(25);
+
+    await expect(failure).rejects.toBeInstanceOf(SaveProjectError);
+    await expect(failure).rejects.toMatchObject({
+      code,
+      message,
+      ...expected,
+    });
+  },
+);
 
 test("normalizes typed media preview failures without losing their code or message", async () => {
   vi.mocked(invoke).mockRejectedValueOnce({

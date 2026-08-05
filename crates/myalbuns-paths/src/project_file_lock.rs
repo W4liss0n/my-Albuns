@@ -7,7 +7,9 @@ use std::{
 
 use crate::{
     PhysicalFileIdentity, PhysicalIdentityEvidence, ResolvedObject,
-    resolve::{compare_file_identity, file_identity, read_file_handle_to_string},
+    resolve::{
+        compare_file_identity, file_identity, read_file_handle_to_bytes, read_file_handle_to_string,
+    },
 };
 
 use windows_sys::Win32::{
@@ -82,6 +84,10 @@ impl ProjectFileLock {
     /// a path replacement cannot redirect the final opening read.
     pub fn read_to_string(&self) -> std::io::Result<String> {
         read_file_handle_to_string(&self.file)
+    }
+
+    pub fn read_bytes(&self) -> std::io::Result<Vec<u8>> {
+        read_file_handle_to_bytes(&self.file)
     }
 }
 

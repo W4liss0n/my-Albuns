@@ -200,6 +200,14 @@ export function useProjectEditorController({
     );
   }
 
+  function saveVisibleRevision() {
+    const expectedRevision = projection.state.revision;
+    return runWithGlobalFeedback("Salvando", async (port) => {
+      const result = await port.save(expectedRevision);
+      return result.projection;
+    });
+  }
+
   async function commitInteraction(intent: ProjectIntent) {
     setMessage(null);
     const outcome = await runProjectMutation((port) =>
@@ -298,7 +306,15 @@ export function useProjectEditorController({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (interactionBlocked || !event.ctrlKey || event.altKey) return;
+      if (!event.ctrlKey || event.altKey) return;
+      if (event.key.toLocaleLowerCase() === "s") {
+        event.preventDefault();
+        if (!interactionBlocked && !busy) {
+          void saveVisibleRevision();
+        }
+        return;
+      }
+      if (interactionBlocked) return;
       if (
         event.key.toLocaleLowerCase() === "z" &&
         projection.state.canUndo
@@ -430,6 +446,7 @@ export function useProjectEditorController({
         dpi,
       });
     },
+    save: () => void saveVisibleRevision(),
     undo: () =>
       void runWithGlobalFeedback("Desfazendo", (port) =>
         port.undo(),

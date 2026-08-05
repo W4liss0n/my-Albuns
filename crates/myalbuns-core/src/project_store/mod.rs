@@ -12,7 +12,13 @@ use myalbuns_paths::{
 use crate::project_document::ProjectRevision;
 
 pub(crate) use editable_store::{
-    CreateStoreError, OpenStoreError, ProjectStore, create_only, open_editable, prepare_replacement,
+    CreateStoreError, OpenStoreError, ProjectStore, SaveStoreError, SaveStoreResult, create_only,
+    open_editable, prepare_replacement,
+};
+#[cfg(test)]
+pub(crate) use editable_store::{
+    inject_post_publication_indeterminate_for_current_thread,
+    release_post_publication_indeterminate_for_current_thread,
 };
 pub(crate) use identity_lease::{
     IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,

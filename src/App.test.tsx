@@ -26,6 +26,9 @@ const projectSessionPort: ProjectSessionPort = {
   apply: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
+  save: async () => {
+    throw new Error("Salvamento não configurado neste teste.");
+  },
 };
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,

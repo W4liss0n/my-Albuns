@@ -42,6 +42,10 @@ impl PersistentProjectSession {
         &self.current.project
     }
 
+    pub(crate) fn current_revision(&self) -> ProjectRevision {
+        self.current.clone()
+    }
+
     pub(crate) fn has_unsaved_changes(&self) -> bool {
         self.current.revision != self.saved_revision
     }
@@ -91,5 +95,13 @@ impl PersistentProjectSession {
         let current = std::mem::replace(&mut self.current, next);
         self.undo.push(current);
         Some(())
+    }
+
+    pub(crate) fn confirm_saved(&mut self, candidate: &ProjectRevision) -> Result<(), ()> {
+        if self.current != *candidate {
+            return Err(());
+        }
+        self.saved_revision = candidate.revision;
+        Ok(())
     }
 }

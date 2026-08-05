@@ -20,7 +20,8 @@ pub use model::{
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
-    LoadedProjectRevision, OpenProjectError, OpenProjectRequest,
+    LoadedProjectRevision, OpenProjectError, OpenProjectRequest, SaveProjectError,
+    SaveProjectOutcome,
 };
 pub use project::{
     EditableProject as DemoEditableProject, LoadedProjectRevision as DemoLoadedProjectRevision,

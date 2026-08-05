@@ -12,6 +12,7 @@ use crate::{
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
         OpenStoreError, PathFailure, ProjectIdentityLease, ProjectLocation, ProjectStore,
+        SaveStoreError, SaveStoreResult,
     },
 };
 
@@ -91,11 +92,26 @@ pub enum OpenProjectError {
     IdentityIndeterminate,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveProjectOutcome {
+    Saved { revision: u64 },
+    AlreadyCurrent { revision: u64 },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveProjectError {
+    StaleRevision { expected: u64, current: u64 },
+    PersistedBaselineConflict,
+    Path(PathFailure),
+    SaveStateIndeterminate,
+}
+
 #[derive(Debug)]
 pub struct EditableProject {
     session: PersistentProjectSession,
     store: ProjectStore,
-    _identity_lease: ProjectIdentityLease,
+    identity_lease: ProjectIdentityLease,
+    session_valid: bool,
 }
 
 impl EditableProject {
@@ -124,11 +140,11 @@ impl EditableProject {
     }
 
     pub fn can_undo(&self) -> bool {
-        self.session.can_undo()
+        self.session_valid && self.session.can_undo()
     }
 
     pub fn can_redo(&self) -> bool {
-        self.session.can_redo()
+        self.session_valid && self.session.can_redo()
     }
 
     /// Initial read-only editor view of the productive v1 document.
@@ -157,18 +173,70 @@ impl EditableProject {
     }
 
     pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorProjection, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
         self.session.apply(intent)?;
         Ok(self.projection())
     }
 
     pub fn undo(&mut self) -> Option<EditorProjection> {
+        if !self.session_valid {
+            return None;
+        }
         self.session.undo()?;
         Some(self.projection())
     }
 
     pub fn redo(&mut self) -> Option<EditorProjection> {
+        if !self.session_valid {
+            return None;
+        }
         self.session.redo()?;
         Some(self.projection())
+    }
+
+    pub fn save(&mut self, expected_revision: u64) -> Result<SaveProjectOutcome, SaveProjectError> {
+        if !self.session_valid {
+            return Err(SaveProjectError::SaveStateIndeterminate);
+        }
+        let current = self.revision();
+        if expected_revision != current {
+            return Err(SaveProjectError::StaleRevision {
+                expected: expected_revision,
+                current,
+            });
+        }
+        if !self.has_unsaved_changes() {
+            return Ok(SaveProjectOutcome::AlreadyCurrent { revision: current });
+        }
+        let candidate = self.session.current_revision();
+        match self.store.save(candidate, &self.identity_lease) {
+            SaveStoreResult::Saved(receipt) => {
+                if self.session.confirm_saved(receipt.candidate()).is_err() {
+                    self.invalidate_session();
+                    return Err(SaveProjectError::SaveStateIndeterminate);
+                }
+                Ok(SaveProjectOutcome::Saved {
+                    revision: receipt.candidate().revision,
+                })
+            }
+            SaveStoreResult::NotSaved(SaveStoreError::PersistedBaselineConflict) => {
+                Err(SaveProjectError::PersistedBaselineConflict)
+            }
+            SaveStoreResult::NotSaved(SaveStoreError::Path(error)) => {
+                Err(SaveProjectError::Path(error))
+            }
+            SaveStoreResult::StateIndeterminate => {
+                self.invalidate_session();
+                Err(SaveProjectError::SaveStateIndeterminate)
+            }
+        }
+    }
+
+    fn invalidate_session(&mut self) {
+        self.session_valid = false;
+        self.store.invalidate();
     }
 }
 
@@ -252,7 +320,8 @@ impl ProjectCore {
         Ok(EditableProject {
             session: PersistentProjectSession::from_persisted(revision),
             store,
-            _identity_lease: identity_lease,
+            identity_lease,
+            session_valid: true,
         })
     }
 
@@ -272,7 +341,8 @@ impl ProjectCore {
         Ok(EditableProject {
             session: PersistentProjectSession::from_persisted(opened.revision),
             store: opened.store,
-            _identity_lease: identity_lease,
+            identity_lease,
+            session_valid: true,
         })
     }
 }
@@ -325,5 +395,79 @@ fn map_open_identity_lease_error(error: IdentityLeaseError) -> OpenProjectError 
     match error {
         IdentityLeaseError::Conflict => OpenProjectError::ExternalCopyRequiresInteractiveResolution,
         IdentityLeaseError::Unavailable => OpenProjectError::Path(PathFailure::IoFailure),
+    }
+}
+
+#[cfg(test)]
+mod save_tests {
+    use myalbuns_paths::OperationPathContext;
+
+    use super::{CreateAuthorization, CreateProjectRequest, OpenProjectRequest, SaveProjectError};
+    use crate::{CoreError, InitialProject, ProjectCore, ProjectIntent, ProjectLocation};
+
+    fn location(path: &std::path::Path) -> ProjectLocation {
+        let mut context = OperationPathContext::new();
+        context
+            .capture(path)
+            .expect("the test Project root is captured");
+        ProjectLocation::new(path.to_path_buf(), context.freeze())
+    }
+
+    #[test]
+    fn an_indeterminate_post_publication_state_is_not_confirmed_and_requires_reopening() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let project_path = directory.path().join("Estado inconclusivo.myalbuns");
+        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                location(&project_path),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the productive Project opens");
+        project
+            .apply(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the visible revision advances");
+        crate::project_store::inject_post_publication_indeterminate_for_current_thread();
+
+        assert_eq!(
+            project
+                .save(1)
+                .expect_err("an unverified publication never confirms the candidate"),
+            SaveProjectError::SaveStateIndeterminate
+        );
+        let unconfirmed = project.projection();
+        assert_eq!(unconfirmed.state.revision, 1);
+        assert_eq!(unconfirmed.state.saved_revision, 0);
+        assert!(unconfirmed.state.dirty);
+        assert!(!unconfirmed.state.can_undo);
+        assert!(!unconfirmed.state.can_redo);
+        assert_eq!(
+            project
+                .apply(ProjectIntent::SetDpi { dpi: 600 })
+                .expect_err("an invalidated editable Session rejects creative mutations"),
+            CoreError::EditableSessionInvalidated
+        );
+        assert!(project.undo().is_none());
+        assert!(project.redo().is_none());
+        assert_eq!(project.projection(), unconfirmed);
+        assert_eq!(
+            project
+                .save(1)
+                .expect_err("the invalidated Store cannot be retried"),
+            SaveProjectError::SaveStateIndeterminate
+        );
+
+        crate::project_store::release_post_publication_indeterminate_for_current_thread();
+        drop(project);
+        let reopened = core
+            .open_editable(OpenProjectRequest::new(location(&project_path)))
+            .expect("reopening establishes which complete revision reached the pathname");
+        assert_eq!(reopened.revision(), 1);
+        assert_eq!(reopened.saved_revision(), 1);
+        assert_eq!(reopened.project().document().dpi(), 240);
+        assert!(!reopened.has_unsaved_changes());
+        assert!(!reopened.can_undo());
+        assert!(!reopened.can_redo());
     }
 }

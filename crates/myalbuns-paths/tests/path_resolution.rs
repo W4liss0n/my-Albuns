@@ -108,6 +108,49 @@ fn prepares_a_new_file_from_its_parent_handle_and_verifies_the_created_child() {
 }
 
 #[test]
+fn resolves_an_operational_sibling_without_reinterpreting_the_logical_binding() {
+    let root = tempfile::tempdir().expect("temporary operational root");
+    let logical_target = if cfg!(windows) {
+        std::path::PathBuf::from(r"R:\Albuns\Projeto.myalbuns")
+    } else {
+        std::path::PathBuf::from("/Albuns/Projeto.myalbuns")
+    };
+    let operational_parent = root.path().join("Albuns");
+    std::fs::create_dir(&operational_parent).expect("the operational parent exists");
+
+    let mut owner = OperationPathContext::new();
+    owner
+        .capture_with_binding(&logical_target, root.path())
+        .expect("the logical root is bound to the injected operational root");
+    let destination = owner
+        .freeze()
+        .prepare_file_destination(&logical_target)
+        .expect("the destination follows the captured binding");
+    let temporary = destination.sibling_temporary_path();
+    std::fs::write(&temporary, b"candidate").expect("the operational sibling is writable");
+
+    let resolved = destination
+        .resolve_existing_sibling(&temporary)
+        .expect("the already-operational sibling resolves directly");
+
+    assert_eq!(resolved.operational_path(), temporary);
+    assert_eq!(
+        resolved.logical_path(),
+        logical_target.with_file_name(
+            temporary
+                .file_name()
+                .expect("the generated sibling has a file name")
+        )
+    );
+    assert_eq!(
+        resolved
+            .read_bytes()
+            .expect("the sibling handle is readable"),
+        b"candidate"
+    );
+}
+
+#[test]
 fn reads_a_regular_file_through_the_resolved_handle_after_path_replacement() {
     let root = tempfile::tempdir().expect("temporary handle-bound read root");
     let project = root.path().join("Projeto.myalbum");

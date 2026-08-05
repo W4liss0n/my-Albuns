@@ -67,6 +67,14 @@ export function ProjectWorkspace({
         <div className="command-group">
           <Button
             className="icon-command"
+            aria-label="Salvar"
+            isDisabled={Boolean(busy) || exportActive}
+            onPress={controller.save}
+          >
+            ⇩
+          </Button>
+          <Button
+            className="icon-command"
             aria-label="Desfazer"
             isDisabled={
               !projection.state.canUndo || Boolean(busy) || exportActive
