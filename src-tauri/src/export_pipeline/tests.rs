@@ -9,10 +9,10 @@ use std::{
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    ImagingCommand, ImagingProgress, ImagingProgressStage, ImagingResponse, MediaSource,
-    RenderCompletion, decode_command, encode_command,
+    ImagingCommand, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingResponse,
+    MediaSource, RenderCompletion, decode_command, encode_command,
 };
-use myalbuns_paths::{OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
 use super::{
@@ -139,7 +139,7 @@ impl ImagingTransport for GroupedTransport {
             .prepared_outputs
             .pop_front()
             .expect("one prepared payload exists per grouped Export unit");
-        std::fs::write(&request.prepared_output_path, &prepared)
+        std::fs::write(request.prepared_output_path(), &prepared)
             .expect("the grouped Processor writes its preparation");
         if self.invocations == 2
             && let Some(blocked_output) = self.block_output_before_publication.take()
@@ -199,14 +199,31 @@ impl ImagingTransport for PlanObservingTransport {
 }
 
 fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
+    export_plan_with_authorization(output, request_id, ExportWriteAuthorization::CreateOnly)
+}
+
+fn replacement_export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
+    export_plan_with_authorization(
+        output,
+        request_id,
+        ExportWriteAuthorization::ReplaceConfirmed,
+    )
+}
+
+fn export_plan_with_authorization(
+    output: PathBuf,
+    request_id: &str,
+    authorization: ExportWriteAuthorization,
+) -> ExportPlan {
     let source = SampleProject::Horizon
         .persisted_source(2)
         .expect("the sample project serializes");
     let core = ProjectCore::new();
-    let snapshot = core
+    let mut snapshot = core
         .open_demo_editable_session(&source)
         .expect("the sample project opens")
         .render_snapshot();
+    snapshot.dpi = 25;
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let mut media_ids = Vec::new();
     for media_id in snapshot.composition.sheets[0].referenced_media_ids() {
@@ -246,7 +263,7 @@ fn export_plan(output: PathBuf, request_id: &str) -> ExportPlan {
     }
     plan(
         snapshot,
-        ExportOptions::new(request_id, output, sheet_id, 25, sources),
+        ExportOptions::new(request_id, output, authorization, sheet_id, sources),
     )
     .expect("the Export request is valid")
 }
@@ -287,9 +304,9 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
         snapshot,
         ExportOptions::new(
             "export-without-originals",
-            destination.path().join("Album.png"),
+            destination.path().join("Album.jpg"),
+            ExportWriteAuthorization::CreateOnly,
             sheet_id,
-            25,
             vec![],
         ),
     )
@@ -301,7 +318,7 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
 #[test]
 fn host_execution_uses_the_same_frozen_mapped_drive_binding_as_the_processor() {
     let logical_plan = myalbuns_paths::ExportPathPlan::new(
-        PathBuf::from(r"Z:\Exports\Album.png"),
+        PathBuf::from(r"Z:\Exports\Album.jpg"),
         "export-mapped",
     )
     .expect("the logical Export path is valid");
@@ -318,12 +335,12 @@ fn host_execution_uses_the_same_frozen_mapped_drive_binding_as_the_processor() {
 
     assert_eq!(
         operational.output_path(),
-        std::path::Path::new(r"\\servidor\destino\Exports\Album.png")
+        std::path::Path::new(r"\\servidor\destino\Exports\Album.jpg")
     );
     assert_eq!(
         operational.prepared_output_path(),
         std::path::Path::new(
-            r"\\servidor\destino\Exports\.myalbuns-export-export-mapped.tmp\Album.png"
+            r"\\servidor\destino\Exports\.myalbuns-export-export-mapped.tmp\Album.jpg"
         )
     );
 }
@@ -332,7 +349,7 @@ fn host_execution_uses_the_same_frozen_mapped_drive_binding_as_the_processor() {
 fn export_pipeline_sends_the_exact_plan_used_by_the_host_through_the_ipc_boundary() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         let plan = export_plan(output.clone(), "export-plan-correlation");
         let bindings = root_bindings(&plan);
         let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
@@ -364,7 +381,7 @@ fn export_pipeline_sends_the_exact_plan_used_by_the_host_through_the_ipc_boundar
 fn planning_an_export_does_not_create_its_destination() {
     let root = tempfile::tempdir().expect("temporary Export root");
     let destination = root.path().join("not-created").join("nested");
-    let output = destination.join("Album.png");
+    let output = destination.join("Album.jpg");
 
     let _plan = export_plan(output, "export-pure-plan");
 
@@ -382,14 +399,14 @@ fn context(request_id: &str) -> InvocationContext {
 fn grouped_export_prepares_every_output_before_publishing_the_complete_set() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary grouped Export destination");
-        let first_output = destination.path().join("Album_001.png");
-        let second_output = destination.path().join("Album_002.png");
+        let first_output = destination.path().join("Album_001.jpg");
+        let second_output = destination.path().join("Album_002.jpg");
         std::fs::write(&first_output, b"previous first")
             .expect("the first previous Export is writable");
         std::fs::write(&second_output, b"previous second")
             .expect("the second previous Export is writable");
-        let first_plan = export_plan(first_output.clone(), "export-group-success-1");
-        let second_plan = export_plan(second_output.clone(), "export-group-success-2");
+        let first_plan = replacement_export_plan(first_output.clone(), "export-group-success-1");
+        let second_plan = replacement_export_plan(second_output.clone(), "export-group-success-2");
         let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
         let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
         let second_preparation = second_plan
@@ -431,13 +448,7 @@ fn grouped_export_prepares_every_output_before_publishing_the_complete_set() {
             Some(b"previous first".to_vec()),
             "the first output cannot be promoted while the second is still being prepared"
         );
-        assert_eq!(
-            published
-                .iter()
-                .map(|result| result.output_path.as_path())
-                .collect::<Vec<_>>(),
-            [first_output.as_path(), second_output.as_path()]
-        );
+        assert_eq!(published.len(), 2);
         assert_eq!(
             std::fs::read(&first_output).expect("the first grouped output is readable"),
             b"new first"
@@ -480,11 +491,11 @@ fn grouped_export_prepares_every_output_before_publishing_the_complete_set() {
 fn grouped_export_reports_a_typed_partial_publication_and_discards_the_remainder() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary grouped Export destination");
-        let first_output = destination.path().join("Album_001.png");
-        let second_output = destination.path().join("Album_002.png");
+        let first_output = destination.path().join("Album_001.jpg");
+        let second_output = destination.path().join("Album_002.jpg");
         std::fs::write(&first_output, b"previous first")
             .expect("the first previous Export is writable");
-        let first_plan = export_plan(first_output.clone(), "export-group-partial-1");
+        let first_plan = replacement_export_plan(first_output.clone(), "export-group-partial-1");
         let second_plan = export_plan(second_output.clone(), "export-group-partial-2");
         let bindings = grouped_root_bindings(&[&first_plan, &second_plan]);
         let first_preparation = first_plan.path_plan().preparation_directory().to_path_buf();
@@ -556,9 +567,9 @@ fn grouped_export_reports_a_typed_partial_publication_and_discards_the_remainder
 fn a_processor_crash_is_not_retried_and_preserves_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-failure");
+        let plan = replacement_export_plan(output.clone(), "export-failure");
         let mut transport = ScriptedTransport {
             prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
             prepared_bytes: b"incomplete".to_vec(),
@@ -601,12 +612,63 @@ fn a_processor_crash_is_not_retried_and_preserves_the_previous_output() {
 }
 
 #[test]
+fn a_known_processor_failure_uses_the_structured_terminal_without_an_exit_code() {
+    tauri::async_runtime::block_on(async {
+        let destination = tempfile::tempdir().expect("temporary Export destination");
+        let output = destination.path().join("Album.jpg");
+        std::fs::write(&output, b"previous export").expect("the previous Export is writable");
+        let plan = replacement_export_plan(output.clone(), "export-known-failure");
+        let mut transport = ScriptedTransport {
+            prepared_path: plan.path_plan().prepared_output_path().to_path_buf(),
+            prepared_bytes: b"incomplete".to_vec(),
+            result: Some(Ok(ImagingResponse::failed(
+                "export-known-failure",
+                ImagingFailureStage::OutputEncode,
+            ))),
+            invocations: 0,
+        };
+        let bindings = root_bindings(&plan);
+
+        let failure = execute(
+            &mut transport,
+            plan,
+            &bindings,
+            &ExportExecutionControl::default(),
+            &|_| {},
+            &context("export-known-failure"),
+        )
+        .await
+        .expect_err("the structured failure remains visible");
+
+        assert_eq!(
+            failure.stage,
+            ExportFailureStage::Processor(
+                crate::imaging_processor::InvocationFailureStage::Processor(
+                    ImagingFailureStage::OutputEncode,
+                ),
+            )
+        );
+        assert_eq!(failure.exit_code, None);
+        assert_eq!(
+            std::fs::read(output).expect("the previous Export remains readable"),
+            b"previous export"
+        );
+        assert!(
+            !destination
+                .path()
+                .join(".myalbuns-export-export-known-failure.tmp")
+                .exists()
+        );
+    });
+}
+
+#[test]
 fn unconfirmed_process_termination_preserves_the_preparation_for_safe_recovery() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-unconfirmed-termination");
+        let plan = replacement_export_plan(output.clone(), "export-unconfirmed-termination");
         let prepared_path = plan.path_plan().prepared_output_path().to_path_buf();
         let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
         let mut transport = ScriptedTransport {
@@ -656,9 +718,9 @@ fn unconfirmed_process_termination_preserves_the_preparation_for_safe_recovery()
 fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-success");
+        let plan = replacement_export_plan(output.clone(), "export-success");
         let bytes = b"verified export".to_vec();
         let completion = RenderCompletion {
             width_px: 10,
@@ -698,9 +760,8 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
         .expect("the verified Export is published");
 
         assert_eq!(published.completion, completion);
-        assert_eq!(published.output_path, output);
         assert_eq!(
-            std::fs::read(&published.output_path).expect("the published Export is readable"),
+            std::fs::read(&output).expect("the published Export is readable"),
             b"verified export"
         );
         assert_eq!(
@@ -762,9 +823,9 @@ fn a_verified_preparation_is_published_only_after_the_response_is_validated() {
 fn pipeline_claims_publication_before_observers_receive_the_event() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-publication-boundary");
+        let plan = replacement_export_plan(output.clone(), "export-publication-boundary");
         let bytes = b"verified replacement".to_vec();
         let response = ImagingResponse::completed(
             "export-publication-boundary",
@@ -797,7 +858,7 @@ fn pipeline_claims_publication_before_observers_receive_the_event() {
             }
         };
 
-        let published = execute(
+        execute(
             &mut transport,
             plan,
             &bindings,
@@ -815,7 +876,7 @@ fn pipeline_claims_publication_before_observers_receive_the_event() {
             Some(ExportCancellationResult::TooLate)
         );
         assert_eq!(
-            std::fs::read(&published.output_path).expect("the new Export is readable"),
+            std::fs::read(&output).expect("the new Export is readable"),
             b"verified replacement"
         );
     });
@@ -825,9 +886,9 @@ fn pipeline_claims_publication_before_observers_receive_the_event() {
 fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-cancel-before-publication");
+        let plan = replacement_export_plan(output.clone(), "export-cancel-before-publication");
         let bytes = b"verified replacement".to_vec();
         let response = ImagingResponse::completed(
             "export-cancel-before-publication",
@@ -898,9 +959,9 @@ fn cancellation_that_wins_before_the_publication_claim_preserves_the_previous_ou
 fn an_unverified_preparation_never_replaces_the_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-invalid");
+        let plan = replacement_export_plan(output.clone(), "export-invalid");
         let bytes = b"unverified export".to_vec();
         let response = ImagingResponse::completed(
             "export-invalid",
@@ -948,7 +1009,7 @@ fn an_unverified_preparation_never_replaces_the_previous_output() {
 fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         let plan = export_plan(output, "export-cancelled");
         let preparation_path = plan.path_plan().preparation_directory().to_path_buf();
         let bindings = root_bindings(&plan);
@@ -998,9 +1059,9 @@ fn cancellation_before_execution_creates_no_preparation_or_processor_work() {
 fn cancellation_during_processing_discards_preparation_and_preserves_previous_output() {
     tauri::async_runtime::block_on(async {
         let destination = tempfile::tempdir().expect("temporary Export destination");
-        let output = destination.path().join("Album.png");
+        let output = destination.path().join("Album.jpg");
         std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-        let plan = export_plan(output.clone(), "export-cancelled-during-processing");
+        let plan = replacement_export_plan(output.clone(), "export-cancelled-during-processing");
         let preparation_directory = plan.path_plan().preparation_directory().to_path_buf();
         let invocation_started = Arc::new(Barrier::new(2));
         let mut transport = CancellationAwareTransport {

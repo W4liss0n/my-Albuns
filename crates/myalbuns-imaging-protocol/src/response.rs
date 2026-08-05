@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::cache::CacheCompletion;
+use crate::command::ImagingFailureStage;
 use crate::render::RenderCompletion;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -18,6 +19,10 @@ pub enum ImagingResponse {
         request_id: String,
         completion: CacheCompletion,
     },
+    Failed {
+        request_id: String,
+        stage: ImagingFailureStage,
+    },
 }
 
 impl ImagingResponse {
@@ -32,6 +37,13 @@ impl ImagingResponse {
         Self::CacheCompleted {
             request_id: request_id.into(),
             completion,
+        }
+    }
+
+    pub fn failed(request_id: impl Into<String>, stage: ImagingFailureStage) -> Self {
+        Self::Failed {
+            request_id: request_id.into(),
+            stage,
         }
     }
 
@@ -55,11 +67,22 @@ impl ImagingResponse {
         }
     }
 
+    pub fn failure_for(&self, expected_request_id: &str) -> Option<ImagingFailureStage> {
+        match self {
+            Self::Failed { request_id, stage } if request_id == expected_request_id => Some(*stage),
+            _ => None,
+        }
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::Failed { .. })
+    }
+
     pub fn request_id(&self) -> &str {
         match self {
-            Self::Completed { request_id, .. } | Self::CacheCompleted { request_id, .. } => {
-                request_id
-            }
+            Self::Completed { request_id, .. }
+            | Self::CacheCompleted { request_id, .. }
+            | Self::Failed { request_id, .. } => request_id,
         }
     }
 }

@@ -26,7 +26,7 @@ interface AttemptHarness {
 
 function createExportHarness() {
   const attempts: AttemptHarness[] = [];
-  const startPreview = vi.fn<ExportPort["startPreview"]>((onEvent) => {
+  const startSheet = vi.fn<ExportPort["startSheet"]>((_sheetId, onEvent) => {
     let resolve!: (outcome: ExportOutcome) => void;
     let reject!: (error: unknown) => void;
     const completion = new Promise<ExportOutcome>(
@@ -50,8 +50,8 @@ function createExportHarness() {
 
   return {
     attempts,
-    port: { startPreview } satisfies ExportPort,
-    startPreview,
+    port: { startSheet } satisfies ExportPort,
+    startSheet,
   };
 }
 
@@ -67,16 +67,20 @@ test("waits for the started event before showing progress", async () => {
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-002"
     />,
   );
 
   const exportButton = screen.getByRole("button", {
-    name: "Exportar prova",
+    name: "Exportar Lâmina",
   });
   await user.click(exportButton);
 
   expect(exportButton).toBeDisabled();
-  expect(harness.startPreview).toHaveBeenCalledOnce();
+  expect(harness.startSheet).toHaveBeenCalledWith(
+    "sheet-002",
+    expect.any(Function),
+  );
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
   act(() => {
@@ -109,10 +113,11 @@ test("rejects an attempt before started without opening a modal", async () => {
       exportPort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
 
   await act(async () => {
@@ -128,7 +133,7 @@ test("rejects an attempt before started without opening a modal", async () => {
     "Outra operação exclusiva já está em andamento.",
   );
   expect(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   ).toBeEnabled();
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
@@ -141,10 +146,11 @@ test("projects progress and follows the backend cancellation declaration", async
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
 
   act(() => {
@@ -222,10 +228,11 @@ test("requests cancellation once and waits for completion before showing feedbac
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   act(() => {
     harness.attempts[0].emit({
@@ -281,10 +288,11 @@ test("closes progress and confirms a completed Export briefly", async () => {
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   act(() => {
     harness.attempts[0].emit({
@@ -297,7 +305,6 @@ test("closes progress and confirms a completed Export briefly", async () => {
     harness.attempts[0].resolve({
       status: "completed",
       result: {
-        outputPath: "C:/exports/Album_001.jpg",
         widthPx: 7_087,
         heightPx: 3_543,
       },
@@ -310,7 +317,7 @@ test("closes progress and confirms a completed Export briefly", async () => {
     "Exportação concluída",
   );
   expect(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   ).toBeEnabled();
 
   act(() => {
@@ -328,10 +335,11 @@ test("offers retry and close in feedback after an Export failure", async () => {
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   act(() => {
     harness.attempts[0].emit({
@@ -359,10 +367,10 @@ test("offers retry and close in feedback after an Export failure", async () => {
     screen.getByRole("button", { name: "Tentar novamente" }),
   );
 
-  expect(harness.startPreview).toHaveBeenCalledTimes(2);
+  expect(harness.startSheet).toHaveBeenCalledTimes(2);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   ).toBeDisabled();
 
   act(() => {
@@ -379,7 +387,7 @@ test("offers retry and close in feedback after an Export failure", async () => {
 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   ).toBeEnabled();
 });
 
@@ -392,11 +400,12 @@ test("retires an active attempt when the Project changes or the control unmounts
       exportPort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
 
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   act(() => {
     harness.attempts[0].emit({
@@ -411,6 +420,7 @@ test("retires an active attempt when the Project changes or the control unmounts
       exportPort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-b"
+      sheetId="sheet-001"
     />,
   );
 
@@ -430,7 +440,6 @@ test("retires an active attempt when the Project changes or the control unmounts
     harness.attempts[0].resolve({
       status: "completed",
       result: {
-        outputPath: "C:/exports/stale.jpg",
         widthPx: 100,
         heightPx: 50,
       },
@@ -442,7 +451,7 @@ test("retires an active attempt when the Project changes or the control unmounts
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 
   await user.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   expect(onActiveChange.mock.calls).toEqual([[true], [false], [true]]);
 
@@ -473,25 +482,27 @@ test("honors external disabling and keeps commands blocked until terminal feedba
       exportPort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
 
   const disabledButton = screen.getByRole("button", {
-    name: "Exportar prova",
+    name: "Exportar Lâmina",
   });
   expect(disabledButton).toBeDisabled();
   fireEvent.click(disabledButton);
-  expect(harness.startPreview).not.toHaveBeenCalled();
+  expect(harness.startSheet).not.toHaveBeenCalled();
 
   view.rerender(
     <ExportPreviewControl
       exportPort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   fireEvent.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
 
   expect(onActiveChange.mock.calls).toEqual([[true]]);
@@ -521,10 +532,11 @@ test("moves focus into progress and restores it after completion", async () => {
     <ExportPreviewControl
       exportPort={harness.port}
       projectId="project-a"
+      sheetId="sheet-001"
     />,
   );
   const exportButton = screen.getByRole("button", {
-    name: "Exportar prova",
+    name: "Exportar Lâmina",
   });
   await user.click(exportButton);
 
@@ -545,7 +557,6 @@ test("moves focus into progress and restores it after completion", async () => {
     harness.attempts[0].resolve({
       status: "completed",
       result: {
-        outputPath: "C:/exports/Album_001.jpg",
         widthPx: 7_087,
         heightPx: 3_543,
       },

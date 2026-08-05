@@ -5,8 +5,8 @@ use std::{
 
 use directories::BaseDirs;
 use myalbuns_paths::{
-    AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, OperationPathContext,
-    PathRootKind, RootBindingPlan, project_data_namespace,
+    AppPaths, AppPathsError, CacheArtifactFormat, ExportPathPlan, ExportWriteAuthorization,
+    OperationPathContext, PathRootKind, RootBindingPlan, project_data_namespace,
 };
 
 #[test]
@@ -532,8 +532,12 @@ fn publishing_a_verified_preparation_replaces_the_previous_output() {
     let destination = tempfile::tempdir().expect("temporary Export destination");
     let output = destination.path().join("Álbum 01.png");
     std::fs::write(&output, b"previous export").expect("the previous Export is writable");
-    let plan =
-        ExportPathPlan::new(output.clone(), "export-success").expect("the Export plan is valid");
+    let plan = ExportPathPlan::new_authorized(
+        output.clone(),
+        "export-success",
+        ExportWriteAuthorization::ReplaceConfirmed,
+    )
+    .expect("the Export plan is valid");
     let preparation = plan
         .prepare()
         .expect("the Export preparation is reserved safely");
@@ -547,6 +551,35 @@ fn publishing_a_verified_preparation_replaces_the_previous_output() {
     assert_eq!(
         std::fs::read(output).expect("the published Export is readable"),
         b"verified export"
+    );
+    assert!(!plan.preparation_directory().exists());
+}
+
+#[test]
+fn create_only_publication_never_reinfers_permission_to_replace() {
+    let destination = tempfile::tempdir().expect("temporary Export destination");
+    let output = destination.path().join("Álbum 01.jpg");
+    std::fs::write(&output, b"external final").expect("the conflicting final is writable");
+    let plan = ExportPathPlan::new_authorized(
+        output.clone(),
+        "export-create-only",
+        ExportWriteAuthorization::CreateOnly,
+    )
+    .expect("the CreateOnly Export plan is valid");
+    assert_eq!(plan.authorization(), ExportWriteAuthorization::CreateOnly);
+    let preparation = plan
+        .prepare()
+        .expect("the Export preparation is reserved safely");
+    std::fs::write(plan.prepared_output_path(), b"verified export")
+        .expect("the verified preparation is writable");
+
+    assert_eq!(
+        preparation.publish().unwrap_err(),
+        AppPathsError::ExportTargetConflict
+    );
+    assert_eq!(
+        std::fs::read(&output).expect("the external final remains readable"),
+        b"external final"
     );
     assert!(!plan.preparation_directory().exists());
 }

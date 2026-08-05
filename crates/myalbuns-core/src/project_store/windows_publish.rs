@@ -22,55 +22,10 @@ pub(crate) fn write_synced_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     writer.sync_all()
 }
 
-#[cfg(windows)]
 pub(crate) fn publish_new(prepared: &Path, target: &Path) -> io::Result<()> {
-    use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
-
-    let prepared = wide_path(prepared);
-    let target = wide_path(target);
-    let succeeded = unsafe { MoveFileExW(prepared.as_ptr(), target.as_ptr(), 0) };
-    if succeeded == 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
+    myalbuns_paths::publish_new_file(prepared, target)
 }
 
-#[cfg(not(windows))]
-pub(crate) fn publish_new(prepared: &Path, target: &Path) -> io::Result<()> {
-    std::fs::hard_link(prepared, target)?;
-    std::fs::remove_file(prepared)
-}
-
-#[cfg(windows)]
 pub(crate) fn replace_existing(prepared: &Path, target: &Path) -> io::Result<()> {
-    use windows_sys::Win32::Storage::FileSystem::ReplaceFileW;
-
-    let target = wide_path(target);
-    let prepared = wide_path(prepared);
-    let succeeded = unsafe {
-        ReplaceFileW(
-            target.as_ptr(),
-            prepared.as_ptr(),
-            std::ptr::null(),
-            0,
-            std::ptr::null(),
-            std::ptr::null(),
-        )
-    };
-    if succeeded == 0 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
-
-#[cfg(not(windows))]
-pub(crate) fn replace_existing(prepared: &Path, target: &Path) -> io::Result<()> {
-    std::fs::rename(prepared, target)
-}
-
-#[cfg(windows)]
-fn wide_path(path: &Path) -> Vec<u16> {
-    myalbuns_paths::wide_api_path(path)
+    myalbuns_paths::replace_existing_file(prepared, target)
 }

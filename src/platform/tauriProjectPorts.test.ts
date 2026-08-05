@@ -38,19 +38,19 @@ beforeEach(() => {
 
 test("completes an Export attempt with the backend result", async () => {
   const result = {
-    outputPath: "C:/exports/preview.pdf",
     widthPx: 7_087,
     heightPx: 3_543,
   };
   vi.mocked(invoke).mockResolvedValueOnce(result);
 
-  const attempt = tauriExportPort.startPreview(vi.fn());
+  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
 
   await expect(attempt.completion).resolves.toEqual({
     status: "completed",
     result,
   });
-  expect(invoke).toHaveBeenCalledWith("export_preview", {
+  expect(invoke).toHaveBeenCalledWith("export_sheet", {
+    sheetId: "sheet-001",
     onEvent: tauriBoundary.channels[0],
   });
 });
@@ -58,7 +58,7 @@ test("completes an Export attempt with the backend result", async () => {
 test("forwards Export events without exposing the backend operation id", () => {
   const onEvent = vi.fn();
 
-  tauriExportPort.startPreview(onEvent);
+  tauriExportPort.startSheet("sheet-001", onEvent);
   tauriBoundary.channels[0].onmessage({
     event: "started",
     data: {
@@ -102,7 +102,7 @@ test("cancels an Export attempt using the operation id kept inside the adapter",
   );
   vi.mocked(invoke).mockResolvedValueOnce("requested");
 
-  const attempt = tauriExportPort.startPreview(vi.fn());
+  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
   tauriBoundary.channels[0].onmessage({
     event: "started",
     data: {
@@ -128,7 +128,7 @@ test("maps the backend cancelled error to a cancelled Export outcome", async () 
     message: "A Exportação foi cancelada.",
   });
 
-  const attempt = tauriExportPort.startPreview(vi.fn());
+  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
 
   await expect(attempt.completion).resolves.toEqual({
     status: "cancelled",
@@ -145,7 +145,7 @@ test("keeps a cancellation requested before started until the operation id arriv
   );
   vi.mocked(invoke).mockResolvedValueOnce("requested");
 
-  const attempt = tauriExportPort.startPreview(vi.fn());
+  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
   const cancellation = attempt.cancel();
   await Promise.resolve();
 
@@ -165,7 +165,6 @@ test("keeps a cancellation requested before started until the operation id arriv
   });
 
   completeBackend({
-    outputPath: "C:/exports/preview.pdf",
     widthPx: 7_087,
     heightPx: 3_543,
   });
@@ -179,7 +178,7 @@ test("resolves a queued cancellation as not_found when completion fails before s
   };
   vi.mocked(invoke).mockRejectedValueOnce(failure);
 
-  const attempt = tauriExportPort.startPreview(vi.fn());
+  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
   const cancellation = attempt.cancel();
 
   await expect(attempt.completion).rejects.toBe(failure);

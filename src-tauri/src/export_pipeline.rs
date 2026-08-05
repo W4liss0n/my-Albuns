@@ -8,13 +8,17 @@ use std::{
     },
 };
 
-use myalbuns_core::RenderSnapshot;
+use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingProgress, ImagingProgressStage,
-    ImagingRequest, MediaSource, RenderCompletion, validate_render_content,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailureStage, ImagingProgress,
+    ImagingProgressStage, ImagingRequest, MediaSource, RenderCompletion, has_jpeg_extension,
+    validate_render_content,
 };
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{ExportPathPlan, PreparedExportStorage, RootBindingPlan};
+use myalbuns_paths::{
+    AppPathsError, ExportPathPlan, ExportWriteAuthorization, NativePathDto, PreparedExportStorage,
+    RootBindingPlan,
+};
 use sha2::{Digest, Sha256};
 use tokio::sync::Notify;
 
@@ -25,16 +29,19 @@ use crate::imaging_processor::{
 
 #[derive(Debug)]
 pub(crate) struct ExportPlan {
-    snapshot: RenderSnapshot,
-    options: ExportOptions,
+    unit: ComposedOutputUnit,
+    dpi: u32,
+    request_id: String,
+    path_plan: ExportPathPlan,
+    sources: Vec<MediaSource>,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ExportOptions {
     request_id: String,
     output_path: PathBuf,
+    authorization: ExportWriteAuthorization,
     sheet_id: String,
-    dpi: u32,
     sources: Vec<MediaSource>,
 }
 
@@ -42,15 +49,15 @@ impl ExportOptions {
     pub(crate) fn new(
         request_id: impl Into<String>,
         output_path: PathBuf,
+        authorization: ExportWriteAuthorization,
         sheet_id: impl Into<String>,
-        dpi: u32,
         sources: Vec<MediaSource>,
     ) -> Self {
         Self {
             request_id: request_id.into(),
             output_path,
+            authorization,
             sheet_id: sheet_id.into(),
-            dpi,
             sources,
         }
     }
@@ -58,21 +65,20 @@ impl ExportOptions {
 
 impl ExportPlan {
     pub(crate) fn required_paths(&self) -> Vec<&Path> {
-        let mut paths = Vec::with_capacity(self.options.sources.len() + 1);
-        paths.push(self.options.output_path.as_path());
-        paths.extend(self.options.sources.iter().map(MediaSource::source_path));
+        let mut paths = Vec::with_capacity(self.sources.len() + 1);
+        paths.push(self.path_plan.output_path());
+        paths.extend(self.sources.iter().map(MediaSource::source_path));
         paths
     }
 
-    fn path_plan(&self) -> ExportPathPlan {
-        ExportPathPlan::new(self.options.output_path.clone(), &self.options.request_id)
-            .expect("ExportPlan only exists after its path plan was validated")
+    #[cfg(test)]
+    fn path_plan(&self) -> &ExportPathPlan {
+        &self.path_plan
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct PublishedExport {
-    pub(crate) output_path: PathBuf,
     pub(crate) completion: RenderCompletion,
 }
 
@@ -120,7 +126,6 @@ impl Drop for ExportPreparationGuard {
 
 struct PreparedExport {
     preparation: ExportPreparationGuard,
-    output_path: PathBuf,
     completion: RenderCompletion,
 }
 
@@ -128,6 +133,7 @@ struct PreparedExport {
 pub(crate) enum ExportFailureStage {
     Plan,
     Cancelled,
+    ExportConflict,
     Prepare,
     Processor(InvocationFailureStage),
     ValidateResponse,
@@ -143,6 +149,7 @@ impl ExportFailureStage {
         match self {
             Self::Plan => "plan_request",
             Self::Cancelled => "cancelled",
+            Self::ExportConflict => "export_conflict",
             Self::Prepare => "prepare_output",
             Self::Processor(stage) => stage.as_str(),
             Self::ValidateResponse => "validate_response",
@@ -286,29 +293,51 @@ pub(crate) fn plan(
     snapshot: RenderSnapshot,
     options: ExportOptions,
 ) -> Result<ExportPlan, ExportFailure> {
-    let _path_plan = ExportPathPlan::new(options.output_path.clone(), &options.request_id)
+    let ExportOptions {
+        request_id,
+        output_path,
+        authorization,
+        sheet_id,
+        sources,
+    } = options;
+    let path_plan = ExportPathPlan::new_authorized(output_path.clone(), &request_id, authorization)
         .map_err(|error| {
             ExportFailure::new(
                 ExportFailureStage::Plan,
                 format!("Não foi possível planejar o Destino da Exportação: {error}"),
             )
         })?;
-    validate_plan_inputs(&snapshot, &options)?;
-    Ok(ExportPlan { snapshot, options })
-}
-
-fn validate_plan_inputs(
-    snapshot: &RenderSnapshot,
-    options: &ExportOptions,
-) -> Result<(), ExportFailure> {
-    validate_render_content(snapshot, &options.sheet_id, options.dpi, &options.sources).map_err(
-        |error| {
-            ExportFailure::new(
-                ExportFailureStage::Plan,
-                format!("Não foi possível planejar a Exportação: {error}"),
-            )
-        },
-    )
+    if !has_jpeg_extension(&output_path) {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Plan,
+            "O Destino da Exportação precisa usar a extensão .jpg.",
+        ));
+    }
+    snapshot.validate().map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível congelar a Exportação: {error}"),
+        )
+    })?;
+    let unit = snapshot.output_unit(&sheet_id).map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível selecionar a Lâmina da Exportação: {error}"),
+        )
+    })?;
+    validate_render_content(&unit, snapshot.dpi, &sources).map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Plan,
+            format!("Não foi possível planejar a Exportação: {error}"),
+        )
+    })?;
+    Ok(ExportPlan {
+        unit,
+        dpi: snapshot.dpi,
+        request_id,
+        path_plan,
+        sources,
+    })
 }
 
 pub(crate) async fn execute<T: ImagingTransport>(
@@ -370,7 +399,6 @@ pub(crate) async fn execute_group<T: ImagingTransport>(
     for prepared in preparations {
         let PreparedExport {
             preparation,
-            output_path,
             completion,
         } = prepared;
         if let Err(error) = preparation.publish() {
@@ -382,19 +410,18 @@ pub(crate) async fn execute_group<T: ImagingTransport>(
                     published.len()
                 )
             };
-            return Err(ExportFailure::new(
+            let stage = if error == AppPathsError::ExportTargetConflict {
+                ExportFailureStage::ExportConflict
+            } else {
                 ExportFailureStage::Publish {
                     promoted_outputs: u32::try_from(published.len())
                         .expect("the promoted count fits the validated total"),
                     total_outputs: total_units,
-                },
-                message,
-            ));
+                }
+            };
+            return Err(ExportFailure::new(stage, message));
         }
-        published.push(PublishedExport {
-            output_path,
-            completion,
-        });
+        published.push(PublishedExport { completion });
     }
     progress(ExportProgress::measured(
         ExportProgressStage::Completed,
@@ -414,15 +441,13 @@ async fn prepare_export<T: ImagingTransport>(
     context: &InvocationContext,
 ) -> Result<PreparedExport, ExportFailure> {
     ensure_not_cancelled(control)?;
-    let path_plan = plan.path_plan();
-    let ExportPlan { snapshot, options } = plan;
-    let ExportOptions {
-        request_id,
-        output_path,
-        sheet_id,
+    let ExportPlan {
+        unit,
         dpi,
+        request_id,
+        path_plan,
         sources,
-    } = options;
+    } = plan;
     if context.operation_id != request_id {
         return Err(ExportFailure::new(
             ExportFailureStage::Plan,
@@ -432,9 +457,8 @@ async fn prepare_export<T: ImagingTransport>(
     let execution_path_plan = bind_execution_paths(&path_plan, root_bindings, &request_id)?;
     let request = ImagingRequest::new(
         request_id,
-        path_plan.prepared_output_path().to_path_buf(),
-        snapshot,
-        sheet_id,
+        NativePathDto::from(path_plan.prepared_output_path()),
+        unit,
         dpi,
         sources,
         root_bindings.clone(),
@@ -445,7 +469,7 @@ async fn prepare_export<T: ImagingTransport>(
             format!("Não foi possível planejar a Exportação: {error}"),
         )
     })?;
-    if request.prepared_output_path != path_plan.prepared_output_path() {
+    if request.prepared_output_path() != path_plan.prepared_output_path() {
         return Err(ExportFailure::new(
             ExportFailureStage::Prepare,
             "A preparação da Exportação não corresponde ao plano de caminhos.",
@@ -506,6 +530,12 @@ async fn prepare_export<T: ImagingTransport>(
         }
     };
     ensure_not_cancelled(control)?;
+    if let Some(stage) = response.failure_for(&request.request_id) {
+        return Err(ExportFailure::new(
+            ExportFailureStage::Processor(InvocationFailureStage::Processor(stage)),
+            processor_failure_message(stage),
+        ));
+    }
     let Some(completion) = response.completed_for(&request.request_id).cloned() else {
         return Err(ExportFailure::new(
             ExportFailureStage::ValidateResponse,
@@ -524,9 +554,36 @@ async fn prepare_export<T: ImagingTransport>(
     }
     Ok(PreparedExport {
         preparation,
-        output_path,
         completion,
     })
+}
+
+fn processor_failure_message(stage: ImagingFailureStage) -> &'static str {
+    match stage {
+        ImagingFailureStage::InvalidRenderRequest => {
+            "A solicitação de Exportação não corresponde ao contrato do Processador."
+        }
+        ImagingFailureStage::CacheProcessing => {
+            "O Processador encontrou uma falha interna de Cache durante a Exportação."
+        }
+        ImagingFailureStage::ResourceLimitExceeded => {
+            "A Exportação excede o limite seguro de recursos desta versão."
+        }
+        ImagingFailureStage::SourceVerification => {
+            "Uma fonte original não pôde ser verificada para a Exportação."
+        }
+        ImagingFailureStage::SourceDecode => {
+            "Uma fonte original não pôde ser decodificada para a Exportação."
+        }
+        ImagingFailureStage::Composition => "A composição da Lâmina não pôde ser concluída.",
+        ImagingFailureStage::OutputPrepare => {
+            "O arquivo temporário da Exportação não pôde ser preparado."
+        }
+        ImagingFailureStage::OutputEncode => "O JPEG não pôde ser codificado.",
+        ImagingFailureStage::OutputVerify => {
+            "O JPEG preparado não passou pela verificação de integridade."
+        }
+    }
 }
 
 fn bind_execution_paths(
@@ -543,13 +600,17 @@ fn bind_execution_paths(
                     format!("Não foi possível aplicar o plano de caminhos: {error}"),
                 )
             })?;
-    let operational_plan =
-        ExportPathPlan::new(operational_output, request_id).map_err(|error| {
-            ExportFailure::new(
-                ExportFailureStage::Prepare,
-                format!("O Destino operacional da Exportação é inválido: {error}"),
-            )
-        })?;
+    let operational_plan = ExportPathPlan::new_authorized(
+        operational_output,
+        request_id,
+        logical_plan.authorization(),
+    )
+    .map_err(|error| {
+        ExportFailure::new(
+            ExportFailureStage::Prepare,
+            format!("O Destino operacional da Exportação é inválido: {error}"),
+        )
+    })?;
     let expected_preparation = root_bindings
         .resolve(logical_plan.prepared_output_path())
         .map_err(|error| {

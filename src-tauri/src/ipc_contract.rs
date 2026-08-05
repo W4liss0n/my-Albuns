@@ -16,6 +16,8 @@ pub enum CancelDisposition {
 pub enum ExportCommandErrorCode {
     Cancelled,
     Conflict,
+    ExportConflict,
+    PublicationFailed,
     Failed,
 }
 
@@ -29,7 +31,6 @@ pub struct ExportCommandError {
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportResult {
-    pub(crate) output_path: String,
     pub(crate) width_px: u32,
     pub(crate) height_px: u32,
 }

@@ -35,11 +35,10 @@ const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
 };
 const exportPort: ExportPort = {
-  startPreview: () => ({
+  startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
       result: {
-        outputPath: "C:\\Temp\\Album-Horizonte_001.png",
         widthPx: 600,
         heightPx: 300,
       },
@@ -147,7 +146,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar prova" }),
+    await screen.findByRole("button", { name: "Exportar Lâmina" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("navigation", { name: "Menu principal" }),
@@ -208,7 +207,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   );
 
   expect(
-    await screen.findByRole("button", { name: "Exportar prova" }),
+    await screen.findByRole("button", { name: "Exportar Lâmina" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
   expect(logEvents).toEqual(

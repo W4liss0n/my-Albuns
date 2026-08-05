@@ -13,10 +13,12 @@ pub use event_stream::{
     decode_event_stream, encode_event,
 };
 pub use myalbuns_paths::CacheArtifactFormat;
-pub use render::{ImagingRequest, MediaSource, RenderCompletion, validate_render_content};
+pub use render::{
+    ImagingRequest, MediaSource, RenderCompletion, has_jpeg_extension, validate_render_content,
+};
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 12;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 14;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

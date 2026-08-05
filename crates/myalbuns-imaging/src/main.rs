@@ -1,4 +1,5 @@
 mod cache;
+mod jpeg_output;
 mod render;
 mod source;
 
@@ -133,7 +134,28 @@ fn cache_failure(_: String) -> ProcessFailure {
 
 fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
     let operation_id = safe_log_identifier(&request.request_id);
-    let project_id = safe_log_identifier(&request.snapshot.project_id);
+    let project_id = Option::<&str>::None;
+    if request.validate().is_err() {
+        tracing::warn!(
+            target: "myalbuns.imaging",
+            process_role = ProcessRole::Imaging.as_str(),
+            protocol_version = request.protocol_version,
+            operation_id,
+            project_id,
+            event = "imaging_request_rejected",
+        );
+        if operation_id.is_none() {
+            return Err(ProcessFailure {
+                stage: Some(ImagingFailureStage::InvalidRenderRequest),
+            });
+        }
+        write_response(&ImagingResponse::failed(
+            request.request_id,
+            ImagingFailureStage::InvalidRenderRequest,
+        ))?;
+        return Ok(());
+    }
+
     let root_binding_plan_sha256 = root_binding_plan_sha256(&request.root_bindings)?;
     tracing::info!(
         target: "myalbuns.imaging",
@@ -146,23 +168,13 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         event = "imaging_request_started",
     );
 
-    request.validate().inspect_err(|_| {
-        tracing::warn!(
-            target: "myalbuns.imaging",
-            process_role = ProcessRole::Imaging.as_str(),
-            protocol_version = request.protocol_version,
-            operation_id,
-            project_id,
-            event = "imaging_request_rejected",
-        );
-    })?;
-
     let mut report_progress =
         |stage: ImagingProgressStage, completed_units: u32, total_units: u32| {
             write_progress(&request.request_id, stage, completed_units, total_units)
         };
-    let completion =
-        render::render_request(&request, &mut report_progress).inspect_err(|failure| {
+    let completion = match render::render_request(&request, &mut report_progress) {
+        Ok(completion) => completion,
+        Err(failure) => {
             tracing::error!(
                 target: "myalbuns.imaging",
                 process_role = ProcessRole::Imaging.as_str(),
@@ -172,7 +184,10 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
                 stage = failure.stage.as_str(),
                 event = "imaging_render_failed",
             );
-        })?;
+            write_response(&ImagingResponse::failed(request.request_id, failure.stage))?;
+            return Ok(());
+        }
+    };
     let response = ImagingResponse::completed(request.request_id.clone(), completion.clone());
     write_response(&response).inspect_err(|_| {
         tracing::error!(

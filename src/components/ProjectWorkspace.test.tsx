@@ -122,11 +122,10 @@ function deferredProjection() {
 }
 
 const exportPort: ExportPort = {
-  startPreview: () => ({
+  startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
       result: {
-        outputPath: "C:\\Temp\\Album-Horizonte_001.png",
         widthPx: 600,
         heightPx: 300,
       },
@@ -307,7 +306,7 @@ test("uses the same close decision for the application command and blocks it whi
   expect(screen.getByRole("button", { name: "Descartar e fechar" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   expect(
-    screen.getByRole("button", { name: "Exportar prova", hidden: true }),
+    screen.getByRole("button", { name: "Exportar Lâmina", hidden: true }),
   ).toBeDisabled();
 
   await act(async () => finish());
@@ -399,7 +398,9 @@ test("never resumes or reports success after an indeterminate close save", async
   ).toBeInTheDocument();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Exportar prova" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
+  ).toBeDisabled();
 });
 
 test("blocks only Project commands while its Export attempt is active", async () => {
@@ -409,7 +410,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
     finish = resolve;
   });
   const controlledExportPort: ExportPort = {
-    startPreview: (onEvent) => {
+    startSheet: (_sheetId, onEvent) => {
       emit = onEvent;
       return {
         completion,
@@ -430,7 +431,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   );
 
   fireEvent.click(
-    screen.getByRole("button", { name: "Exportar prova" }),
+    screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
 
@@ -1005,7 +1006,9 @@ test("commits a slider zoom once without flashing a global busy state", async ()
   );
 
   const slider = screen.getByRole("slider", { name: "Zoom da Foto" });
-  const exportButton = screen.getByRole("button", { name: "Exportar prova" });
+  const exportButton = screen.getByRole("button", {
+    name: "Exportar Lâmina",
+  });
 
   fireEvent.pointerDown(slider);
   fireEvent.change(slider, { target: { value: "112" } });

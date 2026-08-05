@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::model::{
-    AlbumSnapshot, ComposedBackground, CoreError, MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN,
-    PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, ProjectedBackground, ProjectedBackgroundContent,
-    ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
+    AlbumSnapshot, ComposedBackground, ComposedOutputUnit, ComposedSheet, CoreError, MediaKind,
+    PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, ProjectedBackground,
+    ProjectedBackgroundContent, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
     RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot,
 };
 use crate::project_document::{Rgb, frame_border_width_is_valid};
@@ -23,15 +23,34 @@ pub(crate) fn validate_render_snapshot(snapshot: &RenderSnapshot) -> Result<(), 
             snapshot.unit
         )));
     }
+    if !(1..=1_200).contains(&snapshot.dpi) {
+        return Err(CoreError::InvalidSnapshot(
+            "a resolução da Exportação é inválida".into(),
+        ));
+    }
     if snapshot.composition.sheets.is_empty() {
         return Err(CoreError::InvalidSnapshot(
             "a composição não contém Lâminas".into(),
         ));
     }
 
+    validate_composed_content(
+        &snapshot.composition.frame_border,
+        &snapshot.composition.sheets,
+    )
+}
+
+pub(crate) fn validate_composed_output_unit(unit: &ComposedOutputUnit) -> Result<(), CoreError> {
+    validate_composed_content(&unit.frame_border, std::slice::from_ref(&unit.sheet))
+}
+
+fn validate_composed_content(
+    frame_border: &ProjectedFrameBorder,
+    sheets: &[ComposedSheet],
+) -> Result<(), CoreError> {
     let mut sheet_ids = HashSet::new();
     let mut frame_ids = HashSet::new();
-    for sheet in &snapshot.composition.sheets {
+    for sheet in sheets {
         if sheet.sheet_id.trim().is_empty() || !sheet_ids.insert(sheet.sheet_id.as_str()) {
             return Err(CoreError::InvalidSnapshot(format!(
                 "Identificador de Lâmina vazio ou duplicado: {}",
@@ -147,10 +166,7 @@ pub(crate) fn validate_render_snapshot(snapshot: &RenderSnapshot) -> Result<(), 
         }
     }
 
-    validate_frame_border(
-        &snapshot.composition.frame_border,
-        CoreError::InvalidSnapshot,
-    )?;
+    validate_frame_border(frame_border, CoreError::InvalidSnapshot)?;
     Ok(())
 }
 

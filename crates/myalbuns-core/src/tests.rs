@@ -458,7 +458,8 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
-    assert_eq!(snapshot.schema_version, 4);
+    assert_eq!(snapshot.schema_version, 5);
+    assert_eq!(snapshot.dpi, 300);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo
         .as_ref()
@@ -477,6 +478,25 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let wire = serde_json::to_string(&snapshot).expect("snapshot is serializable");
     assert!(!wire.contains("viewport"));
     assert!(!wire.contains("selection"));
+}
+
+#[test]
+fn render_snapshot_extracts_one_self_contained_composed_output_unit() {
+    let session = horizon_project(12);
+    let snapshot = session.render_snapshot();
+    let selected_sheet = snapshot.composition.sheets[1].clone();
+    let other_sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+
+    let unit = snapshot
+        .output_unit(&selected_sheet.sheet_id)
+        .expect("the selected composed Sheet becomes one output unit");
+
+    assert_eq!(unit.sheet, selected_sheet);
+    assert_eq!(unit.frame_border, snapshot.composition.frame_border);
+    let wire = serde_json::to_string(&unit).expect("the output unit is serializable");
+    assert!(!wire.contains(&snapshot.project_id));
+    assert!(!wire.contains(&snapshot.project_name));
+    assert!(!wire.contains(&other_sheet_id));
 }
 
 #[test]

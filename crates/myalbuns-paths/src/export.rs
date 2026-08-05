@@ -11,13 +11,21 @@ use crate::{
         validate_open_file,
     },
     operation::validate_external_path,
+    publish_new_file, replace_existing_file,
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ExportWriteAuthorization {
+    CreateOnly,
+    ReplaceConfirmed,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExportPathPlan {
     output_path: PathBuf,
     preparation_directory: PathBuf,
     prepared_output_path: PathBuf,
+    authorization: ExportWriteAuthorization,
 }
 
 /// Keeps the Export destination and its operation-specific preparation open.
@@ -30,6 +38,18 @@ pub struct PreparedExportStorage {
 
 impl ExportPathPlan {
     pub fn new(output_path: PathBuf, operation_id: &str) -> Result<Self, AppPathsError> {
+        Self::new_authorized(
+            output_path,
+            operation_id,
+            ExportWriteAuthorization::CreateOnly,
+        )
+    }
+
+    pub fn new_authorized(
+        output_path: PathBuf,
+        operation_id: &str,
+        authorization: ExportWriteAuthorization,
+    ) -> Result<Self, AppPathsError> {
         if validate_external_path(&output_path).is_err() || !valid_cache_component(operation_id) {
             return Err(AppPathsError::InvalidExportPath);
         }
@@ -46,6 +66,7 @@ impl ExportPathPlan {
             output_path,
             preparation_directory,
             prepared_output_path,
+            authorization,
         })
     }
 
@@ -59,6 +80,10 @@ impl ExportPathPlan {
 
     pub fn prepared_output_path(&self) -> &Path {
         &self.prepared_output_path
+    }
+
+    pub fn authorization(&self) -> ExportWriteAuthorization {
+        self.authorization
     }
 
     pub fn prepare(&self) -> Result<PreparedExportStorage, AppPathsError> {
@@ -84,19 +109,34 @@ impl PreparedExportStorage {
                 open_export_file(&self.preparation, &self.plan.prepared_output_path, false)?
                     .ok_or(AppPathsError::ExportStorageUnavailable)?;
             drop(prepared);
-            if let Some(existing) =
+            let final_exists = if let Some(existing) =
                 open_export_file(&self.destination, &self.plan.output_path, true)?
             {
                 drop(existing);
+                true
+            } else {
+                false
+            };
+            if final_exists && self.plan.authorization == ExportWriteAuthorization::CreateOnly {
+                return Err(AppPathsError::ExportTargetConflict);
             }
-            Ok(())
+            Ok(final_exists)
         })();
-        if let Err(error) = validation {
-            let _ = self.discard();
-            return Err(error);
-        }
+        let final_exists = match validation {
+            Ok(final_exists) => final_exists,
+            Err(error) => {
+                let _ = self.discard();
+                return Err(error);
+            }
+        };
 
-        if fs::rename(&self.plan.prepared_output_path, &self.plan.output_path).is_err() {
+        let publication = match (self.plan.authorization, final_exists) {
+            (ExportWriteAuthorization::ReplaceConfirmed, true) => {
+                replace_existing_file(&self.plan.prepared_output_path, &self.plan.output_path)
+            }
+            _ => publish_new_file(&self.plan.prepared_output_path, &self.plan.output_path),
+        };
+        if publication.is_err() {
             let _ = self.discard();
             return Err(AppPathsError::ExportStorageUnavailable);
         }

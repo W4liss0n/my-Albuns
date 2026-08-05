@@ -168,6 +168,7 @@ impl EditableProject {
             &projection.state.project_id,
             &projection.state.project_name,
             projection.state.revision,
+            projection.state.document.dpi,
             &projection.state.album,
         )
     }

@@ -159,6 +159,7 @@ mod tests {
 
     use super::{OperationGate, OperationGateError};
     use crate::{
+        cache_activity_gate::CacheActivityGate,
         imaging_processor::ImagingProcessor,
         operation_lease::{OperationLease, OperationLeaseError},
     };
@@ -222,18 +223,27 @@ mod tests {
                 thread::sleep(Duration::from_millis(20));
             }
 
+            let challenger_cache = CacheActivityGate::default();
             let challenger_processor = ImagingProcessor::default();
             assert!(matches!(
-                OperationLease::acquire(&OperationGate::new(&paths), &challenger_processor,).await,
+                OperationLease::acquire(
+                    &OperationGate::new(&paths),
+                    &challenger_cache,
+                    &challenger_processor,
+                )
+                .await,
                 Err(OperationLeaseError::Gate(OperationGateError::Conflict))
             ));
             owner.kill().expect("the owner process is terminated");
             owner.wait().expect("the terminated owner is reaped");
 
-            let recovered =
-                OperationLease::acquire(&OperationGate::new(&paths), &challenger_processor)
-                    .await
-                    .expect("the successor acquires the complete lease after owner death");
+            let recovered = OperationLease::acquire(
+                &OperationGate::new(&paths),
+                &challenger_cache,
+                &challenger_processor,
+            )
+            .await
+            .expect("the successor acquires the complete lease after owner death");
             drop(recovered);
         });
     }
@@ -246,8 +256,9 @@ mod tests {
         let root = std::path::PathBuf::from(root);
         let paths = app_paths(&root);
         tauri::async_runtime::block_on(async {
+            let cache = CacheActivityGate::default();
             let processor = ImagingProcessor::default();
-            let _lease = OperationLease::acquire(&OperationGate::new(&paths), &processor)
+            let _lease = OperationLease::acquire(&OperationGate::new(&paths), &cache, &processor)
                 .await
                 .expect("the child owns the complete operation lease");
             std::fs::write(ready, b"owned").expect("the child signals lease ownership");

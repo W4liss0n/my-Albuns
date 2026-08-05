@@ -167,7 +167,8 @@ impl ImagingEventStreamDecoder {
             }
             ImagingEvent::Response(response) => {
                 self.correlate(response.request_id())?;
-                if let Some(progress) = self.progress
+                if !response.is_failure()
+                    && let Some(progress) = self.progress
                     && (progress.stage != ImagingProgressStage::EncodingOutput
                         || progress.completed_units != progress.total_units)
                 {

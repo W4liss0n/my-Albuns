@@ -188,6 +188,7 @@ impl LoadedProjectRevision {
             &self.project.project_id,
             &self.project.project_name,
             self.project.revision,
+            DocumentSnapshot::neutral().dpi,
             &self.project.album,
         )
     }

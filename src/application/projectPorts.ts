@@ -24,7 +24,6 @@ export class MediaPreviewError extends Error {
 }
 
 export interface ExportResult {
-  outputPath: string;
   widthPx: number;
   heightPx: number;
 }
@@ -167,5 +166,8 @@ export interface MediaPreviewPort {
 }
 
 export interface ExportPort {
-  startPreview(onEvent: (event: ExportProgressEvent) => void): ExportAttempt;
+  startSheet(
+    sheetId: string,
+    onEvent: (event: ExportProgressEvent) => void,
+  ): ExportAttempt;
 }

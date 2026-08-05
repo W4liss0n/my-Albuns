@@ -7,7 +7,9 @@ use myalbuns_imaging_protocol::{
     ImagingResponse, MediaSource, RenderCompletion, decode_command, decode_event_stream,
     encode_command, encode_event, root_binding_plan_sha256,
 };
-use myalbuns_paths::{AppPaths, CacheArtifactFormat, OperationPathContext, RootBindingPlan};
+use myalbuns_paths::{
+    AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, RootBindingPlan,
+};
 
 #[path = "../../../tests/support/sample_project.rs"]
 mod sample_project;
@@ -30,6 +32,7 @@ fn empty_cache_response(request_id: &str) -> ImagingResponse {
 #[test]
 fn imaging_failure_stages_have_stable_process_exit_codes() {
     let stages = [
+        ImagingFailureStage::InvalidRenderRequest,
         ImagingFailureStage::CacheProcessing,
         ImagingFailureStage::SourceVerification,
         ImagingFailureStage::SourceDecode,
@@ -37,6 +40,7 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
         ImagingFailureStage::OutputPrepare,
         ImagingFailureStage::OutputEncode,
         ImagingFailureStage::OutputVerify,
+        ImagingFailureStage::ResourceLimitExceeded,
     ];
 
     for stage in stages {
@@ -55,6 +59,42 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
 }
 
 #[test]
+fn deterministic_failure_is_one_correlated_terminal_even_mid_progress() {
+    let progress =
+        ImagingProgress::new("render-failed", ImagingProgressStage::LoadingSources, 0, 1)
+            .expect("the partial progress is valid");
+    let failure =
+        ImagingResponse::failed("render-failed", ImagingFailureStage::ResourceLimitExceeded);
+    let mut stream =
+        encode_event(&ImagingEvent::Progress(progress.clone())).expect("progress serializes");
+    stream.extend(
+        encode_event(&ImagingEvent::Response(failure.clone())).expect("failure serializes"),
+    );
+
+    let (decoded_progress, decoded_terminal) =
+        decode_event_stream(&stream).expect("a known failure may terminate partial progress");
+    assert_eq!(decoded_progress, vec![progress]);
+    assert_eq!(
+        decoded_terminal.failure_for("render-failed"),
+        Some(ImagingFailureStage::ResourceLimitExceeded)
+    );
+    assert_eq!(decoded_terminal.failure_for("another"), None);
+    assert_eq!(decoded_terminal, failure);
+
+    stream.extend(
+        encode_event(&ImagingEvent::Response(ImagingResponse::failed(
+            "render-failed",
+            ImagingFailureStage::Composition,
+        )))
+        .expect("the duplicate terminal fixture serializes"),
+    );
+    assert!(
+        decode_event_stream(&stream).is_err(),
+        "the stream rejects a second terminal"
+    );
+}
+
+#[test]
 fn host_and_processor_share_one_serialized_protocol() {
     let source = SampleProject::Horizon
         .persisted_source(2)
@@ -64,7 +104,7 @@ fn host_and_processor_share_one_serialized_protocol() {
         .expect("the sample project opens through ProjectCore")
         .render_snapshot();
     let prepared_output_path =
-        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png");
+        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.jpg");
     let sources = vec![
         MediaSource::new(
             "media-costa",
@@ -98,12 +138,14 @@ fn host_and_processor_share_one_serialized_protocol() {
             .expect("the source root is captured");
     }
     let root_bindings = path_context.freeze();
+    let unit = snapshot
+        .output_unit("lamina-01")
+        .expect("the selected sheet becomes one self-contained output unit");
     let request = ImagingRequest::new(
         "render-42",
-        prepared_output_path,
-        snapshot,
-        "lamina-01",
-        300,
+        NativePathDto::from(prepared_output_path),
+        unit,
+        snapshot.dpi,
         sources,
         root_bindings.clone(),
     )
@@ -125,10 +167,23 @@ fn host_and_processor_share_one_serialized_protocol() {
     );
     assert_eq!(request_json["request"]["requestId"], "render-42");
     assert_eq!(
-        request_json["request"]["preparedOutputPath"],
-        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png"
+        request_json["request"]["preparedOutputPath"]["encoding"],
+        "windowsUtf16"
     );
-    assert_eq!(request_json["request"]["sheetId"], "lamina-01");
+    assert!(
+        request_json["request"]["preparedOutputPath"]["units"]
+            .as_array()
+            .is_some_and(|units| !units.is_empty()),
+        "the output path uses only the reversible native Windows wire form"
+    );
+    assert!(
+        request_json["request"].get("sheetId").is_none(),
+        "selection belongs to the host; the Processor receives one output unit"
+    );
+    assert_eq!(
+        request_json["request"]["unit"]["sheet"]["sheetId"],
+        "lamina-01"
+    );
     assert_eq!(request_json["request"]["dpi"], 300);
     assert!(
         request_json["request"].get("sourcePolicy").is_none(),
@@ -177,12 +232,29 @@ fn host_and_processor_share_one_serialized_protocol() {
         unbound_request.validate().is_err(),
         "a worker must never resolve a root omitted by the operation owner"
     );
+    let mut non_jpeg_request = request.clone();
+    non_jpeg_request.prepared_output_path = NativePathDto::from(PathBuf::from(
+        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.png",
+    ));
+    assert!(
+        non_jpeg_request.validate().is_err(),
+        "the Processor rejects a JPEG payload prepared under a misleading extension"
+    );
+    let mut uppercase_jpeg_request = request.clone();
+    uppercase_jpeg_request.prepared_output_path = NativePathDto::from(PathBuf::from(
+        r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.JPG",
+    ));
+    assert!(
+        uppercase_jpeg_request.validate().is_ok(),
+        "Windows extension casing must not make the host and Processor disagree"
+    );
     assert!(
         ImagingRequest::new(
             r"C:\private\operation",
-            PathBuf::from(r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.png"),
-            request.snapshot.clone(),
-            "lamina-01",
+            NativePathDto::from(PathBuf::from(
+                r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.jpg",
+            )),
+            request.unit.clone(),
             25,
             request.sources.clone(),
             root_bindings,

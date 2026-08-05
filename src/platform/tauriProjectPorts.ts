@@ -177,7 +177,10 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
 };
 
 export const tauriExportPort: ExportPort = {
-  startPreview: (emitEvent: (event: ExportProgressEvent) => void) => {
+  startSheet: (
+    sheetId: string,
+    emitEvent: (event: ExportProgressEvent) => void,
+  ) => {
     const onEvent = new Channel<IpcExportEvent>();
     let correlationSettled = false;
     let resolveCorrelation: (operationId: string | null) => void = () =>
@@ -212,7 +215,10 @@ export const tauriExportPort: ExportPort = {
         cancellable: event.data.cancellable,
       });
     };
-    const completion = invoke<IpcExportResult>("export_preview", { onEvent })
+    const completion = invoke<IpcExportResult>("export_sheet", {
+      sheetId,
+      onEvent,
+    })
       .then((result) => ({
         status: "completed" as const,
         result,

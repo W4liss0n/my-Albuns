@@ -15,6 +15,7 @@ interface ExportPreviewControlProps {
   exportPort: ExportPort;
   onActiveChange?(active: boolean): void;
   projectId: string;
+  sheetId: string | null;
 }
 
 interface ExportNotification {
@@ -27,6 +28,7 @@ export function ExportPreviewControl({
   exportPort,
   onActiveChange,
   projectId,
+  sheetId,
 }: ExportPreviewControlProps) {
   const [phase, setPhase] = useState<
     "idle" | "starting" | "running" | "cancelled" | "failed"
@@ -70,7 +72,7 @@ export function ExportPreviewControl({
   }, [projectId]);
 
   function startExport() {
-    if (disabled || currentAttemptId.current !== null) {
+    if (disabled || !sheetId || currentAttemptId.current !== null) {
       return;
     }
 
@@ -86,7 +88,7 @@ export function ExportPreviewControl({
 
     let attempt: ExportAttempt;
     try {
-      attempt = exportPort.startPreview((event) => {
+      attempt = exportPort.startSheet(sheetId, (event) => {
         if (currentAttemptId.current !== attemptId) {
           return;
         }
@@ -252,10 +254,10 @@ export function ExportPreviewControl({
       <button
         className="export-preview-trigger"
         type="button"
-        disabled={disabled || phase !== "idle"}
+        disabled={disabled || !sheetId || phase !== "idle"}
         onClick={startExport}
       >
-        Exportar prova
+        Exportar Lâmina
       </button>
 
       {phase === "running" && (

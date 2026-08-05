@@ -254,6 +254,7 @@ pub(crate) fn build_render_snapshot(
     project_id: &str,
     project_name: &str,
     revision: u64,
+    dpi: u32,
     album: &AlbumSnapshot,
 ) -> RenderSnapshot {
     RenderSnapshot {
@@ -261,6 +262,7 @@ pub(crate) fn build_render_snapshot(
         project_id: project_id.into(),
         project_name: project_name.into(),
         revision,
+        dpi,
         unit: "micrometers".into(),
         composition: CompositionCore::compose(album),
     }

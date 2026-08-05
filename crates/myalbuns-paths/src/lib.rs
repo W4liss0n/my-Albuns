@@ -1,6 +1,7 @@
 //! Descoberta centralizada e operações protegidas dos caminhos do aplicativo.
 
 mod app_paths;
+mod atomic_publish;
 mod cache;
 mod error;
 mod export;
@@ -15,12 +16,13 @@ mod resolve;
 mod windows_path;
 
 pub use app_paths::{AppPaths, PreparedExportPreviewDirectory, project_data_namespace};
+pub use atomic_publish::{publish_new_file, replace_existing_file};
 pub use cache::{
     CacheArtifactFormat, CachePathPlan, PendingCachePublication, PreparedCacheStorage,
     SynchronizedCachePublication,
 };
 pub use error::AppPathsError;
-pub use export::{ExportPathPlan, PreparedExportStorage};
+pub use export::{ExportPathPlan, ExportWriteAuthorization, PreparedExportStorage};
 pub use native_path_serde::NativePathDto;
 pub use operation::{
     OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,

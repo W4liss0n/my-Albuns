@@ -3,6 +3,8 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use tauri::Manager;
 
+use myalbuns_paths::ExportWriteAuthorization;
+
 use crate::project_bootstrap::CreateWriteAuthorization;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -11,6 +13,15 @@ pub(crate) enum ProjectSaveDialogOutcome {
     Selected {
         path: PathBuf,
         authorization: CreateWriteAuthorization,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ExportSaveDialogOutcome {
+    Cancelled,
+    Selected {
+        path: PathBuf,
+        authorization: ExportWriteAuthorization,
     },
 }
 
@@ -90,9 +101,39 @@ pub(crate) async fn choose_project_destination(
     }
 }
 
+pub(crate) async fn choose_export_destination(
+    window: &tauri::WebviewWindow,
+    suggested_filename: String,
+) -> Result<ExportSaveDialogOutcome, NativeProjectDialogError> {
+    #[cfg(windows)]
+    {
+        let owner = window
+            .hwnd()
+            .map_err(NativeProjectDialogError::NativeWindowUnavailable)?
+            .0 as isize;
+        tauri::async_runtime::spawn_blocking(move || {
+            show_export_save_dialog(owner, &suggested_filename)
+        })
+        .await
+        .map_err(|error| NativeProjectDialogError::DialogThreadUnavailable(error.to_string()))?
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (window, suggested_filename);
+        Err(NativeProjectDialogError::UnsupportedPlatform)
+    }
+}
+
 #[cfg(windows)]
 mod windows_dialog {
-    use std::{cell::RefCell, ffi::OsString, os::windows::ffi::OsStringExt, path::PathBuf, rc::Rc};
+    use std::{
+        cell::RefCell,
+        ffi::{OsStr, OsString},
+        os::windows::ffi::{OsStrExt, OsStringExt},
+        path::PathBuf,
+        rc::Rc,
+    };
 
     use windows::{
         Win32::{
@@ -114,10 +155,26 @@ mod windows_dialog {
                 },
             },
         },
-        core::{HRESULT, Interface, Ref, w},
+        core::{HRESULT, Interface, PCWSTR, Ref, w},
     };
 
-    use super::{CreateWriteAuthorization, NativeProjectDialogError, ProjectSaveDialogOutcome};
+    use super::{
+        CreateWriteAuthorization, ExportSaveDialogOutcome, ExportWriteAuthorization,
+        NativeProjectDialogError, ProjectSaveDialogOutcome,
+    };
+
+    enum SaveDialogKind<'a> {
+        Project,
+        Export { suggested_filename: &'a str },
+    }
+
+    enum SaveDialogOutcome {
+        Cancelled,
+        Selected {
+            path: PathBuf,
+            replacement_confirmed: bool,
+        },
+    }
 
     struct ComApartment;
 
@@ -140,13 +197,19 @@ mod windows_dialog {
     #[windows::core::implement(IFileDialogEvents)]
     struct SaveDialogEvents {
         owner: isize,
+        overwrite_title: Vec<u16>,
         confirmed_replacement: Rc<RefCell<Option<IShellItem>>>,
     }
 
     impl SaveDialogEvents {
-        fn new(owner: isize, confirmed_replacement: Rc<RefCell<Option<IShellItem>>>) -> Self {
+        fn new(
+            owner: isize,
+            overwrite_title: Vec<u16>,
+            confirmed_replacement: Rc<RefCell<Option<IShellItem>>>,
+        ) -> Self {
             Self {
                 owner,
+                overwrite_title,
                 confirmed_replacement,
             }
         }
@@ -200,7 +263,7 @@ mod windows_dialog {
                 MessageBoxW(
                     Some(HWND(self.owner as *mut _)),
                     w!("Já existe um arquivo com este nome. Deseja substituí-lo?"),
-                    w!("Substituir Projeto MyAlbuns"),
+                    PCWSTR(self.overwrite_title.as_ptr()),
                     MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2,
                 )
             };
@@ -227,6 +290,48 @@ mod windows_dialog {
     pub(super) fn show_project_save_dialog(
         owner: isize,
     ) -> Result<ProjectSaveDialogOutcome, NativeProjectDialogError> {
+        Ok(match show_save_dialog(owner, SaveDialogKind::Project)? {
+            SaveDialogOutcome::Cancelled => ProjectSaveDialogOutcome::Cancelled,
+            SaveDialogOutcome::Selected {
+                path,
+                replacement_confirmed,
+            } => ProjectSaveDialogOutcome::Selected {
+                path,
+                authorization: if replacement_confirmed {
+                    CreateWriteAuthorization::ReplaceConfirmed
+                } else {
+                    CreateWriteAuthorization::CreateOnly
+                },
+            },
+        })
+    }
+
+    pub(super) fn show_export_save_dialog(
+        owner: isize,
+        suggested_filename: &str,
+    ) -> Result<ExportSaveDialogOutcome, NativeProjectDialogError> {
+        Ok(
+            match show_save_dialog(owner, SaveDialogKind::Export { suggested_filename })? {
+                SaveDialogOutcome::Cancelled => ExportSaveDialogOutcome::Cancelled,
+                SaveDialogOutcome::Selected {
+                    path,
+                    replacement_confirmed,
+                } => ExportSaveDialogOutcome::Selected {
+                    path,
+                    authorization: if replacement_confirmed {
+                        ExportWriteAuthorization::ReplaceConfirmed
+                    } else {
+                        ExportWriteAuthorization::CreateOnly
+                    },
+                },
+            },
+        )
+    }
+
+    fn show_save_dialog(
+        owner: isize,
+        kind: SaveDialogKind<'_>,
+    ) -> Result<SaveDialogOutcome, NativeProjectDialogError> {
         let _apartment = ComApartment::initialize()?;
         // SAFETY: COM is initialized as an STA on this thread; the resulting interfaces never
         // leave it and are released before `ComApartment` is dropped.
@@ -234,18 +339,43 @@ mod windows_dialog {
             unsafe { CoCreateInstance(&FileSaveDialog, None, CLSCTX_INPROC_SERVER)? };
         let dialog: IFileDialog = save_dialog.cast()?;
 
-        let filters = [COMDLG_FILTERSPEC {
-            pszName: w!("Projeto MyAlbuns (*.myalbuns)"),
-            pszSpec: w!("*.myalbuns"),
-        }];
-        // SAFETY: all strings and filter storage remain valid through these synchronous COM calls.
+        let overwrite_title = match kind {
+            SaveDialogKind::Project => {
+                let filters = [COMDLG_FILTERSPEC {
+                    pszName: w!("Projeto MyAlbuns (*.myalbuns)"),
+                    pszSpec: w!("*.myalbuns"),
+                }];
+                // SAFETY: all strings and filter storage remain valid through these synchronous calls.
+                unsafe {
+                    dialog.SetFileTypes(&filters)?;
+                    dialog.SetFileTypeIndex(1)?;
+                    dialog.SetDefaultExtension(w!("myalbuns"))?;
+                    dialog.SetFileName(w!("Novo Projeto.myalbuns"))?;
+                    dialog.SetTitle(w!("Criar Projeto MyAlbuns"))?;
+                    dialog.SetOkButtonLabel(w!("Criar"))?;
+                }
+                wide("Substituir Projeto MyAlbuns")
+            }
+            SaveDialogKind::Export { suggested_filename } => {
+                let filters = [COMDLG_FILTERSPEC {
+                    pszName: w!("Imagem JPEG (*.jpg)"),
+                    pszSpec: w!("*.jpg"),
+                }];
+                let suggested_filename = wide(suggested_filename);
+                // SAFETY: all UTF-16 buffers remain alive through these synchronous calls.
+                unsafe {
+                    dialog.SetFileTypes(&filters)?;
+                    dialog.SetFileTypeIndex(1)?;
+                    dialog.SetDefaultExtension(w!("jpg"))?;
+                    dialog.SetFileName(PCWSTR(suggested_filename.as_ptr()))?;
+                    dialog.SetTitle(w!("Exportar Lâmina como JPEG"))?;
+                    dialog.SetOkButtonLabel(w!("Exportar"))?;
+                }
+                wide("Substituir Exportação")
+            }
+        };
+        // SAFETY: the dialog interface is live on this STA.
         unsafe {
-            dialog.SetFileTypes(&filters)?;
-            dialog.SetFileTypeIndex(1)?;
-            dialog.SetDefaultExtension(w!("myalbuns"))?;
-            dialog.SetFileName(w!("Novo Projeto.myalbuns"))?;
-            dialog.SetTitle(w!("Criar Projeto MyAlbuns"))?;
-            dialog.SetOkButtonLabel(w!("Criar"))?;
             let options = dialog.GetOptions()?;
             dialog.SetOptions(
                 options
@@ -257,7 +387,8 @@ mod windows_dialog {
         }
 
         let confirmed_replacement = Rc::new(RefCell::new(None));
-        let events = SaveDialogEvents::new(owner, Rc::clone(&confirmed_replacement));
+        let events =
+            SaveDialogEvents::new(owner, overwrite_title, Rc::clone(&confirmed_replacement));
         let events_interface: IFileDialogEvents = events.into();
         // SAFETY: `events_interface` remains alive until after `Unadvise`.
         let cookie = unsafe { dialog.Advise(&events_interface)? };
@@ -267,7 +398,7 @@ mod windows_dialog {
         let unadvised = unsafe { dialog.Unadvise(cookie) };
 
         match shown {
-            Err(error) if is_cancelled(&error) => return Ok(ProjectSaveDialogOutcome::Cancelled),
+            Err(error) if is_cancelled(&error) => return Ok(SaveDialogOutcome::Cancelled),
             Err(error) => return Err(error.into()),
             Ok(()) => unadvised?,
         }
@@ -275,25 +406,25 @@ mod windows_dialog {
         // SAFETY: the successful modal result remains owned by this STA until it is converted.
         let result = unsafe { dialog.GetResult()? };
         let confirmed_item = confirmed_replacement.borrow().clone();
-        let authorization = match confirmed_item {
+        let replacement_confirmed = match confirmed_item {
             Some(confirmed_item) => {
                 // SAFETY: both shell items are live COM interfaces on this STA.
                 let comparison =
                     unsafe { confirmed_item.Compare(&result, SICHINT_CANONICAL.0 as u32)? };
-                if comparison == 0 {
-                    CreateWriteAuthorization::ReplaceConfirmed
-                } else {
-                    CreateWriteAuthorization::CreateOnly
-                }
+                comparison == 0
             }
-            None => CreateWriteAuthorization::CreateOnly,
+            None => false,
         };
         let path = shell_item_path(&result)?;
 
-        Ok(ProjectSaveDialogOutcome::Selected {
+        Ok(SaveDialogOutcome::Selected {
             path,
-            authorization,
+            replacement_confirmed,
         })
+    }
+
+    fn wide(value: &str) -> Vec<u16> {
+        OsStr::new(value).encode_wide().chain(Some(0)).collect()
     }
 
     fn shell_item_path(item: &IShellItem) -> Result<PathBuf, windows::core::Error> {
@@ -333,4 +464,4 @@ mod windows_dialog {
 }
 
 #[cfg(windows)]
-use windows_dialog::show_project_save_dialog;
+use windows_dialog::{show_export_save_dialog, show_project_save_dialog};

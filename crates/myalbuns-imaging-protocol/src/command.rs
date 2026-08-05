@@ -5,9 +5,12 @@ use sha2::{Digest, Sha256};
 use crate::cache::CacheRequest;
 use crate::render::ImagingRequest;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum ImagingFailureStage {
+    InvalidRenderRequest,
     CacheProcessing,
+    ResourceLimitExceeded,
     SourceVerification,
     SourceDecode,
     Composition,
@@ -19,7 +22,9 @@ pub enum ImagingFailureStage {
 impl ImagingFailureStage {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::InvalidRenderRequest => "invalid_render_request",
             Self::CacheProcessing => "cache_processing",
+            Self::ResourceLimitExceeded => "resource_limit_exceeded",
             Self::SourceVerification => "source_verification",
             Self::SourceDecode => "source_decode",
             Self::Composition => "composition",
@@ -31,7 +36,9 @@ impl ImagingFailureStage {
 
     pub const fn exit_code(self) -> u8 {
         match self {
+            Self::InvalidRenderRequest => 29,
             Self::CacheProcessing => 27,
+            Self::ResourceLimitExceeded => 28,
             Self::SourceVerification => 20,
             Self::SourceDecode => 21,
             Self::Composition => 22,
@@ -43,7 +50,9 @@ impl ImagingFailureStage {
 
     pub const fn from_exit_code(exit_code: i32) -> Option<Self> {
         match exit_code {
+            29 => Some(Self::InvalidRenderRequest),
             27 => Some(Self::CacheProcessing),
+            28 => Some(Self::ResourceLimitExceeded),
             20 => Some(Self::SourceVerification),
             21 => Some(Self::SourceDecode),
             22 => Some(Self::Composition),

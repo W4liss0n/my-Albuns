@@ -5,6 +5,7 @@ use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
+    cache_activity_gate::CacheActivityGate,
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
@@ -112,7 +113,7 @@ pub(crate) fn run(
             crate::project_close_commands::request_project_close,
             crate::project_close_commands::resolve_project_close,
             crate::media_preview_commands::prepare_media_previews,
-            crate::export_commands::export_preview,
+            crate::export_commands::export_sheet,
             crate::export_commands::cancel_export,
         ])
         .run(tauri::generate_context!())?;
@@ -160,6 +161,7 @@ fn setup_host(
         app_paths.webview_data_directory(&project_data_namespace(&projection.state.project_id))?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
     app.manage(OperationGate::new(&app_paths));
+    app.manage(CacheActivityGate::default());
     app.manage(ImagingProcessor::default());
     app.manage(app_paths);
 

@@ -11,12 +11,13 @@ mod validation;
 
 pub use model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
-    ComposedPhoto, ComposedSheet, CompositionPlan, CoreError, DocumentSnapshot, EditorProjection,
-    EditorState, FrameSnapshot, Matrix2, MediaCatalogItem, MediaKind, MediaTransform, MediaUsage,
-    NormalizedPan, NumberRange, PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectIntent,
-    ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit,
-    ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
-    RectUm, RenderSnapshot, SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    ComposedOutputUnit, ComposedPhoto, ComposedSheet, CompositionPlan, CoreError, DocumentSnapshot,
+    EditorProjection, EditorState, FrameSnapshot, Matrix2, MediaCatalogItem, MediaKind,
+    MediaTransform, MediaUsage, NormalizedPan, NumberRange, PhotoPlacement, PhotoPlacementPlan,
+    PhotoSnapshot, ProjectIntent, ProjectedActiveSides, ProjectedBackground,
+    ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay,
+    ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RenderSnapshot, SheetRole,
+    SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

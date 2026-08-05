@@ -21,6 +21,7 @@ pub enum AppPathsError {
     CacheStorageOutsideRoot,
     ExportStorageUnavailable,
     ExportStorageOutsideDestination,
+    ExportTargetConflict,
 }
 
 impl Display for AppPathsError {
@@ -72,6 +73,9 @@ impl Display for AppPathsError {
             Self::ExportStorageOutsideDestination => {
                 formatter.write_str("a preparação da Exportação escapou do Destino autorizado")
             }
+            Self::ExportTargetConflict => formatter.write_str(
+                "o Destino da Exportação passou a existir sem autorização para substituição",
+            ),
         }
     }
 }

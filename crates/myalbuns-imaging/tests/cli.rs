@@ -1,11 +1,12 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{
-    DemoEditableProject as EditableProject, ProjectCore, ProjectIntent, ProjectedFrameBorder,
+    CreateAuthorization, CreateProjectRequest, DemoEditableProject as EditableProject,
+    InitialProject, ProjectCore, ProjectIntent, ProjectLocation, ProjectedFrameBorder,
     RenderSnapshot,
 };
 use myalbuns_imaging_protocol::{
@@ -14,7 +15,8 @@ use myalbuns_imaging_protocol::{
     decode_event_stream, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
-    AppPaths, CachePathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
+    AppPaths, CachePathPlan, NativePathDto, OperationPathContext, RootBindingPlan,
+    project_data_namespace,
 };
 use sha2::{Digest, Sha256};
 
@@ -81,6 +83,144 @@ fn sample_session(sample: SampleProject, sheet_count: usize) -> EditableProject 
 }
 
 #[test]
+fn processor_exports_the_neutral_project_as_the_canonical_jpeg() {
+    let project_directory = tempfile::tempdir().expect("temporary neutral Project directory");
+    let project_path = project_directory.path().join("Projeto.myalbuns");
+    let mut project_context = OperationPathContext::new();
+    project_context
+        .capture(&project_path)
+        .expect("the neutral Project root is captured");
+    let project = ProjectCore::new()
+        .with_identity_lease_root(project_directory.path().join("leases"))
+        .create_editable(CreateProjectRequest::new(
+            ProjectLocation::new(project_path, project_context.freeze()),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the neutral Project is created");
+    let snapshot = project.render_snapshot();
+    let unit = snapshot
+        .output_unit(&snapshot.composition.sheets[0].sheet_id)
+        .expect("the first neutral Sheet becomes an output unit");
+    let output_directory = tempfile::tempdir().expect("temporary JPEG output directory");
+    let output_path = output_directory.path().join("Projeto_001.jpg");
+    let bindings = root_bindings(&[&output_path]);
+    let request = ImagingRequest::new(
+        "neutral-jpeg-001",
+        NativePathDto::from(output_path.as_path()),
+        unit,
+        snapshot.dpi,
+        Vec::new(),
+        bindings,
+    )
+    .expect("the source-free neutral render request is valid");
+
+    let log_directory = tempfile::tempdir().expect("temporary Processor log directory");
+    let result = invoke_render_request(&request, Some(log_directory.path()));
+
+    assert!(
+        result.status.success(),
+        "processor failed: {}\n{}",
+        String::from_utf8_lossy(&result.stderr),
+        read_logs(log_directory.path())
+    );
+    let bytes = std::fs::read(&output_path).expect("the exported JPEG is readable");
+    assert_eq!(&bytes[..2], b"\xFF\xD8");
+    assert_eq!(&bytes[bytes.len() - 2..], b"\xFF\xD9");
+    let markers = jpeg_header_markers(&bytes);
+    assert_eq!(markers[0].0, 0xE0, "JFIF must immediately follow SOI");
+    let jfif = markers[0].1;
+    assert_eq!(&jfif[..5], b"JFIF\0");
+    assert_eq!(jfif[7], 1, "JFIF density units must be DPI");
+    assert_eq!(u16::from_be_bytes([jfif[8], jfif[9]]), 300);
+    assert_eq!(u16::from_be_bytes([jfif[10], jfif[11]]), 300);
+    assert_eq!(&jfif[12..14], &[0, 0], "JFIF thumbnail must be absent");
+    assert!(markers.iter().all(|(marker, _)| *marker != 0xE1));
+    assert!(markers.iter().all(|(marker, _)| *marker != 0xFE));
+
+    let sof0 = markers
+        .iter()
+        .find_map(|(marker, payload)| (*marker == 0xC0).then_some(*payload))
+        .expect("the JPEG uses baseline SOF0");
+    assert_eq!(sof0[0], 8);
+    assert_eq!(u16::from_be_bytes([sof0[1], sof0[2]]), 3_543);
+    assert_eq!(u16::from_be_bytes([sof0[3], sof0[4]]), 7_087);
+    assert_eq!(sof0[5], 3);
+
+    let mut icc_segments = markers
+        .iter()
+        .filter_map(|(marker, payload)| {
+            (*marker == 0xE2 && payload.starts_with(b"ICC_PROFILE\0")).then_some((
+                payload[12],
+                payload[13],
+                &payload[14..],
+            ))
+        })
+        .collect::<Vec<_>>();
+    icc_segments.sort_by_key(|(sequence, _, _)| *sequence);
+    assert!(!icc_segments.is_empty());
+    let segment_count = icc_segments[0].1;
+    assert_eq!(usize::from(segment_count), icc_segments.len());
+    assert!(
+        icc_segments
+            .iter()
+            .enumerate()
+            .all(|(index, (sequence, total, _))| {
+                usize::from(*sequence) == index + 1 && *total == segment_count
+            })
+    );
+    let profile = icc_segments
+        .into_iter()
+        .flat_map(|(_, _, payload)| payload.iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(profile.len(), 3_024);
+    assert_eq!(
+        format!("{:x}", Sha256::digest(&profile)),
+        "384b832de3412066743b52a75ee906b6fb9fb8d9e09e936fc2c43223815c6e0a"
+    );
+
+    let decoded = image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
+        .expect("the golden JPEG decodes")
+        .to_rgb8();
+    assert_eq!(decoded.dimensions(), (7_087, 3_543));
+    assert!(decoded.pixels().all(|pixel| pixel.0 == [255, 255, 255]));
+    let (_, response) =
+        decode_event_stream(&result.stdout).expect("the processor output is a valid event stream");
+    let completion = response
+        .completed_for("neutral-jpeg-001")
+        .expect("the neutral render completes");
+    assert_eq!(completion.source_count, 0);
+    assert_eq!(completion.source_bytes, 0);
+    assert_eq!(completion.width_px, 7_087);
+    assert_eq!(completion.height_px, 3_543);
+    assert_eq!(completion.dpi, 300);
+}
+
+fn jpeg_header_markers(bytes: &[u8]) -> Vec<(u8, &[u8])> {
+    assert_eq!(&bytes[..2], b"\xFF\xD8");
+    let mut markers = Vec::new();
+    let mut cursor = 2;
+    while cursor < bytes.len() {
+        assert_eq!(bytes[cursor], 0xFF, "expected a JPEG marker prefix");
+        while bytes[cursor] == 0xFF {
+            cursor += 1;
+        }
+        let marker = bytes[cursor];
+        cursor += 1;
+        if marker == 0xDA || marker == 0xD9 {
+            break;
+        }
+        let length = usize::from(u16::from_be_bytes([bytes[cursor], bytes[cursor + 1]]));
+        assert!(length >= 2);
+        cursor += 2;
+        let payload_length = length - 2;
+        markers.push((marker, &bytes[cursor..cursor + payload_length]));
+        cursor += payload_length;
+    }
+    markers
+}
+
+#[test]
 fn processor_advertises_the_protocol_version_used_by_external_runners() {
     let output = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"))
         .arg("--protocol-version")
@@ -98,14 +238,14 @@ fn processor_advertises_the_protocol_version_used_by_external_runners() {
 }
 
 #[test]
-fn processor_renders_a_png_from_a_validated_snapshot_only() {
+fn processor_renders_a_jpeg_from_a_validated_output_unit() {
     let session = sample_session(SampleProject::Horizon, 12);
     let snapshot = session.render_snapshot();
     let expected_source_count = snapshot.composition.sheets[0]
         .referenced_media_ids()
         .count();
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let output_path = output_dir.path().join("lamina-001.png");
+    let output_path = output_dir.path().join("lamina-001.jpg");
     let result = invoke_processor(snapshot, &output_path, "request-001");
 
     assert!(
@@ -115,7 +255,8 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
     );
     assert!(output_path.exists());
     let bytes = std::fs::read(output_path).expect("rendered output is readable");
-    assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+    assert_eq!(&bytes[..2], b"\xff\xd8");
+    assert_eq!(&bytes[bytes.len() - 2..], b"\xff\xd9");
     let (progress, response) =
         decode_event_stream(&result.stdout).expect("the processor output is a valid event stream");
     let stage_transitions =
@@ -154,7 +295,7 @@ fn processor_renders_a_png_from_a_validated_snapshot_only() {
 fn processor_never_replaces_an_existing_preparation() {
     let session = sample_session(SampleProject::Horizon, 2);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let output_path = output_dir.path().join("existing-output.png");
+    let output_path = output_dir.path().join("existing-output.jpg");
     std::fs::write(&output_path, b"previous export").expect("the previous output is writable");
 
     let result = invoke_processor(
@@ -164,8 +305,8 @@ fn processor_never_replaces_an_existing_preparation() {
     );
 
     assert_eq!(
-        result.status.code(),
-        Some(ImagingFailureStage::OutputPrepare.exit_code().into())
+        render_failure_stage(&result, "replacement-request"),
+        ImagingFailureStage::OutputPrepare
     );
     assert_eq!(
         std::fs::read(output_path).expect("the existing preparation remains readable"),
@@ -387,7 +528,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let source_path = source_dir.path().join("photo.jpg");
-    let output_path = output_dir.path().join("real-sheet-without-border.png");
+    let output_path = output_dir.path().join("real-sheet-without-border.jpg");
     let mut source = RgbImage::new(40, 20);
     for (x, _, pixel) in source.enumerate_pixels_mut() {
         *pixel = if x < 20 {
@@ -476,7 +617,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
         rgb: "#00FF00".into(),
         width_um: 1_270,
     };
-    let bordered_output_path = output_dir.path().join("real-sheet-with-border.png");
+    let bordered_output_path = output_dir.path().join("real-sheet-with-border.jpg");
     let bordered_result = invoke_real_processor(
         snapshot,
         &bordered_output_path,
@@ -504,7 +645,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
 fn processor_composites_a_transparent_decorative_from_its_original_png() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let output_path = output_dir.path().join("decorative-sheet.png");
+    let output_path = output_dir.path().join("decorative-sheet.jpg");
     let photo_path = source_dir.path().join("photo.jpg");
     let decorative_path = source_dir.path().join("overlay.png");
     RgbImage::from_pixel(40, 20, Rgb([20, 40, 220]))
@@ -603,7 +744,7 @@ fn processor_identifies_source_verification_failures() {
         .expect("the linked JPEG fixture is written");
     let original = std::fs::read(&source_path).expect("the source is readable");
     let request = single_photo_render_request(
-        output_dir.path().join("source-verification.png"),
+        output_dir.path().join("source-verification.jpg"),
         "source-verification",
         &source_path,
         original.len() as u64,
@@ -616,8 +757,8 @@ fn processor_identifies_source_verification_failures() {
     let result = invoke_render_request(&request, Some(log_dir.path()));
 
     assert_eq!(
-        result.status.code(),
-        Some(ImagingFailureStage::SourceVerification.exit_code().into())
+        render_failure_stage(&result, "source-verification"),
+        ImagingFailureStage::SourceVerification
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
 }
@@ -628,7 +769,7 @@ fn processor_identifies_a_missing_original_as_a_source_verification_failure() {
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let source_path = source_dir.path().join("missing-photo.jpg");
-    let output_path = output_dir.path().join("missing-original.png");
+    let output_path = output_dir.path().join("missing-original.jpg");
     let request = single_photo_render_request(
         output_path.clone(),
         "missing-original",
@@ -640,8 +781,8 @@ fn processor_identifies_a_missing_original_as_a_source_verification_failure() {
     let result = invoke_render_request(&request, Some(log_dir.path()));
 
     assert_eq!(
-        result.status.code(),
-        Some(ImagingFailureStage::SourceVerification.exit_code().into())
+        render_failure_stage(&result, "missing-original"),
+        ImagingFailureStage::SourceVerification
     );
     assert!(!output_path.exists());
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_verification\""));
@@ -656,7 +797,7 @@ fn processor_identifies_source_decode_failures() {
     let bytes = b"this is not a JPEG";
     std::fs::write(&source_path, bytes).expect("the invalid source is written");
     let request = single_photo_render_request(
-        output_dir.path().join("source-decode.png"),
+        output_dir.path().join("source-decode.jpg"),
         "source-decode",
         &source_path,
         bytes.len() as u64,
@@ -666,8 +807,8 @@ fn processor_identifies_source_decode_failures() {
     let result = invoke_render_request(&request, Some(log_dir.path()));
 
     assert_eq!(
-        result.status.code(),
-        Some(ImagingFailureStage::SourceDecode.exit_code().into())
+        render_failure_stage(&result, "source-decode"),
+        ImagingFailureStage::SourceDecode
     );
     assert!(read_logs(log_dir.path()).contains("\"stage\":\"source_decode\""));
 }
@@ -725,8 +866,8 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
 fn processor_uses_the_composed_media_transform() {
     let mut session = sample_session(SampleProject::Horizon, 12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let original_path = output_dir.path().join("original.png");
-    let transformed_path = output_dir.path().join("transformed.png");
+    let original_path = output_dir.path().join("original.jpg");
+    let transformed_path = output_dir.path().join("transformed.jpg");
 
     let original = invoke_processor(session.render_snapshot(), &original_path, "original");
     assert!(original.status.success());
@@ -750,15 +891,15 @@ fn processor_uses_the_composed_media_transform() {
 }
 
 #[test]
-fn processor_rejects_an_invalid_snapshot() {
+fn processor_rejects_an_invalid_output_unit() {
     let session = sample_session(SampleProject::Horizon, 12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let output_path = output_dir.path().join("invalid.png");
+    let output_path = output_dir.path().join("invalid.jpg");
     let snapshot = session.render_snapshot();
     let (_source_dir, request) =
         render_request_with_temp_originals(snapshot, &output_path, "invalid", 25);
     let mut request = serde_json::to_value(request).expect("request is serializable");
-    request["snapshot"]["composition"]["sheets"][0]["widthUm"] = serde_json::json!(0);
+    request["unit"]["sheet"]["widthUm"] = serde_json::json!(0);
 
     let command = serde_json::json!({
         "kind": "render",
@@ -769,20 +910,18 @@ fn processor_rejects_an_invalid_snapshot() {
         None,
     );
 
-    assert!(!result.status.success());
-    assert!(!output_path.exists());
-    assert!(
-        String::from_utf8_lossy(&result.stderr).contains("não concluiu a solicitação"),
-        "unexpected stderr: {}",
-        String::from_utf8_lossy(&result.stderr)
+    assert_eq!(
+        render_failure_stage(&result, "invalid"),
+        ImagingFailureStage::InvalidRenderRequest
     );
+    assert!(!output_path.exists());
 }
 
 #[test]
 fn processor_rejects_a_render_root_omitted_by_the_operation_owner() {
     let session = sample_session(SampleProject::Horizon, 2);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
-    let output_path = output_dir.path().join("unbound.png");
+    let output_path = output_dir.path().join("unbound.jpg");
     let snapshot = session.render_snapshot();
     let (_source_dir, request) =
         render_request_with_temp_originals(snapshot, &output_path, "unbound-root", 25);
@@ -795,7 +934,10 @@ fn processor_rejects_a_render_root_omitted_by_the_operation_owner() {
         None,
     );
 
-    assert!(!result.status.success());
+    assert_eq!(
+        render_failure_stage(&result, "unbound-root"),
+        ImagingFailureStage::InvalidRenderRequest
+    );
     assert!(
         !output_path.exists(),
         "the Processor must reject the request before creating a preparation"
@@ -807,7 +949,7 @@ fn processor_writes_correlated_logs_without_exposing_the_output_path() {
     let session = sample_session(SampleProject::Horizon, 12);
     let output_dir = tempfile::tempdir().expect("temporary output directory");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
-    let output_path = output_dir.path().join("private-album-name.png");
+    let output_path = output_dir.path().join("private-album-name.jpg");
 
     let (_source_dir, request) = render_request_with_temp_originals(
         session.render_snapshot(),
@@ -868,18 +1010,16 @@ fn processor_redacts_path_shaped_project_identifiers_and_output_failures() {
     let output_path = output_dir
         .path()
         .join("missing-parent")
-        .join("private-album-name.png");
+        .join("private-album-name.jpg");
 
     let result =
         invoke_processor_with_log_dir(snapshot, &output_path, request_id, Some(log_dir.path()));
 
-    assert!(!result.status.success());
     assert_eq!(
-        result.status.code(),
-        Some(ImagingFailureStage::OutputPrepare.exit_code().into())
+        render_failure_stage(&result, request_id),
+        ImagingFailureStage::OutputPrepare
     );
     let stderr = String::from_utf8_lossy(&result.stderr);
-    assert!(stderr.contains("não concluiu a solicitação"));
     assert!(!stderr.contains(request_id));
     assert!(!stderr.contains(&output_path.to_string_lossy().into_owned()));
 
@@ -931,11 +1071,13 @@ fn single_photo_render_request(
     )
     .expect("the linked source is valid");
     let bindings = root_bindings(&[&output_path, source.source_path()]);
+    let unit = snapshot
+        .output_unit(&sheet_id)
+        .expect("the selected Sheet becomes an output unit");
     ImagingRequest::new(
         request_id,
-        output_path,
-        snapshot,
-        sheet_id,
+        NativePathDto::from(output_path),
+        unit,
         25,
         vec![source],
         bindings,
@@ -1031,11 +1173,13 @@ fn render_request_with_temp_originals(
     paths.extend(sources.iter().map(MediaSource::source_path));
     let bindings = root_bindings(&paths);
     drop(paths);
+    let unit = snapshot
+        .output_unit(&sheet_id)
+        .expect("the selected Sheet becomes an output unit");
     let request = ImagingRequest::new(
         request_id,
-        output_path.to_path_buf(),
-        snapshot,
-        sheet_id,
+        NativePathDto::from(output_path),
+        unit,
         dpi,
         sources,
         bindings,
@@ -1063,17 +1207,31 @@ fn invoke_real_processor(
     paths.extend(sources.iter().map(MediaSource::source_path));
     let bindings = root_bindings(&paths);
     drop(paths);
+    let unit = snapshot
+        .output_unit(&sheet_id)
+        .expect("the selected Sheet becomes an output unit");
     let request = ImagingRequest::new(
         request_id,
-        output_path.to_path_buf(),
-        snapshot,
-        sheet_id,
+        NativePathDto::from(output_path),
+        unit,
         dpi,
         sources,
         bindings,
     )
     .expect("the linked-original render request is valid");
     invoke_render_request(&request, None)
+}
+
+fn render_failure_stage(result: &Output, request_id: &str) -> ImagingFailureStage {
+    assert!(
+        result.status.success(),
+        "known render failures must use a structured terminal: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let (_, response) = decode_event_stream(&result.stdout).expect("the failure stream is valid");
+    response
+        .failure_for(request_id)
+        .expect("the failure terminal is correlated")
 }
 
 fn invoke_render_request(request: &ImagingRequest, log_dir: Option<&Path>) -> std::process::Output {

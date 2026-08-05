@@ -5,10 +5,10 @@ use std::{
 
 use myalbuns_imaging_protocol::{IMAGING_PROTOCOL_VERSION, root_binding_plan_sha256};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use myalbuns_paths::AppPaths;
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
 use crate::{
+    cache_activity_gate::CacheActivityGate,
     export_attempts::ExportAttempts,
     export_pipeline,
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
@@ -17,6 +17,7 @@ use crate::{
         ExportProgressStagePayload, ExportProgressUnitsPayload, ExportResult,
     },
     logging::{LoggingState, log_imaging_failure},
+    native_project_dialog,
     operation_gate::{OperationGate, OperationGateError},
     operation_lease::OperationLease,
     path_io,
@@ -101,10 +102,17 @@ impl ExportCommandError {
     }
 
     fn from_pipeline(failure: export_pipeline::ExportFailure) -> Self {
-        if failure.stage == export_pipeline::ExportFailureStage::Cancelled {
-            Self::cancelled()
-        } else {
-            Self::failed(failure.message)
+        match failure.stage {
+            export_pipeline::ExportFailureStage::Cancelled => Self::cancelled(),
+            export_pipeline::ExportFailureStage::ExportConflict => Self {
+                code: ExportCommandErrorCode::ExportConflict,
+                message: failure.message,
+            },
+            export_pipeline::ExportFailureStage::Publish { .. } => Self {
+                code: ExportCommandErrorCode::PublicationFailed,
+                message: failure.message,
+            },
+            _ => Self::failed(failure.message),
         }
     }
 }
@@ -131,56 +139,56 @@ fn log_export_cancelled(
 // Grouping them only to shorten this signature would create a false coordinator.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
-pub(crate) async fn export_preview(
+pub(crate) async fn export_sheet(
     app: AppHandle,
     window: WebviewWindow,
+    sheet_id: String,
     on_event: Channel<ExportEvent>,
     state: State<'_, ProjectHost>,
-    app_paths: State<'_, AppPaths>,
     logging: State<'_, LoggingState>,
     operation_gate: State<'_, OperationGate>,
+    cache: State<'_, CacheActivityGate>,
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
-    let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let request_id = format!("export-{}-{export_sequence}", std::process::id());
     let snapshot = state
         .render_snapshot()
-        .inspect_err(|_| {
-            log_imaging_failure("export_failed", &request_id, None, "session_lock", None);
-        })
         .map_err(ExportCommandError::failed)?;
-
-    let output_directory = app_paths
-        .prepare_export_preview_directory()
-        .map_err(|error| {
-            ExportCommandError::failed(format!(
-                "Não foi possível preparar o Destino da Exportação: {error}"
-            ))
-        })?;
-    let output_path = output_directory.path().join(format!(
-        "Album-Horizonte_{}_{export_sequence:03}.png",
-        std::process::id()
-    ));
-    let sheet_id = snapshot
+    let sheet = snapshot
         .composition
         .sheets
-        .first()
-        .ok_or_else(|| ExportCommandError::failed("O snapshot não contém Lâminas."))?
-        .sheet_id
-        .clone();
+        .iter()
+        .find(|sheet| sheet.sheet_id == sheet_id)
+        .ok_or_else(|| ExportCommandError::failed("A Lâmina selecionada não existe."))?;
+    let suggested_filename = suggested_export_filename(&snapshot.project_name, sheet.number);
+    let destination = native_project_dialog::choose_export_destination(&window, suggested_filename)
+        .await
+        .map_err(|error| {
+            ExportCommandError::failed(format!(
+                "Não foi possível escolher o Destino da Exportação: {error}"
+            ))
+        })?;
+    let native_project_dialog::ExportSaveDialogOutcome::Selected {
+        path: output_path,
+        authorization,
+    } = destination
+    else {
+        return Err(ExportCommandError::cancelled());
+    };
+
+    let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let request_id = format!("export-{}-{export_sequence}", std::process::id());
     let sources = state
         .export_sources(&snapshot, &sheet_id)
         .map_err(ExportCommandError::failed)?;
-    let dpi = 300;
     let project_id = safe_log_identifier(&snapshot.project_id).map(str::to_owned);
     let plan = export_pipeline::plan(
         snapshot,
         export_pipeline::ExportOptions::new(
             request_id.clone(),
             output_path,
+            authorization,
             sheet_id,
-            dpi,
             sources,
         ),
     )
@@ -274,7 +282,7 @@ pub(crate) async fn export_preview(
     );
 
     let context = InvocationContext::new(request_id.clone(), project_id.clone());
-    let lease_completion = acquisition.complete(&processor);
+    let lease_completion = acquisition.complete(&cache, &processor);
     tokio::pin!(lease_completion);
     let lease = tokio::select! {
         lease = &mut lease_completion => lease.map_err(|error| {
@@ -367,22 +375,6 @@ pub(crate) async fn export_preview(
         }
         ExportCommandError::from_pipeline(failure)
     })?;
-    let output_path = published
-        .output_path
-        .to_str()
-        .ok_or_else(|| {
-            log_imaging_failure(
-                "export_failed",
-                &request_id,
-                project_id.as_deref(),
-                "serialize_output_path",
-                None,
-            );
-            ExportCommandError::failed(
-                "o caminho da Exportação não pode ser representado pela interface",
-            )
-        })?
-        .to_owned();
     let completed = published.completion;
     let elapsed_ms = started.elapsed().as_millis();
     tracing::info!(
@@ -405,7 +397,6 @@ pub(crate) async fn export_preview(
     );
 
     Ok(ExportResult {
-        output_path,
         width_px: completed.width_px,
         height_px: completed.height_px,
     })
@@ -429,6 +420,31 @@ pub(crate) fn cancel_export(
     disposition
 }
 
+fn suggested_export_filename(project_name: &str, sheet_number: usize) -> String {
+    let sanitized = project_name
+        .chars()
+        .map(|character| {
+            if character.is_control()
+                || matches!(
+                    character,
+                    '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'
+                )
+            {
+                '_'
+            } else {
+                character
+            }
+        })
+        .collect::<String>();
+    let sanitized = sanitized.trim_matches(|character| matches!(character, ' ' | '.'));
+    let project_name = if sanitized.is_empty() {
+        "Projeto"
+    } else {
+        sanitized
+    };
+    format!("{project_name}_{sheet_number:03}.jpg")
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
@@ -437,11 +453,25 @@ mod tests {
     use tauri::ipc::{Channel, InvokeResponseBody};
 
     use crate::{
-        export_pipeline::{ExportProgress, ExportProgressStage, ExportProgressUnits},
+        export_pipeline::{
+            ExportFailure, ExportFailureStage, ExportProgress, ExportProgressStage,
+            ExportProgressUnits,
+        },
         operation_gate::OperationGateError,
     };
 
     use crate::ipc_contract::{ExportCommandError, ExportEvent};
+
+    use super::suggested_export_filename;
+
+    #[test]
+    fn suggested_jpeg_name_uses_the_project_and_sheet_position_safely() {
+        assert_eq!(
+            suggested_export_filename("Álbum: Horizonte", 2),
+            "Álbum_ Horizonte_002.jpg"
+        );
+        assert_eq!(suggested_export_filename("...", 1), "Projeto_001.jpg");
+    }
 
     #[test]
     fn export_channel_has_one_closed_camel_case_contract() {
@@ -524,6 +554,36 @@ mod tests {
             json!({
                 "code": "conflict",
                 "message": "Outra operação exclusiva já está em andamento. Aguarde sua conclusão e tente novamente.",
+            })
+        );
+    }
+
+    #[test]
+    fn publication_outcomes_keep_distinct_typed_ipc_results() {
+        let conflict = ExportCommandError::from_pipeline(ExportFailure::new(
+            ExportFailureStage::ExportConflict,
+            "O Destino surgiu depois da confirmação.",
+        ));
+        assert_eq!(
+            serde_json::to_value(conflict).expect("the conflict serializes"),
+            json!({
+                "code": "export_conflict",
+                "message": "O Destino surgiu depois da confirmação.",
+            })
+        );
+
+        let publication = ExportCommandError::from_pipeline(ExportFailure::new(
+            ExportFailureStage::Publish {
+                promoted_outputs: 0,
+                total_outputs: 1,
+            },
+            "A Publicação não pôde ser confirmada.",
+        ));
+        assert_eq!(
+            serde_json::to_value(publication).expect("the publication failure serializes"),
+            json!({
+                "code": "publication_failed",
+                "message": "A Publicação não pôde ser confirmada.",
             })
         );
     }

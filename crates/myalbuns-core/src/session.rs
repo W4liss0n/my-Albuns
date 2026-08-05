@@ -143,6 +143,7 @@ impl ProjectSession {
             &self.state.project_id,
             &self.state.project_name,
             self.state.revision,
+            self.state.document.dpi,
             &self.state.album,
         )
     }

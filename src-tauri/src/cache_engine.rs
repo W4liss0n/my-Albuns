@@ -119,6 +119,12 @@ pub(crate) async fn execute<T: ImagingTransport>(
     let command = ImagingCommand::build_cache(request.clone());
     let (response, recovery) =
         invoke_with_recovery(transport, app_paths, &work.cache_paths, &command, context).await?;
+    if let Some(stage) = response.failure_for(&work.request_id) {
+        return Err(CacheFailure::new(
+            CacheFailureStage::Processor(InvocationFailureStage::Processor(stage)),
+            "O Processador recusou o trabalho de Cache.",
+        ));
+    }
     let completion = response
         .cache_completed_for(&work.request_id)
         .cloned()

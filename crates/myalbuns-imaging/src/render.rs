@@ -1,18 +1,15 @@
-use std::{
-    collections::HashMap,
-    fs,
-    fs::OpenOptions,
-    io::{BufWriter, Write},
-    path::Path,
-};
+use std::collections::HashMap;
 
-use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage, codecs::png::PngEncoder};
+use image::{Rgba, RgbaImage};
 use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
     ImagingFailureStage, ImagingProgressStage, ImagingRequest, RenderCompletion,
 };
 
-use crate::source::{decode_source, read_verified_source, sha256_file};
+use crate::{
+    jpeg_output::{JpegFailure, RasterPlan, write_verified},
+    source::{decode_source, read_verified_source},
+};
 
 const MICROMETERS_PER_INCH: f64 = 25_400.0;
 
@@ -36,22 +33,21 @@ impl From<String> for RenderFailure {
     }
 }
 
+impl From<JpegFailure> for RenderFailure {
+    fn from(failure: JpegFailure) -> Self {
+        Self::new(failure.stage, failure.message)
+    }
+}
+
 pub(crate) fn render_request(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
 ) -> Result<RenderCompletion, RenderFailure> {
-    let sheet = request
-        .snapshot
-        .composition
-        .sheets
-        .iter()
-        .find(|sheet| sheet.sheet_id == request.sheet_id)
-        .ok_or_else(|| "a Lâmina solicitada não existe no snapshot".to_string())?;
+    let sheet = &request.unit.sheet;
+    let raster = RasterPlan::new(sheet.width_um, sheet.height_um, request.dpi)?;
     let pixels_per_micrometer = request.dpi as f64 / MICROMETERS_PER_INCH;
-    let width_px = to_pixels(sheet.width_um, pixels_per_micrometer).max(1);
-    let height_px = to_pixels(sheet.height_um, pixels_per_micrometer).max(1);
     let (sources, source_bytes) = load_render_sources(request, progress)?;
-    let mut image = RgbaImage::from_pixel(width_px, height_px, opaque_rgb(&sheet.base.rgb));
+    let mut image = raster.allocate_rgba(opaque_rgb(&sheet.base.rgb))?;
 
     for background in &sheet.backgrounds {
         match background {
@@ -76,20 +72,24 @@ pub(crate) fn render_request(
 
     let frame_count = u32::try_from(sheet.frames.len())
         .map_err(|_| "a Lâmina contém Frames demais".to_string())?;
-    progress(ImagingProgressStage::Composing, 0, frame_count)?;
+    let composition_units = frame_count.max(1);
+    progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
         draw_frame(&mut image, frame, pixels_per_micrometer, &sources)?;
         draw_frame_border(
             &mut image,
             &frame.clip_rect,
-            &request.snapshot.composition.frame_border,
+            &request.unit.frame_border,
             pixels_per_micrometer,
         );
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
-            frame_count,
+            composition_units,
         )?;
+    }
+    if frame_count == 0 {
+        progress(ImagingProgressStage::Composing, 1, composition_units)?;
     }
     for overlay in &sheet.overlays {
         let source = sources.get(&overlay.media_id).ok_or_else(|| {
@@ -109,23 +109,23 @@ pub(crate) fn render_request(
     progress(ImagingProgressStage::EncodingOutput, 0, 1)?;
     let operational_output = request
         .root_bindings
-        .resolve(&request.prepared_output_path)
+        .resolve(request.prepared_output_path())
         .map_err(|error| {
             RenderFailure::new(
                 ImagingFailureStage::OutputPrepare,
                 format!("não foi possível aplicar o plano de caminhos: {error}"),
             )
         })?;
-    let (output_bytes, output_sha256) = write_verified_png(&image, &operational_output)?;
+    let verified = write_verified(&image, &operational_output, request.dpi)?;
     progress(ImagingProgressStage::EncodingOutput, 1, 1)?;
     Ok(RenderCompletion {
-        width_px,
-        height_px,
+        width_px: raster.width_px,
+        height_px: raster.height_px,
         dpi: request.dpi,
         source_count: sources.len(),
         source_bytes,
-        output_bytes,
-        output_sha256,
+        output_bytes: verified.output_bytes,
+        output_sha256: verified.output_sha256,
     })
 }
 
@@ -137,7 +137,8 @@ fn load_render_sources(
     let mut source_bytes = 0_u64;
     let source_count = u32::try_from(request.sources.len())
         .map_err(|_| "a Exportação contém fontes demais".to_string())?;
-    progress(ImagingProgressStage::LoadingSources, 0, source_count)?;
+    let loading_units = source_count.max(1);
+    progress(ImagingProgressStage::LoadingSources, 0, loading_units)?;
     for (index, source) in request.sources.iter().enumerate() {
         let operational_source = request
             .root_bindings
@@ -168,78 +169,13 @@ fn load_render_sources(
             ImagingProgressStage::LoadingSources,
             u32::try_from(index + 1)
                 .map_err(|_| "a Exportação contém fontes demais".to_string())?,
-            source_count,
+            loading_units,
         )?;
     }
-    Ok((decoded, source_bytes))
-}
-
-fn write_verified_png(
-    image: &RgbaImage,
-    prepared_output_path: &Path,
-) -> Result<(u64, String), RenderFailure> {
-    let mut created = false;
-    let write_result = (|| -> Result<(u64, String), RenderFailure> {
-        let file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(prepared_output_path)
-            .map_err(|error| {
-                RenderFailure::new(
-                    ImagingFailureStage::OutputPrepare,
-                    format!("não foi possível criar a preparação da Exportação: {error}"),
-                )
-            })?;
-        created = true;
-        let mut writer = BufWriter::new(file);
-        PngEncoder::new(&mut writer)
-            .write_image(
-                image.as_raw(),
-                image.width(),
-                image.height(),
-                ExtendedColorType::Rgba8,
-            )
-            .map_err(|error| {
-                RenderFailure::new(
-                    ImagingFailureStage::OutputEncode,
-                    format!("não foi possível codificar a imagem exportada: {error}"),
-                )
-            })?;
-        writer.flush().map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureStage::OutputEncode,
-                format!("não foi possível finalizar a imagem exportada: {error}"),
-            )
-        })?;
-        let file = writer.into_inner().map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureStage::OutputEncode,
-                format!("não foi possível finalizar a imagem exportada: {error}"),
-            )
-        })?;
-        file.sync_all().map_err(|error| {
-            RenderFailure::new(
-                ImagingFailureStage::OutputEncode,
-                format!("não foi possível sincronizar a imagem exportada: {error}"),
-            )
-        })?;
-        drop(file);
-        let output_bytes = fs::metadata(prepared_output_path)
-            .map_err(|error| {
-                RenderFailure::new(
-                    ImagingFailureStage::OutputVerify,
-                    format!("não foi possível verificar a imagem preparada: {error}"),
-                )
-            })?
-            .len();
-        let output_sha256 = sha256_file(prepared_output_path)
-            .map_err(|error| RenderFailure::new(ImagingFailureStage::OutputVerify, error))?;
-        Ok((output_bytes, output_sha256))
-    })();
-    if write_result.is_err() && created {
-        let _ = fs::remove_file(prepared_output_path);
+    if source_count == 0 {
+        progress(ImagingProgressStage::LoadingSources, 1, loading_units)?;
     }
-    write_result
+    Ok((decoded, source_bytes))
 }
 
 fn draw_frame(
@@ -439,10 +375,6 @@ fn blend(from: Rgba<u8>, to: Rgba<u8>, amount: f32) -> Rgba<u8> {
         (from[2] as f32 + (to[2] as f32 - from[2] as f32) * amount) as u8,
         (from[3] as f32 + (to[3] as f32 - from[3] as f32) * amount) as u8,
     ])
-}
-
-fn to_pixels(value_um: i64, pixels_per_micrometer: f64) -> u32 {
-    (value_um as f64 * pixels_per_micrometer).round().max(0.0) as u32
 }
 
 fn to_pixels_signed(value_um: i64, pixels_per_micrometer: f64) -> i64 {

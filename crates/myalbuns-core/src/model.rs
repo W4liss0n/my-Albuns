@@ -5,7 +5,7 @@ use ts_rs::TS;
 use crate::project_document::{DisplayUnit, DocumentSettings};
 
 pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 4;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 5;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -430,6 +430,19 @@ pub struct CompositionPlan {
     pub sheets: Vec<ComposedSheet>,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ComposedOutputUnit {
+    pub frame_border: ProjectedFrameBorder,
+    pub sheet: ComposedSheet,
+}
+
+impl ComposedOutputUnit {
+    pub fn validate(&self) -> Result<(), CoreError> {
+        crate::validation::validate_composed_output_unit(self)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUsage {
@@ -452,6 +465,7 @@ pub struct RenderSnapshot {
     pub project_id: String,
     pub project_name: String,
     pub revision: u64,
+    pub dpi: u32,
     pub unit: String,
     pub composition: CompositionPlan,
 }
@@ -459,6 +473,20 @@ pub struct RenderSnapshot {
 impl RenderSnapshot {
     pub fn validate(&self) -> Result<(), CoreError> {
         crate::validation::validate_render_snapshot(self)
+    }
+
+    pub fn output_unit(&self, sheet_id: &str) -> Result<ComposedOutputUnit, CoreError> {
+        let sheet = self
+            .composition
+            .sheets
+            .iter()
+            .find(|sheet| sheet.sheet_id == sheet_id)
+            .cloned()
+            .ok_or_else(|| CoreError::SheetNotFound(sheet_id.to_owned()))?;
+        Ok(ComposedOutputUnit {
+            frame_border: self.composition.frame_border.clone(),
+            sheet,
+        })
     }
 }
 

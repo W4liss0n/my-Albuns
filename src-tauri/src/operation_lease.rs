@@ -2,6 +2,7 @@
 use std::fmt;
 
 use crate::{
+    cache_activity_gate::{CacheActivityGate, CachePause},
     imaging_processor::{ImagingProcessor, ProcessorReservation, ProcessorUnavailable},
     operation_gate::{OperationGate, OperationGateError, OperationGrant},
 };
@@ -9,6 +10,7 @@ use crate::{
 #[derive(Debug)]
 pub(crate) struct OperationLease {
     processor_reservation: ProcessorReservation,
+    _cache_pause: CachePause,
     _gate_grant: OperationGrant,
 }
 
@@ -36,11 +38,12 @@ impl OperationLease {
     #[cfg(test)]
     pub(crate) async fn acquire(
         gate: &OperationGate,
+        cache: &CacheActivityGate,
         processor: &ImagingProcessor,
     ) -> Result<Self, OperationLeaseError> {
         Self::begin(gate)
             .map_err(OperationLeaseError::Gate)?
-            .complete(processor)
+            .complete(cache, processor)
             .await
             .map_err(OperationLeaseError::Processor)
     }
@@ -53,11 +56,14 @@ impl OperationLease {
 impl OperationLeaseAcquisition {
     pub(crate) async fn complete(
         self,
+        cache: &CacheActivityGate,
         processor: &ImagingProcessor,
     ) -> Result<OperationLease, ProcessorUnavailable> {
+        let cache_pause = cache.pause().await;
         let processor_reservation = processor.reserve().await?;
         Ok(OperationLease {
             processor_reservation,
+            _cache_pause: cache_pause,
             _gate_grant: self.gate_grant,
         })
     }
@@ -88,29 +94,42 @@ mod tests {
     use tempfile::tempdir;
 
     use super::OperationLease;
-    use crate::{imaging_processor::ImagingProcessor, operation_gate::OperationGate};
+    use crate::{
+        cache_activity_gate::CacheActivityGate, imaging_processor::ImagingProcessor,
+        operation_gate::OperationGate,
+    };
 
     fn app_paths(root: &Path) -> AppPaths {
         AppPaths::from_roots(&root.join("roaming"), &root.join("local"), root)
     }
 
     #[test]
-    fn dropping_the_lease_releases_gate_and_processor_together() {
+    fn dropping_the_lease_releases_gate_cache_and_processor_together() {
         tauri::async_runtime::block_on(async {
             let root = tempdir().expect("the release fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
+            let cache = CacheActivityGate::default();
             let processor = ImagingProcessor::default();
-            let lease = OperationLease::acquire(&gate, &processor)
+            let lease = OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .expect("the attempt acquires the common lease");
 
             assert!(
-                OperationLease::acquire(&gate, &processor).await.is_err(),
+                OperationLease::acquire(&gate, &cache, &processor)
+                    .await
+                    .is_err(),
                 "another Export is refused without a queue"
             );
+            let cache_work = cache.begin_work();
+            tokio::pin!(cache_work);
             let processor_work = processor.reserve();
             tokio::pin!(processor_work);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut cache_work)
+                    .await
+                    .is_err()
+            );
             assert!(
                 tokio::time::timeout(Duration::from_millis(20), &mut processor_work)
                     .await
@@ -118,11 +137,14 @@ mod tests {
             );
 
             drop(lease);
+            tokio::time::timeout(Duration::from_secs(1), &mut cache_work)
+                .await
+                .expect("Cache resumes with the lease release");
             tokio::time::timeout(Duration::from_secs(1), &mut processor_work)
                 .await
                 .expect("the Processor returns with the lease release")
                 .expect("the Processor remains healthy");
-            OperationLease::acquire(&gate, &processor)
+            OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .expect("the next Export acquires immediately");
         });
@@ -133,11 +155,12 @@ mod tests {
         let root = tempdir().expect("the unwind fixture exists");
         let paths = app_paths(root.path());
         let gate = OperationGate::new(&paths);
+        let cache = CacheActivityGate::default();
         let processor = ImagingProcessor::default();
 
         let outcome = catch_unwind(AssertUnwindSafe(|| {
             tauri::async_runtime::block_on(async {
-                let _lease = OperationLease::acquire(&gate, &processor)
+                let _lease = OperationLease::acquire(&gate, &cache, &processor)
                     .await
                     .expect("the failed attempt acquires");
                 panic!("injected operation failure");
@@ -146,7 +169,7 @@ mod tests {
         assert!(outcome.is_err(), "the injected failure must unwind");
 
         tauri::async_runtime::block_on(async {
-            OperationLease::acquire(&gate, &processor)
+            OperationLease::acquire(&gate, &cache, &processor)
                 .await
                 .expect("the successor acquires every resource after unwind");
         });
@@ -158,6 +181,7 @@ mod tests {
             let root = tempdir().expect("the staged acquisition fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
+            let cache = CacheActivityGate::default();
             let processor = ImagingProcessor::default();
             let occupied_processor = processor
                 .reserve()
@@ -171,7 +195,7 @@ mod tests {
                 "a concurrent caller receives a conflict before progress can start"
             );
 
-            let mut completion = Box::pin(acquisition.complete(&processor));
+            let mut completion = Box::pin(acquisition.complete(&cache, &processor));
             assert!(
                 tokio::time::timeout(Duration::from_millis(20), &mut completion)
                     .await
@@ -192,12 +216,13 @@ mod tests {
             let root = tempdir().expect("the Processor-cancellation fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
+            let cache = CacheActivityGate::default();
             let processor = ImagingProcessor::default();
             let occupied_processor = processor
                 .reserve()
                 .await
                 .expect("the Processor can be reserved");
-            let mut pending = Box::pin(OperationLease::acquire(&gate, &processor));
+            let mut pending = Box::pin(OperationLease::acquire(&gate, &cache, &processor));
 
             assert!(
                 tokio::time::timeout(Duration::from_millis(20), &mut pending)
@@ -209,6 +234,9 @@ mod tests {
 
             gate.try_acquire()
                 .expect("cancelling the pending future releases its gate grant");
+            tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
+                .await
+                .expect("cancelling the pending future releases its Cache pause");
             drop(occupied_processor);
         });
     }
@@ -219,6 +247,7 @@ mod tests {
             let root = tempdir().expect("the quarantine fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
+            let cache = CacheActivityGate::default();
             let processor = ImagingProcessor::default();
             let reservation = processor
                 .reserve()
@@ -229,7 +258,7 @@ mod tests {
 
             let failure = OperationLease::begin(&gate)
                 .expect("the gate can be acquired")
-                .complete(&processor)
+                .complete(&cache, &processor)
                 .await
                 .expect_err("a quarantined Processor refuses a lease");
 
@@ -241,6 +270,35 @@ mod tests {
                 OperationLease::begin(&gate).is_ok(),
                 "the failed completion releases the gate"
             );
+            tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
+                .await
+                .expect("the failed completion releases the Cache pause");
+        });
+    }
+
+    #[test]
+    fn lease_waits_for_active_cache_before_reserving_the_processor() {
+        tauri::async_runtime::block_on(async {
+            let root = tempdir().expect("the Cache-pause fixture exists");
+            let paths = app_paths(root.path());
+            let gate = OperationGate::new(&paths);
+            let cache = CacheActivityGate::default();
+            let processor = ImagingProcessor::default();
+            let active_cache = cache.begin_work().await;
+            let mut lease = Box::pin(OperationLease::acquire(&gate, &cache, &processor));
+
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut lease)
+                    .await
+                    .is_err(),
+                "the lease waits until active Cache work reaches a safe endpoint"
+            );
+
+            drop(active_cache);
+            tokio::time::timeout(Duration::from_secs(1), &mut lease)
+                .await
+                .expect("the Cache pause becomes available")
+                .expect("the complete lease is acquired");
         });
     }
 }

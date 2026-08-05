@@ -13,7 +13,8 @@ use myalbuns_imaging_protocol::{
     encode_command,
 };
 use myalbuns_paths::{
-    AppPaths, ExportPathPlan, OperationPathContext, RootBindingPlan, project_data_namespace,
+    AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
+    project_data_namespace,
 };
 use sha2::{Digest, Sha256};
 
@@ -176,7 +177,7 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
                 )
                 .ok()
         }
-        ImagingCommand::Render(request) => Some(request.prepared_output_path.clone()),
+        ImagingCommand::Render(request) => Some(request.prepared_output_path().to_path_buf()),
     }
 }
 
@@ -406,7 +407,7 @@ fn real_processor_recovery_flows_through_production_modules() {
             .persisted_revision()
             .expect("the Project revision serializes before failure");
         let project_sha256_before = format!("{:x}", Sha256::digest(project_before.as_bytes()));
-        let output_path = fixture.path().join("recoverable-output.png");
+        let output_path = fixture.path().join("recoverable-output.jpg");
         let previous_output = b"previous completed export";
         std::fs::write(&output_path, previous_output).expect("the previous Export is writable");
         let previous_output_sha256 = format!("{:x}", Sha256::digest(previous_output));
@@ -418,8 +419,8 @@ fn real_processor_recovery_flows_through_production_modules() {
             export_pipeline::ExportOptions::new(
                 failed_request_id,
                 output_path.clone(),
+                ExportWriteAuthorization::ReplaceConfirmed,
                 sheet_id.clone(),
-                300,
                 vec![export_source.clone()],
             ),
         )
@@ -461,8 +462,8 @@ fn real_processor_recovery_flows_through_production_modules() {
             export_pipeline::ExportOptions::new(
                 retry_request_id,
                 output_path.clone(),
+                ExportWriteAuthorization::ReplaceConfirmed,
                 sheet_id,
-                300,
                 vec![export_source],
             ),
         )
@@ -490,6 +491,12 @@ fn real_processor_recovery_flows_through_production_modules() {
         );
         let final_output_sha256 = published.completion.output_sha256;
         assert_ne!(final_output_sha256, previous_output_sha256);
+        let project_after_success = session
+            .persisted_revision()
+            .expect("the Project revision serializes after successful Export");
+        let project_sha256_after_success =
+            format!("{:x}", Sha256::digest(project_after_success.as_bytes()));
+        assert_eq!(project_sha256_after_success, project_sha256_before);
 
         write_evidence(
             "export",
@@ -505,6 +512,7 @@ fn real_processor_recovery_flows_through_production_modules() {
                 "previousOutputSha256AfterFailure": output_sha256_after_failure,
                 "projectSha256BeforeFailure": project_sha256_before,
                 "projectSha256AfterFailure": project_sha256_after,
+                "projectSha256AfterSuccess": project_sha256_after_success,
                 "finalOutputSha256AfterExplicitRetry": final_output_sha256,
             }),
         );
@@ -559,22 +567,22 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             source.source_sha256(),
         )
         .expect("the mapped source matches the Export frame");
-        let output_path = logical_exports.join("Album-path-gate.png");
+        let output_path = logical_exports.join("Album-path-gate.jpg");
         let unavailable_request_id = "export-real-unc-unavailable";
         let unavailable_plan = export_pipeline::plan(
             snapshot.clone(),
             export_pipeline::ExportOptions::new(
                 unavailable_request_id,
-                logical_exports.join("Album-unavailable.png"),
+                logical_exports.join("Album-unavailable.jpg"),
+                ExportWriteAuthorization::CreateOnly,
                 sheet_id.clone(),
-                300,
                 vec![source.clone()],
             ),
         )
         .expect("the unavailable UNC Export is planned");
         let unavailable_bindings = root_bindings(&unavailable_plan.required_paths());
         let unavailable_operational_output = unavailable_bindings
-            .resolve(&logical_exports.join("Album-unavailable.png"))
+            .resolve(&logical_exports.join("Album-unavailable.jpg"))
             .expect("the unavailable output has a frozen UNC binding");
         let unavailable_log_directory = local_sidecar_root.join("unavailable-logs");
 
@@ -617,8 +625,8 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             export_pipeline::ExportOptions::new(
                 request_id,
                 output_path.clone(),
+                ExportWriteAuthorization::CreateOnly,
                 sheet_id,
-                300,
                 vec![source],
             ),
         )

@@ -1,3 +1,4 @@
+mod cache_activity_gate;
 #[cfg(test)]
 mod cache_engine;
 mod desktop_webview_policy;
