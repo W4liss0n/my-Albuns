@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::cache::CacheCompletion;
-use crate::command::ImagingFailureStage;
+use crate::command::{ImagingFailure, ImagingFailureCode, ImagingPathCode};
 use crate::render::RenderCompletion;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -21,7 +21,8 @@ pub enum ImagingResponse {
     },
     Failed {
         request_id: String,
-        stage: ImagingFailureStage,
+        #[serde(flatten)]
+        failure: ImagingFailure,
     },
 }
 
@@ -40,10 +41,19 @@ impl ImagingResponse {
         }
     }
 
-    pub fn failed(request_id: impl Into<String>, stage: ImagingFailureStage) -> Self {
+    pub fn failed<M: Into<String>>(
+        request_id: impl Into<String>,
+        code: ImagingFailureCode,
+        media_id: Option<M>,
+        path_code: Option<ImagingPathCode>,
+    ) -> Self {
         Self::Failed {
             request_id: request_id.into(),
-            stage,
+            failure: ImagingFailure {
+                code,
+                media_id: media_id.map(Into::into),
+                path_code,
+            },
         }
     }
 
@@ -67,9 +77,12 @@ impl ImagingResponse {
         }
     }
 
-    pub fn failure_for(&self, expected_request_id: &str) -> Option<ImagingFailureStage> {
+    pub fn failure_for(&self, expected_request_id: &str) -> Option<ImagingFailure> {
         match self {
-            Self::Failed { request_id, stage } if request_id == expected_request_id => Some(*stage),
+            Self::Failed {
+                request_id,
+                failure,
+            } if request_id == expected_request_id => Some(failure.clone()),
             _ => None,
         }
     }

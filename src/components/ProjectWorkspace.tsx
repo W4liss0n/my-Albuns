@@ -159,10 +159,7 @@ export function ProjectWorkspace({
           exportPort={exportPort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
-          sheetId={
-            controller.canvasProps.focusedSheetId ??
-            controller.canvasProps.centeredSheetId
-          }
+          sheetId={controller.canvasProps.centeredSheetId}
         />
       </div>
 

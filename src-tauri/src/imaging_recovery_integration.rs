@@ -10,7 +10,7 @@ use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse, MediaSource,
-    encode_command,
+    RenderSource, encode_command,
 };
 use myalbuns_paths::{
     AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
@@ -52,7 +52,28 @@ fn root_bindings(paths: &[&Path]) -> RootBindingPlan {
     context.freeze()
 }
 
-struct RealProcessTransport {
+fn export_plan(
+    snapshot: myalbuns_core::RenderSnapshot,
+    request_id: &str,
+    output_path: PathBuf,
+    authorization: ExportWriteAuthorization,
+    sheet_id: String,
+    sources: Vec<RenderSource>,
+) -> export_pipeline::ExportPlan {
+    export_pipeline::plan(
+        snapshot,
+        export_pipeline::ExportOptions::new(
+            request_id,
+            output_path,
+            authorization,
+            sheet_id,
+            sources,
+        ),
+    )
+    .expect("the Exportação is planned")
+}
+
+pub(crate) struct RealProcessTransport {
     executable: PathBuf,
     log_directory: PathBuf,
     crash_next: CrashNext,
@@ -71,6 +92,10 @@ impl RealProcessTransport {
             partial_preparation_observed: false,
             cache_metadata_existed_after_failure: false,
         }
+    }
+
+    pub(crate) fn stable(executable: PathBuf, log_directory: PathBuf) -> Self {
+        Self::new(executable, log_directory, CrashNext::Never)
     }
 
     fn invoke_process(
@@ -396,13 +421,8 @@ fn real_processor_recovery_flows_through_production_modules() {
             .expect("the recovery frame contains a Photo")
             .media_id
             .clone();
-        let export_source = MediaSource::new(
-            export_media_id,
-            source.source_path().to_path_buf(),
-            source.source_bytes(),
-            source.source_sha256(),
-        )
-        .expect("the Export source matches the recovery frame");
+        let export_source = RenderSource::new(export_media_id, source.source_path().to_path_buf())
+            .expect("the source for Exportação matches the recovery Frame");
         let project_before = session
             .persisted_revision()
             .expect("the Project revision serializes before failure");
@@ -414,17 +434,14 @@ fn real_processor_recovery_flows_through_production_modules() {
         let failed_request_id = "export-real-failure";
         let failed_path_plan = ExportPathPlan::new(output_path.clone(), failed_request_id)
             .expect("the failed Export path is valid");
-        let failed_plan = export_pipeline::plan(
+        let failed_plan = export_plan(
             snapshot.clone(),
-            export_pipeline::ExportOptions::new(
-                failed_request_id,
-                output_path.clone(),
-                ExportWriteAuthorization::ReplaceConfirmed,
-                sheet_id.clone(),
-                vec![export_source.clone()],
-            ),
-        )
-        .expect("the failed Export is planned");
+            failed_request_id,
+            output_path.clone(),
+            ExportWriteAuthorization::ReplaceConfirmed,
+            sheet_id.clone(),
+            vec![export_source.clone()],
+        );
         let failed_bindings = root_bindings(&failed_plan.required_paths());
         let failed_context = InvocationContext::new(failed_request_id, Some(project_id.clone()));
         let mut failed_transport =
@@ -457,17 +474,14 @@ fn real_processor_recovery_flows_through_production_modules() {
         assert_eq!(project_sha256_after, project_sha256_before);
 
         let retry_request_id = "export-real-retry";
-        let retry_plan = export_pipeline::plan(
+        let retry_plan = export_plan(
             snapshot,
-            export_pipeline::ExportOptions::new(
-                retry_request_id,
-                output_path.clone(),
-                ExportWriteAuthorization::ReplaceConfirmed,
-                sheet_id,
-                vec![export_source],
-            ),
-        )
-        .expect("the explicit retry is planned");
+            retry_request_id,
+            output_path.clone(),
+            ExportWriteAuthorization::ReplaceConfirmed,
+            sheet_id,
+            vec![export_source],
+        );
         let retry_bindings = root_bindings(&retry_plan.required_paths());
         let retry_context = InvocationContext::new(retry_request_id, Some(project_id.clone()));
         let mut retry_transport =
@@ -560,26 +574,18 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             .expect("the Export frame contains a Photo")
             .media_id
             .clone();
-        let source = MediaSource::new(
-            media_id,
-            source.source_path().to_path_buf(),
-            source.source_bytes(),
-            source.source_sha256(),
-        )
-        .expect("the mapped source matches the Export frame");
+        let source = RenderSource::new(media_id, source.source_path().to_path_buf())
+            .expect("the mapped source matches the Frame used by Exportação");
         let output_path = logical_exports.join("Album-path-gate.jpg");
         let unavailable_request_id = "export-real-unc-unavailable";
-        let unavailable_plan = export_pipeline::plan(
+        let unavailable_plan = export_plan(
             snapshot.clone(),
-            export_pipeline::ExportOptions::new(
-                unavailable_request_id,
-                logical_exports.join("Album-unavailable.jpg"),
-                ExportWriteAuthorization::CreateOnly,
-                sheet_id.clone(),
-                vec![source.clone()],
-            ),
-        )
-        .expect("the unavailable UNC Export is planned");
+            unavailable_request_id,
+            logical_exports.join("Album-unavailable.jpg"),
+            ExportWriteAuthorization::CreateOnly,
+            sheet_id.clone(),
+            vec![source.clone()],
+        );
         let unavailable_bindings = root_bindings(&unavailable_plan.required_paths());
         let unavailable_operational_output = unavailable_bindings
             .resolve(&logical_exports.join("Album-unavailable.jpg"))
@@ -620,17 +626,14 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
 
         mapping.map_to(&unc_sidecar_root);
         let request_id = "export-real-unc-plan";
-        let plan = export_pipeline::plan(
+        let plan = export_plan(
             snapshot,
-            export_pipeline::ExportOptions::new(
-                request_id,
-                output_path.clone(),
-                ExportWriteAuthorization::CreateOnly,
-                sheet_id,
-                vec![source],
-            ),
-        )
-        .expect("the real UNC Export is planned");
+            request_id,
+            output_path.clone(),
+            ExportWriteAuthorization::CreateOnly,
+            sheet_id,
+            vec![source],
+        );
         let bindings = root_bindings(&plan.required_paths());
         let plan_wire = serde_json::to_vec(&bindings).expect("the frozen plan serializes");
         let plan_sha256 = format!("{:x}", Sha256::digest(&plan_wire));

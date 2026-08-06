@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Initialize-MyAlbunsToolchain
 
 Push-Location $script:WorkspaceRoot
+$previousTestProcessor = $env:MYALBUNS_TEST_IMAGING_PROCESSOR
 try {
     # Cargo 1.97 can rematerialize a stale top-level binary while testing the
     # complete workspace, even after an explicit build. Keep the processor out
@@ -22,9 +23,24 @@ try {
         exit $LASTEXITCODE
     }
 
+    $env:MYALBUNS_TEST_IMAGING_PROCESSOR = Join-Path `
+        $script:WorkspaceRoot `
+        'target\debug\myalbuns-imaging.exe'
+    & $script:CargoExecutable test `
+        -p myalbuns-desktop `
+        'project_host::tests::reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor' `
+        -- `
+        --ignored `
+        --exact `
+        --test-threads=1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & $script:CargoExecutable test -p myalbuns-imaging
     exit $LASTEXITCODE
 }
 finally {
+    $env:MYALBUNS_TEST_IMAGING_PROCESSOR = $previousTestProcessor
     Pop-Location
 }

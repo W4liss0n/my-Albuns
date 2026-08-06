@@ -1,5 +1,6 @@
 mod cache;
 mod jpeg_output;
+mod process_tree;
 mod render;
 mod source;
 
@@ -9,16 +10,14 @@ use std::{
 };
 
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureStage, ImagingProgress,
-    ImagingProgressStage, ImagingRequest, ImagingResponse, decode_command, encode_event,
-    root_binding_plan_sha256,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureCode,
+    ImagingFailureStage, ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest,
+    ImagingResponse, decode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
 };
 use myalbuns_paths::AppPaths;
-
-use render::RenderFailure;
 
 struct ProcessFailure {
     stage: Option<ImagingFailureStage>,
@@ -30,18 +29,18 @@ impl From<String> for ProcessFailure {
     }
 }
 
-impl From<RenderFailure> for ProcessFailure {
-    fn from(failure: RenderFailure) -> Self {
-        Self {
-            stage: Some(failure.stage),
-        }
-    }
-}
-
 fn main() -> ExitCode {
-    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
+    let mode = std::env::args_os().nth(1);
+    if mode.as_deref() == Some(std::ffi::OsStr::new(source::JPEG_WORKER_MODE)) {
+        return source::run_jpeg_worker(std::env::args_os().nth(2));
+    }
+    if mode.as_deref() == Some(std::ffi::OsStr::new("--protocol-version")) {
         println!("{IMAGING_PROTOCOL_VERSION}");
         return ExitCode::SUCCESS;
+    }
+    if let Err(error) = process_tree::install_descendant_cleanup_on_exit() {
+        eprintln!("ciclo de vida do Processador indisponível: {error}");
+        return ExitCode::FAILURE;
     }
 
     let process_role = ProcessRole::Imaging;
@@ -134,7 +133,8 @@ fn cache_failure(_: String) -> ProcessFailure {
 
 fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
     let operation_id = safe_log_identifier(&request.request_id);
-    let project_id = Option::<&str>::None;
+    let project_id = safe_log_identifier(&request.project_id);
+    let revision = request.revision;
     if request.validate().is_err() {
         tracing::warn!(
             target: "myalbuns.imaging",
@@ -142,6 +142,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
+            revision,
             event = "imaging_request_rejected",
         );
         if operation_id.is_none() {
@@ -151,7 +152,9 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         }
         write_response(&ImagingResponse::failed(
             request.request_id,
-            ImagingFailureStage::InvalidRenderRequest,
+            ImagingFailureCode::InvalidRenderRequest,
+            None::<String>,
+            None,
         ))?;
         return Ok(());
     }
@@ -163,6 +166,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        revision,
         process_id = std::process::id(),
         root_binding_plan_sha256,
         event = "imaging_request_started",
@@ -181,10 +185,19 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
                 protocol_version = request.protocol_version,
                 operation_id,
                 project_id,
-                stage = failure.stage.as_str(),
+                revision,
+                stage = failure.failure.code.stage().as_str(),
+                failure_code = failure.failure.code.as_str(),
+                path_code = failure.failure.path_code.map(ImagingPathCode::as_str),
+                reason = failure.message.as_str(),
                 event = "imaging_render_failed",
             );
-            write_response(&ImagingResponse::failed(request.request_id, failure.stage))?;
+            write_response(&ImagingResponse::failed(
+                request.request_id,
+                failure.failure.code,
+                failure.failure.media_id,
+                failure.failure.path_code,
+            ))?;
             return Ok(());
         }
     };
@@ -196,6 +209,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
             protocol_version = request.protocol_version,
             operation_id,
             project_id,
+            revision,
             event = "imaging_response_write_failed",
         );
     })?;
@@ -205,6 +219,7 @@ fn run_render(request: ImagingRequest) -> Result<(), ProcessFailure> {
         protocol_version = request.protocol_version,
         operation_id,
         project_id,
+        revision,
         process_id = std::process::id(),
         root_binding_plan_sha256,
         event = "imaging_request_completed",

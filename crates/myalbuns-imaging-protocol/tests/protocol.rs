@@ -3,12 +3,14 @@ use std::path::PathBuf;
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingEvent, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingRequest,
-    ImagingResponse, MediaSource, RenderCompletion, decode_command, decode_event_stream,
+    ImagingEvent, ImagingEventStreamDecoder, ImagingFailureCode, ImagingFailureStage,
+    ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest, ImagingResponse,
+    MediaSource, RenderCompletion, RenderSource, decode_command, decode_event_stream,
     encode_command, encode_event, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
-    AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, RootBindingPlan,
+    AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, ResolveError,
+    RootBindingPlan,
 };
 
 #[path = "../../../tests/support/sample_project.rs"]
@@ -59,12 +61,36 @@ fn imaging_failure_stages_have_stable_process_exit_codes() {
 }
 
 #[test]
+fn imaging_path_codes_centralize_resolver_and_io_taxonomy() {
+    assert_eq!(
+        ImagingPathCode::from_resolve_error(ResolveError::NotFound),
+        ImagingPathCode::NotFound
+    );
+    assert_eq!(
+        ImagingPathCode::from_resolve_error(ResolveError::UnsupportedNamespace),
+        ImagingPathCode::InvalidPath
+    );
+    assert_eq!(
+        ImagingPathCode::from_io_error(&std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+        ImagingPathCode::AccessDenied
+    );
+    assert_eq!(
+        ImagingPathCode::from_io_error(&std::io::Error::from(std::io::ErrorKind::TimedOut)),
+        ImagingPathCode::Unavailable
+    );
+}
+
+#[test]
 fn deterministic_failure_is_one_correlated_terminal_even_mid_progress() {
     let progress =
         ImagingProgress::new("render-failed", ImagingProgressStage::LoadingSources, 0, 1)
             .expect("the partial progress is valid");
-    let failure =
-        ImagingResponse::failed("render-failed", ImagingFailureStage::ResourceLimitExceeded);
+    let failure = ImagingResponse::failed(
+        "render-failed",
+        ImagingFailureCode::ResourceLimitExceeded,
+        Some("media-42"),
+        Some(ImagingPathCode::Unavailable),
+    );
     let mut stream =
         encode_event(&ImagingEvent::Progress(progress.clone())).expect("progress serializes");
     stream.extend(
@@ -76,7 +102,11 @@ fn deterministic_failure_is_one_correlated_terminal_even_mid_progress() {
     assert_eq!(decoded_progress, vec![progress]);
     assert_eq!(
         decoded_terminal.failure_for("render-failed"),
-        Some(ImagingFailureStage::ResourceLimitExceeded)
+        Some(myalbuns_imaging_protocol::ImagingFailure {
+            code: ImagingFailureCode::ResourceLimitExceeded,
+            media_id: Some("media-42".into()),
+            path_code: Some(ImagingPathCode::Unavailable),
+        })
     );
     assert_eq!(decoded_terminal.failure_for("another"), None);
     assert_eq!(decoded_terminal, failure);
@@ -84,13 +114,65 @@ fn deterministic_failure_is_one_correlated_terminal_even_mid_progress() {
     stream.extend(
         encode_event(&ImagingEvent::Response(ImagingResponse::failed(
             "render-failed",
-            ImagingFailureStage::Composition,
+            ImagingFailureCode::CompositionFailed,
+            None::<String>,
+            None,
         )))
         .expect("the duplicate terminal fixture serializes"),
     );
     assert!(
         decode_event_stream(&stream).is_err(),
         "the stream rejects a second terminal"
+    );
+}
+
+#[test]
+fn terminal_absence_malformed_payload_and_other_attempt_are_protocol_failures() {
+    let absent = ImagingEventStreamDecoder::for_request("render-current")
+        .expect("the expected correlation is valid");
+    assert!(absent.finish().is_err(), "a terminal is mandatory");
+
+    let mut malformed = ImagingEventStreamDecoder::for_request("render-current")
+        .expect("the expected correlation is valid");
+    assert!(
+        malformed.push(b"{not-json}\n").is_err(),
+        "a malformed terminal is rejected"
+    );
+
+    let other_attempt = ImagingResponse::failed(
+        "render-previous",
+        ImagingFailureCode::CompositionFailed,
+        None::<String>,
+        None,
+    );
+    let payload = encode_event(&ImagingEvent::Response(other_attempt))
+        .expect("the other attempt terminal serializes");
+    let mut correlated = ImagingEventStreamDecoder::for_request("render-current")
+        .expect("the expected correlation is valid");
+    assert!(
+        correlated.push(&payload).is_err(),
+        "a terminal from another attempt is rejected"
+    );
+}
+
+#[test]
+fn deterministic_failure_serializes_stable_code_and_optional_context() {
+    let response = ImagingResponse::failed(
+        "render-profile",
+        ImagingFailureCode::UnsupportedColorProfile,
+        Some("overlay-01"),
+        Some(ImagingPathCode::AccessDenied),
+    );
+
+    assert_eq!(
+        serde_json::to_value(response).expect("the terminal serializes"),
+        serde_json::json!({
+            "kind": "failed",
+            "requestId": "render-profile",
+            "code": "unsupportedColorProfile",
+            "mediaId": "overlay-01",
+            "pathCode": "accessDenied"
+        })
     );
 }
 
@@ -106,25 +188,13 @@ fn host_and_processor_share_one_serialized_protocol() {
     let prepared_output_path =
         PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.jpg");
     let sources = vec![
-        MediaSource::new(
-            "media-costa",
-            PathBuf::from(r"C:\Photos\costa.jpg"),
-            1024,
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        )
-        .expect("the first native source is valid"),
-        MediaSource::new(
-            "media-campo",
-            PathBuf::from(r"C:\Photos\campo.jpg"),
-            2048,
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        )
-        .expect("the second native source is valid"),
-        MediaSource::new(
+        RenderSource::new("media-costa", PathBuf::from(r"C:\Photos\costa.jpg"))
+            .expect("the first native source is valid"),
+        RenderSource::new("media-campo", PathBuf::from(r"C:\Photos\campo.jpg"))
+            .expect("the second native source is valid"),
+        RenderSource::new(
             "decorative-overlay",
             PathBuf::from(r"C:\Photos\overlay.png"),
-            512,
-            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         )
         .expect("the Decorative source is valid"),
     ];
@@ -143,6 +213,8 @@ fn host_and_processor_share_one_serialized_protocol() {
         .expect("the selected sheet becomes one self-contained output unit");
     let request = ImagingRequest::new(
         "render-42",
+        snapshot.project_id.clone(),
+        snapshot.revision,
         NativePathDto::from(prepared_output_path),
         unit,
         snapshot.dpi,
@@ -166,6 +238,14 @@ fn host_and_processor_share_one_serialized_protocol() {
         IMAGING_PROTOCOL_VERSION
     );
     assert_eq!(request_json["request"]["requestId"], "render-42");
+    assert_eq!(
+        request_json["request"]["projectId"], snapshot.project_id,
+        "the frozen Identidade do Projeto remains opaque render context"
+    );
+    assert_eq!(
+        request_json["request"]["revision"], snapshot.revision,
+        "the visible Revisão crosses the process boundary with its composition"
+    );
     assert_eq!(
         request_json["request"]["preparedOutputPath"]["encoding"],
         "windowsUtf16"
@@ -192,6 +272,18 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert_eq!(
         request_json["request"]["sources"][0]["mediaId"],
         "media-costa"
+    );
+    assert!(
+        request_json["request"]["sources"][0]
+            .get("sourceBytes")
+            .is_none(),
+        "The Processador opens and validates the original instead of receiving a Host measurement"
+    );
+    assert!(
+        request_json["request"]["sources"][0]
+            .get("sourceSha256")
+            .is_none(),
+        "The Processador must not require the Host to read and hash the original first"
     );
     assert_eq!(
         request_json["request"]["rootBindings"]["bindings"][0]["kind"],
@@ -251,6 +343,8 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert!(
         ImagingRequest::new(
             r"C:\private\operation",
+            request.project_id.clone(),
+            request.revision,
             NativePathDto::from(PathBuf::from(
                 r"C:\Temp\.myalbuns-export-invalid.tmp\invalid.jpg",
             )),

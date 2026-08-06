@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io::{BufReader, Read},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{
         Mutex,
         atomic::{AtomicBool, Ordering},
@@ -10,8 +10,8 @@ use std::{
 
 use myalbuns_core::{ComposedOutputUnit, RenderSnapshot};
 use myalbuns_imaging_protocol::{
-    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailureStage, ImagingProgress,
-    ImagingProgressStage, ImagingRequest, MediaSource, RenderCompletion, has_jpeg_extension,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingProgress,
+    ImagingProgressStage, ImagingRequest, RenderCompletion, RenderSource, has_jpeg_extension,
     validate_render_content,
 };
 use myalbuns_logging::ProcessRole;
@@ -23,17 +23,18 @@ use sha2::{Digest, Sha256};
 use tokio::sync::Notify;
 
 use crate::imaging_processor::{
-    ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
-    InvocationFailureStage, OperationFailure,
+    ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
+    InvocationFailureStage,
 };
-
 #[derive(Debug)]
 pub(crate) struct ExportPlan {
     unit: ComposedOutputUnit,
     dpi: u32,
+    project_id: String,
+    revision: u64,
     request_id: String,
     path_plan: ExportPathPlan,
-    sources: Vec<MediaSource>,
+    sources: Vec<RenderSource>,
 }
 
 #[derive(Clone, Debug)]
@@ -42,7 +43,7 @@ pub(crate) struct ExportOptions {
     output_path: PathBuf,
     authorization: ExportWriteAuthorization,
     sheet_id: String,
-    sources: Vec<MediaSource>,
+    sources: Vec<RenderSource>,
 }
 
 impl ExportOptions {
@@ -51,7 +52,7 @@ impl ExportOptions {
         output_path: PathBuf,
         authorization: ExportWriteAuthorization,
         sheet_id: impl Into<String>,
-        sources: Vec<MediaSource>,
+        sources: Vec<RenderSource>,
     ) -> Self {
         Self {
             request_id: request_id.into(),
@@ -64,10 +65,10 @@ impl ExportOptions {
 }
 
 impl ExportPlan {
-    pub(crate) fn required_paths(&self) -> Vec<&Path> {
+    pub(crate) fn required_paths(&self) -> Vec<&std::path::Path> {
         let mut paths = Vec::with_capacity(self.sources.len() + 1);
         paths.push(self.path_plan.output_path());
-        paths.extend(self.sources.iter().map(MediaSource::source_path));
+        paths.extend(self.sources.iter().map(RenderSource::source_path));
         paths
     }
 
@@ -159,7 +160,49 @@ impl ExportFailureStage {
     }
 }
 
-pub(crate) type ExportFailure = OperationFailure<ExportFailureStage>;
+#[derive(Debug)]
+pub(crate) struct ExportFailure {
+    pub(crate) stage: ExportFailureStage,
+    pub(crate) exit_code: Option<i32>,
+    pub(crate) message: String,
+    pub(crate) processor_failure: Option<ImagingFailure>,
+}
+
+impl ExportFailure {
+    pub(crate) fn new(stage: ExportFailureStage, message: impl Into<String>) -> Self {
+        Self {
+            stage,
+            exit_code: None,
+            message: message.into(),
+            processor_failure: None,
+        }
+    }
+
+    fn from_invocation(
+        failure: InvocationFailure,
+        map_stage: impl FnOnce(InvocationFailureStage) -> ExportFailureStage,
+    ) -> Self {
+        Self {
+            stage: map_stage(failure.stage),
+            exit_code: failure.exit_code,
+            message: failure.message,
+            processor_failure: None,
+        }
+    }
+
+    fn from_processor(
+        stage: ExportFailureStage,
+        failure: ImagingFailure,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            stage,
+            exit_code: None,
+            message: message.into(),
+            processor_failure: Some(failure),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ExportCancellationResult {
@@ -334,6 +377,8 @@ pub(crate) fn plan(
     Ok(ExportPlan {
         unit,
         dpi: snapshot.dpi,
+        project_id: snapshot.project_id,
+        revision: snapshot.revision,
         request_id,
         path_plan,
         sources,
@@ -444,6 +489,8 @@ async fn prepare_export<T: ImagingTransport>(
     let ExportPlan {
         unit,
         dpi,
+        project_id,
+        revision,
         request_id,
         path_plan,
         sources,
@@ -457,6 +504,8 @@ async fn prepare_export<T: ImagingTransport>(
     let execution_path_plan = bind_execution_paths(&path_plan, root_bindings, &request_id)?;
     let request = ImagingRequest::new(
         request_id,
+        project_id,
+        revision,
         NativePathDto::from(path_plan.prepared_output_path()),
         unit,
         dpi,
@@ -530,10 +579,13 @@ async fn prepare_export<T: ImagingTransport>(
         }
     };
     ensure_not_cancelled(control)?;
-    if let Some(stage) = response.failure_for(&request.request_id) {
-        return Err(ExportFailure::new(
+    if let Some(failure) = response.failure_for(&request.request_id) {
+        let stage = failure.code.stage();
+        let message = processor_failure_message(failure.code);
+        return Err(ExportFailure::from_processor(
             ExportFailureStage::Processor(InvocationFailureStage::Processor(stage)),
-            processor_failure_message(stage),
+            failure,
+            message,
         ));
     }
     let Some(completion) = response.completed_for(&request.request_id).cloned() else {
@@ -558,29 +610,35 @@ async fn prepare_export<T: ImagingTransport>(
     })
 }
 
-fn processor_failure_message(stage: ImagingFailureStage) -> &'static str {
-    match stage {
-        ImagingFailureStage::InvalidRenderRequest => {
+fn processor_failure_message(code: ImagingFailureCode) -> &'static str {
+    match code {
+        ImagingFailureCode::InvalidRenderRequest => {
             "A solicitação de Exportação não corresponde ao contrato do Processador."
         }
-        ImagingFailureStage::CacheProcessing => {
-            "O Processador encontrou uma falha interna de Cache durante a Exportação."
+        ImagingFailureCode::SourceUnavailable => {
+            "Uma fonte original necessária não está disponível para a Exportação."
         }
-        ImagingFailureStage::ResourceLimitExceeded => {
+        ImagingFailureCode::UnsupportedSourceFormat => {
+            "Uma fonte original não usa JPEG ou PNG estático aceito neste fluxo."
+        }
+        ImagingFailureCode::UnsupportedSourceVariant => {
+            "Uma fonte original usa uma variante de imagem não aceita neste fluxo."
+        }
+        ImagingFailureCode::UnsupportedColorModel => {
+            "Uma fonte original usa um modelo de cor não aceito neste fluxo."
+        }
+        ImagingFailureCode::UnsupportedColorProfile => {
+            "Uma fonte original contém um perfil de cor não permitido ou malformado."
+        }
+        ImagingFailureCode::DecodeFailed => {
+            "Uma fonte original permitida não pôde ser decodificada para a Exportação."
+        }
+        ImagingFailureCode::CompositionFailed => "A composição da Lâmina não pôde ser concluída.",
+        ImagingFailureCode::ResourceLimitExceeded => {
             "A Exportação excede o limite seguro de recursos desta versão."
         }
-        ImagingFailureStage::SourceVerification => {
-            "Uma fonte original não pôde ser verificada para a Exportação."
-        }
-        ImagingFailureStage::SourceDecode => {
-            "Uma fonte original não pôde ser decodificada para a Exportação."
-        }
-        ImagingFailureStage::Composition => "A composição da Lâmina não pôde ser concluída.",
-        ImagingFailureStage::OutputPrepare => {
-            "O arquivo temporário da Exportação não pôde ser preparado."
-        }
-        ImagingFailureStage::OutputEncode => "O JPEG não pôde ser codificado.",
-        ImagingFailureStage::OutputVerify => {
+        ImagingFailureCode::EncodeFailed => "O JPEG não pôde ser codificado e sincronizado.",
+        ImagingFailureCode::VerificationFailed => {
             "O JPEG preparado não passou pela verificação de integridade."
         }
     }

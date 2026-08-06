@@ -9,8 +9,8 @@ use std::{
 use image::{ImageFormat, Rgb, RgbImage};
 use myalbuns_core::ProjectCore;
 use myalbuns_imaging_protocol::{
-    ImagingCommand, ImagingFailureStage, ImagingProgress, ImagingProgressStage, ImagingResponse,
-    MediaSource, RenderCompletion, decode_command, encode_command,
+    ImagingCommand, ImagingFailureCode, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
+    ImagingResponse, RenderCompletion, RenderSource, decode_command, encode_command,
 };
 use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext, RootBindingPlan};
 use sha2::{Digest, Sha256};
@@ -250,15 +250,8 @@ fn export_plan_with_authorization(
         })
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the test original is written");
-        let source_bytes = std::fs::read(&source_path).expect("the test original is readable");
         sources.push(
-            MediaSource::new(
-                media_id,
-                source_path,
-                source_bytes.len() as u64,
-                format!("{:x}", Sha256::digest(&source_bytes)),
-            )
-            .expect("the test original source is valid"),
+            RenderSource::new(media_id, source_path).expect("the test original source is valid"),
         );
     }
     plan(
@@ -313,6 +306,51 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
     .expect_err("an Export without linked originals is rejected");
 
     assert_eq!(failure.stage, ExportFailureStage::Plan);
+}
+
+#[test]
+fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
+    let source = SampleProject::Horizon
+        .persisted_source(2)
+        .expect("the sample Projeto serializes");
+    let snapshot = ProjectCore::new()
+        .open_demo_editable_session(&source)
+        .expect("the sample Projeto opens")
+        .render_snapshot();
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let root = tempfile::tempdir().expect("temporary dependency-plan fixture");
+    let sources = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .enumerate()
+        .map(|(index, media_id)| {
+            RenderSource::new(
+                media_id.to_owned(),
+                root.path().join(format!("planned-{index}.jpg")),
+            )
+            .expect("the planned source descriptor is valid")
+        })
+        .collect::<Vec<_>>();
+    let planned = plan(
+        snapshot,
+        ExportOptions::new(
+            "dependency-plan",
+            root.path().join("Album.jpg"),
+            ExportWriteAuthorization::CreateOnly,
+            sheet_id,
+            sources.clone(),
+        ),
+    )
+    .expect("planning needs identities and paths but no source I/O");
+    assert_eq!(planned.sources, sources);
+    assert!(
+        planned
+            .sources
+            .iter()
+            .all(|source| !source.source_path().exists()),
+        "planning freezes descriptors without opening their originals"
+    );
 }
 
 #[test]
@@ -623,7 +661,9 @@ fn a_known_processor_failure_uses_the_structured_terminal_without_an_exit_code()
             prepared_bytes: b"incomplete".to_vec(),
             result: Some(Ok(ImagingResponse::failed(
                 "export-known-failure",
-                ImagingFailureStage::OutputEncode,
+                ImagingFailureCode::EncodeFailed,
+                None::<String>,
+                None,
             ))),
             invocations: 0,
         };

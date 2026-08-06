@@ -18,14 +18,42 @@ pub enum ExportCommandErrorCode {
     Conflict,
     ExportConflict,
     PublicationFailed,
+    InvalidRenderRequest,
+    SourceUnavailable,
+    UnsupportedSourceFormat,
+    UnsupportedSourceVariant,
+    UnsupportedColorModel,
+    UnsupportedColorProfile,
+    DecodeFailed,
+    CompositionFailed,
+    ResourceLimitExceeded,
+    EncodeFailed,
+    VerificationFailed,
     Failed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportPathCode {
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidPath,
+    UnexpectedObjectType,
+    Conflict,
+    IoFailure,
 }
 
 #[derive(Debug, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(optional_fields)]
 pub struct ExportCommandError {
     pub(crate) code: ExportCommandErrorCode,
     pub(crate) message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) media_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) path_code: Option<ExportPathCode>,
 }
 
 #[derive(Serialize, TS)]
