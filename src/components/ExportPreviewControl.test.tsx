@@ -93,12 +93,12 @@ test("waits for the started event before showing progress", async () => {
   expect(
     screen.getByRole("dialog", { name: "Exportando" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("Iniciando a exportação")).toBeInTheDocument();
+  expect(screen.getByText("Iniciando a Exportação")).toBeInTheDocument();
   expect(screen.getByRole("progressbar")).not.toHaveAttribute(
     "aria-valuenow",
   );
   expect(
-    screen.queryByRole("button", { name: "Cancelar exportação" }),
+    screen.queryByRole("button", { name: "Cancelar Exportação" }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText(/ de /)).not.toBeInTheDocument();
 });
@@ -189,7 +189,7 @@ test("projects progress and follows the backend cancellation declaration", async
   expect(screen.getByText("2 de 5")).toBeInTheDocument();
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
   expect(
-    screen.getByRole("button", { name: "Cancelar exportação" }),
+    screen.getByRole("button", { name: "Cancelar Exportação" }),
   ).toBeInTheDocument();
 
   act(() => {
@@ -202,7 +202,7 @@ test("projects progress and follows the backend cancellation declaration", async
   });
 
   expect(
-    screen.queryByRole("button", { name: "Cancelar exportação" }),
+    screen.queryByRole("button", { name: "Cancelar Exportação" }),
   ).not.toBeInTheDocument();
 
   act(() => {
@@ -216,7 +216,7 @@ test("projects progress and follows the backend cancellation declaration", async
 
   expect(screen.getByText("Publicando a prova")).toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Cancelar exportação" }),
+    screen.getByRole("button", { name: "Cancelar Exportação" }),
   ).toBeInTheDocument();
 });
 
@@ -252,7 +252,7 @@ test("requests cancellation once and waits for completion before showing feedbac
   });
 
   const cancelButton = screen.getByRole("button", {
-    name: "Cancelar exportação",
+    name: "Cancelar Exportação",
   });
   await user.click(cancelButton);
   await user.click(cancelButton);

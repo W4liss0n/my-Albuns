@@ -35,6 +35,12 @@ const decorativePickerFallbackFailure: ProjectLaunchFailure = {
   action: "Tente novamente.",
 };
 
+const graphicsGateFallbackFailure: ProjectLaunchFailure = {
+  code: "graphics_gate_unavailable",
+  message: "Não foi possível confirmar o requisito gráfico do editor.",
+  action: "Reinicie o MyAlbuns e tente novamente.",
+};
+
 const validationCodes = new Set<ProjectConfigurationValidationCode>(
   PROJECT_CONFIGURATION_VALIDATION_CODES,
 );
@@ -188,6 +194,21 @@ async function validateProjectConfiguration(
 }
 
 export const tauriGlobalProjectPort: GlobalProjectPort = {
+  completeGraphicsGate: async (supported) => {
+    try {
+      const result = await invoke<unknown>("complete_graphics_gate", {
+        report: { status: supported ? "supported" : "unsupported" },
+      });
+      return result === null
+        ? null
+        : toProjectLaunchOutcome(result, graphicsGateFallbackFailure);
+    } catch (error) {
+      return {
+        status: "failed",
+        error: toProjectLaunchFailure(error, graphicsGateFallbackFailure),
+      };
+    }
+  },
   validateProjectConfiguration: (configuration) =>
     validateProjectConfiguration(() =>
       invoke<unknown>("validate_project_configuration", { configuration }),

@@ -271,7 +271,7 @@ export function ExportPreviewControl({
                 <>
                   <progress
                     className="export-preview-progress"
-                    aria-label="Progresso da exportação"
+                    aria-label="Progresso da Exportação"
                     aria-valuemax={progress.units.totalUnits}
                     aria-valuenow={progress.units.completedUnits}
                     max={progress.units.totalUnits}
@@ -285,16 +285,16 @@ export function ExportPreviewControl({
               ) : (
                 <progress
                   className="export-preview-progress"
-                  aria-label="Progresso da exportação"
+                  aria-label="Progresso da Exportação"
                 />
               )}
             </>
           ) : (
             <>
-              <p aria-live="polite">Iniciando a exportação</p>
+              <p aria-live="polite">Iniciando a Exportação</p>
               <progress
                 className="export-preview-progress"
-                aria-label="Progresso da exportação"
+                aria-label="Progresso da Exportação"
               />
             </>
           )}
@@ -307,7 +307,7 @@ export function ExportPreviewControl({
               >
                 {cancelRequested
                   ? "Cancelando…"
-                  : "Cancelar exportação"}
+                  : "Cancelar Exportação"}
               </button>
             </div>
           )}
@@ -324,7 +324,7 @@ export function ExportPreviewControl({
         >
           <p>
             {phase === "cancelled"
-              ? "A exportação foi cancelada."
+              ? "A Exportação foi cancelada."
               : failureMessage ??
                 "Não foi possível exportar a prova."}
           </p>

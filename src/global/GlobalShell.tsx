@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { GraphicsDiagnostic } from "../application/graphics";
+import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
   OpenProjectFailure,
@@ -9,10 +11,14 @@ import type {
 import { NewProjectFlow } from "./NewProjectFlow";
 
 interface GlobalShellProps {
+  graphicsDiagnostic: GraphicsDiagnostic;
   projectPort: GlobalProjectPort;
 }
 
-export function GlobalShell({ projectPort }: GlobalShellProps) {
+export function GlobalShell({
+  graphicsDiagnostic,
+  projectPort,
+}: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [failure, setFailure] = useState<OpenProjectFailure | null>(null);
@@ -20,6 +26,19 @@ export function GlobalShell({ projectPort }: GlobalShellProps) {
     readonly RecentProjectSummary[]
   >([]);
   const openingAttempt = useRef(0);
+  const graphicsGateReported = useRef(false);
+
+  useEffect(() => {
+    if (graphicsGateReported.current) return;
+    graphicsGateReported.current = true;
+    void projectPort
+      .completeGraphicsGate(graphicsDiagnostic.supported)
+      .then((outcome) => {
+        if (outcome?.status === "failed") {
+          setFailure(outcome.error);
+        }
+      });
+  }, [graphicsDiagnostic.supported, projectPort]);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +85,10 @@ export function GlobalShell({ projectPort }: GlobalShellProps) {
     setFailure(null);
     setIsCreating(true);
   };
+
+  if (!graphicsDiagnostic.supported) {
+    return <SafeApplicationShell diagnostic={graphicsDiagnostic} />;
+  }
 
   return (
     <>

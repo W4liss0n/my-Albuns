@@ -9,16 +9,16 @@ use crate::{
     guarded_fs::{DirectoryGuard, GuardedFsError, ensure_direct_child, open_directory},
 };
 
-/// Namespace temporário usado para não misturar os dados deste desenvolvimento
-/// com os dados da versão anterior do MyAlbuns.
+/// Temporary namespace that keeps this development version's data separate
+/// from data belonging to the previous MyAlbuns version.
 ///
-/// A distribuição final voltará a usar `MyAlbuns` depois que a nova versão
-/// estiver concluída.
+/// The final distribution will return to `MyAlbuns` after the new version is
+/// complete.
 const TEMPORARY_APP_DIRECTORY_NAME: &str = "MyAlbuns2";
 
-/// Deriva uma representação opaca, estável e segura da Identidade do Projeto
-/// para diretórios internos. A Identidade permanece um valor de domínio livre
-/// de restrições de nome de arquivo; somente esta representação chega ao disco.
+/// Derives an opaque, stable, and safe representation of the Identidade do Projeto
+/// for internal directories. The Identidade remains a domain value free from
+/// file-name restrictions; only this representation reaches the filesystem.
 pub fn project_data_namespace(project_id: &str) -> String {
     opaque_data_key("project", project_id)
 }

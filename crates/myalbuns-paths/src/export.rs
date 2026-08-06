@@ -142,7 +142,7 @@ impl PreparedExportStorage {
         }
         let preparation_directory = self.plan.preparation_directory.clone();
         drop(self);
-        // Uma pasta vazia remanescente é órfã descartável e não desfaz a Publicação.
+        // A remaining empty directory is a disposable orphan and does not undo Publicação.
         let _ = fs::remove_dir(preparation_directory);
         Ok(())
     }

@@ -152,12 +152,19 @@ impl EditableProject {
     /// Creative mutations are added by the following vertical slices; this
     /// projection intentionally contains no content from the temporary demo.
     pub fn projection(&self) -> EditorProjection {
+        let project_name = self
+            .project_path()
+            .file_stem()
+            .map(|name| name.to_string_lossy().into_owned())
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "Projeto".into());
         persistent_projection::editor_projection(
             self.project_id(),
             self.revision(),
             self.saved_revision(),
             self.can_undo(),
             self.can_redo(),
+            &project_name,
             self.project(),
         )
     }
@@ -412,6 +419,36 @@ mod save_tests {
             .capture(path)
             .expect("the test Project root is captured");
         ProjectLocation::new(path.to_path_buf(), context.freeze())
+    }
+
+    #[test]
+    fn projection_and_render_snapshot_derive_the_non_ascii_project_name_from_its_native_path() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let project_path = directory.path().join("Casamento da Júlia.myalbuns");
+        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let project = core
+            .create_editable(CreateProjectRequest::new(
+                location(&project_path),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the named Project opens");
+
+        assert_eq!(project.project_path(), project_path);
+        assert_eq!(
+            project.projection().state.project_name,
+            "Casamento da Júlia"
+        );
+        assert_eq!(project.render_snapshot().project_name, "Casamento da Júlia");
+
+        drop(project);
+        let reopened = core
+            .open_editable(OpenProjectRequest::new(location(&project_path)))
+            .expect("the named Project reopens");
+        assert_eq!(
+            reopened.projection().state.project_name,
+            "Casamento da Júlia"
+        );
     }
 
     #[test]

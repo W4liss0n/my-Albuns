@@ -10,14 +10,11 @@ import type { EditorProjection } from "../domain/project";
 import type { ProjectCloseChoice as IpcProjectCloseChoice } from "./generated/ProjectCloseChoice";
 import type { ProjectCloseRequestOutcome as IpcProjectCloseRequestOutcome } from "./generated/ProjectCloseRequestOutcome";
 import type { ProjectCloseResolution as IpcProjectCloseResolution } from "./generated/ProjectCloseResolution";
+import { isIpcRecord } from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
 
 export const PROJECT_CLOSE_CONFIRMATION_EVENT =
   "myalbuns://project-close-confirmation-requested";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
   const actual = Object.keys(value).sort();
@@ -29,8 +26,8 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]) {
 
 function isProjection(value: unknown): value is EditorProjection {
   return (
-    isRecord(value) &&
-    isRecord(value.state) &&
+    isIpcRecord(value) &&
+    isIpcRecord(value.state) &&
     typeof value.state.projectId === "string" &&
     Number.isSafeInteger(value.state.revision)
   );
@@ -45,7 +42,7 @@ function invalidCloseResponse() {
 
 function parseCloseRequestOutcome(value: unknown): IpcProjectCloseRequestOutcome {
   if (
-    !isRecord(value) ||
+    !isIpcRecord(value) ||
     !hasOnlyKeys(value, ["kind"]) ||
     (value.kind !== "closed" && value.kind !== "confirmationRequired")
   ) {
@@ -55,7 +52,7 @@ function parseCloseRequestOutcome(value: unknown): IpcProjectCloseRequestOutcome
 }
 
 function parseCloseResolution(value: unknown): IpcProjectCloseResolution {
-  if (!isRecord(value) || typeof value.kind !== "string") {
+  if (!isIpcRecord(value) || typeof value.kind !== "string") {
     throw invalidCloseResponse();
   }
   if (value.kind === "closed" && hasOnlyKeys(value, ["kind"])) {

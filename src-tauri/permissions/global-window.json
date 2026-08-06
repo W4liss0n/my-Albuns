@@ -2,9 +2,10 @@
   "permission": [
     {
       "identifier": "global-window-commands",
-      "description": "Permite validar, criar ou abrir Projetos, selecionar Imagens decorativas provisórias e consultar o estado local da Tela de Boas-vindas.",
+      "description": "Allows validating, creating, or opening Projetos, selecting provisional Imagens decorativas, and reading local Tela de Boas-vindas state.",
       "commands": {
         "allow": [
+          "complete_graphics_gate",
           "create_project",
           "open_project",
           "recent_projects",

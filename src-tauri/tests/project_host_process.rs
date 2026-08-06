@@ -29,6 +29,7 @@ use windows_sys::Win32::{
 const PROJECT_HOST_ARGUMENT: &str = "--myalbuns-project-host";
 const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
 const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
+const PROCESS_GATE_GRAPHICS_SUPPORTED_ENV: &str = "MYALBUNS_PROCESS_GATE_GRAPHICS_SUPPORTED";
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 const STILL_ACTIVE: u32 = 259;
 
@@ -92,6 +93,37 @@ fn real_host_process_creates_and_owns_the_requested_project_configuration() {
     assert_configured_project(&reopened, &fixture);
 }
 
+#[test]
+fn real_global_process_rejects_graphics_before_starting_a_host_or_session() {
+    let fixture = ProjectFixture::new("gate-grafico-reprovado");
+    let mut global = ChildGuard::spawn(
+        Command::new(desktop_binary())
+            .arg(&fixture.project_path)
+            .env(PROCESS_GATE_ROOT_ENV, &fixture.process_data_root)
+            .env(PROCESS_GATE_HEADLESS_ENV, "1")
+            .env(PROCESS_GATE_GRAPHICS_SUPPORTED_ENV, "0")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null()),
+    );
+    let global_pid = global.id();
+    let deadline = Instant::now() + Duration::from_secs(2);
+
+    while Instant::now() < deadline {
+        assert!(
+            project_host_child_of(global_pid).is_none(),
+            "the graphics gate must reject the direct opening before a Project Host exists"
+        );
+        let project = fixture
+            .try_open()
+            .expect("the rejected gate must not retain an editable Project lock");
+        drop(project);
+        thread::sleep(Duration::from_millis(50));
+    }
+
+    global.terminate();
+}
+
 fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {
     let attempt_id = format!("gate-attempt-{}", uuid::Uuid::new_v4().simple());
     let launch_nonce = uuid::Uuid::new_v4().simple().to_string();
@@ -127,6 +159,7 @@ fn prove_host_outlives_the_global_parent(fixture: &ProjectFixture) {
             .arg(&fixture.project_path)
             .env(PROCESS_GATE_ROOT_ENV, &fixture.process_data_root)
             .env(PROCESS_GATE_HEADLESS_ENV, "1")
+            .env(PROCESS_GATE_GRAPHICS_SUPPORTED_ENV, "1")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null()),

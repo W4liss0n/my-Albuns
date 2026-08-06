@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
 import App from "./App";
@@ -63,8 +62,7 @@ const canvasGraphicsDiagnosticProbe = () =>
     },
   }) as const;
 
-test("keeps diagnostics available when hardware WebGL2 is unavailable", async () => {
-  const user = userEvent.setup();
+test("reports a defensive Project Canvas failure without claiming that no Session exists", async () => {
   const load = vi.fn(async () => projection);
   const prepareMediaPreviews = vi.fn(async () => null);
   render(
@@ -86,32 +84,15 @@ test("keeps diagnostics available when hardware WebGL2 is unavailable", async ()
   );
 
   expect(
-    await screen.findByRole("heading", { name: "Boas-vindas" }),
+    await screen.findByRole("heading", {
+      name: "O Canvas não pôde ser iniciado",
+    }),
   ).toBeInTheDocument();
   expect(
     screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("navigation", { name: "Superfícies globais" }),
-  ).toBeInTheDocument();
-
-  await user.click(screen.getByRole("button", { name: "Configurações" }));
-  expect(
-    screen.getByRole("heading", {
-      name: "Configurações do aplicativo",
-    }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("tab", { name: "Desempenho" }),
-  ).toHaveAttribute("aria-selected", "true");
-  await user.click(screen.getByRole("tab", { name: "Photoshop" }));
-  expect(
-    screen.getByRole("heading", { name: "Photoshop" }),
-  ).toBeInTheDocument();
-
-  await user.click(screen.getByRole("button", { name: "Diagnóstico" }));
-  expect(
-    screen.getByRole("heading", { name: "Diagnóstico gráfico" }),
+    screen.getByRole("alert"),
   ).toBeInTheDocument();
 
   expect(load).not.toHaveBeenCalled();

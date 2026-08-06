@@ -50,6 +50,23 @@ const creationConfiguration: NewProjectCreationConfiguration = {
   },
 };
 
+test.each([
+  [true, "supported"],
+  [false, "unsupported"],
+] as const)(
+  "reports graphics support %s through the closed %s gate terminal",
+  async (supported, status) => {
+    vi.mocked(invoke).mockResolvedValueOnce(null);
+
+    await expect(
+      tauriGlobalProjectPort.completeGraphicsGate(supported),
+    ).resolves.toBeNull();
+    expect(invoke).toHaveBeenCalledWith("complete_graphics_gate", {
+      report: { status },
+    });
+  },
+);
+
 test("starts creation with exactly the normalized configuration and no pathname or overwrite authority", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
 

@@ -20,6 +20,7 @@ pub(crate) fn editor_projection(
     saved_revision: u64,
     can_undo: bool,
     can_redo: bool,
+    project_name: &str,
     project: &ProjectDocument,
 ) -> EditorProjection {
     let settings = project.document();
@@ -66,7 +67,7 @@ pub(crate) fn editor_projection(
     };
     let state = EditorState {
         project_id: project_id.hyphenated().to_string(),
-        project_name: "Projeto".into(),
+        project_name: project_name.into(),
         document: DocumentSnapshot::from_settings(settings),
         revision,
         saved_revision,
@@ -204,6 +205,7 @@ mod tests {
             0,
             false,
             false,
+            "Projeto",
             &project,
         );
         let value = serde_json::to_value(&projection).expect("projection serializes");
