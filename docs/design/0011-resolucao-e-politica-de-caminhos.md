@@ -82,6 +82,8 @@ let worker_paths = OperationPathContext::from_plan(plan)?;
 
 `ResolvedPath` é um valor opaco. Ele conserva a forma escolhida para apresentação, a forma operacional nativa e a raiz classificada sem obrigar chamadores a conhecer regras de prefixo. Somente o módulo pode derivar caminhos filhos ou locais temporários a partir dele.
 
+A prova temporária da primeira versão também entra por `AppPaths`: o módulo prepara `%TEMP%\MyAlbuns2\ExportPreview`, valida cada filho contra a raiz temporária por handle e conserva os guards até o fim da tentativa. O comando recebe o diretório preparado, sem conhecer o namespace transitório do produto nem criar diretórios por conta própria. Esse local descartável não integra as árvores persistentes de `%APPDATA%` e `%LOCALAPPDATA%`; nos testes, sua raiz é injetada junto às demais para não escrever no `%TEMP%` compartilhado.
+
 `RootBindingPlan` contém somente a raiz lógica, seu tipo, o binding operacional capturado e a representação nativa escolhida para I/O. Ele não contém existência, metadados ou identidade de arquivos individuais, capacidades genéricas do servidor nem promessa sobre o servidor físico que atenderá os acessos.
 
 Quando necessário, a comparação entre dois objetos existentes produz `Same`, `Different` ou `Indeterminate`; falha ao obter identidade física nunca é convertida em `Different`. O módulo fornece a evidência e não escolhe a política funcional do chamador.
@@ -128,7 +130,7 @@ O Projeto persiste sua Identidade própria e os caminhos escolhidos pelo usuári
 
 Para um arquivo existente, duas formas textuais podem representar o mesmo alvo, como uma unidade mapeada e seu UNC. Quando essa distinção for necessária, o módulo compara a identidade física obtida por handles. A comparação pode ser inconclusiva em determinados sistemas de arquivos ou servidores.
 
-O módulo encerra sua responsabilidade ao retornar a evidência tri-state. O guardião de abertura do Projeto aplica a política funcional:
+A comparação de identidade encerra sua responsabilidade ao retornar a evidência tri-state. O módulo também expõe a primitiva nativa de trava de arquivo, sem decidir identidade, foco, conflito funcional ou duração da posse. O guardião de abertura do Projeto aplica essa política e mantém a primitiva pelo mesmo ciclo de vida da Sessão editável:
 
 1. o arquivo é aberto e sua Identidade persistida é lida;
 2. a identidade física é comparada com as sessões abertas;

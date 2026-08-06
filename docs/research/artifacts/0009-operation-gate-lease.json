@@ -1,0 +1,197 @@
+{
+    "schemaVersion":  1,
+    "collectedAtUtc":  "2026-07-31T04:11:49.2014009+00:00",
+    "gitCommit":  "bbf646045ed304284a921e3a0651ca9ed7d2e6f1",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "builtAtUtc":  "2026-07-31T04:09:32.3702516+00:00",
+                  "elapsedMs":  132405,
+                  "profile":  "release",
+                  "executable":  "target/operation-gate/release/myalbuns-desktop.exe",
+                  "executableBytes":  13596160,
+                  "executableSha256":  "29b259b382613aa302e6571264d3820b6935ef87001e4fda1b2ae20b718bdf1a",
+                  "buildInputFileCount":  196,
+                  "buildInputDigestSha256":  "0b69b56dddd3be7f1540f2926659e2070fa86090cced0c5fa087d137df22a7c0",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "strict-probe-json-parser",
+                       "passed":  true,
+                       "elapsedMs":  154
+                   },
+                   {
+                       "name":  "operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  607
+                   },
+                   {
+                       "name":  "operation-lease",
+                       "passed":  true,
+                       "elapsedMs":  643
+                   },
+                   {
+                       "name":  "operation-gate-probe-contract",
+                       "passed":  true,
+                       "elapsedMs":  449
+                   },
+                   {
+                       "name":  "cache-pause",
+                       "passed":  true,
+                       "elapsedMs":  586
+                   },
+                   {
+                       "name":  "processor-reservation",
+                       "passed":  true,
+                       "elapsedMs":  445
+                   },
+                   {
+                       "name":  "real-owner-process-death",
+                       "passed":  true,
+                       "elapsedMs":  674
+                   },
+                   {
+                       "name":  "export-success-and-progress",
+                       "passed":  true,
+                       "elapsedMs":  442
+                   },
+                   {
+                       "name":  "export-failure",
+                       "passed":  true,
+                       "elapsedMs":  646
+                   },
+                   {
+                       "name":  "export-cancellation-before-start",
+                       "passed":  true,
+                       "elapsedMs":  466
+                   },
+                   {
+                       "name":  "export-cancellation-in-flight",
+                       "passed":  true,
+                       "elapsedMs":  455
+                   },
+                   {
+                       "name":  "processor-progress-stream",
+                       "passed":  true,
+                       "elapsedMs":  491
+                   },
+                   {
+                       "name":  "real-desktop-build",
+                       "passed":  true,
+                       "elapsedMs":  132405
+                   },
+                   {
+                       "name":  "independent-two-host-operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  2708
+                   },
+                   {
+                       "name":  "multiwindow-two-window-operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  842
+                   }
+               ],
+    "results":  {
+                    "independent":  {
+                                        "topology":  "independent",
+                                        "passed":  true,
+                                        "startedAtUtc":  "2026-07-31T04:11:45.4193102+00:00",
+                                        "elapsedMs":  2708,
+                                        "processCount":  2,
+                                        "processIds":  [
+                                                           27552,
+                                                           9928
+                                                       ],
+                                        "releaseGateCreated":  true,
+                                        "ownerReady":  {
+                                                           "schemaVersion":  1,
+                                                           "processId":  27552,
+                                                           "topology":  "independent",
+                                                           "windowLabel":  "main",
+                                                           "state":  "owner_ready",
+                                                           "operationMode":  "normal_export"
+                                                       },
+                                        "challengerConflict":  {
+                                                                   "schemaVersion":  1,
+                                                                   "processId":  9928,
+                                                                   "topology":  "independent",
+                                                                   "windowLabel":  "main",
+                                                                   "state":  "challenger_conflict",
+                                                                   "operationMode":  "normal_export"
+                                                               },
+                                        "ownerReleased":  {
+                                                              "schemaVersion":  1,
+                                                              "processId":  27552,
+                                                              "topology":  "independent",
+                                                              "windowLabel":  "main",
+                                                              "state":  "owner_released",
+                                                              "operationMode":  "normal_export"
+                                                          },
+                                        "challengerSuccess":  {
+                                                                  "schemaVersion":  1,
+                                                                  "processId":  9928,
+                                                                  "topology":  "independent",
+                                                                  "windowLabel":  "main",
+                                                                  "state":  "challenger_success",
+                                                                  "operationMode":  "normal_export"
+                                                              }
+                                    },
+                    "multiwindow":  {
+                                        "topology":  "multiwindow",
+                                        "passed":  true,
+                                        "startedAtUtc":  "2026-07-31T04:11:48.3255947+00:00",
+                                        "elapsedMs":  842,
+                                        "processCount":  1,
+                                        "processIds":  [
+                                                           4860
+                                                       ],
+                                        "releaseGateCreated":  true,
+                                        "ownerReady":  {
+                                                           "schemaVersion":  1,
+                                                           "processId":  4860,
+                                                           "topology":  "multiwindow",
+                                                           "windowLabel":  "main",
+                                                           "state":  "owner_ready",
+                                                           "operationMode":  "normal_export"
+                                                       },
+                                        "challengerConflict":  {
+                                                                   "schemaVersion":  1,
+                                                                   "processId":  4860,
+                                                                   "topology":  "multiwindow",
+                                                                   "windowLabel":  "project-b",
+                                                                   "state":  "challenger_conflict",
+                                                                   "operationMode":  "normal_export"
+                                                               },
+                                        "ownerReleased":  {
+                                                              "schemaVersion":  1,
+                                                              "processId":  4860,
+                                                              "topology":  "multiwindow",
+                                                              "windowLabel":  "main",
+                                                              "state":  "owner_released",
+                                                              "operationMode":  "normal_export"
+                                                          },
+                                        "challengerSuccess":  {
+                                                                  "schemaVersion":  1,
+                                                                  "processId":  4860,
+                                                                  "topology":  "multiwindow",
+                                                                  "windowLabel":  "project-b",
+                                                                  "state":  "challenger_success",
+                                                                  "operationMode":  "normal_export"
+                                                              }
+                                    }
+                },
+    "limits":  {
+                   "batchRunner":  false,
+                   "multiOutputPromotion":  false,
+                   "projectOpenGuardian":  false,
+                   "exportCancellationEntryPoint":  false,
+                   "progressWindow":  false
+               }
+}

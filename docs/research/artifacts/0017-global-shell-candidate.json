@@ -1,0 +1,276 @@
+{
+    "schemaVersion":  1,
+    "suite":  "global_shell_candidate",
+    "collectedAtUtc":  "2026-08-01T01:22:51.3938886+00:00",
+    "gitCommit":  "d20062830159ee7eef2198c6b83191f1b529aeb1",
+    "sourceInputsDirty":  false,
+    "build":  {
+                  "profile":  "release",
+                  "inputFileCount":  220,
+                  "inputDigestSha256":  "25481f3a3e96773c68ef1060828dbb26c2dfb8433c8091f5882d97d8b3048589",
+                  "executable":  "target/global-shell-gate/release/myalbuns-desktop.exe",
+                  "executableSha256":  "ba8ad10424637fdae303cc998b7270f1ed9c84f4d65371b4a469dec1313f615f",
+                  "globalBundle":  {
+                                       "htmlBytes":  475,
+                                       "directAssetBytes":  198685,
+                                       "assets":  [
+                                                      {
+                                                          "path":  "/assets/global-u_FrKEtf.js",
+                                                          "bytes":  1396,
+                                                          "sha256":  "8a235dbca31d92044ca5088bf2d28b69af43f162921966fa7204bd830182c574"
+                                                      },
+                                                      {
+                                                          "path":  "/assets/index-CBQ2cHVy.js",
+                                                          "bytes":  194889,
+                                                          "sha256":  "786f7ec79c691a1d47ac4baf1c6788175520a55f86ae51aabccee79d29f74273"
+                                                      },
+                                                      {
+                                                          "path":  "/assets/global-NS8CLH1R.css",
+                                                          "bytes":  2400,
+                                                          "sha256":  "fe97a853d64df4f3ffd6d2a281d4855cc0977105f069635a42adadbb58f37687"
+                                                      }
+                                                  ],
+                                       "projectAssetReferences":  0
+                                   },
+                  "workingTreeDirty":  true
+              },
+    "hardware":  {
+                     "operatingSystem":  "Microsoft Windows 11 Pro",
+                     "operatingSystemVersion":  "10.0.26200",
+                     "processors":  [
+                                        "13th Gen Intel(R) Core(TM) i5-13450HX"
+                                    ],
+                     "physicalMemoryBytes":  25439191040,
+                     "videoControllers":  [
+                                              {
+                                                  "name":  "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+                                                  "driverVersion":  "32.0.15.8195"
+                                              },
+                                              {
+                                                  "name":  "Intel(R) UHD Graphics",
+                                                  "driverVersion":  "32.0.101.7077"
+                                              }
+                                          ]
+                 },
+    "checks":  [
+                   {
+                       "name":  "powershell-runner-ast",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "frontend-global-shell-contract",
+                       "passed":  true,
+                       "elapsedMs":  3343
+                   },
+                   {
+                       "name":  "rust-global-shell-contract",
+                       "passed":  true,
+                       "elapsedMs":  563
+                   },
+                   {
+                       "name":  "tauri-release-with-global-entry",
+                       "passed":  true,
+                       "elapsedMs":  296896
+                   },
+                   {
+                       "name":  "global-html-excludes-project-entry",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "independent-global-shell-runtime",
+                       "passed":  true,
+                       "elapsedMs":  4200
+                   },
+                   {
+                       "name":  "multiwindow-global-shell-runtime",
+                       "passed":  true,
+                       "elapsedMs":  2488
+                   }
+               ],
+    "results":  {
+                    "passed":  true,
+                    "ranking":  null,
+                    "recommendation":  null,
+                    "independent":  {
+                                        "topology":  "independent",
+                                        "passed":  true,
+                                        "readyMs":  1650,
+                                        "processId":  28224,
+                                        "windowTitle":  "MyAlbuns",
+                                        "welcomeScreenVisible":  true,
+                                        "status":  {
+                                                       "kind":  "status",
+                                                       "processId":  28224,
+                                                       "runId":  "global-shell-independent-639211441600273525",
+                                                       "topology":  "independent",
+                                                       "probeId":  "independent-global-shell-gate"
+                                                   },
+                                        "singleton":  {
+                                                          "rejectedExitCode":  73,
+                                                          "ownerPreserved":  true
+                                                      },
+                                        "projectWorkload":  {
+                                                                "imagingProcessCount":  0
+                                                            },
+                                        "processTree":  {
+                                                            "processCount":  7,
+                                                            "workingSetBytes":  390332416,
+                                                            "privateMemoryBytes":  190414848,
+                                                            "handleCount":  3230,
+                                                            "threadCount":  160,
+                                                            "processes":  [
+                                                                              {
+                                                                                  "processId":  18508,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  20140032,
+                                                                                  "privateMemoryBytes":  9629696,
+                                                                                  "handleCount":  169,
+                                                                                  "threadCount":  9
+                                                                              },
+                                                                              {
+                                                                                  "processId":  27776,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  119582720,
+                                                                                  "privateMemoryBytes":  39612416,
+                                                                                  "handleCount":  1250,
+                                                                                  "threadCount":  55
+                                                                              },
+                                                                              {
+                                                                                  "processId":  28224,
+                                                                                  "name":  "myalbuns-desktop",
+                                                                                  "workingSetBytes":  44654592,
+                                                                                  "privateMemoryBytes":  10915840,
+                                                                                  "handleCount":  377,
+                                                                                  "threadCount":  29
+                                                                              },
+                                                                              {
+                                                                                  "processId":  30800,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  60751872,
+                                                                                  "privateMemoryBytes":  27074560,
+                                                                                  "handleCount":  298,
+                                                                                  "threadCount":  15
+                                                                              },
+                                                                              {
+                                                                                  "processId":  34252,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  37134336,
+                                                                                  "privateMemoryBytes":  15347712,
+                                                                                  "handleCount":  352,
+                                                                                  "threadCount":  24
+                                                                              },
+                                                                              {
+                                                                                  "processId":  35988,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  96800768,
+                                                                                  "privateMemoryBytes":  84209664,
+                                                                                  "handleCount":  616,
+                                                                                  "threadCount":  17
+                                                                              },
+                                                                              {
+                                                                                  "processId":  36056,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  11268096,
+                                                                                  "privateMemoryBytes":  3624960,
+                                                                                  "handleCount":  168,
+                                                                                  "threadCount":  11
+                                                                              }
+                                                                          ]
+                                                        }
+                                    },
+                    "multiwindow":  {
+                                        "topology":  "multiwindow",
+                                        "passed":  true,
+                                        "readyMs":  487,
+                                        "processId":  32584,
+                                        "windowTitle":  "MyAlbuns",
+                                        "welcomeScreenVisible":  true,
+                                        "status":  {
+                                                       "kind":  "status",
+                                                       "processId":  32584,
+                                                       "runId":  "global-shell-multiwindow-639211441641911765",
+                                                       "topology":  "multiwindow",
+                                                       "probeId":  "multiwindow-global-shell-gate"
+                                                   },
+                                        "singleton":  {
+                                                          "rejectedExitCode":  73,
+                                                          "ownerPreserved":  true
+                                                      },
+                                        "projectWorkload":  {
+                                                                "imagingProcessCount":  0
+                                                            },
+                                        "processTree":  {
+                                                            "processCount":  7,
+                                                            "workingSetBytes":  375820288,
+                                                            "privateMemoryBytes":  189489152,
+                                                            "handleCount":  3224,
+                                                            "threadCount":  158,
+                                                            "processes":  [
+                                                                              {
+                                                                                  "processId":  508,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  37138432,
+                                                                                  "privateMemoryBytes":  15343616,
+                                                                                  "handleCount":  350,
+                                                                                  "threadCount":  24
+                                                                              },
+                                                                              {
+                                                                                  "processId":  14796,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  11280384,
+                                                                                  "privateMemoryBytes":  3620864,
+                                                                                  "handleCount":  168,
+                                                                                  "threadCount":  11
+                                                                              },
+                                                                              {
+                                                                                  "processId":  25040,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  94687232,
+                                                                                  "privateMemoryBytes":  83914752,
+                                                                                  "handleCount":  608,
+                                                                                  "threadCount":  15
+                                                                              },
+                                                                              {
+                                                                                  "processId":  28696,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  119910400,
+                                                                                  "privateMemoryBytes":  39292928,
+                                                                                  "handleCount":  1260,
+                                                                                  "threadCount":  55
+                                                                              },
+                                                                              {
+                                                                                  "processId":  32016,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  60428288,
+                                                                                  "privateMemoryBytes":  26755072,
+                                                                                  "handleCount":  299,
+                                                                                  "threadCount":  15
+                                                                              },
+                                                                              {
+                                                                                  "processId":  32584,
+                                                                                  "name":  "myalbuns-desktop",
+                                                                                  "workingSetBytes":  32235520,
+                                                                                  "privateMemoryBytes":  10924032,
+                                                                                  "handleCount":  370,
+                                                                                  "threadCount":  29
+                                                                              },
+                                                                              {
+                                                                                  "processId":  37736,
+                                                                                  "name":  "msedgewebview2",
+                                                                                  "workingSetBytes":  20140032,
+                                                                                  "privateMemoryBytes":  9637888,
+                                                                                  "handleCount":  169,
+                                                                                  "threadCount":  9
+                                                                              }
+                                                                          ]
+                                                        }
+                                    }
+                },
+    "interpretation":  {
+                           "candidateOnly":  true,
+                           "numericBudgetApplied":  false,
+                           "reason":  "This gate materializes the real Welcome entry in both topologies, observes no Imaging Processor and checks the source boundary against editor dependencies. Final comparison budgets remain reserved for the terminal spike gate."
+                       }
+}

@@ -1,0 +1,10 @@
+{
+  "level": "info",
+  "component": "canvas",
+  "event": "canvas_initialization_completed",
+  "projectId": "project-spike-001",
+  "instanceId": "canvas-2",
+  "width": 1200,
+  "height": 500,
+  "sheetCount": 12
+}

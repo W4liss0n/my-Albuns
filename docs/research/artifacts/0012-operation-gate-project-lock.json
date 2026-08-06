@@ -1,0 +1,267 @@
+{
+    "schemaVersion":  1,
+    "suite":  "operation_gate_project_file_lock",
+    "collectedAtUtc":  "2026-07-31T15:36:08.6143814+00:00",
+    "gitCommit":  "cb874058b6ffe46c6327f24584846200c7dcdbf7",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "builtAtUtc":  "2026-07-31T15:29:09.5616609+00:00",
+                  "elapsedMs":  410428,
+                  "profile":  "release",
+                  "cargoBuildJobs":  1,
+                  "rustCheckTarget":  "target",
+                  "executable":  "target/operation-gate/release/myalbuns-desktop.exe",
+                  "executableBytes":  14336000,
+                  "executableSha256":  "a17b4e8a194b1637f801198144b299fbc60d70ac1386b9be15f48e076a6450ed",
+                  "imagingExecutable":  "target/operation-gate/release/myalbuns-imaging.exe",
+                  "imagingExecutableBytes":  2796032,
+                  "imagingExecutableSha256":  "4474f5895909484c3b56835c9f1643e713d1538c3b9882d35f0865835ab9a240",
+                  "buildInputFileCount":  207,
+                  "buildInputDigestSha256":  "2e495dc9c712147b45f60897bc00e58a616f4b3e34376aeacd6a1004ecf4e389",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "strict-project-open-json-parser",
+                       "passed":  true,
+                       "elapsedMs":  185
+                   },
+                   {
+                       "name":  "project-file-lock",
+                       "passed":  true,
+                       "elapsedMs":  30511
+                   },
+                   {
+                       "name":  "operation-gate",
+                       "passed":  true,
+                       "elapsedMs":  440955
+                   },
+                   {
+                       "name":  "operation-lease",
+                       "passed":  true,
+                       "elapsedMs":  489
+                   },
+                   {
+                       "name":  "project-open-probe-contract",
+                       "passed":  true,
+                       "elapsedMs":  518
+                   },
+                   {
+                       "name":  "real-desktop-build",
+                       "passed":  true,
+                       "elapsedMs":  410428
+                   },
+                   {
+                       "name":  "project-open-normal_close",
+                       "passed":  true,
+                       "elapsedMs":  3034
+                   },
+                   {
+                       "name":  "project-open-owner_death",
+                       "passed":  true,
+                       "elapsedMs":  3282
+                   }
+               ],
+    "results":  {
+                    "topology":  "independent_two_host",
+                    "scenarios":  {
+                                      "normal_close":  {
+                                                           "topology":  "independent",
+                                                           "scenario":  "normal_close",
+                                                           "passed":  true,
+                                                           "startedAtUtc":  "2026-07-31T15:36:01.1643657+00:00",
+                                                           "elapsedMs":  3034,
+                                                           "ownerProcessId":  17608,
+                                                           "challengerProcessId":  36504,
+                                                           "ownerAliveDuringIntermediatePhases":  true,
+                                                           "ownerAliveAfterSessionClose":  true,
+                                                           "ownerTerminationConfirmed":  false,
+                                                           "isolatedGateReleaseCreated":  true,
+                                                           "terminalMarkerCreated":  true,
+                                                           "fixtureBefore":  {
+                                                                                 "name":  "Projeto.myalbum",
+                                                                                 "bytes":  372,
+                                                                                 "sha256":  "1efb9ac2eca59a8194766440765bff331324731574d06dedcb46f3fc248d7b7b"
+                                                                             },
+                                                           "fixtureAfter":  {
+                                                                                "name":  "Projeto.myalbum",
+                                                                                "bytes":  372,
+                                                                                "sha256":  "1efb9ac2eca59a8194766440765bff331324731574d06dedcb46f3fc248d7b7b"
+                                                                            },
+                                                           "ownerBothHeld":  {
+                                                                                 "schemaVersion":  1,
+                                                                                 "processId":  17608,
+                                                                                 "role":  "owner",
+                                                                                 "scenario":  "normal_close",
+                                                                                 "state":  "owner_both_held",
+                                                                                 "operationMode":  "normal_export",
+                                                                                 "operationGateState":  "held",
+                                                                                 "projectFileLockState":  "held"
+                                                                             },
+                                                           "challengerBothConflict":  {
+                                                                                          "schemaVersion":  1,
+                                                                                          "processId":  36504,
+                                                                                          "role":  "challenger",
+                                                                                          "scenario":  "normal_close",
+                                                                                          "state":  "challenger_both_conflict",
+                                                                                          "operationMode":  "normal_export",
+                                                                                          "operationGateState":  "conflict",
+                                                                                          "projectFileLockState":  "conflict"
+                                                                                      },
+                                                           "ownerGateReleasedLockHeld":  {
+                                                                                             "schemaVersion":  1,
+                                                                                             "processId":  17608,
+                                                                                             "role":  "owner",
+                                                                                             "scenario":  "normal_close",
+                                                                                             "state":  "owner_gate_released_lock_held",
+                                                                                             "operationMode":  "normal_export",
+                                                                                             "operationGateState":  "released",
+                                                                                             "projectFileLockState":  "held"
+                                                                                         },
+                                                           "challengerGateHeldLockConflict":  {
+                                                                                                  "schemaVersion":  1,
+                                                                                                  "processId":  36504,
+                                                                                                  "role":  "challenger",
+                                                                                                  "scenario":  "normal_close",
+                                                                                                  "state":  "challenger_gate_held_lock_conflict",
+                                                                                                  "operationMode":  "normal_export",
+                                                                                                  "operationGateState":  "held",
+                                                                                                  "projectFileLockState":  "conflict"
+                                                                                              },
+                                                           "ownerBothReheld":  {
+                                                                                   "schemaVersion":  1,
+                                                                                   "processId":  17608,
+                                                                                   "role":  "owner",
+                                                                                   "scenario":  "normal_close",
+                                                                                   "state":  "owner_both_reheld",
+                                                                                   "operationMode":  "normal_export",
+                                                                                   "operationGateState":  "held",
+                                                                                   "projectFileLockState":  "held"
+                                                                               },
+                                                           "ownerSessionClosed":  {
+                                                                                      "schemaVersion":  1,
+                                                                                      "processId":  17608,
+                                                                                      "role":  "owner",
+                                                                                      "scenario":  "normal_close",
+                                                                                      "state":  "owner_session_closed",
+                                                                                      "operationMode":  "normal_export",
+                                                                                      "operationGateState":  "released",
+                                                                                      "projectFileLockState":  "released"
+                                                                                  },
+                                                           "challengerBothRecovered":  {
+                                                                                           "schemaVersion":  1,
+                                                                                           "processId":  36504,
+                                                                                           "role":  "challenger",
+                                                                                           "scenario":  "normal_close",
+                                                                                           "state":  "challenger_both_recovered",
+                                                                                           "operationMode":  "normal_export",
+                                                                                           "operationGateState":  "recovered",
+                                                                                           "projectFileLockState":  "recovered"
+                                                                                       }
+                                                       },
+                                      "owner_death":  {
+                                                          "topology":  "independent",
+                                                          "scenario":  "owner_death",
+                                                          "passed":  true,
+                                                          "startedAtUtc":  "2026-07-31T15:36:04.2966288+00:00",
+                                                          "elapsedMs":  3282,
+                                                          "ownerProcessId":  22344,
+                                                          "challengerProcessId":  21548,
+                                                          "ownerAliveDuringIntermediatePhases":  true,
+                                                          "ownerAliveAfterSessionClose":  false,
+                                                          "ownerTerminationConfirmed":  true,
+                                                          "isolatedGateReleaseCreated":  true,
+                                                          "terminalMarkerCreated":  true,
+                                                          "fixtureBefore":  {
+                                                                                "name":  "Projeto.myalbum",
+                                                                                "bytes":  372,
+                                                                                "sha256":  "1efb9ac2eca59a8194766440765bff331324731574d06dedcb46f3fc248d7b7b"
+                                                                            },
+                                                          "fixtureAfter":  {
+                                                                               "name":  "Projeto.myalbum",
+                                                                               "bytes":  372,
+                                                                               "sha256":  "1efb9ac2eca59a8194766440765bff331324731574d06dedcb46f3fc248d7b7b"
+                                                                           },
+                                                          "ownerBothHeld":  {
+                                                                                "schemaVersion":  1,
+                                                                                "processId":  22344,
+                                                                                "role":  "owner",
+                                                                                "scenario":  "owner_death",
+                                                                                "state":  "owner_both_held",
+                                                                                "operationMode":  "normal_export",
+                                                                                "operationGateState":  "held",
+                                                                                "projectFileLockState":  "held"
+                                                                            },
+                                                          "challengerBothConflict":  {
+                                                                                         "schemaVersion":  1,
+                                                                                         "processId":  21548,
+                                                                                         "role":  "challenger",
+                                                                                         "scenario":  "owner_death",
+                                                                                         "state":  "challenger_both_conflict",
+                                                                                         "operationMode":  "normal_export",
+                                                                                         "operationGateState":  "conflict",
+                                                                                         "projectFileLockState":  "conflict"
+                                                                                     },
+                                                          "ownerGateReleasedLockHeld":  {
+                                                                                            "schemaVersion":  1,
+                                                                                            "processId":  22344,
+                                                                                            "role":  "owner",
+                                                                                            "scenario":  "owner_death",
+                                                                                            "state":  "owner_gate_released_lock_held",
+                                                                                            "operationMode":  "normal_export",
+                                                                                            "operationGateState":  "released",
+                                                                                            "projectFileLockState":  "held"
+                                                                                        },
+                                                          "challengerGateHeldLockConflict":  {
+                                                                                                 "schemaVersion":  1,
+                                                                                                 "processId":  21548,
+                                                                                                 "role":  "challenger",
+                                                                                                 "scenario":  "owner_death",
+                                                                                                 "state":  "challenger_gate_held_lock_conflict",
+                                                                                                 "operationMode":  "normal_export",
+                                                                                                 "operationGateState":  "held",
+                                                                                                 "projectFileLockState":  "conflict"
+                                                                                             },
+                                                          "ownerBothReheld":  {
+                                                                                  "schemaVersion":  1,
+                                                                                  "processId":  22344,
+                                                                                  "role":  "owner",
+                                                                                  "scenario":  "owner_death",
+                                                                                  "state":  "owner_both_reheld",
+                                                                                  "operationMode":  "normal_export",
+                                                                                  "operationGateState":  "held",
+                                                                                  "projectFileLockState":  "held"
+                                                                              },
+                                                          "ownerSessionClosed":  null,
+                                                          "challengerBothRecovered":  {
+                                                                                          "schemaVersion":  1,
+                                                                                          "processId":  21548,
+                                                                                          "role":  "challenger",
+                                                                                          "scenario":  "owner_death",
+                                                                                          "state":  "challenger_both_recovered",
+                                                                                          "operationMode":  "normal_export",
+                                                                                          "operationGateState":  "recovered",
+                                                                                          "projectFileLockState":  "recovered"
+                                                                                      }
+                                                      }
+                                  }
+                },
+    "limits":  {
+                   "operationGate":  true,
+                   "projectFileLock":  true,
+                   "mechanismsSeparated":  true,
+                   "normalSessionClose":  true,
+                   "ownerProcessDeath":  true,
+                   "physicalIdentityComparison":  false,
+                   "existingSessionFocus":  false,
+                   "mappedUncAlias":  false,
+                   "completeProjectOpenGuardian":  false
+               }
+}

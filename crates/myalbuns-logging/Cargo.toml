@@ -1,0 +1,13 @@
+[package]
+name = "myalbuns-logging"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+myalbuns-paths = { path = "../myalbuns-paths" }
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

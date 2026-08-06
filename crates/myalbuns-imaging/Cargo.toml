@@ -1,0 +1,21 @@
+[package]
+name = "myalbuns-imaging"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+embed-resource = "3"
+
+[dependencies]
+myalbuns-core = { path = "../myalbuns-core" }
+myalbuns-imaging-protocol = { path = "../myalbuns-imaging-protocol" }
+myalbuns-logging = { path = "../myalbuns-logging" }
+myalbuns-paths = { path = "../myalbuns-paths" }
+serde_json.workspace = true
+sha2.workspace = true
+tracing.workspace = true
+image = { workspace = true, features = ["jpeg", "png"] }
+
+[dev-dependencies]
+tempfile.workspace = true

@@ -1,0 +1,13 @@
+.tools/
+node_modules/
+dist/
+target/
+src-tauri/target/
+src-tauri/binaries/*.exe
+.scratch/cargo-target-tests/
+.scratch/topology-spike-target/
+.scratch/topology-corpus/
+benchmark-data/albums/*
+!benchmark-data/albums/README.md
+*.log
+.DS_Store

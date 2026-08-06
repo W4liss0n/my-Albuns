@@ -1,0 +1,46 @@
+[package]
+name = "myalbuns-desktop"
+version.workspace = true
+description = "Editor desktop de diagramação de álbuns"
+authors = ["MyAlbuns"]
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "myalbuns_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "~2.11", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+myalbuns-core = { path = "../crates/myalbuns-core" }
+myalbuns-imaging-protocol = { path = "../crates/myalbuns-imaging-protocol" }
+myalbuns-logging = { path = "../crates/myalbuns-logging" }
+myalbuns-paths = { path = "../crates/myalbuns-paths" }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+ts-rs.workspace = true
+uuid.workspace = true
+windows-sys.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.38"
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-core = "0.61"
+
+[dev-dependencies]
+image = { workspace = true, features = ["jpeg"] }
+tempfile.workspace = true

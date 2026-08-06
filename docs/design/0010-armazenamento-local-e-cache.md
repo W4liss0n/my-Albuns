@@ -17,6 +17,15 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 
 ## Raízes do aplicativo
 
+> **Namespace transitório de desenvolvimento (2026-07-29):** enquanto a
+> nova geração do programa não estiver concluída, a implementação usa
+> `MyAlbuns2` nas duas raízes (`%APPDATA%\MyAlbuns2` e
+> `%LOCALAPPDATA%\MyAlbuns2`). Essa separação impede que o desenvolvimento
+> leia, sobrescreva ou misture automaticamente os dados da versão anterior,
+> que permanecem em `MyAlbuns`. A árvore normativa abaixo continua sendo o
+> destino final; a remoção do sufixo `2` e qualquer migração de dados exigem
+> uma alteração explícita antes da distribuição final.
+
 ```text
 %APPDATA%\MyAlbuns\
 ├── settings.json
@@ -24,12 +33,12 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 
 %LOCALAPPDATA%\MyAlbuns\
 ├── Cache\
-│   └── {project-id}\
+│   └── {project-key}\
 │       ├── metadata.json
 │       └── Media\
 ├── Recovery\
 │   ├── Projects\
-│   │   └── {project-id}.json
+│   │   └── {project-key}.json
 │   └── Batches\
 │       └── {batch-id}.json
 ├── State\
@@ -57,9 +66,13 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 
 `SettingsStore` guarda preferências de apresentação em `settings.json`. `LayoutCatalogStore` guarda o catálogo global criado pelo usuário em `Layouts`. Esses dados não são Cache e nunca podem ser apagados por uma ação de liberação de espaço.
 
-Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Broadcast imediato entre todas as Janelas pode ser acrescentado depois se a topologia escolhida torná-lo praticamente gratuito, mas não é requisito do MVP.
+Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
 `StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e as preferências de interface que dependem da tela.
+
+Os dados internos do WebView2 ficam em `State\WebView2\{project-key}`. Cada
+host de Projeto deriva uma chave opaca própria da Identidade persistida; hosts
+distintos nunca compartilham o mesmo diretório de perfil do navegador.
 
 A divisão entre as duas raízes segue o que a preferência representa:
 
@@ -80,7 +93,7 @@ Nenhuma dessas preferências altera o Projeto, participa de Undo/Redo ou exige S
 
 ## Recuperação
 
-`RecoveryStore` mantém `Recovery\Projects\{project-id}.json` como um checkpoint atômico com:
+`RecoveryStore` mantém `Recovery\Projects\{project-key}.json` como um checkpoint atômico com:
 
 - schema e Identidade;
 - estado criativo consolidado ainda não salvo;
@@ -101,27 +114,40 @@ Não contém estado criativo nem preparação parcial. Após interrupção, o it
 
 ## Namespace do Projeto
 
-Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-id}`. Nome e caminho do arquivo não participam desse namespace.
+Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-key}`. A mesma chave identifica o checkpoint futuro em `Recovery` e o perfil do WebView2. Nome e caminho do arquivo não participam desse namespace.
 
 - mover ou renomear preserva a pasta;
 - `Salvar como` começa em uma pasta nova e vazia;
 - uma Cópia externa recebe outra pasta;
 - Projetos diferentes nunca compartilham estado mutável de Cache.
 
-O formato textual definitivo da Identidade pertence ao documento de Projeto. Para o Cache, ela precisa ser estável, única e segura como nome de diretório.
+O formato textual definitivo da Identidade pertence ao documento de Projeto e
+não herda restrições de nomes do Windows. A implementação deriva
+`project-{sha256}` dos bytes UTF-8 da Identidade e usa a mesma chave opaca para
+Cache, Recuperação e WebView2. O valor original nunca vira componente de
+caminho.
 
 ## Conteúdo mínimo
 
 ```text
 Cache\
-└── {project-id}\
+└── {project-key}\
     ├── metadata.json
     └── Media\
-        ├── {media-id}.{generation-id}.{formato}
-        └── {media-id}.{generation-id}.tmp
+        ├── {media-key}.{generation-id}.{formato}
+        └── {media-key}.{generation-id}.tmp
 ```
 
+`{media-key}` é `media-{sha256}` derivado da Identidade da mídia. A Identidade
+original continua preservada no Projeto, no protocolo e em `metadata.json`;
+somente a chave opaca participa do nome do artefato.
+
 O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. Não existem tiles, pirâmides nem previews persistidos de Lâmina no MVP, salvo se o spike provar com medições que a representação única não atende.
+
+Conteúdo opaco usa JPEG; conteúdo que precisa preservar transparência usa PNG.
+O formato é propriedade do artefato derivado e integra seu caminho e o índice
+do Cache. Essa escolha não altera o original nem permite que a Exportação use a
+representação reduzida.
 
 O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Importação, Cache ou Exportação existem somente em memória e não criam outra pasta, índice ou categoria sob `Cache`.
 
@@ -148,7 +174,7 @@ O Monitor apenas sinaliza uma possível mudança e agrupa eventos. Depois de uma
 
 É aceito no MVP o caso raro de uma alteração feita com o aplicativo fechado conservar exatamente tamanho e data. A Exportação reabre o original e não depende dessa concessão.
 
-Fora de manutenção, `CacheEngine` é o proprietário lógico de cada namespace. Conforme a topologia escolhida, um único Processador de Imagens atua como adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
+Fora de manutenção, o `CacheEngine` de cada Projeto é o proprietário lógico de seu namespace. O Processador de Imagens isolado daquela Sessão atua como único adaptador escritor dos arquivos. Jobs equivalentes podem ser agrupados e obsoletos cancelados. Cache não participa de Salvamento, Undo/Redo ou Recuperação.
 
 ## Liberação de espaço
 
@@ -161,7 +187,7 @@ Não existe limite rígido, expiração automática por idade ou sequência de a
 - remove somente Cache de Projetos fechados;
 - preserva a pasta se não conseguir a reserva.
 
-`Limpar todo o Cache` executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão `CacheMaintenance` do `OperationGate`. Caso contrário, o usuário pode agendá-lo para a próxima inicialização, antes da abertura de Projetos. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo.
+`Limpar todo o Cache` executa imediatamente apenas quando não houver Projeto ou Processador ativo e depois de adquirir a concessão exclusiva única do `OperationGate`. Caso contrário, o usuário pode agendá-lo para a próxima inicialização, antes da abertura de Projetos. A concessão impede abertura, Processador ou Exportação concorrente e é liberada em sucesso, falha ou cancelamento. O MVP não pausa editores nem remove Cache ativo ao vivo.
 
 Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperação, Layouts, preferências, Exportações ou originais.
 

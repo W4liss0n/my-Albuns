@@ -2,6 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
+updated: 2026-08-02
 ---
 
 # Programa de Diagramação de Álbuns
@@ -88,7 +89,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que o Modo de edição isole e amplie uma Lâmina, para concentrar a manipulação detalhada nela.
 1. Como pessoa diagramadora, quero que o Painel de imagens fique temporariamente menor nesse modo, para aumentar o Canvas sem perder acesso às mídias.
 1. Como pessoa diagramadora, quero retornar ao mesmo ponto e à mesma altura anterior do painel ao sair, para continuar a navegação sem reorganizar a interface.
-1. Como pessoa diagramadora, quero uma Grade de Lâminas no Painel contextual, para obter uma visão geral, saltar rapidamente e reordenar a sequência por miniaturas.
+1. Como pessoa diagramadora, quero uma Grade de Lâminas no Painel contextual cujas miniaturas representem a composição atual de cada Lâmina, para obter uma visão geral fiel, saltar rapidamente e reordenar a sequência.
 1. Como pessoa diagramadora, quero o Painel de imagens abaixo do Canvas e ocupando toda a largura restante até o Painel contextual, para manter mídias próximas da composição.
 1. Como pessoa diagramadora, quero redimensionar ou ocultar o Painel de imagens, para priorizar mídias ou ampliar o Canvas conforme a tarefa.
 1. Como pessoa diagramadora, quero redimensionar o Painel contextual por um divisor vertical, para equilibrar ferramentas e área de composição.
@@ -528,13 +529,14 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Lâmina` oferece `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`, usando a Lâmina mais centralizada como alvo.
 - Os mesmos comandos aparecem no menu de contexto da superfície ou Barra de uma Lâmina e usam o item clicado como alvo explícito. A conversão só é habilitada em uma extremidade válida.
 - Durante o Modo de edição, todos os comandos que adicionam, duplicam, excluem, convertem ou reordenam Lâminas ficam desabilitados; a sequência só pode ser alterada depois de sair com `Esc`.
-- Abaixo do menu, a interface se divide em uma coluna de trabalho à esquerda e um Painel contextual fixo à direita.
+- Abaixo do menu, a interface se divide em uma coluna de trabalho à esquerda e um Painel contextual à direita.
 - A coluna de trabalho contém o Canvas contínuo na parte superior e o Painel de imagens na parte inferior. O Painel de imagens não avança sob o Painel contextual.
 - Um splitter horizontal redimensiona Canvas e Painel de imagens. `Exibir > Painel de imagens` oculta ou restaura o Painel; ocultá-lo entrega a altura disponível ao Canvas.
 - Altura e visibilidade do Painel de imagens são preferências da interface lembradas entre sessões, sem alterar o Projeto ou Undo/Redo.
 - Um splitter vertical separa a coluna de trabalho inteira do Painel contextual e permite ajustar a largura direita sem sobreposição.
 - `Exibir > Painel contextual` oculta ou restaura essa região. Ocultá-lo entrega toda a largura à coluna de trabalho; largura e visibilidade são preferências lembradas entre sessões, sem alterar o Projeto ou Undo/Redo.
 - O Canvas apresenta as Lâminas lado a lado em uma sequência horizontal contínua. Não existe um navegador lateral independente.
+- O Canvas começa diretamente abaixo da barra de menus e comandos, sem uma faixa permanente de título, contagem ou ajuda sobre os gestos.
 - O modelo lógico mantém todas as Lâminas do Álbum e não impõe um máximo arbitrário. A cena detalhada e suas texturas são materializadas somente para a área visível e uma margem de pré-carga adjacente.
 - Ao sair dessa faixa, uma Lâmina conserva seu estado lógico, mas pode liberar recursos gráficos pesados; retornar à faixa reconstrói sua representação sem alterar o Projeto. A política concreta de residência e descarte será calibrada por testes de estresse com Álbuns longos.
 - No modo normal não existe uma Lâmina ativa exclusiva: todas as Lâminas apresentadas são interativas.
@@ -550,13 +552,16 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Se o Painel estava aberto ao entrar no Modo de edição, seu alvo e estado ficam suspensos; ao sair com `Esc`, ele reaparece para a mesma Lâmina com candidatos recalculados. Um Painel anteriormente fechado continua fechado.
 - O Canvas contínuo do modo normal não possui Zoom. O Zoom de visualização existe exclusivamente para a Lâmina isolada no Modo de edição.
 - No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical, somente navegação horizontal.
-- Redimensionar a Janela ou o splitter do Painel de imagens recalcula essa escala sem alterar o Projeto ou criar um estado de Zoom.
+- Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
+- Redimensionar a Janela ou o splitter do Painel de imagens sincroniza primeiro a superfície do renderizador com a área útil e então recalcula essa escala, mantendo a Lâmina inteira visível sem alterar o Projeto ou criar um estado de Zoom.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.
 - `Alt` + pressionar e iniciar o arraste é consumido como Pan e não seleciona o Frame; `Alt` + roda também preserva a seleção atual.
 - O arraste completo gera uma ação ao soltar; eventos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência termina.
 - Soltar uma Foto usa a Lâmina sob o ponteiro como destino. Selecionar um Frame ou Foto em outra Lâmina transfere a seleção diretamente para aquele elemento.
 - Clicar em uma área vazia limpa a seleção do elemento e retorna ao contexto do Álbum. Clicar na Grade de Lâminas ou usar as setas navega; arrastar uma miniatura da Grade reordena; rolar o Canvas não altera o contexto.
-- A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. É apenas um alvo implícito transitório e não torna as demais Lâminas inativas.
+- Toda ação explícita de navegação para uma Lâmina, inclusive Grade e setas, alinha o centro visual da Lâmina de destino ao centro horizontal da área útil do Canvas; não a alinha à borda esquerda.
+- Cada miniatura da Grade deriva da mesma `ComposedSheet` usada pelo Canvas e representa proporção, Frames em sua ordem, Fotos com recorte e transformação, placeholders e Overlay; não existe uma miniatura padrão independente da composição.
+- A Lâmina centralizada no Canvas é aquela cujo centro visual está mais próximo do centro horizontal da área visível. Essa referência é recalculada durante a navegação, permanece independente da Lâmina ou do Frame em foco e serve como alvo implícito dos comandos sem destino explícito; não torna as demais Lâminas inativas.
 - O Modo de edição da Lâmina oculta temporariamente as demais, centraliza e amplia a escolhida e reduz o Painel de imagens para aumentar o Canvas.
 - Não existe faixa, rótulo, botão de retorno ou mudança adicional de fundo: o isolamento da única Lâmina e a nova proporção das regiões identificam o modo; `Esc` continua sendo a saída.
 - Cada entrada no Modo de edição inicia em `Ajustar Lâmina`, na maior escala que mantém a Lâmina inteira visível. Sair descarta o Zoom e uma nova entrada volta ao ajuste inicial.
@@ -567,6 +572,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Ajustar Lâmina` é o limite mínimo do Zoom; o limite máximo é calibrado no protótipo conforme nitidez e responsividade.
 - No Modo de edição, gestos diretos selecionam um ou vários Frames e permitem suas operações geométricas; os atalhos diretos de Pan e Zoom da Foto não atuam nesse modo.
 - Nesse modo, o Painel de imagens assume uma altura compacta sem desaparecer. Ao sair, o Canvas contínuo retorna à posição anterior e restaura a altura normal do Painel.
+- As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
+- Painel de imagens e Painel contextual reservam permanentemente a largura potencial de suas barras de rolagem vertical, evitando deslocamento horizontal do conteúdo quando elas aparecem ou desaparecem.
 - Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada e `Esc` retorna ao Canvas contínuo.
 - Dois cliques em uma Foto no Painel de imagens usam a Lâmina centralizada ou, no Modo de edição, a Lâmina isolada. Se houver placeholders, preenchem primeiro o mais à esquerda; sem placeholder, criam um novo Frame conforme as regras do modo.
 - O placeholder do duplo clique é ordenado pela coordenada horizontal da borda esquerda e, em empate, pela coordenada vertical da borda superior, ambas crescentes.
@@ -786,6 +793,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Fotos nunca podem revelar áreas vazias dentro do Frame. O Zoom de preenchimento é recalculado sempre que necessário.
 - O Zoom do usuário é um multiplicador adicional iniciado em `1×` e nunca reduz a Foto abaixo do Zoom de preenchimento.
 - O gesto direto de enquadramento existe no modo normal: `Alt` + arraste faz Pan e `Alt` + roda altera o Zoom da Foto no Frame sob o ponteiro. No Modo de edição, os gestos diretos manipulam a geometria do Frame.
+- Durante o Pan, a porção da Foto fora do Frame é exibida temporariamente com opacidade reduzida, sem diminuir a opacidade da porção interna, e o Frame apresenta as quatro linhas-guia da regra dos terços. Os dois auxílios desaparecem ao encerrar o gesto e nunca participam do Projeto, Undo/Redo ou Exportação.
+- Enquanto Pan ou Zoom apresenta uma prévia contínua, o Painel contextual atualiza imediatamente os valores correspondentes sem esperar a soltura ou a consolidação da roda. Cancelar ou falhar restaura os valores confirmados, e somente o gesto consolidado pode criar uma ação de Undo/Redo.
 - Gestos diretos de Pan/Zoom não alteram a seleção. Cada arraste consolidado e cada sequência contínua da roda formam, respectivamente, uma única ação de Undo/Redo.
 - Os ajustes iniciais exaustivos da Foto são Pan, Zoom do usuário, espelhamento horizontal, Giro anti-horário em passos de 90 graus, Ângulo contínuo entre `-45°` e `+45°` e preto e branco.
 - Giro de 90° e Ângulo são valores independentes. A ordem normativa é Giro de 90°, Ângulo, Espelhamento horizontal, Zoom de preenchimento, Zoom do usuário, Pan e Efeitos. Alterar Giro, Ângulo ou Espelhamento recalcula o preenchimento e os limites de Pan.
@@ -902,7 +911,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Eventos rápidos do mesmo caminho são consolidados; uma inspeção autoritativa só começa quando o arquivo estiver estável e legível. Depois da confirmação, o estado observado é atualizado e somente as representações de Cache afetadas são invalidadas.
 - Se a origem estiver acessível e a remoção ou renomeação persistir depois da estabilização, o item assume o estado de Arquivo ausente. Se a rede, o servidor, o compartilhamento ou a permissão impedir a confirmação, ele assume Arquivo indisponível sem alterar a referência. Quando o acesso ou o arquivo retornam ao caminho registrado, o estado e as prévias são restaurados automaticamente sem Religação.
 - A atualização externa não altera a referência persistida, não entra em Undo/Redo e não marca o Projeto como alterado.
-- O Cache de cada Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-id}`, usando a Identidade em vez de Nome ou caminho.
+- O Cache de cada Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-key}`, usando uma chave opaca derivada da Identidade em vez de Nome, caminho ou a Identidade bruta como componente do sistema de arquivos.
 - O baseline do spike para a pasta é `metadata.json` e `Media`, com uma representação reduzida por mídia e sem tiles ou previews de Lâmina persistidas em disco. Se as cenas e o Zoom representativos demonstrarem insuficiência, o relatório do spike revisa esse contrato antes da implementação ampla.
 - `metadata.json` é descartável e registra versão do schema, Identidade do Projeto, último uso e, por mídia, dimensões, formato, orientação EXIF, tamanho, datas, quantidade de páginas quando aplicável, perfil de cor básico e fingerprint.
 - Cada representação registra também uma versão de suas regras e uma geração única. Versão incompatível invalida a entrada.
@@ -936,7 +945,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Fechar uma sessão com mudanças pendentes oferece salvar e fechar, descartar e fechar, ou cancelar.
 - `Salvar como` grava o estado visível em um novo Projeto e faz a sessão passar a representar esse novo arquivo; o original permanece em sua última versão salva.
 - Recuperação de sessão usa estado temporário separado. Ao restaurar, o conteúdo continua não salvo até uma ação explícita.
-- A Recuperação de Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-id}.json`; a identidade de uma Cópia externa é resolvida antes de consultá-la.
+- A Recuperação de Projeto fica em `%LOCALAPPDATA%\MyAlbuns\Recovery\Projects\{project-key}.json`, usando a mesma chave opaca do Cache; a identidade de uma Cópia externa é resolvida antes de consultá-la.
 - Depois de `Salvar como` bem-sucedido, o checkpoint da Identidade anterior é removido; mudanças posteriores usam a nova Identidade. Cancelamento ou falha preserva a sessão e o checkpoint anteriores.
 - Cada ação criativa concluída agenda a atualização atômica da Recuperação. Ações muito próximas podem ser consolidadas em uma única escrita, e nenhum estado transitório de arraste ou redimensionamento é persistido.
 - Uma queda durante um gesto restaura o último estado concluído antes dele. `Salvar` sem novas mudanças e o fechamento normal confirmado removem a Recuperação temporária.
@@ -945,9 +954,9 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Cada Projeto mantém Undo/Redo dentro de um orçamento automático de memória. Comandos contêm somente deltas de domínio e referências, nunca IDs genéricos de comandos da interface, pixels, Cache ou cópias dos originais.
 - Ao alcançar o orçamento, as ações de Undo mais antigas são descartadas primeiro. Estado atual, Redo ainda válido, marco do último Salvamento e indicação de mudanças pendentes permanecem independentes.
 - A Recuperação não guarda o Histórico disponível. O orçamento do Histórico em memória será definido pelo spike e não terá configuração manual na primeira versão.
-- Uma falha em uma Sessão do Projeto não pode corromper o estado ou a Recuperação de outro Projeto. A sobrevivência das demais Janelas depende da topologia escolhida pelo spike.
+- Uma falha em uma Sessão ou host de Projeto não pode corromper o estado ou a Recuperação de outro Projeto. Cada Projeto usa um host independente; a queda de um deles encerra somente sua Janela e preserva os demais hosts.
 - Após a queda, `Reabrir e recuperar` cria uma nova sessão ainda não salva; `Abrir última versão salva` exige confirmação antes de descartar a recuperação; `Agora não` mantém o estado temporário para a próxima abertura.
-- Se a topologia permitir que Janelas sobrevivam à indisponibilidade do componente global, edição e Salvamento locais continuam, enquanto operações globais ficam indisponíveis até uma reinicialização explícita protegida pelo singleton; não há eleição ou reinício automático no MVP.
+- Se o componente global ficar indisponível, as Janelas de Projeto sobreviventes continuam a editar e salvar localmente, enquanto operações globais ficam indisponíveis até uma reinicialização explícita protegida pelo singleton; não há eleição ou reinício automático no MVP.
 - Undo e Redo abrangem todas as alterações editáveis durante a sessão, continuam disponíveis depois de Salvar e não persistem após fechar.
 - Alterar um Projeto nunca modifica o estado pertencente a outro Projeto.
 
@@ -967,7 +976,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Outros Projetos continuam disponíveis para edição, Undo/Redo, Salvamento e navegação durante a Exportação; somente suas ações de Exportação normal ficam indisponíveis.
 - O Bloqueio global de Exportação normal é liberado ao concluir, falhar ou cancelar a operação ativa.
 - A exclusividade usa uma concessão global limitada à tentativa; progresso e cancelamento pertencem somente àquela tentativa e não transformam o mecanismo de exclusividade em coordenador de comandos ou estado criativo.
-- Antes de reservar o Processador para a saída final, a Exportação pausa todo trabalho de Cache que compartilharia esse Processador, usando o menor escopo seguro permitido pela topologia. A pausa cobre ao menos o Cache do Projeto exportado e é liberada ao concluir, falhar ou cancelar.
+- Antes de reservar o Processador da Sessão para uma Exportação normal, o sistema pausa o trabalho de Cache do Projeto exportado. A pausa é liberada ao concluir, falhar ou cancelar. O lote usa seu Processador temporário e não compartilha o Processador de uma Sessão editável.
 - Toda saída é renderizada a partir dos Arquivos vinculados originais, nunca do Cache.
 - Exportação normal e cada item do lote percorrem o mesmo contrato de planejamento, execução e Publicação. A operação recebe um snapshot imutável, não salva nem religa o Projeto e conserva a Publicação limitada documentada.
 - A validação considera somente a seleção. Arquivos ausentes ou indisponíveis efetivamente necessários à renderização e placeholders dentro dela bloqueiam; problemas fora dela não bloqueiam. O Filtro de uso do Painel não substitui essa análise de dependências.
@@ -1075,7 +1084,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Operações em lote devem cobrir descoberta recursiva, execução estritamente serial, caminho exato no espelho da árvore, conflitos, proteção de Projeto aberto, relinks individuais e globais estritos, revalidação da revisão persistida antes do snapshot, checkpoint por item, retomada que refaz o item interrompido, isolamento de falhas, cópia integral do estado visível do Projeto modelo e importação das novas imagens somente no Painel.
 - Namespace, representação reduzida única, metadados, invalidação e políticas de liberação do Cache exigem testes próprios, incluindo a impossibilidade de limpar Cache ativo ao vivo. Formato, resolução, fingerprint e eventual tiling aguardam medições.
 - Álbuns longos devem ser testados com virtualização da cena, margem de pré-carga, descarte e reconstrução de texturas, preservando todo o modelo lógico e a latência de navegação.
-- O spike arquitetural deve exercitar a pequena interface externa do núcleo e o mesmo conjunto de cenários nas duas topologias, sem acoplar os testes às subdivisões internas, e registrar memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs.
+- O spike arquitetural exercitou a pequena interface externa do núcleo e o mesmo conjunto de cenários nas topologias A e B, registrando memória, GPU, processos, abertura, latência do Canvas, propagação de falhas, recuperação e complexidade de IPC/logs. A regressão da topologia adotada deve abrir ao menos dois hosts independentes e provar o isolamento entre Projetos sem acoplar os testes às subdivisões internas.
 
 ## Out of Scope
 
@@ -1136,8 +1145,8 @@ As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliber
 - comportamento da numeração de arquivos quando uma Exportação ultrapassar o índice `999`;
 - formato e extensão do arquivo de Projeto, codificação reversível dos caminhos Windows persistidos e mecanismo interno usado para detectar movimentações e Cópias externas.
 
-O repositório ainda não possui implementação nem convenções de teste estabelecidas. Tauri 2 com React/TypeScript e Rust é a hipótese principal da primeira versão, sujeita a um spike que compare duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões e Processadores de Imagens isolados. A comparação mede memória, GPU, quantidade de processos, tempo de abertura, latência do Canvas, propagação de falhas, recuperação, IPC e complexidade operacional; a escolha não está congelada pela documentação atual.
+O spike executável validou Tauri 2 com React/TypeScript e Rust para a primeira versão e comparou duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões isoladas. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) aceita A: cada Projeto aberto possui seu próprio `MyAlbuns.Project.exe`, enquanto o processo global e o Processador de Imagens conservam responsabilidades separadas. A comparação de memória, GPU, processos, abertura, Canvas, falhas, Recuperação e custo operacional permanece registrada como evidência, não como comportamento do produto.
 
-As duas alternativas reutilizam um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o componente de imagem recebe um snapshot validado e imutável e não interpreta independentemente o documento persistido.
+A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o componente de imagem recebe um snapshot validado e imutável e não interpreta independentemente o documento persistido.
 
-`MyAlbuns.exe` permanece como nome pretendido da experiência global e da Tela de Boas-vindas se a topologia escolhida o permitir sem custo desproporcional. PixiJS sobre WebGL2 continua a hipótese para a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece contingência. Formato do arquivo de Projeto, topologia final dos processos e controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC.
+`MyAlbuns.exe` hospeda a experiência global e a Tela de Boas-vindas sem possuir estado criativo mutável. PixiJS sobre WebGL2 compõe a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece somente como contingência futura, sem implementação paralela. O formato do arquivo de Projeto e os controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC.

@@ -17,6 +17,14 @@ Manter a composição do Álbum como foco principal, permitir navegação contí
 
 A referência fixa a organização espacial, não o estilo visual final, as cores ou o tamanho exato de cada região.
 
+## Comportamento desktop da WebView
+
+A WebView da Janela do Projeto funciona como uma superfície desktop e não expõe ações próprias de navegador. Recarregar a página, alterar o zoom da página, abrir busca, salvar, imprimir ou abrir a página, navegar pelo histórico, acessar código-fonte ou ferramentas de desenvolvimento, abrir o menu de contexto nativo e navegar por link ou arquivo solto ficam desabilitados. Botões auxiliares do mouse também não acionam histórico ou rolagem automática do navegador.
+
+Essa política impede apenas o comportamento padrão da WebView: os eventos continuam chegando aos controles do produto. Assim, atalhos contextuais, menus próprios, Pan com botão do meio e importação por arraste podem usar as mesmas entradas quando forem implementados. Edição de texto, seleção, Clipboard, Undo/Redo e comportamentos da janela fornecidos pelo sistema operacional permanecem disponíveis.
+
+No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de navegador e o menu de contexto padrão; uma falha nessa configuração impede a abertura da Janela do Projeto. Zoom nativo e ferramentas de desenvolvimento também ficam desabilitados na configuração declarativa da janela. A política DOM cuida somente de navegação por link ou arquivo solto e das ações nativas dos botões auxiliares do mouse. Nenhuma dessas políticas executa comandos do produto ou substitui o registro contextual de comandos e atalhos.
+
 ## Estrutura-base
 
 ```text
@@ -97,6 +105,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 ## Canvas contínuo
 
 - Ocupa a região superior da coluna de trabalho, desde a borda esquerda até o Painel contextual.
+- Começa diretamente abaixo da barra de menus e comandos, sem uma faixa permanente de título, contagem ou ajuda sobre os gestos.
 - Apresenta as Lâminas lado a lado em uma sequência horizontal contínua.
 - Permite percorrer o Álbum sem trocar para uma tela separada por Lâmina.
 - Mantém todas as Lâminas no modelo lógico, sem máximo arbitrário, mas materializa a cena detalhada e suas texturas somente para a área visível e uma margem de pré-carga adjacente.
@@ -105,21 +114,31 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Arrastar uma Foto do Painel de imagens usa a Lâmina sob o ponteiro como destino.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame aplica Pan à Foto contida nele; `Alt` + roda do mouse sobre o Frame altera o Zoom da Foto. Ambos integram a `MediaTransform` persistente da colocação.
 - Para o Pan, o usuário mantém `Alt`, pressiona sobre o Frame e inicia o arraste; o clique modificado é consumido pelo gesto e não seleciona o Frame. `Alt` + roda também preserva a seleção atual.
+- Enquanto o Pan estiver ativo, a porção da Foto fora do Frame aparece temporariamente com opacidade reduzida, a porção interna permanece com opacidade normal e quatro linhas-guia da regra dos terços são exibidas dentro do Frame. Esses auxílios desaparecem ao terminar o gesto e não integram o Projeto, o Histórico ou a Exportação.
+- Durante a prévia contínua de Pan ou Zoom, os valores correspondentes no Painel contextual acompanham imediatamente cada atualização do gesto. A prévia é transitória, volta aos valores confirmados em um cancelamento ou falha e não cria ações intermediárias no Histórico.
 - Esses gestos atuam na Foto sob o ponteiro sem mover ou redimensionar o Frame e sempre respeitam o Preenchimento do Frame.
 - Um arraste completo cria uma única ação de Undo/Redo ao soltar. Passos consecutivos de `Alt` + roda são agrupados em uma ação quando a sequência de rolagem termina.
 - Selecionar um Frame ou Foto em qualquer Lâmina troca a seleção para aquele elemento e atualiza o contexto à direita.
 - Clicar em uma área vazia remove a seleção do elemento e retorna ao contexto geral do Álbum, sem desativar nenhuma Lâmina.
-- Clicar na Grade de Lâminas ou usar as setas de navegação leva o Canvas até outra Lâmina, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
+- Clicar na Grade de Lâminas, usar as setas de navegação ou executar qualquer comando `Ir para Lâmina` posiciona o centro visual da Lâmina de destino no centro horizontal da área útil do Canvas, mas não torna as demais inativas. Arrastar uma miniatura da Grade inicia a reordenação estrutural descrita para a Barra.
 - Apenas percorrer o Canvas por rolagem não troca o conteúdo do Painel contextual.
 - A Lâmina cujo centro visual está mais próximo do centro horizontal da área visível é a `Lâmina centralizada no Canvas`.
-- Essa referência não cria uma seleção exclusiva; ela apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro.
+- Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.
 - O Canvas não depende de uma coluna lateral de thumbnails.
 - O modo normal do Canvas contínuo não oferece Zoom.
 - Todas as Lâminas usam a mesma escala automática, calculada para que a altura completa caiba no Canvas com margem visual ao redor.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
-- Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens recalcula a escala automática sem criar estado de Zoom.
+- A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
+- Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
 
-A margem exata e a centralização da escala continuam abertas. A largura da pré-carga, a residência de texturas e os gatilhos de descarte serão definidos por testes de estresse com Álbuns longos.
+A política inicial de residência expande o viewport em 700 unidades lógicas do
+Canvas para cada lado e mantém ainda uma Lâmina adjacente antes e depois do
+intervalo encontrado. Ao sair dessa faixa, o nó visual da Lâmina é destruído e
+as texturas que não pertencem mais ao conjunto residente são descarregadas,
+inclusive quando uma carga assíncrona termina atrasada. Retornar à faixa
+reconstrói nós e texturas a partir do modelo lógico preservado. Esses valores
+são parâmetros internos de desempenho, não estado do Projeto, e podem ser
+recalibrados por medições posteriores sem alterar o comportamento documental.
 
 ### Barra da Lâmina e Painel de Layouts
 
@@ -296,6 +315,8 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Para Decorativos, um único item sem uso pode ser removido diretamente; um item em uso ou uma seleção múltipla abre uma única confirmação conjunta.
 - Cada remoção confirmada, inclusive em lote, forma uma única ação de Undo/Redo. Nenhuma opção modifica ou exclui os Arquivos originais.
 - Exibe as mídias em uma grade de previews sem substituir o Canvas.
+- A grade começa no canto superior esquerdo, distribui as mídias por colunas e continua em novas linhas conforme a largura disponível. Quando a altura não comporta todas as linhas, somente a rolagem vertical é usada.
+- A área rolável reserva permanentemente a largura potencial da barra de rolagem para que previews e controles não mudem de posição quando ela aparece ou desaparece.
 - O menu de contexto de uma Foto oferece `Abrir no Photoshop`, com o mesmo comando e atalho do Frame preenchido.
 - Dois cliques em uma Foto usam a Lâmina centralizada no Canvas como alvo implícito; no Modo de edição, usam a única Lâmina isolada.
 - Se o alvo implícito possuir placeholders, o duplo clique preenche o mais à esquerda sem alterar sua geometria. Sem placeholder, cria um novo Frame conforme as regras do modo: primeiro Layout compatível no modo normal e Frame centralizado proporcional no Modo de edição.
@@ -337,6 +358,8 @@ O estado aberto ou fechado das seções é lembrado separadamente para os contex
 
 Esses estados são preferências da interface reutilizadas entre Projetos e sessões; não pertencem ao Projeto e não participam de Undo/Redo.
 
+A área de rolagem do Painel reserva permanentemente a largura potencial da barra vertical. Expandir ou recolher seções não desloca horizontalmente títulos, controles ou previews quando a barra aparece ou desaparece.
+
 Um splitter vertical separa o Painel contextual da coluna formada conjuntamente por Canvas e Painel de imagens. Arrastá-lo altera a largura do Painel contextual sem permitir que ele cubra ou se sobreponha às duas regiões.
 
 `Exibir > Painel contextual` oculta ou restaura completamente a região. Quando ocultada, Canvas e Painel de imagens usam toda a largura disponível. Largura e visibilidade são preferências da interface lembradas entre sessões; não alteram o Projeto nem participam de Undo/Redo.
@@ -350,6 +373,8 @@ No Canvas contínuo, quando não existe um Frame ou uma Foto selecionada, o Pain
 3. `Grade de Lâminas`.
 
 `Grade de Lâminas` mostra previews compactos de todo o Álbum, serve como navegação rápida e também permite reordenar a sequência.
+
+Cada preview é uma representação vetorial da `ComposedSheet` correspondente na projeção atual do Editor, nunca uma miniatura genérica. Ela preserva proporção, superfície, linha central, geometria e ordem dos Frames, recorte e transformação das Fotos, placeholders e Overlay. Uma nova projeção produzida pelo domínio atualiza Canvas e Grade a partir da mesma composição; o destaque de navegação permanece uma camada da interface externa à preview.
 
 Um clique sem ultrapassar o limiar de arraste centraliza a Lâmina correspondente no Canvas. Ao arrastar uma miniatura, sua célula vira um espaço reservado, um fantasma da miniatura acompanha o ponteiro e as células intermediárias se deslocam na ordem linear do Álbum. Soltar confirma a mesma operação de inserção e Undo/Redo usada no Canvas; `Esc`, soltura inválida e posições que interiorizariam uma Página única restauram a grade original.
 

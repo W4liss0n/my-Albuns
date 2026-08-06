@@ -1,0 +1,808 @@
+{
+    "schemaVersion":  1,
+    "suite":  "batch_operation_lease",
+    "collectedAtUtc":  "2026-07-31T14:22:43.3385020+00:00",
+    "gitCommit":  "48a434eaac89d293e136ed95d9c60a0f0888c1ef",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "builtAtUtc":  "2026-07-31T14:19:15.8586009+00:00",
+                  "elapsedMs":  199501,
+                  "profile":  "release",
+                  "cargoBuildJobs":  1,
+                  "rustCheckTarget":  "target",
+                  "executable":  "target/operation-gate/release/myalbuns-desktop.exe",
+                  "executableBytes":  14267392,
+                  "executableSha256":  "661bd02256b38893c3a95b5e62823a3f1d1becf79c8f8950abcd5c371b3c35d0",
+                  "imagingExecutable":  "target/operation-gate/release/myalbuns-imaging.exe",
+                  "imagingExecutableBytes":  2796032,
+                  "imagingExecutableSha256":  "669276150685df5c53f2b68b9640de2510e960ae5a36313a9bbb694f7ce8d271",
+                  "buildInputFileCount":  204,
+                  "buildInputDigestSha256":  "bac0391b136f1f89c9df06885c8e864c52785426b3dee811f242746687cdf3a4",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "strict-batch-lease-json-parser",
+                       "passed":  true,
+                       "elapsedMs":  380
+                   },
+                   {
+                       "name":  "operation-lease",
+                       "passed":  true,
+                       "elapsedMs":  418422
+                   },
+                   {
+                       "name":  "batch-runner",
+                       "passed":  true,
+                       "elapsedMs":  4150
+                   },
+                   {
+                       "name":  "grouped-export-prepares-before-publish",
+                       "passed":  true,
+                       "elapsedMs":  483
+                   },
+                   {
+                       "name":  "grouped-export-partial-publication",
+                       "passed":  true,
+                       "elapsedMs":  528
+                   },
+                   {
+                       "name":  "batch-lease-probe-contract",
+                       "passed":  true,
+                       "elapsedMs":  474
+                   },
+                   {
+                       "name":  "real-desktop-build",
+                       "passed":  true,
+                       "elapsedMs":  199501
+                   },
+                   {
+                       "name":  "batch-lease-success",
+                       "passed":  true,
+                       "elapsedMs":  2159
+                   },
+                   {
+                       "name":  "batch-lease-before_preparation",
+                       "passed":  true,
+                       "elapsedMs":  1018
+                   },
+                   {
+                       "name":  "batch-lease-between_promotions",
+                       "passed":  true,
+                       "elapsedMs":  1361
+                   },
+                   {
+                       "name":  "batch-lease-owner_death",
+                       "passed":  true,
+                       "elapsedMs":  2620
+                   }
+               ],
+    "results":  {
+                    "topology":  "independent_two_host",
+                    "scenarios":  {
+                                      "success":  {
+                                                      "topology":  "independent",
+                                                      "scenario":  "success",
+                                                      "passed":  true,
+                                                      "startedAtUtc":  "2026-07-31T14:22:35.7623693+00:00",
+                                                      "elapsedMs":  2159,
+                                                      "ownerProcessId":  34116,
+                                                      "challengerProcessId":  11584,
+                                                      "successorProcessId":  34116,
+                                                      "ownerTerminated":  false,
+                                                      "ownerReady":  {
+                                                                         "schemaVersion":  1,
+                                                                         "processId":  34116,
+                                                                         "role":  "owner",
+                                                                         "scenario":  "success",
+                                                                         "state":  "owner_ready",
+                                                                         "operationMode":  "batch_exclusive",
+                                                                         "operationId":  "batch-34116-success",
+                                                                         "terminal":  null,
+                                                                         "itemIndex":  null,
+                                                                         "totalItems":  2,
+                                                                         "completedItems":  0,
+                                                                         "promotedOutputs":  null,
+                                                                         "totalOutputs":  null,
+                                                                         "failureStage":  null,
+                                                                         "progressStages":  [
+
+                                                                                            ],
+                                                                         "resources":  [
+                                                                                           "operation_gate",
+                                                                                           "cache_pause",
+                                                                                           "processor_reservation"
+                                                                                       ],
+                                                                         "resourceState":  "held",
+                                                                         "outputEvidence":  [
+
+                                                                                            ],
+                                                                         "outputBytes":  null
+                                                                     },
+                                                      "challengerConflict":  {
+                                                                                 "schemaVersion":  1,
+                                                                                 "processId":  11584,
+                                                                                 "role":  "challenger",
+                                                                                 "scenario":  "success",
+                                                                                 "state":  "challenger_conflict",
+                                                                                 "operationMode":  "normal_export",
+                                                                                 "operationId":  null,
+                                                                                 "terminal":  "conflict",
+                                                                                 "itemIndex":  null,
+                                                                                 "totalItems":  2,
+                                                                                 "completedItems":  0,
+                                                                                 "promotedOutputs":  null,
+                                                                                 "totalOutputs":  null,
+                                                                                 "failureStage":  null,
+                                                                                 "progressStages":  [
+
+                                                                                                    ],
+                                                                                 "resources":  [
+
+                                                                                               ],
+                                                                                 "resourceState":  "blocked",
+                                                                                 "outputEvidence":  [
+
+                                                                                                    ],
+                                                                                 "outputBytes":  null
+                                                                             },
+                                                      "betweenItemsReady":  {
+                                                                                "schemaVersion":  1,
+                                                                                "processId":  34116,
+                                                                                "role":  "owner",
+                                                                                "scenario":  "success",
+                                                                                "state":  "between_items_ready",
+                                                                                "operationMode":  "batch_exclusive",
+                                                                                "operationId":  "batch-34116-success",
+                                                                                "terminal":  null,
+                                                                                "itemIndex":  0,
+                                                                                "totalItems":  2,
+                                                                                "completedItems":  1,
+                                                                                "promotedOutputs":  null,
+                                                                                "totalOutputs":  null,
+                                                                                "failureStage":  null,
+                                                                                "progressStages":  [
+
+                                                                                                   ],
+                                                                                "resources":  [
+                                                                                                  "operation_gate",
+                                                                                                  "cache_pause",
+                                                                                                  "processor_reservation"
+                                                                                              ],
+                                                                                "resourceState":  "held",
+                                                                                "outputEvidence":  [
+
+                                                                                                   ],
+                                                                                "outputBytes":  null
+                                                                            },
+                                                      "betweenItemsConflict":  {
+                                                                                   "schemaVersion":  1,
+                                                                                   "processId":  11584,
+                                                                                   "role":  "challenger",
+                                                                                   "scenario":  "success",
+                                                                                   "state":  "between_items_conflict",
+                                                                                   "operationMode":  "normal_export",
+                                                                                   "operationId":  null,
+                                                                                   "terminal":  "conflict",
+                                                                                   "itemIndex":  0,
+                                                                                   "totalItems":  2,
+                                                                                   "completedItems":  1,
+                                                                                   "promotedOutputs":  null,
+                                                                                   "totalOutputs":  null,
+                                                                                   "failureStage":  null,
+                                                                                   "progressStages":  [
+
+                                                                                                      ],
+                                                                                   "resources":  [
+
+                                                                                                 ],
+                                                                                   "resourceState":  "blocked",
+                                                                                   "outputEvidence":  [
+
+                                                                                                      ],
+                                                                                   "outputBytes":  null
+                                                                               },
+                                                      "ownerTerminal":  {
+                                                                            "schemaVersion":  1,
+                                                                            "processId":  34116,
+                                                                            "role":  "owner",
+                                                                            "scenario":  "success",
+                                                                            "state":  "owner_terminal",
+                                                                            "operationMode":  "batch_exclusive",
+                                                                            "operationId":  "batch-34116-success",
+                                                                            "terminal":  "success",
+                                                                            "itemIndex":  null,
+                                                                            "totalItems":  2,
+                                                                            "completedItems":  2,
+                                                                            "promotedOutputs":  2,
+                                                                            "totalOutputs":  2,
+                                                                            "failureStage":  null,
+                                                                            "progressStages":  [
+                                                                                                   "0:preparing",
+                                                                                                   "0:loading_sources",
+                                                                                                   "0:composing",
+                                                                                                   "0:composing",
+                                                                                                   "0:composing",
+                                                                                                   "0:encoding_output",
+                                                                                                   "0:encoding_output",
+                                                                                                   "0:verifying",
+                                                                                                   "0:publishing",
+                                                                                                   "0:completed",
+                                                                                                   "1:preparing",
+                                                                                                   "1:loading_sources",
+                                                                                                   "1:composing",
+                                                                                                   "1:composing",
+                                                                                                   "1:composing",
+                                                                                                   "1:encoding_output",
+                                                                                                   "1:encoding_output",
+                                                                                                   "1:verifying",
+                                                                                                   "1:publishing",
+                                                                                                   "1:completed"
+                                                                                               ],
+                                                                            "resources":  [
+                                                                                              "operation_gate",
+                                                                                              "cache_pause",
+                                                                                              "processor_reservation"
+                                                                                          ],
+                                                                            "resourceState":  "released",
+                                                                            "outputEvidence":  [
+                                                                                                   {
+                                                                                                       "name":  "success-item-1.png",
+                                                                                                       "bytes":  39164,
+                                                                                                       "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                                   },
+                                                                                                   {
+                                                                                                       "name":  "success-item-2.png",
+                                                                                                       "bytes":  39164,
+                                                                                                       "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                                   }
+                                                                                               ],
+                                                                            "outputBytes":  null
+                                                                        },
+                                                      "successorSuccess":  {
+                                                                               "schemaVersion":  1,
+                                                                               "processId":  34116,
+                                                                               "role":  "owner",
+                                                                               "scenario":  "success",
+                                                                               "state":  "successor_success",
+                                                                               "operationMode":  "normal_export",
+                                                                               "operationId":  null,
+                                                                               "terminal":  "success",
+                                                                               "itemIndex":  null,
+                                                                               "totalItems":  2,
+                                                                               "completedItems":  2,
+                                                                               "promotedOutputs":  null,
+                                                                               "totalOutputs":  null,
+                                                                               "failureStage":  null,
+                                                                               "progressStages":  [
+
+                                                                                                  ],
+                                                                               "resources":  [
+                                                                                                 "operation_gate",
+                                                                                                 "cache_pause",
+                                                                                                 "processor_reservation"
+                                                                                             ],
+                                                                               "resourceState":  "reacquired",
+                                                                               "outputEvidence":  [
+
+                                                                                                  ],
+                                                                               "outputBytes":  39164
+                                                                           },
+                                                      "publicationEvidence":  [
+                                                                                  {
+                                                                                      "name":  "success-item-1.png",
+                                                                                      "bytes":  39164,
+                                                                                      "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                  },
+                                                                                  {
+                                                                                      "name":  "success-item-2.png",
+                                                                                      "bytes":  39164,
+                                                                                      "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                  }
+                                                                              ],
+                                                      "preparationRemnants":  0
+                                                  },
+                                      "before_preparation":  {
+                                                                 "topology":  "independent",
+                                                                 "scenario":  "before_preparation",
+                                                                 "passed":  true,
+                                                                 "startedAtUtc":  "2026-07-31T14:22:37.9976862+00:00",
+                                                                 "elapsedMs":  1018,
+                                                                 "ownerProcessId":  9944,
+                                                                 "challengerProcessId":  31192,
+                                                                 "successorProcessId":  9944,
+                                                                 "ownerTerminated":  false,
+                                                                 "ownerReady":  {
+                                                                                    "schemaVersion":  1,
+                                                                                    "processId":  9944,
+                                                                                    "role":  "owner",
+                                                                                    "scenario":  "before_preparation",
+                                                                                    "state":  "owner_ready",
+                                                                                    "operationMode":  "batch_exclusive",
+                                                                                    "operationId":  "batch-9944-before_preparation",
+                                                                                    "terminal":  null,
+                                                                                    "itemIndex":  null,
+                                                                                    "totalItems":  2,
+                                                                                    "completedItems":  0,
+                                                                                    "promotedOutputs":  null,
+                                                                                    "totalOutputs":  null,
+                                                                                    "failureStage":  null,
+                                                                                    "progressStages":  [
+
+                                                                                                       ],
+                                                                                    "resources":  [
+                                                                                                      "operation_gate",
+                                                                                                      "cache_pause",
+                                                                                                      "processor_reservation"
+                                                                                                  ],
+                                                                                    "resourceState":  "held",
+                                                                                    "outputEvidence":  [
+
+                                                                                                       ],
+                                                                                    "outputBytes":  null
+                                                                                },
+                                                                 "challengerConflict":  {
+                                                                                            "schemaVersion":  1,
+                                                                                            "processId":  31192,
+                                                                                            "role":  "challenger",
+                                                                                            "scenario":  "before_preparation",
+                                                                                            "state":  "challenger_conflict",
+                                                                                            "operationMode":  "normal_export",
+                                                                                            "operationId":  null,
+                                                                                            "terminal":  "conflict",
+                                                                                            "itemIndex":  null,
+                                                                                            "totalItems":  2,
+                                                                                            "completedItems":  0,
+                                                                                            "promotedOutputs":  null,
+                                                                                            "totalOutputs":  null,
+                                                                                            "failureStage":  null,
+                                                                                            "progressStages":  [
+
+                                                                                                               ],
+                                                                                            "resources":  [
+
+                                                                                                          ],
+                                                                                            "resourceState":  "blocked",
+                                                                                            "outputEvidence":  [
+
+                                                                                                               ],
+                                                                                            "outputBytes":  null
+                                                                                        },
+                                                                 "betweenItemsReady":  {
+                                                                                           "schemaVersion":  1,
+                                                                                           "processId":  9944,
+                                                                                           "role":  "owner",
+                                                                                           "scenario":  "before_preparation",
+                                                                                           "state":  "between_items_ready",
+                                                                                           "operationMode":  "batch_exclusive",
+                                                                                           "operationId":  "batch-9944-before_preparation",
+                                                                                           "terminal":  null,
+                                                                                           "itemIndex":  0,
+                                                                                           "totalItems":  2,
+                                                                                           "completedItems":  1,
+                                                                                           "promotedOutputs":  null,
+                                                                                           "totalOutputs":  null,
+                                                                                           "failureStage":  null,
+                                                                                           "progressStages":  [
+
+                                                                                                              ],
+                                                                                           "resources":  [
+                                                                                                             "operation_gate",
+                                                                                                             "cache_pause",
+                                                                                                             "processor_reservation"
+                                                                                                         ],
+                                                                                           "resourceState":  "held",
+                                                                                           "outputEvidence":  [
+
+                                                                                                              ],
+                                                                                           "outputBytes":  null
+                                                                                       },
+                                                                 "betweenItemsConflict":  {
+                                                                                              "schemaVersion":  1,
+                                                                                              "processId":  31192,
+                                                                                              "role":  "challenger",
+                                                                                              "scenario":  "before_preparation",
+                                                                                              "state":  "between_items_conflict",
+                                                                                              "operationMode":  "normal_export",
+                                                                                              "operationId":  null,
+                                                                                              "terminal":  "conflict",
+                                                                                              "itemIndex":  0,
+                                                                                              "totalItems":  2,
+                                                                                              "completedItems":  1,
+                                                                                              "promotedOutputs":  null,
+                                                                                              "totalOutputs":  null,
+                                                                                              "failureStage":  null,
+                                                                                              "progressStages":  [
+
+                                                                                                                 ],
+                                                                                              "resources":  [
+
+                                                                                                            ],
+                                                                                              "resourceState":  "blocked",
+                                                                                              "outputEvidence":  [
+
+                                                                                                                 ],
+                                                                                              "outputBytes":  null
+                                                                                          },
+                                                                 "ownerTerminal":  {
+                                                                                       "schemaVersion":  1,
+                                                                                       "processId":  9944,
+                                                                                       "role":  "owner",
+                                                                                       "scenario":  "before_preparation",
+                                                                                       "state":  "owner_terminal",
+                                                                                       "operationMode":  "batch_exclusive",
+                                                                                       "operationId":  "batch-9944-before_preparation",
+                                                                                       "terminal":  "failed",
+                                                                                       "itemIndex":  1,
+                                                                                       "totalItems":  2,
+                                                                                       "completedItems":  1,
+                                                                                       "promotedOutputs":  0,
+                                                                                       "totalOutputs":  1,
+                                                                                       "failureStage":  "prepare_output",
+                                                                                       "progressStages":  [
+                                                                                                              "0:preparing",
+                                                                                                              "0:loading_sources",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:verifying",
+                                                                                                              "0:publishing",
+                                                                                                              "0:completed",
+                                                                                                              "1:preparing"
+                                                                                                          ],
+                                                                                       "resources":  [
+                                                                                                         "operation_gate",
+                                                                                                         "cache_pause",
+                                                                                                         "processor_reservation"
+                                                                                                     ],
+                                                                                       "resourceState":  "released",
+                                                                                       "outputEvidence":  [
+                                                                                                              {
+                                                                                                                  "name":  "before-preparation-item-1.png",
+                                                                                                                  "bytes":  39164,
+                                                                                                                  "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                                              }
+                                                                                                          ],
+                                                                                       "outputBytes":  null
+                                                                                   },
+                                                                 "successorSuccess":  {
+                                                                                          "schemaVersion":  1,
+                                                                                          "processId":  9944,
+                                                                                          "role":  "owner",
+                                                                                          "scenario":  "before_preparation",
+                                                                                          "state":  "successor_success",
+                                                                                          "operationMode":  "normal_export",
+                                                                                          "operationId":  null,
+                                                                                          "terminal":  "success",
+                                                                                          "itemIndex":  null,
+                                                                                          "totalItems":  2,
+                                                                                          "completedItems":  1,
+                                                                                          "promotedOutputs":  null,
+                                                                                          "totalOutputs":  null,
+                                                                                          "failureStage":  null,
+                                                                                          "progressStages":  [
+
+                                                                                                             ],
+                                                                                          "resources":  [
+                                                                                                            "operation_gate",
+                                                                                                            "cache_pause",
+                                                                                                            "processor_reservation"
+                                                                                                        ],
+                                                                                          "resourceState":  "reacquired",
+                                                                                          "outputEvidence":  [
+
+                                                                                                             ],
+                                                                                          "outputBytes":  39164
+                                                                                      },
+                                                                 "publicationEvidence":  [
+                                                                                             {
+                                                                                                 "name":  "before-preparation-item-1.png",
+                                                                                                 "bytes":  39164,
+                                                                                                 "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                             }
+                                                                                         ],
+                                                                 "preparationRemnants":  0
+                                                             },
+                                      "between_promotions":  {
+                                                                 "topology":  "independent",
+                                                                 "scenario":  "between_promotions",
+                                                                 "passed":  true,
+                                                                 "startedAtUtc":  "2026-07-31T14:22:39.0461323+00:00",
+                                                                 "elapsedMs":  1361,
+                                                                 "ownerProcessId":  28220,
+                                                                 "challengerProcessId":  12400,
+                                                                 "successorProcessId":  28220,
+                                                                 "ownerTerminated":  false,
+                                                                 "ownerReady":  {
+                                                                                    "schemaVersion":  1,
+                                                                                    "processId":  28220,
+                                                                                    "role":  "owner",
+                                                                                    "scenario":  "between_promotions",
+                                                                                    "state":  "owner_ready",
+                                                                                    "operationMode":  "batch_exclusive",
+                                                                                    "operationId":  "batch-28220-between_promotions",
+                                                                                    "terminal":  null,
+                                                                                    "itemIndex":  null,
+                                                                                    "totalItems":  1,
+                                                                                    "completedItems":  0,
+                                                                                    "promotedOutputs":  null,
+                                                                                    "totalOutputs":  null,
+                                                                                    "failureStage":  null,
+                                                                                    "progressStages":  [
+
+                                                                                                       ],
+                                                                                    "resources":  [
+                                                                                                      "operation_gate",
+                                                                                                      "cache_pause",
+                                                                                                      "processor_reservation"
+                                                                                                  ],
+                                                                                    "resourceState":  "held",
+                                                                                    "outputEvidence":  [
+
+                                                                                                       ],
+                                                                                    "outputBytes":  null
+                                                                                },
+                                                                 "challengerConflict":  {
+                                                                                            "schemaVersion":  1,
+                                                                                            "processId":  12400,
+                                                                                            "role":  "challenger",
+                                                                                            "scenario":  "between_promotions",
+                                                                                            "state":  "challenger_conflict",
+                                                                                            "operationMode":  "normal_export",
+                                                                                            "operationId":  null,
+                                                                                            "terminal":  "conflict",
+                                                                                            "itemIndex":  null,
+                                                                                            "totalItems":  1,
+                                                                                            "completedItems":  0,
+                                                                                            "promotedOutputs":  null,
+                                                                                            "totalOutputs":  null,
+                                                                                            "failureStage":  null,
+                                                                                            "progressStages":  [
+
+                                                                                                               ],
+                                                                                            "resources":  [
+
+                                                                                                          ],
+                                                                                            "resourceState":  "blocked",
+                                                                                            "outputEvidence":  [
+
+                                                                                                               ],
+                                                                                            "outputBytes":  null
+                                                                                        },
+                                                                 "betweenItemsReady":  null,
+                                                                 "betweenItemsConflict":  null,
+                                                                 "ownerTerminal":  {
+                                                                                       "schemaVersion":  1,
+                                                                                       "processId":  28220,
+                                                                                       "role":  "owner",
+                                                                                       "scenario":  "between_promotions",
+                                                                                       "state":  "owner_terminal",
+                                                                                       "operationMode":  "batch_exclusive",
+                                                                                       "operationId":  "batch-28220-between_promotions",
+                                                                                       "terminal":  "failed",
+                                                                                       "itemIndex":  0,
+                                                                                       "totalItems":  1,
+                                                                                       "completedItems":  0,
+                                                                                       "promotedOutputs":  1,
+                                                                                       "totalOutputs":  2,
+                                                                                       "failureStage":  "publish_output",
+                                                                                       "progressStages":  [
+                                                                                                              "0:preparing",
+                                                                                                              "0:loading_sources",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:verifying",
+                                                                                                              "0:preparing",
+                                                                                                              "0:loading_sources",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:composing",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:encoding_output",
+                                                                                                              "0:verifying",
+                                                                                                              "0:publishing"
+                                                                                                          ],
+                                                                                       "resources":  [
+                                                                                                         "operation_gate",
+                                                                                                         "cache_pause",
+                                                                                                         "processor_reservation"
+                                                                                                     ],
+                                                                                       "resourceState":  "released",
+                                                                                       "outputEvidence":  [
+                                                                                                              {
+                                                                                                                  "name":  "between-promotions-1.png",
+                                                                                                                  "bytes":  39164,
+                                                                                                                  "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                                              }
+                                                                                                          ],
+                                                                                       "outputBytes":  null
+                                                                                   },
+                                                                 "successorSuccess":  {
+                                                                                          "schemaVersion":  1,
+                                                                                          "processId":  28220,
+                                                                                          "role":  "owner",
+                                                                                          "scenario":  "between_promotions",
+                                                                                          "state":  "successor_success",
+                                                                                          "operationMode":  "normal_export",
+                                                                                          "operationId":  null,
+                                                                                          "terminal":  "success",
+                                                                                          "itemIndex":  null,
+                                                                                          "totalItems":  1,
+                                                                                          "completedItems":  0,
+                                                                                          "promotedOutputs":  null,
+                                                                                          "totalOutputs":  null,
+                                                                                          "failureStage":  null,
+                                                                                          "progressStages":  [
+
+                                                                                                             ],
+                                                                                          "resources":  [
+                                                                                                            "operation_gate",
+                                                                                                            "cache_pause",
+                                                                                                            "processor_reservation"
+                                                                                                        ],
+                                                                                          "resourceState":  "reacquired",
+                                                                                          "outputEvidence":  [
+
+                                                                                                             ],
+                                                                                          "outputBytes":  39164
+                                                                                      },
+                                                                 "publicationEvidence":  {
+                                                                                             "before":  [
+                                                                                                            {
+                                                                                                                "name":  "between-promotions-1.png",
+                                                                                                                "bytes":  21,
+                                                                                                                "sha256":  "68b0e44e1d446ebbd764286c6dd4872a52b7092d5938c02e2703444eba2a2031"
+                                                                                                            },
+                                                                                                            {
+                                                                                                                "name":  "between-promotions-2.png",
+                                                                                                                "bytes":  22,
+                                                                                                                "sha256":  "b41460a0afe33af53d4f1598c3040a1388ff816bdbfeb5a690793e437c328de2"
+                                                                                                            }
+                                                                                                        ],
+                                                                                             "after":  [
+                                                                                                           {
+                                                                                                               "name":  "between-promotions-1.png",
+                                                                                                               "bytes":  39164,
+                                                                                                               "sha256":  "eb02749f7cc312f422a0e18febf5b1758eb56ac09dc5e7905d97281c51be59af"
+                                                                                                           },
+                                                                                                           {
+                                                                                                               "name":  "between-promotions-2.png",
+                                                                                                               "bytes":  22,
+                                                                                                               "sha256":  "b41460a0afe33af53d4f1598c3040a1388ff816bdbfeb5a690793e437c328de2"
+                                                                                                           }
+                                                                                                       ],
+                                                                                             "promotedOutputs":  1,
+                                                                                             "totalOutputs":  2
+                                                                                         },
+                                                                 "preparationRemnants":  0
+                                                             },
+                                      "owner_death":  {
+                                                          "topology":  "independent",
+                                                          "scenario":  "owner_death",
+                                                          "passed":  true,
+                                                          "startedAtUtc":  "2026-07-31T14:22:40.4346870+00:00",
+                                                          "elapsedMs":  2620,
+                                                          "ownerProcessId":  22764,
+                                                          "challengerProcessId":  20768,
+                                                          "successorProcessId":  20768,
+                                                          "ownerTerminated":  true,
+                                                          "ownerReady":  {
+                                                                             "schemaVersion":  1,
+                                                                             "processId":  22764,
+                                                                             "role":  "owner",
+                                                                             "scenario":  "owner_death",
+                                                                             "state":  "owner_ready",
+                                                                             "operationMode":  "batch_exclusive",
+                                                                             "operationId":  "batch-22764-owner_death",
+                                                                             "terminal":  null,
+                                                                             "itemIndex":  null,
+                                                                             "totalItems":  1,
+                                                                             "completedItems":  0,
+                                                                             "promotedOutputs":  null,
+                                                                             "totalOutputs":  null,
+                                                                             "failureStage":  null,
+                                                                             "progressStages":  [
+
+                                                                                                ],
+                                                                             "resources":  [
+                                                                                               "operation_gate",
+                                                                                               "cache_pause",
+                                                                                               "processor_reservation"
+                                                                                           ],
+                                                                             "resourceState":  "held",
+                                                                             "outputEvidence":  [
+
+                                                                                                ],
+                                                                             "outputBytes":  null
+                                                                         },
+                                                          "challengerConflict":  {
+                                                                                     "schemaVersion":  1,
+                                                                                     "processId":  20768,
+                                                                                     "role":  "challenger",
+                                                                                     "scenario":  "owner_death",
+                                                                                     "state":  "challenger_conflict",
+                                                                                     "operationMode":  "normal_export",
+                                                                                     "operationId":  null,
+                                                                                     "terminal":  "conflict",
+                                                                                     "itemIndex":  null,
+                                                                                     "totalItems":  1,
+                                                                                     "completedItems":  0,
+                                                                                     "promotedOutputs":  null,
+                                                                                     "totalOutputs":  null,
+                                                                                     "failureStage":  null,
+                                                                                     "progressStages":  [
+
+                                                                                                        ],
+                                                                                     "resources":  [
+
+                                                                                                   ],
+                                                                                     "resourceState":  "blocked",
+                                                                                     "outputEvidence":  [
+
+                                                                                                        ],
+                                                                                     "outputBytes":  null
+                                                                                 },
+                                                          "betweenItemsReady":  null,
+                                                          "betweenItemsConflict":  null,
+                                                          "ownerTerminal":  null,
+                                                          "successorSuccess":  {
+                                                                                   "schemaVersion":  1,
+                                                                                   "processId":  20768,
+                                                                                   "role":  "challenger",
+                                                                                   "scenario":  "owner_death",
+                                                                                   "state":  "successor_success",
+                                                                                   "operationMode":  "normal_export",
+                                                                                   "operationId":  null,
+                                                                                   "terminal":  "success",
+                                                                                   "itemIndex":  null,
+                                                                                   "totalItems":  1,
+                                                                                   "completedItems":  0,
+                                                                                   "promotedOutputs":  null,
+                                                                                   "totalOutputs":  null,
+                                                                                   "failureStage":  null,
+                                                                                   "progressStages":  [
+
+                                                                                                      ],
+                                                                                   "resources":  [
+                                                                                                     "operation_gate",
+                                                                                                     "cache_pause",
+                                                                                                     "processor_reservation"
+                                                                                                 ],
+                                                                                   "resourceState":  "reacquired",
+                                                                                   "outputEvidence":  [
+
+                                                                                                      ],
+                                                                                   "outputBytes":  39164
+                                                                               },
+                                                          "publicationEvidence":  [
+
+                                                                                  ],
+                                                          "preparationRemnants":  0
+                                                      }
+                                  }
+                },
+    "limits":  {
+                   "batchRunnerExecution":  true,
+                   "batchWideOperationLease":  true,
+                   "multiOutputPromotion":  true,
+                   "topologyMatrix":  false,
+                   "automaticDiscovery":  false,
+                   "checkpoint":  false,
+                   "resume":  false,
+                   "batchUi":  false,
+                   "orphanCleanup":  false,
+                   "projectOpenGuardian":  false
+               }
+}

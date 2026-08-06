@@ -1,0 +1,817 @@
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { expect, test, vi } from "vitest";
+
+import type {
+  NewProjectConfiguration,
+  ProjectConfigurationValidationOutcome,
+  ProjectLaunchOutcome,
+  ProvisionalDecorativeSelection,
+  ProvisionalDecorativeSelectionOutcome,
+} from "./application/globalProjectPort";
+import type { NewProjectCreationConfiguration } from "./application/newProjectPersonalization";
+import { NewProjectFlow } from "./NewProjectFlow";
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+function validConfiguration(): Promise<ProjectConfigurationValidationOutcome> {
+  return Promise.resolve({ status: "valid" });
+}
+
+function selectedDecorative(
+  selection: ProvisionalDecorativeSelection,
+): ProvisionalDecorativeSelectionOutcome {
+  return { status: "selected", selection };
+}
+
+const neutralVisualDefaults = {
+  background: {
+    scope: "bothSides" as const,
+    both: { kind: "color" as const, rgb: "#FFFFFF" },
+  },
+  overlay: { scope: "bothSides" as const, both: null },
+  frameBorder: { kind: "none" as const },
+};
+
+test("validates and creates with the complete neutral configuration", async () => {
+  const user = userEvent.setup();
+  const onValidate = vi.fn(validConfiguration);
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={onValidate}
+    />,
+  );
+
+  expect(screen.getByRole("combobox", { name: "Unidade" })).toHaveValue(
+    "mm",
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+  ).toHaveValue("600");
+  expect(
+    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+  ).toHaveValue("300");
+  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("300");
+  expect(
+    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+  ).toHaveValue("2");
+  expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("3");
+  expect(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("3");
+  expect(
+    screen.getByText(
+      "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Reprodução da Lâmina"),
+  ).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  expect(
+    await screen.findByRole("heading", { name: "Personalização" }),
+  ).toBeInTheDocument();
+
+  const expectedConfiguration = {
+    document: {
+      displayUnit: "mm",
+      sheetWidthUm: 600_000,
+      sheetHeightUm: 300_000,
+      dpi: 300,
+      bleedUm: 3_000,
+      safetyUm: 3_000,
+    },
+    structure: {
+      sheetCount: 2,
+      firstSheet: "double",
+      lastSheet: "double",
+    },
+  } satisfies NewProjectConfiguration;
+  expect(onValidate).toHaveBeenCalledWith(expectedConfiguration);
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith({
+    ...expectedConfiguration,
+    visualDefaults: neutralVisualDefaults,
+  });
+});
+
+test("creates from the neutral visual defaults without copying the demonstrative Frames", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn<
+    (
+      configuration: NewProjectCreationConfiguration,
+    ) => Promise<ProjectLaunchOutcome>
+  >(async () => ({ status: "cancelled" }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  expect(
+    await screen.findByRole("img", { name: "Reprodução da Lâmina" }),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Base branca canônica")).toHaveAttribute(
+    "fill",
+    "#FFFFFF",
+  );
+  expect(screen.getByLabelText("Frame demonstrativo esquerdo")).not.toHaveAttribute(
+    "stroke",
+    "transparent",
+  );
+  expect(screen.getByLabelText("Frame demonstrativo esquerdo")).not.toHaveAttribute(
+    "stroke-width",
+    "0",
+  );
+  expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff");
+  expect(
+    screen.getByRole("checkbox", { name: "Borda dos Frames" }),
+  ).not.toBeChecked();
+  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+    "fill",
+    "#FFFFFF",
+  );
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      visualDefaults: neutralVisualDefaults,
+    }),
+  );
+  expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
+    '"frames"',
+  );
+});
+
+test("hover only highlights while the fixed scope drives immediate Background changes", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  const both = await screen.findByRole("button", {
+    name: "Ambos os lados",
+  });
+  const left = screen.getByRole("button", { name: "Lado esquerdo" });
+  expect(both).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.pointerEnter(left);
+  expect(left).toHaveAttribute("data-highlighted", "true");
+  expect(both).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByLabelText("Realce do lado esquerdo")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#123456" },
+  });
+  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+    "fill",
+    "#123456",
+  );
+
+  await user.click(left);
+  expect(left).toHaveAttribute("aria-pressed", "true");
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#abcdef" },
+  });
+  expect(screen.getByLabelText("Background do lado esquerdo")).toHaveAttribute(
+    "fill",
+    "#ABCDEF",
+  );
+  expect(screen.getByLabelText("Background do lado direito")).toHaveAttribute(
+    "fill",
+    "#123456",
+  );
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      visualDefaults: expect.objectContaining({
+        background: {
+          scope: "perSide",
+          left: { kind: "color", rgb: "#ABCDEF" },
+          right: { kind: "color", rgb: "#123456" },
+        },
+      }),
+    }),
+  );
+});
+
+test("shows a solid Frame border immediately and sends its canonical values", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(
+    await screen.findByRole("checkbox", { name: "Borda dos Frames" }),
+  );
+
+  fireEvent.change(screen.getByLabelText("Cor da Borda"), {
+    target: { value: "#fedcba" },
+  });
+  fireEvent.change(screen.getByLabelText("Espessura da Borda (µm)"), {
+    target: { value: "2500" },
+  });
+
+  expect(screen.getByLabelText("Borda do Frame esquerdo")).toHaveAttribute(
+    "stroke",
+    "#FEDCBA",
+  );
+  expect(screen.getByLabelText("Borda do Frame esquerdo")).toHaveAttribute(
+    "stroke-width",
+    "2500",
+  );
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      visualDefaults: expect.objectContaining({
+        frameBorder: {
+          kind: "solid",
+          rgb: "#FEDCBA",
+          widthUm: 2500,
+        },
+      }),
+    }),
+  );
+});
+
+test("keeps distinct provisional images by side and sends only their opaque ids", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn<
+    (
+      configuration: NewProjectCreationConfiguration,
+    ) => Promise<ProjectLaunchOutcome>
+  >(async () => ({ status: "cancelled" }));
+  const chooseDecorative = vi
+    .fn()
+    .mockResolvedValueOnce(selectedDecorative({
+      selectionId: "selection-background-left",
+      displayName: "Background esquerdo.jpg",
+      previewUrl: "blob:background-left",
+    }))
+    .mockResolvedValueOnce(selectedDecorative({
+      selectionId: "selection-background-right",
+      displayName: "Background direito.jpg",
+      previewUrl: "blob:background-right",
+    }))
+    .mockResolvedValueOnce(selectedDecorative({
+      selectionId: "selection-overlay-right",
+      displayName: "Overlay direito.png",
+      previewUrl: "blob:overlay-right",
+    }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onChooseDecorative={chooseDecorative}
+      onCreate={onCreate}
+      onReleaseDecorative={vi.fn()}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  await user.click(
+    await screen.findByRole("button", { name: "Lado esquerdo" }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+  );
+  expect(await screen.findByText("Background esquerdo.jpg")).toBeInTheDocument();
+  const leftBackground = screen.getByLabelText("Background do lado esquerdo");
+  expect(leftBackground).toHaveAttribute(
+    "href",
+    "blob:background-left",
+  );
+  const canonicalBase = screen.getByLabelText("Base branca canônica");
+  expect(canonicalBase.parentElement).toBe(leftBackground.parentElement);
+  expect(
+    [...(canonicalBase.parentElement?.children ?? [])].indexOf(canonicalBase),
+  ).toBeLessThan(
+    [...(leftBackground.parentElement?.children ?? [])].indexOf(leftBackground),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Lado direito" }));
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Overlay" }),
+  );
+  expect(await screen.findByText("Overlay direito.png")).toBeInTheDocument();
+  expect(screen.getByLabelText("Overlay do lado direito")).toHaveAttribute(
+    "href",
+    "blob:overlay-right",
+  );
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      visualDefaults: {
+        background: {
+          scope: "perSide",
+          left: { kind: "image", selectionId: "selection-background-left" },
+          right: {
+            kind: "image",
+            selectionId: "selection-background-right",
+          },
+        },
+        overlay: {
+          scope: "perSide",
+          left: null,
+          right: { kind: "image", selectionId: "selection-overlay-right" },
+        },
+        frameBorder: { kind: "none" },
+      },
+    }),
+  );
+  expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
+    "blob:background-left",
+  );
+  expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
+    "Background esquerdo.jpg",
+  );
+});
+
+test("preserves provisional personalization and delegates final cancellation cleanup to its owner", async () => {
+  const user = userEvent.setup();
+  const onCancel = vi.fn();
+  const onReleaseDecorative = vi.fn();
+  const selection = {
+    selectionId: "selection-kept",
+    displayName: "Background preservado.jpg",
+    previewUrl: "blob:background-kept",
+  };
+  const onChooseDecorative = vi
+    .fn()
+    .mockResolvedValueOnce(selectedDecorative(selection))
+    .mockResolvedValueOnce({ status: "cancelled" });
+
+  render(
+    <NewProjectFlow
+      onCancel={onCancel}
+      onChooseDecorative={onChooseDecorative}
+      onCreate={async () => ({ status: "cancelled" })}
+      onReleaseDecorative={onReleaseDecorative}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+  );
+  expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+  );
+  expect(screen.getByText(selection.displayName)).toBeInTheDocument();
+  expect(onReleaseDecorative).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(onReleaseDecorative).not.toHaveBeenCalled();
+  expect(onCancel).toHaveBeenCalledOnce();
+});
+
+test("shows a typed native picker failure without changing personalization", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onChooseDecorative={vi.fn(async () => ({
+        status: "failed" as const,
+        error: {
+          code: "unsupported_image",
+          message: "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+          action: "Escolha outro arquivo JPEG ou PNG.",
+        },
+      }))}
+      onCreate={async () => ({ status: "cancelled" })}
+      onReleaseDecorative={vi.fn()}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(
+    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+  );
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Escolha outro arquivo JPEG ou PNG.",
+  );
+  expect(screen.getByText("Cor do Background")).toBeInTheDocument();
+});
+
+test("releases a provisional image as soon as it is no longer referenced", async () => {
+  const user = userEvent.setup();
+  const firstSelection = {
+    selectionId: "selection-replaced",
+    displayName: "Primeiro Background.jpg",
+    previewUrl: "blob:first-background",
+  };
+  const secondSelection = {
+    selectionId: "selection-current",
+    displayName: "Background atual.jpg",
+    previewUrl: "blob:current-background",
+  };
+  const onReleaseDecorative = vi.fn();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onChooseDecorative={vi
+        .fn()
+        .mockResolvedValueOnce(selectedDecorative(firstSelection))
+        .mockResolvedValueOnce(selectedDecorative(secondSelection))}
+      onCreate={async () => ({ status: "cancelled" })}
+      onReleaseDecorative={onReleaseDecorative}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  const chooseBackground = await screen.findByRole("button", {
+    name: "Escolher imagem de Background",
+  });
+  await user.click(chooseBackground);
+  expect(await screen.findByText(firstSelection.displayName)).toBeInTheDocument();
+  await user.click(chooseBackground);
+
+  expect(await screen.findByText(secondSelection.displayName)).toBeInTheDocument();
+  expect(onReleaseDecorative).toHaveBeenCalledOnce();
+  expect(onReleaseDecorative).toHaveBeenCalledWith(
+    firstSelection.selectionId,
+  );
+});
+
+test("converts periodic display values without changing physical values and keeps the chosen proportion", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const unit = screen.getByRole("combobox", { name: "Unidade" });
+  const width = screen.getByRole("textbox", {
+    name: "Largura da Lâmina",
+  });
+  const height = screen.getByRole("textbox", {
+    name: "Altura da Lâmina",
+  });
+  await user.selectOptions(unit, "in");
+  expect(width).toHaveValue("23.622047244094488");
+  expect(height).toHaveValue("11.811023622047244");
+  await user.selectOptions(unit, "mm");
+  expect(width).toHaveValue("600");
+  expect(height).toHaveValue("300");
+
+  await user.selectOptions(unit, "cm");
+  fireEvent.change(width, { target: { value: "50.8" } });
+  fireEvent.change(height, { target: { value: "25.4" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "600" },
+  });
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+    { target: { value: "4" } },
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Primeira Lâmina" }),
+    "singlePage",
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Sangria" }), {
+    target: { value: "0" },
+  });
+
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  expect(
+    await screen.findByLabelText("Prévia do formato da Lâmina"),
+  ).toHaveStyle({ aspectRatio: "508000 / 254000" });
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith({
+    document: {
+      displayUnit: "cm",
+      sheetWidthUm: 508_000,
+      sheetHeightUm: 254_000,
+      dpi: 600,
+      bleedUm: 0,
+      safetyUm: 3_000,
+    },
+    structure: {
+      sheetCount: 4,
+      firstSheet: "singlePage",
+      lastSheet: "double",
+    },
+    visualDefaults: neutralVisualDefaults,
+  } satisfies NewProjectCreationConfiguration);
+});
+
+test("blocks locally unrepresentable text, then revalidates through the Core after correction", async () => {
+  const user = userEvent.setup();
+  const onValidate = vi.fn(validConfiguration);
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={onValidate}
+    />,
+  );
+  const width = screen.getByRole("textbox", {
+    name: "Largura da Lâmina",
+  });
+  fireEvent.change(width, { target: { value: "60.0001" } });
+  expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  expect(width).toHaveFocus();
+  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
+  expect(onValidate).not.toHaveBeenCalled();
+
+  fireEvent.change(width, { target: { value: "600" } });
+  await waitFor(() => expect(onValidate).toHaveBeenCalledOnce());
+  await waitFor(() =>
+    expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument(),
+  );
+  expect(
+    screen.getByRole("heading", { name: "Dimensões" }),
+  ).toBeInTheDocument();
+});
+
+test("shows every Core error, focuses the first field and refreshes errors after editing", async () => {
+  const user = userEvent.setup();
+  const onValidate = vi
+    .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
+    .mockResolvedValueOnce({
+      status: "invalid",
+      errors: [
+        "sheetHeightNotPositive",
+        "dpiOutOfRange",
+        "sheetCountTooSmall",
+      ],
+    })
+    .mockResolvedValue({ status: "valid" });
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={onValidate}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  expect(await screen.findByText(/altura.*maior que zero/i)).toBeInTheDocument();
+  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
+  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  expect(
+    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+  ).toHaveFocus();
+
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    { target: { value: "250" } },
+  );
+  await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.queryByText(/altura.*maior que zero/i)).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByText(/DPI inteiro entre/i)).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Dimensões" }),
+  ).toBeInTheDocument();
+});
+
+test("preserves errors from untouched fields during live validation", async () => {
+  const user = userEvent.setup();
+  const liveValidation = deferred<ProjectConfigurationValidationOutcome>();
+  const onValidate = vi
+    .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
+    .mockResolvedValueOnce({
+      status: "invalid",
+      errors: ["dpiOutOfRange", "sheetCountTooSmall"],
+    })
+    .mockReturnValueOnce(liveValidation.promise);
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={onValidate}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  expect(
+    await screen.findByText(/DPI inteiro entre 1 e 1\.200/i),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    { target: { value: "250" } },
+  );
+  await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
+  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
+  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    { target: { value: "600.0001" } },
+  );
+  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
+  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
+  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  expect(onValidate).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    liveValidation.resolve({ status: "valid" });
+  });
+  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
+  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
+  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+});
+
+test("ignores a late validation response after a newer edit", async () => {
+  const user = userEvent.setup();
+  const first = deferred<ProjectConfigurationValidationOutcome>();
+  const second = deferred<ProjectConfigurationValidationOutcome>();
+  const onValidate = vi
+    .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
+    .mockReturnValueOnce(first.promise)
+    .mockReturnValueOnce(second.promise);
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={onValidate}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await waitFor(() => expect(onValidate).toHaveBeenCalledOnce());
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    { target: { value: "500" } },
+  );
+  await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
+
+  await act(async () => {
+    second.resolve({
+      status: "invalid",
+      errors: ["sheetWidthNotEven"],
+    });
+  });
+  expect(screen.getByText(/micrômetros pares/i)).toBeInTheDocument();
+
+  await act(async () => {
+    first.resolve({ status: "valid" });
+  });
+  expect(screen.getByText(/micrômetros pares/i)).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Dimensões" }),
+  ).toBeInTheDocument();
+});
+
+test("blocks navigation and shows an actionable operational validation failure", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={async () => ({
+        status: "failed",
+        error: {
+          code: "validation_unavailable",
+          message: "A validação está indisponível.",
+          action: "Tente novamente.",
+        },
+      })}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "A validação está indisponível.",
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent("Tente novamente.");
+  expect(
+    screen.getByRole("heading", { name: "Dimensões" }),
+  ).toBeInTheDocument();
+  expect(onCreate).not.toHaveBeenCalled();
+});
+
+test("cancels before validation or creation", async () => {
+  const user = userEvent.setup();
+  const onCancel = vi.fn();
+  const onValidate = vi.fn(validConfiguration);
+  const onCreate = vi.fn(async () => ({ status: "opened" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={onCancel}
+      onCreate={onCreate}
+      onValidate={onValidate}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(onCancel).toHaveBeenCalledOnce();
+  expect(onValidate).not.toHaveBeenCalled();
+  expect(onCreate).not.toHaveBeenCalled();
+});
+
+test("preserves the draft after native cancellation and structured creation failure", async () => {
+  const user = userEvent.setup();
+  const nativeCreation = deferred<ProjectLaunchOutcome>();
+  const onCreate = vi
+    .fn<() => Promise<ProjectLaunchOutcome>>()
+    .mockReturnValueOnce(nativeCreation.promise)
+    .mockResolvedValueOnce({
+      status: "failed",
+      error: {
+        code: "destination_conflict",
+        message: "Outro objeto passou a ocupar este destino.",
+      },
+    });
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    { target: { value: "500" } },
+  );
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(await screen.findByRole("button", { name: "Criar" }));
+  await act(async () => nativeCreation.resolve({ status: "cancelled" }));
+
+  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  expect(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+  ).toHaveValue("500");
+  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(await screen.findByRole("button", { name: "Criar" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Outro objeto passou a ocupar este destino.",
+  );
+  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  expect(
+    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+  ).toHaveValue("500");
+});

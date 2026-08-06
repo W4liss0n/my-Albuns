@@ -14,7 +14,7 @@
 - [ ] Definir normalização de orientação EXIF e o tratamento explícito de TIFF multipágina.
 - [ ] Definir identidade de um item importado, duplicação entre abas, substituição no mesmo caminho e detecção separada de Arquivo ausente e Arquivo indisponível.
 - [ ] Manter `MediaRef` persistente no Projeto; fazer `MediaResolver` inspecionar arquivos e produzir observações ou propostas imutáveis de Importação e Religação, `MediaRuntime` registrar os estados observados e `MediaMonitor` apenas sinalizar mudanças que exigem nova inspeção.
-- [ ] Manter o Cache por Projeto em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-id}`, usando a Identidade persistente e nunca o Nome ou o caminho do arquivo.
+- [ ] Manter o Cache por Projeto em `%LOCALAPPDATA%\MyAlbuns\Cache\{project-key}`, usando a chave opaca central `project-{sha256}` derivada da Identidade persistente e nunca o Nome, o caminho ou a Identidade bruta como componente do sistema de arquivos.
 - [ ] Implementar o resultado do spike. O baseline a validar persiste apenas `metadata.json` e uma representação visual reduzida por Foto ou Decorativo em `Media`, sem tiles ou previews de Lâmina em disco e com miniaturas da Grade somente em memória; qualquer revisão exige evidência registrada no ticket 01.
 - [ ] Manter no índice descartável schema, versão das regras da representação, Identidade do Projeto, último uso e, por mídia, geração publicada, dimensões, formato, orientação EXIF, tamanho, datas do arquivo, quantidade de páginas aplicável, perfil de cor básico e fingerprint.
 - [ ] Manter no Projeto a identidade da mídia, o caminho original, sua categoria e decisões do usuário; metadados em Cache nunca substituem essas informações canônicas.
@@ -26,7 +26,7 @@
 - [ ] Aceitar na primeira versão o risco raro de uma alteração feita com o aplicativo fechado preservar exatamente tamanho e data de alteração; não calcular hash completo de todos os originais a cada abertura.
 - [ ] Se o original estiver ausente, permitir manter a última representação e os últimos metadados apenas como contexto visual, preservando o estado ausente e o bloqueio de toda Exportação que dependa dele.
 - [ ] Se a origem estiver indisponível, preservar vínculo e última representação com estado próprio e `Tentar novamente`; não oferecer Religação nem confirmar ausência até a raiz voltar a ser acessível.
-- [ ] Definir o modo de mídia do Processador de Imagens associado ao contexto do Projeto conforme a topologia escolhida no ticket 01, seus limites de memória e as prioridades entre Lâmina ativa, Painel visível, prefetch, reconstrução e limpeza.
+- [ ] Definir o modo de mídia do Processador de Imagens isolado associado ao host de cada Projeto, seus limites de memória e as prioridades entre Lâmina ativa, Painel visível, prefetch, reconstrução e limpeza.
 - [ ] Pedidos de preview obsoletos devem ser canceláveis e pedidos equivalentes agrupados sem bloquear a fila de comandos do Projeto.
 - [ ] Ao iniciar Exportação, o trabalho de Cache concorrente é pausado ou cancelado com segurança; o Processador responsável pela saída final recebe exclusividade e a fila descartável é retomada depois.
 - [ ] Se o Processador de Imagens cair durante o Cache, reiniciá-lo automaticamente, descartar o item incompleto e reconstruir somente os pedidos ainda relevantes a partir do estado canônico e dos originais; falhas repetidas suspendem o Cache e geram aviso, sem bloquear edição ou Salvamento.

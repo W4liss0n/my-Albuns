@@ -1,0 +1,24 @@
+{
+  "permission": [
+    {
+      "identifier": "project-window-commands",
+      "description": "Allows only the application commands used by local Janelas de Projeto.",
+      "commands": {
+        "allow": [
+          "frontend_log",
+          "project_state",
+          "apply_project_intent",
+          "undo_project",
+          "redo_project",
+          "save_project",
+          "request_project_close",
+          "resolve_project_close",
+          "prepare_media_previews",
+          "export_sheet",
+          "cancel_export"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

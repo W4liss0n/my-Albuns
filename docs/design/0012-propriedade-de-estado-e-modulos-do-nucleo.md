@@ -1,6 +1,7 @@
 ---
-status: proposed
+status: accepted
 document: design
+updated: 2026-08-02
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -9,7 +10,7 @@ document: design
 
 Definir onde vivem o estado criativo, os cálculos de composição e os estados operacionais do MyAlbuns. O desenho evita duas fontes canônicas para o mesmo Projeto, impede que Cache, watcher ou interface marquem o documento como alterado e fornece os mesmos cálculos para editor, Exportação normal e lote.
 
-Este documento detalha a direção ainda proposta no [ADR 0005](../adr/0005-adotar-tauri-react-rust.md). Os nomes abaixo são nomes de trabalho e podem mudar no spike. O contrato de propriedade e as separações de responsabilidade importam mais que a quantidade final de crates, processos ou tipos públicos.
+Este documento detalha a direção aceita no [ADR 0005](../adr/0005-adotar-tauri-react-rust.md). Os nomes abaixo continuam sendo nomes de trabalho. O contrato de propriedade e as separações de responsabilidade importam mais que a quantidade final de crates ou tipos públicos.
 
 ## Princípios
 
@@ -17,7 +18,7 @@ Este documento detalha a direção ainda proposta no [ADR 0005](../adr/0005-adot
 - O arquivo persistido, a Sessão do Projeto, o estado transitório da interface, o estado operacional das mídias e o Cache são estados diferentes.
 - Cálculos de composição são puros e determinísticos: recebem valores imutáveis e retornam resultados sem I/O ou mutação escondida.
 - O `ProjectCore` continua sendo o seam externo pequeno usado pelo host interativo e pelo lote. Suas subdivisões são inicialmente internas e não precisam virar interfaces públicas.
-- Processos são uma decisão de implantação. Os módulos não presumem uma das topologias avaliadas pelo spike.
+- Processos são uma decisão de implantação. Os módulos permanecem neutros, embora a implantação aceita use um host independente por Projeto.
 - Uma operação longa possui seus próprios cancelamento e progresso. Exclusividade global é pequena e explícita, não um coordenador universal de toda ação do aplicativo.
 - Persistências com garantias diferentes usam stores concretos; somente primitivas mecânicas comprovadamente iguais são compartilhadas.
 
@@ -142,36 +143,35 @@ Sua implementação possui três fases internas:
 
 `ExportPipeline` possui o ciclo de vida da preparação; `ExportExecutor` grava e verifica as saídas nela, e o pipeline garante sua limpeza nos estados terminais tratáveis. `Publisher` segue a transação limitada do [ADR 0006](../adr/0006-publicar-exportacao-com-transacao-limitada.md). Staging no Destino permite substituição atômica por arquivo quando suportada, mas não oferece rollback do conjunto, backup integral ou manifesto persistente.
 
-`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Primeiro usa `plan` para os itens conhecidos e captura o único `RootBindingPlan` da tentativa do lote; depois chama `execute` para cada item com esse mesmo plano. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
+`BatchRunner` permanece fora de `ExportPipeline`. Ele descobre e pré-valida Projetos, mantém checkpoint e processa os itens serialmente. Primeiro usa `plan` para os itens conhecidos e captura o único `RootBindingPlan` da tentativa do lote; depois chama `execute_group` para cada item com esse mesmo plano — `execute` é apenas a especialização de saída única. Uma raiz inesperada interrompe o planejamento atual em vez de ser resolvida independentemente por um worker.
 
 ### Dois mecanismos de exclusividade, deliberadamente separados
 
 O aplicativo possui duas exclusividades que nunca devem ser unificadas:
 
-| Mecanismo | Escopo | Sobrevive à queda? |
+| Mecanismo | Escopo da posse | Término da posse |
 |---|---|---|
-| `OperationGate` | concessões entre operações do aplicativo em execução | não — a concessão morre com o processo, e é isso que se quer |
-| Bloqueio de abertura | uma sessão editável por Identidade de Projeto | sim — é trava real de arquivo, some só quando o processo dono some |
+| `OperationGate` | uma tentativa de operação do aplicativo | terminal da tentativa ou abandono quando o processo proprietário morre |
+| Bloqueio de abertura | uma Sessão editável por Identidade de Projeto | fechamento normal da Sessão; em uma queda, o Windows só o libera depois que o processo proprietário realmente morre |
 
-A separação não é acidental. Uma concessão em memória não protege um arquivo depois que o programa morre, e uma trava de arquivo é cara demais para arbitrar operações internas. Unificá-las quebraria os dois lados: a recuperação automática de Bloqueio órfão depende de a trava pertencer ao processo, e a liberação imediata de uma concessão depende de ela não persistir.
+A separação não é acidental. O terminal de uma tentativa devolve sua concessão sem encerrar a Sessão e sem liberar o arquivo; o Bloqueio de abertura continua retido enquanto essa Sessão permanecer editável. Nenhum dos mecanismos é estado persistente: diante da queda do proprietário, o sistema operacional libera os recursos somente depois que o processo deixa de existir. Uma trava de arquivo também é inadequada para arbitrar operações internas. Unificá-los quebraria os dois ciclos de vida.
 
 O Bloqueio de abertura também combina identidade física e Identidade persistida, que o `OperationGate` desconhece por completo. Ele pertence ao fluxo de abertura de Projeto, não a este módulo.
 
-`OperationGate` concede somente os modos de exclusividade necessários:
-
-- uma única Exportação normal global;
-- Modo de lote exclusivo;
-- manutenção total do Cache.
-
-`NormalExport` conflita com outra Exportação, lote e manutenção total, mas não bloqueia edição nas demais Janelas. `BatchExclusive` e `CacheMaintenance` aplicam os bloqueios mais fortes definidos pela SPEC. O gate não armazena progresso nem cancelamento e não vira um mutex universal.
+`OperationGate` concede uma única reserva exclusiva global, sem codificar rótulos
+de operações que ainda não possuem consumidores. Hoje a Exportação normal usa
+essa concessão. O futuro lote e a manutenção total do Cache devem adquirir a
+mesma concessão, enquanto seus proprietários aplicam as políticas adicionais
+definidas pela SPEC. O gate não armazena o tipo da operação, progresso,
+cancelamento ou estado criativo e não vira um coordenador universal.
 
 Cada tentativa possui seu próprio token de cancelamento e destino de progresso.
 
 Toda Exportação precisa de três reservas antes de produzir saída: a concessão aplicável do `OperationGate`, a pausa do trabalho de Cache que compartilharia o Processador e a reserva do próprio Processador. As três são adquiridas e liberadas por um `OperationLease` único, e não pelo chamador.
 
-`OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. A pausa usa o menor escopo seguro permitido pela topologia, cobrindo ao menos o namespace do Projeto exportado.
+`OperationLease` não possui a política de exclusividade nem os jobs de Cache — `OperationGate` e `CacheEngine` continuam donos deles. O que ele possui é a **ordem de aquisição e a garantia de liberação**: as três reservas são devolvidas em sucesso, falha, cancelamento e queda do proprietário, sempre juntas. Como cada Projeto possui host e Processador de Imagens isolados, a pausa cobre o namespace do Projeto exportado.
 
-A Exportação normal e cada item da Exportação em lote usam o mesmo lease, e por isso não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
+A Exportação normal adquire uma instância de `OperationLease` por tentativa. O `BatchRunner` adquire uma única instância de `OperationLease` para toda a tentativa do lote e executa todos os itens sob ela, sem liberar ou readquirir entre itens. Assim, os dois caminhos usam o mesmo mecanismo e não podem divergir em quais recursos devolvem depois de uma falha. Uma reserva vazada é o pior modo de falha do sistema: a concessão é global, então uma Exportação que não devolve a sua impede qualquer outra em todos os Projetos abertos até o programa reiniciar. Concentrar a liberação em um lugar é o que torna esse caso verificável por um teste só.
 
 ## Persistência concreta e primitivas compartilhadas
 
@@ -188,11 +188,11 @@ Esses stores podem compartilhar uma implementação interna pequena para criar t
 
 ## Topologia e IPC
 
-Os módulos acima são neutros entre host independente por Projeto e host multiwindow. O spike continua responsável por escolher a topologia.
+Os módulos acima permanecem neutros quanto à implantação para não espalhar detalhes de processo pelo núcleo. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) mapeia essa arquitetura para um host independente por Projeto no MVP.
 
-Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e, caso a topologia escolhida coloque o consumidor da composição em outro processo, `CompositionPlan`. O spike define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
+Quando uma operação lógica atravessar processos, a IPC transporta somente valores imutáveis. Entre as cargas possíveis estão intenção consolidada, `RenderSnapshot`, plano de bindings de raiz e `CompositionPlan`. A implementação define quais desses valores realmente cruzam a fronteira e seu esquema concreto. Progresso e cancelamento usam mensagens ou handles limitados à tentativa. Nenhum processo mantém uma segunda cópia mutável do Projeto como fonte canônica.
 
-O cenário baseline a medir continua sendo uma aplicação Tauri com Janelas separadas, uma Sessão por Projeto, Processador de Imagens isolado conforme a topologia e Processador temporário para lote. Isso é hipótese de comparação, não decisão aceita antes do relatório do spike.
+O baseline aceito é uma aplicação Tauri com Janelas e hosts separados, uma Sessão e um Processador de Imagens isolado por Projeto e um Processador temporário para o lote.
 
 ## Testes
 
@@ -212,7 +212,7 @@ Testes não dependem da quantidade final de crates nem atravessam seams internos
 ## Decisões adiadas
 
 - nomes finais, crates e visibilidade pública das subdivisões internas;
-- topologia de processos e transporte concreto de IPC;
+- transporte e esquema concretos da IPC;
 - formato concreto de `RenderSnapshot`, `CompositionPlan` e patches;
 - algoritmo do Gerador de Layouts;
 - codecs, perfis de cor e implementação do renderizador;

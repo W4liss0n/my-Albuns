@@ -1,0 +1,133 @@
+{
+    "schemaVersion":  2,
+    "suite":  "frontend_security_capabilities",
+    "collectedAtUtc":  "2026-08-01T02:18:30.5869530+00:00",
+    "gitCommit":  "abc023d6dd7fd55fd9d6c0131dd51bfcf359a245",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "powerShellEdition":  "Desktop",
+                     "powerShellVersion":  "5.1.26100.8875"
+                 },
+    "build":  {
+                  "profile":  "dev-check-and-test",
+                  "cargoBuildJobs":  2,
+                  "targetDirectory":  "target/frontend-security-gate",
+                  "buildInputFileCount":  223,
+                  "buildInputDigestSha256":  "425b449cd27d02163e11375145a6f50e8ac3e73646061d1ff4f0dbbe501e6243",
+                  "buildInputsDirty":  false,
+                  "workingTreeDirty":  true
+              },
+    "checks":  [
+                   {
+                       "name":  "powershell-runner-ast",
+                       "passed":  true,
+                       "elapsedMs":  0
+                   },
+                   {
+                       "name":  "rust-project-capability-contract",
+                       "passed":  true,
+                       "elapsedMs":  48437
+                   },
+                   {
+                       "name":  "rust-global-capability-contract",
+                       "passed":  true,
+                       "elapsedMs":  6260
+                   },
+                   {
+                       "name":  "rust-asset-scope-contract",
+                       "passed":  true,
+                       "elapsedMs":  467
+                   },
+                   {
+                       "name":  "tauri-acl-compilation",
+                       "passed":  true,
+                       "elapsedMs":  19699
+                   },
+                   {
+                       "name":  "frontend-tauri-boundary",
+                       "passed":  true,
+                       "elapsedMs":  3817
+                   },
+                   {
+                       "name":  "frontend-production-build",
+                       "passed":  true,
+                       "elapsedMs":  10556
+                   }
+               ],
+    "results":  {
+                    "capabilities":  [
+                                         {
+                                             "identifier":  "default",
+                                             "local":  true,
+                                             "windows":  [
+                                                             "main",
+                                                             "project-b"
+                                                         ],
+                                             "permissions":  [
+                                                                 "project-window-commands"
+                                                             ],
+                                             "permissionIdentifier":  "project-window-commands",
+                                             "pluginPermissions":  [
+
+                                                                   ],
+                                             "commands":  [
+                                                              "apply_project_intent",
+                                                              "cancel_export_spike",
+                                                              "export_spike",
+                                                              "frontend_log",
+                                                              "persist_topology_fault_probe",
+                                                              "prepare_media_previews",
+                                                              "project_state",
+                                                              "redo_project",
+                                                              "report_topology_benchmark_failure",
+                                                              "report_topology_canvas_benchmark",
+                                                              "report_topology_canvas_ready",
+                                                              "report_topology_fault_probe_failure",
+                                                              "topology_benchmark_config",
+                                                              "topology_fault_probe_config",
+                                                              "undo_project"
+                                                          ]
+                                         },
+                                         {
+                                             "identifier":  "global-shell",
+                                             "local":  true,
+                                             "windows":  [
+                                                             "global"
+                                                         ],
+                                             "permissions":  [
+                                                                 "global-shell-logging",
+                                                                 "dialog:allow-open"
+                                                             ],
+                                             "permissionIdentifier":  "global-shell-logging",
+                                             "pluginPermissions":  [
+                                                                       "dialog:allow-open"
+                                                                   ],
+                                             "commands":  [
+                                                              "frontend_log"
+                                                          ]
+                                         }
+                                     ],
+                    "assetScopes":  [
+                                        "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.jpg",
+                                        "$LOCALDATA/MyAlbuns2/Cache/*/Media/*.png"
+                                    ],
+                    "compiledAppManifest":  true,
+                    "genericFilesystemPermission":  false,
+                    "genericShellPermission":  false,
+                    "backendSidecarShellDependency":  true,
+                    "backendSidecarShellRegistration":  true,
+                    "fixedImagingSidecarInvocation":  true,
+                    "globalNativeDialogDependency":  true,
+                    "globalNativeDialogRegistration":  true,
+                    "nativeDialogCommands":  [
+                                                 "open"
+                                             ]
+                },
+    "limits":  {
+                   "topologyProbeCommandsRemainTemporary":  true,
+                   "assetScopeUsesTemporaryMyAlbuns2Namespace":  true,
+                   "runtimeWebView2AndInstallerGate":  false
+               }
+}

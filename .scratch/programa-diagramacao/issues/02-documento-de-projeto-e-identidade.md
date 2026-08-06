@@ -25,3 +25,7 @@
 - [ ] A Recuperação usa substituição atômica fora do arquivo do Projeto e é removida quando não existem mudanças pendentes após `Salvar` ou fechamento normal.
 - [ ] Garantir que mídia continue vinculada a caminhos externos e que qualquer Projeto copiado seja independente dos demais.
 - [ ] Fornecer exemplos versionados de documento válido, migração e estados inválidos para orientar testes futuros.
+
+## Comments
+
+- 2026-07-31: o gate de caminhos da fase 1 demonstrou que `ProjectFileLock` acompanha o objeto físico aberto e permanece como proteção final da Sessão. O futuro `ProjectStore` precisa definir como a trava é transferida ou readquirida durante a substituição atômica do arquivo, sem intervalo desprotegido e sem voltar a decidir pelo pathname. A implementação atual não encerra este critério de Salvamento.

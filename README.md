@@ -19,7 +19,7 @@ O glossário é normativo apenas para o significado dos termos. As pesquisas sã
 - [ADR 0002 — Identidade de cópias externas](docs/adr/0002-identificar-copias-externas.md) · aceito
 - [ADR 0003 — Limpeza de saídas órfãs pela nomeação](docs/adr/0003-limpar-saidas-orfas-pela-nomeacao.md) · aceito
 - [ADR 0004 — Margens dentro da dimensão exportada](docs/adr/0004-manter-margens-dentro-da-dimensao-exportada.md) · aceito
-- [ADR 0005 — Tauri 2, React/TypeScript e Rust](docs/adr/0005-adotar-tauri-react-rust.md) · **proposto**, pendente do spike
+- [ADR 0005 — Tauri 2, React/TypeScript e Rust com host por Projeto](docs/adr/0005-adotar-tauri-react-rust.md) · aceito
 - [ADR 0006 — Publicação com transação limitada](docs/adr/0006-publicar-exportacao-com-transacao-limitada.md) · aceito
 - [ADR 0007 — Caminhos Windows e identidade física](docs/adr/0007-tratar-caminhos-windows-e-identidade-fisica.md) · aceito
 - [ADR 0008 — Arranjo de reserva de Layout](docs/adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md) · aceito
@@ -68,4 +68,4 @@ O mapa de implementação está em [`.scratch/programa-diagramacao/`](.scratch/p
 
 ## Estado do repositório
 
-O repositório ainda não possui implementação. Windows 10/11 x64 é a plataforma inicial, e o editor exigirá WebGL2 com backend de hardware verificável. Tauri 2 com React/TypeScript e Rust é a hipótese principal, mas a topologia de processos só será decidida depois de um spike comparativo.
+Windows 10/11 x64 é o escopo inicial. No Windows 11 x64, o spike executável validou WebGL2 com backend de hardware verificável e Tauri 2 com React/TypeScript e Rust. A arquitetura aceita usa `MyAlbuns.exe` como processo global leve, um host independente por Projeto e um Processador de Imagens separado, conforme o [ADR 0005](docs/adr/0005-adotar-tauri-react-rust.md).

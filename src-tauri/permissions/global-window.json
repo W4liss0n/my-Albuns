@@ -1,0 +1,23 @@
+{
+  "permission": [
+    {
+      "identifier": "global-window-commands",
+      "description": "Allows validating, creating, or opening Projetos, selecting provisional Imagens decorativas, and reading local Tela de Boas-vindas state.",
+      "commands": {
+        "allow": [
+          "complete_graphics_gate",
+          "create_project",
+          "open_project",
+          "recent_projects",
+          "open_recent_project",
+          "startup_open_failure",
+          "validate_project_configuration",
+          "choose_provisional_decorative",
+          "release_provisional_decorative",
+          "clear_provisional_decoratives"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}
