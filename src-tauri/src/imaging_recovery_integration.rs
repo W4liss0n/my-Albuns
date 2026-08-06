@@ -70,7 +70,7 @@ fn export_plan(
             sources,
         ),
     )
-    .expect("the Export is planned")
+    .expect("the Exportação is planned")
 }
 
 pub(crate) struct RealProcessTransport {
@@ -422,7 +422,7 @@ fn real_processor_recovery_flows_through_production_modules() {
             .media_id
             .clone();
         let export_source = RenderSource::new(export_media_id, source.source_path().to_path_buf())
-            .expect("the Export source matches the recovery frame");
+            .expect("the source for Exportação matches the recovery Frame");
         let project_before = session
             .persisted_revision()
             .expect("the Project revision serializes before failure");
@@ -575,7 +575,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             .media_id
             .clone();
         let source = RenderSource::new(media_id, source.source_path().to_path_buf())
-            .expect("the mapped source matches the Export frame");
+            .expect("the mapped source matches the Frame used by Exportação");
         let output_path = logical_exports.join("Album-path-gate.jpg");
         let unavailable_request_id = "export-real-unc-unavailable";
         let unavailable_plan = export_plan(

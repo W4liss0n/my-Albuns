@@ -22,7 +22,6 @@ import {
   type CanvasGraphicsDiagnosticProbe,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
-import { SafeApplicationShell } from "./components/SafeApplicationShell";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import "./App.css";
 
@@ -171,7 +170,7 @@ function App({
   }, [editorGraphics.supported, logger, mediaPreviewPort, projectId]);
 
   if (!editorGraphics.supported) {
-    return <SafeApplicationShell diagnostic={editorGraphics} />;
+    return <ProjectGraphicsFailure diagnostic={editorGraphics} />;
   }
 
   if (loadError) {
@@ -213,6 +212,26 @@ function App({
         />
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
+  );
+}
+
+function ProjectGraphicsFailure({
+  diagnostic,
+}: {
+  diagnostic: Extract<GraphicsDiagnostic, { supported: false }>;
+}) {
+  return (
+    <main className="startup-surface">
+      <section className="startup-card" role="alert">
+        <p className="eyebrow">Editor indisponível</p>
+        <h1>O Canvas não pôde ser iniciado</h1>
+        <p>{diagnostic.reason}</p>
+        <p className="support-note">
+          Feche esta Janela do Projeto e use o Diagnóstico gráfico da
+          Boas-vindas antes de tentar novamente.
+        </p>
+      </section>
+    </main>
   );
 }
 

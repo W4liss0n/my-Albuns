@@ -1659,7 +1659,7 @@ fn an_open_v1_project_exposes_the_initial_editor_projection_without_demo_content
         projection.state.project_id,
         project.project_id().to_string()
     );
-    assert_eq!(projection.state.project_name, "Projeto");
+    assert_eq!(projection.state.project_name, "Projeto produtivo");
     assert_eq!(projection.state.revision, 0);
     assert_eq!(projection.state.saved_revision, 0);
     assert!(!projection.state.dirty);

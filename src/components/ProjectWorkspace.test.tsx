@@ -1210,7 +1210,7 @@ test("uses the Canvas-centered sheet for a media double click", () => {
   });
 });
 
-test("exports the Canvas-centered sheet even while focus remains on another sheet", () => {
+test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {
   const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",

@@ -7,11 +7,15 @@ use std::{
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto};
 use serde::Serialize;
-use tauri::{AppHandle, Manager, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    desktop_webview_policy, logging, native_project_dialog, path_io,
+    desktop_webview_policy,
+    graphics_launch_gate::{
+        GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
+    },
+    logging, native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
         FailureStage, InitialProjectConfiguration, InitialProjectCreationConfiguration,
@@ -25,20 +29,28 @@ use crate::{
     recent_projects::{RecentProjectSummary, RecentProjectsStore},
 };
 
+#[cfg(debug_assertions)]
+use crate::graphics_launch_gate::debug_process_gate_report;
+
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[cfg(debug_assertions)]
+const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
 
 #[derive(Clone)]
 struct GlobalRuntimeState {
     bootstrap: ProjectHostBootstrap,
+    graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
 }
 
 impl GlobalRuntimeState {
-    fn new(app_paths: &AppPaths) -> Result<Self, std::io::Error> {
+    fn new(app_paths: &AppPaths, direct_project: Option<PathBuf>) -> Result<Self, std::io::Error> {
         Ok(Self {
             bootstrap: ProjectHostBootstrap::new(std::env::current_exe()?, HOST_TERMINAL_TIMEOUT),
+            graphics_gate: GraphicsLaunchGate::new(direct_project),
             recent_projects: RecentProjectsStore::new(app_paths),
             startup_failure: Arc::new(Mutex::new(None)),
         })
@@ -56,6 +68,12 @@ impl GlobalRuntimeState {
             .startup_failure
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(failure);
+    }
+
+    fn project_host_gate_rejection(&self) -> Option<ProjectLaunchOutcome> {
+        (!self.graphics_gate.allows_project_host()).then(|| ProjectLaunchOutcome::Failed {
+            error: graphics_gate_failure(),
+        })
     }
 }
 
@@ -88,8 +106,43 @@ enum ConfirmedLaunch {
 }
 
 #[tauri::command]
+async fn complete_graphics_gate(
+    app: AppHandle,
+    report: GraphicsGateReport,
+) -> Option<ProjectLaunchOutcome> {
+    let state = app.state::<GlobalRuntimeState>().inner().clone();
+    match state.graphics_gate.complete(report) {
+        GraphicsGateCompletion::Ready(Some(project_path)) => {
+            let outcome = launch_confirmed_project(
+                state.clone(),
+                project_path,
+                ConfirmedLaunch::OpenExisting,
+            )
+            .await;
+            match &outcome {
+                ProjectLaunchOutcome::Opened => app.exit(0),
+                ProjectLaunchOutcome::Failed { error } => {
+                    state.record_startup_failure(error.clone());
+                    show_existing_global_window(&app);
+                }
+                ProjectLaunchOutcome::Cancelled => show_existing_global_window(&app),
+            }
+            Some(outcome)
+        }
+        GraphicsGateCompletion::Rejected => {
+            show_existing_global_window(&app);
+            None
+        }
+        GraphicsGateCompletion::Ready(None) | GraphicsGateCompletion::AlreadyFinal => None,
+    }
+}
+
+#[tauri::command]
 async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -148,6 +201,9 @@ async fn create_project(
     configuration: ProvisionalProjectCreationConfiguration,
 ) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
     let provisional_decoratives = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
     let resolution_registry = provisional_decoratives.clone();
     let configuration = match tauri::async_runtime::spawn_blocking(move || {
@@ -226,6 +282,9 @@ async fn recent_projects(
 #[tauri::command]
 async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
     let store = state.recent_projects.clone();
     let lookup_id = project_id.clone();
     let path = match tauri::async_runtime::spawn_blocking(move || store.path_for(&lookup_id)).await
@@ -265,6 +324,9 @@ async fn launch_confirmed_project(
     project_path: PathBuf,
     launch: ConfirmedLaunch,
 ) -> ProjectLaunchOutcome {
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
     let root_bindings = match path_io::capture_root_bindings(vec![project_path.clone()]).await {
         Ok(root_bindings) => root_bindings,
         Err(error) => {
@@ -510,6 +572,22 @@ fn state_failure() -> ProjectLaunchFailure {
     )
 }
 
+fn graphics_gate_failure() -> ProjectLaunchFailure {
+    simple_failure(
+        "graphics_requirement_not_met",
+        "O editor exige WebGL2 com aceleração por hardware confirmada.",
+        "Consulte o Diagnóstico gráfico antes de abrir ou criar um Projeto.",
+    )
+}
+
+fn graphics_gate_timeout_failure() -> ProjectLaunchFailure {
+    simple_failure(
+        "graphics_gate_timeout",
+        "Não foi possível confirmar o requisito gráfico do editor no prazo.",
+        "Reinicie o MyAlbuns e consulte o Diagnóstico gráfico.",
+    )
+}
+
 fn simple_failure(code: &str, message: &str, action: &str) -> ProjectLaunchFailure {
     staged_failure(code, None, message, action)
 }
@@ -528,14 +606,14 @@ fn staged_failure(
     }
 }
 
-async fn show_global_window(app: &AppHandle) -> Result<(), std::io::Error> {
+async fn build_global_window(app: &AppHandle) -> Result<WebviewWindow, std::io::Error> {
     let config = app
         .config()
         .app
         .windows
         .iter()
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
-        .ok_or_else(|| std::io::Error::other("a configuração da janela global não existe"))?;
+        .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
     let window = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
         .build()
@@ -543,24 +621,73 @@ async fn show_global_window(app: &AppHandle) -> Result<(), std::io::Error> {
     desktop_webview_policy::enforce(&window)
         .await
         .map_err(std::io::Error::other)?;
-    window.show().map_err(std::io::Error::other)
+    Ok(window)
 }
 
-async fn show_global_window_or_exit(app: AppHandle) {
-    if let Err(error) = show_global_window(&app).await {
-        tracing::error!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::Global.as_str(),
-            error = %error,
-            event = "global_window_initialization_failed",
-        );
-        app.exit(1);
+fn show_existing_global_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(GLOBAL_WINDOW_LABEL) {
+        let _ = window.show();
     }
+}
+
+async fn initialize_global_window(app: AppHandle, state: GlobalRuntimeState) {
+    let direct_project_pending = state.graphics_gate.has_pending_direct_project();
+    let window = match build_global_window(&app).await {
+        Ok(window) => window,
+        Err(error) => {
+            tracing::error!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "global_window_initialization_failed",
+            );
+            app.exit(1);
+            return;
+        }
+    };
+    if !direct_project_pending {
+        if let Err(error) = window.show() {
+            tracing::error!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error = %error,
+                event = "global_window_show_failed",
+            );
+            app.exit(1);
+        }
+        return;
+    }
+
+    tokio::time::sleep(GRAPHICS_GATE_TIMEOUT).await;
+    if state.graphics_gate.expire() {
+        state.record_startup_failure(graphics_gate_timeout_failure());
+        let _ = window.show();
+    }
+}
+
+#[cfg(debug_assertions)]
+fn process_gate_headless_enabled() -> bool {
+    std::env::var_os(PROCESS_GATE_HEADLESS_ENV).as_deref() == Some(std::ffi::OsStr::new("1"))
+}
+
+#[cfg(debug_assertions)]
+fn start_headless_process_gate(app: AppHandle, state: GlobalRuntimeState) {
+    let GraphicsGateCompletion::Ready(Some(project_path)) =
+        state.graphics_gate.complete(debug_process_gate_report())
+    else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        match launch_confirmed_project(state, project_path, ConfirmedLaunch::OpenExisting).await {
+            ProjectLaunchOutcome::Opened => app.exit(0),
+            ProjectLaunchOutcome::Cancelled | ProjectLaunchOutcome::Failed { .. } => app.exit(1),
+        }
+    });
 }
 
 pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let app_paths = AppPaths::discover()?;
-    let state = GlobalRuntimeState::new(&app_paths)?;
+    let state = GlobalRuntimeState::new(&app_paths, direct_project)?;
     let setup_state = state.clone();
     let provisional_decoratives =
         crate::provisional_decoratives::ProvisionalDecorativeRegistry::default();
@@ -583,32 +710,16 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
             let app_handle = app.handle().clone();
-            if let Some(project_path) = direct_project {
-                let direct_state = setup_state.clone();
-                tauri::async_runtime::spawn(async move {
-                    match launch_confirmed_project(
-                        direct_state.clone(),
-                        project_path,
-                        ConfirmedLaunch::OpenExisting,
-                    )
-                    .await
-                    {
-                        ProjectLaunchOutcome::Opened => app_handle.exit(0),
-                        ProjectLaunchOutcome::Failed { error } => {
-                            direct_state.record_startup_failure(error);
-                            show_global_window_or_exit(app_handle).await;
-                        }
-                        ProjectLaunchOutcome::Cancelled => {
-                            show_global_window_or_exit(app_handle).await;
-                        }
-                    }
-                });
-            } else {
-                tauri::async_runtime::spawn(show_global_window_or_exit(app_handle));
+            #[cfg(debug_assertions)]
+            if process_gate_headless_enabled() {
+                start_headless_process_gate(app_handle, setup_state.clone());
+                return Ok(());
             }
+            tauri::async_runtime::spawn(initialize_global_window(app_handle, setup_state.clone()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            complete_graphics_gate,
             create_project,
             open_project,
             recent_projects,
@@ -626,6 +737,64 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn creation_launch() -> ConfirmedLaunch {
+        ConfirmedLaunch::CreateNew {
+            configuration: Box::new(
+                serde_json::from_value(serde_json::json!({
+                    "document": {
+                        "displayUnit": "mm",
+                        "sheetWidthUm": 600000,
+                        "sheetHeightUm": 300000,
+                        "dpi": 300,
+                        "bleedUm": 3000,
+                        "safetyUm": 3000
+                    },
+                    "structure": {
+                        "sheetCount": 2,
+                        "firstSheet": "double",
+                        "lastSheet": "double"
+                    },
+                    "visualDefaults": {
+                        "background": {
+                            "scope": "bothSides",
+                            "both": { "kind": "color", "rgb": "#FFFFFF" }
+                        },
+                        "overlay": { "scope": "bothSides", "both": null },
+                        "frameBorder": { "kind": "none" }
+                    }
+                }))
+                .expect("the creation launch fixture is valid"),
+            ),
+            authorization: CreateWriteAuthorization::CreateOnly,
+        }
+    }
+
+    #[tokio::test]
+    async fn graphics_gate_precedes_open_and_create_host_boundaries() {
+        let directory = tempfile::tempdir().expect("temporary Global state root");
+        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
+
+        for (name, launch) in [
+            ("Abrir.myalbuns", ConfirmedLaunch::OpenExisting),
+            ("Criar.myalbuns", creation_launch()),
+        ] {
+            let project_path = directory.path().join(name);
+            let outcome =
+                launch_confirmed_project(state.clone(), project_path.clone(), launch).await;
+            assert!(matches!(
+                outcome,
+                ProjectLaunchOutcome::Failed {
+                    error: ProjectLaunchFailure { ref code, .. }
+                } if code == "graphics_requirement_not_met"
+            ));
+            assert!(
+                !project_path.exists(),
+                "the rejected gate has no Project file or Host side effect"
+            );
+        }
+    }
 
     #[test]
     fn validation_command_is_pure_and_returns_the_closed_wire_response() {
@@ -676,7 +845,7 @@ mod tests {
     fn startup_failure_reads_are_idempotent_for_strict_mode_mounts() {
         let directory = tempfile::tempdir().expect("temporary Global state root");
         let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
-        let state = GlobalRuntimeState::new(&paths).expect("Global state initializes");
+        let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
         let failure = simple_failure("invalid_project_document", "Inválido.", "Escolha outro.");
         state.record_startup_failure(failure.clone());
 

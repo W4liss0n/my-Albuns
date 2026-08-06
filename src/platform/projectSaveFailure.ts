@@ -3,19 +3,12 @@ import type {
   SaveProjectFailureCode,
 } from "../application/projectPorts";
 import type { SaveProjectCommandError as IpcSaveProjectCommandError } from "./generated/SaveProjectCommandError";
+import { isIpcRecord, isIpcRevision } from "./ipcGuards";
 
 export interface ProjectSaveFailure {
   code: SaveProjectFailureCode;
   message: string;
   context?: SaveProjectErrorContext;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isRevision(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
 const failureMessages: Readonly<
@@ -45,7 +38,7 @@ const failureMessages: Readonly<
 export function parseProjectSaveFailure(
   error: unknown,
 ): ProjectSaveFailure | null {
-  if (!isRecord(error) || typeof error.code !== "string") {
+  if (!isIpcRecord(error) || typeof error.code !== "string") {
     return null;
   }
 
@@ -56,8 +49,8 @@ export function parseProjectSaveFailure(
 
   if (code === "stale_revision") {
     if (
-      !isRevision(error.expectedRevision) ||
-      !isRevision(error.currentRevision)
+      !isIpcRevision(error.expectedRevision) ||
+      !isIpcRevision(error.currentRevision)
     ) {
       return null;
     }

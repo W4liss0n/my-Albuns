@@ -7,7 +7,27 @@ import type {
   OpenProjectFailure,
   OpenProjectOutcome,
 } from "./application/globalProjectPort";
+import type { GraphicsDiagnostic } from "../application/graphics";
 import { GlobalShell } from "./GlobalShell";
+
+const supportedGraphics: GraphicsDiagnostic = {
+  supported: true,
+  renderer: "NVIDIA GeForce RTX",
+  reason: "WebGL2 acelerado por hardware confirmado.",
+  limits: {
+    maxTextureSizePx: 16_384,
+    maxRenderbufferSizePx: 16_384,
+    maxTextureImageUnits: 16,
+  },
+};
+
+const unavailableGraphics: GraphicsDiagnostic = {
+  supported: false,
+  code: "webgl2_unavailable",
+  renderer: "indisponível",
+  reason: "WebGL2 acelerado por hardware não foi confirmado.",
+  limits: null,
+};
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -21,6 +41,7 @@ function createProjectPort(
   overrides: Partial<GlobalProjectPort> = {},
 ): GlobalProjectPort {
   return {
+    completeGraphicsGate: async () => null,
     validateProjectConfiguration: async () => ({ status: "valid" }),
     createProject: async () => ({ status: "cancelled" }),
     chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
@@ -37,7 +58,12 @@ function createProjectPort(
 test("shows the global welcome surface without a Project workspace", () => {
   const projectPort = createProjectPort({ openProject: vi.fn() });
 
-  render(<GlobalShell projectPort={projectPort} />);
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={projectPort}
+    />,
+  );
 
   expect(
     screen.getByRole("heading", { name: "Projetos recentes" }),
@@ -51,6 +77,39 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 
+test("blocks Project hosts at the global graphics boundary when hardware WebGL2 is unavailable", async () => {
+  const completeGraphicsGate = vi.fn(async () => null);
+  const openProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={unavailableGraphics}
+      projectPort={createProjectPort({
+        completeGraphicsGate,
+        createProject,
+        openProject,
+      })}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Boas-vindas" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("WebGL2 acelerado por hardware não foi confirmado."),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Novo Projeto" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Abrir Projeto" }),
+  ).not.toBeInTheDocument();
+  expect(completeGraphicsGate).toHaveBeenCalledWith(false);
+  expect(openProject).not.toHaveBeenCalled();
+  expect(createProject).not.toHaveBeenCalled();
+});
+
 test("opens and cancels the creation assistant without starting Project creation", async () => {
   const user = userEvent.setup();
   const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
@@ -58,6 +117,7 @@ test("opens and cancels the creation assistant without starting Project creation
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
         createProject,
         clearProvisionalDecoratives,
@@ -90,6 +150,7 @@ test("connects provisional selection and owns final registry cleanup in Global",
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
         chooseProvisionalDecorative,
         releaseProvisionalDecorative,
@@ -120,7 +181,10 @@ test("forwards the completed dimensions configuration to creation", async () => 
   const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
 
   render(
-    <GlobalShell projectPort={createProjectPort({ createProject })} />,
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ createProject })}
+    />,
   );
 
   await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
@@ -157,7 +221,12 @@ test("starts one opening attempt and reports that it is in progress", async () =
   const opening = deferred<OpenProjectOutcome>();
   const openProject = vi.fn(() => opening.promise);
 
-  render(<GlobalShell projectPort={createProjectPort({ openProject })} />);
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ openProject })}
+    />,
+  );
 
   await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
 
@@ -181,7 +250,12 @@ test("shows an actionable structured failure without exposing a pathname", async
     },
   }));
 
-  render(<GlobalShell projectPort={createProjectPort({ openProject })} />);
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ openProject })}
+    />,
+  );
   await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -204,6 +278,7 @@ test("loads and renders recent Projects by name", async () => {
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({ listRecentProjects })}
     />,
   );
@@ -225,6 +300,7 @@ test("reopens a recent Project using only its opaque id", async () => {
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
           { id: "recent-ana", name: "Álbum da Ana" },
@@ -257,6 +333,7 @@ test("shows the startup failure from a direct Windows opening", async () => {
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({ startupOpenFailure })}
     />,
   );
@@ -276,6 +353,7 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
 
   render(
     <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
         openProject: async () => ({ status: "cancelled" }),
         startupOpenFailure: () => startupFailure.promise,

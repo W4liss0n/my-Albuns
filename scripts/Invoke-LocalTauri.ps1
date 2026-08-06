@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $tauriCommand = Join-Path $script:WorkspaceRoot 'node_modules\.bin\tauri.cmd'
 if (-not (Test-Path -LiteralPath $tauriCommand)) {
-    throw 'A CLI local do Tauri não existe. Execute npm run setup:local.'
+    throw 'The local Tauri CLI does not exist. Run npm run setup:local.'
 }
 
 Push-Location $script:WorkspaceRoot

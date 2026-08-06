@@ -108,6 +108,9 @@ export interface RecentProjectSummary {
 }
 
 export interface GlobalProjectPort {
+  completeGraphicsGate(
+    supported: boolean,
+  ): Promise<ProjectLaunchOutcome | null>;
   validateProjectConfiguration(
     configuration: NewProjectConfiguration,
   ): Promise<ProjectConfigurationValidationOutcome>;

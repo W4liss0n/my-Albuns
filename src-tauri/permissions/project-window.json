@@ -2,7 +2,7 @@
   "permission": [
     {
       "identifier": "project-window-commands",
-      "description": "Permite somente os comandos próprios usados pelas Janelas de Projeto locais.",
+      "description": "Allows only the application commands used by local Janelas de Projeto.",
       "commands": {
         "allow": [
           "frontend_log",

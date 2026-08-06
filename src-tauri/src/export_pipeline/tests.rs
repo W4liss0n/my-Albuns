@@ -312,10 +312,10 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
 fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
     let source = SampleProject::Horizon
         .persisted_source(2)
-        .expect("the sample project serializes");
+        .expect("the sample Projeto serializes");
     let snapshot = ProjectCore::new()
         .open_demo_editable_session(&source)
-        .expect("the sample project opens")
+        .expect("the sample Projeto opens")
         .render_snapshot();
     let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let root = tempfile::tempdir().expect("temporary dependency-plan fixture");

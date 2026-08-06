@@ -240,11 +240,11 @@ fn host_and_processor_share_one_serialized_protocol() {
     assert_eq!(request_json["request"]["requestId"], "render-42");
     assert_eq!(
         request_json["request"]["projectId"], snapshot.project_id,
-        "the frozen Project identity remains opaque render context"
+        "the frozen Identidade do Projeto remains opaque render context"
     );
     assert_eq!(
         request_json["request"]["revision"], snapshot.revision,
-        "the visible revision crosses the process boundary with its composition"
+        "the visible Revisão crosses the process boundary with its composition"
     );
     assert_eq!(
         request_json["request"]["preparedOutputPath"]["encoding"],
@@ -277,13 +277,13 @@ fn host_and_processor_share_one_serialized_protocol() {
         request_json["request"]["sources"][0]
             .get("sourceBytes")
             .is_none(),
-        "Render opens and validates the original itself instead of receiving a Host measurement"
+        "The Processador opens and validates the original instead of receiving a Host measurement"
     );
     assert!(
         request_json["request"]["sources"][0]
             .get("sourceSha256")
             .is_none(),
-        "Render must not require the Host to read and hash the original first"
+        "The Processador must not require the Host to read and hash the original first"
     );
     assert_eq!(
         request_json["request"]["rootBindings"]["bindings"][0]["kind"],

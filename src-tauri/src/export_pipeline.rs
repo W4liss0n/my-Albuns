@@ -27,18 +27,13 @@ use crate::imaging_processor::{
     InvocationFailureStage,
 };
 #[derive(Debug)]
-struct ExportPlanCore {
+pub(crate) struct ExportPlan {
     unit: ComposedOutputUnit,
     dpi: u32,
     project_id: String,
     revision: u64,
     request_id: String,
     path_plan: ExportPathPlan,
-}
-
-#[derive(Debug)]
-pub(crate) struct ExportPlan {
-    core: ExportPlanCore,
     sources: Vec<RenderSource>,
 }
 
@@ -72,14 +67,14 @@ impl ExportOptions {
 impl ExportPlan {
     pub(crate) fn required_paths(&self) -> Vec<&std::path::Path> {
         let mut paths = Vec::with_capacity(self.sources.len() + 1);
-        paths.push(self.core.path_plan.output_path());
+        paths.push(self.path_plan.output_path());
         paths.extend(self.sources.iter().map(RenderSource::source_path));
         paths
     }
 
     #[cfg(test)]
     fn path_plan(&self) -> &ExportPathPlan {
-        &self.core.path_plan
+        &self.path_plan
     }
 }
 
@@ -226,7 +221,7 @@ enum ExportExecutionPhase {
 
 #[derive(Debug, Default)]
 pub(crate) struct ExportExecutionControl {
-    cancelled: std::sync::Arc<AtomicBool>,
+    cancelled: AtomicBool,
     phase: Mutex<ExportExecutionPhase>,
     notification: Notify,
 }
@@ -280,7 +275,7 @@ impl ExportExecutionControl {
     }
 
     fn cancellation_flag(&self) -> &AtomicBool {
-        self.cancelled.as_ref()
+        &self.cancelled
     }
 }
 
@@ -380,14 +375,12 @@ pub(crate) fn plan(
         )
     })?;
     Ok(ExportPlan {
-        core: ExportPlanCore {
-            unit,
-            dpi: snapshot.dpi,
-            project_id: snapshot.project_id,
-            revision: snapshot.revision,
-            request_id,
-            path_plan,
-        },
+        unit,
+        dpi: snapshot.dpi,
+        project_id: snapshot.project_id,
+        revision: snapshot.revision,
+        request_id,
+        path_plan,
         sources,
     })
 }
@@ -493,15 +486,15 @@ async fn prepare_export<T: ImagingTransport>(
     context: &InvocationContext,
 ) -> Result<PreparedExport, ExportFailure> {
     ensure_not_cancelled(control)?;
-    let ExportPlan { core, sources } = plan;
-    let ExportPlanCore {
+    let ExportPlan {
         unit,
         dpi,
         project_id,
         revision,
         request_id,
         path_plan,
-    } = core;
+        sources,
+    } = plan;
     if context.operation_id != request_id {
         return Err(ExportFailure::new(
             ExportFailureStage::Plan,

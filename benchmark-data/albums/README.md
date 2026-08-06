@@ -1,22 +1,21 @@
-# Álbuns locais para medição
+# Local albums for measurement
 
-Coloque diretamente nesta pasta as duas pastas com fotos típicas de
-diagramação. A ordenação dos nomes define somente os slots A e B usados pelo
-ensaio; nomes e caminhos não entram nos artefatos versionados.
+Place directly in this directory the two folders containing photos typical of
+album layout work. Name ordering defines only the A and B slots used by the
+measurement; names and paths do not enter versioned artifacts.
 
-Estrutura esperada:
+Expected structure:
 
 ```text
 albums/
-├── nome-do-primeiro-album/
+├── first-album-name/
 │   ├── foto-01.jpg
 │   └── ...
-└── nome-do-segundo-album/
+└── second-album-name/
     ├── foto-01.jpg
     └── ...
 ```
 
-As fotos e suas subpastas são dados locais e estão ignoradas pelo Git. Somente
-este arquivo de orientação é versionado. O corpus aceita apenas JPEG; arquivos
-RAW devem permanecer fora desta pasta. O programa de medição não altera os
-arquivos originais.
+The photos and their subdirectories are local data ignored by Git. Only this
+guide is versioned. The corpus accepts JPEG files only; RAW files must remain
+outside this directory. The measurement program does not modify the originals.

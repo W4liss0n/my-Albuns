@@ -103,11 +103,11 @@ pub fn init_local_logging(
     })
 }
 
-/// Resolve o diretório enviado pelo host ao Processador de Imagens.
+/// Resolves the directory supplied by the host to the Processador de Imagens.
 ///
-/// O host usa `AppPaths::logs_dir()` diretamente e define este override ao
-/// iniciar o sidecar. A descoberta local é somente o fallback para uma
-/// execução independente do Processador.
+/// The host uses `AppPaths::logs_dir()` directly and sets this override when it
+/// starts the sidecar. Local discovery is only the fallback for an independent
+/// Processador execution.
 pub fn sidecar_log_directory(app_paths: &AppPaths) -> PathBuf {
     std::env::var_os(LOG_DIRECTORY_ENV)
         .filter(|value| !value.is_empty())

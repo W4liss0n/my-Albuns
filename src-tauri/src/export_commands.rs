@@ -523,6 +523,10 @@ mod tests {
     #[test]
     fn suggested_jpeg_name_uses_the_project_and_sheet_position_safely() {
         assert_eq!(
+            suggested_export_filename("Casamento da Júlia", 2),
+            "Casamento da Júlia_002.jpg"
+        );
+        assert_eq!(
             suggested_export_filename("Álbum: Horizonte", 2),
             "Álbum_ Horizonte_002.jpg"
         );
@@ -662,7 +666,7 @@ mod tests {
         });
 
         assert_eq!(
-            serde_json::to_value(failure).expect("the processor failure serializes"),
+            serde_json::to_value(failure).expect("the Processador failure serializes"),
             json!({
                 "code": "source_unavailable",
                 "message": "O original não está mais disponível.",

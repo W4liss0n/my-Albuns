@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões mínimas da Janela do Projeto",
+  "description": "Minimum permissions for the Janela do Projeto",
   "local": true,
   "windows": ["project"],
   "permissions": [

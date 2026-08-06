@@ -8,10 +8,10 @@ function Initialize-MyAlbunsToolchain {
     $cargoBin = Join-Path $script:CargoHome 'bin'
 
     if (-not (Test-Path -LiteralPath $script:CargoExecutable)) {
-        throw 'A toolchain Rust local não existe. Execute npm run setup:local.'
+        throw 'The local Rust toolchain does not exist. Run npm run setup:local.'
     }
     if (-not (Test-Path -LiteralPath $devCommand)) {
-        throw 'Microsoft Visual Studio Build Tools 2022 não foi encontrado.'
+        throw 'Microsoft Visual Studio Build Tools 2022 was not found.'
     }
     if ($env:MYALBUNS_LOCAL_TOOLCHAIN_INITIALIZED -eq '1') {
         $env:RUSTUP_HOME = $script:RustupHome

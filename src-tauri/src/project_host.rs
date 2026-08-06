@@ -237,7 +237,7 @@ impl ProjectHost {
                 .find(|media| media.id().hyphenated().to_string() == media_id)
                 .ok_or_else(|| {
                     format!(
-                        "A fonte original da mídia {media_id} não pertence à mesma revisão do Projeto."
+                        "A fonte original da mídia {media_id} não pertence à mesma Revisão do Projeto."
                     )
                 })?;
             sources.push(
@@ -395,7 +395,7 @@ mod tests {
                     .sheets[0]
                     .sheet_id,
             )
-            .expect("the neutral Export is frozen");
+            .expect("the neutral Exportação is frozen");
 
         assert!(frozen.snapshot.validate().is_ok());
         assert!(frozen.sources.is_empty());
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn freezes_one_visible_sheet_unsaved_dpi_and_its_exact_originals_without_mutating_project() {
-        let root = tempfile::tempdir().expect("temporary decorative media fixture");
+        let root = tempfile::tempdir().expect("temporary Imagem decorativa fixture");
         let shared_path = root.path().join("shared.png");
         let right_path = root.path().join("right.png");
         std::fs::write(&shared_path, b"shared original").expect("the shared original is writable");
@@ -431,13 +431,13 @@ mod tests {
             .apply(ProjectIntent::SetDpi { dpi: 240 })
             .expect("the current unsaved DPI is applied");
         let persisted_before =
-            std::fs::read(&fixture.project_path).expect("the Project baseline is readable");
+            std::fs::read(&fixture.project_path).expect("the Projeto baseline is readable");
         let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
 
         let frozen = fixture
             .host
             .freeze_sheet_export(&sheet_id)
-            .expect("the noninitial visible sheet is frozen atomically");
+            .expect("the noninitial visible Lâmina is frozen atomically");
 
         assert_eq!(frozen.snapshot.revision, dirty.state.revision);
         assert_eq!(frozen.snapshot.dpi, 240);
@@ -445,7 +445,7 @@ mod tests {
             frozen
                 .snapshot
                 .output_unit(&sheet_id)
-                .expect("the selected sheet remains in the frozen snapshot")
+                .expect("the selected Lâmina remains in the frozen snapshot")
                 .sheet
                 .sheet_id,
             sheet_id
@@ -454,11 +454,11 @@ mod tests {
             fixture
                 .host
                 .projection()
-                .expect("the Project remains readable"),
+                .expect("the Projeto remains readable"),
             dirty
         );
         assert_eq!(
-            std::fs::read(&fixture.project_path).expect("the Project remains persisted"),
+            std::fs::read(&fixture.project_path).expect("the Projeto remains persisted"),
             persisted_before
         );
 
@@ -473,7 +473,7 @@ mod tests {
         fixture
             .host
             .apply(ProjectIntent::SetDpi { dpi: 180 })
-            .expect("the live Project may advance after freezing");
+            .expect("the live Projeto may advance after freezing");
         assert_eq!(frozen.snapshot.dpi, 240);
         assert_eq!(frozen.snapshot.revision, dirty.state.revision);
     }
@@ -484,9 +484,12 @@ mod tests {
         tauri::async_runtime::block_on(async {
             let executable = PathBuf::from(
                 std::env::var_os(TEST_PROCESSOR_ENV)
-                    .expect("the real imaging executable path is configured"),
+                    .expect("the real Processador executable path is configured"),
             );
-            assert!(executable.is_file(), "the real imaging executable exists");
+            assert!(
+                executable.is_file(),
+                "the real Processador executable exists"
+            );
 
             let media_root = tempfile::tempdir().expect("temporary E2E media fixture");
             let shared_path = media_root.path().join("shared-overlay.png");
@@ -534,18 +537,18 @@ mod tests {
             );
             let host = open_project(&project_path, &identity_lease_root);
             let persisted_before =
-                std::fs::read(&project_path).expect("the reopened Project is readable");
+                std::fs::read(&project_path).expect("the reopened Projeto is readable");
             let dirty = host
                 .apply(ProjectIntent::SetDpi { dpi: 25 })
                 .expect("the current unsaved DPI is applied");
             assert_ne!(
                 dirty.composition.sheets[0].active_sides, dirty.composition.sheets[1].active_sides,
-                "the initial and visible noninitial Sheets must be semantically distinguishable"
+                "the initial and visible noninitial Lâminas must be semantically distinguishable"
             );
             let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
             let frozen = host
                 .freeze_sheet_export(&sheet_id)
-                .expect("the visible noninitial Sheet is frozen by the Host");
+                .expect("the visible noninitial Lâmina is frozen by the Host");
             let expected_dpi = frozen.snapshot.dpi;
             let expected_revision = frozen.snapshot.revision;
             let output_path = project_root.path().join("visible-sheet.jpg");
@@ -560,7 +563,7 @@ mod tests {
                     frozen.sources,
                 ),
             )
-            .expect("the Host snapshot owns the exact Export dependencies");
+            .expect("the Host snapshot owns the exact Exportação dependencies");
             let operation_paths = planned
                 .required_paths()
                 .into_iter()
@@ -568,9 +571,9 @@ mod tests {
                 .collect();
             let root_bindings = path_io::capture_root_bindings(operation_paths)
                 .await
-                .expect("the Export roots are captured once");
+                .expect("the Exportação roots are captured once");
             let log_directory = project_root.path().join("processor-logs");
-            std::fs::create_dir(&log_directory).expect("the processor log directory exists");
+            std::fs::create_dir(&log_directory).expect("the Processador log directory exists");
             let mut transport = RealProcessTransport::stable(executable, log_directory);
             let published = export_pipeline::execute(
                 &mut transport,
@@ -581,7 +584,7 @@ mod tests {
                 &InvocationContext::new(request_id, Some(dirty.state.project_id.clone())),
             )
             .await
-            .expect("the real processor publishes the frozen visible Sheet");
+            .expect("the real Processador completes Publicação of the frozen visible Lâmina");
 
             assert_eq!(published.completion.dpi, expected_dpi);
             assert_eq!(published.completion.source_count, 2);
@@ -591,10 +594,11 @@ mod tests {
                     published.completion.height_px
                 ),
                 (591, 295),
-                "the visible internal double Sheet is exported; the initial right-only Sheet would be 295 × 295"
+                "the Exportação targets the visible internal Lâmina dupla; the initial right-side Lâmina de página única would be 295 × 295"
             );
             assert_eq!(expected_revision, dirty.state.revision);
-            let rendered = image::open(&output_path).expect("the published JPEG decodes");
+            let rendered =
+                image::open(&output_path).expect("the JPEG produced by Publicação decodes");
             assert_eq!(
                 rendered.dimensions(),
                 (
@@ -614,13 +618,13 @@ mod tests {
                 "the red translucent Overlay is composed over the blue right Background"
             );
             assert_eq!(
-                host.projection().expect("the Project remains available"),
+                host.projection().expect("the Projeto remains available"),
                 dirty
             );
             assert_eq!(
-                std::fs::read(&project_path).expect("the Project remains readable"),
+                std::fs::read(&project_path).expect("the Projeto remains readable"),
                 persisted_before,
-                "Export does not save or mutate the Project"
+                "Exportação does not save or mutate the Projeto"
             );
         });
     }

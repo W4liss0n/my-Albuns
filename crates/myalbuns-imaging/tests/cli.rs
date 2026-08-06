@@ -210,7 +210,7 @@ fn processor_exports_the_neutral_project_as_the_canonical_jpeg() {
 
 #[test]
 fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals_end_to_end() {
-    let root = tempfile::tempdir().expect("temporary visible-state Project fixture");
+    let root = tempfile::tempdir().expect("temporary visible-state Projeto fixture");
     let project_path = root.path().join("Visivel.myalbuns");
     let left_path = root.path().join("left-background.png");
     let right_path = root.path().join("right-background.png");
@@ -223,7 +223,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
         .expect("the opaque right Background is written");
     RgbaImage::from_pixel(4, 4, Rgba([20, 220, 20, 128]))
         .save_with_format(&overlay_path, ImageFormat::Png)
-        .expect("the translucent both-sides Overlay is written");
+        .expect("the translucent Overlay with Ambos os lados scope is written");
     let initial = InitialProject::configured(InitialProjectConfiguration::new(
         DisplayUnit::Mm,
         25_400,
@@ -254,7 +254,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
     let mut project_context = OperationPathContext::new();
     project_context
         .capture(&project_path)
-        .expect("the Project root is captured");
+        .expect("the Projeto root is captured");
     let mut project = ProjectCore::new()
         .with_identity_lease_root(root.path().join("leases"))
         .create_editable(CreateProjectRequest::new(
@@ -262,9 +262,9 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
             initial,
             CreateAuthorization::CreateOnly,
         ))
-        .expect("the personalized Project is created");
+        .expect("the personalized Projeto is created");
     let persisted_before =
-        std::fs::read(&project_path).expect("the persisted Project baseline is readable");
+        std::fs::read(&project_path).expect("the persisted Projeto baseline is readable");
     let visible = project
         .apply(ProjectIntent::SetDpi { dpi: 200 })
         .expect("the visible DPI changes without saving");
@@ -281,7 +281,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
             .sheets
             .iter()
             .all(|sheet| sheet.frames.is_empty()),
-        "the real v1 Project contributes no demonstration Frames"
+        "the real v1 Projeto contributes no demonstration Frames"
     );
 
     let expected_widths = [100, 200, 100];
@@ -291,7 +291,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
         let output_path = root.path().join(format!("visible-sheet-{index}.jpg"));
         let unit = snapshot
             .output_unit(&sheet.sheet_id)
-            .expect("the chosen visible Sheet becomes one output unit");
+            .expect("the chosen visible Lâmina becomes one output unit");
         let mut media_ids = Vec::new();
         for media_id in unit.sheet.referenced_media_ids() {
             if !media_ids.iter().any(|known| known == media_id) {
@@ -305,7 +305,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
                 .media()
                 .iter()
                 .find(|media| media.id().hyphenated().to_string() == media_id)
-                .expect("every composed Decorative belongs to the frozen revision");
+                .expect("every composed Imagem decorativa belongs to the frozen Revisão");
             sources.push(
                 RenderSource::new(media_id, media.path().to_path_buf())
                     .expect("the exact original descriptor is valid"),
@@ -333,7 +333,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
 
         assert!(
             result.status.success(),
-            "processor failed for Sheet {index}: {}",
+            "Processador failed for Lâmina {index}: {}",
             String::from_utf8_lossy(&result.stderr)
         );
         let response = processor_response(&result.stdout);
@@ -365,15 +365,15 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
     );
     assert!(
         both_left[1] > 100 && both_right[1] > 100,
-        "both-sides Overlay remains visible"
+        "the Overlay with Ambos os lados scope remains visible"
     );
     assert_eq!(
         right_only.0, both_right.0,
-        "the right single Page normalizes the right-side personalization"
+        "the right-side Lâmina de página única normalizes its personalization"
     );
     assert_eq!(
         left_only.0, both_left.0,
-        "the left single Page normalizes the left-side personalization"
+        "the left-side Lâmina de página única normalizes its personalization"
     );
     assert!(
         both_left[2] > 50,
@@ -382,12 +382,12 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
     assert_eq!(
         project.projection(),
         visible,
-        "Export leaves revision, dirty state and Undo/Redo untouched"
+        "Exportação leaves Revisão, dirty state and Undo/Redo untouched"
     );
     assert_eq!(
-        std::fs::read(&project_path).expect("the Project file remains readable"),
+        std::fs::read(&project_path).expect("the Projeto file remains readable"),
         persisted_before,
-        "the unsaved visible revision is never persisted by Export"
+        "the unsaved visible Revisão is never persisted by Exportação"
     );
 }
 
@@ -876,9 +876,9 @@ fn processor_composites_a_transparent_decorative_from_its_original_png() {
     }];
 
     let photo_source =
-        RenderSource::new(photo_media_id, photo_path).expect("the Photo source is valid");
+        RenderSource::new(photo_media_id, photo_path).expect("the source for the Foto is valid");
     let decorative_source = RenderSource::new("decorative-overlay", decorative_path.clone())
-        .expect("the Decorative source is valid");
+        .expect("the source for the Imagem decorativa is valid");
 
     let result = invoke_real_processor(
         snapshot,
@@ -1004,13 +1004,13 @@ fn processor_decodes_a_supported_progressive_jpeg_in_the_isolated_worker() {
 
     assert!(
         result.status.success(),
-        "processor failed: {}",
+        "Processador failed: {}",
         String::from_utf8_lossy(&result.stderr)
     );
     processor_response(&result.stdout)
         .completed_for("progressive-worker")
         .expect("the successful terminal is correlated");
-    image::open(output_path).expect("the exported JPEG decodes");
+    image::open(output_path).expect("the JPEG produced by Exportação decodes");
 }
 
 #[cfg(windows)]
@@ -1036,8 +1036,10 @@ fn cancelling_processor_during_progressive_decode_leaves_no_worker_process() {
 
     processor
         .kill()
-        .expect("cancellation terminates the Processor");
-    processor.wait().expect("the cancelled Processor is reaped");
+        .expect("cancellation terminates the Processador");
+    processor
+        .wait()
+        .expect("the cancelled Processador is reaped");
     let worker_stopped = wait_for_process_exit(worker_pid, Duration::from_secs(2));
 
     let _ = std::fs::remove_file(&barrier_path);
@@ -1049,7 +1051,7 @@ fn cancelling_processor_during_progressive_decode_leaves_no_worker_process() {
     }
     assert!(
         worker_stopped,
-        "cancelling the Processor must terminate its progressive JPEG worker"
+        "cancelling the Processador must terminate its progressive JPEG worker"
     );
 }
 

@@ -1,4 +1,4 @@
-//! Descoberta centralizada e operações protegidas dos caminhos do aplicativo.
+//! Centralized discovery and guarded application pathname operations.
 
 mod app_paths;
 mod atomic_publish;

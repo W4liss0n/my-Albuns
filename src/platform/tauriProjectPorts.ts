@@ -22,6 +22,7 @@ import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
+import { isIpcRecord, isIpcRevision } from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
 
 function isMediaPreviewCommandError(
@@ -65,14 +66,6 @@ function isCancelledExportError(
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isRevision(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) >= 0;
-}
-
 function toSaveProjectError(error: unknown): SaveProjectError {
   const failure = parseProjectSaveFailure(error);
   if (!failure) {
@@ -97,7 +90,7 @@ function invalidSaveResponse() {
 }
 
 function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
-  if (!isRecord(value) || !isRecord(value.outcome)) {
+  if (!isIpcRecord(value) || !isIpcRecord(value.outcome)) {
     throw invalidSaveResponse();
   }
 
@@ -105,12 +98,12 @@ function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
   if (
     (outcome.kind !== "saved" &&
       outcome.kind !== "alreadyCurrent") ||
-    !isRevision(outcome.revision) ||
-    !isRecord(projection) ||
-    !isRecord(projection.state) ||
+    !isIpcRevision(outcome.revision) ||
+    !isIpcRecord(projection) ||
+    !isIpcRecord(projection.state) ||
     typeof projection.state.projectId !== "string" ||
-    !isRevision(projection.state.revision) ||
-    !isRevision(projection.state.savedRevision) ||
+    !isIpcRevision(projection.state.revision) ||
+    !isIpcRevision(projection.state.savedRevision) ||
     projection.state.revision !== outcome.revision ||
     projection.state.savedRevision !== outcome.revision
   ) {
