@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-08-03
+updated: 2026-08-10
 ---
 
 # Contrato do Arquivo de Projeto v1
@@ -173,6 +173,7 @@ Aplicações locais, Frames, Fotos, Layouts, favoritos e demais edições poster
 Não pertencem ao payload:
 
 - Nome ou Localização do Projeto, pois o Nome deriva do nome do arquivo e a Localização é o próprio caminho aberto;
+- a última Localização autorizada e qualquer evidência física usada para reencontrar a Instância de arquivo do Projeto, pois esse estado pertence somente ao registro local da máquina;
 - `savedRevision`, indicação de mudanças pendentes, Undo/Redo ou estado transitório da interface;
 - Cache, representações reduzidas, metadados derivados ou disponibilidade observada das mídias;
 - Recuperação de sessão, preferências globais, Logs ou resultados de Exportação;
@@ -218,6 +219,18 @@ A correção pré-sessão da Identidade de uma Cópia externa não promove o sch
 
 Como a barreira de exclusão é derivada da Identidade, a abertura editável mantém a barreira antiga enquanto adquire a barreira da nova Identidade. Ela só publica a substituição depois de obter ambas; depois da publicação, instala e verifica a nova trava física e o novo `PersistedBaseline` ainda sob as duas barreiras. A barreira antiga só é liberada após essa verificação. Cache, Recuperação e Sessão são montados exclusivamente com a nova Identidade e somente depois do processo inteiro, impedindo uma janela em que a origem e a Cópia usem a mesma Identidade ou em que a nova Identidade fique sem proteção.
 
+### Política de exemplos versionados
+
+Os exemplos acompanham versões públicas reais, e não versões inventadas para testar infraestrutura:
+
+| Classe | Cobertura normativa enquanto a versão atual é v1 | Regra para a primeira v2 pública |
+|---|---|---|
+| documento válido | o envelope neutro completo deste design e os casos válidos da matriz abaixo são exemplos v1 | conservar ao menos um exemplo válido de cada versão ainda suportada |
+| migração | não há exemplo: `migrations = []` declara que não existe versão pública anterior nem transformação legítima | acrescentar no mesmo conjunto de alterações um documento v1, o resultado v2 esperado de `v1 -> v2` e a prova de abertura v1 sem escrita |
+| estados inválidos | a matriz abaixo vincula cada forma inválida ao resultado tipado esperado, incluindo versões futura, antiga sem cadeia e o schema 3 do spike | manter inválidos identificados por versão e acrescentar quebras próprias do novo DTO fechado |
+
+`migrations = []` descreve honestamente o estado atual, mas não constitui um exemplo de migração. Um par versionado de entrada e resultado só pode existir quando houver uma segunda versão pública; não se preenche essa ausência com `v0` ou com o schema demonstrativo. Nenhum leitor ou escritor de v2 pode ser considerado completo antes de os exemplos de migração correspondentes existirem no controle de versão.
+
 ## Salvamento
 
 O escritor emite somente a versão atual, com representação determinística para facilitar diagnóstico e fixtures, mas o leitor não depende da formatação. `ProjectCore` valida a revisão esperada e congela a candidata antes do I/O. O `ProjectStore` segue o contrato de temporário irmão, sincronização, publicação, nova trava e verificação exata já aprovado para o Salvamento atômico; só depois devolve um recibo privado de publicação para que `ProjectCore` confirme a Revisão salva na `ProjectSession`.
@@ -261,7 +274,7 @@ A implementação publica fixtures versionadas e testes para, no mínimo:
 | Cópia externa em abertura editável | recebe nova Identidade no mesmo schema antes da Sessão, sob as duas barreiras |
 | Cópia externa em entrada headless | `ExternalCopyRequiresInteractiveResolution`, sem escrita |
 
-Quando `schemaVersion: 2` existir, os casos dourados passam a incluir um documento v1 aberto e fechado sem escrita, o mesmo documento seguido de `Salvar` e a correção de Identidade de uma Cópia externa ainda em v1. Não se cria hoje uma versão antiga fictícia apenas para exercitar a infraestrutura.
+Quando `schemaVersion: 2` existir, os casos dourados passam a incluir também o mesmo documento v1 seguido de `Salvar`, a correção de Identidade de uma Cópia externa ainda em v1 e a recusa de uma migração cujo resultado viole o DTO v2 ou as invariantes atuais. Não se cria hoje uma versão antiga fictícia apenas para exercitar a infraestrutura.
 
 ## Fronteira modular
 

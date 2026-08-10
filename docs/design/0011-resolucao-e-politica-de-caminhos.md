@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-08-10
 ---
 
 # Resolução e política de caminhos
@@ -128,6 +129,8 @@ O binding estabiliza a representação operacional escolhida pelo aplicativo; n�
 
 O Projeto persiste sua Identidade própria e os caminhos escolhidos pelo usuário. Canonicalização não substitui nenhum dos dois.
 
+A última Localização autorizada por Identidade fica no `ProjectIdentityRegistry`, sob o estado local da máquina, e não neste módulo, no arquivo de Projeto, em Projetos recentes, no Cache ou na Recuperação. Durante uma nova abertura, o `ProjectCore` entrega essa Localização ao módulo apenas para resolver a instância anterior e obter evidência atual. O caminho registrado é um endereço para reinspeção: igualdade ou diferença textual nunca produz `Same` ou `Different`.
+
 Para um arquivo existente, duas formas textuais podem representar o mesmo alvo, como uma unidade mapeada e seu UNC. Quando essa distinção for necessária, o módulo compara a identidade física obtida por handles. A comparação pode ser inconclusiva em determinados sistemas de arquivos ou servidores.
 
 A comparação de identidade encerra sua responsabilidade ao retornar a evidência tri-state. O módulo também expõe a primitiva nativa de trava de arquivo, sem decidir identidade, foco, conflito funcional ou duração da posse. O guardião de abertura do Projeto aplica essa política e mantém a primitiva pelo mesmo ciclo de vida da Sessão editável:
@@ -138,6 +141,8 @@ A comparação de identidade encerra sua responsabilidade ao retornar a evidênc
 4. somente `Different` combinado à mesma Identidade persistida caracteriza uma Cópia externa;
 5. o bloqueio real do arquivo decide se uma nova sessão editável pode ser criada;
 6. `Indeterminate` ou conflito de bloqueio falha de forma fechada e nunca reescreve a Identidade.
+
+Quando não existe Sessão ativa, a reinspeção da última Localização autorizada segue a mesma assimetria: alvo anterior acessível produz a comparação física; `NotFound` sob raiz confirmadamente acessível permite ao chamador tratar o candidato como movimentação; `Unavailable`, `AccessDenied`, falha ao abrir o objeto ou comparação sem evidência suficiente produzem `Indeterminate`. A ausência legítima de registro é tratada pelo `ProjectCore` como primeira observação, não como um resultado inventado desta interface. A matriz e a atualização do registro estão definidas em [Contrato público de persistência do ProjectCore](0015-contrato-publico-de-persistencia-do-project-core.md).
 
 Para itens do Painel, a regra funcional continua sendo a duplicação do mesmo caminho dentro da mesma aba. A identidade física não mescla automaticamente vínculos que o usuário importou por representações diferentes.
 
