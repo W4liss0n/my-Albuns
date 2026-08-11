@@ -16,6 +16,9 @@ Nome atribuído ao Projeto e usado como base para sua apresentação e para os n
 **Localização do Projeto**:
 Caminho do arquivo que contém o estado persistido de um Projeto.
 
+**Instância de arquivo do Projeto**:
+Objeto físico que contém o estado persistido de um Projeto em determinado momento. Caminhos diferentes podem alcançar a mesma instância, e uma Cópia externa cria outra instância mesmo quando repete inicialmente a Identidade do Projeto.
+
 **Isolamento de Projeto**:
 Propriedade segundo a qual alterações em um Projeto nunca modificam o estado criativo de outro Projeto.
 

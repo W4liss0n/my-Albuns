@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-08-02
+updated: 2026-08-10
 ---
 
 # Programa de Diagramação de Álbuns
@@ -1124,9 +1124,12 @@ O [glossário do domínio](../../CONTEXT.md) é normativo somente para o signifi
 - [Validar Tauri 2, React/TypeScript e Rust](../adr/0005-adotar-tauri-react-rust.md);
 - [Publicar Exportações com transação limitada](../adr/0006-publicar-exportacao-com-transacao-limitada.md);
 - [Tratar caminhos Windows como valores nativos e separá-los da identidade física](../adr/0007-tratar-caminhos-windows-e-identidade-fisica.md);
-- [Garantir sempre um Layout compatível por arranjo de reserva](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md).
+- [Garantir sempre um Layout compatível por arranjo de reserva](../adr/0008-garantir-layout-compativel-por-arranjo-de-reserva.md);
+- [Adotar `.myalbuns` como arquivo JSON versionado de Projeto](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md).
 
 A organização reversível de dados locais e o contrato técnico do Cache estão em [Armazenamento local e Cache](../design/0010-armazenamento-local-e-cache.md). O módulo compartilhado, as formas aceitas e os bindings temporários de cada operação estão em [Resolução e política de caminhos](../design/0011-resolucao-e-politica-de-caminhos.md). A propriedade do estado e os módulos de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md).
+
+O envelope `.myalbuns`, o DTO `windowsUtf16` e a política de evolução estão em [Contrato do Arquivo de Projeto v1](../design/0013-contrato-do-arquivo-de-projeto-v1.md). A autoridade de Identidade, o registro da última Localização, o Salvamento atômico e as transições públicas de `Salvar como` estão em [Contrato público de persistência do ProjectCore](../design/0015-contrato-publico-de-persistencia-do-project-core.md).
 
 A limpeza sem manifesto possui uma consequência aceita: um arquivo manual com Nome, extensão e índice indistinguíveis de uma Saída órfã pode ser removido depois da confirmação explícita de sobrescrita.
 
@@ -1143,10 +1146,10 @@ As funcionalidades abaixo permanecem no produto, mas seus detalhes foram deliber
 - eventual paralelismo entre itens de lote, somente se medições demonstrarem ganho e preservarem o contrato serial observável;
 - perfis de hardware mínimo e recomendado e metas quantitativas de desempenho, que serão definidos somente após medições reais do spike;
 - comportamento da numeração de arquivos quando uma Exportação ultrapassar o índice `999`;
-- formato e extensão do arquivo de Projeto, codificação reversível dos caminhos Windows persistidos e mecanismo interno usado para detectar movimentações e Cópias externas.
+- detalhes idiomáticos da implementação de movimentações e Cópias externas, sem alterar a autoridade, a evidência e os estados fechados definidos nos designs aceitos.
 
 O spike executável validou Tauri 2 com React/TypeScript e Rust para a primeira versão e comparou duas topologias: `(A)` um host independente por Projeto e `(B)` um host multiwindow com sessões isoladas. O [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) aceita A: cada Projeto aberto possui seu próprio `MyAlbuns.Project.exe`, enquanto o processo global e o Processador de Imagens conservam responsabilidades separadas. A comparação de memória, GPU, processos, abertura, Canvas, falhas, Recuperação e custo operacional permanece registrada como evidência, não como comportamento do produto.
 
 A arquitetura adotada reutiliza um núcleo Rust compartilhado atrás de uma pequena interface externa para carregar, validar, modificar, persistir e criar snapshots do Projeto. Internamente, existe exatamente uma sessão proprietária mutável do estado criativo de cada Projeto, enquanto domínio e persistência conservam responsabilidades próprias. A Janela normal e o lote passam por essa interface; o componente de imagem recebe um snapshot validado e imutável e não interpreta independentemente o documento persistido.
 
-`MyAlbuns.exe` hospeda a experiência global e a Tela de Boas-vindas sem possuir estado criativo mutável. PixiJS sobre WebGL2 compõe a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece somente como contingência futura, sem implementação paralela. O formato do arquivo de Projeto e os controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC.
+`MyAlbuns.exe` hospeda a experiência global e a Tela de Boas-vindas sem possuir estado criativo mutável. PixiJS sobre WebGL2 compõe a prévia interativa, enquanto a Exportação Rust reabre os originais. Windows 10/11 x64 é o escopo inicial, WebGL2 com aceleração de hardware verificável é requisito do editor e WPF/.NET com C# permanece somente como contingência futura, sem implementação paralela. Os controles concretos da interface ainda deverão ser definidos sem alterar os contratos funcionais desta SPEC; o formato do arquivo e a fronteira de persistência já estão fixados pelo ADR 0009 e pelos designs 0013 e 0015.

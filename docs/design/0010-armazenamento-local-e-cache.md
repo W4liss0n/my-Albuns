@@ -1,6 +1,7 @@
 ---
 status: accepted
 document: design
+updated: 2026-08-10
 ---
 
 # Armazenamento local e Cache
@@ -42,6 +43,11 @@ A propriedade lógica dos stores e do `CacheEngine` segue [Propriedade de estado
 │   └── Batches\
 │       └── {batch-id}.json
 ├── State\
+│   ├── ProjectIdentities\
+│   │   └── {project-key}.json
+│   ├── ProjectIdentityLeases\
+│   ├── WebView2\
+│   │   └── {project-key}\
 │   ├── recent-projects.json
 │   └── photoshop.json
 └── Logs\
@@ -56,6 +62,7 @@ Cada categoria conserva suas próprias garantias:
 - `SettingsStore` grava `settings.json`;
 - `LayoutCatalogStore` grava o catálogo em `Layouts`;
 - `StateStore` grava os arquivos de `State`;
+- `ProjectIdentityRegistry` grava a evidência durável por Identidade em `State\ProjectIdentities`;
 - `RecoveryStore` grava checkpoints de Projetos e lotes;
 - `ProjectStore` grava o arquivo de Projeto no local escolhido pelo usuário;
 - `CacheEngine` possui `metadata.json`, artefatos e manutenção do Cache.
@@ -69,6 +76,8 @@ Eles podem reutilizar primitivas internas para criar temporário irmão, descarr
 Alterações globais usam schema e substituição atômica. Janelas ou sessões consultam a revisão vigente ao abrir, receber foco ou solicitar atualização manual. Como as Janelas pertencem a hosts de Projeto distintos, um broadcast imediato exigiria coordenação entre processos; ele não é requisito do MVP e só será acrescentado diante de necessidade observada.
 
 `StateStore` mantém em `State` informações locais independentes, que não fazem sentido fora desta máquina: Projetos recentes, a instalação escolhida do Photoshop e as preferências de interface que dependem da tela.
+
+`ProjectIdentityRegistry` é um store concreto distinto dentro da mesma raiz. Sua falha não pode ser tratada como perda de uma preferência: o registro participa da autorização de Identidade antes de montar qualquer estado local de Projeto. Projetos recentes podem ser limitados, reordenados ou removidos sem apagar essa evidência.
 
 Os dados internos do WebView2 ficam em `State\WebView2\{project-key}`. Cada
 host de Projeto deriva uma chave opaca própria da Identidade persistida; hosts
@@ -112,6 +121,20 @@ Uma Cópia externa recebe nova Identidade antes de consultar Recuperação ou Ca
 
 Não contém estado criativo nem preparação parcial. Após interrupção, o item que estava em execução volta a `pendente` e é refeito integralmente; itens já concluídos não são repetidos.
 
+## Evidência local de Identidade
+
+`ProjectIdentityRegistry` mantém um arquivo por Identidade em `State\ProjectIdentities\{project-key}.json`. Cada registro fechado e versionado contém somente:
+
+- schema do próprio registro;
+- a Identidade canônica do Projeto, para validar a chave e detectar corrupção;
+- a última Localização autorizada, codificada pelo mesmo DTO reversível `windowsUtf16` do documento.
+
+O registro não serializa pathname como identidade física nem transforma uma observação do sistema operacional em verdade eterna. Na abertura seguinte, a Localização registrada serve para o módulo de caminhos abrir novamente a instância anterior e produzir evidência física atual por handles. Enquanto a tentativa ou a Sessão estiver viva, `PersistedBaseline` e a trava do arquivo conservam a evidência física; `ProjectIdentityLease` conserva a exclusividade da Identidade e o alvo ativo autorizado. Depois do fechamento, essas posses são liberadas e somente o registro local permanece.
+
+Cada atualização grava o registro completo por substituição atômica. Falha antes da substituição conserva o registro anterior; falha que impeça comprovar o estado final não autoriza tratar o novo valor como vigente. A ordem das transições de Projeto, a classificação da abertura e o momento em que a autoridade pode ser emitida pertencem exclusivamente ao [contrato público de persistência](0015-contrato-publico-de-persistencia-do-project-core.md).
+
+Fechamento normal ou inesperado, remoção de Projetos recentes, `Liberar espaço` e `Limpar todo o Cache` não removem esses registros. A primeira versão não executa expiração automática. Ausência legítima significa primeira observação da Identidade nesta máquina; registro corrompido, inacessível ou incompatível falha de forma fechada e nunca é confundido com ausência.
+
 ## Namespace do Projeto
 
 Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidade persistente, indicada por `{project-key}`. A mesma chave identifica o checkpoint futuro em `Recovery` e o perfil do WebView2. Nome e caminho do arquivo não participam desse namespace.
@@ -121,11 +144,11 @@ Cada pasta abaixo de `Cache` usa uma representação opaca e segura da Identidad
 - uma Cópia externa recebe outra pasta;
 - Projetos diferentes nunca compartilham estado mutável de Cache.
 
-O formato textual definitivo da Identidade pertence ao documento de Projeto e
-não herda restrições de nomes do Windows. A implementação deriva
-`project-{sha256}` dos bytes UTF-8 da Identidade e usa a mesma chave opaca para
-Cache, Recuperação e WebView2. O valor original nunca vira componente de
-caminho.
+A Identidade é o UUID v4 canônico, minúsculo e hifenizado definido pelo
+documento de Projeto. A implementação deriva `project-{sha256}` dos bytes
+UTF-8 dessa representação canônica e usa a mesma chave opaca para o registro
+local, Cache, Recuperação e WebView2. O valor original nunca vira componente
+de caminho.
 
 ## Conteúdo mínimo
 
@@ -215,5 +238,4 @@ Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperaç�
 - formato e resolução da representação reduzida;
 - necessidade de tiles depois do spike;
 - algoritmo concreto do fingerprint;
-- retenção de Logs;
-- representação textual da Identidade do Projeto.
+- retenção de Logs.

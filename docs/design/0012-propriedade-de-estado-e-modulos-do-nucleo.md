@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-02
+updated: 2026-08-10
 ---
 
 # Propriedade de estado e módulos do núcleo
@@ -29,6 +29,7 @@ Este documento detalha a direção aceita no [ADR 0005](../adr/0005-adotar-tauri
 | `ProjectDomain` | tipos persistentes, Identidades, Lâminas, Frames, referências de mídia, invariantes e comandos de domínio | I/O, JSON, migração de arquivos, Cache, watcher, IPC ou estado da interface |
 | `ProjectSession` | estado criativo atual, revisão, revisão salva, mudanças pendentes, Undo/Redo, aplicação de comandos e snapshots | seleção, hover, zoom do Canvas, estado de rede, artefatos de Cache ou publicação de Exportação |
 | `ProjectStore` | detecção de versão, migração, desserialização, validação estrutural, revisão esperada e Salvamento atômico do arquivo de Projeto | Sessão viva, Undo/Redo, Cache ou interpretação visual |
+| `ProjectIdentityRegistry` | última Localização autorizada por Identidade, schema e substituição atômica do registro local que sobrevive à Sessão | documento de Projeto, Identidade física eterna, Sessão viva, Projetos recentes, Cache ou Recuperação |
 | `CompositionCore` | recortes, preenchimento, transformações, ordem de desenho, travessia central, divisão por Página e plano determinístico de composição | I/O, codecs, PixiJS, documento bruto, estado mutável ou publicação |
 | `LayoutRules` | compatibilidade, Mapeamento, escopo inferido, identidade de Layout personalizado, prioridade de candidatos, produção de `LayoutPatch` e a garantia de ao menos um candidato compatível | confirmação do patch, catálogo persistido, Undo/Redo, estado da interface ou o algoritmo do Gerador |
 | `MediaResolver` | inspeção autoritativa de arquivos, validação de formato, busca de Religação e produção de observações ou propostas imutáveis | mutação direta do Projeto, estado observado da sessão, Undo/Redo, Cache persistido ou canonicalização textual como identidade |
@@ -42,16 +43,19 @@ Este documento detalha a direção aceita no [ADR 0005](../adr/0005-adotar-tauri
 
 ## `ProjectCore` e a única sessão mutável
 
-`ProjectCore` é a interface que esconde as subdivisões `ProjectDomain`, `ProjectSession` e `ProjectStore`. Ela possui exatamente duas entradas, com garantias diferentes:
+`ProjectCore` é a interface que esconde as subdivisões `ProjectDomain`, `ProjectSession`, `ProjectStore` e `ProjectIdentityRegistry`. Ela possui dois modos de acesso e operações públicas distintas, sem oferecer cada subdivisão aos chamadores:
 
-| Entrada | Usada por | Devolve | Instancia `ProjectSession`? |
+| Operação | Usada por | Devolve | Instancia `ProjectSession`? |
 |---|---|---|---|
-| Abrir sessão editável | Janela do Projeto | sessão viva: aplicar intenção, salvar, obter snapshots | sim |
+| Criar sessão editável | fluxo de criação | sessão viva publicada, autorizada e bloqueada | sim |
+| Abrir sessão editável | Janela do Projeto | sessão viva autorizada: aplicar intenção, salvar, `Salvar como`, obter snapshots | sim |
 | Carregar revisão persistida | `BatchRunner` | valor imutável suficiente para o `RenderSnapshot` | não |
 
-As duas compartilham carregamento, migração, resolução de Identidade e validação de invariantes. Só a primeira produz Histórico, revisão corrente e mudanças pendentes; a segunda não oferece comando, Salvamento ou Undo/Redo, e por isso não pode gravar no arquivo do usuário.
+Criação e abertura editável devolvem um `EditableProject`; `Salvar` e `Salvar como` são transições desse mesmo proprietário, não entradas livres que aceitam estado serializado pelo frontend. A carga somente de leitura compartilha detecção, migração e validação, mas não oferece comando, Salvamento ou Undo/Redo e por isso não pode gravar no arquivo do usuário. A forma detalhada dessas operações pertence ao [Contrato público de persistência do ProjectCore](0015-contrato-publico-de-persistencia-do-project-core.md).
 
-Essa separação é o que sustenta a regra do [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) de que `MyAlbuns.exe` hospeda o lote sem possuir estado criativo mutável. Um chamador precisa escolher a entrada conscientemente: pedir a editável para um trabalho de leitura cria um dono mutável desnecessário.
+Antes de devolver um `EditableProject`, `ProjectCore` coordena o `ProjectStore`, o registro local, o `ProjectIdentityLease` e a trava física. Somente o terminal em que o arquivo e o registro da Identidade aplicável foram publicados e verificados produz uma autoridade de Identidade consumível por Cache, Recuperação ou WebView2. Um `projectId` apenas desserializado nunca basta para montar esses namespaces.
+
+Essa separação é o que sustenta a regra do [ADR 0005](../adr/0005-adotar-tauri-react-rust.md) de que `MyAlbuns.exe` hospeda o lote sem possuir estado criativo mutável. Um chamador precisa escolher o modo conscientemente: pedir o editável para um trabalho de leitura cria um dono mutável desnecessário.
 
 `ProjectSession` é a única proprietária mutável do estado criativo de um Projeto aberto. Uma alteração segue este fluxo:
 
@@ -178,6 +182,7 @@ A Exportação normal adquire uma instância de `OperationLease` por tentativa. 
 As garantias abaixo não devem ser escondidas por um `AppStorage` ou `Store<T>` genérico:
 
 - `ProjectStore` possui schema, migrações, revisão esperada e Salvamento explícito;
+- `ProjectIdentityRegistry` possui evidência local durável, atualização atômica e falha fechada própria;
 - `SettingsStore` possui preferências globais e atualização imediata;
 - `LayoutCatalogStore` possui conteúdo global criado pelo usuário e revisão própria;
 - `StateStore` possui estado local reconstruível ou substituível;
@@ -200,6 +205,7 @@ Os testes atravessam as interfaces que representam comportamento observável:
 
 - comandos aplicados pela interface de sessão do `ProjectCore`, incluindo invariantes, Undo/Redo e mudanças pendentes;
 - carregamento, migração e Salvamento atômico pela interface do `ProjectCore`;
+- autorização de Identidade, movimentação, Cópia externa e `Salvar como` pela superfície pública, sem montar estado local antes do terminal autorizado;
 - casos dourados do `CompositionCore`, reutilizados por prévia e Exportação;
 - propostas sem mutação do `MediaResolver`;
 - invalidação e reconstrução descartável do `CacheEngine`;

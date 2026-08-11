@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-07-28
-updated: 2026-08-02
+updated: 2026-08-10
 ---
 
 # Adotar Tauri 2, React/TypeScript e Rust com host independente por Projeto
@@ -14,13 +14,13 @@ Tauri 2 com React/TypeScript e Rust é a arquitetura aceita para o MVP. O spike 
 
 - React/TypeScript hospeda a interface e apenas o estado transitório das interações.
 - PixiJS sobre WebGL2 compõe a prévia interativa.
-- Um núcleo Rust compartilhado, denominado provisoriamente `myalbuns-core`, expõe o seam externo `ProjectCore` com duas entradas: abrir uma sessão editável e carregar uma revisão persistida somente para leitura. Uma `ProjectSession` por Projeto aberto é a única proprietária mutável do estado criativo, e a entrada somente de leitura nunca instancia uma.
+- Um núcleo Rust compartilhado, denominado provisoriamente `myalbuns-core`, expõe a fronteira externa `ProjectCore` com dois modos: uma sessão editável e uma revisão persistida somente para leitura. Criação, abertura e transições da sessão permanecem operações distintas dentro dessa fronteira. Uma `ProjectSession` por Projeto aberto é a única proprietária mutável do estado criativo, e o modo somente leitura nunca instancia uma.
 - `MyAlbuns.Imaging.exe` decodifica originais, produz a representação reduzida do Cache e renderiza Exportações a partir de um `RenderSnapshot` imutável e validado.
 - `MyAlbuns.exe` hospeda Boas-vindas e as exclusividades globais estritamente necessárias, sem possuir estado criativo mutável de Projetos.
 
 `myalbuns-core` deve ser independente de Tauri, React, PixiJS e do Processador de Imagens. Tanto o host interativo quanto o caminho headless do lote usam a interface do `ProjectCore` para carregar e migrar o documento, resolver sua Identidade antes de Cache ou Recuperação, validar invariantes e produzir o `RenderSnapshot`. `MyAlbuns.Imaging.exe` nunca interpreta por conta própria o arquivo bruto do Projeto.
 
-As duas entradas compartilham carregamento, migração, resolução de Identidade e validação de invariantes. Somente a entrada editável instancia uma `ProjectSession` com Histórico, revisão corrente e mudanças pendentes; a entrada somente de leitura devolve um valor imutável suficiente para produzir o `RenderSnapshot` e nada mais. É essa separação que permite ao `BatchRunner` executar dentro do `MyAlbuns.exe` sem que esse processo passe a hospedar estado criativo mutável, e que impede uma falha do lote de gravar no arquivo do usuário.
+Os dois modos compartilham carregamento, migração, resolução de Identidade e validação de invariantes. Somente o modo editável instancia uma `ProjectSession` com Histórico, revisão corrente e mudanças pendentes; o modo somente leitura devolve um valor imutável suficiente para produzir o `RenderSnapshot` e nada mais. É essa separação que permite ao `BatchRunner` executar dentro do `MyAlbuns.exe` sem que esse processo passe a hospedar estado criativo mutável, e que impede uma falha do lote de gravar no arquivo do usuário.
 
 Quando uma tentativa dependente de caminhos atravessar processos, seu proprietário envia também o `RootBindingPlan` imutável daquela tentativa. O processo receptor usa os mesmos bindings e não resolve novamente por conta própria unidades mapeadas ou raízes já capturadas.
 
@@ -32,7 +32,7 @@ Por ele, escolher qual Frame recebe uma Foto, qual Frame responde a um ponto com
 
 ## Propriedade e módulos
 
-A interface externa do `ProjectCore` esconde inicialmente três responsabilidades internas: `ProjectDomain` mantém tipos, invariantes e comandos; `ProjectSession` mantém estado atual, revisão, mudanças pendentes e Undo/Redo; `ProjectStore` mantém versão, migração, validação estrutural e Salvamento atômico. O spike pode alterar nomes e empacotamento, mas não pode criar dois proprietários mutáveis do mesmo Projeto.
+A interface externa do `ProjectCore` esconde quatro responsabilidades internas: `ProjectDomain` mantém tipos, invariantes e comandos; `ProjectSession` mantém estado atual, revisão, mudanças pendentes e Undo/Redo; `ProjectStore` mantém versão, migração, validação estrutural e Salvamento atômico; `ProjectIdentityRegistry` mantém somente a última Localização autorizada por Identidade como evidência local que sobrevive à Sessão. O spike pode alterar nomes e empacotamento, mas não pode criar dois proprietários mutáveis do mesmo Projeto nem transformar o registro em fonte de estado criativo.
 
 Um `CompositionCore` puro recebe valores imutáveis e produz planos determinísticos de recorte, preenchimento, transformação e ordem de desenho. Editor e Exportação reutilizam essa regra sem duplicá-la em TypeScript ou no Processador. A transformação persistente da Foto dentro do Frame é diferente da transformação transitória usada para navegar no Canvas.
 
@@ -42,7 +42,7 @@ A Exportação usa um único `ExportPipeline` para o fluxo normal e cada item do
 
 Exclusividade global é representada por um `OperationGate` pequeno. Cancelamento e progresso pertencem a cada tentativa, e a pausa do Cache pertence ao `CacheEngine`; não existe um coordenador universal de comandos, estado de interface e operações.
 
-Stores de Projeto, Configurações, Layouts, Estado, Recuperação e Cache conservam políticas próprias. Eles podem compartilhar primitivas internas de escrita de um único arquivo, mas não são achatados em um armazenamento genérico.
+Stores de Projeto, evidência local de Identidade, Configurações, Layouts, Estado, Recuperação e Cache conservam políticas próprias. Eles podem compartilhar primitivas internas de escrita de um único arquivo, mas não são achatados em um armazenamento genérico.
 
 O detalhamento e os nomes de trabalho estão em [Propriedade de estado e módulos do núcleo](../design/0012-propriedade-de-estado-e-modulos-do-nucleo.md). Eles orientam o spike sem transformar subdivisões internas em interfaces públicas prematuras.
 
@@ -131,7 +131,6 @@ A alternativa multiwindow não será mantida em paralelo. Ela só volta à decis
 - transporte e esquema concretos entre processos;
 - WebGPU no frontend e `wgpu` no pipeline Rust;
 - bibliotecas concretas de codecs, ICC, EXIF, TIFF e PDF;
-- formato e extensão do arquivo de Projeto;
 - formato e resolução da representação reduzida e eventual adoção de tiles;
 - números de threads e orçamento de memória;
 - paralelismo futuro da Exportação em lote;
