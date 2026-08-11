@@ -11,7 +11,7 @@ use myalbuns_core::{
     ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SaveProjectError,
     SaveProjectOutcome, SheetRole,
 };
-use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier};
+use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier, project_data_namespace};
 
 const NEUTRAL_PROJECT_V1: &str = r##"{
   "documentType": "myalbuns.project",
@@ -304,9 +304,9 @@ fn classifies_document_type_and_schema_failures_with_public_typed_errors() {
             replace_literal_once(
                 NEUTRAL_PROJECT_V1,
                 "\"schemaVersion\": 1",
-                "\"schemaVersion\": 2",
+                "\"schemaVersion\": 3",
             ),
-            DocumentFailure::UnsupportedFutureSchema { version: 2 },
+            DocumentFailure::UnsupportedFutureSchema { version: 3 },
         ),
         (
             "schema legado",
@@ -676,7 +676,7 @@ fn read_only_loading_succeeds_without_retaining_an_editable_lock() {
 fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Álbum criado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let created = core
         .create_editable(CreateProjectRequest::new(
@@ -735,10 +735,48 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
 }
 
 #[test]
+fn configures_identity_lease_and_registry_roots_explicitly() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory
+        .path()
+        .join("Projeto com raízes explícitas.myalbuns");
+    let lease_root = directory.path().join("ownership").join("leases");
+    let registry_root = directory.path().join("authority").join("records");
+    let formerly_derived_root = lease_root
+        .parent()
+        .expect("the fixture lease root has a parent")
+        .join("ProjectIdentities");
+    let core =
+        ProjectCore::new().with_identity_storage_roots(lease_root.clone(), registry_root.clone());
+
+    let project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the Project is created with explicit identity storage roots");
+    let identity_record = registry_root.join(format!(
+        "{}.json",
+        project_data_namespace(&project.project_id().hyphenated().to_string())
+    ));
+
+    assert!(lease_root.is_dir(), "the lease root owns the live lease");
+    assert!(
+        identity_record.is_file(),
+        "the explicit registry root owns the durable record"
+    );
+    assert!(
+        !formerly_derived_root.exists(),
+        "the lease root must not imply a second persistent storage location"
+    );
+}
+
+#[test]
 fn configured_project_round_trips_physical_settings_and_album_structure() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("configurado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let configuration = InitialProjectConfiguration::new(
         DisplayUnit::Cm,
         508_000,
@@ -840,7 +878,7 @@ fn configured_project_round_trips_physical_settings_and_album_structure() {
 fn creates_and_reopens_a_project_with_both_sides_visual_defaults() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("personalizado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let background_path = std::path::PathBuf::from(r"C:\Decorativos\background.png");
     let overlay_path = std::path::PathBuf::from(r"C:\Decorativos\overlay.png");
     let personalization = InitialProjectPersonalization::new(
@@ -928,7 +966,7 @@ fn per_side_personalization_preserves_reference_order_and_deduplicates_native_pa
 
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("por-lado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let background_path = PathBuf::from(OsString::from_wide(&[
         67, 58, 92, 68, 101, 99, 111, 114, 97, 116, 105, 118, 111, 115, 92, 99, 97, 112, 97,
         0xD800, 46, 112, 110, 103,
@@ -1076,9 +1114,9 @@ fn invalid_initial_personalization_has_no_file_or_identity_lease_effects() {
 
     for (case, personalization) in cases {
         let project_path = directory.path().join(format!("{case}.myalbuns"));
-        let lease_root = directory.path().join(format!("leases-{case}"));
-        let error = ProjectCore::new()
-            .with_identity_lease_root(lease_root.clone())
+        let storage_root = directory.path().join(format!("identity-{case}"));
+        let lease_root = storage_root.join("leases");
+        let error = project_core_with_identity_storage(&storage_root)
             .create_editable(CreateProjectRequest::new(
                 project_location(&project_path),
                 InitialProject::neutral().with_personalization(personalization),
@@ -1142,24 +1180,24 @@ fn configured_project_maps_every_end_sheet_combination_and_keeps_internal_sheets
         let project_path = directory
             .path()
             .join(format!("extremidades-{index}.myalbuns"));
-        let project = ProjectCore::new()
-            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
-            .create_editable(CreateProjectRequest::new(
-                project_location(&project_path),
-                InitialProject::configured(InitialProjectConfiguration::new(
-                    DisplayUnit::Mm,
-                    600_000,
-                    300_000,
-                    300,
-                    3_000,
-                    3_000,
-                    4,
-                    first_format,
-                    last_format,
-                )),
-                CreateAuthorization::CreateOnly,
-            ))
-            .expect("the end-sheet combination is valid");
+        let project =
+            project_core_with_identity_storage(&directory.path().join(format!("identity-{index}")))
+                .create_editable(CreateProjectRequest::new(
+                    project_location(&project_path),
+                    InitialProject::configured(InitialProjectConfiguration::new(
+                        DisplayUnit::Mm,
+                        600_000,
+                        300_000,
+                        300,
+                        3_000,
+                        3_000,
+                        4,
+                        first_format,
+                        last_format,
+                    )),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .expect("the end-sheet combination is valid");
 
         assert_eq!(
             project
@@ -1198,24 +1236,24 @@ fn display_unit_does_not_change_authoritative_physical_values() {
         .enumerate()
     {
         let project_path = directory.path().join(format!("unidade-{index}.myalbuns"));
-        let project = ProjectCore::new()
-            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
-            .create_editable(CreateProjectRequest::new(
-                project_location(&project_path),
-                InitialProject::configured(InitialProjectConfiguration::new(
-                    display_unit,
-                    508_000,
-                    254_000,
-                    300,
-                    1_270,
-                    2_540,
-                    2,
-                    EndSheetFormat::Double,
-                    EndSheetFormat::Double,
-                )),
-                CreateAuthorization::CreateOnly,
-            ))
-            .expect("displayUnit does not reinterpret micrometers");
+        let project =
+            project_core_with_identity_storage(&directory.path().join(format!("identity-{index}")))
+                .create_editable(CreateProjectRequest::new(
+                    project_location(&project_path),
+                    InitialProject::configured(InitialProjectConfiguration::new(
+                        display_unit,
+                        508_000,
+                        254_000,
+                        300,
+                        1_270,
+                        2_540,
+                        2,
+                        EndSheetFormat::Double,
+                        EndSheetFormat::Double,
+                    )),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .expect("displayUnit does not reinterpret micrometers");
 
         assert_eq!(project.project().document().display_unit(), display_unit);
         assert_eq!(project.project().document().sheet_width_um(), 508_000);
@@ -1231,24 +1269,24 @@ fn bleed_and_safety_accept_zero_independently() {
 
     for (index, (bleed_um, safety_um)) in [(0, 3_000), (3_000, 0)].into_iter().enumerate() {
         let project_path = directory.path().join(format!("margens-{index}.myalbuns"));
-        let project = ProjectCore::new()
-            .with_identity_lease_root(directory.path().join(format!("leases-{index}")))
-            .create_editable(CreateProjectRequest::new(
-                project_location(&project_path),
-                InitialProject::configured(InitialProjectConfiguration::new(
-                    DisplayUnit::Mm,
-                    600_000,
-                    300_000,
-                    300,
-                    bleed_um,
-                    safety_um,
-                    2,
-                    EndSheetFormat::Double,
-                    EndSheetFormat::Double,
-                )),
-                CreateAuthorization::CreateOnly,
-            ))
-            .expect("zero is valid for either technical area");
+        let project =
+            project_core_with_identity_storage(&directory.path().join(format!("identity-{index}")))
+                .create_editable(CreateProjectRequest::new(
+                    project_location(&project_path),
+                    InitialProject::configured(InitialProjectConfiguration::new(
+                        DisplayUnit::Mm,
+                        600_000,
+                        300_000,
+                        300,
+                        bleed_um,
+                        safety_um,
+                        2,
+                        EndSheetFormat::Double,
+                        EndSheetFormat::Double,
+                    )),
+                    CreateAuthorization::CreateOnly,
+                ))
+                .expect("zero is valid for either technical area");
 
         assert_eq!(
             project.project().document().bleed_um(),
@@ -1503,7 +1541,10 @@ fn invalid_initial_configuration_has_no_file_or_identity_lease_effects() {
             "{case}"
         );
         let error = ProjectCore::new()
-            .with_identity_lease_root(lease_root.clone())
+            .with_identity_storage_roots(
+                lease_root.clone(),
+                directory.path().join(format!("identities-{case}")),
+            )
             .create_editable(CreateProjectRequest::new(
                 project_location(&project_path),
                 InitialProject::configured(configuration),
@@ -1567,7 +1608,7 @@ fn an_unreservable_sheet_count_is_rejected_without_inventing_a_functional_maximu
 
     assert_eq!(
         ProjectCore::new()
-            .with_identity_lease_root(lease_root.clone())
+            .with_identity_storage_roots(lease_root.clone(), directory.path().join("identities"),)
             .create_editable(CreateProjectRequest::new(
                 project_location(&project_path),
                 InitialProject::configured(configuration),
@@ -1584,8 +1625,7 @@ fn an_unreservable_sheet_count_is_rejected_without_inventing_a_functional_maximu
 fn horizontal_technical_areas_may_reach_one_micrometer_before_the_page_center() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("limiar-horizontal.myalbuns");
-    let project = ProjectCore::new()
-        .with_identity_lease_root(directory.path().join("leases"))
+    let project = project_core_with_identity_storage(directory.path())
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
             InitialProject::configured(InitialProjectConfiguration::new(
@@ -1612,7 +1652,7 @@ fn horizontal_technical_areas_may_reach_one_micrometer_before_the_page_center() 
 fn structurally_valid_configuration_is_not_rejected_by_the_export_memory_guardrail() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("alta-resolucao.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let created = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1644,7 +1684,7 @@ fn structurally_valid_configuration_is_not_rejected_by_the_export_memory_guardra
 fn an_open_v1_project_exposes_the_initial_editor_projection_without_demo_content() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Projeto produtivo.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1686,7 +1726,7 @@ fn an_open_v1_project_exposes_the_initial_editor_projection_without_demo_content
 fn changing_dpi_updates_the_authoritative_projection_without_writing_the_project_file() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("DPI editável.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1741,7 +1781,7 @@ fn changing_dpi_updates_the_authoritative_projection_without_writing_the_project
 fn saving_the_current_revision_returns_already_current_without_touching_the_project_file() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Projeto atual.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1766,7 +1806,7 @@ fn saving_the_current_revision_returns_already_current_without_touching_the_proj
 fn a_stale_save_request_is_rejected_before_file_io_and_preserves_the_session() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Pedido obsoleto.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1800,7 +1840,7 @@ fn a_stale_save_request_is_rejected_before_file_io_and_preserves_the_session() {
 fn saving_the_visible_revision_publishes_it_and_preserves_session_history() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("RevisÃ£o confirmada.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1852,7 +1892,7 @@ fn saving_reuses_the_captured_mapped_drive_binding_for_its_temporary_sibling() {
         .capture_with_binding(&logical_path, directory.path())
         .expect("the mapped drive binding is captured for the attempt");
     let location = ProjectLocation::new(logical_path, context.freeze());
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             location.clone(),
@@ -1881,7 +1921,7 @@ fn saving_reuses_the_captured_mapped_drive_binding_for_its_temporary_sibling() {
 fn reopening_a_saved_revision_starts_a_clean_session_with_empty_history() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Reabertura confirmada.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1913,7 +1953,7 @@ fn reopening_a_saved_revision_starts_a_clean_session_with_empty_history() {
 fn opening_an_editable_project_respects_its_stable_transition_barrier() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Barreira de abertura.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1937,7 +1977,7 @@ fn opening_an_editable_project_respects_its_stable_transition_barrier() {
 fn a_conclusive_save_failure_preserves_the_editable_session_for_retry() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Falha conclusiva.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -1986,7 +2026,7 @@ fn a_replace_failure_reacquires_the_exact_baseline_and_allows_retry() {
 
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Replace bloqueado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -2024,7 +2064,7 @@ fn a_replace_failure_reacquires_the_exact_baseline_and_allows_retry() {
 fn save_rejects_persisted_bytes_that_diverge_even_with_the_same_revision() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Baseline divergente.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -2063,7 +2103,7 @@ fn save_rejects_a_different_physical_object_even_when_its_bytes_are_identical() 
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Objeto fisico divergente.myalbuns");
     let displaced_path = directory.path().join("baseline-deslocado.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -2100,7 +2140,7 @@ fn save_rejects_a_different_physical_object_even_when_its_bytes_are_identical() 
 #[test]
 fn invalid_dpi_values_leave_the_session_history_and_project_file_unchanged() {
     let directory = tempfile::tempdir().expect("temporary directory");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let neutral_path = directory.path().join("DPI inválido.myalbuns");
     let mut neutral = core
         .create_editable(CreateProjectRequest::new(
@@ -2181,7 +2221,7 @@ fn invalid_dpi_values_leave_the_session_history_and_project_file_unchanged() {
 fn undo_redo_and_a_divergent_dpi_branch_restore_authoritative_revisions() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("Histórico de DPI.myalbuns");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .create_editable(CreateProjectRequest::new(
             project_location(&project_path),
@@ -2245,7 +2285,7 @@ fn exhausting_the_safe_revision_range_rejects_dpi_before_mutation() {
         "\"revision\": 9007199254740991",
     );
     fs::write(&project_path, &bytes).expect("the maximal public revision is written");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
     let mut project = core
         .open_editable(OpenProjectRequest::new(project_location(&project_path)))
         .expect("the maximal public revision opens");
@@ -2277,7 +2317,8 @@ fn create_only_never_replaces_an_object_that_already_occupies_the_destination() 
     let original = b"conteudo preexistente";
     fs::write(&project_path, original).expect("the destination exists");
     let lease_root = directory.path().join("leases");
-    let core = ProjectCore::new().with_identity_lease_root(lease_root.clone());
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(lease_root.clone(), directory.path().join("identities"));
 
     assert_eq!(
         core.create_editable(CreateProjectRequest::new(
@@ -2309,16 +2350,18 @@ fn concurrent_create_only_attempts_publish_exactly_one_complete_project() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("corrida.myalbuns");
     let lease_root = directory.path().join("leases");
+    let registry_root = directory.path().join("identities");
     let barrier = Arc::new(Barrier::new(6));
     let workers = (0..6)
         .map(|_| {
             let barrier = Arc::clone(&barrier);
             let project_path = project_path.clone();
             let lease_root = lease_root.clone();
+            let registry_root = registry_root.clone();
             std::thread::spawn(move || {
                 barrier.wait();
                 ProjectCore::new()
-                    .with_identity_lease_root(lease_root)
+                    .with_identity_storage_roots(lease_root, registry_root)
                     .create_editable(CreateProjectRequest::new(
                         project_location(&project_path),
                         InitialProject::neutral(),
@@ -2365,8 +2408,7 @@ fn creation_rejects_unsafe_children_through_the_public_core_boundary() {
     ];
 
     for unsafe_path in unsafe_paths {
-        let error = ProjectCore::new()
-            .with_identity_lease_root(directory.path().join("leases"))
+        let error = project_core_with_identity_storage(directory.path())
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(unsafe_path.clone(), bindings.clone()),
                 InitialProject::neutral(),
@@ -2394,7 +2436,7 @@ fn creates_and_reopens_a_non_ascii_project_beyond_the_legacy_path_limit() {
     std::fs::create_dir_all(&parent).expect("the long parent is materialized");
     let project_path = parent.join("Álbum de família.myalbuns");
     assert!(project_path.as_os_str().encode_wide().count() > 260);
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let created = core
         .create_editable(CreateProjectRequest::new(
@@ -2420,7 +2462,7 @@ fn creates_and_reopens_through_an_accepted_forward_slash_windows_path() {
     let native_path = directory.path().join("Álbum com barras.myalbuns");
     let forward_slash_path =
         std::path::PathBuf::from(native_path.to_string_lossy().replace('\\', "/"));
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let created = core
         .create_editable(CreateProjectRequest::new(
@@ -2447,7 +2489,8 @@ fn replace_confirmed_replaces_an_unprotected_file_but_not_an_open_project() {
     let project_path = directory.path().join("substituivel.myalbuns");
     fs::write(&project_path, b"arquivo regular antigo").expect("ordinary file exists");
     let lease_root = directory.path().join("leases");
-    let core = ProjectCore::new().with_identity_lease_root(lease_root);
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(lease_root, directory.path().join("identities"));
 
     let first_project = core
         .create_editable(CreateProjectRequest::new(
@@ -2490,7 +2533,7 @@ fn opening_invalid_content_leaves_no_editable_ownership_behind() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("qualquer-extensao.bin");
     fs::write(&project_path, b"not a project").expect("invalid fixture is written");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     assert!(matches!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path))),
@@ -2511,7 +2554,7 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
     let copy_path = directory.path().join("copia.myalbuns");
     fs::write(&original_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
     fs::write(&copy_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("copied fixture");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let original = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
@@ -2522,8 +2565,40 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
         OpenProjectError::ExternalCopyRequiresInteractiveResolution
     );
     drop(original);
-    core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-        .expect("the classification did not leave a residual physical lock");
+    assert_eq!(
+        core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
+            .expect_err("durable Identity evidence still protects the closed original"),
+        OpenProjectError::ExternalCopyRequiresInteractiveResolution
+    );
+
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&original_path)))
+        .expect("the last authorized physical instance can reopen after closure");
+    assert_eq!(
+        reopened.project_id().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
+    );
+}
+
+#[test]
+fn a_possible_move_stays_fail_closed_until_the_identity_promotion_ticket() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let original_path = directory.path().join("original.myalbuns");
+    let moved_path = directory.path().join("movido.myalbuns");
+    fs::write(&original_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
+    let core = project_core_with_identity_storage(directory.path());
+
+    let original = core
+        .open_editable(OpenProjectRequest::new(project_location(&original_path)))
+        .expect("the first observation authorizes the original");
+    drop(original);
+    fs::rename(&original_path, &moved_path).expect("the Project is moved after closure");
+
+    assert_eq!(
+        core.open_editable(OpenProjectRequest::new(project_location(&moved_path)))
+            .expect_err("issue #44 cannot classify or promote a possible movement"),
+        OpenProjectError::IdentityIndeterminate
+    );
 }
 
 #[test]
@@ -2532,7 +2607,7 @@ fn read_only_load_accepts_the_same_physical_project_while_it_is_open_for_editing
     let project_path = directory.path().join("original.myalbuns");
     fs::write(&project_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
     let original_bytes = fs::read(&project_path).expect("original bytes");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let original = core
         .open_editable(OpenProjectRequest::new(project_location(&project_path)))
@@ -2556,7 +2631,7 @@ fn read_only_load_rejects_an_external_physical_copy_of_an_open_project() {
     let original_path = directory.path().join("original.myalbuns");
     let copy_path = directory.path().join("copia.myalbuns");
     fs::write(&original_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
-    let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+    let core = project_core_with_identity_storage(directory.path());
 
     let _original = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
@@ -2582,7 +2657,8 @@ fn read_only_load_fails_closed_when_active_identity_evidence_is_invalid() {
     let project_path = directory.path().join("original.myalbuns");
     let lease_root = directory.path().join("leases");
     fs::write(&project_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
-    let core = ProjectCore::new().with_identity_lease_root(lease_root.clone());
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(lease_root.clone(), directory.path().join("identities"));
 
     let _original = core
         .open_editable(OpenProjectRequest::new(project_location(&project_path)))
@@ -2642,4 +2718,9 @@ fn project_location(project_path: &Path) -> ProjectLocation {
         .capture(project_path)
         .expect("the fixture has a supported absolute path");
     ProjectLocation::new(project_path.to_path_buf(), paths.freeze())
+}
+
+fn project_core_with_identity_storage(storage_root: &Path) -> ProjectCore {
+    ProjectCore::new()
+        .with_identity_storage_roots(storage_root.join("leases"), storage_root.join("identities"))
 }

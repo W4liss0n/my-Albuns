@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { MediaPreviewDemand } from "../application/projectPorts";
 
 import type {
   MediaCatalogItem,
@@ -11,6 +13,7 @@ export interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
 }
 
@@ -18,6 +21,7 @@ export function MediaPanel({
   mediaItems,
   mediaUsage,
   mediaPreviewUrls = {},
+  onMediaDemandChange,
   onFillPhoto,
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
@@ -25,6 +29,59 @@ export function MediaPanel({
   const mediaUsageById = new Map(
     mediaUsage.map((usage) => [usage.mediaId, usage.count]),
   );
+  const activeMediaItems = useMemo(
+    () => mediaItems.filter((media) => media.kind === activeMediaKind),
+    [activeMediaKind, mediaItems],
+  );
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!onMediaDemandChange) return;
+    const root = stripRef.current;
+    const targets = root?.querySelectorAll<HTMLElement>("[data-media-id]");
+    onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
+    if (!root || !targets?.length || !("IntersectionObserver" in globalThis)) {
+      return;
+    }
+
+    const visible = new Set<string>();
+    const resident = new Set<string>();
+    const emitDemand = () => {
+      const visibleMediaIds = activeMediaItems
+        .map(({ id }) => id)
+        .filter((mediaId) => visible.has(mediaId));
+      const preloadMediaIds = activeMediaItems
+        .map(({ id }) => id)
+        .filter(
+          (mediaId) => resident.has(mediaId) && !visible.has(mediaId),
+        );
+      onMediaDemandChange({ visibleMediaIds, preloadMediaIds });
+    };
+    const update = (entries: IntersectionObserverEntry[], set: Set<string>) => {
+      for (const entry of entries) {
+        const mediaId = (entry.target as HTMLElement).dataset.mediaId;
+        if (!mediaId) continue;
+        if (entry.isIntersecting) set.add(mediaId);
+        else set.delete(mediaId);
+      }
+      emitDemand();
+    };
+    const visibleObserver = new IntersectionObserver(
+      (entries) => update(entries, visible),
+      { root, rootMargin: "0px", threshold: 0.01 },
+    );
+    const preloadObserver = new IntersectionObserver(
+      (entries) => update(entries, resident),
+      { root, rootMargin: "122px 0px", threshold: 0.01 },
+    );
+    targets.forEach((target) => {
+      visibleObserver.observe(target);
+      preloadObserver.observe(target);
+    });
+    return () => {
+      visibleObserver.disconnect();
+      preloadObserver.disconnect();
+    };
+  }, [activeMediaItems, onMediaDemandChange]);
 
   return (
     <section
@@ -56,14 +113,13 @@ export function MediaPanel({
           <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
         </label>
       </div>
-      <div className="media-strip">
-        {mediaItems
-          .filter((media) => media.kind === activeMediaKind)
-          .map((media) => (
+      <div className="media-strip" ref={stripRef}>
+        {activeMediaItems.map((media) => (
             <button
               className="media-card"
               type="button"
               key={media.id}
+              data-media-id={media.id}
               onDoubleClick={
                 media.kind === "photo"
                   ? () => onFillPhoto(media.id)

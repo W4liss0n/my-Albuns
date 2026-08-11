@@ -9,18 +9,20 @@ pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
     latest_revision: u64,
     saved_revision: u64,
+    schema_upgrade_required: bool,
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
 }
 
 impl PersistentProjectSession {
-    pub(crate) fn from_persisted(current: ProjectRevision) -> Self {
+    pub(crate) fn from_persisted(current: ProjectRevision, schema_upgrade_required: bool) -> Self {
         let saved_revision = current.revision;
         let latest_revision = current.revision;
         Self {
             current,
             latest_revision,
             saved_revision,
+            schema_upgrade_required,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -48,6 +50,10 @@ impl PersistentProjectSession {
 
     pub(crate) fn has_unsaved_changes(&self) -> bool {
         self.current.revision != self.saved_revision
+    }
+
+    pub(crate) fn requires_save(&self) -> bool {
+        self.has_unsaved_changes() || self.schema_upgrade_required
     }
 
     pub(crate) fn can_undo(&self) -> bool {
@@ -102,6 +108,7 @@ impl PersistentProjectSession {
             return Err(());
         }
         self.saved_revision = candidate.revision;
+        self.schema_upgrade_required = false;
         Ok(())
     }
 }

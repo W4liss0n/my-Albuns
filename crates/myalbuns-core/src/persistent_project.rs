@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use myalbuns_paths::OperationPathContext;
 use uuid::Uuid;
 
 use crate::{
@@ -11,8 +12,8 @@ use crate::{
     project_document::{InitialProject, ProjectDocument, ProjectRevision},
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
-        OpenStoreError, PathFailure, ProjectIdentityLease, ProjectLocation, ProjectStore,
-        SaveStoreError, SaveStoreResult,
+        IdentityRegistryLookup, OpenStoreError, PathFailure, ProjectIdentityLease,
+        ProjectIdentityRegistry, ProjectLocation, ProjectStore, SaveStoreError, SaveStoreResult,
     },
 };
 
@@ -106,17 +107,41 @@ pub enum SaveProjectError {
     SaveStateIndeterminate,
 }
 
+/// Opaque proof that one editable Project passed the identity-opening barrier.
+///
+/// Read-only loads never produce this value. Local state keyed by Project
+/// identity must require it instead of accepting an ID parsed from a document.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectIdentityAuthority {
+    project_id: Uuid,
+}
+
+impl ProjectIdentityAuthority {
+    pub fn project_id(&self) -> Uuid {
+        self.project_id
+    }
+
+    fn authorized(project_id: Uuid) -> Self {
+        Self { project_id }
+    }
+}
+
 #[derive(Debug)]
 pub struct EditableProject {
     session: PersistentProjectSession,
     store: ProjectStore,
     identity_lease: ProjectIdentityLease,
+    identity_authority: ProjectIdentityAuthority,
     session_valid: bool,
 }
 
 impl EditableProject {
     pub fn project_id(&self) -> Uuid {
         self.session.project_id()
+    }
+
+    pub fn identity_authority(&self) -> &ProjectIdentityAuthority {
+        &self.identity_authority
     }
 
     pub fn revision(&self) -> u64 {
@@ -215,7 +240,7 @@ impl EditableProject {
                 current,
             });
         }
-        if !self.has_unsaved_changes() {
+        if !self.session.requires_save() {
             return Ok(SaveProjectOutcome::AlreadyCurrent { revision: current });
         }
         let candidate = self.session.current_revision();
@@ -324,11 +349,17 @@ impl ProjectCore {
             identity_lease.discard_unpublished();
             return Err(CreateProjectError::IdentityIndeterminate);
         }
+        if publish_identity_location(self, revision.project_id, &store).is_err() {
+            identity_lease.discard_unpublished();
+            return Err(CreateProjectError::CreateStateIndeterminate);
+        }
 
+        let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
-            session: PersistentProjectSession::from_persisted(revision),
+            session: PersistentProjectSession::from_persisted(revision, false),
             store,
             identity_lease,
+            identity_authority,
             session_valid: true,
         })
     }
@@ -344,14 +375,80 @@ impl ProjectCore {
             project_store::open_editable(request.location).map_err(map_open_store_error)?;
         let identity_lease = ProjectIdentityLease::acquire(lease_root, opened.revision.project_id)
             .map_err(map_open_identity_lease_error)?;
+        authorize_opened_identity(self, opened.revision.project_id, &opened.store)?;
         bind_identity_target(&identity_lease, &opened.store)
             .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
+        let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
-            session: PersistentProjectSession::from_persisted(opened.revision),
+            session: PersistentProjectSession::from_persisted(
+                opened.revision,
+                opened.requires_schema_upgrade,
+            ),
             store: opened.store,
             identity_lease,
+            identity_authority,
             session_valid: true,
         })
+    }
+}
+
+fn identity_registry(core: &ProjectCore) -> Result<ProjectIdentityRegistry, ()> {
+    core.identity_registry_root()
+        .map(|root| ProjectIdentityRegistry::new(root.to_path_buf()))
+        .ok_or(())
+}
+
+fn publish_identity_location(
+    core: &ProjectCore,
+    project_id: Uuid,
+    store: &ProjectStore,
+) -> Result<(), ()> {
+    identity_registry(core)?
+        .publish(project_id, store.location().project_path())
+        .map_err(|_| ())
+}
+
+fn authorize_opened_identity(
+    core: &ProjectCore,
+    project_id: Uuid,
+    store: &ProjectStore,
+) -> Result<(), OpenProjectError> {
+    let registry = identity_registry(core).map_err(|()| OpenProjectError::IdentityIndeterminate)?;
+    let previous_location = match registry
+        .lookup(project_id)
+        .map_err(|_| OpenProjectError::IdentityIndeterminate)?
+    {
+        IdentityRegistryLookup::Missing => {
+            return registry
+                .publish(project_id, store.location().project_path())
+                .map_err(|_| OpenProjectError::IdentityIndeterminate);
+        }
+        IdentityRegistryLookup::Location(location) => location,
+    };
+
+    let mut context = OperationPathContext::new();
+    context
+        .capture(&previous_location)
+        .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
+    let previous = project_store::read(&ProjectLocation::new(previous_location, context.freeze()));
+    match previous {
+        Ok(previous) if previous.revision.project_id == project_id => {
+            match (previous.physical_identity, store.physical_identity()) {
+                (Some(previous), Some(candidate)) => {
+                    if previous == candidate {
+                        Ok(())
+                    } else {
+                        Err(OpenProjectError::ExternalCopyRequiresInteractiveResolution)
+                    }
+                }
+                _ => Err(OpenProjectError::IdentityIndeterminate),
+            }
+        }
+        Ok(_) => Err(OpenProjectError::IdentityIndeterminate),
+        Err(project_store::DecodeFailure::Path(PathFailure::NotFound)) => {
+            Err(OpenProjectError::IdentityIndeterminate)
+        }
+        Err(_) => Err(OpenProjectError::IdentityIndeterminate),
     }
 }
 
@@ -425,7 +522,10 @@ mod save_tests {
     fn projection_and_render_snapshot_derive_the_non_ascii_project_name_from_its_native_path() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let project_path = directory.path().join("Casamento da Júlia.myalbuns");
-        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
         let project = core
             .create_editable(CreateProjectRequest::new(
                 location(&project_path),
@@ -455,7 +555,10 @@ mod save_tests {
     fn an_indeterminate_post_publication_state_is_not_confirmed_and_requires_reopening() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let project_path = directory.path().join("Estado inconclusivo.myalbuns");
-        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
         let mut project = core
             .create_editable(CreateProjectRequest::new(
                 location(&project_path),

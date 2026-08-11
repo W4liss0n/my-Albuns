@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectIntent } from "../domain/project";
@@ -16,6 +17,9 @@ import {
 const tauriBoundary = vi.hoisted(() => ({
   channels: [] as Array<{ onmessage: (message: unknown) => void }>,
 }));
+const eventBoundary = vi.hoisted(() => ({
+  listeners: [] as Array<(event: { payload: unknown }) => void>,
+}));
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve(undefined)),
@@ -30,10 +34,21 @@ vi.mock("@tauri-apps/api/core", () => ({
   },
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(
+    async (_eventName: string, listener: (event: { payload: unknown }) => void) => {
+      eventBoundary.listeners.push(listener);
+      return vi.fn();
+    },
+  ),
+}));
+
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
   vi.mocked(invoke).mockResolvedValue(undefined);
   tauriBoundary.channels.length = 0;
+  vi.mocked(listen).mockClear();
+  eventBoundary.listeners.length = 0;
 });
 
 test("completes an Export attempt with the backend result", async () => {
@@ -200,10 +215,16 @@ test("maps the Project and media ports to the desktop commands", async () => {
   vi.mocked(invoke).mockResolvedValueOnce([
     {
       mediaId: "media-a-001",
+      state: "ready",
       url: "http://asset.localhost/cache-preview",
     },
   ]);
-  const previews = await tauriMediaPreviewPort.prepareMediaPreviews();
+  const demand = {
+    revision: 1,
+    visibleMediaIds: ["media-a-001"],
+    preloadMediaIds: ["media-b-001"],
+  };
+  const previews = await tauriMediaPreviewPort.prepareMediaPreviews(demand);
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
     operationId: "project-load-1",
@@ -213,8 +234,26 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(invoke).toHaveBeenNthCalledWith(3, "undo_project");
   expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
-  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews");
+  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews", {
+    demand,
+  });
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
+});
+
+test("maps stable linked-media events to the reactive preview seam", async () => {
+  const listener = vi.fn();
+
+  const unlisten = await tauriMediaPreviewPort.onMediaChanged(listener);
+  eventBoundary.listeners[0]({
+    payload: { mediaIds: ["photo-a", "overlay-a"] },
+  });
+
+  expect(listen).toHaveBeenCalledWith(
+    "myalbuns://linked-media-changed",
+    expect.any(Function),
+  );
+  expect(listener).toHaveBeenCalledWith(["photo-a", "overlay-a"]);
+  expect(unlisten).toEqual(expect.any(Function));
 });
 
 test("returns the authoritative projection from a confirmed Project save", async () => {
@@ -383,7 +422,11 @@ test("normalizes typed media preview failures without losing their code or messa
     message: "A Imagem decorativa vinculada não está disponível.",
   });
 
-  const failure = tauriMediaPreviewPort.prepareMediaPreviews();
+  const failure = tauriMediaPreviewPort.prepareMediaPreviews({
+    revision: 1,
+    visibleMediaIds: ["media-a-001"],
+    preloadMediaIds: [],
+  });
 
   await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
   await expect(failure).rejects.toMatchObject({

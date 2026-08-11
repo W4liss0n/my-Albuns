@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import App from "./App";
@@ -16,7 +17,62 @@ import type {
 import { createEmptyProjection } from "./test/projectFixtures";
 
 vi.mock("./components/AlbumCanvas", () => ({
-  AlbumCanvas: () => <div data-testid="album-canvas" />,
+  AlbumCanvas: ({
+    onMediaDemandChange,
+    mediaPreviewUrls,
+    onGraphicsUnavailable,
+  }: {
+    onMediaDemandChange?: (demand: {
+      visibleMediaIds: readonly string[];
+      preloadMediaIds: readonly string[];
+    }) => void;
+    mediaPreviewUrls?: Readonly<Record<string, string>>;
+    onGraphicsUnavailable?: (diagnostic: {
+      supported: false;
+      code: "webgl2_unavailable";
+      renderer: string;
+      reason: string;
+      limits: null;
+    }) => void;
+  }) => {
+    useEffect(() => {
+      onMediaDemandChange?.({
+        visibleMediaIds: ["media-001"],
+        preloadMediaIds: [],
+      });
+    }, [onMediaDemandChange]);
+    return (
+      <>
+        <div
+          data-testid="album-canvas"
+          data-media-preview={mediaPreviewUrls?.["media-001"] ?? ""}
+        />
+        <button
+          type="button"
+          aria-label="Esvaziar demanda de Canvas"
+          onClick={() =>
+            onMediaDemandChange?.({
+              visibleMediaIds: [],
+              preloadMediaIds: [],
+            })
+          }
+        />
+        <button
+          type="button"
+          aria-label="Simular perda grafica"
+          onClick={() =>
+            onGraphicsUnavailable?.({
+              supported: false,
+              code: "webgl2_unavailable",
+              renderer: "indisponivel",
+              reason: "WebGL2 runtime failure.",
+              limits: null,
+            })
+          }
+        />
+      </>
+    );
+  },
 }));
 
 const projection = createEmptyProjection();
@@ -32,6 +88,7 @@ const projectSessionPort: ProjectSessionPort = {
 };
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
+  onMediaChanged: async () => () => undefined,
 };
 const exportPort: ExportPort = {
   startSheet: () => ({
@@ -69,7 +126,10 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
     <App
       exportPort={exportPort}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={{ prepareMediaPreviews }}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+      }}
       projectSessionPort={{ ...projectSessionPort, load }}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
@@ -162,7 +222,8 @@ test("prepares real media previews after opening without blocking the Workspace"
   const prepareMediaPreviews = vi.fn(async () => [
       {
         mediaId: "media-001",
-        url: "http://myalbuns-media.localhost/opaque-media-token",
+        state: "ready" as const,
+        url: "http://myalbuns-cache.localhost/opaque-media-token",
       },
     ]);
 
@@ -170,7 +231,10 @@ test("prepares real media previews after opening without blocking the Workspace"
     <App
       exportPort={exportPort}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={{ prepareMediaPreviews }}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+      }}
       projectSessionPort={projectSessionPort}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
@@ -202,6 +266,150 @@ test("prepares real media previews after opening without blocking the Workspace"
   );
 });
 
+test("reprepares demanded media when the stable Monitor reports a change", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const prepareMediaPreviews = vi
+    .fn()
+    .mockResolvedValueOnce([
+      {
+        mediaId: "media-001",
+        state: "ready" as const,
+        url: "http://myalbuns-cache.localhost/generation-one",
+      },
+    ])
+    .mockResolvedValueOnce([
+      {
+        mediaId: "media-001",
+        state: "ready" as const,
+        url: "http://myalbuns-cache.localhost/generation-two",
+      },
+    ]);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectSessionPort={projectSessionPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    "http://myalbuns-cache.localhost/generation-one",
+  );
+
+  act(() => notifyMediaChanged?.(["media-001"]));
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    "http://myalbuns-cache.localhost/generation-two",
+  );
+});
+
+test("keeps one Monitor subscription while demand revisions change", async () => {
+  const onMediaChanged = vi.fn(async () => () => undefined);
+  const prepareMediaPreviews = vi.fn(async () => []);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{ prepareMediaPreviews, onMediaChanged }}
+      projectSessionPort={projectSessionPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Esvaziar demanda de Canvas" }),
+  );
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+
+  expect(onMediaChanged).toHaveBeenCalledOnce();
+  expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
+    revision: 2,
+    visibleMediaIds: [],
+    preloadMediaIds: [],
+  });
+});
+
+test("cancels resident media demand when runtime graphics become unavailable", async () => {
+  const prepareMediaPreviews = vi.fn(async () => []);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+      }}
+      projectSessionPort={projectSessionPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  fireEvent.click(
+    screen.getByRole("button", { name: "Simular perda grafica" }),
+  );
+  expect(
+    await screen.findByRole("heading", {
+      name: /O Canvas/,
+    }),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
+    revision: 2,
+    visibleMediaIds: [],
+    preloadMediaIds: [],
+  });
+});
+
 test("logs the typed media preview failure code without replacing it with unknown_error", async () => {
   const logEvents: LogEvent[] = [];
   const logger: Logger = {
@@ -219,7 +427,10 @@ test("logs the typed media preview failure code without replacing it with unknow
     <App
       exportPort={exportPort}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={{ prepareMediaPreviews }}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+      }}
       projectSessionPort={projectSessionPort}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}

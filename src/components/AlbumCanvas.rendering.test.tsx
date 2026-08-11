@@ -1,6 +1,7 @@
 import { act, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
+import type { LogEvent, Logger } from "../application/logging";
 import type { CompositionPlan } from "../domain/project";
 import {
   composition,
@@ -84,16 +85,21 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
 
 test("materializes a reduced Cache preview as the Canvas texture", async () => {
   const texture = { label: "cache-preview" };
+  const logEvents: LogEvent[] = [];
+  const logger: Logger = {
+    write: (event) => logEvents.push(event),
+  };
   renderCanvas({
     compositionPlan: interactiveComposition,
     mediaPreviewUrls: {
-      "media-001": "asset://localhost/cache/media-001.jpg",
+      "media-001": "http://myalbuns-cache.localhost/photo-token",
     },
+    logger,
   });
   await finishPixiInitialization();
 
   expect(pixiLifecycle.assetLoads).toEqual([
-    "asset://localhost/cache/media-001.jpg",
+    "http://myalbuns-cache.localhost/photo-token",
   ]);
   expect(pixiLifecycle.spriteTextures).toEqual([]);
 
@@ -105,11 +111,24 @@ test("materializes a reduced Cache preview as the Canvas texture", async () => {
   await waitFor(() => {
     expect(pixiLifecycle.spriteTextures).toEqual([texture, texture]);
   });
+  expect(logEvents).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        component: "canvas",
+        event: "canvas_opaque_preview_texture_loaded",
+      }),
+    ]),
+  );
+  expect(
+    logEvents.filter(
+      ({ event }) => event === "canvas_opaque_preview_texture_loaded",
+    ),
+  ).toHaveLength(1);
 });
 
 test("materializes a transparent Decorative from the shared Cache URL", async () => {
   const previewUrl =
-    "asset://localhost/cache/decorative-overlay.png";
+    "http://myalbuns-cache.localhost/decorative-token";
   const texture = { label: "decorative-cache-preview" };
   const decorativeComposition: CompositionPlan = {
     ...composition,
@@ -152,6 +171,78 @@ test("materializes a transparent Decorative from the shared Cache URL", async ()
     expect(
       displayWithLabel("decorative-overlay-decorative-overlay"),
     ).toBeDefined();
+  });
+});
+
+test("renders Background and Overlay from opaque Cache representations and reports visible demand", async () => {
+  const backgroundTexture = { label: "background-cache-preview" };
+  const overlayTexture = { label: "overlay-cache-preview" };
+  const onMediaDemandChange = vi.fn();
+  const faithfulComposition: CompositionPlan = {
+    ...composition,
+    sheets: [
+      {
+        ...composition.sheets[0],
+        backgrounds: [
+          {
+            kind: "media",
+            mediaId: "background-media",
+            name: "Background.jpg",
+            drawRect: {
+              x: 0,
+              y: 0,
+              width: composition.sheets[0].widthUm,
+              height: composition.sheets[0].heightUm,
+            },
+          },
+        ],
+        overlays: [
+          {
+            mediaId: "overlay-media",
+            name: "Overlay.png",
+            drawRect: {
+              x: 0,
+              y: 0,
+              width: composition.sheets[0].widthUm,
+              height: composition.sheets[0].heightUm,
+            },
+          },
+        ],
+      },
+    ],
+  };
+
+  renderCanvas({
+    compositionPlan: faithfulComposition,
+    mediaPreviewUrls: {
+      "background-media":
+        "http://myalbuns-cache.localhost/background-token",
+      "overlay-media": "http://myalbuns-cache.localhost/overlay-token",
+    },
+    onMediaDemandChange,
+  });
+  await finishPixiInitialization();
+
+  expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+    visibleMediaIds: ["background-media", "overlay-media"],
+    preloadMediaIds: [],
+  });
+  expect(pixiLifecycle.assetLoads).toEqual([
+    "http://myalbuns-cache.localhost/background-token",
+    "http://myalbuns-cache.localhost/overlay-token",
+  ]);
+
+  await act(async () => {
+    pixiLifecycle.resolveAssetLoads[0]?.(backgroundTexture);
+    pixiLifecycle.resolveAssetLoads[1]?.(overlayTexture);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await waitFor(() => {
+    expect(displayWithLabel("background-media-background-media"))
+      .toBeDefined();
+    expect(displayWithLabel("decorative-overlay-overlay-media"))
+      .toBeDefined();
   });
 });
 

@@ -11,7 +11,9 @@ try {
     # CARGO_BIN_EXE_myalbuns-imaging names the executable just produced.
     & $script:CargoExecutable test `
         --workspace `
-        --exclude myalbuns-imaging
+        --exclude myalbuns-imaging `
+        -- `
+        --test-threads=1
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

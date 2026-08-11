@@ -2,7 +2,8 @@
 use std::fmt;
 
 use crate::{
-    cache_activity_gate::{CacheActivityGate, CachePause},
+    cache_activity_gate::CachePause,
+    cache_engine::CacheEngine,
     imaging_processor::{ImagingProcessor, ProcessorReservation, ProcessorUnavailable},
     operation_gate::{OperationGate, OperationGateError, OperationGrant},
 };
@@ -38,7 +39,7 @@ impl OperationLease {
     #[cfg(test)]
     pub(crate) async fn acquire(
         gate: &OperationGate,
-        cache: &CacheActivityGate,
+        cache: &CacheEngine,
         processor: &ImagingProcessor,
     ) -> Result<Self, OperationLeaseError> {
         Self::begin(gate)
@@ -56,7 +57,7 @@ impl OperationLease {
 impl OperationLeaseAcquisition {
     pub(crate) async fn complete(
         self,
-        cache: &CacheActivityGate,
+        cache: &CacheEngine,
         processor: &ImagingProcessor,
     ) -> Result<OperationLease, ProcessorUnavailable> {
         let cache_pause = cache.pause().await;
@@ -95,7 +96,9 @@ mod tests {
 
     use super::OperationLease;
     use crate::{
-        cache_activity_gate::CacheActivityGate, imaging_processor::ImagingProcessor,
+        cache_activity_gate::{CacheCancellation, CacheCancellationReason},
+        cache_engine::CacheEngine,
+        imaging_processor::ImagingProcessor,
         operation_gate::OperationGate,
     };
 
@@ -109,7 +112,7 @@ mod tests {
             let root = tempdir().expect("the release fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let lease = OperationLease::acquire(&gate, &cache, &processor)
                 .await
@@ -121,7 +124,7 @@ mod tests {
                     .is_err(),
                 "another Export is refused without a queue"
             );
-            let cache_work = cache.begin_work();
+            let cache_work = cache.begin_cancellable_work(CacheCancellation::default());
             tokio::pin!(cache_work);
             let processor_work = processor.reserve();
             tokio::pin!(processor_work);
@@ -155,7 +158,7 @@ mod tests {
         let root = tempdir().expect("the unwind fixture exists");
         let paths = app_paths(root.path());
         let gate = OperationGate::new(&paths);
-        let cache = CacheActivityGate::default();
+        let cache = CacheEngine::default();
         let processor = ImagingProcessor::default();
 
         let outcome = catch_unwind(AssertUnwindSafe(|| {
@@ -181,7 +184,7 @@ mod tests {
             let root = tempdir().expect("the staged acquisition fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let occupied_processor = processor
                 .reserve()
@@ -216,7 +219,7 @@ mod tests {
             let root = tempdir().expect("the Processor-cancellation fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let occupied_processor = processor
                 .reserve()
@@ -234,9 +237,12 @@ mod tests {
 
             gate.try_acquire()
                 .expect("cancelling the pending future releases its gate grant");
-            tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
-                .await
-                .expect("cancelling the pending future releases its Cache pause");
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                cache.begin_cancellable_work(CacheCancellation::default()),
+            )
+            .await
+            .expect("cancelling the pending future releases its Cache pause");
             drop(occupied_processor);
         });
     }
@@ -247,7 +253,7 @@ mod tests {
             let root = tempdir().expect("the quarantine fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let reservation = processor
                 .reserve()
@@ -270,9 +276,12 @@ mod tests {
                 OperationLease::begin(&gate).is_ok(),
                 "the failed completion releases the gate"
             );
-            tokio::time::timeout(Duration::from_secs(1), cache.begin_work())
-                .await
-                .expect("the failed completion releases the Cache pause");
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                cache.begin_cancellable_work(CacheCancellation::default()),
+            )
+            .await
+            .expect("the failed completion releases the Cache pause");
         });
     }
 
@@ -282,9 +291,10 @@ mod tests {
             let root = tempdir().expect("the Cache-pause fixture exists");
             let paths = app_paths(root.path());
             let gate = OperationGate::new(&paths);
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
-            let active_cache = cache.begin_work().await;
+            let cancellation = CacheCancellation::default();
+            let active_cache = cache.begin_cancellable_work(cancellation.clone()).await;
             let mut lease = Box::pin(OperationLease::acquire(&gate, &cache, &processor));
 
             assert!(
@@ -293,12 +303,32 @@ mod tests {
                     .is_err(),
                 "the lease waits until active Cache work reaches a safe endpoint"
             );
+            assert!(
+                cancellation
+                    .flag()
+                    .load(std::sync::atomic::Ordering::Acquire),
+                "the export pause causally cancels the active Cache sidecar first"
+            );
+            assert_eq!(cancellation.reason(), Some(CacheCancellationReason::Paused));
 
             drop(active_cache);
-            tokio::time::timeout(Duration::from_secs(1), &mut lease)
+            let lease = tokio::time::timeout(Duration::from_secs(1), &mut lease)
                 .await
                 .expect("the Cache pause becomes available")
                 .expect("the complete lease is acquired");
+            let mut blocked_resume = Box::pin(cache.begin_cancellable_work(cancellation.clone()));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), &mut blocked_resume)
+                    .await
+                    .is_err(),
+                "the Cache cannot resume while Export owns its causal pause"
+            );
+            drop(lease);
+            let resumed = cancellation.resume_after_pause();
+            assert!(resumed, "the same non-obsolete demand can resume");
+            tokio::time::timeout(Duration::from_secs(1), &mut blocked_resume)
+                .await
+                .expect("the Cache resumes after every Export terminal drops its lease");
         });
     }
 }

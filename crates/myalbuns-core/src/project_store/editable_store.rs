@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use super::{
     DecodeFailure, DocumentFailure, PathFailure, ProjectIdentityLease, ProjectLocation, decode,
-    encode, map_path_failure,
+    decode_with_metadata, encode, map_path_failure,
     windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
@@ -87,6 +87,7 @@ impl ProjectStore {
 
 pub(crate) struct OpenedProject {
     pub(crate) revision: ProjectRevision,
+    pub(crate) requires_schema_upgrade: bool,
     pub(crate) store: ProjectStore,
 }
 
@@ -220,12 +221,13 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
     let bytes = lock
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
-    let revision = decode(&bytes).map_err(map_open_decode_error)?;
-    if revision.project_id != initial_revision.project_id {
+    let decoded = decode_with_metadata(&bytes).map_err(map_open_decode_error)?;
+    if decoded.revision.project_id != initial_revision.project_id {
         return Err(OpenStoreError::IdentityIndeterminate);
     }
     Ok(OpenedProject {
-        revision,
+        revision: decoded.revision,
+        requires_schema_upgrade: decoded.requires_schema_upgrade,
         store: ProjectStore::from_verified(location, lock, bytes),
     })
 }

@@ -10,13 +10,14 @@ use myalbuns_core::{
     CreateAuthorization, CreateProjectRequest, DemoEditableProject as EditableProject, DisplayUnit,
     EndSheetFormat, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
     InitialOverlay, InitialOverlayContent, InitialProject, InitialProjectConfiguration,
-    InitialProjectPersonalization, ProjectCore, ProjectIntent, ProjectLocation,
+    InitialProjectPersonalization, MediaKind, ProjectCore, ProjectIntent, ProjectLocation,
     ProjectedFrameBorder, RenderSnapshot,
 };
 use myalbuns_imaging_protocol::{
-    CacheArtifactFormat, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgressStage,
-    ImagingRequest, ImagingResponse, MediaSource, RenderSource, decode_event_stream,
+    CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheJob, CacheMediaSource,
+    CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration, IMAGING_PROTOCOL_VERSION,
+    ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
+    ImagingProgressStage, ImagingRequest, ImagingResponse, RenderSource, decode_event_stream,
     root_binding_plan_sha256,
 };
 use myalbuns_paths::{
@@ -65,12 +66,29 @@ impl Drop for TestCache {
     }
 }
 
-fn cache_job(source: MediaSource, max_edge_px: u32) -> CacheJob {
-    let generation_id = format!(
-        "{}-v1-{max_edge_px}",
-        source.source_sha256()[..16].to_ascii_lowercase()
-    );
-    CacheJob::new(source, generation_id).expect("the Cache job is valid")
+fn cache_job(
+    source: CacheMediaSource,
+    generation_id: &str,
+    reusable: Option<CacheReusableGeneration>,
+) -> CacheJob {
+    CacheJob::new(source, generation_id, reusable).expect("the Cache job is valid")
+}
+
+fn reusable_generation(artifact: &CacheArtifact) -> CacheReusableGeneration {
+    CacheReusableGeneration::new(
+        artifact.generation_id.clone(),
+        CacheArtifactProperties::new(
+            artifact.format,
+            artifact.width_px,
+            artifact.height_px,
+            artifact.preview_bytes,
+            artifact.exif_orientation,
+            artifact.source_page_count,
+            artifact.basic_color_profile,
+        ),
+        artifact.fingerprint.clone(),
+    )
+    .expect("the generated artifact is valid reuse evidence")
 }
 
 fn root_bindings(paths: &[&Path]) -> RootBindingPlan {
@@ -101,7 +119,10 @@ fn processor_exports_the_neutral_project_as_the_canonical_jpeg() {
         .capture(&project_path)
         .expect("the neutral Project root is captured");
     let project = ProjectCore::new()
-        .with_identity_lease_root(project_directory.path().join("leases"))
+        .with_identity_storage_roots(
+            project_directory.path().join("leases"),
+            project_directory.path().join("identities"),
+        )
         .create_editable(CreateProjectRequest::new(
             ProjectLocation::new(project_path, project_context.freeze()),
             InitialProject::neutral(),
@@ -256,7 +277,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
         .capture(&project_path)
         .expect("the Projeto root is captured");
     let mut project = ProjectCore::new()
-        .with_identity_lease_root(root.path().join("leases"))
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
         .create_editable(CreateProjectRequest::new(
             ProjectLocation::new(project_path.clone(), project_context.freeze()),
             initial,
@@ -515,35 +536,27 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
     let cache = TestCache::new("build");
     let log_dir = tempfile::tempdir().expect("temporary log directory");
     let source_path = source_dir.path().join("photo.jpg");
-    let mut source = RgbImage::new(64, 48);
+    let mut source = RgbImage::new(2_000, 1_500);
     for (x, y, pixel) in source.enumerate_pixels_mut() {
-        *pixel = Rgb([x as u8 * 3, y as u8 * 4, 96]);
+        *pixel = Rgb([((x * 3) % 256) as u8, ((y * 4) % 256) as u8, 96]);
     }
     source
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the real JPEG fixture is written");
-    let source_bytes = std::fs::metadata(&source_path)
-        .expect("source metadata is available")
-        .len();
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();
-    let media_source = MediaSource::new(
-        "benchmark-a-001",
-        source_path,
-        source_bytes,
-        source_sha256.clone(),
-    )
-    .expect("the native source is valid");
+    let media_source = CacheMediaSource::new("benchmark-a-001", MediaKind::Photo, source_path)
+        .expect("the native source is valid");
     let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-001",
             cache.project_id.clone(),
             cache_paths.clone(),
-            vec![cache_job(media_source, 32)],
-            32,
-            bindings,
+            vec![cache_job(media_source.clone(), "g-build-one", None)],
+            CacheRepresentationPolicy::measured_v1(),
+            bindings.clone(),
         )
         .expect("the Cache request is valid"),
     );
@@ -562,14 +575,11 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
     assert_eq!(completed.generated_count, 1);
     assert_eq!(completed.reused_count, 0);
     assert_eq!(completed.artifacts.len(), 1);
-    assert!(completed.artifacts[0].width_px <= 32);
-    assert!(completed.artifacts[0].height_px <= 32);
+    assert_eq!(completed.artifacts[0].width_px, 1_600);
+    assert_eq!(completed.artifacts[0].height_px, 1_200);
+    assert_eq!(completed.artifacts[0].fingerprint.value, source_sha256);
     let preview_path = cache_paths
-        .preview_file(
-            "benchmark-a-001",
-            &format!("{}-v1-32", &source_sha256[..16]),
-            CacheArtifactFormat::Jpeg,
-        )
+        .preview_file("benchmark-a-001", "g-build-one", CacheArtifactFormat::Jpeg)
         .expect("the preview path is derived centrally");
     let bytes = std::fs::read(preview_path).expect("the reduced representation is readable");
     assert_eq!(&bytes[..2], b"\xff\xd8");
@@ -582,11 +592,26 @@ fn processor_builds_one_reduced_representation_per_real_photo() {
         "only CacheEngine publishes the disposable index after validating the response"
     );
 
-    let reused_result = invoke_imaging_command(&command, Some(log_dir.path()));
+    let reuse_command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-002",
+            cache.project_id.clone(),
+            cache_paths,
+            vec![cache_job(
+                media_source,
+                "g-build-two",
+                Some(reusable_generation(&completed.artifacts[0])),
+            )],
+            CacheRepresentationPolicy::measured_v1(),
+            bindings.clone(),
+        )
+        .expect("the reuse request is valid"),
+    );
+    let reused_result = invoke_imaging_command(&reuse_command, Some(log_dir.path()));
     assert!(reused_result.status.success());
     let reused_response = processor_response(&reused_result.stdout);
     let reused = reused_response
-        .cache_completed_for("cache-001")
+        .cache_completed_for("cache-002")
         .expect("the reuse response is correlated");
     assert_eq!(reused.generated_count, 0);
     assert_eq!(reused.reused_count, 1);
@@ -603,21 +628,17 @@ fn processor_preserves_transparency_in_one_reduced_png_representation() {
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();
-    let media_source = MediaSource::new(
-        "decorative-overlay-001",
-        source_path,
-        original_source.len() as u64,
-        source_sha256.clone(),
-    )
-    .expect("the transparent decorative source is valid");
+    let media_source =
+        CacheMediaSource::new("decorative-overlay-001", MediaKind::Decorative, source_path)
+            .expect("the transparent decorative source is valid");
     let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-transparent-decorative",
             cache.project_id.clone(),
             cache_paths.clone(),
-            vec![cache_job(media_source, 1_600)],
-            1_600,
+            vec![cache_job(media_source, "g-transparent-one", None)],
+            CacheRepresentationPolicy::measured_v1(),
             bindings,
         )
         .expect("the Cache request is valid"),
@@ -638,13 +659,14 @@ fn processor_preserves_transparency_in_one_reduced_png_representation() {
     assert_eq!(completed.reused_count, 0);
     assert_eq!(completed.artifacts.len(), 1);
     let artifact = &completed.artifacts[0];
+    assert_eq!(artifact.fingerprint.value, source_sha256);
     assert_eq!(artifact.format, CacheArtifactFormat::Png);
     assert_eq!(artifact.exif_orientation, None);
     assert_eq!((artifact.width_px, artifact.height_px), (1_600, 1_200));
     let preview_path = cache_paths
         .preview_file(
             "decorative-overlay-001",
-            &format!("{}-v1-1600", &source_sha256[..16]),
+            "g-transparent-one",
             CacheArtifactFormat::Png,
         )
         .expect("the PNG preview path is derived centrally");
@@ -673,21 +695,17 @@ fn processor_keeps_an_opaque_png_source_in_the_jpeg_cache_baseline() {
     let original_source = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original_source));
     let cache_paths = cache.paths.clone();
-    let media_source = MediaSource::new(
-        "decorative-opaque-001",
-        source_path,
-        original_source.len() as u64,
-        source_sha256.clone(),
-    )
-    .expect("the opaque source is valid");
+    let media_source =
+        CacheMediaSource::new("decorative-opaque-001", MediaKind::Decorative, source_path)
+            .expect("the opaque source is valid");
     let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-opaque-png",
             cache.project_id.clone(),
             cache_paths.clone(),
-            vec![cache_job(media_source, 32)],
-            32,
+            vec![cache_job(media_source, "g-opaque-one", None)],
+            CacheRepresentationPolicy::measured_v1(),
             bindings,
         )
         .expect("the Cache request is valid"),
@@ -705,12 +723,13 @@ fn processor_keeps_an_opaque_png_source_in_the_jpeg_cache_baseline() {
         .cache_completed_for("cache-opaque-png")
         .expect("the Cache response is correlated")
         .artifacts[0];
+    assert_eq!(artifact.fingerprint.value, source_sha256);
     assert_eq!(artifact.format, CacheArtifactFormat::Jpeg);
     assert_eq!(artifact.exif_orientation, None);
     let preview_path = cache_paths
         .preview_file(
             "decorative-opaque-001",
-            &format!("{}-v1-32", &source_sha256[..16]),
+            "g-opaque-one",
             CacheArtifactFormat::Jpeg,
         )
         .expect("the JPEG preview path is derived centrally");
@@ -1212,6 +1231,35 @@ fn processor_checks_unique_source_pixels_separately_from_output_pixels() {
 }
 
 #[test]
+fn processor_enforces_the_measured_decoder_allocation_budget_below_the_pixel_ceiling() {
+    let source_dir = tempfile::tempdir().expect("temporary source directory");
+    let output_dir = tempfile::tempdir().expect("temporary output directory");
+    let source_path = source_dir.path().join("decoder-allocation-limit.png");
+    RgbaImage::from_pixel(1, 1, Rgba([20, 40, 60, 255]))
+        .save_with_format(&source_path, ImageFormat::Png)
+        .expect("the PNG baseline is written");
+    let mut bytes = std::fs::read(&source_path).expect("the PNG baseline is readable");
+    // 8,192² stays below the measured pixel ceiling, but the conservative
+    // PNG decoder working plan (8 bytes/pixel plus headroom) exceeds 512 MiB.
+    set_png_dimensions(&mut bytes, 8_192, 8_192);
+    std::fs::write(&source_path, &bytes).expect("the allocation header is written");
+    let output_path = output_dir.path().join("decoder-allocation-limit.jpg");
+    let request = single_photo_render_request(
+        output_path.clone(),
+        "decoder-allocation-limit",
+        &source_path,
+    );
+
+    let result = invoke_render_request(&request, None);
+
+    assert_eq!(
+        render_failure(&result, "decoder-allocation-limit").code,
+        ImagingFailureCode::ResourceLimitExceeded
+    );
+    assert!(!output_path.exists());
+}
+
+#[test]
 fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     let source_dir = tempfile::tempdir().expect("temporary source directory");
     let cache = TestCache::new("integrity");
@@ -1223,31 +1271,49 @@ fn processor_rejects_a_same_length_change_before_reusing_a_preview() {
     let original = std::fs::read(&source_path).expect("the source is readable");
     let source_sha256 = format!("{:x}", Sha256::digest(&original));
     let cache_paths = cache.paths.clone();
-    let media_source = MediaSource::new(
-        "benchmark-a-001",
-        source_path.clone(),
-        original.len() as u64,
-        source_sha256,
-    )
-    .expect("the source is valid");
+    let media_source =
+        CacheMediaSource::new("benchmark-a-001", MediaKind::Photo, source_path.clone())
+            .expect("the source is valid");
     let bindings = root_bindings(&[cache_paths.root(), media_source.source_path()]);
     let command = ImagingCommand::build_cache(
         CacheRequest::new(
             "cache-integrity",
             cache.project_id.clone(),
-            cache_paths,
-            vec![cache_job(media_source, 32)],
-            32,
-            bindings,
+            cache_paths.clone(),
+            vec![cache_job(media_source.clone(), "g-integrity-one", None)],
+            CacheRepresentationPolicy::measured_v1(),
+            bindings.clone(),
         )
         .expect("the Cache request is valid"),
     );
     let generated = invoke_imaging_command(&command, Some(log_dir.path()));
     assert!(generated.status.success());
+    let generated_response = processor_response(&generated.stdout);
+    let generated_artifact = generated_response
+        .cache_completed_for("cache-integrity")
+        .expect("the generated response is correlated")
+        .artifacts[0]
+        .clone();
+    assert_eq!(generated_artifact.fingerprint.value, source_sha256);
 
     std::fs::write(&source_path, vec![0x5a; original.len()])
         .expect("the source changes without changing its length");
-    let changed = invoke_imaging_command(&command, Some(log_dir.path()));
+    let changed_command = ImagingCommand::build_cache(
+        CacheRequest::new(
+            "cache-integrity-changed",
+            cache.project_id.clone(),
+            cache_paths,
+            vec![cache_job(
+                media_source,
+                "g-integrity-two",
+                Some(reusable_generation(&generated_artifact)),
+            )],
+            CacheRepresentationPolicy::measured_v1(),
+            bindings,
+        )
+        .expect("the changed-source request is valid"),
+    );
+    let changed = invoke_imaging_command(&changed_command, Some(log_dir.path()));
 
     assert!(
         !changed.status.success(),

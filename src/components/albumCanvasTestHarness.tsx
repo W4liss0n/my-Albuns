@@ -2,6 +2,7 @@ import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 import type { CompositionPlan } from "../domain/project";
+import type { MediaPreviewDemand } from "../application/projectPorts";
 import {
   AlbumCanvas as ProductionAlbumCanvas,
   type AlbumCanvasProps,
@@ -330,6 +331,7 @@ export function renderCanvas({
   onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,
   ),
+  onMediaDemandChange,
   onGraphicsUnavailable,
   canvasGraphicsDiagnosticProbe,
   logger = silentLogger,
@@ -347,6 +349,7 @@ export function renderCanvas({
   onTransformCommit?: (
     delta: PhotoTransformDelta,
   ) => Promise<boolean>;
+  onMediaDemandChange?: (demand: MediaPreviewDemand) => void;
   onGraphicsUnavailable?: (diagnostic: GraphicsDiagnostic) => void;
   canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
   logger?: Logger;
@@ -374,6 +377,7 @@ export function renderCanvas({
         onTransformPreview={onTransformPreview}
         onTransformCommit={onTransformCommit}
         onCanvasMetricsChange={onCanvasMetricsChange}
+        onMediaDemandChange={onMediaDemandChange}
         onGraphicsUnavailable={onGraphicsUnavailable}
       />
     </LoggingProvider>,

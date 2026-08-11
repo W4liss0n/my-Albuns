@@ -1,0 +1,76 @@
+{
+  "documentType": "myalbuns.project",
+  "schemaVersion": 1,
+  "projectId": "550e8400-e29b-41d4-a716-446655440000",
+  "revision": 7,
+  "project": {
+    "document": {
+      "displayUnit": "mm",
+      "sheetWidthUm": 600000,
+      "sheetHeightUm": 300000,
+      "dpi": 300,
+      "bleedUm": 3000,
+      "safetyUm": 3000
+    },
+    "visualDefaults": {
+      "background": {
+        "scope": "bothSides",
+        "both": {
+          "kind": "media",
+          "mediaId": "00000000-0000-4000-8000-000000000011"
+        }
+      },
+      "overlay": {
+        "scope": "bothSides",
+        "both": {
+          "kind": "media",
+          "mediaId": "00000000-0000-4000-8000-000000000011"
+        }
+      },
+      "frameBorder": {
+        "kind": "none"
+      }
+    },
+    "media": [
+      {
+        "id": "00000000-0000-4000-8000-000000000011",
+        "kind": "decorative",
+        "path": {
+          "encoding": "windowsUtf16",
+          "units": [
+            67,
+            58,
+            92,
+            70,
+            111,
+            116,
+            111,
+            115,
+            92,
+            79,
+            118,
+            101,
+            114,
+            108,
+            97,
+            121,
+            46,
+            112,
+            110,
+            103
+          ]
+        }
+      }
+    ],
+    "sheets": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "activeSides": "both"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "activeSides": "both"
+      }
+    ]
+  }
+}

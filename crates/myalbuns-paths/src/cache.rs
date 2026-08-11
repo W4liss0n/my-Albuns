@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     fs::{self, File, OpenOptions},
     io::{self, Write},
     path::{Path, PathBuf},
@@ -258,6 +259,57 @@ impl PreparedCacheStorage {
         Ok(Some(file))
     }
 
+    pub fn remove_existing_file(&self, path: &Path) -> Result<bool, AppPathsError> {
+        let parent = self
+            .directories
+            .iter()
+            .rev()
+            .take(2)
+            .find(|directory| path.parent() == Some(directory.logical_path.as_path()))
+            .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
+        let metadata = match fs::symlink_metadata(path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(parent, path, &file)?;
+        drop(file);
+        fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        Ok(true)
+    }
+
+    pub fn remove_unreferenced_generations(
+        &self,
+        referenced: &HashSet<PathBuf>,
+    ) -> Result<usize, AppPathsError> {
+        let media_directory = self
+            .directories
+            .last()
+            .ok_or(AppPathsError::CacheStorageUnavailable)?;
+        for path in referenced {
+            if path.parent() != Some(media_directory.logical_path.as_path()) {
+                return Err(AppPathsError::CacheStorageOutsideRoot);
+            }
+        }
+
+        let mut removed = 0;
+        let entries = fs::read_dir(&media_directory.logical_path)
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        for entry in entries {
+            let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            let path = entry.path();
+            if !is_final_generation_name(&entry.file_name()) || referenced.contains(&path) {
+                continue;
+            }
+            removed += usize::from(self.remove_existing_file(&path)?);
+        }
+        Ok(removed)
+    }
+
     fn replace_file(&self, temporary: &Path, final_path: &Path) -> Result<(), AppPathsError> {
         let (temporary_parent, final_parent) =
             self.validate_publication_paths(temporary, final_path)?;
@@ -306,6 +358,25 @@ impl PreparedCacheStorage {
             .find(|directory| path.parent() == Some(directory.logical_path.as_path()))
             .ok_or(AppPathsError::CacheStorageOutsideRoot)
     }
+}
+
+fn is_final_generation_name(name: &std::ffi::OsStr) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let mut parts = name.split('.');
+    let (Some(media_key), Some(generation), Some(extension), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Some(digest) = media_key.strip_prefix("media-") else {
+        return false;
+    };
+    digest.len() == 64
+        && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && valid_cache_component(generation)
+        && matches!(extension, "jpg" | "png")
 }
 
 impl Write for PendingCachePublication<'_> {

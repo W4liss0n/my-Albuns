@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
-use myalbuns_core::ProjectCore;
+use myalbuns_core::{MediaKind, ProjectCore};
 use myalbuns_imaging_protocol::{
-    CacheCompletion, CacheJob, CacheRequest, IMAGING_PROTOCOL_VERSION, ImagingCommand,
-    ImagingEvent, ImagingEventStreamDecoder, ImagingFailureCode, ImagingFailureStage,
-    ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest, ImagingResponse,
-    MediaSource, RenderCompletion, RenderSource, decode_command, decode_event_stream,
-    encode_command, encode_event, root_binding_plan_sha256,
+    CacheCompletion, CacheJob, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
+    IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingEventStreamDecoder,
+    ImagingFailureCode, ImagingFailureStage, ImagingPathCode, ImagingProgress,
+    ImagingProgressStage, ImagingRequest, ImagingResponse, MediaSource, RenderCompletion,
+    RenderSource, decode_command, decode_event_stream, encode_command, encode_event,
+    root_binding_plan_sha256,
 };
 use myalbuns_paths::{
     AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, ResolveError,
@@ -511,11 +512,10 @@ fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
     )
     .project_cache("project-42")
     .expect("the project Cache namespace is safe");
-    let source = MediaSource::new(
+    let source = CacheMediaSource::new(
         "media-42",
+        MediaKind::Photo,
         PathBuf::from(r"C:\Photos\photo.jpg"),
-        1024,
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     )
     .expect("the native media source is valid");
     let mut path_context = OperationPathContext::new();
@@ -531,9 +531,10 @@ fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
             "Projeto/\u{00c1}rvore CON",
             cache_paths,
             vec![
-                CacheJob::new(source, "aaaaaaaaaaaaaaaa-v1-1600").expect("the Cache job is valid"),
+                CacheJob::new(source, "aaaaaaaaaaaaaaaa-v1-1600", None)
+                    .expect("the Cache job is valid"),
             ],
-            1600,
+            CacheRepresentationPolicy::measured_v1(),
             path_context.freeze(),
         )
         .expect("the Cache request is valid"),
@@ -555,7 +556,7 @@ fn cache_command_keeps_project_identity_opaque_and_source_paths_native() {
         "media-42"
     );
     assert_eq!(
-        command_json["request"]["jobs"][0]["generationId"],
+        command_json["request"]["jobs"][0]["candidateGenerationId"],
         "aaaaaaaaaaaaaaaa-v1-1600"
     );
 

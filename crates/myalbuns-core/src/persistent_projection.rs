@@ -51,13 +51,16 @@ pub(crate) fn editor_projection(
             .iter()
             .map(|media| MediaCatalogItem {
                 id: media.id().hyphenated().to_string(),
-                kind: MediaKind::Decorative,
+                kind: media.kind(),
                 name: media
                     .path()
                     .file_name()
                     .map(|name| name.to_string_lossy().into_owned())
                     .filter(|name| !name.is_empty())
-                    .unwrap_or_else(|| "Decorativo".into()),
+                    .unwrap_or_else(|| match media.kind() {
+                        MediaKind::Photo => "Foto".into(),
+                        MediaKind::Decorative => "Decorativo".into(),
+                    }),
                 source_width_px: None,
                 source_height_px: None,
                 palette: None,
@@ -183,8 +186,16 @@ mod tests {
                 },
             ),
             vec![
-                DecorativeMedia::new(background_id, PathBuf::from(r"C:\Fotos\fundo.png")),
-                DecorativeMedia::new(overlay_id, PathBuf::from(r"C:\Fotos\overlay.png")),
+                DecorativeMedia::new(
+                    background_id,
+                    MediaKind::Decorative,
+                    PathBuf::from(r"C:\Fotos\fundo.png"),
+                ),
+                DecorativeMedia::new(
+                    overlay_id,
+                    MediaKind::Decorative,
+                    PathBuf::from(r"C:\Fotos\overlay.png"),
+                ),
             ],
             vec![
                 ProjectSheet::new(

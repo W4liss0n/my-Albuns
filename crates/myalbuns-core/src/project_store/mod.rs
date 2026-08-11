@@ -1,6 +1,7 @@
 mod codec_v1;
 mod editable_store;
 mod identity_lease;
+mod identity_registry;
 mod windows_publish;
 
 use std::path::{Path, PathBuf};
@@ -23,6 +24,7 @@ pub(crate) use editable_store::{
 pub(crate) use identity_lease::{
     IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,
 };
+pub(crate) use identity_registry::{IdentityRegistryLookup, ProjectIdentityRegistry};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DocumentFailure {
@@ -97,6 +99,11 @@ pub(crate) struct LoadedStoredRevision {
     pub(crate) physical_identity: Option<PhysicalFileIdentity>,
 }
 
+pub(crate) struct DecodedStoredRevision {
+    pub(crate) revision: ProjectRevision,
+    pub(crate) requires_schema_upgrade: bool,
+}
+
 #[derive(Debug)]
 pub(crate) enum DecodeFailure {
     Path(PathFailure),
@@ -114,14 +121,21 @@ pub(crate) fn read(location: &ProjectLocation) -> Result<LoadedStoredRevision, D
         .map_err(|error| DecodeFailure::Path(map_path_failure(error)))?;
     let physical_identity = resolved.physical_identity();
     let source = resolved.read_to_string().map_err(map_read_error)?;
-    codec_v1::decode(source.as_bytes()).map(|revision| LoadedStoredRevision {
-        revision,
+    codec_v1::decode(source.as_bytes()).map(|decoded| LoadedStoredRevision {
+        revision: decoded.revision,
         physical_identity,
     })
 }
 
 pub(crate) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
-    codec_v1::decode(bytes)
+    decode_with_metadata(bytes).map(|decoded| decoded.revision)
+}
+
+pub(crate) fn decode_with_metadata(bytes: &[u8]) -> Result<DecodedStoredRevision, DecodeFailure> {
+    codec_v1::decode(bytes).map(|decoded| DecodedStoredRevision {
+        revision: decoded.revision,
+        requires_schema_upgrade: decoded.source_schema_version < codec_v1::SCHEMA_VERSION_V2,
+    })
 }
 
 fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {

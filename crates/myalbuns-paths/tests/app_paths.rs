@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
 };
@@ -724,6 +725,83 @@ fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
         std::fs::read(published).expect("the previous Cache artifact remains"),
         b"previous preview"
     );
+}
+
+#[test]
+fn removes_only_one_validated_cache_artifact_from_the_held_namespace() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let cache = paths
+        .project_cache("project-targeted-cleanup")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let removed = cache
+        .preview_file("media-01", "generation-old", CacheArtifactFormat::Jpeg)
+        .expect("the old generation path is valid");
+    let preserved = cache
+        .preview_file("media-02", "generation-live", CacheArtifactFormat::Png)
+        .expect("the live generation path is valid");
+    std::fs::write(&removed, b"old").expect("the old generation is writable");
+    std::fs::write(&preserved, b"live").expect("the live generation is writable");
+
+    assert!(
+        storage
+            .remove_existing_file(&removed)
+            .expect("the targeted generation is removed")
+    );
+    assert!(preserved.is_file());
+    assert!(
+        !storage
+            .remove_existing_file(&removed)
+            .expect("targeted removal is idempotent")
+    );
+    assert_eq!(
+        storage
+            .remove_existing_file(root.path().join("outside.jpg").as_path())
+            .unwrap_err(),
+        AppPathsError::CacheStorageOutsideRoot
+    );
+}
+
+#[test]
+fn sweeps_only_unreferenced_final_generations_below_the_held_media_directory() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let cache = paths
+        .project_cache("project-orphan-sweep")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let orphan = cache
+        .preview_file("media-01", "generation-orphan", CacheArtifactFormat::Jpeg)
+        .expect("the orphan path is valid");
+    let referenced = cache
+        .preview_file("media-02", "generation-live", CacheArtifactFormat::Png)
+        .expect("the live path is valid");
+    let temporary = cache
+        .preview_temporary_file(
+            "media-03",
+            "generation-in-flight",
+            CacheArtifactFormat::Jpeg,
+            4_242,
+        )
+        .expect("the in-flight path is valid");
+    std::fs::write(&orphan, b"orphan").expect("the orphan is writable");
+    std::fs::write(&referenced, b"live").expect("the live generation is writable");
+    std::fs::write(&temporary, b"partial").expect("the temporary is writable");
+
+    assert_eq!(
+        storage
+            .remove_unreferenced_generations(&HashSet::from([referenced.clone()]))
+            .expect("the orphan sweep is contained"),
+        1
+    );
+    assert!(!orphan.exists());
+    assert!(referenced.is_file());
+    assert!(temporary.is_file(), "recovery owns processor temporaries");
 }
 
 #[test]

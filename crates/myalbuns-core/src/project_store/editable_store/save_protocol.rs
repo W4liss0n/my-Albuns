@@ -35,7 +35,7 @@ pub(crate) enum SaveStoreResult {
 }
 
 pub(crate) struct SaveReceipt {
-    candidate: ProjectRevision,
+    candidate: Box<ProjectRevision>,
 }
 
 impl SaveReceipt {
@@ -337,7 +337,9 @@ fn verify_saved_candidate(
     }
     SaveCandidateResult::Saved {
         baseline: PersistedBaseline::new(lock, candidate_bytes),
-        receipt: SaveReceipt { candidate },
+        receipt: SaveReceipt {
+            candidate: Box::new(candidate),
+        },
     }
 }
 

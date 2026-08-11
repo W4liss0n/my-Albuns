@@ -1,9 +1,7 @@
 mod cache;
 mod progressive_jpeg;
 
-pub(crate) use cache::{
-    cache_source_orientation, decode_source, read_verified_source, verify_source_current,
-};
+pub(crate) use cache::{fingerprint_source, verify_source_fingerprint};
 pub(crate) use progressive_jpeg::{JPEG_WORKER_MODE, run_jpeg_worker};
 
 use std::{
@@ -13,10 +11,12 @@ use std::{
 
 use image::{
     ColorType, ImageDecoder, ImageError, Limits, RgbaImage,
-    codecs::{jpeg::JpegDecoder, png::PngDecoder},
+    codecs::{jpeg::JpegDecoder, png::PngDecoder, tiff::TiffDecoder},
     metadata::Orientation,
 };
-use myalbuns_imaging_protocol::{ImagingFailureCode, ImagingPathCode};
+use myalbuns_imaging_protocol::{
+    CACHE_MAX_DECODER_ALLOC_BYTES, CacheBasicColorProfile, ImagingFailureCode, ImagingPathCode,
+};
 use myalbuns_paths::ResolvedObject;
 
 pub(crate) const MAX_DECODED_SOURCE_PIXELS_TOTAL: u64 = 134_217_728;
@@ -68,6 +68,7 @@ pub(crate) struct OpenRenderSource {
 enum SourcePreflight {
     Jpeg(JpegPreflight),
     Png(PngPreflight),
+    Tiff(TiffPreflight),
 }
 
 struct JpegPreflight {
@@ -99,6 +100,13 @@ struct PngPreflight {
     has_icc_profile: bool,
 }
 
+struct TiffPreflight {
+    width: u32,
+    height: u32,
+    orientation: Orientation,
+    has_icc_profile: bool,
+}
+
 impl OpenRenderSource {
     pub(crate) fn byte_count(&self) -> u64 {
         self.source_bytes
@@ -108,6 +116,7 @@ impl OpenRenderSource {
         let (width, height) = match &self.preflight {
             SourcePreflight::Jpeg(preflight) => (preflight.width, preflight.height),
             SourcePreflight::Png(preflight) => (preflight.width, preflight.height),
+            SourcePreflight::Tiff(preflight) => (preflight.width, preflight.height),
         };
         u64::from(width)
             .checked_mul(u64::from(height))
@@ -123,12 +132,42 @@ impl OpenRenderSource {
         match self.preflight {
             SourcePreflight::Jpeg(preflight) => decode_render_jpeg(self.reader, preflight),
             SourcePreflight::Png(preflight) => decode_render_png(self.reader, preflight),
+            SourcePreflight::Tiff(preflight) => decode_render_tiff(self.reader, preflight),
         }
+    }
+
+    pub(crate) fn exif_orientation(&self) -> Option<u8> {
+        match &self.preflight {
+            SourcePreflight::Jpeg(preflight) => Some(preflight.orientation.to_exif()),
+            SourcePreflight::Png(_) => None,
+            SourcePreflight::Tiff(preflight) => Some(preflight.orientation.to_exif()),
+        }
+    }
+
+    pub(crate) fn source_page_count(&self) -> Option<u32> {
+        matches!(self.preflight, SourcePreflight::Tiff(_)).then_some(1)
+    }
+
+    pub(crate) const fn basic_color_profile(&self) -> CacheBasicColorProfile {
+        CacheBasicColorProfile::Srgb
     }
 }
 
 pub(crate) fn open_render_source(
     resolved: &ResolvedObject,
+) -> Result<OpenRenderSource, SourceFailure> {
+    open_source(resolved, false)
+}
+
+pub(crate) fn open_cache_source(
+    resolved: &ResolvedObject,
+) -> Result<OpenRenderSource, SourceFailure> {
+    open_source(resolved, true)
+}
+
+fn open_source(
+    resolved: &ResolvedObject,
+    allow_single_page_tiff: bool,
 ) -> Result<OpenRenderSource, SourceFailure> {
     let file = resolved.reopen_for_read().map_err(|error| {
         SourceFailure::path(
@@ -158,6 +197,14 @@ pub(crate) fn open_render_source(
     } else if signature_length == signature.len() && signature == [137, 80, 78, 71, 13, 10, 26, 10]
     {
         SourcePreflight::Png(preflight_png(&mut reader, source_bytes)?)
+    } else if allow_single_page_tiff
+        && signature_length >= 4
+        && matches!(
+            &signature[..4],
+            b"II\x2a\0" | b"MM\0\x2a" | b"II\x2b\0" | b"MM\0\x2b"
+        )
+    {
+        SourcePreflight::Tiff(preflight_tiff(&mut reader)?)
     } else {
         return Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedSourceFormat,
@@ -920,6 +967,87 @@ fn image_failure(
     }
 }
 
+fn preflight_tiff(reader: &mut (impl Read + Seek)) -> Result<TiffPreflight, SourceFailure> {
+    let mut decoder = tiff::decoder::Decoder::new(reader).map_err(|error| {
+        SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            format!("não foi possível preparar o decoder TIFF: {error}"),
+        )
+    })?;
+    let (width, height) = decoder.dimensions().map_err(|error| {
+        SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            format!("não foi possível ler as dimensões TIFF: {error}"),
+        )
+    })?;
+    if width == 0 || height == 0 {
+        return Err(SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            "as dimensões TIFF são inválidas",
+        ));
+    }
+    if decoder.more_images() {
+        return Err(SourceFailure::new(
+            ImagingFailureCode::UnsupportedSourceVariant,
+            "TIFF com mais de uma página não é aceito neste fluxo",
+        ));
+    }
+    let color_type = decoder.colortype().map_err(|error| {
+        SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            format!("não foi possível identificar o modelo de cor TIFF: {error}"),
+        )
+    })?;
+    if !matches!(
+        color_type,
+        tiff::ColorType::Gray(8 | 16)
+            | tiff::ColorType::GrayA(8 | 16)
+            | tiff::ColorType::RGB(8 | 16)
+            | tiff::ColorType::RGBA(8 | 16)
+    ) {
+        return Err(SourceFailure::new(
+            ImagingFailureCode::UnsupportedColorModel,
+            "o modelo de cor TIFF não é RGB, RGBA ou tons de cinza de 8/16 bits",
+        ));
+    }
+    let orientation = decoder
+        .find_tag_unsigned::<u16>(tiff::tags::Tag::Orientation)
+        .map_err(|error| {
+            SourceFailure::new(
+                ImagingFailureCode::DecodeFailed,
+                format!("não foi possível ler a orientação TIFF: {error}"),
+            )
+        })?
+        .and_then(|value| Orientation::from_exif(value.min(255) as u8))
+        .unwrap_or(Orientation::NoTransforms);
+    let profile = decoder
+        .find_tag(tiff::tags::Tag::IccProfile)
+        .map_err(|error| {
+            SourceFailure::new(
+                ImagingFailureCode::UnsupportedColorProfile,
+                format!("não foi possível ler o perfil ICC do TIFF: {error}"),
+            )
+        })?
+        .map(|value| {
+            value.into_u8_vec().map_err(|error| {
+                SourceFailure::new(
+                    ImagingFailureCode::UnsupportedColorProfile,
+                    format!("o perfil ICC do TIFF é inválido: {error}"),
+                )
+            })
+        })
+        .transpose()?;
+    if let Some(profile) = &profile {
+        validate_icc_profile(profile)?;
+    }
+    Ok(TiffPreflight {
+        width,
+        height,
+        orientation,
+        has_icc_profile: profile.is_some(),
+    })
+}
+
 fn decode_render_jpeg(
     reader: BufReader<File>,
     preflight: JpegPreflight,
@@ -929,6 +1057,64 @@ fn decode_render_jpeg(
         return progressive_jpeg::decode_in_worker(reader, preflight);
     }
     decode_render_jpeg_in_process(reader, preflight)
+}
+
+fn decode_render_tiff(
+    reader: BufReader<File>,
+    preflight: TiffPreflight,
+) -> Result<RgbaImage, SourceFailure> {
+    let mut decoder = TiffDecoder::new(reader).map_err(|error| {
+        image_failure(
+            error,
+            ImagingFailureCode::DecodeFailed,
+            "não foi possível preparar o decoder TIFF",
+        )
+    })?;
+    if decoder.dimensions() != (preflight.width, preflight.height) {
+        return Err(SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            "as dimensões TIFF mudaram entre preflight e decoder",
+        ));
+    }
+    decoder
+        .set_limits(decode_limits(&decoder)?)
+        .map_err(|error| {
+            image_failure(
+                error,
+                ImagingFailureCode::ResourceLimitExceeded,
+                "o decoder TIFF recusou os limites da fonte",
+            )
+        })?;
+    if let Some(profile) = decoder.icc_profile().map_err(|error| {
+        image_failure(
+            error,
+            ImagingFailureCode::UnsupportedColorProfile,
+            "o perfil ICC do TIFF não pôde ser lido",
+        )
+    })? {
+        validate_icc_profile(&profile)?;
+    } else if preflight.has_icc_profile {
+        return Err(unsupported_profile(
+            "o perfil declarado pelo TIFF não pôde ser recuperado",
+        ));
+    }
+    let orientation = decoder.orientation().map_err(|error| {
+        image_failure(
+            error,
+            ImagingFailureCode::DecodeFailed,
+            "não foi possível validar a orientação TIFF",
+        )
+    })?;
+    if orientation != preflight.orientation {
+        return Err(SourceFailure::new(
+            ImagingFailureCode::DecodeFailed,
+            "a orientação TIFF mudou entre preflight e decoder",
+        ));
+    }
+    let color_type = decoder.color_type();
+    let raw = decode_raw(decoder)?;
+    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
+    apply_orientation(image, orientation)
 }
 
 fn decode_render_jpeg_in_process<R: BufRead + Seek>(
@@ -981,18 +1167,14 @@ fn decode_render_png(
     let mut limits = Limits::default();
     limits.max_image_width = Some(preflight.width);
     limits.max_image_height = Some(preflight.height);
-    limits.max_alloc = Some(
-        u64::from(preflight.width)
-            .checked_mul(u64::from(preflight.height))
-            .and_then(|pixels| pixels.checked_mul(8))
-            .and_then(|bytes| bytes.checked_add(1024 * 1024))
-            .ok_or_else(|| {
-                SourceFailure::new(
-                    ImagingFailureCode::ResourceLimitExceeded,
-                    "o buffer PNG excedeu o intervalo seguro",
-                )
-            })?,
-    );
+    let planned_bytes = u64::from(preflight.width)
+        .checked_mul(u64::from(preflight.height))
+        .and_then(|pixels| pixels.checked_mul(8))
+        .ok_or_else(|| decoder_allocation_failure("o buffer PNG excedeu o intervalo seguro"))?;
+    limits.max_alloc = Some(checked_decoder_allocation(
+        planned_bytes,
+        "o buffer PNG excede o limite medido do decoder",
+    )?);
     let mut decoder = PngDecoder::with_limits(reader, limits).map_err(|error| {
         let fallback = if preflight.has_icc_profile {
             ImagingFailureCode::UnsupportedColorProfile
@@ -1051,13 +1233,28 @@ fn decode_limits(decoder: &impl ImageDecoder) -> Result<Limits, SourceFailure> {
     let mut limits = Limits::default();
     limits.max_image_width = Some(width);
     limits.max_image_height = Some(height);
-    limits.max_alloc = Some(raw_bytes.checked_add(1024 * 1024).ok_or_else(|| {
-        SourceFailure::new(
-            ImagingFailureCode::ResourceLimitExceeded,
-            "o buffer do decoder excedeu o intervalo seguro",
-        )
-    })?);
+    limits.max_alloc = Some(checked_decoder_allocation(
+        raw_bytes,
+        "o buffer excede o limite medido do decoder",
+    )?);
     Ok(limits)
+}
+
+fn checked_decoder_allocation(
+    decoded_bytes: u64,
+    message: &'static str,
+) -> Result<u64, SourceFailure> {
+    let planned_bytes = decoded_bytes.checked_add(1024 * 1024).ok_or_else(|| {
+        decoder_allocation_failure("o buffer do decoder excedeu o intervalo seguro")
+    })?;
+    if planned_bytes > CACHE_MAX_DECODER_ALLOC_BYTES {
+        return Err(decoder_allocation_failure(message));
+    }
+    Ok(planned_bytes)
+}
+
+fn decoder_allocation_failure(message: impl Into<String>) -> SourceFailure {
+    SourceFailure::new(ImagingFailureCode::ResourceLimitExceeded, message)
 }
 
 fn decode_raw(decoder: impl ImageDecoder) -> Result<Vec<u8>, SourceFailure> {

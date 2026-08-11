@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-03T02:39:37.3658446Z",
-    "gitCommit":  "52a664aea21d65bc8e7e69b29c6e8a4a90547b3d",
-    "sourceInputsDirty":  false,
+    "collectedAtUtc":  "2026-08-11T18:12:10.8398582Z",
+    "gitCommit":  "1165634c37a28ca197784c2985468e1596983301",
+    "sourceInputsDirty":  true,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64"
@@ -11,48 +11,140 @@
                    {
                        "name":  "protocol",
                        "passed":  true,
-                       "elapsedMs":  29397
+                       "elapsedMs":  19660
                    },
                    {
                        "name":  "cache-temporary-cleanup",
                        "passed":  true,
-                       "elapsedMs":  22851
+                       "elapsedMs":  14077
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  6337
+                       "elapsedMs":  362
                    },
                    {
                        "name":  "production-recovery-integration",
                        "passed":  true,
-                       "elapsedMs":  123423
+                       "elapsedMs":  46710
+                   },
+                   {
+                       "name":  "cache-webview-canvas-export-journey",
+                       "passed":  true,
+                       "elapsedMs":  794
+                   },
+                   {
+                       "name":  "obsolete-cache-cancellation-integration",
+                       "passed":  true,
+                       "elapsedMs":  594
+                   },
+                   {
+                       "name":  "causal-cache-pause-integration",
+                       "passed":  true,
+                       "elapsedMs":  1015
+                   },
+                   {
+                       "name":  "actual-album-canvas-pixi-webview2",
+                       "passed":  true,
+                       "elapsedMs":  21839
                    }
                ],
     "evidence":  {
                      "cache":  {
-                                   "failedProcessId":  18420,
+                                   "failedProcessId":  30704,
                                    "foreignTemporarySurvivedCleanup":  true,
                                    "generatedCountAfterRestart":  1,
                                    "metadataExistedAfterFailure":  false,
                                    "metadataExistedAfterRestart":  true,
                                    "removedTemporaryCount":  1,
-                                   "restartedProcessId":  2280,
+                                   "restartedProcessId":  1552,
                                    "temporaryExistedAfterCleanup":  false,
                                    "temporaryObservedAfterFailure":  true
                                },
                      "export":  {
-                                    "failedProcessId":  26708,
-                                    "finalOutputSha256AfterExplicitRetry":  "845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb",
+                                    "failedProcessId":  12352,
+                                    "finalOutputSha256AfterExplicitRetry":  "9d29aa06810d45517e59fa6ef7531c5c959df4b11e2279da31f976ec3300c0c8",
                                     "partialPreparationObserved":  true,
                                     "previousOutputSha256AfterFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
                                     "previousOutputSha256BeforeFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
                                     "processCountBeforeExplicitRetry":  1,
-                                    "projectSha256AfterFailure":  "2bff41c103c1b6acf7f9f01f64d8cfb158bf4e79252056cb5ed9e9d515cab193",
-                                    "projectSha256BeforeFailure":  "2bff41c103c1b6acf7f9f01f64d8cfb158bf4e79252056cb5ed9e9d515cab193",
-                                    "protocolVersion":  11,
-                                    "retryProcessId":  14328,
+                                    "projectSha256AfterFailure":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "projectSha256AfterSuccess":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "projectSha256BeforeFailure":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "protocolVersion":  17,
+                                    "retryProcessId":  18812,
                                     "successResponseBeforeExplicitRetry":  false
-                                }
+                                },
+                     "canvas":  {
+                                    "backgroundUrlOpaque":  true,
+                                    "canvasReferencePixel":  [
+                                                                 102,
+                                                                 64,
+                                                                 82
+                                                             ],
+                                    "channelDelta":  [
+                                                         0,
+                                                         1,
+                                                         0
+                                                     ],
+                                    "compositionMediaOrder":  [
+                                                                  "background-media",
+                                                                  "overlay-media"
+                                                              ],
+                                    "equivalentBackgroundDemandCount":  2,
+                                    "finalJpegPixel":  [
+                                                           102,
+                                                           63,
+                                                           82
+                                                       ],
+                                    "finalOutputSha256":  "9c337fd61b8c1e4362091722f2c75dedc08d020e543dfc88aa0d23e7573891dd",
+                                    "finalSourceCount":  2,
+                                    "originalBytesExposedToWebView":  false,
+                                    "originalPathExposedToWebView":  false,
+                                    "overlayUrlOpaque":  true,
+                                    "processorIds":  [
+                                                         27736,
+                                                         15296,
+                                                         8456
+                                                     ],
+                                    "singleFlightGenerationId":  "g-a5c4eb78f29a48129c110cb21c8159cd",
+                                    "singleFlightProcessorCount":  1,
+                                    "actualAlbumCanvas":  true,
+                                    "actualPixiRuntime":  true,
+                                    "browserProcess":  "Microsoft Edge Chromium",
+                                    "actualCanvasPixel":  [
+                                                              103,
+                                                              65,
+                                                              83
+                                                          ],
+                                    "actualCanvasDelta":  [
+                                                              1,
+                                                              1,
+                                                              1
+                                                          ]
+                                },
+                     "obsolete":  {
+                                      "cacheIndexAfterCancellation":  false,
+                                      "cancellationReason":  "obsolete",
+                                      "cancelledProcessId":  10676,
+                                      "cancelledProcessReaped":  true,
+                                      "cancelledStage":  "cancelled",
+                                      "resumableAfterCancellation":  false,
+                                      "singleFlightDemandCount":  2,
+                                      "singleFlightProcessorCount":  1,
+                                      "waiterObservedCancellation":  true
+                                  },
+                     "pause":  {
+                                   "cacheBlockedWhileExportLease":  true,
+                                   "cacheIndexAfterCancellation":  false,
+                                   "cancelledProcessId":  17200,
+                                   "cancelledProcessReaped":  true,
+                                   "cancelledStage":  "cancelled",
+                                   "pauseReason":  "paused",
+                                   "processorExclusiveWhileExportLease":  true,
+                                   "resumedAfterExportTerminal":  true,
+                                   "resumedGenerationPublished":  true,
+                                   "resumedProcessId":  4180
+                               }
                  }
 }

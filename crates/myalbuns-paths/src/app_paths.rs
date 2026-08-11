@@ -160,6 +160,10 @@ impl AppPaths {
         self.state_dir().join("ProjectIdentityLeases")
     }
 
+    pub fn project_identities_dir(&self) -> PathBuf {
+        self.state_dir().join("ProjectIdentities")
+    }
+
     pub fn webview_data_directory(&self, host_namespace: &str) -> Result<PathBuf, AppPathsError> {
         if !valid_namespace_component(host_namespace) {
             return Err(AppPathsError::InvalidStateNamespace);

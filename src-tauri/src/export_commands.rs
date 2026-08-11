@@ -11,7 +11,7 @@ use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
 use crate::{
-    cache_activity_gate::CacheActivityGate,
+    cache_engine::CacheEngine,
     export_attempts::ExportAttempts,
     export_pipeline,
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
@@ -202,7 +202,7 @@ pub(crate) async fn export_sheet(
     state: State<'_, ProjectHost>,
     logging: State<'_, LoggingState>,
     operation_gate: State<'_, OperationGate>,
-    cache: State<'_, CacheActivityGate>,
+    cache: State<'_, CacheEngine>,
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {

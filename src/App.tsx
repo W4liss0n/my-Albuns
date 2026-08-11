@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GraphicsDiagnostic,
@@ -11,6 +11,7 @@ import {
 } from "./application/logging";
 import type {
   ExportPort,
+  MediaPreviewDemand,
   MediaPreviewPort,
   ProjectSessionPort,
   ProjectWindowPort,
@@ -53,6 +54,12 @@ function App({
   const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
     Readonly<Record<string, string>>
   >({});
+  const [mediaDemand, setMediaDemand] = useState<MediaPreviewDemand>({
+    visibleMediaIds: [],
+    preloadMediaIds: [],
+  });
+  const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
+  const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -76,6 +83,7 @@ function App({
             projectId: value.state.projectId,
             sheetCount: value.composition.sheets.length,
           });
+          setMediaDemand({ visibleMediaIds: [], preloadMediaIds: [] });
           setProjection(value);
         }
       })
@@ -119,8 +127,56 @@ function App({
     projectSessionPort,
   );
   useEffect(() => {
+    if (!projectId) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void mediaPreviewPort
+      .onMediaChanged(() => {
+        if (!active) return;
+        setMediaRefreshRevision((revision) => revision + 1);
+      })
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+        } else {
+          dispose();
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        logger.write({
+          level: "warn",
+          component: "media-preview",
+          event: "media_monitor_subscription_failed",
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [logger, mediaPreviewPort, projectId]);
+
+  useEffect(() => {
     setMediaPreviewUrls({});
-    if (!projectId || !editorGraphics.supported) return;
+    if (!projectId) return;
+    if (mediaDemandSequence.current.projectId !== projectId) {
+      mediaDemandSequence.current = { projectId, revision: 0 };
+    }
+    const effectiveDemand = editorGraphics.supported
+      ? mediaDemand
+      : { visibleMediaIds: [], preloadMediaIds: [] };
+    const demandIsEmpty =
+      effectiveDemand.visibleMediaIds.length === 0 &&
+      effectiveDemand.preloadMediaIds.length === 0;
+    if (demandIsEmpty && mediaDemandSequence.current.revision === 0) {
+      return;
+    }
+    const demand = {
+      ...effectiveDemand,
+      revision: ++mediaDemandSequence.current.revision,
+    };
 
     let active = true;
     const operationId = createLogInstanceId("media-preview");
@@ -132,19 +188,18 @@ function App({
       projectId,
     });
     mediaPreviewPort
-      .prepareMediaPreviews()
+      .prepareMediaPreviews(demand)
       .then((previews) => {
         if (!active) return;
-        if (previews) {
-          setMediaPreviewUrls(
-            Object.fromEntries(
-              previews.map(({ mediaId, url }) => [
-                mediaId,
-                url,
-              ]),
-            ),
-          );
-        }
+        const readyPreviews = (previews ?? []).flatMap(
+          ({ mediaId, state, url }) =>
+            state === "ready" && url ? [{ mediaId, url }] : [],
+        );
+        setMediaPreviewUrls(
+          Object.fromEntries(
+            readyPreviews.map(({ mediaId, url }) => [mediaId, url]),
+          ),
+        );
         logger.write({
           level: "info",
           component: "media-preview",
@@ -167,7 +222,14 @@ function App({
     return () => {
       active = false;
     };
-  }, [editorGraphics.supported, logger, mediaPreviewPort, projectId]);
+  }, [
+    editorGraphics.supported,
+    logger,
+    mediaDemand,
+    mediaRefreshRevision,
+    mediaPreviewPort,
+    projectId,
+  ]);
 
   if (!editorGraphics.supported) {
     return <ProjectGraphicsFailure diagnostic={editorGraphics} />;
@@ -207,6 +269,7 @@ function App({
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
           mediaPreviewUrls={mediaPreviewUrls}
+          onMediaDemandChange={setMediaDemand}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
         />

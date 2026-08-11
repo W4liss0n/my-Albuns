@@ -17,4 +17,6 @@ pub(crate) use protocol::{
     HostTerminal, TargetAuthority, TerminalValidationError, ValidatedTerminal,
     read_bootstrap_request, validate_terminal, write_host_terminal,
 };
-pub(crate) use supervisor::{BootstrapFailure, BootstrapFailureKind, ProjectHostBootstrap};
+pub(crate) use supervisor::{
+    BootstrapFailure, BootstrapFailureKind, ProjectHostBootstrap, new_open_request,
+};

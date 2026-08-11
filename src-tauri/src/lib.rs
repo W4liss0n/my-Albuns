@@ -1,6 +1,6 @@
 mod cache_activity_gate;
-#[cfg(test)]
 mod cache_engine;
+mod cache_previews;
 mod desktop_webview_policy;
 mod export_attempts;
 mod export_commands;
@@ -11,9 +11,9 @@ mod imaging_processor;
 #[cfg(test)]
 mod imaging_recovery_integration;
 pub mod ipc_contract;
-mod linked_media_previews;
 mod logging;
 mod media_preview_commands;
+mod media_runtime;
 mod native_project_dialog;
 mod opaque_image_protocol;
 mod operation_gate;
@@ -34,13 +34,45 @@ mod sample_project;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let result = match runtime_role::parse_runtime_role(std::env::args_os()) {
-        runtime_role::RuntimeRole::Global { direct_project } => global_runtime::run(direct_project),
-        runtime_role::RuntimeRole::ProjectHost => run_project_host(),
+    #[cfg(debug_assertions)]
+    let webdriver_project = global_runtime::webdriver_automation_project();
+    #[cfg(not(debug_assertions))]
+    let webdriver_project: Option<std::path::PathBuf> = None;
+
+    let result = if let Some(project_path) = webdriver_project {
+        run_webdriver_project_host(project_path)
+    } else {
+        match runtime_role::parse_runtime_role(std::env::args_os()) {
+            runtime_role::RuntimeRole::Global { direct_project } => {
+                global_runtime::run(direct_project)
+            }
+            runtime_role::RuntimeRole::ProjectHost => run_project_host(),
+        }
     };
     if let Err(error) = result {
         eprintln!("não foi possível executar o MyAlbuns: {error}");
     }
+}
+
+#[cfg(debug_assertions)]
+fn run_webdriver_project_host(
+    project_path: std::path::PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use myalbuns_paths::{NativePathDto, OperationPathContext};
+
+    use project_bootstrap::{TargetAuthority, bootstrap_host_project, new_open_request};
+
+    let app_paths = myalbuns_paths::AppPaths::discover()?;
+    let mut path_context = OperationPathContext::new();
+    path_context.capture(&project_path)?;
+    let request = new_open_request(TargetAuthority {
+        logical_target: NativePathDto::from(project_path),
+        root_bindings: path_context.freeze(),
+    })
+    .map_err(|failure| std::io::Error::other(format!("bootstrap inválido: {failure:?}")))?;
+    let opened = bootstrap_host_project(request, &app_paths)
+        .map_err(|terminal| std::io::Error::other(format!("bootstrap recusado: {terminal:?}")))?;
+    product_runtime::run(opened, app_paths)
 }
 
 fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
@@ -229,10 +261,16 @@ mod tests {
                     .split_whitespace()
                     .any(|value| value == "http://asset.localhost")
             );
-            for image_only_scheme in ["myalbuns-preview", "myalbuns-media"] {
+            assert!(
+                !connect_sources.contains("myalbuns-preview"),
+                "the provisional preview protocol remains image-only"
+            );
+            for cache_origin in ["http://myalbuns-cache.localhost", "myalbuns-cache:"] {
                 assert!(
-                    !connect_sources.contains(image_only_scheme),
-                    "opaque image protocols are image-only"
+                    connect_sources
+                        .split_whitespace()
+                        .any(|value| value == cache_origin),
+                    "Pixi Assets.load fetches opaque Cache textures"
                 );
             }
             let image_sources = policy
@@ -247,12 +285,12 @@ mod tests {
                     "the global preview protocol is allowed only as an image source"
                 );
             }
-            for media_origin in ["http://myalbuns-media.localhost", "myalbuns-media:"] {
+            for media_origin in ["http://myalbuns-cache.localhost", "myalbuns-cache:"] {
                 assert!(
                     image_sources
                         .split_whitespace()
                         .any(|value| value == media_origin),
-                    "the Project media protocol is allowed only as an image source"
+                    "the registered Project Cache protocol is allowed as an image source"
                 );
             }
         }

@@ -24,6 +24,7 @@ pub(crate) enum IdentityLeaseObservation {
 
 #[derive(Debug)]
 pub(crate) struct ProjectIdentityLease {
+    project_id: Uuid,
     #[cfg(windows)]
     _lock: ProjectFileLock,
     #[cfg(windows)]
@@ -72,6 +73,7 @@ impl ProjectIdentityLease {
             }
         };
         Ok(Self {
+            project_id,
             _lock: lock,
             lease_path,
             target_path: target_path(root, project_id),
@@ -159,6 +161,10 @@ impl ProjectIdentityLease {
     #[cfg(not(windows))]
     pub(crate) fn acquire(_root: &Path, _project_id: Uuid) -> Result<Self, IdentityLeaseError> {
         Err(IdentityLeaseError::Unavailable)
+    }
+
+    pub(crate) fn project_id(&self) -> Uuid {
+        self.project_id
     }
 
     #[cfg(not(windows))]

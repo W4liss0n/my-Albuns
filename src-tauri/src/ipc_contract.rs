@@ -111,11 +111,53 @@ pub enum ExportEvent {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaPreviewState {
+    Ready,
+    Absent,
+    Unavailable,
+}
+
+#[derive(Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaPreviewDemand {
+    pub(crate) revision: u64,
+    pub(crate) visible_media_ids: Vec<String>,
+    pub(crate) preload_media_ids: Vec<String>,
+}
+
 #[derive(Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaPreview {
     pub(crate) media_id: String,
-    pub(crate) url: String,
+    pub(crate) state: MediaPreviewState,
+    pub(crate) url: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedMediaChanged {
+    pub(crate) media_ids: Vec<String>,
+}
+
+#[cfg(test)]
+mod media_change_contract_tests {
+    use serde_json::json;
+
+    use super::LinkedMediaChanged;
+
+    #[test]
+    fn stable_media_change_event_exposes_only_opaque_media_identities() {
+        let event = LinkedMediaChanged {
+            media_ids: vec!["photo-a".into(), "overlay-a".into()],
+        };
+
+        assert_eq!(
+            serde_json::to_value(event).expect("the event serializes"),
+            json!({ "mediaIds": ["photo-a", "overlay-a"] })
+        );
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]

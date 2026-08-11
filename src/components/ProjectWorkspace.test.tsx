@@ -12,6 +12,7 @@ import type {
   ExportOutcome,
   ExportPort,
   ExportProgressEvent,
+  MediaPreviewDemand,
   ProjectCloseResolution,
   ProjectSessionPort,
   ProjectWindowPort,
@@ -40,6 +41,7 @@ const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     continuousCanvasLayout: ContinuousCanvasLayout;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    onMediaDemandChange?(demand: MediaPreviewDemand): void;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
     onTransformPreview?(
@@ -51,6 +53,34 @@ const canvasHarness = vi.hoisted(() => ({
     onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
   },
 }));
+
+interface ObservedViewport {
+  callback: IntersectionObserverCallback;
+  options: IntersectionObserverInit;
+  targets: Set<Element>;
+}
+
+const observedViewports: ObservedViewport[] = [];
+
+function emitPanelIntersections(
+  rootMargin: string,
+  intersections: Readonly<Record<string, boolean>>,
+) {
+  const viewport = observedViewports.find(
+    ({ options }) => options.rootMargin === rootMargin,
+  );
+  if (!viewport) throw new Error(`Observer ${rootMargin} ausente.`);
+  const entries = Object.entries(intersections).map(
+    ([mediaId, isIntersecting]) => ({
+      target: document.querySelector(`[data-media-id="${mediaId}"]`)!,
+      isIntersecting,
+    }),
+  );
+  viewport.callback(
+    entries as IntersectionObserverEntry[],
+    {} as IntersectionObserver,
+  );
+}
 
 vi.mock("./AlbumCanvas", () => ({
   AlbumCanvas: (props: typeof canvasHarness.props) => {
@@ -205,6 +235,37 @@ function ProjectWorkspace({
 beforeEach(() => {
   canvasHarness.props = null;
   localStorage.clear();
+  observedViewports.length = 0;
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      readonly viewport: ObservedViewport;
+
+      constructor(
+        callback: IntersectionObserverCallback,
+        options: IntersectionObserverInit = {},
+      ) {
+        this.viewport = { callback, options, targets: new Set() };
+        observedViewports.push(this.viewport);
+      }
+
+      observe(target: Element) {
+        this.viewport.targets.add(target);
+      }
+
+      unobserve(target: Element) {
+        this.viewport.targets.delete(target);
+      }
+
+      disconnect() {
+        this.viewport.targets.clear();
+      }
+
+      takeRecords() {
+        return [];
+      }
+    },
+  );
   useEditorView.setState({
     projectId: projection.state.projectId,
     selectedFrameId: null,
@@ -265,7 +326,9 @@ test("offers the three close choices for a native request and Cancel keeps the P
     expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+  expect(
+    await screen.findByRole("button", { name: "Desfazer" }),
+  ).toBeEnabled();
 });
 
 test("uses the same close decision for the application command and blocks it while resolving", async () => {
@@ -311,7 +374,9 @@ test("uses the same close decision for the application command and blocks it whi
 
   await act(async () => finish());
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+  expect(
+    await screen.findByRole("button", { name: "Desfazer" }),
+  ).toBeDisabled();
 });
 
 test("sends Discard and resumes the unchanged Project after a conclusive save failure", async () => {
@@ -364,7 +429,9 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
       "O arquivo do Projeto foi alterado fora do MyAlbuns.",
     ),
   ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+  expect(
+    await screen.findByRole("button", { name: "Desfazer" }),
+  ).toBeEnabled();
 });
 
 test("never resumes or reports success after an indeterminate close save", async () => {
@@ -397,7 +464,9 @@ test("never resumes or reports success after an indeterminate close save", async
     ),
   ).toBeInTheDocument();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+  expect(
+    await screen.findByRole("button", { name: "Desfazer" }),
+  ).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Exportar Lâmina" }),
   ).toBeDisabled();
@@ -821,6 +890,43 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   ).not.toBeNull();
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
+  );
+});
+
+test("merges only Panel viewport and one-row preload margin with Canvas demand", async () => {
+  const onMediaDemandChange = vi.fn();
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onMediaDemandChange={onMediaDemandChange}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => {
+    canvasHarness.props?.onMediaDemandChange?.({
+      visibleMediaIds: ["media-003"],
+      preloadMediaIds: ["decorative-not-in-panel"],
+    });
+    emitPanelIntersections("0px", {
+      "media-001": true,
+      "media-002": false,
+      "media-003": false,
+    });
+    emitPanelIntersections("122px 0px", {
+      "media-001": true,
+      "media-002": true,
+      "media-003": false,
+    });
+  });
+
+  await waitFor(() =>
+    expect(onMediaDemandChange).toHaveBeenLastCalledWith({
+      visibleMediaIds: ["media-003", "media-001"],
+      preloadMediaIds: ["decorative-not-in-panel", "media-002"],
+    }),
   );
 });
 

@@ -3,6 +3,7 @@ import { Button } from "react-aria-components";
 
 import type {
   ExportPort,
+  MediaPreviewDemand,
   ProjectWindowPort,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -26,6 +27,7 @@ interface ProjectWorkspaceProps {
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }
@@ -36,12 +38,45 @@ export function ProjectWorkspace({
   projectWindowPort,
   runProjectMutation,
   mediaPreviewUrls = {},
+  onMediaDemandChange,
   onProjectionChange,
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const [canvasMediaDemand, setCanvasMediaDemand] =
+    useState<MediaPreviewDemand>({
+      visibleMediaIds: [],
+      preloadMediaIds: [],
+    });
+  const [panelMediaDemand, setPanelMediaDemand] =
+    useState<MediaPreviewDemand>({
+      visibleMediaIds: [],
+      preloadMediaIds: [],
+    });
+  useEffect(() => {
+    if (!onMediaDemandChange) return;
+    const visible = Array.from(
+      new Set([
+        ...canvasMediaDemand.visibleMediaIds,
+        ...panelMediaDemand.visibleMediaIds,
+      ]),
+    );
+    const visibleSet = new Set(visible);
+    const preload = Array.from(
+      new Set(
+        [
+          ...canvasMediaDemand.preloadMediaIds,
+          ...panelMediaDemand.preloadMediaIds,
+        ].filter((mediaId) => !visibleSet.has(mediaId)),
+      ),
+    );
+    onMediaDemandChange({
+      visibleMediaIds: visible,
+      preloadMediaIds: preload,
+    });
+  }, [canvasMediaDemand, onMediaDemandChange, panelMediaDemand]);
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
@@ -176,6 +211,7 @@ export function ProjectWorkspace({
           <AlbumCanvas
             {...controller.canvasProps}
             mediaPreviewUrls={mediaPreviewUrls}
+            onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
           />
         </section>
@@ -218,6 +254,7 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           mediaPreviewUrls={mediaPreviewUrls}
+          onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
         />
       </div>
