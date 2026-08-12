@@ -456,7 +456,7 @@ finally {
 }
 
 $sourceStatus = @(
-    Get-TrackedGateSourceStatus `
+    Get-GateSourceStatus `
         -WorkspaceRoot $script:WorkspaceRoot `
         -EvidencePath $OutputPath
 )

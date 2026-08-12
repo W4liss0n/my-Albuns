@@ -49,7 +49,7 @@ try {
         [System.Text.UTF8Encoding]::new($false)
     )
     $evidenceOnlyStatus = @(
-        Get-TrackedGateSourceStatus `
+        Get-GateSourceStatus `
             -WorkspaceRoot $fixtureRoot `
             -EvidencePath $evidencePath
     )
@@ -63,7 +63,7 @@ try {
         [System.Text.UTF8Encoding]::new($false)
     )
     $dirtySourceStatus = @(
-        Get-TrackedGateSourceStatus `
+        Get-GateSourceStatus `
             -WorkspaceRoot $fixtureRoot `
             -EvidencePath $evidencePath
     )
@@ -72,7 +72,29 @@ try {
         throw "A tracked root build input was not detected: $dirtySourceStatus"
     }
 
-    Write-Output 'Gate source provenance: 2 assertions passed.'
+    [System.IO.File]::WriteAllText(
+        (Join-Path $fixtureRoot 'vite.config.ts'),
+        "export default {};`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $untrackedSourceDirectory = Join-Path $fixtureRoot 'src'
+    New-Item -ItemType Directory -Force -Path $untrackedSourceDirectory | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $untrackedSourceDirectory 'new-entry.ts'),
+        "export const newEntry = true;`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $untrackedSourceStatus = @(
+        Get-GateSourceStatus `
+            -WorkspaceRoot $fixtureRoot `
+            -EvidencePath $evidencePath
+    )
+    if ($untrackedSourceStatus.Count -ne 1 `
+            -or $untrackedSourceStatus[0] -notmatch '\?\? src/new-entry\.ts$') {
+        throw "An untracked source input was not detected: $untrackedSourceStatus"
+    }
+
+    Write-Output 'Gate source provenance: 3 assertions passed.'
 }
 finally {
     if (Test-Path -LiteralPath $fixtureRoot) {

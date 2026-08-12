@@ -1,4 +1,4 @@
-function Get-TrackedGateSourceStatus {
+function Get-GateSourceStatus {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
@@ -42,12 +42,12 @@ function Get-TrackedGateSourceStatus {
             -C $gitRoot `
             status `
             --porcelain=v1 `
-            --untracked-files=no `
+            --untracked-files=all `
             -- `
             @pathSpecs
     )
     if ($LASTEXITCODE -ne 0) {
-        throw 'Git could not inspect the tracked gate source inputs.'
+        throw 'Git could not inspect the gate source inputs.'
     }
     return $status
 }

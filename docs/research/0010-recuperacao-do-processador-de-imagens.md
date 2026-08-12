@@ -30,12 +30,13 @@ primeira versão desta pesquisa descrevia uma prova de quatro grupos; essa prova
 foi substituída pelo gate posterior de 9 verificações e não representa a mesma
 execução do artefato atual.
 
-O campo `sourceInputsDirty` considera todo arquivo rastreado da worktree,
-inclusive configurações e entradas na raiz. Somente o próprio arquivo de
-evidência é excluído; outputs de build não rastreados não são insumos
-versionados. Assim, `sourceInputsDirty: false` atribui a execução ao
-`gitCommit` registrado sem esconder alterações locais de Vite, TypeScript,
-Tauri ou manifests.
+O campo `sourceInputsDirty` considera todo arquivo rastreado e também arquivos
+novos não rastreados que não estejam ignorados pelo Git, inclusive
+configurações e entradas na raiz. Somente o próprio arquivo de evidência é
+excluído; outputs de build declarados no `.gitignore` ficam fora da árvore de
+fontes. Assim, `sourceInputsDirty: false` atribui a execução ao `gitCommit`
+registrado sem esconder alterações locais de Vite, TypeScript, Tauri ou
+manifests.
 
 ## Fronteiras implementadas
 

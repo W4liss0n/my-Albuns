@@ -56,9 +56,10 @@ rodada. A coleta descrita na primeira versão desta pesquisa foi substituída po
 essa rodada posterior; elas não são apresentadas como a mesma execução.
 
 O campo `sourceInputsDirty` usa a mesma regra do gate de recuperação: inspeciona
-todo arquivo rastreado da worktree e exclui somente a própria evidência gerada.
-Isso inclui entradas da raiz, configurações de build e
-`resources/windows/myalbuns.manifest`.
+todo arquivo rastreado e todo arquivo novo não ignorado pelo Git, excluindo
+somente a própria evidência gerada. Isso inclui entradas da raiz, configurações
+de build e `resources/windows/myalbuns.manifest`; outputs declarados no
+`.gitignore` não são tratados como fontes.
 
 O runner cria duas raízes descartáveis no volume local e as expõe por SMB real
 através do compartilhamento administrativo loopback `C$`. Uma letra livre é
