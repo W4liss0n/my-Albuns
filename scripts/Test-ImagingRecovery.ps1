@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
+. (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 Initialize-MyAlbunsToolchain
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -432,20 +433,9 @@ finally {
         $previousProcessDataRoot,
         [System.EnvironmentVariableTarget]::Process
     )
-    if (Test-Path -LiteralPath $evidenceDirectory) {
-        $verifiedEvidenceDirectory = [System.IO.Path]::GetFullPath($evidenceDirectory)
-        $verifiedEvidenceParent = [System.IO.Path]::GetDirectoryName(
-            $verifiedEvidenceDirectory
-        )
-        if (-not [string]::Equals(
-                $verifiedEvidenceParent,
-                $scratchRoot,
-                [System.StringComparison]::OrdinalIgnoreCase
-            )) {
-            throw 'Refusing to remove an unverified recovery evidence directory.'
-        }
-        Remove-Item -LiteralPath $verifiedEvidenceDirectory -Recurse -Force
-    }
+    Remove-GateScratchDirectory `
+        -Path $evidenceDirectory `
+        -AllowedParent $scratchRoot
 }
 
 $sourceSnapshotAfter = Get-GateSourceSnapshot `

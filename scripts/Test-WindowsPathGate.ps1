@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
+. (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 Initialize-MyAlbunsToolchain
 
 if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
@@ -342,16 +343,9 @@ finally {
     if ([System.IO.File]::Exists($preflightPath)) {
         [System.IO.File]::Delete($preflightPath)
     }
-    if (Test-Path -LiteralPath $runRoot) {
-        $verifiedRunRoot = [System.IO.Path]::GetFullPath($runRoot)
-        if (-not $verifiedRunRoot.StartsWith(
-                $scratchRoot + [System.IO.Path]::DirectorySeparatorChar,
-                [System.StringComparison]::OrdinalIgnoreCase
-            )) {
-            throw 'Refusing to remove an unverified Windows path fixture.'
-        }
-        Remove-Item -LiteralPath $verifiedRunRoot -Recurse -Force
-    }
+    Remove-GateScratchDirectory `
+        -Path $runRoot `
+        -AllowedParent $scratchRoot
 }
 
 $sourceSnapshotAfter = Get-GateSourceSnapshot `

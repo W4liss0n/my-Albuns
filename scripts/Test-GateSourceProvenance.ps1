@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
+. (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 
 $workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $scratchRoot = [System.IO.Path]::GetFullPath((Join-Path $workspaceRoot '.scratch'))
@@ -139,7 +140,45 @@ try {
     if (-not $dirtyRunnerOutput.sourceInputsDirty) {
         throw 'An untracked runner output was incorrectly reported as a clean input tree.'
     }
-    Remove-Item -LiteralPath $runnerOutputRoot -Recurse -Force
+    $cleanupAttempts = [System.Collections.Generic.List[int]]::new()
+    $transientCleanup = {
+        param([string] $Candidate)
+        $cleanupAttempts.Add(1)
+        if ($cleanupAttempts.Count -lt 3) {
+            throw 'simulated transient WebView file lock'
+        }
+        Remove-Item -LiteralPath $Candidate -Recurse -Force -ErrorAction Stop
+    }
+    Remove-GateScratchDirectory `
+        -Path $runnerOutputRoot `
+        -AllowedParent (Split-Path -Parent $runnerOutputRoot) `
+        -MaximumAttempts 3 `
+        -RetryDelayMilliseconds 0 `
+        -RemoveOperation $transientCleanup
+    if ($cleanupAttempts.Count -ne 3) {
+        throw 'Gate scratch cleanup did not retry a transient file lock.'
+    }
+    $persistentCleanupRoot = Join-Path $fixtureRoot '.scratch\persistent-lock'
+    New-Item -ItemType Directory -Force -Path $persistentCleanupRoot | Out-Null
+    $persistentFailure = $null
+    try {
+        Remove-GateScratchDirectory `
+            -Path $persistentCleanupRoot `
+            -AllowedParent (Split-Path -Parent $persistentCleanupRoot) `
+            -MaximumAttempts 2 `
+            -RetryDelayMilliseconds 0 `
+            -RemoveOperation { throw 'simulated persistent WebView file lock' }
+    }
+    catch {
+        $persistentFailure = $_.Exception.Message
+    }
+    if ($persistentFailure -notmatch 'failed after 2 attempts' `
+            -or -not (Test-Path -LiteralPath $persistentCleanupRoot)) {
+        throw 'Gate scratch cleanup did not fail closed after exhausting retries.'
+    }
+    Remove-GateScratchDirectory `
+        -Path $persistentCleanupRoot `
+        -AllowedParent (Split-Path -Parent $persistentCleanupRoot)
     $cleanAfterRunnerCleanup = Get-GateSourceSnapshot `
         -WorkspaceRoot $fixtureRoot `
         -EvidencePath $evidencePath
@@ -147,18 +186,10 @@ try {
         throw 'A runner-shaped cleanup did not restore a clean evidence input tree.'
     }
 
-    Write-Output 'Gate source provenance: 7 assertions passed.'
+    Write-Output 'Gate source provenance: 9 assertions passed.'
 }
 finally {
-    if (Test-Path -LiteralPath $fixtureRoot) {
-        $verifiedFixtureRoot = [System.IO.Path]::GetFullPath($fixtureRoot)
-        if (-not [string]::Equals(
-                [System.IO.Path]::GetDirectoryName($verifiedFixtureRoot),
-                $scratchRoot,
-                [System.StringComparison]::OrdinalIgnoreCase
-            )) {
-            throw 'Refusing to remove an unverified provenance fixture.'
-        }
-        Remove-Item -LiteralPath $verifiedFixtureRoot -Recurse -Force
-    }
+    Remove-GateScratchDirectory `
+        -Path $fixtureRoot `
+        -AllowedParent $scratchRoot
 }
