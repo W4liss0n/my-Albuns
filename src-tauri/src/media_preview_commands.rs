@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
 use myalbuns_paths::OperationPathContext;
-use tauri::{AppHandle, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
@@ -15,12 +15,12 @@ use crate::{
         ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
     },
     ipc_contract::{
-        MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode, MediaPreviewDemand,
-        MediaPreviewState,
+        LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode,
+        MediaPreviewDemand, MediaPreviewState,
     },
     logging::LoggingState,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
-    product_runtime::PROJECT_WINDOW_LABEL,
+    product_runtime::{LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL},
     project_host::ProjectHost,
 };
 
@@ -83,16 +83,11 @@ pub(crate) async fn prepare_media_previews(
     }
     let namespace = AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority)
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
-    let demand_revision = engine.reconcile_demand(
+    let mut demand_revision = engine.reconcile_preview_demand(
+        registry.inner(),
         namespace.project_id(),
         demand.revision,
         ordered_demand.iter().map(String::as_str),
-    );
-    registry.invalidate_media(
-        demand_revision
-            .retired_media_ids()
-            .iter()
-            .map(String::as_str),
     );
     if ordered_demand.is_empty() {
         return Ok(Some(Vec::new()));
@@ -107,10 +102,7 @@ pub(crate) async fn prepare_media_previews(
     let poll = tauri::async_runtime::spawn_blocking(move || monitor.poll(&runtime, &bindings))
         .await
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
-    let invalidated_media_ids = poll
-        .update()
-        .map(|update| update.invalidated_media_ids().to_vec())
-        .unwrap_or_default();
+    let runtime_update = poll.update().cloned();
     let observations = poll
         .confirmed_observation()
         .map(|proposal| {
@@ -121,18 +113,35 @@ pub(crate) async fn prepare_media_previews(
                 .collect::<HashMap<_, _>>()
         })
         .unwrap_or_default();
-    if !engine.demand_is_current(&demand_revision) {
-        return Ok(Some(Vec::new()));
-    }
-    if !invalidated_media_ids.is_empty() {
-        engine
-            .invalidate_media(
+    if let Some(runtime_update) = runtime_update.as_ref()
+        && (!runtime_update.changed_media_ids().is_empty()
+            || !runtime_update.invalidated_media_ids().is_empty())
+    {
+        let cache_update = engine
+            .apply_demand_media_update(
                 &app_paths,
                 &namespace,
-                invalidated_media_ids.iter().map(String::as_str),
+                registry.inner(),
+                &mut demand_revision,
+                runtime_update,
             )
             .map_err(|_| MediaPreviewCommandError::read_failed())?;
-        registry.invalidate_media(invalidated_media_ids.iter().map(String::as_str));
+        if cache_update.retry_required() {
+            window
+                .emit(
+                    LINKED_MEDIA_CHANGED_EVENT,
+                    LinkedMediaChanged {
+                        media_ids: runtime_update.changed_media_ids().to_vec(),
+                    },
+                )
+                .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        }
+        if !cache_update.demand_can_resume() {
+            return Ok(Some(Vec::new()));
+        }
+    }
+    if !engine.demand_is_current(&demand_revision) {
+        return Ok(Some(Vec::new()));
     }
     let mut previews = Vec::with_capacity(ordered_demand.len());
     for media_id in ordered_demand {
@@ -216,11 +225,14 @@ pub(crate) async fn prepare_media_previews(
                         event = "cache_processor_recovered",
                     );
                 }
-                previews.push(
-                    registry
-                        .publish(&app_paths, &namespace, execution.artifact())
-                        .map_err(MediaPreviewCommandError::from)?,
-                );
+                let Some(preview) =
+                    engine.commit_preview_if_demanded(&demand_revision, media_id.as_str(), || {
+                        registry.publish(&app_paths, &namespace, execution.artifact())
+                    })
+                else {
+                    return Ok(Some(Vec::new()));
+                };
+                previews.push(preview.map_err(MediaPreviewCommandError::from)?);
             }
             Err(failure) => {
                 tracing::warn!(

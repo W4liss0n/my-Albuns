@@ -281,17 +281,16 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     changed_media_count = changed.len(),
                     event = "linked_media_observation_applied",
                 );
-                app.state::<CachePreviewRegistry>()
-                    .invalidate_media(changed.iter().map(String::as_str));
             }
             let invalidated = update.invalidated_media_ids();
-            if !invalidated.is_empty() {
+            if !changed.is_empty() || !invalidated.is_empty() {
                 let app_paths = app.state::<AppPaths>();
                 match AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority) {
-                    Ok(namespace) => match app.state::<CacheEngine>().invalidate_media(
+                    Ok(namespace) => match app.state::<CacheEngine>().apply_monitor_media_update(
                         &app_paths,
                         &namespace,
-                        invalidated.iter().map(String::as_str),
+                        app.state::<CachePreviewRegistry>().inner(),
+                        update,
                     ) {
                         Ok(removed_generation_count) => {
                             tracing::info!(

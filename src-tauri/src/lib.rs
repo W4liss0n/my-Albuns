@@ -35,22 +35,22 @@ mod sample_project;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
-    let webdriver_project = global_runtime::webdriver_automation_project();
-    #[cfg(not(debug_assertions))]
-    let webdriver_project: Option<std::path::PathBuf> = None;
-
-    let result = if let Some(project_path) = webdriver_project {
-        run_webdriver_project_host(project_path)
-    } else {
-        match runtime_role::parse_runtime_role(std::env::args_os()) {
-            runtime_role::RuntimeRole::Global { direct_project } => {
-                global_runtime::run(direct_project)
-            }
-            runtime_role::RuntimeRole::ProjectHost => run_project_host(),
-        }
+    let result = match global_runtime::webdriver_automation_project() {
+        Some(project_path) => run_webdriver_project_host(project_path),
+        None => run_selected_runtime_role(),
     };
+    #[cfg(not(debug_assertions))]
+    let result = run_selected_runtime_role();
+
     if let Err(error) = result {
         eprintln!("não foi possível executar o MyAlbuns: {error}");
+    }
+}
+
+fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
+    match runtime_role::parse_runtime_role(std::env::args_os()) {
+        runtime_role::RuntimeRole::Global { direct_project } => global_runtime::run(direct_project),
+        runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
 }
 

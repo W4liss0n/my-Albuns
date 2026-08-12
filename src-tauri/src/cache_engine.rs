@@ -26,10 +26,12 @@ use tokio::sync::Notify;
 
 use crate::{
     cache_activity_gate::{CacheActivityGate, CacheCancellation, CachePause, CacheWorkPermit},
+    cache_previews::CachePreviewRegistry,
     imaging_processor::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFailureStage, OperationFailure,
     },
+    media_runtime::MediaRuntimeUpdate,
 };
 
 const CACHE_METADATA_SCHEMA_VERSION: u32 = 5;
@@ -193,6 +195,7 @@ type FlightResult = Result<CacheExecution, CacheFailure>;
 pub(crate) struct CacheEngine {
     flights: Arc<Mutex<HashMap<CacheFlightKey, Arc<CacheFlight>>>>,
     demands: Mutex<HashMap<String, CacheDemandState>>,
+    applied_observation_generations: Mutex<HashMap<(String, String), u64>>,
     active_owners: Arc<AtomicUsize>,
     activity: CacheActivityGate,
     metadata: Mutex<()>,
@@ -202,16 +205,43 @@ pub(crate) struct CacheEngine {
 struct CacheDemandState {
     revision: u64,
     media_ids: HashSet<String>,
+    invalidation_epoch: uuid::Uuid,
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct CacheDemandRevision {
     project_id: String,
     revision: u64,
+    invalidation_epoch: uuid::Uuid,
     accepted: bool,
+    #[cfg(test)]
     retired_media_ids: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CacheDemandMediaUpdate {
+    demand_can_resume: bool,
+    retry_required: bool,
+}
+
+impl CacheDemandMediaUpdate {
+    pub(crate) fn demand_can_resume(self) -> bool {
+        self.demand_can_resume
+    }
+
+    pub(crate) fn retry_required(self) -> bool {
+        self.retry_required
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CacheMediaUpdateOutcome {
+    removed_generation_count: usize,
+    demand_can_resume: bool,
+    update_applied: bool,
+}
+
+#[cfg(test)]
 impl CacheDemandRevision {
     pub(crate) fn retired_media_ids(&self) -> &[String] {
         &self.retired_media_ids
@@ -267,11 +297,39 @@ impl CacheEngine {
         execute_cache(self, transport, app_paths, work, context, cancellation).await
     }
 
+    pub(crate) fn reconcile_preview_demand<'a>(
+        &self,
+        registry: &CachePreviewRegistry,
+        project_id: &str,
+        revision: u64,
+        demanded_media_ids: impl IntoIterator<Item = &'a str>,
+    ) -> CacheDemandRevision {
+        self.reconcile_demand_with(
+            project_id,
+            revision,
+            demanded_media_ids,
+            |retired_media_ids| {
+                registry.invalidate_media(retired_media_ids.iter().map(String::as_str));
+            },
+        )
+    }
+
+    #[cfg(test)]
     pub(crate) fn reconcile_demand<'a>(
         &self,
         project_id: &str,
         revision: u64,
         demanded_media_ids: impl IntoIterator<Item = &'a str>,
+    ) -> CacheDemandRevision {
+        self.reconcile_demand_with(project_id, revision, demanded_media_ids, |_| {})
+    }
+
+    fn reconcile_demand_with<'a>(
+        &self,
+        project_id: &str,
+        revision: u64,
+        demanded_media_ids: impl IntoIterator<Item = &'a str>,
+        revoke_retired_previews: impl FnOnce(&[String]),
     ) -> CacheDemandRevision {
         let demanded = demanded_media_ids
             .into_iter()
@@ -291,6 +349,10 @@ impl CacheEngine {
             Some(current) if revision == current.revision => current.media_ids == demanded,
             Some(_) => false,
         };
+        let invalidation_epoch = demands
+            .get(project_id)
+            .map(|current| current.invalidation_epoch)
+            .unwrap_or_else(uuid::Uuid::nil);
         let mut retired_media_ids = if accepted {
             demands
                 .get(project_id)
@@ -308,6 +370,7 @@ impl CacheEngine {
                 CacheDemandState {
                     revision,
                     media_ids: demanded.clone(),
+                    invalidation_epoch,
                 },
             );
             let mut flights = self
@@ -321,13 +384,43 @@ impl CacheEngine {
                 }
                 true
             });
+            revoke_retired_previews(&retired_media_ids);
         }
         CacheDemandRevision {
             project_id: project_id.to_owned(),
             revision,
+            invalidation_epoch,
             accepted,
+            #[cfg(test)]
             retired_media_ids,
         }
+    }
+
+    pub(crate) fn commit_preview_if_demanded<T>(
+        &self,
+        demand: &CacheDemandRevision,
+        media_id: &str,
+        commit: impl FnOnce() -> T,
+    ) -> Option<T> {
+        if !demand.accepted {
+            return None;
+        }
+        let _metadata_guard = self
+            .metadata
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let demands = self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = demands.get(&demand.project_id)?;
+        if current.revision != demand.revision
+            || current.invalidation_epoch != demand.invalidation_epoch
+            || !current.media_ids.contains(media_id)
+        {
+            return None;
+        }
+        Some(commit())
     }
 
     pub(crate) fn demand_is_current(&self, demand: &CacheDemandRevision) -> bool {
@@ -338,7 +431,10 @@ impl CacheEngine {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(&demand.project_id)
-            .is_some_and(|current| current.revision == demand.revision)
+            .is_some_and(|current| {
+                current.revision == demand.revision
+                    && current.invalidation_epoch == demand.invalidation_epoch
+            })
     }
 
     pub(crate) fn claim_demanded(
@@ -355,6 +451,7 @@ impl CacheEngine {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let current = demands.get(&demand.project_id)?;
         if current.revision != demand.revision
+            || current.invalidation_epoch != demand.invalidation_epoch
             || !current.media_ids.contains(work.source.media_id())
         {
             return None;
@@ -395,6 +492,138 @@ impl CacheEngine {
         })
     }
 
+    pub(crate) fn apply_monitor_media_update(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        update: &MediaRuntimeUpdate,
+    ) -> Result<usize, CacheFailure> {
+        let outcome = self.apply_media_update(app_paths, namespace, registry, update, None)?;
+        Ok(outcome.removed_generation_count)
+    }
+
+    pub(crate) fn apply_demand_media_update(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        demand: &mut CacheDemandRevision,
+        update: &MediaRuntimeUpdate,
+    ) -> Result<CacheDemandMediaUpdate, CacheFailure> {
+        let outcome =
+            self.apply_media_update(app_paths, namespace, registry, update, Some(demand))?;
+        Ok(CacheDemandMediaUpdate {
+            demand_can_resume: outcome.demand_can_resume,
+            retry_required: outcome.update_applied && !outcome.demand_can_resume,
+        })
+    }
+
+    fn apply_media_update(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        update: &MediaRuntimeUpdate,
+        resume_demand: Option<&mut CacheDemandRevision>,
+    ) -> Result<CacheMediaUpdateOutcome, CacheFailure> {
+        let observation_generation = update.observation_generation();
+        let mut changed = update
+            .changed_media_ids()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+        let invalidated = update
+            .invalidated_media_ids()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
+        changed.extend(invalidated.iter().cloned());
+        let _metadata_guard = self
+            .metadata
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let applied_media_ids = {
+            let generations = self
+                .applied_observation_generations
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            changed
+                .iter()
+                .filter(|media_id| {
+                    observation_generation
+                        > *generations
+                            .get(&(namespace.project_id().to_owned(), (*media_id).clone()))
+                            .unwrap_or(&0)
+                })
+                .cloned()
+                .collect::<HashSet<_>>()
+        };
+        let update_applied = !applied_media_ids.is_empty();
+        let demand_can_resume = {
+            let mut demands = self
+                .demands
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut demand_can_resume = resume_demand.is_none();
+            match (demands.get_mut(namespace.project_id()), resume_demand) {
+                (Some(current), Some(demand)) => {
+                    demand_can_resume = demand.accepted
+                        && demand.project_id == namespace.project_id()
+                        && demand.revision == current.revision
+                        && demand.invalidation_epoch == current.invalidation_epoch;
+                    if !current.media_ids.is_disjoint(&applied_media_ids) {
+                        current.invalidation_epoch = uuid::Uuid::new_v4();
+                        if demand_can_resume {
+                            demand.invalidation_epoch = current.invalidation_epoch;
+                        }
+                    }
+                }
+                (Some(current), None) if !current.media_ids.is_disjoint(&applied_media_ids) => {
+                    current.invalidation_epoch = uuid::Uuid::new_v4();
+                }
+                (Some(_), None) | (None, None) | (None, Some(_)) => {}
+            }
+            demand_can_resume
+        };
+        if !update_applied {
+            return Ok(CacheMediaUpdateOutcome {
+                removed_generation_count: 0,
+                demand_can_resume,
+                update_applied,
+            });
+        }
+        self.cancel_flights(namespace.project_id(), &applied_media_ids);
+        registry.invalidate_media(applied_media_ids.iter().map(String::as_str));
+        let applied_invalidated = invalidated
+            .intersection(&applied_media_ids)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let removed_generation_count = if applied_invalidated.is_empty() {
+            0
+        } else {
+            self.invalidate_artifacts_locked(app_paths, namespace, &applied_invalidated)?
+        };
+        {
+            let mut generations = self
+                .applied_observation_generations
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            for media_id in &applied_media_ids {
+                generations.insert(
+                    (namespace.project_id().to_owned(), media_id.clone()),
+                    observation_generation,
+                );
+            }
+        }
+        Ok(CacheMediaUpdateOutcome {
+            removed_generation_count,
+            demand_can_resume,
+            update_applied,
+        })
+    }
+
+    #[cfg(test)]
     pub(crate) fn invalidate_media<I, S>(
         &self,
         app_paths: &AppPaths,
@@ -416,20 +645,30 @@ impl CacheEngine {
             .metadata
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        {
-            let mut flights = self
-                .flights
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            flights.retain(|_, flight| {
-                if flight.project_id == namespace.project_id && media_ids.contains(&flight.media_id)
-                {
-                    flight.cancellation.cancel_obsolete();
-                    return false;
-                }
-                true
-            });
-        }
+        self.cancel_flights(namespace.project_id(), &media_ids);
+        self.invalidate_artifacts_locked(app_paths, namespace, &media_ids)
+    }
+
+    fn cancel_flights(&self, project_id: &str, media_ids: &HashSet<String>) {
+        let mut flights = self
+            .flights
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        flights.retain(|_, flight| {
+            if flight.project_id == project_id && media_ids.contains(&flight.media_id) {
+                flight.cancellation.cancel_obsolete();
+                return false;
+            }
+            true
+        });
+    }
+
+    fn invalidate_artifacts_locked(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        media_ids: &HashSet<String>,
+    ) -> Result<usize, CacheFailure> {
         let storage = app_paths
             .prepare_cache_storage(namespace.paths())
             .map_err(|error| {
@@ -1144,7 +1383,13 @@ fn unix_millis(time: SystemTime) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::VecDeque, io::Write};
+    use std::{
+        collections::VecDeque,
+        io::Write,
+        sync::{Arc, mpsc},
+        thread,
+        time::Duration,
+    };
 
     use image::{
         DynamicImage, ExtendedColorType, ImageEncoder, Rgba, RgbaImage,
@@ -1160,16 +1405,19 @@ mod tests {
     };
     use myalbuns_paths::{AppPaths, OperationPathContext};
     use sha2::{Digest, Sha256};
+    use tauri::http::{Method, Request, StatusCode};
 
     use super::{
         AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheFlightClaim, CacheWork,
     };
     use crate::{
         cache_activity_gate::CacheCancellation,
+        cache_previews::CachePreviewRegistry,
         imaging_processor::{
             ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
             InvocationFailure, InvocationFuture,
         },
+        media_runtime::MediaRuntimeUpdate,
     };
 
     const SRGB_PROFILE: &[u8] = include_bytes!("../../crates/myalbuns-imaging/assets/sRGB2014.icc");
@@ -1427,6 +1675,44 @@ mod tests {
         drop(storage);
     }
 
+    async fn verified_preview_artifact(fixture: &Fixture, engine: &CacheEngine) -> CacheArtifact {
+        verified_preview_artifact_for_work(fixture, engine, &fixture.work, &fixture.context).await
+    }
+
+    async fn verified_preview_artifact_for_work(
+        fixture: &Fixture,
+        engine: &CacheEngine,
+        work: &CacheWork,
+        context: &InvocationContext,
+    ) -> CacheArtifact {
+        let mut transport = ScriptedTransport {
+            app_paths: fixture.app_paths.clone(),
+            scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+            attempts: Vec::new(),
+        };
+        engine
+            .execute(
+                &mut transport,
+                &fixture.app_paths,
+                work.clone(),
+                context,
+                &CacheCancellation::default(),
+            )
+            .await
+            .expect("the in-flight demand produces one verified artifact")
+            .artifact()
+            .clone()
+    }
+
+    fn preview_status(registry: &CachePreviewRegistry, token: &str) -> StatusCode {
+        let request = Request::builder()
+            .method(Method::GET)
+            .uri(format!("/{token}"))
+            .body(Vec::new())
+            .expect("the opaque request is valid");
+        registry.serve("project", request).status()
+    }
+
     #[test]
     fn cache_namespace_can_only_be_mounted_from_editable_identity_authority() {
         let root = tempfile::tempdir().expect("temporary authority fixture");
@@ -1581,6 +1867,460 @@ mod tests {
             None,
             "a late older command cannot cancel a newer flight"
         );
+    }
+
+    #[test]
+    fn a_newer_demand_revokes_a_preview_committed_by_an_inflight_old_revision() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = Arc::new(CacheEngine::default());
+            let registry = Arc::new(CachePreviewRegistry::new("project"));
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let demand = engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                1,
+                [fixture.work.source.media_id()],
+            );
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+
+            let (commit_entered_tx, commit_entered_rx) = mpsc::channel();
+            let (release_commit_tx, release_commit_rx) = mpsc::channel();
+            let old_engine = Arc::clone(&engine);
+            let old_registry = Arc::clone(&registry);
+            let old_app_paths = fixture.app_paths.clone();
+            let old_namespace = fixture.work.namespace.clone();
+            let media_id = fixture.work.source.media_id().to_owned();
+            let old_commit = thread::spawn(move || {
+                old_engine.commit_preview_if_demanded(&demand, &media_id, || {
+                    commit_entered_tx
+                        .send(())
+                        .expect("the test observes the serialized preview commit");
+                    release_commit_rx
+                        .recv()
+                        .expect("the test releases the serialized preview commit");
+                    old_registry.publish(&old_app_paths, &old_namespace, &artifact)
+                })
+            });
+            commit_entered_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("the old revision reaches its preview commit");
+
+            let newer_engine = Arc::clone(&engine);
+            let newer_registry = Arc::clone(&registry);
+            let (reconciled_tx, reconciled_rx) = mpsc::channel();
+            let newer_reconciliation = thread::spawn(move || {
+                newer_engine.reconcile_preview_demand(
+                    &newer_registry,
+                    &project_id,
+                    2,
+                    std::iter::empty(),
+                );
+                reconciled_tx
+                    .send(())
+                    .expect("the test observes the newer reconciliation");
+            });
+            assert!(
+                reconciled_rx
+                    .recv_timeout(Duration::from_millis(20))
+                    .is_err(),
+                "reconciliation waits until the old commit reaches one serial endpoint"
+            );
+
+            release_commit_tx
+                .send(())
+                .expect("the old serialized commit is released");
+            let preview = old_commit
+                .join()
+                .expect("the old commit thread joins")
+                .expect("the old revision was current when its commit began")
+                .expect("the verified preview is published");
+            newer_reconciliation
+                .join()
+                .expect("the newer reconciliation thread joins");
+            reconciled_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("the newer demand completes after revocation");
+
+            let token = preview
+                .url
+                .expect("the committed preview has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("the opaque URL has a token")
+                .to_owned();
+            let request = Request::builder()
+                .method(Method::GET)
+                .uri(format!("/{token}"))
+                .body(Vec::new())
+                .expect("the revoked opaque request is valid");
+            assert_eq!(
+                registry.serve("project", request).status(),
+                StatusCode::NOT_FOUND,
+                "the newer demand leaves no bytes or token resident"
+            );
+        });
+    }
+
+    #[test]
+    fn a_monitor_invalidation_serializes_with_commit_and_expires_the_old_epoch() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = Arc::new(CacheEngine::default());
+            let registry = Arc::new(CachePreviewRegistry::new("project"));
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let demand = engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                1,
+                [fixture.work.source.media_id()],
+            );
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+
+            let (commit_entered_tx, commit_entered_rx) = mpsc::channel();
+            let (release_commit_tx, release_commit_rx) = mpsc::channel();
+            let old_engine = Arc::clone(&engine);
+            let old_registry = Arc::clone(&registry);
+            let old_app_paths = fixture.app_paths.clone();
+            let old_namespace = fixture.work.namespace.clone();
+            let media_id = fixture.work.source.media_id().to_owned();
+            let demand_for_commit = demand.clone();
+            let old_commit = thread::spawn(move || {
+                old_engine.commit_preview_if_demanded(&demand_for_commit, &media_id, || {
+                    commit_entered_tx
+                        .send(())
+                        .expect("the test observes the serialized preview commit");
+                    release_commit_rx
+                        .recv()
+                        .expect("the test releases the serialized preview commit");
+                    old_registry.publish(&old_app_paths, &old_namespace, &artifact)
+                })
+            });
+            commit_entered_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("the old revision reaches its preview commit");
+
+            let monitor_engine = Arc::clone(&engine);
+            let monitor_registry = Arc::clone(&registry);
+            let monitor_app_paths = fixture.app_paths.clone();
+            let monitor_namespace = fixture.work.namespace.clone();
+            let (invalidated_tx, invalidated_rx) = mpsc::channel();
+            let monitor_update = thread::spawn(move || {
+                monitor_engine
+                    .apply_monitor_media_update(
+                        &monitor_app_paths,
+                        &monitor_namespace,
+                        &monitor_registry,
+                        &MediaRuntimeUpdate::for_test(1, vec!["photo-a".to_owned()], vec![]),
+                    )
+                    .expect("the stable Monitor update revokes the resident preview");
+                invalidated_tx
+                    .send(())
+                    .expect("the test observes the Monitor update");
+            });
+            assert!(
+                invalidated_rx
+                    .recv_timeout(Duration::from_millis(20))
+                    .is_err(),
+                "the Monitor update waits for the old commit's serial endpoint"
+            );
+
+            release_commit_tx
+                .send(())
+                .expect("the old serialized commit is released");
+            let preview = old_commit
+                .join()
+                .expect("the old commit thread joins")
+                .expect("the old revision was current when its commit began")
+                .expect("the verified preview is published before invalidation");
+            monitor_update
+                .join()
+                .expect("the Monitor update thread joins");
+            invalidated_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("the Monitor update completes after revocation");
+
+            let token = preview
+                .url
+                .expect("the committed preview has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("the opaque URL has a token")
+                .to_owned();
+            let request = Request::builder()
+                .method(Method::GET)
+                .uri(format!("/{token}"))
+                .body(Vec::new())
+                .expect("the revoked opaque request is valid");
+            assert_eq!(
+                registry.serve("project", request).status(),
+                StatusCode::NOT_FOUND,
+                "the Monitor update wins after the serialized old commit"
+            );
+            assert!(
+                engine
+                    .commit_preview_if_demanded(&demand, "photo-a", || {
+                        panic!("an expired observation epoch cannot commit")
+                    })
+                    .is_none(),
+                "the old demand cannot republish after Monitor invalidation"
+            );
+        });
+    }
+
+    #[test]
+    fn a_monitor_update_cannot_be_adopted_by_an_older_demand_command() {
+        let fixture = fixture();
+        let engine = CacheEngine::default();
+        let registry = CachePreviewRegistry::new("project");
+        let project_id = fixture.work.namespace.project_id().to_owned();
+        let mut old_demand = engine.reconcile_preview_demand(
+            &registry,
+            &project_id,
+            1,
+            [fixture.work.source.media_id()],
+        );
+
+        engine
+            .apply_monitor_media_update(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(
+                    2,
+                    vec![fixture.work.source.media_id().to_owned()],
+                    vec![],
+                ),
+            )
+            .expect("the Monitor wins and advances the invalidation epoch");
+        let stale_update = engine
+            .apply_demand_media_update(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+                &registry,
+                &mut old_demand,
+                &MediaRuntimeUpdate::for_test(
+                    1,
+                    vec![fixture.work.source.media_id().to_owned()],
+                    vec![],
+                ),
+            )
+            .expect("the old command observes that it lost authority");
+
+        assert!(
+            !stale_update.demand_can_resume() && !stale_update.retry_required(),
+            "the command must report that the Monitor already won"
+        );
+
+        assert!(
+            !engine.demand_is_current(&old_demand),
+            "an old command cannot adopt the epoch established by the Monitor"
+        );
+        assert!(
+            engine
+                .commit_preview_if_demanded(&old_demand, fixture.work.source.media_id(), || {
+                    panic!("the stale demand cannot regain publication authority")
+                })
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn an_observation_owned_by_a_retired_command_is_applied_once_and_requests_retry() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let mut old_demand = engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                1,
+                [fixture.work.source.media_id()],
+            );
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let preview = engine
+                .commit_preview_if_demanded(&old_demand, fixture.work.source.media_id(), || {
+                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                })
+                .expect("the original demand is current")
+                .expect("the original preview is resident");
+            let token = preview
+                .url
+                .expect("the resident preview has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("the opaque URL has a token")
+                .to_owned();
+
+            engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                2,
+                [fixture.work.source.media_id()],
+            );
+            let outcome = engine
+                .apply_demand_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &mut old_demand,
+                    &MediaRuntimeUpdate::for_test(
+                        1,
+                        vec![fixture.work.source.media_id().to_owned()],
+                        vec![],
+                    ),
+                )
+                .expect("the confirmed observation is applied despite its retired caller");
+
+            assert!(!outcome.demand_can_resume());
+            assert!(
+                outcome.retry_required(),
+                "the winning demand needs a new attempt after its epoch is invalidated"
+            );
+            let request = Request::builder()
+                .method(Method::GET)
+                .uri(format!("/{token}"))
+                .body(Vec::new())
+                .expect("the opaque request is valid");
+            assert_eq!(
+                registry.serve("project", request).status(),
+                StatusCode::NOT_FOUND,
+                "Candidate to Absent/Unavailable cannot leave old bytes resident"
+            );
+        });
+    }
+
+    #[test]
+    fn out_of_order_observation_deltas_are_ordered_independently_per_media() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let photo_b_path = fixture._root.path().join("photo-b.jpg");
+            std::fs::write(&photo_b_path, b"original-photo-b")
+                .expect("the second Original fixture is writable");
+            let source_b = CacheMediaSource::new("photo-b", MediaKind::Photo, photo_b_path)
+                .expect("the second Cache source is valid");
+            let mut operation_context_b = OperationPathContext::new();
+            operation_context_b
+                .capture(fixture.work.namespace.paths().root())
+                .expect("the Cache root is captured for the second media");
+            operation_context_b
+                .capture(source_b.source_path())
+                .expect("the second Original root is captured");
+            let work_b = CacheWork::new(
+                "cache-test-b",
+                fixture.work.namespace.clone(),
+                source_b,
+                operation_context_b.freeze(),
+            );
+            let context_b = InvocationContext::new("cache-test-b", Some(project_id.clone()));
+            let artifact_a = verified_preview_artifact(&fixture, &engine).await;
+            let artifact_b =
+                verified_preview_artifact_for_work(&fixture, &engine, &work_b, &context_b).await;
+            let demand =
+                engine.reconcile_preview_demand(&registry, &project_id, 1, ["photo-a", "photo-b"]);
+            let preview_a = engine
+                .commit_preview_if_demanded(&demand, "photo-a", || {
+                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact_a)
+                })
+                .expect("the demand authorizes photo-a")
+                .expect("photo-a is resident");
+            let preview_b = engine
+                .commit_preview_if_demanded(&demand, "photo-b", || {
+                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact_b)
+                })
+                .expect("the demand authorizes photo-b")
+                .expect("photo-b is resident");
+            let token_a = preview_a
+                .url
+                .expect("photo-a has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("photo-a has a token")
+                .to_owned();
+            let token_b = preview_b
+                .url
+                .expect("photo-b has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("photo-b has a token")
+                .to_owned();
+
+            engine
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(11, vec!["photo-b".to_owned()], vec![]),
+                )
+                .expect("generation 11 applies to photo-b first");
+            engine
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
+                )
+                .expect("generation 10 still applies independently to photo-a");
+
+            assert_eq!(preview_status(&registry, &token_a), StatusCode::NOT_FOUND);
+            assert_eq!(preview_status(&registry, &token_b), StatusCode::NOT_FOUND);
+        });
+    }
+
+    #[test]
+    fn an_older_observation_for_the_same_media_cannot_revoke_a_newer_preview() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let demand = engine.reconcile_preview_demand(&registry, &project_id, 1, ["photo-a"]);
+            engine
+                .commit_preview_if_demanded(&demand, "photo-a", || {
+                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                })
+                .expect("the first demand is current")
+                .expect("the first preview is resident");
+            engine
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(11, vec!["photo-a".to_owned()], vec![]),
+                )
+                .expect("generation 11 revokes the older preview");
+            let newer_demand =
+                engine.reconcile_preview_demand(&registry, &project_id, 2, ["photo-a"]);
+            let newer_preview = engine
+                .commit_preview_if_demanded(&newer_demand, "photo-a", || {
+                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                })
+                .expect("the newer demand is current")
+                .expect("the newer preview is resident");
+            let newer_token = newer_preview
+                .url
+                .expect("the newer preview has an opaque URL")
+                .rsplit('/')
+                .next()
+                .expect("the newer preview has a token")
+                .to_owned();
+
+            engine
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
+                )
+                .expect("the stale generation is ignored");
+
+            assert_eq!(preview_status(&registry, &newer_token), StatusCode::OK);
+        });
     }
 
     #[test]

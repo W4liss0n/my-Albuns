@@ -50,17 +50,35 @@ impl MediaResolutionProposal {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct MediaRuntimeUpdate {
+    observation_generation: u64,
     changed_media_ids: Vec<String>,
     invalidated_media_ids: Vec<String>,
 }
 
 impl MediaRuntimeUpdate {
+    pub(crate) fn observation_generation(&self) -> u64 {
+        self.observation_generation
+    }
+
     pub(crate) fn changed_media_ids(&self) -> &[String] {
         &self.changed_media_ids
     }
 
     pub(crate) fn invalidated_media_ids(&self) -> &[String] {
         &self.invalidated_media_ids
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(
+        observation_generation: u64,
+        changed_media_ids: Vec<String>,
+        invalidated_media_ids: Vec<String>,
+    ) -> Self {
+        Self {
+            observation_generation,
+            changed_media_ids,
+            invalidated_media_ids,
+        }
     }
 }
 
@@ -174,6 +192,7 @@ impl MediaRuntime {
         {
             return MediaRuntimeUpdate::default();
         }
+        let observation_generation = proposal.generation;
         let previous = current
             .as_ref()
             .map(|current| {
@@ -206,6 +225,7 @@ impl MediaRuntime {
             .collect();
         *current = Some(proposal);
         MediaRuntimeUpdate {
+            observation_generation,
             changed_media_ids,
             invalidated_media_ids,
         }
@@ -373,6 +393,11 @@ mod tests {
             "two stable samples seed Runtime"
         );
         assert!(initial.update().unwrap().invalidated_media_ids().is_empty());
+        assert_eq!(
+            initial.update().unwrap().observation_generation(),
+            2,
+            "the confirmed update carries its monotonic observation generation"
+        );
 
         std::fs::write(&source, b"photo-version-two-with-a-new-size")
             .expect("the Original changes in place");
