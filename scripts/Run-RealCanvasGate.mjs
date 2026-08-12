@@ -252,12 +252,12 @@ try {
     script: 5_000,
   });
 
-  const windowDeadline = Date.now() + gateTimeoutMilliseconds;
+  const gateDeadline = Date.now() + gateTimeoutMilliseconds;
   let handles = [];
   let elementId;
   let lastWindowError;
   let lastWindowState;
-  while (!elementId && Date.now() < windowDeadline) {
+  while (!elementId && Date.now() < gateDeadline) {
     handles = await request("GET", `/session/${sessionId}/window/handles`);
     if (handles.length > 1) {
       throw new Error(`Expected one productive Project WebView, received ${handles.length}`);
@@ -301,18 +301,22 @@ try {
     throw new Error("An Original pathname crossed the productive WebView boundary");
   }
 
-  const tracerDeadline = Date.now() + 5_000;
+  // Texture production can include a cold Processador build/start. Keep it
+  // inside the same explicit end-to-end budget as WebView startup instead of
+  // imposing a shorter, machine-speed-dependent deadline after DOM mount.
   let liveDriverOutput = "";
   let liveTextureLoadCount = 0;
   do {
-    liveDriverOutput = stripVTControlCharacters(driverOutput());
+    liveDriverOutput = stripVTControlCharacters(
+      `${appendedDesktopLogs(initialDesktopLogOffsets)}\n${driverOutput()}`,
+    );
     liveTextureLoadCount = eventCount(
       liveDriverOutput,
       "canvas_opaque_preview_texture_loaded",
     );
     if (liveTextureLoadCount >= expectedPreviewCount) break;
     await delay(100);
-  } while (Date.now() < tracerDeadline);
+  } while (Date.now() < gateDeadline);
   if (liveTextureLoadCount < expectedPreviewCount) {
     throw new Error(
       `The productive Canvas did not load every opaque texture before its screenshot (${liveTextureLoadCount}/${expectedPreviewCount})`,
