@@ -11,6 +11,7 @@ import {
 } from "./application/logging";
 import type {
   ExportPort,
+  MediaPreview,
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectSessionPort,
@@ -51,8 +52,8 @@ function App({
   const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [mediaPreviewUrls, setMediaPreviewUrls] = useState<
-    Readonly<Record<string, string>>
+  const [mediaPreviews, setMediaPreviews] = useState<
+    Readonly<Record<string, MediaPreview>>
   >({});
   const [mediaDemand, setMediaDemand] = useState<MediaPreviewDemand>({
     visibleMediaIds: [],
@@ -159,7 +160,10 @@ function App({
   }, [logger, mediaPreviewPort, projectId]);
 
   useEffect(() => {
-    setMediaPreviewUrls({});
+    setMediaPreviews({});
+  }, [projectId]);
+
+  useEffect(() => {
     if (!projectId) return;
     if (mediaDemandSequence.current.projectId !== projectId) {
       mediaDemandSequence.current = { projectId, revision: 0 };
@@ -191,13 +195,9 @@ function App({
       .prepareMediaPreviews(demand)
       .then((previews) => {
         if (!active) return;
-        const readyPreviews = (previews ?? []).flatMap(
-          ({ mediaId, state, url }) =>
-            state === "ready" && url ? [{ mediaId, url }] : [],
-        );
-        setMediaPreviewUrls(
+        setMediaPreviews(
           Object.fromEntries(
-            readyPreviews.map(({ mediaId, url }) => [mediaId, url]),
+            (previews ?? []).map((preview) => [preview.mediaId, preview]),
           ),
         );
         logger.write({
@@ -268,7 +268,7 @@ function App({
           exportPort={exportPort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
-          mediaPreviewUrls={mediaPreviewUrls}
+          mediaPreviews={mediaPreviews}
           onMediaDemandChange={setMediaDemand}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}

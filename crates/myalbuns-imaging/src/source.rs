@@ -208,7 +208,11 @@ fn open_source(
     } else {
         return Err(SourceFailure::new(
             ImagingFailureCode::UnsupportedSourceFormat,
-            "a fonte não contém JPEG ou PNG",
+            if allow_single_page_tiff {
+                "a fonte não contém JPEG, PNG ou TIFF"
+            } else {
+                "a fonte não contém JPEG ou PNG"
+            },
         ));
     };
     rewind(&mut reader)?;
@@ -1214,17 +1218,9 @@ fn decode_render_png(
             "o perfil declarado pelo PNG não pôde ser recuperado",
         ));
     }
-    let orientation = decoder.orientation().map_err(|error| {
-        image_failure(
-            error,
-            ImagingFailureCode::DecodeFailed,
-            "não foi possível validar a orientação PNG",
-        )
-    })?;
     let color_type = decoder.color_type();
     let raw = decode_raw(decoder)?;
-    let image = normalize_rgba(preflight.width, preflight.height, color_type, raw)?;
-    apply_orientation(image, orientation)
+    normalize_rgba(preflight.width, preflight.height, color_type, raw)
 }
 
 fn decode_limits(decoder: &impl ImageDecoder) -> Result<Limits, SourceFailure> {
@@ -1555,6 +1551,23 @@ mod render_source_tests {
             assert_eq!(decoded.dimensions(), (1, 1));
             assert_eq!(decoded.get_pixel(0, 0).0, expected);
         }
+    }
+
+    #[test]
+    fn png_exif_orientation_is_metadata_only_and_never_rotates_pixels() {
+        mod png_exif_fixture {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/tests/support/png_exif.rs"
+            ));
+        }
+        let png = png_exif_fixture::orientation_6_rgb_2x1();
+
+        let decoded = decode_fixture(&png).expect("the PNG with eXIf metadata decodes");
+
+        assert_eq!(decoded.dimensions(), (2, 1));
+        assert_eq!(decoded.get_pixel(0, 0).0, [240, 10, 10, 255]);
+        assert_eq!(decoded.get_pixel(1, 0).0, [10, 10, 240, 255]);
     }
 
     #[test]
@@ -1949,9 +1962,20 @@ mod render_source_tests {
         scanline: &[u8],
         chunks: &[(&[u8; 4], &[u8])],
     ) -> Vec<u8> {
+        png_fixture_with_dimensions(1, 1, bit_depth, color_type, scanline, chunks)
+    }
+
+    fn png_fixture_with_dimensions(
+        width: u32,
+        height: u32,
+        bit_depth: u8,
+        color_type: u8,
+        scanline: &[u8],
+        chunks: &[(&[u8; 4], &[u8])],
+    ) -> Vec<u8> {
         let mut bytes = vec![137, 80, 78, 71, 13, 10, 26, 10];
-        let mut ihdr = Vec::from(1_u32.to_be_bytes());
-        ihdr.extend_from_slice(&1_u32.to_be_bytes());
+        let mut ihdr = Vec::from(width.to_be_bytes());
+        ihdr.extend_from_slice(&height.to_be_bytes());
         ihdr.extend_from_slice(&[bit_depth, color_type, 0, 0, 0]);
         push_png_chunk(&mut bytes, b"IHDR", &ihdr);
         for (kind, payload) in chunks {

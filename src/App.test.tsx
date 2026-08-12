@@ -14,7 +14,10 @@ import type {
   ProjectSessionPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
-import { createEmptyProjection } from "./test/projectFixtures";
+import {
+  createEmptyProjection,
+  representativeProjection,
+} from "./test/projectFixtures";
 
 vi.mock("./components/AlbumCanvas", () => ({
   AlbumCanvas: ({
@@ -296,7 +299,10 @@ test("reprepares demanded media when the stable Monitor reports a change", async
           return () => undefined;
         },
       }}
-      projectSessionPort={projectSessionPort}
+      projectSessionPort={{
+        ...projectSessionPort,
+        load: async () => representativeProjection,
+      }}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -324,6 +330,111 @@ test("reprepares demanded media when the stable Monitor reports a change", async
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     "http://myalbuns-cache.localhost/generation-two",
+  );
+});
+
+test("keeps the last known preview when linked media becomes unavailable", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const retainedUrl = "http://myalbuns-cache.localhost/generation-one";
+  const prepareMediaPreviews = vi
+    .fn()
+    .mockResolvedValueOnce([
+      { mediaId: "media-001", state: "ready" as const, url: retainedUrl },
+    ])
+    .mockResolvedValueOnce([
+      {
+        mediaId: "media-001",
+        state: "unavailable" as const,
+        url: retainedUrl,
+      },
+    ]);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectSessionPort={{
+        ...projectSessionPort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    retainedUrl,
+  );
+
+  act(() => notifyMediaChanged?.(["media-001"]));
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    retainedUrl,
+  );
+  expect(
+    screen.getByRole("status", { name: "Indisponível · prévia anterior" }),
+  ).toBeInTheDocument();
+});
+
+test("labels first-observation unavailability without claiming a previous preview", async () => {
+  const prepareMediaPreviews = vi.fn().mockResolvedValue([
+    { mediaId: "media-001", state: "unavailable" as const, url: null },
+  ]);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+      }}
+      projectSessionPort={{
+        ...projectSessionPort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(screen.getByRole("status", { name: "Indisponível" })).toBeInTheDocument();
+  expect(screen.queryByText("Indisponível · prévia anterior")).not.toBeInTheDocument();
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    "",
   );
 });
 

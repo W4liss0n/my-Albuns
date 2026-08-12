@@ -111,7 +111,12 @@ fn build_cache(request: &CacheRequest, app_paths: &AppPaths) -> Result<CacheComp
                 )
                 .unwrap_or(false)
             }) {
-            verify_source_fingerprint(source.media_id(), &resolved, &fingerprint)?;
+            verify_source_fingerprint(
+                source.media_id(),
+                &request.root_bindings,
+                source.source_path(),
+                &fingerprint,
+            )?;
             reused_count += 1;
             artifact_from_reusable(source.media_id(), reusable)
         } else {
@@ -281,7 +286,12 @@ fn generate_preview(
     let publication = publication
         .sync()
         .map_err(|error| format!("não foi possível sincronizar a prévia: {error}"))?;
-    verify_source_fingerprint(source.media_id(), resolved, &fingerprint)?;
+    verify_source_fingerprint(
+        source.media_id(),
+        &request.root_bindings,
+        source.source_path(),
+        &fingerprint,
+    )?;
     publication
         .publish()
         .map_err(|error| format!("não foi possível publicar a prévia: {error}"))?;

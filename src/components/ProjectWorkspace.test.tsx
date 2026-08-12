@@ -873,12 +873,19 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   const mediaPreviewUrls = {
     "media-001": "asset://localhost/cache/media-001.jpg",
   };
+  const mediaPreviews = {
+    "media-001": {
+      mediaId: "media-001",
+      state: "ready" as const,
+      url: mediaPreviewUrls["media-001"],
+    },
+  };
   const view = render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      mediaPreviewUrls={mediaPreviewUrls}
+      mediaPreviews={mediaPreviews}
       onProjectionChange={() => undefined}
     />,
   );
@@ -934,6 +941,13 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
   const mediaPreviewUrls = {
     "decorative-overlay": decorativePreviewUrl,
   };
+  const mediaPreviews = {
+    "decorative-overlay": {
+      mediaId: "decorative-overlay",
+      state: "ready" as const,
+      url: decorativePreviewUrl,
+    },
+  };
   const view = render(
     <ProjectWorkspace
       exportPort={exportPort}
@@ -941,7 +955,7 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
       projectSessionPort={projectSessionPortWithApply(
         async () => decorativeProjection,
       )}
-      mediaPreviewUrls={mediaPreviewUrls}
+      mediaPreviews={mediaPreviews}
       onProjectionChange={() => undefined}
     />,
   );
@@ -960,7 +974,7 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
       `[data-preview-overlay-id="decorative-overlay"][href="${decorativePreviewUrl}"]`,
     ),
   ).not.toBeNull();
-  expect(canvasHarness.props?.mediaPreviewUrls).toBe(mediaPreviewUrls);
+  expect(canvasHarness.props?.mediaPreviewUrls).toEqual(mediaPreviewUrls);
 });
 
 test("renders media usage from the derived Editor projection", () => {

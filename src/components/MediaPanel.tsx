@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { MediaPreviewDemand } from "../application/projectPorts";
+import type {
+  MediaPreview,
+  MediaPreviewDemand,
+} from "../application/projectPorts";
 
 import type {
   MediaCatalogItem,
@@ -12,7 +15,7 @@ import "./MediaPanel.css";
 export interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
-  mediaPreviewUrls?: Readonly<Record<string, string>>;
+  mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
 }
@@ -20,7 +23,7 @@ export interface MediaPanelProps {
 export function MediaPanel({
   mediaItems,
   mediaUsage,
-  mediaPreviewUrls = {},
+  mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
 }: MediaPanelProps) {
@@ -137,13 +140,28 @@ export function MediaPanel({
                   background: mediaCardBackground(media),
                 }}
               >
-                {mediaPreviewUrls[media.id] && (
+                {mediaPreviews[media.id]?.url && (
                   <img
                     alt=""
                     draggable="false"
                     loading="lazy"
-                    src={mediaPreviewUrls[media.id]}
+                    src={mediaPreviews[media.id].url ?? undefined}
                   />
+                )}
+                {mediaPreviews[media.id]?.state === "unavailable" && (
+                  <span
+                    aria-label={
+                      mediaPreviews[media.id].url
+                        ? "Indisponível · prévia anterior"
+                        : "Indisponível"
+                    }
+                    className="media-availability"
+                    role="status"
+                  >
+                    {mediaPreviews[media.id].url
+                      ? "Indisponível · prévia anterior"
+                      : "Indisponível"}
+                  </span>
                 )}
               </span>
               <span className="media-meta">

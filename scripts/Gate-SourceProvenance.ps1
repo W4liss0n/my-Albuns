@@ -51,3 +51,49 @@ function Get-GateSourceStatus {
     }
     return $status
 }
+
+function Get-GateSourceSnapshot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $WorkspaceRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $EvidencePath
+    )
+
+    $headBeforeStatus = (& git -C $WorkspaceRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $headBeforeStatus -notmatch '^[0-9a-f]{40}$') {
+        throw 'Git could not capture the gate source commit.'
+    }
+    $status = @(
+        Get-GateSourceStatus `
+            -WorkspaceRoot $WorkspaceRoot `
+            -EvidencePath $EvidencePath
+    )
+    $headAfterStatus = (& git -C $WorkspaceRoot rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0 -or $headAfterStatus -notmatch '^[0-9a-f]{40}$') {
+        throw 'Git could not verify the gate source commit.'
+    }
+
+    return [pscustomobject]@{
+        gitCommit = $headBeforeStatus
+        sourceInputsDirty = $status.Count -gt 0 `
+            -or $headBeforeStatus -ne $headAfterStatus
+    }
+}
+
+function Test-GateSourceSnapshotsDirty {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject] $Before,
+
+        [Parameter(Mandatory = $true)]
+        [psobject] $After
+    )
+
+    return $Before.sourceInputsDirty `
+        -or $After.sourceInputsDirty `
+        -or $Before.gitCommit -ne $After.gitCommit
+}

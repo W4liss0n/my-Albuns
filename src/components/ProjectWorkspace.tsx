@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "react-aria-components";
 
 import type {
   ExportPort,
+  MediaPreview,
   MediaPreviewDemand,
   ProjectWindowPort,
 } from "../application/projectPorts";
@@ -26,7 +27,7 @@ interface ProjectWorkspaceProps {
   exportPort: ExportPort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
-  mediaPreviewUrls?: Readonly<Record<string, string>>;
+  mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
@@ -37,7 +38,7 @@ export function ProjectWorkspace({
   exportPort,
   projectWindowPort,
   runProjectMutation,
-  mediaPreviewUrls = {},
+  mediaPreviews = {},
   onMediaDemandChange,
   onProjectionChange,
   onGraphicsUnavailable,
@@ -55,6 +56,15 @@ export function ProjectWorkspace({
       visibleMediaIds: [],
       preloadMediaIds: [],
     });
+  const mediaPreviewUrls = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(mediaPreviews).flatMap(([mediaId, preview]) =>
+          preview.url ? [[mediaId, preview.url]] : [],
+        ),
+      ),
+    [mediaPreviews],
+  );
   useEffect(() => {
     if (!onMediaDemandChange) return;
     const visible = Array.from(
@@ -253,7 +263,7 @@ export function ProjectWorkspace({
         <MediaPanel
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
-          mediaPreviewUrls={mediaPreviewUrls}
+          mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
         />

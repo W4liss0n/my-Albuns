@@ -3,7 +3,8 @@
 use std::fs;
 
 use myalbuns_core::{
-    MediaKind, OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectOutcome,
+    DocumentFailure, LoadProjectError, MediaKind, OpenProjectRequest, ProjectCore, ProjectIntent,
+    ProjectLocation, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -104,6 +105,50 @@ fn v2_persists_photo_and_decorative_as_media_refs_without_observed_state() {
             "observed state must stay outside MediaRef: {forbidden}"
         );
     }
+}
+
+#[test]
+fn v2_allows_one_photo_and_one_decorative_to_reference_the_same_native_path() {
+    let root = tempfile::tempdir().expect("temporary cross-tab Project");
+    let project_path = root.path().join("Projeto midia entre abas.myalbuns");
+    let photo_path =
+        "[67, 58, 92, 70, 111, 116, 111, 115, 92, 70, 111, 116, 111, 46, 106, 112, 103]";
+    let overlay_path = "[67, 58, 92, 70, 111, 116, 111, 115, 92, 79, 118, 101, 114, 108, 97, 121, 46, 112, 110, 103]";
+    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE_V2.replacen(overlay_path, photo_path, 1);
+    fs::write(&project_path, project).expect("the cross-tab fixture is written");
+
+    let loaded = ProjectCore::new()
+        .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
+            &project_path,
+        )))
+        .expect("the same path is valid once in each media tab");
+
+    assert_eq!(loaded.project().media().len(), 2);
+    assert_eq!(loaded.project().media()[0].kind(), MediaKind::Photo);
+    assert_eq!(loaded.project().media()[1].kind(), MediaKind::Decorative);
+    assert_eq!(
+        loaded.project().media()[0].path(),
+        loaded.project().media()[1].path()
+    );
+}
+
+#[test]
+fn v2_rejects_a_photo_as_background_or_overlay() {
+    let root = tempfile::tempdir().expect("temporary visual-role Project");
+    let project_path = root.path().join("Projeto foto como padrao.myalbuns");
+    let photo_id = "00000000-0000-4000-8000-000000000010";
+    let decorative_id = "00000000-0000-4000-8000-000000000011";
+    let project = PROJECT_WITH_PHOTO_AND_DECORATIVE_V2.replacen(decorative_id, photo_id, 2);
+    fs::write(&project_path, project).expect("the invalid role fixture is written");
+
+    assert_eq!(
+        ProjectCore::new()
+            .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
+                &project_path,
+            )))
+            .expect_err("a Photo cannot occupy a Decorative-only visual role"),
+        LoadProjectError::Document(DocumentFailure::InvalidProjectState)
+    );
 }
 
 #[test]

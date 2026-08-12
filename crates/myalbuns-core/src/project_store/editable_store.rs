@@ -59,9 +59,25 @@ impl ProjectStore {
         self.baseline.as_ref()?.physical_identity()
     }
 
+    #[cfg(windows)]
+    pub(crate) fn location_still_matches_baseline(&self) -> bool {
+        let Some(baseline) = self.baseline.as_ref() else {
+            return false;
+        };
+        self.location
+            .root_bindings()
+            .resolve_existing(self.location.project_path(), ExpectedObject::RegularFile)
+            .is_ok_and(|resolved| baseline.matches(&resolved))
+    }
+
     #[cfg(not(windows))]
     pub(crate) fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
         None
+    }
+
+    #[cfg(not(windows))]
+    pub(crate) fn location_still_matches_baseline(&self) -> bool {
+        false
     }
 
     #[cfg(windows)]

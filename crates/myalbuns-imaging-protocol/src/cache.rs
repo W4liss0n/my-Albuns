@@ -226,6 +226,9 @@ impl CacheReusableGeneration {
             || self.height_px > CACHE_MAX_EDGE_PX
             || self.preview_bytes == 0
             || self
+                .exif_orientation
+                .is_some_and(|orientation| !(1..=8).contains(&orientation))
+            || self
                 .source_page_count
                 .is_some_and(|page_count| page_count != 1)
         {

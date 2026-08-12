@@ -15,6 +15,9 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+$sourceSnapshotBefore = Get-GateSourceSnapshot `
+    -WorkspaceRoot $script:WorkspaceRoot `
+    -EvidencePath $OutputPath
 
 $scratchRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $script:WorkspaceRoot '.scratch')
@@ -294,6 +297,8 @@ try {
             -or -not $canvasGate.actualPixiRuntime `
             -or $canvasGate.originalPathExposedToWebView `
             -or $canvasGate.opaqueResourceCount -lt 2 `
+            -or $canvasGate.screenshotScope -ne 'canvas-element' `
+            -or $canvasGate.samplePoint -ne 'canvas-center' `
             -or -not (Test-Path -LiteralPath $screenshotPath -PathType Leaf)) {
         throw 'The real Tauri WebView2 AlbumCanvas process did not produce valid evidence.'
     }
@@ -304,23 +309,9 @@ try {
             throw "The productive AlbumCanvas screenshot is unexpectedly small: $($bitmap.Width)x$($bitmap.Height)."
         }
         $expectedCanvasChannels = @($canvasEvidence.canvasReferencePixel)
-        $actualCanvasPixel = $null
-        $actualCanvasMaxDelta = [int]::MaxValue
-        for ($y = 0; $y -lt $bitmap.Height; $y += 4) {
-            for ($x = 0; $x -lt $bitmap.Width; $x += 4) {
-                $candidate = $bitmap.GetPixel($x, $y)
-                $candidateDelta = @(
-                    [Math]::Abs([int]$candidate.R - $expectedCanvasChannels[0]),
-                    [Math]::Abs([int]$candidate.G - $expectedCanvasChannels[1]),
-                    [Math]::Abs([int]$candidate.B - $expectedCanvasChannels[2])
-                )
-                $candidateMaxDelta = @($candidateDelta | Measure-Object -Maximum).Maximum
-                if ($candidateMaxDelta -lt $actualCanvasMaxDelta) {
-                    $actualCanvasPixel = $candidate
-                    $actualCanvasMaxDelta = $candidateMaxDelta
-                }
-            }
-        }
+        $sampleX = [Math]::Floor($bitmap.Width / 2)
+        $sampleY = [Math]::Floor($bitmap.Height / 2)
+        $actualCanvasPixel = $bitmap.GetPixel($sampleX, $sampleY)
     }
     finally {
         $bitmap.Dispose()
@@ -347,6 +338,8 @@ try {
     $canvasEvidence | Add-Member -NotePropertyName nativeDriverVersion -NotePropertyValue $webDriver.nativeDriverVersion
     $canvasEvidence | Add-Member -NotePropertyName webView2RuntimeVersion -NotePropertyValue $webDriver.webView2RuntimeVersion
     $canvasEvidence | Add-Member -NotePropertyName opaqueResourceCount -NotePropertyValue $canvasGate.opaqueResourceCount
+    $canvasEvidence | Add-Member -NotePropertyName canvasScreenshotScope -NotePropertyValue $canvasGate.screenshotScope
+    $canvasEvidence | Add-Member -NotePropertyName actualCanvasSamplePoint -NotePropertyValue @($sampleX, $sampleY)
     $canvasEvidence | Add-Member -NotePropertyName actualCanvasPixel -NotePropertyValue $actualCanvasChannels
     $canvasEvidence | Add-Member -NotePropertyName actualCanvasDelta -NotePropertyValue $actualCanvasDelta
     $browserStopwatch.Stop()
@@ -455,16 +448,16 @@ finally {
     }
 }
 
-$sourceStatus = @(
-    Get-GateSourceStatus `
-        -WorkspaceRoot $script:WorkspaceRoot `
-        -EvidencePath $OutputPath
-)
+$sourceSnapshotAfter = Get-GateSourceSnapshot `
+    -WorkspaceRoot $script:WorkspaceRoot `
+    -EvidencePath $OutputPath
 $report = [ordered]@{
     schemaVersion = 1
     collectedAtUtc = [DateTime]::UtcNow.ToString('o')
-    gitCommit = (& git rev-parse HEAD).Trim()
-    sourceInputsDirty = $sourceStatus.Count -gt 0
+    gitCommit = $sourceSnapshotBefore.gitCommit
+    sourceInputsDirty = Test-GateSourceSnapshotsDirty `
+        -Before $sourceSnapshotBefore `
+        -After $sourceSnapshotAfter
     platform = [ordered]@{
         operatingSystem = [System.Environment]::OSVersion.VersionString
         architecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()

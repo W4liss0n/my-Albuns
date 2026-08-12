@@ -11,6 +11,13 @@ use image::{
 };
 use serde_json::json;
 use sha2::{Digest, Sha256};
+
+mod png_exif_fixture {
+    include!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/support/png_exif.rs"
+    ));
+}
 use tiff::{
     decoder::Decoder as TiffDecoder,
     encoder::{TiffEncoder, colortype},
@@ -209,6 +216,24 @@ fn measured_media_cache_policy() {
     oriented.apply_orientation(orientation);
     assert_eq!(oriented.dimensions(), (4, 8));
 
+    let oriented_png = png_exif_fixture::orientation_6_rgb_2x1();
+    let mut png_reader = ImageReader::with_format(Cursor::new(&oriented_png), ImageFormat::Png);
+    png_reader.limits(decode_limits());
+    let mut png_decoder = png_reader
+        .into_decoder()
+        .expect("the PNG eXIf decoder is prepared");
+    let png_orientation = png_decoder
+        .orientation()
+        .expect("the PNG eXIf metadata is readable");
+    assert_eq!(png_orientation.to_exif(), 6);
+    let png_metadata_only =
+        DynamicImage::from_decoder(png_decoder).expect("the PNG eXIf fixture decodes");
+    assert_eq!(
+        png_metadata_only.dimensions(),
+        (2, 1),
+        "PNG eXIf is metadata-only and never rotates Cache pixels implicitly"
+    );
+
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -221,7 +246,11 @@ fn measured_media_cache_policy() {
                 "maxEdgePx": MAX_EDGE_PX,
                 "opaqueArtifact": format!("jpeg-quality-{selected_quality}-with-srgb-icc"),
                 "alphaArtifact": "png-rgba-with-srgb-icc",
-                "orientation": "apply-exif-or-tiff-once",
+                "orientation": {
+                    "jpegExif": "apply-once",
+                    "tiff": "apply-once",
+                    "pngExif": "metadata-only-no-implicit-rotation"
+                },
                 "tiles": false
             },
             "corpus": {
@@ -244,7 +273,12 @@ fn measured_media_cache_policy() {
                     "pageCount": 1
                 },
                 "multiPageTiff": { "pageCount": 2 },
-                "exifOrientation": 6
+                "orientation": {
+                    "jpegExif": 6,
+                    "jpegDecodedDimensions": [oriented.width(), oriented.height()],
+                    "pngExif": png_orientation.to_exif(),
+                    "pngDecodedDimensions": [png_metadata_only.width(), png_metadata_only.height()]
+                }
             },
             "jpegQualitySweep": {
                 "method": "aggregate-psnr-mae-and-normalized-rate-distortion-knee-v1",

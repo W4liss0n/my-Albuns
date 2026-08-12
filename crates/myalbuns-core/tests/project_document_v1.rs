@@ -2652,6 +2652,84 @@ fn read_only_load_rejects_an_external_physical_copy_of_an_open_project() {
 }
 
 #[test]
+fn read_only_load_uses_the_durable_registry_after_the_original_session_closes() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let original_path = directory.path().join("original.myalbuns");
+    let copy_path = directory.path().join("copia.myalbuns");
+    fs::write(&original_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("original fixture");
+    let core = project_core_with_identity_storage(directory.path());
+
+    let original = core
+        .open_editable(OpenProjectRequest::new(project_location(&original_path)))
+        .expect("the original publishes durable Identity evidence");
+    drop(original);
+    fs::copy(&original_path, &copy_path).expect("the external copy is created after closure");
+    let original_bytes = fs::read(&original_path).expect("original bytes");
+    let copied_bytes = fs::read(&copy_path).expect("copied bytes");
+
+    assert_eq!(
+        core.load_persisted_revision(load_request(&copy_path))
+            .expect_err("the durable registry still identifies a closed original"),
+        LoadProjectError::ExternalCopyRequiresInteractiveResolution
+    );
+    assert_eq!(
+        fs::read(&original_path).expect("original remains readable"),
+        original_bytes
+    );
+    assert_eq!(
+        fs::read(&copy_path).expect("copy remains readable"),
+        copied_bytes
+    );
+}
+
+#[test]
+fn concurrent_first_read_only_observations_serialize_duplicate_identities() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let first_path = directory.path().join("primeira.myalbuns");
+    let second_path = directory.path().join("segunda.myalbuns");
+    fs::write(&first_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("first fixture");
+    fs::write(&second_path, NEUTRAL_PROJECT_V1.as_bytes()).expect("second fixture");
+    let core = project_core_with_identity_storage(directory.path());
+    let start = std::sync::Arc::new(std::sync::Barrier::new(3));
+    let attempts = [first_path, second_path]
+        .into_iter()
+        .map(|path| {
+            let core = core.clone();
+            let start = std::sync::Arc::clone(&start);
+            std::thread::spawn(move || {
+                start.wait();
+                core.load_persisted_revision(load_request(&path))
+            })
+        })
+        .collect::<Vec<_>>();
+
+    start.wait();
+    let outcomes = attempts
+        .into_iter()
+        .map(|attempt| {
+            attempt
+                .join()
+                .expect("the read-only attempt does not panic")
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(outcomes.iter().filter(|outcome| outcome.is_ok()).count(), 1);
+    assert_eq!(
+        outcomes
+            .iter()
+            .filter(|outcome| {
+                matches!(
+                    outcome,
+                    Err(LoadProjectError::ExternalCopyRequiresInteractiveResolution)
+                )
+            })
+            .count(),
+        1,
+        "the losing copy re-evaluates durable evidence under the Identity lease"
+    );
+}
+
+#[test]
 fn read_only_load_fails_closed_when_active_identity_evidence_is_invalid() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let project_path = directory.path().join("original.myalbuns");

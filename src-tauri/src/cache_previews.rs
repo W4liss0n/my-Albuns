@@ -147,6 +147,23 @@ impl CachePreviewRegistry {
         removed
     }
 
+    pub(crate) fn retained_preview(
+        &self,
+        media_id: &str,
+        state: MediaPreviewState,
+    ) -> Option<MediaPreview> {
+        let publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (_, token) = publication.tokens_by_media.get(media_id)?;
+        Some(MediaPreview {
+            media_id: media_id.to_owned(),
+            state,
+            url: Some(opaque_image_url(CACHE_MEDIA_PROTOCOL_SCHEME, token)),
+        })
+    }
+
     pub(crate) fn serve(
         &self,
         webview_label: &str,

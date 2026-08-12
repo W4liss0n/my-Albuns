@@ -7,7 +7,10 @@ use std::{
 use uuid::Uuid;
 
 #[cfg(windows)]
-use myalbuns_paths::{PhysicalFileIdentity, ProjectFileLock, ProjectFileLockError};
+use myalbuns_paths::{
+    PhysicalFileIdentity, ProjectFileLock, ProjectFileLockError, publish_new_file,
+    replace_existing_file,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum IdentityLeaseError {
@@ -18,6 +21,7 @@ pub(crate) enum IdentityLeaseError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum IdentityLeaseObservation {
     Inactive,
+    Pending,
     SamePhysicalTarget,
     DifferentPhysicalTarget,
 }
@@ -72,11 +76,21 @@ impl ProjectIdentityLease {
                 });
             }
         };
+        let target_path = target_path(root, project_id);
+        if let Err(error) = fs::remove_file(&target_path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            drop(lock);
+            if created_for_attempt {
+                let _ = fs::remove_file(&lease_path);
+            }
+            return Err(IdentityLeaseError::Unavailable);
+        }
         Ok(Self {
             project_id,
             _lock: lock,
             lease_path,
-            target_path: target_path(root, project_id),
+            target_path,
             created_for_attempt,
         })
     }
@@ -99,16 +113,7 @@ impl ProjectIdentityLease {
         identity: PhysicalFileIdentity,
     ) -> Result<(), IdentityLeaseError> {
         let token = identity.to_local_token();
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&self.target_path)
-            .map_err(|_| IdentityLeaseError::Unavailable)?;
-        file.write_all(token.as_bytes())
-            .and_then(|_| file.write_all(b"\n"))
-            .and_then(|_| file.sync_all())
-            .map_err(|_| IdentityLeaseError::Unavailable)
+        publish_target_atomically(&self.target_path, &token, || {})
     }
 
     #[cfg(windows)]
@@ -134,8 +139,13 @@ impl ProjectIdentityLease {
             }
             Err(ProjectFileLockError::Conflict) => {
                 let candidate = candidate.ok_or(IdentityLeaseError::Unavailable)?;
-                let source = fs::read_to_string(target_path(root, project_id))
-                    .map_err(|_| IdentityLeaseError::Unavailable)?;
+                let source = match fs::read_to_string(target_path(root, project_id)) {
+                    Ok(source) => source,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        return Ok(IdentityLeaseObservation::Pending);
+                    }
+                    Err(_) => return Err(IdentityLeaseError::Unavailable),
+                };
                 let token = source
                     .strip_suffix('\n')
                     .filter(|value| !value.contains(['\r', '\n']))
@@ -162,7 +172,6 @@ impl ProjectIdentityLease {
     pub(crate) fn acquire(_root: &Path, _project_id: Uuid) -> Result<Self, IdentityLeaseError> {
         Err(IdentityLeaseError::Unavailable)
     }
-
     pub(crate) fn project_id(&self) -> Uuid {
         self.project_id
     }
@@ -188,10 +197,118 @@ impl ProjectIdentityLease {
     }
 }
 
+#[cfg(windows)]
+fn publish_target_atomically(
+    target_path: &Path,
+    token: &str,
+    before_publish: impl FnOnce(),
+) -> Result<(), IdentityLeaseError> {
+    let file_name = target_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(IdentityLeaseError::Unavailable)?;
+    let temporary_path =
+        target_path.with_file_name(format!(".{file_name}.tmp-{}", Uuid::new_v4().simple()));
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary_path)
+            .map_err(|_| IdentityLeaseError::Unavailable)?;
+        file.write_all(token.as_bytes())
+            .and_then(|_| file.write_all(b"\n"))
+            .and_then(|_| file.sync_all())
+            .map_err(|_| IdentityLeaseError::Unavailable)?;
+        drop(file);
+        before_publish();
+        let publish = if target_path.exists() {
+            replace_existing_file(&temporary_path, target_path)
+        } else {
+            publish_new_file(&temporary_path, target_path)
+        };
+        publish.map_err(|_| IdentityLeaseError::Unavailable)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary_path);
+    }
+    result
+}
+
 fn lease_path(root: &Path, project_id: Uuid) -> PathBuf {
     root.join(format!("{}.lease", project_id.hyphenated()))
 }
 
 fn target_path(root: &Path, project_id: Uuid) -> PathBuf {
     root.join(format!("{}.target", project_id.hyphenated()))
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use std::sync::mpsc;
+
+    use myalbuns_paths::{ExpectedObject, OperationPathContext};
+
+    use super::{
+        IdentityLeaseObservation, ProjectIdentityLease, publish_target_atomically, target_path,
+    };
+
+    #[test]
+    fn observers_see_pending_until_the_complete_target_token_is_atomically_published() {
+        let fixture = tempfile::tempdir().expect("temporary identity lease fixture");
+        let root = fixture.path().join("leases");
+        let source_path = fixture.path().join("Project.myalbuns");
+        std::fs::write(&source_path, b"project bytes").expect("the candidate is writable");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&source_path)
+            .expect("the candidate root binding is captured");
+        let resolved = context
+            .freeze()
+            .resolve_existing(&source_path, ExpectedObject::RegularFile)
+            .expect("the candidate is resolved once");
+        let identity = resolved
+            .physical_identity()
+            .expect("the candidate has physical identity evidence");
+        let project_id = uuid::Uuid::new_v4();
+        let lease = ProjectIdentityLease::acquire(&root, project_id)
+            .expect("the first observation owns the lease");
+        let target = target_path(&root, project_id);
+        let publishing_target = target.clone();
+        let token = identity.to_local_token();
+        let (reached_sender, reached_receiver) = mpsc::sync_channel(0);
+        let (release_sender, release_receiver) = mpsc::sync_channel(0);
+
+        let publisher = std::thread::spawn(move || {
+            publish_target_atomically(&publishing_target, &token, || {
+                reached_sender
+                    .send(())
+                    .expect("the observer sees the pre-publication boundary");
+                release_receiver
+                    .recv()
+                    .expect("the observer releases atomic publication");
+            })
+        });
+        reached_receiver
+            .recv()
+            .expect("the complete temporary token is synchronized");
+
+        assert!(!target.exists(), "no partial token is addressable");
+        assert_eq!(
+            ProjectIdentityLease::observe(&root, project_id, Some(identity)),
+            Ok(IdentityLeaseObservation::Pending)
+        );
+
+        release_sender
+            .send(())
+            .expect("the target token may be published");
+        publisher
+            .join()
+            .expect("the target publisher does not panic")
+            .expect("the target token is published atomically");
+        assert_eq!(
+            ProjectIdentityLease::observe(&root, project_id, Some(identity)),
+            Ok(IdentityLeaseObservation::SamePhysicalTarget)
+        );
+        drop(lease);
+    }
 }

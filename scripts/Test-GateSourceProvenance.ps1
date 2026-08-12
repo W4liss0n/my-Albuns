@@ -94,7 +94,60 @@ try {
         throw "An untracked source input was not detected: $untrackedSourceStatus"
     }
 
-    Write-Output 'Gate source provenance: 3 assertions passed.'
+    Remove-Item -LiteralPath $untrackedSourceDirectory -Recurse -Force
+    $beforeSnapshot = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath
+    if (Test-GateSourceSnapshotsDirty `
+            -Before $beforeSnapshot `
+            -After $beforeSnapshot) {
+        throw 'An unchanged clean source snapshot was reported as dirty.'
+    }
+    [System.IO.File]::WriteAllText(
+        (Join-Path $fixtureRoot 'vite.config.ts'),
+        "export default { base: '/new-commit/' };`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    & git -C $fixtureRoot add -- vite.config.ts
+    & git `
+        -C $fixtureRoot `
+        -c user.name='MyAlbuns Gate Test' `
+        -c user.email='gate-test@myalbuns.invalid' `
+        commit --quiet -m 'move fixture head'
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The provenance fixture could not move HEAD.'
+    }
+    $afterSnapshot = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath
+    if (-not (Test-GateSourceSnapshotsDirty `
+                -Before $beforeSnapshot `
+                -After $afterSnapshot)) {
+        throw 'A HEAD change during a gate was not detected.'
+    }
+
+    $runnerOutputRoot = Join-Path $fixtureRoot '.scratch\runner-output'
+    New-Item -ItemType Directory -Force -Path $runnerOutputRoot | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $runnerOutputRoot 'process-evidence.json'),
+        "{`"temporary`":true}`n",
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    $dirtyRunnerOutput = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath
+    if (-not $dirtyRunnerOutput.sourceInputsDirty) {
+        throw 'An untracked runner output was incorrectly reported as a clean input tree.'
+    }
+    Remove-Item -LiteralPath $runnerOutputRoot -Recurse -Force
+    $cleanAfterRunnerCleanup = Get-GateSourceSnapshot `
+        -WorkspaceRoot $fixtureRoot `
+        -EvidencePath $evidencePath
+    if ($cleanAfterRunnerCleanup.sourceInputsDirty) {
+        throw 'A runner-shaped cleanup did not restore a clean evidence input tree.'
+    }
+
+    Write-Output 'Gate source provenance: 7 assertions passed.'
 }
 finally {
     if (Test-Path -LiteralPath $fixtureRoot) {

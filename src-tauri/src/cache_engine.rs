@@ -31,6 +31,7 @@ use crate::{
         ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFailureStage, OperationFailure,
     },
+    ipc_contract::{MediaPreview, MediaPreviewState},
     media_runtime::MediaRuntimeUpdate,
 };
 
@@ -79,6 +80,21 @@ impl CacheMetadataEntry {
             ),
             self.fingerprint.clone(),
         )
+    }
+
+    fn artifact(&self) -> CacheArtifact {
+        CacheArtifact {
+            media_id: self.media_id.clone(),
+            generation_id: self.generation_id.clone(),
+            width_px: self.width_px,
+            height_px: self.height_px,
+            preview_bytes: self.preview_bytes,
+            format: self.format,
+            exif_orientation: self.exif_orientation,
+            source_page_count: self.source_page_count,
+            basic_color_profile: self.basic_color_profile,
+            fingerprint: self.fingerprint.clone(),
+        }
     }
 }
 
@@ -145,7 +161,8 @@ impl CacheWork {
             project_id: self.namespace.project_id.clone(),
             media_id: self.source.media_id().to_owned(),
             source_path: self.source.source_path().to_path_buf(),
-            decorative: self.source.kind() == MediaKind::Decorative,
+            kind: self.source.kind(),
+            root_bindings: self.root_bindings.clone(),
         }
     }
 }
@@ -155,7 +172,8 @@ struct CacheFlightKey {
     project_id: String,
     media_id: String,
     source_path: PathBuf,
-    decorative: bool,
+    kind: MediaKind,
+    root_bindings: RootBindingPlan,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -213,6 +231,7 @@ struct CacheDemandState {
     revision: u64,
     media_ids: HashSet<String>,
     invalidation_epoch: uuid::Uuid,
+    preview_publication_authorities: HashMap<String, CachePreviewPublicationAuthority>,
 }
 
 #[derive(Clone, Debug)]
@@ -259,6 +278,7 @@ impl CacheDemandRevision {
 struct CacheFlight {
     project_id: String,
     media_id: String,
+    publication_id: uuid::Uuid,
     cancellation: CacheCancellation,
     result: Mutex<Option<FlightResult>>,
     completed: Notify,
@@ -267,6 +287,12 @@ struct CacheFlight {
 pub(crate) enum CacheFlightClaim {
     Owner(CacheFlightOwner),
     Waiter(CacheFlightWaiter),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct CachePreviewPublicationAuthority {
+    key: CacheFlightKey,
+    publication_id: uuid::Uuid,
 }
 
 pub(crate) struct CacheFlightOwner {
@@ -278,7 +304,21 @@ pub(crate) struct CacheFlightOwner {
 }
 
 pub(crate) struct CacheFlightWaiter {
+    key: CacheFlightKey,
     flight: Arc<CacheFlight>,
+}
+
+impl CacheFlightClaim {
+    pub(crate) fn preview_publication_authority(&self) -> CachePreviewPublicationAuthority {
+        let (key, flight) = match self {
+            Self::Owner(owner) => (owner.key.clone(), &owner.flight),
+            Self::Waiter(waiter) => (waiter.key.clone(), &waiter.flight),
+        };
+        CachePreviewPublicationAuthority {
+            key,
+            publication_id: flight.publication_id,
+        }
+    }
 }
 
 impl CacheEngine {
@@ -378,6 +418,7 @@ impl CacheEngine {
                     revision,
                     media_ids: demanded.clone(),
                     invalidation_epoch,
+                    preview_publication_authorities: HashMap::new(),
                 },
             );
             let mut flights = self
@@ -403,6 +444,7 @@ impl CacheEngine {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn commit_preview_if_demanded<T>(
         &self,
         demand: &CacheDemandRevision,
@@ -430,6 +472,37 @@ impl CacheEngine {
         Some(commit())
     }
 
+    pub(crate) fn commit_claimed_preview_if_demanded<T>(
+        &self,
+        demand: &CacheDemandRevision,
+        authority: &CachePreviewPublicationAuthority,
+        commit: impl FnOnce() -> T,
+    ) -> Option<T> {
+        if !demand.accepted || demand.project_id != authority.key.project_id {
+            return None;
+        }
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let demands = self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = demands.get(&demand.project_id)?;
+        if current.revision != demand.revision
+            || current.invalidation_epoch != demand.invalidation_epoch
+            || !current.media_ids.contains(&authority.key.media_id)
+            || current
+                .preview_publication_authorities
+                .get(&authority.key.media_id)
+                != Some(authority)
+        {
+            return None;
+        }
+        Some(commit())
+    }
+
     pub(crate) fn demand_is_current(&self, demand: &CacheDemandRevision) -> bool {
         if !demand.accepted {
             return false;
@@ -444,6 +517,51 @@ impl CacheEngine {
             })
     }
 
+    pub(crate) fn retain_last_known_preview(
+        &self,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        demand: &CacheDemandRevision,
+        media_id: &str,
+    ) -> Option<MediaPreview> {
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let demands = self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = demands.get(namespace.project_id())?;
+        if !demand.accepted
+            || demand.project_id != namespace.project_id()
+            || current.revision != demand.revision
+            || current.invalidation_epoch != demand.invalidation_epoch
+            || !current.media_ids.contains(media_id)
+        {
+            return None;
+        }
+        if let Some(preview) = registry.retained_preview(media_id, MediaPreviewState::Unavailable) {
+            return Some(preview);
+        }
+        let storage = app_paths.prepare_cache_storage(namespace.paths()).ok()?;
+        let metadata = load_metadata(&storage, namespace.paths())?;
+        if !metadata_is_current(&metadata, namespace.project_id(), namespace.paths()) {
+            return None;
+        }
+        let artifact = metadata
+            .entries
+            .iter()
+            .find(|entry| entry.media_id == media_id)?
+            .artifact();
+        if verify_cached_artifact(&storage, namespace.paths(), &artifact).is_err() {
+            return None;
+        }
+        registry.publish(app_paths, namespace, &artifact).ok()?;
+        registry.retained_preview(media_id, MediaPreviewState::Unavailable)
+    }
+
     pub(crate) fn claim_demanded(
         &self,
         demand: &CacheDemandRevision,
@@ -452,11 +570,17 @@ impl CacheEngine {
         if !demand.accepted || demand.project_id != work.namespace.project_id {
             return None;
         }
-        let demands = self
+        // Lock order: transition/publication -> demand -> flights. A remapped attempt
+        // must retire the old owner before that owner can enter its publication step.
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut demands = self
             .demands
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let current = demands.get(&demand.project_id)?;
+        let current = demands.get_mut(&demand.project_id)?;
         if current.revision != demand.revision
             || current.invalidation_epoch != demand.invalidation_epoch
             || !current.media_ids.contains(work.source.media_id())
@@ -467,7 +591,12 @@ impl CacheEngine {
             .flights
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        Some(self.claim_locked(work, &mut flights))
+        let claim = self.claim_locked(work, &mut flights);
+        let authority = claim.preview_publication_authority();
+        current
+            .preview_publication_authorities
+            .insert(work.source.media_id().to_owned(), authority);
+        Some(claim)
     }
 
     fn claim_locked(
@@ -478,12 +607,23 @@ impl CacheEngine {
         let key = work.flight_key();
         if let Some(flight) = flights.get(&key) {
             return CacheFlightClaim::Waiter(CacheFlightWaiter {
+                key,
                 flight: Arc::clone(flight),
             });
         }
+        flights.retain(|_, flight| {
+            if flight.project_id == work.namespace.project_id()
+                && flight.media_id == work.source.media_id()
+            {
+                flight.cancellation.cancel_obsolete();
+                return false;
+            }
+            true
+        });
         let flight = Arc::new(CacheFlight {
             project_id: work.namespace.project_id().to_owned(),
             media_id: work.source.media_id().to_owned(),
+            publication_id: uuid::Uuid::new_v4(),
             cancellation: CacheCancellation::default(),
             result: Mutex::new(None),
             completed: Notify::new(),
@@ -545,7 +685,13 @@ impl CacheEngine {
             .iter()
             .cloned()
             .collect::<HashSet<_>>();
+        let revoked_previews = update
+            .revoked_preview_media_ids()
+            .iter()
+            .cloned()
+            .collect::<HashSet<_>>();
         changed.extend(invalidated.iter().cloned());
+        changed.extend(revoked_previews.iter().cloned());
         let _transition_and_publication_guard = self
             .transition_and_publication_gate
             .lock()
@@ -601,7 +747,11 @@ impl CacheEngine {
             });
         }
         self.cancel_flights(namespace.project_id(), &applied_media_ids);
-        registry.invalidate_media(applied_media_ids.iter().map(String::as_str));
+        let applied_revoked_previews = revoked_previews
+            .intersection(&applied_media_ids)
+            .cloned()
+            .collect::<HashSet<_>>();
+        registry.invalidate_media(applied_revoked_previews.iter().map(String::as_str));
         let applied_invalidated = invalidated
             .intersection(&applied_media_ids)
             .cloned()
@@ -795,6 +945,12 @@ async fn execute_cache<T: ImagingTransport>(
     context: &InvocationContext,
     cancellation: &CacheCancellation,
 ) -> Result<CacheExecution, CacheFailure> {
+    if cancellation
+        .flag()
+        .load(std::sync::atomic::Ordering::Acquire)
+    {
+        return Err(cancelled_before_publication());
+    }
     let request = {
         let _transition_and_publication_guard = engine
             .transition_and_publication_gate
@@ -840,7 +996,7 @@ async fn execute_cache<T: ImagingTransport>(
         .load(std::sync::atomic::Ordering::Acquire)
     {
         discard_candidate_generation(&storage, &request);
-        return Err(cancelled_after_processor());
+        return Err(cancelled_before_publication());
     }
     verify_completion(&storage, &request, &completion)?;
     if cancellation
@@ -848,7 +1004,7 @@ async fn execute_cache<T: ImagingTransport>(
         .load(std::sync::atomic::Ordering::Acquire)
     {
         discard_candidate_generation(&storage, &request);
-        return Err(cancelled_after_processor());
+        return Err(cancelled_before_publication());
     }
     let _transition_and_publication_guard = engine
         .transition_and_publication_gate
@@ -859,7 +1015,7 @@ async fn execute_cache<T: ImagingTransport>(
         .load(std::sync::atomic::Ordering::Acquire)
     {
         discard_candidate_generation(&storage, &request);
-        return Err(cancelled_after_processor());
+        return Err(cancelled_before_publication());
     }
     let metadata = publish_cache_metadata(&storage, &request, &completion.artifacts[0])?;
     if engine.can_sweep_after_publication() {
@@ -871,7 +1027,7 @@ async fn execute_cache<T: ImagingTransport>(
     })
 }
 
-fn cancelled_after_processor() -> CacheFailure {
+fn cancelled_before_publication() -> CacheFailure {
     CacheFailure::new(
         CacheFailureStage::Cancelled,
         "O trabalho de Cache ficou obsoleto ou pausado antes da publicação do índice.",
@@ -1015,7 +1171,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                     .flag()
                     .load(std::sync::atomic::Ordering::Acquire)
                 {
-                    return Err(cancelled_after_processor());
+                    return Err(cancelled_before_publication());
                 }
                 if attempt == 1 {
                     recovery = Some(CacheRecovery {
@@ -1042,7 +1198,6 @@ fn verify_completion(
     completion: &CacheCompletion,
 ) -> Result<(), CacheFailure> {
     if completion.artifacts.len() != 1
-        || completion.generated_count + completion.reused_count != 1
         || completion.preview_bytes != completion.artifacts[0].preview_bytes
         || completion.source_bytes != completion.artifacts[0].fingerprint.source_bytes
     {
@@ -1075,22 +1230,27 @@ fn verify_completion(
         || artifact.width_px > request.policy.max_edge_px
         || artifact.height_px > request.policy.max_edge_px
         || artifact.preview_bytes == 0
+        || artifact
+            .exif_orientation
+            .is_some_and(|orientation| !(1..=8).contains(&orientation))
+        || artifact
+            .source_page_count
+            .is_some_and(|page_count| page_count != 1)
     {
         return Err(CacheFailure::new(
             CacheFailureStage::ValidateResponse,
             "A conclusão contém um artefato de Cache inesperado.",
         ));
     }
-    verify_artifact_file(storage, request, artifact)
+    verify_cached_artifact(storage, &request.cache_paths, artifact)
 }
 
-fn verify_artifact_file(
+fn verify_cached_artifact(
     storage: &PreparedCacheStorage,
-    request: &CacheRequest,
+    cache_paths: &CachePathPlan,
     artifact: &CacheArtifact,
 ) -> Result<(), CacheFailure> {
-    let preview_path = request
-        .cache_paths
+    let preview_path = cache_paths
         .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
         .map_err(|error| {
             CacheFailure::new(
@@ -1356,23 +1516,28 @@ fn metadata_is_current(
     project_id: &str,
     cache_paths: &CachePathPlan,
 ) -> bool {
-    metadata.schema_version == CACHE_METADATA_SCHEMA_VERSION
-        && metadata.representation_version == CACHE_REPRESENTATION_VERSION
-        && metadata.project_id == project_id
-        && metadata.policy == CacheRepresentationPolicy::measured_v1()
-        && metadata.entries.iter().all(|entry| {
-            entry.reusable().is_ok()
-                && cache_paths
-                    .preview_file(&entry.media_id, &entry.generation_id, entry.format)
-                    .ok()
-                    .and_then(|path| {
-                        path.file_name()
-                            .and_then(|name| name.to_str())
-                            .map(str::to_owned)
-                    })
-                    .as_deref()
-                    == Some(entry.artifact_name.as_str())
-        })
+    if metadata.schema_version != CACHE_METADATA_SCHEMA_VERSION
+        || metadata.representation_version != CACHE_REPRESENTATION_VERSION
+        || metadata.project_id != project_id
+        || metadata.policy != CacheRepresentationPolicy::measured_v1()
+    {
+        return false;
+    }
+    let mut media_ids = HashSet::new();
+    metadata.entries.iter().all(|entry| {
+        media_ids.insert(entry.media_id.as_str())
+            && entry.reusable().is_ok()
+            && cache_paths
+                .preview_file(&entry.media_id, &entry.generation_id, entry.format)
+                .ok()
+                .and_then(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .map(str::to_owned)
+                })
+                .as_deref()
+                == Some(entry.artifact_name.as_str())
+    })
 }
 
 const fn image_format(format: CacheArtifactFormat) -> ImageFormat {
@@ -1431,6 +1596,9 @@ mod tests {
 
     enum Script {
         Complete(CacheArtifactFormat),
+        MalformedCounts,
+        MalformedOrientation,
+        MalformedPageCount,
         Crash(u32),
         CrashAndObsolete(u32, CacheCancellation),
         Cancel(u32),
@@ -1457,6 +1625,27 @@ mod tests {
             let script = self.scripts.pop_front().expect("one script per invocation");
             let result = match script {
                 Script::Complete(format) => complete(command, &self.app_paths, format),
+                Script::MalformedCounts => complete_with(
+                    command,
+                    &self.app_paths,
+                    CacheArtifactFormat::Jpeg,
+                    |completion| {
+                        completion.generated_count = usize::MAX;
+                        completion.reused_count = 1;
+                    },
+                ),
+                Script::MalformedOrientation => complete_with(
+                    command,
+                    &self.app_paths,
+                    CacheArtifactFormat::Jpeg,
+                    |completion| completion.artifacts[0].exif_orientation = Some(9),
+                ),
+                Script::MalformedPageCount => complete_with(
+                    command,
+                    &self.app_paths,
+                    CacheArtifactFormat::Jpeg,
+                    |completion| completion.artifacts[0].source_page_count = Some(2),
+                ),
                 Script::Crash(process_id) => {
                     write_partial(command, &self.app_paths, process_id);
                     Err(InvocationFailure::unexpected_termination(process_id))
@@ -1540,6 +1729,15 @@ mod tests {
         app_paths: &AppPaths,
         requested_format: CacheArtifactFormat,
     ) -> Result<ImagingResponse, InvocationFailure> {
+        complete_with(command, app_paths, requested_format, |_| {})
+    }
+
+    fn complete_with(
+        command: &ImagingCommand,
+        app_paths: &AppPaths,
+        requested_format: CacheArtifactFormat,
+        mutate: impl FnOnce(&mut CacheCompletion),
+    ) -> Result<ImagingResponse, InvocationFailure> {
         let ImagingCommand::BuildCache(request) = command else {
             panic!("the scripted transport accepts Cache only");
         };
@@ -1579,15 +1777,17 @@ mod tests {
             .reusable
             .as_ref()
             .is_some_and(|reusable| reusable.generation_id == artifact.generation_id);
+        let mut completion = CacheCompletion {
+            source_bytes: artifact.fingerprint.source_bytes,
+            preview_bytes: artifact.preview_bytes,
+            artifacts: vec![artifact],
+            generated_count: usize::from(!reused),
+            reused_count: usize::from(reused),
+        };
+        mutate(&mut completion);
         Ok(ImagingResponse::cache_completed(
             request.request_id.clone(),
-            CacheCompletion {
-                source_bytes: artifact.fingerprint.source_bytes,
-                preview_bytes: artifact.preview_bytes,
-                artifacts: vec![artifact],
-                generated_count: usize::from(!reused),
-                reused_count: usize::from(reused),
-            },
+            completion,
         ))
     }
 
@@ -1812,6 +2012,125 @@ mod tests {
                 .cancellation()
                 .flag()
                 .load(std::sync::atomic::Ordering::Acquire)
+        );
+    }
+
+    #[test]
+    fn a_new_root_binding_plan_retires_the_older_flight() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let demand = engine.reconcile_demand(
+                fixture.work.namespace.project_id(),
+                1,
+                [fixture.work.source.media_id()],
+            );
+            let work_for = |request_id: &str, operational_root: &std::path::Path| {
+                let mut context = OperationPathContext::new();
+                context
+                    .capture_with_binding(fixture.work.source.source_path(), operational_root)
+                    .expect("the attempt-specific operational root is captured");
+                CacheWork::new(
+                    request_id,
+                    fixture.work.namespace.clone(),
+                    fixture.work.source.clone(),
+                    context.freeze(),
+                )
+            };
+            let work_a = fixture.work.clone();
+            let work_b = work_for("cache-plan-b", &fixture._root.path().join("binding-b"));
+
+            let claim_a = engine
+                .claim_demanded(&demand, &work_a)
+                .expect("the first binding plan can claim a flight");
+            let authority_a = claim_a.preview_publication_authority();
+            let CacheFlightClaim::Owner(owner_a) = claim_a else {
+                panic!("the first binding plan owns its flight");
+            };
+            let claim_b = engine
+                .claim_demanded(&demand, &work_b)
+                .expect("the remapped binding plan can claim a distinct flight");
+            let authority_b = claim_b.preview_publication_authority();
+            let CacheFlightClaim::Owner(owner_b) = claim_b else {
+                panic!(
+                    "a new attempt with a different binding plan must not wait on the old attempt"
+                );
+            };
+            assert_eq!(
+                owner_a.cancellation().reason(),
+                Some(crate::cache_activity_gate::CacheCancellationReason::Obsolete),
+                "the old attempt cannot publish after the remapped attempt starts"
+            );
+
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::new(),
+                attempts: Vec::new(),
+            };
+            let old_cancellation = owner_a.cancellation();
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    work_a,
+                    &fixture.context,
+                    &old_cancellation,
+                )
+                .await
+                .expect_err("the retired binding plan cannot reopen the Original or publish");
+            assert_eq!(failure.stage, CacheFailureStage::Cancelled);
+            assert!(transport.attempts.is_empty());
+            assert!(!fixture.work.namespace.paths().metadata_file().exists());
+            assert!(
+                engine
+                    .commit_claimed_preview_if_demanded(&demand, &authority_a, || {
+                        panic!("the retired plan cannot publish an opaque preview token")
+                    })
+                    .is_none()
+            );
+            assert_eq!(
+                engine.commit_claimed_preview_if_demanded(&demand, &authority_b, || "current"),
+                Some("current")
+            );
+
+            drop(owner_a);
+            drop(owner_b);
+        });
+    }
+
+    #[test]
+    fn a_reclaimed_equivalent_flight_cannot_restore_the_previous_publication_authority() {
+        let fixture = fixture();
+        let engine = CacheEngine::default();
+        let demand = engine.reconcile_demand(
+            fixture.work.namespace.project_id(),
+            1,
+            [fixture.work.source.media_id()],
+        );
+        let first_claim = engine
+            .claim_demanded(&demand, &fixture.work)
+            .expect("the first equivalent attempt claims its flight");
+        let first_authority = first_claim.preview_publication_authority();
+        let CacheFlightClaim::Owner(first_owner) = first_claim else {
+            panic!("the first equivalent attempt owns its flight");
+        };
+        drop(first_owner);
+
+        let second_claim = engine
+            .claim_demanded(&demand, &fixture.work)
+            .expect("the equivalent attempt can be reclaimed after its owner terminates");
+        let second_authority = second_claim.preview_publication_authority();
+        assert_ne!(first_authority, second_authority);
+        assert!(
+            engine
+                .commit_claimed_preview_if_demanded(&demand, &first_authority, || {
+                    panic!("a completed incarnation cannot regain token publication authority")
+                })
+                .is_none()
+        );
+        assert_eq!(
+            engine.commit_claimed_preview_if_demanded(&demand, &second_authority, || "latest"),
+            Some("latest")
         );
     }
 
@@ -2193,7 +2512,142 @@ mod tests {
             assert_eq!(
                 registry.serve("project", request).status(),
                 StatusCode::NOT_FOUND,
-                "Candidate to Absent/Unavailable cannot leave old bytes resident"
+                "Candidate to Absent cannot leave an addressable preview resident"
+            );
+        });
+    }
+
+    #[test]
+    fn unavailable_media_preserves_the_last_known_preview_and_its_typed_state() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let mut demand = engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                1,
+                [fixture.work.source.media_id()],
+            );
+            let artifact = verified_preview_artifact(&fixture, &engine).await;
+            let ready = registry
+                .publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                .expect("the last known preview is resident");
+
+            engine
+                .apply_demand_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &mut demand,
+                    &MediaRuntimeUpdate::for_test_preserving_previews(
+                        1,
+                        vec![fixture.work.source.media_id().to_owned()],
+                    ),
+                )
+                .expect("the unavailable observation updates Runtime without revoking pixels");
+
+            let unavailable = registry
+                .retained_preview(
+                    fixture.work.source.media_id(),
+                    crate::ipc_contract::MediaPreviewState::Unavailable,
+                )
+                .expect("the unavailable state serves the last known representation");
+            assert_eq!(unavailable.url, ready.url);
+            let token = unavailable
+                .url
+                .expect("the retained preview remains opaque")
+                .rsplit('/')
+                .next()
+                .expect("the opaque URL has a token")
+                .to_owned();
+            let request = Request::builder()
+                .method(Method::GET)
+                .uri(format!("/{token}"))
+                .body(Vec::new())
+                .expect("the retained opaque request is valid");
+            assert_eq!(registry.serve("project", request).status(), StatusCode::OK);
+
+            let reopened_registry = CachePreviewRegistry::new("project");
+            let reopened = engine
+                .retain_last_known_preview(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &reopened_registry,
+                    &demand,
+                    fixture.work.source.media_id(),
+                )
+                .expect("a new Host process can hydrate the last published generation");
+            assert_eq!(
+                reopened.state,
+                crate::ipc_contract::MediaPreviewState::Unavailable
+            );
+            let reopened_token = reopened
+                .url
+                .expect("the hydrated preview remains opaque")
+                .rsplit('/')
+                .next()
+                .expect("the hydrated URL has a token")
+                .to_owned();
+            assert_eq!(
+                preview_status(&reopened_registry, &reopened_token),
+                StatusCode::OK
+            );
+
+            let artifact_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&artifact.media_id, &artifact.generation_id, artifact.format)
+                .expect("the published artifact pathname is valid");
+            let mut corrupt = std::fs::read(&artifact_path)
+                .expect("the published artifact can be corrupted deterministically");
+            corrupt.fill(0);
+            std::fs::write(&artifact_path, corrupt)
+                .expect("the malformed bytes preserve the indexed length");
+            assert!(
+                engine
+                    .retain_last_known_preview(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &CachePreviewRegistry::new("project"),
+                        &demand,
+                        fixture.work.source.media_id(),
+                    )
+                    .is_none(),
+                "a malformed on-disk generation cannot be rehydrated after restart"
+            );
+        });
+    }
+
+    #[test]
+    fn a_retired_demand_cannot_rehydrate_an_unavailable_preview_from_disk() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let project_id = fixture.work.namespace.project_id().to_owned();
+            let old_demand = engine.reconcile_preview_demand(
+                &registry,
+                &project_id,
+                1,
+                [fixture.work.source.media_id()],
+            );
+            verified_preview_artifact(&fixture, &engine).await;
+            engine.reconcile_preview_demand(&registry, &project_id, 2, std::iter::empty());
+
+            assert!(
+                engine
+                    .retain_last_known_preview(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &registry,
+                        &old_demand,
+                        fixture.work.source.media_id(),
+                    )
+                    .is_none(),
+                "a removed medium cannot regain resident bytes through unavailable fallback"
             );
         });
     }
@@ -2601,6 +3055,28 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_media_entries_make_the_discardable_cache_index_non_current() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            verified_preview_artifact(&fixture, &engine).await;
+            let storage = fixture
+                .app_paths
+                .prepare_cache_storage(fixture.work.namespace.paths())
+                .expect("the Cache storage remains available");
+            let mut metadata = super::load_metadata(&storage, fixture.work.namespace.paths())
+                .expect("the verified publication has metadata");
+            metadata.entries.push(metadata.entries[0].clone());
+
+            assert!(!super::metadata_is_current(
+                &metadata,
+                fixture.work.namespace.project_id(),
+                fixture.work.namespace.paths(),
+            ));
+        });
+    }
+
+    #[test]
     fn cache_engine_recovers_one_crash_and_discards_only_that_process_temporary() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -2736,13 +3212,42 @@ mod tests {
 
             assert_eq!(failure.stage, CacheFailureStage::Cancelled);
             assert!(!metadata_path.exists());
-            assert_eq!(
-                std::fs::read_dir(media_directory)
-                    .expect("the Cache Media directory remains available")
-                    .filter_map(Result::ok)
-                    .count(),
-                0,
-            );
+            let remaining = std::fs::read_dir(media_directory)
+                .map(|entries| entries.filter_map(Result::ok).count())
+                .unwrap_or(0);
+            assert_eq!(remaining, 0);
+        });
+    }
+
+    #[test]
+    fn semantically_malformed_processor_completions_are_typed_protocol_failures() {
+        tauri::async_runtime::block_on(async {
+            for script in [
+                Script::MalformedCounts,
+                Script::MalformedOrientation,
+                Script::MalformedPageCount,
+            ] {
+                let fixture = fixture();
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([script]),
+                    attempts: Vec::new(),
+                };
+
+                let failure = CacheEngine::default()
+                    .execute(
+                        &mut transport,
+                        &fixture.app_paths,
+                        fixture.work,
+                        &fixture.context,
+                        &CacheCancellation::default(),
+                    )
+                    .await
+                    .expect_err("malformed sidecar data cannot become a Cache publication");
+
+                assert_eq!(failure.stage, CacheFailureStage::ValidateResponse);
+                assert_eq!(transport.attempts, [1]);
+            }
         });
     }
 

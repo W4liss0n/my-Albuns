@@ -4,7 +4,7 @@ use std::{
 };
 
 use myalbuns_imaging_protocol::CacheFingerprint;
-use myalbuns_paths::ResolvedObject;
+use myalbuns_paths::{ExpectedObject, ResolvedObject, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
 pub(crate) fn fingerprint_source(
@@ -61,10 +61,16 @@ pub(crate) fn fingerprint_source(
 
 pub(crate) fn verify_source_fingerprint(
     media_id: &str,
-    resolved: &ResolvedObject,
+    root_bindings: &RootBindingPlan,
+    source_path: &std::path::Path,
     expected: &CacheFingerprint,
 ) -> Result<(), String> {
-    let current = fingerprint_source(media_id, resolved)?;
+    let resolved = root_bindings
+        .resolve_existing(source_path, ExpectedObject::RegularFile)
+        .map_err(|error| {
+            format!("não foi possível reabrir a mídia {media_id} pelo plano da operação: {error}")
+        })?;
+    let current = fingerprint_source(media_id, &resolved)?;
     if &current != expected {
         return Err(format!(
             "a mídia {media_id} mudou durante a produção da representação reduzida"

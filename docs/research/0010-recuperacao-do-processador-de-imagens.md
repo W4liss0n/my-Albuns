@@ -36,7 +36,9 @@ configurações e entradas na raiz. Somente o próprio arquivo de evidência é
 excluído; outputs de build declarados no `.gitignore` ficam fora da árvore de
 fontes. Assim, `sourceInputsDirty: false` atribui a execução ao `gitCommit`
 registrado sem esconder alterações locais de Vite, TypeScript, Tauri ou
-manifests.
+manifests. O runner captura commit e estado antes do primeiro check, repete a
+captura depois do último e só publica `false` quando o HEAD permaneceu o mesmo e
+as duas observações estavam limpas.
 
 ## Fronteiras implementadas
 

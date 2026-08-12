@@ -201,15 +201,28 @@ const driverOutput = collectOutput(driver);
 const baseUrl = `http://127.0.0.1:${driverPort}`;
 const request = webdriverClient(baseUrl);
 let sessionId;
-let driverTerminated = false;
+let driverTerminationConfirmed = false;
 
 function terminateDriverTree() {
-  if (driverTerminated || !driver.pid) return;
-  driverTerminated = true;
-  spawnSync("taskkill.exe", ["/PID", String(driver.pid), "/T", "/F"], {
-    windowsHide: true,
-    stdio: "ignore",
-  });
+  if (driverTerminationConfirmed || !driver.pid) return;
+  if (driver.exitCode !== null || driver.signalCode !== null) {
+    driverTerminationConfirmed = true;
+    return;
+  }
+  const termination = spawnSync(
+    "taskkill.exe",
+    ["/PID", String(driver.pid), "/T", "/F"],
+    {
+      windowsHide: true,
+      stdio: "ignore",
+    },
+  );
+  if (termination.status !== 0) {
+    throw new Error(
+      `tauri-driver process tree termination failed with status ${termination.status ?? "unknown"}`,
+    );
+  }
+  driverTerminationConfirmed = true;
 }
 
 try {
@@ -288,27 +301,32 @@ try {
     throw new Error("An Original pathname crossed the productive WebView boundary");
   }
 
-  await delay(Math.min(gateTimeoutMilliseconds, 5_000));
-  const screenshot = await request(
-    "GET",
-    `/session/${sessionId}/screenshot`,
-  );
-  if (typeof screenshot !== "string" || !screenshot) {
-    throw new Error("The productive Tauri WebView2 returned no W3C screenshot");
-  }
-  writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
-
   const tracerDeadline = Date.now() + 5_000;
   let liveDriverOutput = "";
+  let liveTextureLoadCount = 0;
   do {
     liveDriverOutput = stripVTControlCharacters(driverOutput());
-    const liveCount = eventCount(
+    liveTextureLoadCount = eventCount(
       liveDriverOutput,
       "canvas_opaque_preview_texture_loaded",
     );
-    if (liveCount >= expectedPreviewCount) break;
+    if (liveTextureLoadCount >= expectedPreviewCount) break;
     await delay(100);
   } while (Date.now() < tracerDeadline);
+  if (liveTextureLoadCount < expectedPreviewCount) {
+    throw new Error(
+      `The productive Canvas did not load every opaque texture before its screenshot (${liveTextureLoadCount}/${expectedPreviewCount})`,
+    );
+  }
+
+  const screenshot = await request(
+    "GET",
+    `/session/${sessionId}/element/${encodeURIComponent(elementId)}/screenshot`,
+  );
+  if (typeof screenshot !== "string" || !screenshot) {
+    throw new Error("The productive Tauri WebView2 returned no Canvas element screenshot");
+  }
+  writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 
   terminateDriverTree();
   await delay(500);
@@ -346,6 +364,8 @@ try {
       opaqueResourceCount: opaqueTextureLoadCount,
       canvasWidth: canvasRect.width,
       canvasHeight: canvasRect.height,
+      screenshotScope: "canvas-element",
+      samplePoint: "canvas-center",
       screenshotPath,
     }),
   );

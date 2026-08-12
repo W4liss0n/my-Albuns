@@ -40,6 +40,9 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $script:WorkspaceRoot $OutputPath
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+$sourceSnapshotBefore = Get-GateSourceSnapshot `
+    -WorkspaceRoot $script:WorkspaceRoot `
+    -EvidencePath $OutputPath
 
 $scratchRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $script:WorkspaceRoot '.scratch\windows-path-gate')
@@ -339,18 +342,28 @@ finally {
     if ([System.IO.File]::Exists($preflightPath)) {
         [System.IO.File]::Delete($preflightPath)
     }
+    if (Test-Path -LiteralPath $runRoot) {
+        $verifiedRunRoot = [System.IO.Path]::GetFullPath($runRoot)
+        if (-not $verifiedRunRoot.StartsWith(
+                $scratchRoot + [System.IO.Path]::DirectorySeparatorChar,
+                [System.StringComparison]::OrdinalIgnoreCase
+            )) {
+            throw 'Refusing to remove an unverified Windows path fixture.'
+        }
+        Remove-Item -LiteralPath $verifiedRunRoot -Recurse -Force
+    }
 }
 
-$sourceStatus = @(
-    Get-GateSourceStatus `
-        -WorkspaceRoot $script:WorkspaceRoot `
-        -EvidencePath $OutputPath
-)
+$sourceSnapshotAfter = Get-GateSourceSnapshot `
+    -WorkspaceRoot $script:WorkspaceRoot `
+    -EvidencePath $OutputPath
 $report = [ordered]@{
     schemaVersion = 2
     collectedAtUtc = [DateTime]::UtcNow.ToString('o')
-    gitCommit = (& git rev-parse HEAD).Trim()
-    sourceInputsDirty = $sourceStatus.Count -gt 0
+    gitCommit = $sourceSnapshotBefore.gitCommit
+    sourceInputsDirty = Test-GateSourceSnapshotsDirty `
+        -Before $sourceSnapshotBefore `
+        -After $sourceSnapshotAfter
     platform = [ordered]@{
         operatingSystem = [System.Environment]::OSVersion.VersionString
         architecture =
@@ -411,17 +424,6 @@ New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
     $json + [System.Environment]::NewLine,
     [System.Text.UTF8Encoding]::new($false)
 )
-
-if (Test-Path -LiteralPath $runRoot) {
-    $verifiedRunRoot = [System.IO.Path]::GetFullPath($runRoot)
-    if (-not $verifiedRunRoot.StartsWith(
-            $scratchRoot + [System.IO.Path]::DirectorySeparatorChar,
-            [System.StringComparison]::OrdinalIgnoreCase
-        )) {
-        throw 'Refusing to remove an unverified Windows path fixture.'
-    }
-    Remove-Item -LiteralPath $verifiedRunRoot -Recurse -Force
-}
 
 Write-Output "Windows path gate report: $OutputPath"
 Write-Output $json

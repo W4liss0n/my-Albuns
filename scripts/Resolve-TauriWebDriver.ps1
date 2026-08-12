@@ -21,7 +21,7 @@ if ($null -eq $runtime) {
 $runtimeVersion = $runtime.Name
 
 $tauriDriverVersion = '2.0.6'
-$tauriDriverRoot = Join-Path $script:WorkspaceRoot '.tools\tauri-driver'
+$tauriDriverRoot = Join-Path $script:WorkspaceRoot ".tools\tauri-driver\$tauriDriverVersion"
 $tauriDriver = Join-Path $tauriDriverRoot 'bin\tauri-driver.exe'
 if (-not (Test-Path -LiteralPath $tauriDriver -PathType Leaf)) {
     & $script:CargoExecutable `
@@ -33,6 +33,21 @@ if (-not (Test-Path -LiteralPath $tauriDriver -PathType Leaf)) {
     if ($LASTEXITCODE -ne 0) {
         throw "tauri-driver $tauriDriverVersion could not be installed."
     }
+}
+if (-not (Test-Path -LiteralPath $tauriDriver -PathType Leaf)) {
+    throw "tauri-driver $tauriDriverVersion was not materialized."
+}
+$installedTauriDriver = @(
+    & $script:CargoExecutable install --list --root $tauriDriverRoot 2>&1
+)
+if ($LASTEXITCODE -ne 0) {
+    throw "The installed tauri-driver package metadata could not be read: $installedTauriDriver"
+}
+$expectedTauriDriverHeader = "tauri-driver v${tauriDriverVersion}:"
+if (-not ($installedTauriDriver | Where-Object {
+            $_.ToString().Trim() -eq $expectedTauriDriverHeader
+        })) {
+    throw "The executable is not owned by the reported $expectedTauriDriverHeader installation: $installedTauriDriver"
 }
 
 $nativeDriverRoot = Join-Path `

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
-use myalbuns_paths::OperationPathContext;
+use myalbuns_paths::AppPaths;
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::{
@@ -20,6 +20,7 @@ use crate::{
     },
     logging::LoggingState,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
+    path_io,
     product_runtime::{LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL},
     project_host::ProjectHost,
 };
@@ -61,7 +62,7 @@ pub(crate) async fn prepare_media_previews(
     media_monitor: State<'_, MediaMonitor>,
     processor: State<'_, ImagingProcessor>,
     logging: State<'_, LoggingState>,
-    app_paths: State<'_, myalbuns_paths::AppPaths>,
+    app_paths: State<'_, AppPaths>,
 ) -> Result<Option<Vec<MediaPreview>>, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
@@ -153,14 +154,26 @@ pub(crate) async fn prepare_media_previews(
             .copied()
             .unwrap_or(MediaAvailability::Unavailable);
         if availability != MediaAvailability::Candidate {
-            previews.push(MediaPreview {
-                media_id,
-                state: match availability {
-                    MediaAvailability::Absent => MediaPreviewState::Absent,
-                    MediaAvailability::Candidate => unreachable!(),
-                    MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
-                },
-                url: None,
+            let state = match availability {
+                MediaAvailability::Absent => MediaPreviewState::Absent,
+                MediaAvailability::Candidate => unreachable!(),
+                MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
+            };
+            previews.push(if state == MediaPreviewState::Unavailable {
+                unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
+                    media_id,
+                )
+            } else {
+                MediaPreview {
+                    media_id,
+                    state,
+                    url: None,
+                }
             });
             continue;
         }
@@ -173,27 +186,31 @@ pub(crate) async fn prepare_media_previews(
             binding.logical_path.clone(),
         )
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
-        let mut path_context = OperationPathContext::new();
-        if path_context.capture(namespace.paths().root()).is_err()
-            || path_context.capture(source.source_path()).is_err()
+        let root_bindings = match path_io::capture_root_bindings(vec![
+            namespace.paths().root().to_path_buf(),
+            source.source_path().to_path_buf(),
+        ])
+        .await
         {
-            previews.push(MediaPreview {
-                media_id,
-                state: MediaPreviewState::Unavailable,
-                url: None,
-            });
-            continue;
-        }
+            Ok(root_bindings) => root_bindings,
+            Err(_) => {
+                previews.push(unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
+                    media_id,
+                ));
+                continue;
+            }
+        };
         let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
-        let work = CacheWork::new(
-            request_id.clone(),
-            namespace.clone(),
-            source,
-            path_context.freeze(),
-        );
+        let work = CacheWork::new(request_id.clone(), namespace.clone(), source, root_bindings);
         let Some(claim) = engine.claim_demanded(&demand_revision, &work) else {
             return Ok(Some(Vec::new()));
         };
+        let preview_publication_authority = claim.preview_publication_authority();
         let execution = match claim {
             CacheFlightClaim::Waiter(waiter) => waiter.wait().await,
             CacheFlightClaim::Owner(owner) => {
@@ -225,11 +242,11 @@ pub(crate) async fn prepare_media_previews(
                         event = "cache_processor_recovered",
                     );
                 }
-                let Some(preview) =
-                    engine.commit_preview_if_demanded(&demand_revision, media_id.as_str(), || {
-                        registry.publish(&app_paths, &namespace, execution.artifact())
-                    })
-                else {
+                let Some(preview) = engine.commit_claimed_preview_if_demanded(
+                    &demand_revision,
+                    &preview_publication_authority,
+                    || registry.publish(&app_paths, &namespace, execution.artifact()),
+                ) else {
                     return Ok(Some(Vec::new()));
                 };
                 previews.push(preview.map_err(MediaPreviewCommandError::from)?);
@@ -243,15 +260,35 @@ pub(crate) async fn prepare_media_previews(
                     media_id,
                     event = "cache_media_unavailable",
                 );
-                previews.push(MediaPreview {
+                previews.push(unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
                     media_id,
-                    state: MediaPreviewState::Unavailable,
-                    url: None,
-                });
+                ));
             }
         }
     }
     Ok(Some(previews))
+}
+
+fn unavailable_preview(
+    engine: &CacheEngine,
+    registry: &CachePreviewRegistry,
+    app_paths: &AppPaths,
+    namespace: &AuthorizedCacheNamespace,
+    demand: &cache_engine::CacheDemandRevision,
+    media_id: String,
+) -> MediaPreview {
+    engine
+        .retain_last_known_preview(app_paths, namespace, registry, demand, media_id.as_str())
+        .unwrap_or(MediaPreview {
+            media_id,
+            state: MediaPreviewState::Unavailable,
+            url: None,
+        })
 }
 
 fn ordered_demand(demand: &MediaPreviewDemand) -> Vec<String> {

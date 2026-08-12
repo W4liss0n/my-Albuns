@@ -29,9 +29,9 @@ pub use project::{
     ProjectCore,
 };
 pub use project_document::{
-    ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
-    EndSheetFormat, FrameBorder, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
-    InitialOverlay, InitialOverlayContent, InitialProject, InitialProjectConfiguration,
+    ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat,
+    FrameBorder, InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+    InitialOverlayContent, InitialProject, InitialProjectConfiguration,
     InitialProjectPersonalization, InitialProjectValidationError, MediaRef, Overlay,
     OverlayContent, ProjectDocument, ProjectSheet, Rgb, VisualDefaults,
 };

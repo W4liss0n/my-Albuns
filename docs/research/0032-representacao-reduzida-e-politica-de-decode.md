@@ -76,21 +76,23 @@ As decisões que dependem das bibliotecas foram conferidas nas fontes primárias
 
 | Fonte | Massa | Resultado reduzido | Tempo relevante |
 | --- | ---: | ---: | ---: |
-| JPEG opaco | 6000 × 4000 px; 45.562.932 B | JPEG 1600 × 1067 px; 1.161.958 B | SHA-256 20 ms; decode 425 ms; resize 81 ms; encode 48 ms |
-| PNG com alfa | 2400 × 1800 px; 4.875.661 B | PNG 1600 × 1200 px; 2.302.842 B | decode 33 ms; encode 12 ms |
-| TIFF RGB de uma página | 4096 × 3072 px; 37.749.250 B | decode validado | 21 ms |
+| JPEG opaco | 6000 × 4000 px; 45.562.932 B | JPEG 1600 × 1067 px; 1.161.958 B | SHA-256 27 ms; decode 484 ms; resize 107 ms; encode 59 ms |
+| PNG com alfa | 2400 × 1800 px; 4.875.661 B | PNG 1600 × 1200 px; 2.302.842 B | decode 47 ms; encode 12 ms |
+| TIFF RGB de uma página | 4096 × 3072 px; 37.749.250 B | decode validado | 24 ms |
 | TIFF de duas páginas | 2 páginas de 8 × 8 px | recusado pela política | contagem validada |
 | JPEG com EXIF 6 | 8 × 4 px | 4 × 8 px após uma aplicação | orientação validada |
+| PNG com chunk eXIf 6 | 2 × 1 px | 2 × 1 px, sem rotação implícita | metadado lido e geometria preservada |
 
 O fingerprint integral do JPEG foi
 `0baeea4b9beb00e8b62e2a31a18fe6d62fe50461de159051aa8da9ea4cf35bc8`
 e foi recalculado duas vezes pelo teste. O ensaio completo, excluído o build
-frio, levou 3.143 ms na rodada de 12 de agosto; 1.006 ms pertenceram ao sweep
+frio, levou 3.352 ms na rodada de 12 de agosto; 1.028 ms pertenceram ao sweep
 JPEG.
 
 Os artefatos JPEG e PNG foram reabertos pelo decoder e continham exatamente o
 perfil `sRGB2014.icc` versionado no Processador. A variante com alfa permaneceu
-RGBA. A orientação EXIF foi aplicada uma única vez.
+RGBA. O JPEG com EXIF 6 foi orientado uma vez; o PNG com eXIf 6 expôs o
+metadado, mas manteve 2 × 1 px porque PNG não recebe rotação implícita.
 
 ### Sweep fotográfico de qualidade JPEG
 
@@ -194,7 +196,8 @@ medição e decisão normativa.
 ## Conclusão
 
 A política mensurável para o Programa 03A fica fixada em uma representação por
-mídia, 1600 px, JPEG/PNG conforme alfa, sRGB explícito, orientação aplicada uma
-vez, SHA-256 integral, limite estrito de pixels e TIFF apenas de página única.
+mídia, 1600 px, JPEG/PNG conforme alfa, sRGB explícito, orientação de JPEG/TIFF
+aplicada uma vez e PNG sem rotação implícita, SHA-256 integral, limite estrito
+de pixels e TIFF apenas de página única.
 Ela preserva o Cache como derivado descartável e mantém a Exportação final
 ligada ao `CompositionPlan`, ao snapshot e aos Originais exatos.

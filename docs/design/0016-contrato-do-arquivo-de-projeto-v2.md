@@ -20,8 +20,9 @@ a política do [ADR 0009](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md
 
 `schemaVersion: 2` é a versão pública atual e possui DTO próprio e fechado.
 Envelope, `projectId`, Revisão, documento físico, Padrões visuais, caminhos
-`windowsUtf16` e Lâminas mantêm exatamente as formas e invariantes do v1. A
-única ampliação é o discriminador de cada item de `project.media`:
+`windowsUtf16` e Lâminas mantêm as formas do v1. A ampliação é o discriminador
+de cada item de `project.media` e a chave de unicidade do pathname passa a
+incluir a aba:
 
 ```text
 MediaRefV1.kind = "decorative"
@@ -31,8 +32,10 @@ MediaRefV2.kind = "photo" | "decorative"
 Os campos continuam sendo somente `id`, `kind` e `path`. Nome, dimensões,
 paleta, disponibilidade, identidade física, tamanho, datas, perfil, orientação,
 fingerprint e representação reduzida são observações ou derivados e não entram
-no Projeto. IDs permanecem UUID v4 canônicos e únicos; paths duplicados e
-referências visuais quebradas continuam inválidos.
+no Projeto. IDs permanecem UUID v4 canônicos e únicos. Um pathname pode existir
+uma vez em Foto e uma vez em Decorativo; repeti-lo dentro da mesma aba continua
+inválido. Background e Overlay aceitam apenas IDs de Decorativo, e referências
+visuais quebradas continuam inválidas.
 
 Aceitar Foto na lista não persiste Frames ou posicionamentos de Foto. A v2
 permite que o Painel, `MediaResolver`, `MediaRuntime`, `MediaMonitor` e Cache

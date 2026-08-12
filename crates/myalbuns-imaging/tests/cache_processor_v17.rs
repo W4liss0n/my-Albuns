@@ -1,7 +1,10 @@
 use std::{
+    fs,
     io::Write,
     path::Path,
     process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
@@ -221,6 +224,58 @@ fn real_processor_rejects_multi_page_tiff_without_publishing_a_generation() {
     }
 }
 
+#[test]
+fn terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement() {
+    let source_root = tempfile::tempdir().expect("temporary replaceable source root");
+    let log_root = tempfile::tempdir().expect("temporary replaceable source logs");
+    let barrier_root = tempfile::tempdir().expect("temporary decode barrier root");
+    let cache = IsolatedCache::new("terminal-fingerprint");
+    let source_path = source_root.path().join("progressive.jpg");
+    let displaced_path = source_root.path().join("progressive-old.jpg");
+    let barrier_path = barrier_root.path().join("worker.pid");
+    fs::write(
+        &source_path,
+        include_bytes!("fixtures/progressive-420-dri.jpg"),
+    )
+    .expect("the progressive Original is written");
+    let command = request(
+        &cache,
+        "cache-path-replaced",
+        "photo-replaced",
+        MediaKind::Photo,
+        &source_path,
+        "candidate-replaced",
+        None,
+    );
+    let process = spawn(&command, log_root.path(), Some(&barrier_path));
+
+    wait_for_file(&barrier_path, "the progressive decoder reached its barrier");
+    fs::rename(&source_path, &displaced_path)
+        .expect("the opened Original is atomically displaced from its pathname");
+    RgbImage::from_pixel(64, 48, Rgb([220, 30, 40]))
+        .save_with_format(&source_path, ImageFormat::Jpeg)
+        .expect("a different physical Original occupies the frozen pathname");
+    fs::remove_file(&barrier_path).expect("the decoder is released");
+
+    let output = process
+        .wait_with_output()
+        .expect("the Processador reaches a typed terminal");
+    assert!(
+        !output.status.success(),
+        "a preview decoded from the displaced handle cannot be published for the new pathname"
+    );
+    for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
+        assert!(
+            !cache
+                .paths
+                .preview_file("photo-replaced", "candidate-replaced", format)
+                .expect("the candidate path is valid")
+                .exists(),
+            "the stale candidate generation is never published"
+        );
+    }
+}
+
 fn request(
     cache: &IsolatedCache,
     request_id: &str,
@@ -296,12 +351,21 @@ fn run(command: &ImagingCommand, log_root: &Path) -> myalbuns_imaging_protocol::
 }
 
 fn invoke(command: &ImagingCommand, log_root: &Path) -> std::process::Output {
+    spawn(command, log_root, None)
+        .wait_with_output()
+        .expect("the Processador exits")
+}
+
+fn spawn(command: &ImagingCommand, log_root: &Path, barrier: Option<&Path>) -> std::process::Child {
     let mut process = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"));
     process
         .env("MYALBUNS_LOG_DIR", log_root)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    if let Some(barrier) = barrier {
+        process.env("MYALBUNS_TEST_PROGRESSIVE_DECODE_BARRIER", barrier);
+    }
     let mut child = process.spawn().expect("the real Processador starts");
     let mut payload = serde_json::to_vec(command).expect("the command serializes");
     payload.push(b'\n');
@@ -311,7 +375,15 @@ fn invoke(command: &ImagingCommand, log_root: &Path) -> std::process::Output {
         .expect("the Processador stdin is available")
         .write_all(&payload)
         .expect("the Cache command is sent");
-    child.wait_with_output().expect("the Processador exits")
+    child
+}
+
+fn wait_for_file(path: &Path, message: &str) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !path.exists() {
+        assert!(Instant::now() < deadline, "{message}");
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 fn write_tiff(path: &Path, width: u32, height: u32, pages: usize) {

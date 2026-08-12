@@ -1,15 +1,12 @@
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use myalbuns_core::MediaKind;
-use myalbuns_paths::{ExpectedObject, OperationPathContext, ResolveError};
+use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MediaBinding {
@@ -30,7 +27,7 @@ pub(crate) struct MediaObservation {
     pub(crate) media_id: String,
     pub(crate) kind: MediaKind,
     pub(crate) availability: MediaAvailability,
-    physical_identity: Option<String>,
+    physical_identity: Option<PhysicalFileIdentity>,
     source_bytes: Option<u64>,
     source_created_unix_ms: Option<u64>,
     source_modified_unix_ms: Option<u64>,
@@ -53,6 +50,7 @@ pub(crate) struct MediaRuntimeUpdate {
     observation_generation: u64,
     changed_media_ids: Vec<String>,
     invalidated_media_ids: Vec<String>,
+    revoked_preview_media_ids: Vec<String>,
 }
 
 impl MediaRuntimeUpdate {
@@ -68,16 +66,40 @@ impl MediaRuntimeUpdate {
         &self.invalidated_media_ids
     }
 
+    pub(crate) fn revoked_preview_media_ids(&self) -> &[String] {
+        &self.revoked_preview_media_ids
+    }
+
     #[cfg(test)]
     pub(crate) fn for_test(
         observation_generation: u64,
         changed_media_ids: Vec<String>,
         invalidated_media_ids: Vec<String>,
     ) -> Self {
+        let mut revoked_preview_media_ids = changed_media_ids.clone();
+        for media_id in &invalidated_media_ids {
+            if !revoked_preview_media_ids.contains(media_id) {
+                revoked_preview_media_ids.push(media_id.clone());
+            }
+        }
         Self {
             observation_generation,
             changed_media_ids,
             invalidated_media_ids,
+            revoked_preview_media_ids,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test_preserving_previews(
+        observation_generation: u64,
+        changed_media_ids: Vec<String>,
+    ) -> Self {
+        Self {
+            observation_generation,
+            changed_media_ids,
+            invalidated_media_ids: Vec::new(),
+            revoked_preview_media_ids: Vec::new(),
         }
     }
 }
@@ -134,9 +156,7 @@ impl MediaResolver {
                         Ok(resolved) => match resolved.file().metadata() {
                             Ok(metadata) => (
                                 MediaAvailability::Candidate,
-                                resolved
-                                    .physical_identity()
-                                    .map(|identity| identity.to_local_token()),
+                                resolved.physical_identity(),
                                 Some(metadata.len()),
                                 file_time_millis(metadata.created()),
                                 file_time_millis(metadata.modified()),
@@ -222,12 +242,27 @@ impl MediaRuntime {
                     .is_some_and(|previous| invalidates_cache(previous, observation))
             })
             .map(|observation| observation.media_id.clone())
+            .collect::<Vec<_>>();
+        let revoked_preview_media_ids = proposal
+            .observations
+            .iter()
+            .filter(|observation| {
+                previous
+                    .get(observation.media_id.as_str())
+                    .is_none_or(|previous| *previous != **observation)
+                    && (observation.availability == MediaAvailability::Absent
+                        || previous
+                            .get(observation.media_id.as_str())
+                            .is_some_and(|previous| invalidates_cache(previous, observation)))
+            })
+            .map(|observation| observation.media_id.clone())
             .collect();
         *current = Some(proposal);
         MediaRuntimeUpdate {
             observation_generation,
             changed_media_ids,
             invalidated_media_ids,
+            revoked_preview_media_ids,
         }
     }
 
@@ -242,8 +277,13 @@ impl MediaRuntime {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct MediaMonitor {
     resolver: MediaResolver,
-    next_generation: Arc<AtomicU64>,
-    pending: Arc<Mutex<Option<MediaResolutionProposal>>>,
+    transition: Arc<Mutex<MediaMonitorTransition>>,
+}
+
+#[derive(Debug, Default)]
+struct MediaMonitorTransition {
+    next_generation: u64,
+    pending: Option<MediaResolutionProposal>,
 }
 
 impl MediaMonitor {
@@ -252,27 +292,35 @@ impl MediaMonitor {
         runtime: &MediaRuntime,
         bindings: &[MediaBinding],
     ) -> MediaMonitorPoll {
-        let generation = self.next_generation.fetch_add(1, Ordering::Relaxed) + 1;
-        let proposal = self.resolver.observe(generation, bindings);
-        let current = runtime.snapshot();
-        let mut pending = self
-            .pending
+        // A poll owns observation, stability classification and Runtime adoption as
+        // one transition. The background loop and demand commands cannot reorder
+        // samples or return a snapshot from another generation.
+        let mut transition = self
+            .transition
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
+        transition.next_generation = transition
+            .next_generation
+            .checked_add(1)
+            .expect("a MediaMonitor generation cannot exhaust u64");
+        let generation = transition.next_generation;
+        let proposal = self.resolver.observe(generation, bindings);
+        let current = runtime.snapshot();
         let update = match current {
             Some(current) if current.observations == proposal.observations => {
-                *pending = None;
+                transition.pending = None;
                 None
             }
-            _ if pending
+            _ if transition
+                .pending
                 .as_ref()
                 .is_some_and(|candidate| candidate.observations == proposal.observations) =>
             {
-                *pending = None;
+                transition.pending = None;
                 Some(runtime.apply(proposal.clone()))
             }
             _ => {
-                *pending = Some(proposal.clone());
+                transition.pending = Some(proposal.clone());
                 None
             }
         };
@@ -301,6 +349,8 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::mpsc, time::Duration};
+
     use myalbuns_core::MediaKind;
 
     use super::{
@@ -367,6 +417,53 @@ mod tests {
         assert!(update.changed_media_ids().is_empty());
         assert!(update.invalidated_media_ids().is_empty());
         assert_eq!(runtime.snapshot(), Some(newer));
+    }
+
+    #[test]
+    fn concurrent_pollers_cannot_sample_outside_the_monitor_transition() {
+        let root = tempfile::tempdir().expect("temporary serialized-monitor fixture");
+        let source = root.path().join("photo.jpg");
+        std::fs::write(&source, b"photo").expect("the Original fixture is writable");
+        let bindings = vec![MediaBinding {
+            media_id: "photo-a".into(),
+            kind: MediaKind::Photo,
+            logical_path: source,
+        }];
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+        let transition_guard = monitor
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (started_sender, started_receiver) = mpsc::sync_channel(0);
+        let (finished_sender, finished_receiver) = mpsc::sync_channel(0);
+        let queued_monitor = monitor.clone();
+        let queued_runtime = runtime.clone();
+        let queued = std::thread::spawn(move || {
+            started_sender
+                .send(())
+                .expect("the concurrent poller reaches the transition");
+            let poll = queued_monitor.poll(&queued_runtime, &bindings);
+            finished_sender
+                .send(poll)
+                .expect("the serialized poll result is observed");
+        });
+        started_receiver
+            .recv()
+            .expect("the concurrent poller starts");
+        assert!(
+            finished_receiver
+                .recv_timeout(Duration::from_millis(50))
+                .is_err(),
+            "a poll cannot inspect or mutate stability while another transition owns the gate"
+        );
+        drop(transition_guard);
+        let poll = finished_receiver
+            .recv_timeout(Duration::from_secs(2))
+            .expect("the queued poll completes after the transition");
+        assert!(poll.update().is_none());
+        assert!(poll.confirmed_observation().is_none());
+        queued.join().expect("the concurrent poller does not panic");
     }
 
     #[test]

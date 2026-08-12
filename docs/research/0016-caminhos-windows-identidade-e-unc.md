@@ -59,7 +59,9 @@ O campo `sourceInputsDirty` usa a mesma regra do gate de recuperação: inspecio
 todo arquivo rastreado e todo arquivo novo não ignorado pelo Git, excluindo
 somente a própria evidência gerada. Isso inclui entradas da raiz, configurações
 de build e `resources/windows/myalbuns.manifest`; outputs declarados no
-`.gitignore` não são tratados como fontes.
+`.gitignore` não são tratados como fontes. O commit e o estado são capturados
+antes e depois da jornada; mudança de HEAD ou sujeira em qualquer extremidade
+torna a proveniência suja.
 
 O runner cria duas raízes descartáveis no volume local e as expõe por SMB real
 através do compartilhamento administrativo loopback `C$`. Uma letra livre é

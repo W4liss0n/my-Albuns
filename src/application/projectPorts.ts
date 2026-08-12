@@ -3,9 +3,11 @@ import type {
   ProjectIntent,
 } from "../domain/project";
 
+export type MediaPreviewState = "ready" | "absent" | "unavailable";
+
 export interface MediaPreview {
   mediaId: string;
-  state: "ready" | "absent" | "unavailable";
+  state: MediaPreviewState;
   url: string | null;
 }
 

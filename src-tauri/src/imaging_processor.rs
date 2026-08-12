@@ -161,19 +161,19 @@ impl<Stage> OperationFailure<Stage> {
 impl InvocationFailure {
     pub(crate) fn at_stage(
         stage: InvocationFailureStage,
-        _process_id: Option<u32>,
+        process_id: Option<u32>,
         message: impl Into<String>,
     ) -> Self {
         Self {
             stage,
             exit_code: None,
-            process_id: _process_id,
+            process_id,
             message: message.into(),
             termination_observed: false,
         }
     }
 
-    pub(crate) fn terminated(_process_id: u32, exit_code: Option<i32>) -> Self {
+    pub(crate) fn terminated(process_id: u32, exit_code: Option<i32>) -> Self {
         let stage = exit_code
             .and_then(ImagingFailureStage::from_exit_code)
             .map_or(
@@ -183,7 +183,7 @@ impl InvocationFailure {
         Self {
             stage,
             exit_code,
-            process_id: Some(_process_id),
+            process_id: Some(process_id),
             message: format!(
                 "O Processador de Imagens terminou com o código {:?}.",
                 exit_code
@@ -192,21 +192,21 @@ impl InvocationFailure {
         }
     }
 
-    pub(crate) fn cancelled(_process_id: u32) -> Self {
+    pub(crate) fn cancelled(process_id: u32) -> Self {
         Self {
             stage: InvocationFailureStage::Cancelled,
             exit_code: None,
-            process_id: Some(_process_id),
+            process_id: Some(process_id),
             message: "A operação do Processador de Imagens foi cancelada.".into(),
             termination_observed: false,
         }
     }
 
-    pub(crate) fn termination_unconfirmed(_process_id: u32, message: impl Into<String>) -> Self {
+    pub(crate) fn termination_unconfirmed(process_id: u32, message: impl Into<String>) -> Self {
         Self {
             stage: InvocationFailureStage::TerminationUnconfirmed,
             exit_code: None,
-            process_id: Some(_process_id),
+            process_id: Some(process_id),
             message: message.into(),
             termination_observed: false,
         }

@@ -61,6 +61,11 @@ impl PersistedBaseline {
     pub(super) fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
         self.lock.physical_identity()
     }
+
+    #[cfg(windows)]
+    pub(super) fn matches(&self, resolved: &myalbuns_paths::ResolvedObject) -> bool {
+        self.lock.compare_physical(resolved) == myalbuns_paths::PhysicalIdentityEvidence::Same
+    }
 }
 
 #[cfg(test)]

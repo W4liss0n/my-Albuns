@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::AppPathsError;
 
 /// The root syntax captured for one external path.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PathRootKind {
     Disk,
@@ -16,7 +16,7 @@ pub enum PathRootKind {
 }
 
 /// One immutable logical-to-operational root binding.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootBinding {
     kind: PathRootKind,
@@ -41,7 +41,7 @@ impl RootBinding {
 }
 
 /// Frozen bindings shared by every participant in one logical operation.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RootBindingPlan {
     bindings: Vec<RootBinding>,

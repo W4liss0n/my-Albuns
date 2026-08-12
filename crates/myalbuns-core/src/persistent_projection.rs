@@ -154,7 +154,7 @@ mod tests {
 
     use super::*;
     use crate::project_document::{
-        Background, BackgroundContent, DecorativeMedia, DocumentSettings, FrameBorder, Overlay,
+        Background, BackgroundContent, DocumentSettings, FrameBorder, MediaRef, Overlay,
         OverlayContent, ProjectSheet, Rgb, VisualDefaults,
     };
 
@@ -186,12 +186,12 @@ mod tests {
                 },
             ),
             vec![
-                DecorativeMedia::new(
+                MediaRef::new(
                     background_id,
                     MediaKind::Decorative,
                     PathBuf::from(r"C:\Fotos\fundo.png"),
                 ),
-                DecorativeMedia::new(
+                MediaRef::new(
                     overlay_id,
                     MediaKind::Decorative,
                     PathBuf::from(r"C:\Fotos\overlay.png"),

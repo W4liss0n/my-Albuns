@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -208,9 +208,6 @@ impl MediaRef {
         Self { id, kind, path }
     }
 }
-
-/// Compatibility name for the v1-only public model. New code uses `MediaRef`.
-pub type DecorativeMedia = MediaRef;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectSheet {
@@ -627,18 +624,18 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         return Err(());
     }
 
-    let mut media_ids = HashSet::new();
+    let mut media_by_id = HashMap::new();
     let mut media_paths = HashSet::new();
     for media in project.media() {
         if validate_external_path(media.path()).is_err()
-            || !media_ids.insert(media.id())
-            || !media_paths.insert(media.path().to_path_buf())
+            || media_by_id.insert(media.id(), media.kind()).is_some()
+            || !media_paths.insert((media.kind(), media.path().to_path_buf()))
         {
             return Err(());
         }
     }
     for media_id in referenced_media(project.visual_defaults()) {
-        if !media_ids.contains(&media_id) {
+        if media_by_id.get(&media_id) != Some(&MediaKind::Decorative) {
             return Err(());
         }
     }
