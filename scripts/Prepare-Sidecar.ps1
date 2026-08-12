@@ -9,16 +9,7 @@ Initialize-MyAlbunsToolchain
 
 Push-Location $script:WorkspaceRoot
 try {
-    $buildArguments = @('build', '-p', 'myalbuns-imaging')
-    if ($Profile -eq 'release') {
-        $buildArguments += '--release'
-    }
-    & $script:CargoExecutable @buildArguments
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
-    }
-
-    $targetDirectory = if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
+    $baseTargetDirectory = if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
         Join-Path $script:WorkspaceRoot 'target'
     }
     elseif ([System.IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) {
@@ -27,9 +18,27 @@ try {
     else {
         [System.IO.Path]::GetFullPath((Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR))
     }
+    $sidecarTargetDirectory = Join-Path $baseTargetDirectory 'sidecar-build'
+    $buildArguments = @(
+        'build',
+        '-p',
+        'myalbuns-imaging',
+        '--bin',
+        'myalbuns-imaging',
+        '--target-dir',
+        $sidecarTargetDirectory
+    )
+    if ($Profile -eq 'release') {
+        $buildArguments += '--release'
+    }
+    & $script:CargoExecutable @buildArguments
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     $source = (
         Resolve-Path (
-            Join-Path $targetDirectory "$Profile\myalbuns-imaging.exe"
+            Join-Path $sidecarTargetDirectory "$Profile\myalbuns-imaging.exe"
         )
     ).Path
     $binaryDirectory = Join-Path $script:WorkspaceRoot 'src-tauri\binaries'

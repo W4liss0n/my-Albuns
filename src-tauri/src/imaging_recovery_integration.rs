@@ -191,7 +191,12 @@ impl RealProcessTransport {
         if must_crash {
             self.crash_next = CrashNext::Never;
             let partial_path = partial_path(command, process_id).expect("crashable command");
-            wait_for_file_while_running(&mut child, &partial_path, Duration::from_secs(60));
+            wait_for_file_while_running(
+                &mut child,
+                &partial_path,
+                &self.log_directory,
+                Duration::from_secs(60),
+            );
             self.partial_preparation_observed = true;
             child
                 .kill()
@@ -262,7 +267,12 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
     }
 }
 
-fn wait_for_file_while_running(child: &mut std::process::Child, path: &Path, timeout: Duration) {
+fn wait_for_file_while_running(
+    child: &mut std::process::Child,
+    path: &Path,
+    log_directory: &Path,
+    timeout: Duration,
+) {
     let deadline = Instant::now() + timeout;
     loop {
         if path.is_file() {
@@ -274,8 +284,9 @@ fn wait_for_file_while_running(child: &mut std::process::Child, path: &Path, tim
                 let _ = stream.read_to_string(&mut stderr);
             }
             panic!(
-                "processor exited with {status} before materializing {}: {stderr}",
+                "processor exited with {status} before materializing {}: {stderr}\n{}",
                 path.display(),
+                read_test_logs(log_directory),
             );
         }
         assert!(

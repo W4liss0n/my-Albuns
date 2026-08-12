@@ -15,6 +15,24 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 
+$scratchRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot '.scratch')
+)
+$evidenceDirectory = [System.IO.Path]::GetFullPath(
+    (Join-Path `
+        $scratchRoot `
+        "imaging-recovery-evidence-$PID-$([DateTime]::UtcNow.Ticks)")
+)
+$evidenceParent = [System.IO.Path]::GetDirectoryName($evidenceDirectory)
+if (-not [string]::Equals(
+        $evidenceParent,
+        $scratchRoot,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The recovery evidence directory escaped the workspace scratch root.'
+}
+$processorTargetDirectory = Join-Path $evidenceDirectory 'processor-target'
+
 $checks = @(
     [ordered]@{
         name = 'protocol'
@@ -42,7 +60,11 @@ $checks = @(
         arguments = @(
             'build',
             '-p',
-            'myalbuns-imaging'
+            'myalbuns-imaging',
+            '--bin',
+            'myalbuns-imaging',
+            '--target-dir',
+            $processorTargetDirectory
         )
     },
     [ordered]@{
@@ -106,28 +128,11 @@ $checks = @(
     }
 )
 
-$scratchRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $script:WorkspaceRoot '.scratch')
-)
-$evidenceDirectory = [System.IO.Path]::GetFullPath(
-    (Join-Path `
-        $scratchRoot `
-        "imaging-recovery-evidence-$PID-$([DateTime]::UtcNow.Ticks)")
-)
-$evidenceParent = [System.IO.Path]::GetDirectoryName($evidenceDirectory)
-if (-not [string]::Equals(
-        $evidenceParent,
-        $scratchRoot,
-        [System.StringComparison]::OrdinalIgnoreCase
-    )) {
-    throw 'The recovery evidence directory escaped the workspace scratch root.'
-}
-
 New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
 $evidenceEnvironmentName = 'MYALBUNS_RECOVERY_EVIDENCE_DIR'
 $processorEnvironmentName = 'MYALBUNS_REAL_IMAGING_PROCESSOR'
 $processDataEnvironmentName = 'MYALBUNS_PROCESS_GATE_DATA_ROOT'
-$processorPath = Join-Path $script:WorkspaceRoot 'target\debug\myalbuns-imaging.exe'
+$processorPath = Join-Path $processorTargetDirectory 'debug\myalbuns-imaging.exe'
 $processDataRoot = Join-Path $evidenceDirectory 'process-data'
 foreach ($knownFolder in @('Roaming', 'Local', 'Temporary')) {
     New-Item `
