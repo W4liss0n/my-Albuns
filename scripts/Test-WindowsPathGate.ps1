@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
+. (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 Initialize-MyAlbunsToolchain
 
 if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
@@ -341,17 +342,9 @@ finally {
 }
 
 $sourceStatus = @(
-    & git status --porcelain -- `
-        Cargo.toml `
-        Cargo.lock `
-        crates `
-        package.json `
-        package-lock.json `
-        resources `
-        scripts `
-        src `
-        src-tauri `
-        tests
+    Get-TrackedGateSourceStatus `
+        -WorkspaceRoot $script:WorkspaceRoot `
+        -EvidencePath $OutputPath
 )
 $report = [ordered]@{
     schemaVersion = 2

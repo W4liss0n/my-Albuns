@@ -198,7 +198,14 @@ pub(crate) struct CacheEngine {
     applied_observation_generations: Mutex<HashMap<(String, String), u64>>,
     active_owners: Arc<AtomicUsize>,
     activity: CacheActivityGate,
-    metadata: Mutex<()>,
+    /// Serializes Cache state transitions that must be atomic with preview or
+    /// on-disk metadata publication.
+    ///
+    /// When both are needed, a `CacheActivityGate` permit is acquired first.
+    /// This gate is then acquired before `demands`, observation generations,
+    /// `flights`, the preview registry, or Cache metadata I/O. Code holding
+    /// any of those inner resources must never attempt to enter this gate.
+    transition_and_publication_gate: Mutex<()>,
 }
 
 #[derive(Debug, Default)]
@@ -335,8 +342,8 @@ impl CacheEngine {
             .into_iter()
             .map(str::to_owned)
             .collect::<HashSet<_>>();
-        let _metadata_guard = self
-            .metadata
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut demands = self
@@ -405,8 +412,8 @@ impl CacheEngine {
         if !demand.accepted {
             return None;
         }
-        let _metadata_guard = self
-            .metadata
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let demands = self
@@ -539,8 +546,8 @@ impl CacheEngine {
             .cloned()
             .collect::<HashSet<_>>();
         changed.extend(invalidated.iter().cloned());
-        let _metadata_guard = self
-            .metadata
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let applied_media_ids = {
@@ -641,8 +648,8 @@ impl CacheEngine {
         if media_ids.is_empty() {
             return Ok(0);
         }
-        let _metadata_guard = self
-            .metadata
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         self.cancel_flights(namespace.project_id(), &media_ids);
@@ -789,8 +796,8 @@ async fn execute_cache<T: ImagingTransport>(
     cancellation: &CacheCancellation,
 ) -> Result<CacheExecution, CacheFailure> {
     let request = {
-        let _metadata_guard = engine
-            .metadata
+        let _transition_and_publication_guard = engine
+            .transition_and_publication_gate
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         plan_request(app_paths, &work)?
@@ -843,8 +850,8 @@ async fn execute_cache<T: ImagingTransport>(
         discard_candidate_generation(&storage, &request);
         return Err(cancelled_after_processor());
     }
-    let _metadata_guard = engine
-        .metadata
+    let _transition_and_publication_guard = engine
+        .transition_and_publication_gate
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     if cancellation

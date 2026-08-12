@@ -3,6 +3,7 @@ param([string] $OutputPath)
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
+. (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 Initialize-MyAlbunsToolchain
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -455,16 +456,9 @@ finally {
 }
 
 $sourceStatus = @(
-    & git status --porcelain -- `
-        Cargo.toml `
-        Cargo.lock `
-        crates `
-        package.json `
-        package-lock.json `
-        scripts `
-        src `
-        src-tauri `
-        tests
+    Get-TrackedGateSourceStatus `
+        -WorkspaceRoot $script:WorkspaceRoot `
+        -EvidencePath $OutputPath
 )
 $report = [ordered]@{
     schemaVersion = 1
