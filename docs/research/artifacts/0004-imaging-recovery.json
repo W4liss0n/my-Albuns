@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-12T20:29:28.7166734Z",
-    "gitCommit":  "c0fd700b689edee6fc736a526fd3783f19a573a5",
+    "collectedAtUtc":  "2026-08-12T23:29:51.1591404Z",
+    "gitCommit":  "29be09d1f6a2480edd920ef2a780aa5270ced0f5",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -11,63 +11,63 @@
                    {
                        "name":  "protocol",
                        "passed":  true,
-                       "elapsedMs":  28166
+                       "elapsedMs":  1127
                    },
                    {
                        "name":  "cache-temporary-cleanup",
                        "passed":  true,
-                       "elapsedMs":  12595
+                       "elapsedMs":  2186
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  53514
+                       "elapsedMs":  111673
                    },
                    {
                        "name":  "production-recovery-integration",
                        "passed":  true,
-                       "elapsedMs":  157129
+                       "elapsedMs":  56387
                    },
                    {
                        "name":  "cache-webview-canvas-export-journey",
                        "passed":  true,
-                       "elapsedMs":  804
+                       "elapsedMs":  1004
                    },
                    {
                        "name":  "obsolete-cache-cancellation-integration",
                        "passed":  true,
-                       "elapsedMs":  539
+                       "elapsedMs":  905
                    },
                    {
                        "name":  "causal-cache-pause-integration",
                        "passed":  true,
-                       "elapsedMs":  770
+                       "elapsedMs":  1488
                    },
                    {
                        "name":  "actual-tauri-webview2-build",
                        "passed":  true,
-                       "elapsedMs":  178248
+                       "elapsedMs":  89315
                    },
                    {
                        "name":  "actual-tauri-album-canvas-pixi-webview2",
                        "passed":  true,
-                       "elapsedMs":  23761
+                       "elapsedMs":  14520
                    }
                ],
     "evidence":  {
                      "cache":  {
-                                   "failedProcessId":  35200,
+                                   "failedProcessId":  18380,
                                    "foreignTemporarySurvivedCleanup":  true,
                                    "generatedCountAfterRestart":  1,
                                    "metadataExistedAfterFailure":  false,
                                    "metadataExistedAfterRestart":  true,
                                    "removedTemporaryCount":  1,
-                                   "restartedProcessId":  13380,
+                                   "restartedProcessId":  20912,
                                    "temporaryExistedAfterCleanup":  false,
                                    "temporaryObservedAfterFailure":  true
                                },
                      "export":  {
-                                    "failedProcessId":  20544,
+                                    "failedProcessId":  34024,
                                     "finalOutputSha256AfterExplicitRetry":  "9d29aa06810d45517e59fa6ef7531c5c959df4b11e2279da31f976ec3300c0c8",
                                     "partialPreparationObserved":  true,
                                     "previousOutputSha256AfterFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
@@ -77,7 +77,7 @@
                                     "projectSha256AfterSuccess":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
                                     "projectSha256BeforeFailure":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
                                     "protocolVersion":  17,
-                                    "retryProcessId":  25788,
+                                    "retryProcessId":  12968,
                                     "successResponseBeforeExplicitRetry":  false
                                 },
                      "canvas":  {
@@ -93,8 +93,8 @@
                                                          0
                                                      ],
                                     "compositionMediaOrder":  [
-                                                                  "d5acca33-a249-4781-89c0-cb9a985ef017",
-                                                                  "5dec75db-31f9-447f-b0f4-a8c429db63c0"
+                                                                  "32356951-75d3-4d04-8721-1bf925f61e3b",
+                                                                  "2142e462-b366-4efd-b046-8117327382bb"
                                                               ],
                                     "equivalentBackgroundDemandCount":  2,
                                     "finalJpegPixel":  [
@@ -108,13 +108,13 @@
                                     "originalPathExposedToWebView":  false,
                                     "overlayUrlOpaque":  true,
                                     "processorIds":  [
-                                                         33920,
-                                                         36344,
-                                                         33104
+                                                         24372,
+                                                         31196,
+                                                         14068
                                                      ],
-                                    "singleFlightGenerationId":  "g-7e6f580a947a49f095d2f955769150cc",
+                                    "singleFlightGenerationId":  "g-f5049d08b56c48ec93ff23d840d3ca72",
                                     "singleFlightProcessorCount":  1,
-                                    "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\aa69\\my-Albuns\\.scratch\\imaging-recovery-evidence-32488-639221629099664023\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                    "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\aa69\\my-Albuns\\.scratch\\imaging-recovery-evidence-19292-639221739012677178\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
                                     "actualTauriApp":  true,
                                     "actualAlbumCanvas":  true,
                                     "actualPixiRuntime":  true,
@@ -123,6 +123,11 @@
                                     "nativeDriverVersion":  "151.0.4129.78",
                                     "webView2RuntimeVersion":  "151.0.4129.78",
                                     "opaqueResourceCount":  2,
+                                    "canvasScreenshotScope":  "canvas-element",
+                                    "actualCanvasSamplePoint":  [
+                                                                    574,
+                                                                    309
+                                                                ],
                                     "actualCanvasPixel":  [
                                                               103,
                                                               65,
@@ -137,7 +142,7 @@
                      "obsolete":  {
                                       "cacheIndexAfterCancellation":  false,
                                       "cancellationReason":  "obsolete",
-                                      "cancelledProcessId":  25396,
+                                      "cancelledProcessId":  31192,
                                       "cancelledProcessReaped":  true,
                                       "cancelledStage":  "cancelled",
                                       "resumableAfterCancellation":  false,
@@ -148,14 +153,14 @@
                      "pause":  {
                                    "cacheBlockedWhileExportLease":  true,
                                    "cacheIndexAfterCancellation":  false,
-                                   "cancelledProcessId":  6252,
+                                   "cancelledProcessId":  25516,
                                    "cancelledProcessReaped":  true,
                                    "cancelledStage":  "cancelled",
                                    "pauseReason":  "paused",
                                    "processorExclusiveWhileExportLease":  true,
                                    "resumedAfterExportTerminal":  true,
                                    "resumedGenerationPublished":  true,
-                                   "resumedProcessId":  1920
+                                   "resumedProcessId":  31856
                                }
                  }
 }
