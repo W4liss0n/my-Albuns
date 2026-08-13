@@ -14,6 +14,34 @@ import {
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
+function waitForOutput(child, marker, label, timeoutMilliseconds = 10_000) {
+  return new Promise((resolve, reject) => {
+    let output = "";
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`${label} did not emit ${marker}`));
+    }, timeoutMilliseconds);
+    const onData = (chunk) => {
+      output += chunk.toString();
+      if (output.includes(marker)) {
+        cleanup();
+        resolve();
+      }
+    };
+    const onExit = (code) => {
+      cleanup();
+      reject(new Error(`${label} exited ${code} before emitting ${marker}`));
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      child.stdout.off("data", onData);
+      child.off("exit", onExit);
+    };
+    child.stdout.on("data", onData);
+    child.once("exit", onExit);
+  });
+}
+
 test("a pre-existing application instance makes the gate fail closed before launch", () => {
   assert.throws(
     () =>
@@ -37,22 +65,7 @@ test("an unresponsive exact window makes bounded close fail without hanging clea
     { stdio: ["ignore", "pipe", "pipe"] },
   );
   try {
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(
-        () => reject(new Error("unresponsive window fixture did not start")),
-        10_000,
-      );
-      child.stdout.on("data", (chunk) => {
-        if (chunk.toString().includes("READY")) {
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-      child.once("exit", (code) => {
-        clearTimeout(timeout);
-        reject(new Error(`unresponsive window fixture exited ${code}`));
-      });
-    });
+    await waitForOutput(child, "READY", "Unresponsive window fixture");
     const instance = await waitForProcessInstance(
       child.pid,
       "Unresponsive window fixture",
@@ -70,6 +83,38 @@ test("an unresponsive exact window makes bounded close fail without hanging clea
     const exit = new Promise((resolve) => child.once("exit", resolve));
     assert.equal(terminateProcessInstance(instance), true);
     await exit;
+  } finally {
+    child.kill();
+  }
+});
+
+test("an exact responsive window receives bounded native close", async () => {
+  const child = spawn(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      'Add-Type -ReferencedAssemblies System.Windows.Forms,System.Drawing -TypeDefinition \'using System; using System.Drawing; using System.Windows.Forms; public static class MyAlbunsResponsiveWindowFixture { public static void Run() { var form = new Form { Text = "MyAlbuns responsive gate fixture", ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None, StartPosition = FormStartPosition.Manual, Location = new Point(-32000, -32000), Size = new Size(1, 1) }; form.Shown += (_, __) => { Console.WriteLine("READY"); Console.Out.Flush(); }; form.FormClosing += (_, __) => { Console.WriteLine("CLOSING"); Console.Out.Flush(); }; Application.Run(form); } }\'; [MyAlbunsResponsiveWindowFixture]::Run()',
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  try {
+    await waitForOutput(child, "READY", "Responsive window fixture");
+    const instance = await waitForProcessInstance(
+      child.pid,
+      "Responsive window fixture",
+    );
+    const closing = waitForOutput(
+      child,
+      "CLOSING",
+      "Responsive window fixture",
+    );
+    const exit = new Promise((resolve) => child.once("exit", resolve));
+    closeMainWindow(instance);
+    await closing;
+    await exit;
+    assert.deepEqual(aliveProcessInstances([instance]), []);
   } finally {
     child.kill();
   }

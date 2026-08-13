@@ -636,7 +636,10 @@ try {
   // observer before exercising the native close terminal so the instrument is
   // no longer an active participant in the WebView being closed.
   if (driverInstance) {
-    terminateProcessInstance(driverInstance);
+    if (!driver || !terminateProcessInstance(driverInstance)) {
+      throw new Error("The exact WebDriver process instance was not terminable");
+    }
+    await waitForProcessExit(driver, 10_000, "WebDriver");
     driver = undefined;
     driverInstance = undefined;
   }

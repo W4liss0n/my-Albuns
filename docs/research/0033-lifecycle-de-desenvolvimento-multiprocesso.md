@@ -224,6 +224,10 @@ O `WM_CLOSE` usa a janela nativa correlacionada à instância e
 `SendMessageTimeoutW` com limite de cinco segundos. Uma janela sem resposta
 falha o gate e entrega o controle ao cleanup exato, sem bloquear o instrumento;
 uma regressão cria uma janela Windows real sem message pump e prova esse limite.
+Outra regressão cria uma janela responsiva, observa o evento de fechamento e
+prova o terminal positivo. No gate integrado, a instância exata do WebDriver é
+encerrada e seu terminal é observado antes do `WM_CLOSE`, para que o instrumento
+de inspeção já não participe da WebView durante o fechamento nativo.
 
 Antes de iniciar o supervisor, o gate exige zero instâncias preexistentes do
 mesmo binário desktop. A precondição torna a descoberta pertencente à rodada:
