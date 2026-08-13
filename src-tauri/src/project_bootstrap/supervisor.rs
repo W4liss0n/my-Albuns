@@ -127,20 +127,35 @@ fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapF
     #[cfg(debug_assertions)]
     configure_host_webview_debugging(&mut command)?;
     #[cfg(debug_assertions)]
-    crate::dev_host_registration::configure_host_command(&mut command, launch_nonce).map_err(
-        |_| BootstrapFailure {
-            kind: BootstrapFailureKind::HostUnavailable,
-            stage: Some(super::FailureStage::Transport),
-            code: Some(super::FailureCode::IoFailure),
-        },
-    )?;
+    let pending_host_lease =
+        crate::dev_host_registration::prepare_host_command(&mut command, launch_nonce).map_err(
+            |_| BootstrapFailure {
+                kind: BootstrapFailureKind::HostUnavailable,
+                stage: Some(super::FailureStage::Transport),
+                code: Some(super::FailureCode::IoFailure),
+            },
+        )?;
     #[cfg(not(debug_assertions))]
     let _ = launch_nonce;
-    command.spawn().map_err(|_| BootstrapFailure {
+    let mut child = command.spawn().map_err(|_| BootstrapFailure {
         kind: BootstrapFailureKind::HostUnavailable,
         stage: None,
         code: None,
-    })
+    })?;
+    #[cfg(debug_assertions)]
+    if pending_host_lease
+        .as_ref()
+        .is_some_and(|authorization| authorization.authorize_spawned_host(&child).is_err())
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(BootstrapFailure {
+            kind: BootstrapFailureKind::HostUnavailable,
+            stage: Some(super::FailureStage::Transport),
+            code: Some(super::FailureCode::IoFailure),
+        });
+    }
+    Ok(child)
 }
 
 #[cfg(debug_assertions)]

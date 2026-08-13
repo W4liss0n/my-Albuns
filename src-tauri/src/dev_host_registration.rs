@@ -3,10 +3,12 @@ use std::{
     ffi::OsStr,
     io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpStream},
-    process::Command,
+    os::windows::io::AsRawHandle,
+    process::{Child, Command},
     time::Duration,
 };
 
+use crate::dev_process_identity::HostProcessInstanceId;
 use crate::dev_supervisor_protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
@@ -15,13 +17,45 @@ use crate::dev_supervisor_protocol::{
 const HOST_REGISTRATION_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const HOST_LEASE_CREDENTIAL_ENV: &str = "MYALBUNS_DEV_HOST_LEASE_CREDENTIAL";
 
-pub(crate) fn configure_host_command(command: &mut Command, launch_nonce: &str) -> io::Result<()> {
+pub(crate) struct PendingHostLeaseAuthorization {
+    endpoint: SocketAddr,
+    authority: String,
+    credential: String,
+}
+
+impl PendingHostLeaseAuthorization {
+    pub(crate) fn authorize_spawned_host(&self, child: &Child) -> io::Result<()> {
+        let process_instance =
+            HostProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast())?;
+        let response = exchange(
+            self.endpoint,
+            &format!(
+                "{AUTHORIZE_HOST_LEASE_REQUEST} {} {} {} {}\n",
+                self.authority,
+                self.credential,
+                process_instance.process_id(),
+                process_instance.creation_time_wire(),
+            ),
+        )?;
+        if response != HOST_LEASE_AUTHORIZED_RESPONSE {
+            return Err(io::Error::other(
+                "o supervisor recusou a credencial de registro do Host",
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn prepare_host_command(
+    command: &mut Command,
+    launch_nonce: &str,
+) -> io::Result<Option<PendingHostLeaseAuthorization>> {
     let endpoint = env::var_os(HOST_LEASE_ENDPOINT_ENV);
     let authority = env::var_os(HOST_LEASE_AUTHORITY_ENV);
     let (endpoint, authority) = match (endpoint, authority) {
         (None, None) => {
             command.env_remove(HOST_LEASE_CREDENTIAL_ENV);
-            return Ok(());
+            return Ok(None);
         }
         (Some(endpoint), Some(authority)) => (endpoint, authority),
         _ => {
@@ -36,21 +70,15 @@ pub(crate) fn configure_host_command(command: &mut Command, launch_nonce: &str) 
         .ok_or_else(|| io::Error::other("a autoridade do supervisor não é Unicode"))?;
     validate_launch_nonce(launch_nonce)?;
 
-    let response = exchange(
-        endpoint,
-        &format!("{AUTHORIZE_HOST_LEASE_REQUEST} {authority} {launch_nonce}\n"),
-    )?;
-    if response != HOST_LEASE_AUTHORIZED_RESPONSE {
-        return Err(io::Error::other(
-            "o supervisor recusou a credencial de registro do Host",
-        ));
-    }
-
     command
         .env(HOST_LEASE_ENDPOINT_ENV, endpoint.to_string())
         .env_remove(HOST_LEASE_AUTHORITY_ENV)
         .env(HOST_LEASE_CREDENTIAL_ENV, launch_nonce);
-    Ok(())
+    Ok(Some(PendingHostLeaseAuthorization {
+        endpoint,
+        authority: authority.to_owned(),
+        credential: launch_nonce.to_owned(),
+    }))
 }
 
 pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {

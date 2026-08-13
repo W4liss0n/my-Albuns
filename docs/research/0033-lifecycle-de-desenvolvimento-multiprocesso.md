@@ -28,7 +28,7 @@ frontend de desenvolvimento.
 
 A rodada foi fixada em Tauri CLI `2.11.4`, crate `tauri 2.11.5`, Vite `7.3.6`,
 Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
-`151.0.4129.78`.
+`151.0.4129.78`. A fronteira Win32 usa os bindings `windows-sys 0.61.2`.
 
 - A configuração do Tauri define `beforeDevCommand` como o comando executado
   antes de `tauri dev` e `devUrl` como a URL carregada durante desenvolvimento.
@@ -45,6 +45,18 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject),
   [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) e
   [JOBOBJECT_BASIC_LIMIT_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information).
+- O PID identifica um processo apenas durante a vida de seu objeto e pode ser
+  reutilizado depois que o objeto é liberado. O handle devolvido na criação
+  continua ligado ao objeto exato enquanto estiver aberto:
+  [Process Handles and Identifiers](https://learn.microsoft.com/en-us/windows/win32/procthread/process-handles-and-identifiers) e
+  [PROCESS_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/ns-processthreadsapi-process_information).
+- `GetProcessTimes` devolve o instante de criação do processo como `FILETIME`,
+  um valor de 64 bits em unidades de 100 nanossegundos. O handle consultado
+  precisa de `PROCESS_QUERY_INFORMATION` ou
+  `PROCESS_QUERY_LIMITED_INFORMATION`; o último existe em todas as versões de
+  Windows suportadas pelo produto:
+  [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes) e
+  [FILETIME](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime).
 - O WebDriver do Edge recomenda o modo *attach* quando há UI nativa ou mais de
   uma WebView. A aplicação é iniciada fora do driver, o Host recebe
   `--remote-debugging-port` e o driver usa `DebuggerAddress`:
@@ -78,22 +90,30 @@ Cada worker primeiro se bloqueia numa barreira local autenticada. O supervisor
 o associa ao Job Object e só então libera a criação de descendentes. Isso fecha
 a janela entre `spawn` e `AssignProcessToJobObject`.
 
-Antes de iniciar cada Host, o Global usa a autoridade da execução para autorizar
-como credencial consumível o `launch_nonce` já correlacionado à tentativa de
-bootstrap. A autoridade não é herdada pelo Host: seu comando recebe somente o
-endpoint e essa credencial individual. O servidor aceita a credencial uma única
-vez e também rejeita uma nova autorização do mesmo nonce; repetir uma mensagem
-capturada não cria outro registro enquanto a execução permanece ativa.
+Depois de criar cada Host, o Global usa o handle exato do `Child` para capturar
+uma `HostProcessInstanceId`: o par tipado entre o PID usado como localizador e o
+`FILETIME` de criação. Isso ocorre antes de o pai enviar o request de bootstrap,
+portanto o Host ainda não alcançou o registro. A autoridade da execução autoriza
+como credencial consumível o `launch_nonce` já correlacionado à tentativa,
+vinculado a essa identidade de instância. A autoridade não é herdada pelo Host:
+seu comando recebe somente o endpoint e a credencial individual.
 
-O Host produtivo de debug registra seu PID por esse canal local autenticado e
-fecha o socket depois da confirmação. O supervisor abre um handle Windows com
-direito de sincronização e atribui àquele registro um `HostLeaseId` opaco e
-independente do PID. Conexão e desconexão transportam o mesmo `HostLeaseId`;
-assim, uma notificação atrasada do handle antigo não remove outro Host que tenha
-reutilizado o mesmo número de processo. O TCP serve apenas para autorizar e
-transferir o PID; o handle do processo é a autoridade de vida, portanto a
-duração do socket não participa do lease. Credenciais e IDs de lease não são
-gravados nos logs.
+O Host produtivo de debug registra seu PID por esse canal local autenticado. O
+servidor reserva o nonce atomicamente uma única vez e, ainda antes de criar uma
+lease ou responder `REGISTERED`, abre um handle Windows com
+`SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION`, consulta `GetProcessTimes` e
+exige a mesma `HostProcessInstanceId`. PID diferente, criação diferente, Host já
+encerrado, falha da API ou replay são terminais fechados: a credencial permanece
+queimada, nenhum evento `Connected` é emitido e nenhum processo alheio é
+acompanhado. O PID permanece somente localizador e diagnóstico; a identidade de
+criação valida a aquisição e o handle exato validado passa a ser a autoridade de
+vida.
+
+Cada aquisição validada recebe um `HostLeaseId` opaco. Conexão e desconexão
+transportam o mesmo `HostLeaseId`; assim, uma notificação atrasada do handle
+antigo não remove outro Host que tenha reutilizado o mesmo número de processo.
+O socket fecha depois da confirmação e sua duração não participa da lease.
+Credenciais, identidade de criação e IDs de lease não são gravados nos logs.
 
 O supervisor mantém Vite depois que a Tauri CLI e o Global terminam enquanto
 há ao menos um handle de Host ativo. O último Host libera o ambiente. Falha do

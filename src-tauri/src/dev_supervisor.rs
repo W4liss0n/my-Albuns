@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet, hash_map::Entry},
     env,
     ffi::{OsStr, OsString, c_void},
     io::{self, BufRead, BufReader, Read, Write},
@@ -25,13 +25,18 @@ use windows_sys::Win32::{
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
             SetInformationJobObject, TerminateJobObject,
         },
-        Threading::{INFINITE, OpenProcess, WaitForSingleObject},
+        Threading::{
+            INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, WaitForSingleObject,
+        },
     },
 };
 
+#[path = "dev_process_identity.rs"]
+mod process_identity;
 #[path = "dev_supervisor_protocol.rs"]
 mod protocol;
 
+use process_identity::HostProcessInstanceId;
 use protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
@@ -570,26 +575,42 @@ impl HostRegistrationCredential {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HostRegistrationState {
+    Authorized(HostProcessInstanceId),
+    Reserved,
+}
+
 #[derive(Default)]
 struct HostRegistrationCredentials {
-    authorized: HashSet<HostRegistrationCredential>,
-    consumed: HashSet<HostRegistrationCredential>,
+    states: HashMap<HostRegistrationCredential, HostRegistrationState>,
 }
 
 impl HostRegistrationCredentials {
-    fn authorize(&mut self, credential: HostRegistrationCredential) -> bool {
-        if self.authorized.contains(&credential) || self.consumed.contains(&credential) {
-            return false;
+    fn authorize(
+        &mut self,
+        credential: HostRegistrationCredential,
+        expected_process: HostProcessInstanceId,
+    ) -> bool {
+        match self.states.entry(credential) {
+            Entry::Vacant(entry) => {
+                entry.insert(HostRegistrationState::Authorized(expected_process));
+                true
+            }
+            Entry::Occupied(_) => false,
         }
-        self.authorized.insert(credential)
     }
 
-    fn consume(&mut self, credential: HostRegistrationCredential) -> bool {
-        if !self.authorized.remove(&credential) {
-            return false;
+    fn reserve(&mut self, credential: HostRegistrationCredential) -> Option<HostProcessInstanceId> {
+        let state = self.states.get_mut(&credential)?;
+        match state {
+            HostRegistrationState::Authorized(expected_process) => {
+                let expected_process = *expected_process;
+                *state = HostRegistrationState::Reserved;
+                Some(expected_process)
+            }
+            HostRegistrationState::Reserved => None,
         }
-        self.consumed.insert(credential);
-        true
     }
 }
 
@@ -597,6 +618,7 @@ enum HostLeaseRequest {
     Authorize {
         authority: String,
         credential: HostRegistrationCredential,
+        expected_process: HostProcessInstanceId,
     },
     Register {
         credential: HostRegistrationCredential,
@@ -706,12 +728,12 @@ fn handle_host_lease_connection(
         HostLeaseRequest::Authorize {
             authority,
             credential,
+            expected_process,
         } => {
             let accepted = authority == expected_authority
-                && credentials
-                    .lock()
-                    .ok()
-                    .is_some_and(|mut credentials| credentials.authorize(credential));
+                && credentials.lock().ok().is_some_and(|mut credentials| {
+                    credentials.authorize(credential, expected_process)
+                });
             let response = if accepted {
                 HOST_LEASE_AUTHORIZED_RESPONSE
             } else {
@@ -723,36 +745,84 @@ fn handle_host_lease_connection(
             credential,
             process_id,
         } => {
-            let accepted = credentials
+            let expected_process = credentials
                 .lock()
                 .ok()
-                .is_some_and(|mut credentials| credentials.consume(credential));
-            if !accepted {
+                .and_then(|mut credentials| credentials.reserve(credential));
+            let Some(expected_process) = expected_process else {
                 let _ = write_host_lease_response(reader.get_mut(), HOST_LEASE_REJECTED_RESPONSE);
                 return;
-            }
-            track_host_lease(reader.into_inner(), process_id, sender);
+            };
+            track_host_lease(reader.into_inner(), expected_process, process_id, sender);
+        }
+    }
+}
+
+struct ValidatedHostProcess(HANDLE);
+
+impl ValidatedHostProcess {
+    fn open(expected: HostProcessInstanceId) -> io::Result<Self> {
+        // SAFETY: the typed instance guarantees a non-zero PID. The returned
+        // non-inheritable handle is wrapped immediately and closed once.
+        let process = unsafe {
+            OpenProcess(
+                PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+                0,
+                expected.process_id(),
+            )
+        };
+        if process.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let process = Self(process);
+        let observed =
+            HostProcessInstanceId::from_process_handle(expected.process_id(), process.0)?;
+        if observed.process_id() != expected.process_id()
+            || observed.creation_time_wire() != expected.creation_time_wire()
+        {
+            return Err(io::Error::other(
+                "o PID do Host foi reutilizado por outra instância",
+            ));
+        }
+        Ok(process)
+    }
+
+    fn wait_for_exit(&self) -> io::Result<()> {
+        // SAFETY: self owns a validated process handle with SYNCHRONIZE access.
+        let wait = unsafe { WaitForSingleObject(self.0, INFINITE) };
+        if wait == WAIT_OBJECT_0 {
+            Ok(())
+        } else {
+            Err(io::Error::last_os_error())
+        }
+    }
+}
+
+impl Drop for ValidatedHostProcess {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            // SAFETY: this wrapper exclusively owns the handle.
+            unsafe { CloseHandle(self.0) };
+            self.0 = ptr::null_mut();
         }
     }
 }
 
 fn track_host_lease(
     mut connection: TcpStream,
+    expected_process: HostProcessInstanceId,
     process_id: u32,
     sender: mpsc::Sender<HostLeaseEvent>,
 ) {
-    let lease_id = HostLeaseId::new();
-    // SAFETY: OpenProcess receives a non-zero PID authenticated by the
-    // per-launch token; this thread closes the returned handle exactly once.
-    let process = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, process_id) };
-    if process.is_null() {
-        let _ = sender.send(HostLeaseEvent::TrackingFailed {
-            lease_id,
-            process_id,
-        });
+    if expected_process.process_id() != process_id {
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     }
+    let Ok(process) = ValidatedHostProcess::open(expected_process) else {
+        let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
+        return;
+    };
+    let lease_id = HostLeaseId::new();
     if sender
         .send(HostLeaseEvent::Connected {
             lease_id,
@@ -761,16 +831,13 @@ fn track_host_lease(
         .is_err()
     {
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
-        unsafe { CloseHandle(process) };
         return;
     }
     let _ = write_host_lease_response(&mut connection, HOST_LEASE_REGISTERED_RESPONSE);
     drop(connection);
     // The authenticated process handle is the durable lease. TCP is only the
     // bootstrap channel; WebView2 may reset inherited sockets during handoff.
-    let wait = unsafe { WaitForSingleObject(process, INFINITE) };
-    unsafe { CloseHandle(process) };
-    let event = if wait == WAIT_OBJECT_0 {
+    let event = if process.wait_for_exit().is_ok() {
         HostLeaseEvent::Disconnected {
             lease_id,
             process_id,
@@ -795,6 +862,10 @@ fn parse_host_lease_request(line: &str) -> Option<HostLeaseRequest> {
         AUTHORIZE_HOST_LEASE_REQUEST => HostLeaseRequest::Authorize {
             authority: fields.next()?.to_owned(),
             credential: HostRegistrationCredential::parse(fields.next()?)?,
+            expected_process: HostProcessInstanceId::from_wire(
+                fields.next()?.parse::<u32>().ok()?,
+                fields.next()?.parse::<u64>().ok()?,
+            )?,
         },
         REGISTER_HOST_LEASE_REQUEST => HostLeaseRequest::Register {
             credential: HostRegistrationCredential::parse(fields.next()?)?,
@@ -914,13 +985,16 @@ impl Drop for KillOnCloseJob {
 mod tests {
     use super::{
         DevelopmentLifecycle, HostLeaseEvent, HostLeaseId, HostLeaseRequest, HostLeaseServer,
-        KillOnCloseJob, LifecycleDecision, compose_tauri_cli_arguments, parse_host_lease_request,
+        HostProcessInstanceId, KillOnCloseJob, LifecycleDecision, compose_tauri_cli_arguments,
+        parse_host_lease_request,
     };
     use std::ffi::OsString;
     use std::{
         io::{BufRead, BufReader, Write},
         net::TcpStream,
+        os::windows::io::AsRawHandle,
         process::{Command, Stdio},
+        sync::{Arc, Barrier},
         thread,
         time::Duration,
     };
@@ -941,25 +1015,82 @@ mod tests {
         response
     }
 
-    #[test]
-    fn a_host_registration_credential_is_consumed_and_cannot_be_replayed() {
-        let server = HostLeaseServer::start().expect("lease server");
-        let credential = uuid::Uuid::from_u128(7).simple().to_string();
-        assert_eq!(
-            send_host_lease_request(
-                server.endpoint(),
-                &format!("AUTHORIZE {} {credential}\n", server.authority()),
-            ),
-            "AUTHORIZED\n"
-        );
-
-        let mut process = Command::new("cmd.exe")
+    fn spawn_waitable_child() -> std::process::Child {
+        Command::new("cmd.exe")
             .args(["/d", "/c", "ping -n 30 127.0.0.1 >nul"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .expect("waitable child process");
+            .expect("waitable child process")
+    }
+
+    fn capture_process_instance(process: &std::process::Child) -> HostProcessInstanceId {
+        HostProcessInstanceId::from_process_handle(process.id(), process.as_raw_handle().cast())
+            .expect("process instance")
+    }
+
+    fn authorize_process_instance(
+        server: &HostLeaseServer,
+        credential: &str,
+        process_instance: HostProcessInstanceId,
+    ) -> String {
+        send_host_lease_request(
+            server.endpoint(),
+            &format!(
+                "AUTHORIZE {} {credential} {} {}\n",
+                server.authority(),
+                process_instance.process_id(),
+                process_instance.creation_time_wire(),
+            ),
+        )
+    }
+
+    #[test]
+    fn a_registration_cannot_acquire_a_reused_pid_with_another_creation_time() {
+        let server = HostLeaseServer::start().expect("lease server");
+        let credential = uuid::Uuid::from_u128(6).simple().to_string();
+        let mut process = spawn_waitable_child();
+
+        // One FILETIME tick is a valid wire value but cannot be this process's
+        // creation time. This models a PID that was recycled after the parent
+        // captured the previous process instance.
+        let previous_instance =
+            HostProcessInstanceId::from_wire(process.id(), 1).expect("previous process instance");
+        let authorization = authorize_process_instance(&server, &credential, previous_instance);
+        let registration = format!("REGISTER {credential} {}\n", process.id());
+        let registration_response = send_host_lease_request(server.endpoint(), &registration);
+        let no_lease = server
+            .events()
+            .recv_timeout(Duration::from_millis(100))
+            .is_err();
+        let reauthorization_response =
+            authorize_process_instance(&server, &credential, previous_instance);
+        let replay_response = send_host_lease_request(server.endpoint(), &registration);
+
+        process.kill().expect("child terminates");
+        process.wait().expect("child is reaped");
+
+        assert_eq!(authorization, "AUTHORIZED\n");
+        assert_eq!(registration_response, "REJECTED\n");
+        assert!(
+            no_lease,
+            "a mismatched process instance must not create a lease"
+        );
+        assert_eq!(reauthorization_response, "REJECTED\n");
+        assert_eq!(replay_response, "REJECTED\n");
+    }
+
+    #[test]
+    fn a_host_registration_credential_is_consumed_and_cannot_be_replayed() {
+        let server = HostLeaseServer::start().expect("lease server");
+        let credential = uuid::Uuid::from_u128(7).simple().to_string();
+        let mut process = spawn_waitable_child();
+        let process_instance = capture_process_instance(&process);
+        assert_eq!(
+            authorize_process_instance(&server, &credential, process_instance),
+            "AUTHORIZED\n"
+        );
         let registration = format!("REGISTER {credential} {}\n", process.id());
         assert_eq!(
             send_host_lease_request(server.endpoint(), &registration),
@@ -979,10 +1110,7 @@ mod tests {
         assert_eq!(process_id, process.id());
 
         assert_eq!(
-            send_host_lease_request(
-                server.endpoint(),
-                &format!("AUTHORIZE {} {credential}\n", server.authority()),
-            ),
+            authorize_process_instance(&server, &credential, process_instance),
             "REJECTED\n"
         );
         assert_eq!(
@@ -995,6 +1123,68 @@ mod tests {
                 .recv_timeout(Duration::from_millis(100))
                 .is_err(),
             "a replay must not create another lease"
+        );
+
+        process.kill().expect("child terminates");
+        process.wait().expect("child is reaped");
+        assert!(matches!(
+            server.events().recv_timeout(Duration::from_secs(1)),
+            Ok(HostLeaseEvent::Disconnected {
+                lease_id: disconnected_lease,
+                process_id: disconnected_process,
+            }) if disconnected_lease == lease_id && disconnected_process == process_id
+        ));
+    }
+
+    #[test]
+    fn concurrent_registrations_can_reserve_a_credential_only_once() {
+        let server = HostLeaseServer::start().expect("lease server");
+        let credential = uuid::Uuid::from_u128(8).simple().to_string();
+        let mut process = spawn_waitable_child();
+        let process_instance = capture_process_instance(&process);
+        assert_eq!(
+            authorize_process_instance(&server, &credential, process_instance),
+            "AUTHORIZED\n"
+        );
+
+        let registration = format!("REGISTER {credential} {}\n", process.id());
+        let start = Arc::new(Barrier::new(3));
+        let requests = (0..2)
+            .map(|_| {
+                let start = start.clone();
+                let registration = registration.clone();
+                let endpoint = server.endpoint();
+                thread::spawn(move || {
+                    start.wait();
+                    send_host_lease_request(endpoint, &registration)
+                })
+            })
+            .collect::<Vec<_>>();
+        start.wait();
+        let mut responses = requests
+            .into_iter()
+            .map(|request| request.join().expect("registration response"))
+            .collect::<Vec<_>>();
+        responses.sort();
+        assert_eq!(responses, ["REGISTERED\n", "REJECTED\n"]);
+
+        let (lease_id, process_id) = match server
+            .events()
+            .recv_timeout(Duration::from_secs(1))
+            .expect("single connected lease")
+        {
+            HostLeaseEvent::Connected {
+                lease_id,
+                process_id,
+            } => (lease_id, process_id),
+            event => panic!("unexpected lease event: {event:?}"),
+        };
+        assert!(
+            server
+                .events()
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "the competing registration must not create another lease"
         );
 
         process.kill().expect("child terminates");
@@ -1068,8 +1258,14 @@ mod tests {
     fn host_lease_requests_are_command_and_value_typed() {
         let credential = uuid::Uuid::from_u128(7).simple().to_string();
         assert!(matches!(
-            parse_host_lease_request(&format!("AUTHORIZE secret {credential}\n")),
-            Some(HostLeaseRequest::Authorize { authority, .. }) if authority == "secret"
+            parse_host_lease_request(&format!("AUTHORIZE secret {credential} 42 123\n")),
+            Some(HostLeaseRequest::Authorize {
+                authority,
+                expected_process,
+                ..
+            }) if authority == "secret"
+                && expected_process.process_id() == 42
+                && expected_process.creation_time_wire() == 123
         ));
         assert!(matches!(
             parse_host_lease_request(&format!("REGISTER {credential} 42\n")),
@@ -1078,6 +1274,9 @@ mod tests {
         assert!(parse_host_lease_request(&format!("REGISTER {credential} 0\n")).is_none());
         assert!(parse_host_lease_request(&format!("REGISTER {credential} nope\n")).is_none());
         assert!(parse_host_lease_request("REGISTER not-a-uuid 42\n").is_none());
+        assert!(
+            parse_host_lease_request(&format!("AUTHORIZE secret {credential} 42 0\n")).is_none()
+        );
         assert!(
             parse_host_lease_request(&format!("REGISTER {credential} 42 trailing\n")).is_none()
         );
