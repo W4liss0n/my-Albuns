@@ -137,11 +137,13 @@ fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapF
         )?;
     #[cfg(not(debug_assertions))]
     let _ = launch_nonce;
-    let mut child = command.spawn().map_err(|_| BootstrapFailure {
+    let child = command.spawn().map_err(|_| BootstrapFailure {
         kind: BootstrapFailureKind::HostUnavailable,
         stage: None,
         code: None,
     })?;
+    #[cfg(debug_assertions)]
+    let mut child = child;
     #[cfg(debug_assertions)]
     if pending_host_lease
         .as_ref()
