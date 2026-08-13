@@ -25,6 +25,7 @@ else {
 $sourceBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $workspaceRoot `
     -EvidencePath $evidencePath
+$runRootCleaned = $false
 
 try {
     $fixturePath = Join-Path `
@@ -88,6 +89,10 @@ try {
         throw "The Project WebView screenshot is blank ($nonWhiteCount/$sampleCount non-white samples)."
     }
 
+    Remove-GateScratchDirectory `
+        -Path $runRoot `
+        -AllowedParent (Join-Path $workspaceRoot '.scratch')
+    $runRootCleaned = $true
     $sourceAfter = Get-GateSourceSnapshot `
         -WorkspaceRoot $workspaceRoot `
         -EvidencePath $evidencePath
@@ -142,7 +147,9 @@ try {
     Write-Output $json
 }
 finally {
-    Remove-GateScratchDirectory `
-        -Path $runRoot `
-        -AllowedParent (Join-Path $workspaceRoot '.scratch')
+    if (-not $runRootCleaned -and (Test-Path -LiteralPath $runRoot)) {
+        Remove-GateScratchDirectory `
+            -Path $runRoot `
+            -AllowedParent (Join-Path $workspaceRoot '.scratch')
+    }
 }
