@@ -37,7 +37,12 @@ const processDataRoot = path.resolve(processDataArgument);
 const screenshotPath = path.resolve(screenshotArgument);
 const applicationPath = path.resolve(applicationArgument);
 const nativeDriverPath = path.resolve(nativeDriverArgument);
-const desktopBinary = path.join(workspace, "target", "debug", "myalbuns-desktop.exe");
+const desktopBinary = path.join(
+  workspace,
+  "target",
+  "debug",
+  "myalbuns-desktop.exe",
+);
 const devUrl = "http://localhost:1437";
 const gateTimeoutMilliseconds = Number(
   process.env.MYALBUNS_DEV_LIFECYCLE_GATE_TIMEOUT_MS ?? "300000",
@@ -119,7 +124,8 @@ function webdriverClient(baseUrl) {
   return async (method, endpoint, body, timeout = 5_000) => {
     const response = await fetch(`${baseUrl}${endpoint}`, {
       method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers:
+        body === undefined ? undefined : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(timeout),
     });
@@ -177,7 +183,9 @@ function frontendServerProcessId() {
 
 async function frontendResponds() {
   try {
-    const response = await fetch(devUrl, { signal: AbortSignal.timeout(1_000) });
+    const response = await fetch(devUrl, {
+      signal: AbortSignal.timeout(1_000),
+    });
     return response.ok;
   } catch {
     return false;
@@ -195,7 +203,9 @@ function desktopLogs() {
 
 function hasLogEvent(event) {
   const logs = desktopLogs();
-  return logs.includes(`"event":"${event}"`) || logs.includes(`event="${event}"`);
+  return (
+    logs.includes(`"event":"${event}"`) || logs.includes(`event="${event}"`)
+  );
 }
 
 function terminateProcessTree(processId) {
@@ -223,7 +233,11 @@ function processForestIds(rootProcessIds) {
   );
 }
 
-function captureDevelopmentForest(supervisorPid, applications, knownRoots = []) {
+function captureDevelopmentForest(
+  supervisorPid,
+  applications,
+  knownRoots = [],
+) {
   return processForestIds([
     supervisorPid,
     ...knownRoots,
@@ -231,13 +245,44 @@ function captureDevelopmentForest(supervisorPid, applications, knownRoots = []) 
   ]);
 }
 
-function aliveProcessIds(processIds) {
+function processInstances(processIds) {
   if (processIds.length === 0) return [];
   return (
     powershellJson(
-      `$requested = @($env:MYALBUNS_GATE_PROCESS_IDS -split ',' | ForEach-Object { [int]$_ }); $alive = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $requested -contains [int]$_.Id } | ForEach-Object { [int]$_.Id }); [Console]::Out.Write((ConvertTo-Json -InputObject $alive -Compress))`,
+      `$requested = @($env:MYALBUNS_GATE_PROCESS_IDS -split ',' | ForEach-Object { [int]$_ }); $instances = @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $requested -contains [int]$_.ProcessId } | ForEach-Object { [ordered]@{ processId = [int]$_.ProcessId; creationTimeUtc = $_.CreationDate.ToUniversalTime().ToString('O'); name = [string]$_.Name; commandLine = [string]$_.CommandLine } }); [Console]::Out.Write((ConvertTo-Json -InputObject $instances -Compress))`,
       { MYALBUNS_GATE_PROCESS_IDS: processIds.join(",") },
     ) ?? []
+  );
+}
+
+function processInstanceKey(instance) {
+  return `${instance.processId}:${instance.creationTimeUtc}`;
+}
+
+function mergeProcessInstances(...collections) {
+  return [
+    ...new Map(
+      collections
+        .flat()
+        .map((instance) => [processInstanceKey(instance), instance]),
+    ).values(),
+  ];
+}
+
+function aliveProcessInstances(expectedInstances) {
+  const currentByKey = new Map(
+    processInstances(
+      expectedInstances.map((instance) => instance.processId),
+    ).map((instance) => [processInstanceKey(instance), instance]),
+  );
+  return expectedInstances.filter((instance) =>
+    currentByKey.has(processInstanceKey(instance)),
+  );
+}
+
+function aliveProcessIds(processIds) {
+  return aliveProcessInstances(processInstances(processIds)).map(
+    (instance) => instance.processId,
   );
 }
 
@@ -303,7 +348,12 @@ async function waitForOwnedDevelopmentEnvironment({
       hostAlive &&
       hostForest.includes(hostPid) &&
       hostForest.length >= 2;
-    if (baseReady && (!requireIndependentHost || handoffReady)) return observation;
+    if (baseReady && (!requireIndependentHost || handoffReady)) {
+      return {
+        ...observation,
+        forestInstances: processInstances(forest),
+      };
+    }
     if (aliveProcessIds([supervisorPid]).length === 0) {
       throw new Error(
         `${label} supervisor exited during startup: ${JSON.stringify(observation)}`,
@@ -316,13 +366,17 @@ async function waitForOwnedDevelopmentEnvironment({
   );
 }
 
-async function assertDevelopmentCleanup(label, processForest) {
+async function assertDevelopmentCleanup(
+  label,
+  processForest,
+  processForestInstances,
+) {
   let observation;
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     observation = {
       processForest,
-      aliveProcessIds: aliveProcessIds(processForest),
+      aliveProcessInstances: aliveProcessInstances(processForestInstances),
       applicationProcessIds: applicationProcesses().map(
         (entry) => entry.processId,
       ),
@@ -330,7 +384,7 @@ async function assertDevelopmentCleanup(label, processForest) {
       frontendResponding: await frontendResponds(),
     };
     if (
-      observation.aliveProcessIds.length === 0 &&
+      observation.aliveProcessInstances.length === 0 &&
       observation.applicationProcessIds.length === 0 &&
       observation.frontendProcessId === null &&
       !observation.frontendResponding
@@ -350,7 +404,9 @@ function closeMainWindow(processId) {
     { MYALBUNS_GATE_PROCESS_ID: String(processId) },
   );
   if (closed !== true) {
-    throw new Error(`The Project Host exposed no closeable native window (${processId})`);
+    throw new Error(
+      `The Project Host exposed no closeable native window (${processId})`,
+    );
   }
 }
 
@@ -405,12 +461,16 @@ finally {
     },
   );
   if (result.status !== 0) {
-    throw new Error(`CTRL+C delivery failed: ${result.stderr || result.stdout}`);
+    throw new Error(
+      `CTRL+C delivery failed: ${result.stderr || result.stdout}`,
+    );
   }
 }
 
 if (frontendServerProcessId() !== null || (await frontendResponds())) {
-  throw new Error("The lifecycle gate requires port 1437 to be unowned before launch");
+  throw new Error(
+    "The lifecycle gate requires port 1437 to be unowned before launch",
+  );
 }
 
 const driverPort = await freePort();
@@ -436,8 +496,14 @@ function launchSupervisor(launcherArguments = []) {
 }
 
 function launchSupervisorInOwnConsole() {
-  const standardOutputPath = path.join(processDataRoot, "ctrl-c-supervisor.out.log");
-  const standardErrorPath = path.join(processDataRoot, "ctrl-c-supervisor.err.log");
+  const standardOutputPath = path.join(
+    processDataRoot,
+    "ctrl-c-supervisor.out.log",
+  );
+  const standardErrorPath = path.join(
+    processDataRoot,
+    "ctrl-c-supervisor.err.log",
+  );
   const processIdPath = path.join(processDataRoot, "ctrl-c-supervisor.pid");
   const launchResult = spawnSync(
     "powershell.exe",
@@ -464,7 +530,9 @@ function launchSupervisorInOwnConsole() {
   }
   const processId = Number(readFileSync(processIdPath, "utf8").trim());
   if (!Number.isInteger(processId) || processId <= 0) {
-    throw new Error(`PowerShell returned an invalid supervisor PID: ${processId}`);
+    throw new Error(
+      `PowerShell returned an invalid supervisor PID: ${processId}`,
+    );
   }
   return {
     processId,
@@ -509,13 +577,19 @@ try {
     globalPid ??= globalProcess(processes)?.processId;
     hostPid ??= projectHostProcess(processes)?.processId;
     vitePid ??= frontendServerProcessId();
-    const globalAlive = processes.some((entry) => entry.processId === globalPid);
+    const globalAlive = processes.some(
+      (entry) => entry.processId === globalPid,
+    );
     const hostAlive = processes.some((entry) => entry.processId === hostPid);
     if (supervisor.exitCode !== null) {
-      throw new Error(`The supervisor exited before handoff (${supervisor.exitCode})`);
+      throw new Error(
+        `The supervisor exited before handoff (${supervisor.exitCode})`,
+      );
     }
     if (hostPid && !hostAlive) {
-      throw new Error("The Project Host exited before the public UI-ready terminal");
+      throw new Error(
+        "The Project Host exited before the public UI-ready terminal",
+      );
     }
     if (
       globalPid &&
@@ -535,7 +609,9 @@ try {
   const globalAlive = postHandoffProcesses.some(
     (entry) => entry.processId === globalPid,
   );
-  const hostAlive = postHandoffProcesses.some((entry) => entry.processId === hostPid);
+  const hostAlive = postHandoffProcesses.some(
+    (entry) => entry.processId === hostPid,
+  );
   const viteResponding = await frontendResponds();
   const supervisorAlive = supervisorProcesses().some(
     (entry) => entry.processId === supervisorPid,
@@ -570,22 +646,32 @@ try {
   );
   driverOutput = collectOutput(driver);
   const driverBaseUrl = `http://127.0.0.1:${driverPort}`;
-  await waitForHttp(`${driverBaseUrl}/status`, 30_000, "Microsoft Edge WebDriver");
+  await waitForHttp(
+    `${driverBaseUrl}/status`,
+    30_000,
+    "Microsoft Edge WebDriver",
+  );
   const request = webdriverClient(driverBaseUrl);
-  const session = await request("POST", "/session", {
-    capabilities: {
-      alwaysMatch: {
-        browserName: "webview2",
-        pageLoadStrategy: "none",
-        "ms:edgeChromium": true,
-        "ms:edgeOptions": {
-          debuggerAddress: `127.0.0.1:${hostDebugPort}`,
+  const session = await request(
+    "POST",
+    "/session",
+    {
+      capabilities: {
+        alwaysMatch: {
+          browserName: "webview2",
+          pageLoadStrategy: "none",
+          "ms:edgeChromium": true,
+          "ms:edgeOptions": {
+            debuggerAddress: `127.0.0.1:${hostDebugPort}`,
+          },
         },
       },
     },
-  }, 30_000);
+    30_000,
+  );
   sessionId = session.sessionId;
-  if (!sessionId) throw new Error("Microsoft Edge WebDriver returned no session id");
+  if (!sessionId)
+    throw new Error("Microsoft Edge WebDriver returned no session id");
   await request("POST", `/session/${sessionId}/timeouts`, {
     implicit: 250,
     pageLoad: 5_000,
@@ -597,11 +683,10 @@ try {
   let lastUiError;
   while (!appShellElementId && Date.now() < uiDeadline) {
     try {
-      const element = await request(
-        "POST",
-        `/session/${sessionId}/element`,
-        { using: "css selector", value: ".app-shell" },
-      );
+      const element = await request("POST", `/session/${sessionId}/element`, {
+        using: "css selector",
+        value: ".app-shell",
+      });
       appShellElementId = element["element-6066-11e4-a52e-4f735466cecf"];
     } catch (error) {
       lastUiError = error;
@@ -627,10 +712,12 @@ try {
 
   const normalApplications = applicationProcesses();
   const normalHostForest = processForestIds([hostPid]);
-  const normalTree = captureDevelopmentForest(supervisorPid, normalApplications, [
-    globalPid,
-    hostPid,
-  ]);
+  const normalTree = captureDevelopmentForest(
+    supervisorPid,
+    normalApplications,
+    [globalPid, hostPid],
+  );
+  const normalTreeInstances = processInstances(normalTree);
   if (
     !normalTree.includes(supervisorPid) ||
     !normalTree.includes(hostPid) ||
@@ -651,9 +738,17 @@ try {
   }
   sessionId = undefined;
   closeMainWindow(hostPid);
-  await assertDevelopmentCleanup("Normal Host close", normalTree);
-  if (!supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')) {
-    throw new Error("The supervisor exited without confirming frontend cleanup");
+  await assertDevelopmentCleanup(
+    "Normal Host close",
+    normalTree,
+    normalTreeInstances,
+  );
+  if (
+    !supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')
+  ) {
+    throw new Error(
+      "The supervisor exited without confirming frontend cleanup",
+    );
   }
   abruptSupervisor = launchSupervisor();
   abruptSupervisorOutput = collectOutput(abruptSupervisor);
@@ -664,10 +759,17 @@ try {
     timeoutMilliseconds: gateTimeoutMilliseconds,
   });
   const abruptTree = abruptEnvironment.forest;
+  const abruptTreeInstances = abruptEnvironment.forestInstances;
   if (!abruptSupervisor.kill()) {
-    throw new Error("Windows refused to terminate only the development supervisor root");
+    throw new Error(
+      "Windows refused to terminate only the development supervisor root",
+    );
   }
-  await assertDevelopmentCleanup("Abrupt supervisor termination", abruptTree);
+  await assertDevelopmentCleanup(
+    "Abrupt supervisor termination",
+    abruptTree,
+    abruptTreeInstances,
+  );
 
   const ctrlCLaunch = launchSupervisorInOwnConsole();
   ctrlCSupervisorOutput = ctrlCLaunch.output;
@@ -679,9 +781,10 @@ try {
     requireIndependentHost: true,
   });
   const ctrlCTree = ctrlCEnvironment.forest;
+  const ctrlCTreeInstances = ctrlCEnvironment.forestInstances;
   const ctrlCHostForest = ctrlCEnvironment.hostForest;
   sendCtrlC(ctrlCSupervisorPid);
-  await assertDevelopmentCleanup("CTRL+C", ctrlCTree);
+  await assertDevelopmentCleanup("CTRL+C", ctrlCTree, ctrlCTreeInstances);
 
   bootstrapFailureSupervisor = launchSupervisor([
     "--myalbuns-invalid-development-option",
@@ -689,28 +792,37 @@ try {
   bootstrapFailureOutput = collectOutput(bootstrapFailureSupervisor);
   bootstrapFailureSupervisorPid = bootstrapFailureSupervisor.pid;
   let bootstrapFailureTree = [];
+  let bootstrapFailureTreeInstances = [];
   const bootstrapFailureExit = await waitForProcessExit(
     bootstrapFailureSupervisor,
     gateTimeoutMilliseconds,
     "Bootstrap-failure supervisor",
     () => {
+      const observedTree = captureDevelopmentForest(
+        bootstrapFailureSupervisorPid,
+        applicationProcesses(),
+      );
       bootstrapFailureTree = [
-        ...new Set([
-          ...bootstrapFailureTree,
-          ...captureDevelopmentForest(
-            bootstrapFailureSupervisorPid,
-            applicationProcesses(),
-          ),
-        ]),
+        ...new Set([...bootstrapFailureTree, ...observedTree]),
       ];
+      bootstrapFailureTreeInstances = mergeProcessInstances(
+        bootstrapFailureTreeInstances,
+        processInstances(observedTree),
+      );
     },
   );
-  await assertDevelopmentCleanup("Bootstrap failure", bootstrapFailureTree);
+  await assertDevelopmentCleanup(
+    "Bootstrap failure",
+    bootstrapFailureTree,
+    bootstrapFailureTreeInstances,
+  );
   const bootstrapFailureText = bootstrapFailureOutput();
   if (
     bootstrapFailureExit === 0 ||
     !bootstrapFailureText.includes('"event":"dev_frontend_ready"') ||
-    !bootstrapFailureText.includes('"event":"dev_environment_cleanup_completed"') ||
+    !bootstrapFailureText.includes(
+      '"event":"dev_environment_cleanup_completed"',
+    ) ||
     supervisorProcesses().some(
       (entry) => entry.processId === bootstrapFailureSupervisorPid,
     )
@@ -730,16 +842,24 @@ try {
   });
   const failedVitePid = frontendFailureEnvironment.vitePid;
   const frontendFailureTree = frontendFailureEnvironment.forest;
+  const frontendFailureTreeInstances =
+    frontendFailureEnvironment.forestInstances;
   terminateProcessTree(failedVitePid);
   const frontendFailureExit = await waitForProcessExit(
     frontendFailureSupervisor,
     30_000,
     "Frontend-failure supervisor",
   );
-  await assertDevelopmentCleanup("Frontend failure", frontendFailureTree);
+  await assertDevelopmentCleanup(
+    "Frontend failure",
+    frontendFailureTree,
+    frontendFailureTreeInstances,
+  );
   if (
     frontendFailureExit === 0 ||
-    !frontendFailureOutput().includes('"event":"dev_environment_cleanup_completed"')
+    !frontendFailureOutput().includes(
+      '"event":"dev_environment_cleanup_completed"',
+    )
   ) {
     throw new Error(
       `Frontend failure returned the wrong terminal: ${JSON.stringify({ frontendFailureExit, frontendFailureTree })}`,
@@ -778,8 +898,10 @@ try {
   );
 } finally {
   if (driver?.pid) terminateProcessTree(driver.pid);
-  if (frontendFailureSupervisorPid) terminateProcessTree(frontendFailureSupervisorPid);
-  if (bootstrapFailureSupervisorPid) terminateProcessTree(bootstrapFailureSupervisorPid);
+  if (frontendFailureSupervisorPid)
+    terminateProcessTree(frontendFailureSupervisorPid);
+  if (bootstrapFailureSupervisorPid)
+    terminateProcessTree(bootstrapFailureSupervisorPid);
   if (ctrlCSupervisorPid) terminateProcessTree(ctrlCSupervisorPid);
   if (abruptSupervisorPid) terminateProcessTree(abruptSupervisorPid);
   if (supervisorPid) terminateProcessTree(supervisorPid);
