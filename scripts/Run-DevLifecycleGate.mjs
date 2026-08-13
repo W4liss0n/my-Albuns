@@ -642,18 +642,19 @@ try {
       `The normal lifecycle forest was incomplete before shutdown: ${JSON.stringify({ normalTree, normalHostForest, supervisorPid, globalPid, hostPid, vitePid })}`,
     );
   }
-  closeMainWindow(hostPid);
-  await assertDevelopmentCleanup("Normal Host close", normalTree);
-  if (!supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')) {
-    throw new Error("The supervisor exited without confirming frontend cleanup");
-  }
-
+  // The attach-only WebDriver has already produced its evidence. Detach the
+  // observer before exercising the native close terminal so the instrument is
+  // no longer an active participant in the WebView being closed.
   if (driver?.pid) {
     terminateProcessTree(driver.pid);
     driver = undefined;
   }
   sessionId = undefined;
-
+  closeMainWindow(hostPid);
+  await assertDevelopmentCleanup("Normal Host close", normalTree);
+  if (!supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')) {
+    throw new Error("The supervisor exited without confirming frontend cleanup");
+  }
   abruptSupervisor = launchSupervisor();
   abruptSupervisorOutput = collectOutput(abruptSupervisor);
   abruptSupervisorPid = abruptSupervisor.pid;
