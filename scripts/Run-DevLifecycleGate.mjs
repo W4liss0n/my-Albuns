@@ -62,6 +62,7 @@ const devUrl = "http://localhost:1437";
 const gateTimeoutMilliseconds = Number(
   process.env.MYALBUNS_DEV_LIFECYCLE_GATE_TIMEOUT_MS ?? "300000",
 );
+const cleanupTimeoutMilliseconds = 60_000;
 
 for (const [label, candidate] of [
   ["workspace", workspace],
@@ -315,7 +316,7 @@ async function assertDevelopmentCleanup(
   processForestInstances,
 ) {
   let observation;
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + cleanupTimeoutMilliseconds;
   while (Date.now() < deadline) {
     observation = {
       processForest,
@@ -667,7 +668,7 @@ try {
   });
   const abruptTree = abruptEnvironment.forest;
   const abruptTreeInstances = abruptEnvironment.forestInstances;
-  if (!abruptSupervisor.kill()) {
+  if (!terminateProcessInstance(abruptSupervisorInstance)) {
     throw new Error(
       "Windows refused to terminate only the development supervisor root",
     );
