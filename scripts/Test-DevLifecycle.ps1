@@ -123,7 +123,11 @@ try {
         sampleCount = $sampleCount
         cleanupCompleted = [bool] $gate.cleanupCompleted
         cleanupLogged = [bool] $gate.cleanupLogged
+        normalTreeProcessCount = [int] $gate.normalTreeProcessCount
         abruptCleanupCompleted = [bool] $gate.abruptCleanupCompleted
+        abruptTreeProcessCount = [int] $gate.abruptTreeProcessCount
+        ctrlCCleanupCompleted = [bool] $gate.ctrlCCleanupCompleted
+        ctrlCTreeProcessCount = [int] $gate.ctrlCTreeProcessCount
         bootstrapFailureCleanupCompleted = [bool] $gate.bootstrapFailureCleanupCompleted
         frontendFailureCleanupCompleted = [bool] $gate.frontendFailureCleanupCompleted
         nativeDriverVersion = $driver.nativeDriverVersion
@@ -133,6 +137,7 @@ try {
             [ordered]@{ name = 'project-webview-rendered'; passed = $true },
             [ordered]@{ name = 'normal-tree-cleanup'; passed = $true },
             [ordered]@{ name = 'abrupt-tree-cleanup'; passed = $true },
+            [ordered]@{ name = 'ctrl-c-tree-cleanup'; passed = $true },
             [ordered]@{ name = 'bootstrap-failure-cleanup'; passed = $true },
             [ordered]@{ name = 'frontend-failure-cleanup'; passed = $true }
         )

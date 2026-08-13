@@ -48,7 +48,7 @@ pub(crate) fn run(
     }
 
     #[cfg(debug_assertions)]
-    let dev_host_lease = crate::dev_host_lease::DevHostLease::connect_from_environment()?;
+    crate::dev_host_registration::register_from_environment()?;
 
     let (request, project) = opened.into_parts();
     let project_host = ProjectHost::new(project);
@@ -163,8 +163,6 @@ pub(crate) fn run(
             crate::export_commands::cancel_export,
         ])
         .run(context);
-    #[cfg(debug_assertions)]
-    drop(dev_host_lease);
     run_result?;
     Ok(())
 }

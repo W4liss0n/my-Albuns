@@ -436,10 +436,14 @@ fn supervise_development(
         }
 
         let handoff_expired = no_host_deadline.is_some_and(|deadline| Instant::now() >= deadline);
-        match lifecycle.decision(true, handoff_expired) {
+        match lifecycle.decision(handoff_expired) {
             LifecycleDecision::Wait => {}
             LifecycleDecision::Complete => {
-                eprintln!(r#"{{"event":"dev_last_host_exited"}}"#);
+                if lifecycle.host_seen() {
+                    eprintln!(r#"{{"event":"dev_last_host_exited"}}"#);
+                } else {
+                    eprintln!(r#"{{"event":"dev_global_only_exited"}}"#);
+                }
                 return Ok(());
             }
             LifecycleDecision::Fail(reason) => return Err(io::Error::other(reason)),
@@ -499,20 +503,15 @@ impl DevelopmentLifecycle {
         self.host_seen
     }
 
-    fn decision(&self, vite_running: bool, handoff_expired: bool) -> LifecycleDecision {
+    fn decision(&self, handoff_expired: bool) -> LifecycleDecision {
         if self.tracking_failed {
             return LifecycleDecision::Fail("o handle do Host ficou indisponível");
-        }
-        if !vite_running {
-            return LifecycleDecision::Fail("o Vite encerrou antes do último Host");
         }
         match self.cli_success {
             Some(false) => LifecycleDecision::Fail("o Tauri CLI encerrou com falha"),
             Some(true) if !self.active_hosts.is_empty() => LifecycleDecision::Wait,
             Some(true) if self.host_seen => LifecycleDecision::Complete,
-            Some(true) if handoff_expired => {
-                LifecycleDecision::Fail("o Tauri CLI encerrou sem entregar um Host ao supervisor")
-            }
+            Some(true) if handoff_expired => LifecycleDecision::Complete,
             Some(true) | None => LifecycleDecision::Wait,
         }
     }
@@ -867,7 +866,7 @@ mod tests {
         lifecycle.apply(HostLeaseEvent::Connected(41));
         lifecycle.cli_exited(true);
 
-        assert_eq!(lifecycle.decision(true, false), LifecycleDecision::Wait);
+        assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
     }
 
     #[test]
@@ -877,30 +876,26 @@ mod tests {
         lifecycle.apply(HostLeaseEvent::Connected(42));
         lifecycle.cli_exited(true);
         lifecycle.apply(HostLeaseEvent::Disconnected(41));
-        assert_eq!(lifecycle.decision(true, false), LifecycleDecision::Wait);
+        assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
 
         lifecycle.apply(HostLeaseEvent::Disconnected(42));
-        assert_eq!(lifecycle.decision(true, false), LifecycleDecision::Complete);
+        assert_eq!(lifecycle.decision(false), LifecycleDecision::Complete);
     }
 
     #[test]
-    fn bootstrap_and_frontend_failures_fail_closed() {
+    fn bootstrap_failure_fails_closed() {
         let mut lifecycle = DevelopmentLifecycle::default();
         lifecycle.cli_exited(false);
         assert!(matches!(
-            lifecycle.decision(true, false),
+            lifecycle.decision(false),
             LifecycleDecision::Fail(_)
         ));
+    }
 
+    #[test]
+    fn a_successful_global_only_session_completes_after_the_handoff_window() {
         let mut no_host = DevelopmentLifecycle::default();
         no_host.cli_exited(true);
-        assert!(matches!(
-            no_host.decision(true, true),
-            LifecycleDecision::Fail(_)
-        ));
-        assert!(matches!(
-            no_host.decision(false, false),
-            LifecycleDecision::Fail(_)
-        ));
+        assert_eq!(no_host.decision(true), LifecycleDecision::Complete);
     }
 }

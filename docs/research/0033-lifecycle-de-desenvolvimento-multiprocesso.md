@@ -53,6 +53,17 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   modo forçado e abrupto. O gate usa essa propriedade para matar apenas o
   supervisor e comprovar que o Job recolhe os descendentes:
   [Child process](https://nodejs.org/docs/latest-v24.x/api/child_process.html#subprocesskillsignal).
+- No Windows, `Start-Process` abre por padrão uma nova janela; o gate solicita
+  `WindowStyle Hidden`, sem reutilizar o console do runner. Um emissor pode
+  liberar seu console, anexar-se ao console desse processo e gerar
+  `CTRL_C_EVENT`; com grupo `0`, o evento alcança todos os processos que
+  compartilham aquele console. O emissor ignora o próprio evento e a prova
+  observa o término dos PIDs, em vez de inferi-lo do retorno da API:
+  [Start-Process](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process?view=powershell-5.1),
+  [AttachConsole](https://learn.microsoft.com/en-us/windows/console/attachconsole),
+  [FreeConsole](https://learn.microsoft.com/en-us/windows/console/freeconsole),
+  [SetConsoleCtrlHandler](https://learn.microsoft.com/en-us/windows/console/setconsolectrlhandler) e
+  [GenerateConsoleCtrlEvent](https://learn.microsoft.com/en-us/windows/console/generateconsolectrlevent).
 
 ## Decisão
 
@@ -67,17 +78,19 @@ Cada worker primeiro se bloqueia numa barreira local autenticada. O supervisor
 o associa ao Job Object e só então libera a criação de descendentes. Isso fecha
 a janela entre `spawn` e `AssignProcessToJobObject`.
 
-O Host produtivo de debug abre um lease local autenticado e informa seu PID. O
-supervisor abre um handle Windows com direito de sincronização e espera o
-término desse processo. O TCP serve apenas para autenticar e transferir o PID;
-o handle do processo é a autoridade de vida, portanto a perda do socket durante
-o handoff da WebView não encerra o lease.
+O Host produtivo de debug registra seu PID por um canal local autenticado e
+fecha o socket depois do envio. O supervisor abre um handle Windows com direito
+de sincronização e espera o término desse processo. O TCP serve apenas para
+autenticar e transferir o PID; o handle do processo é a autoridade de vida,
+portanto a duração do socket não participa do lease.
 
 O supervisor mantém Vite depois que a Tauri CLI e o Global terminam enquanto
 há ao menos um handle de Host ativo. O último Host libera o ambiente. Falha do
 Vite, falha da CLI/bootstrap, queda do supervisor e Ctrl+C fecham ou terminam o
 Job Object, recolhendo Vite, Node, Global, Host e descendentes. O Global não é
-mantido artificialmente vivo.
+mantido artificialmente vivo. Se o usuário fecha normalmente apenas a Tela
+Global, sem iniciar Projeto, o supervisor reserva uma janela curta para um
+registro de Host atrasado e então conclui a sessão com sucesso.
 
 ## Ready causal
 
@@ -108,10 +121,16 @@ um EdgeDriver da mesma versão do runtime à porta de depuração exclusiva do
 Host. Essa porta e a variável WebView2 só existem em build de debug.
 
 Na fase normal, o gate exige Global encerrado, Host vivo, Vite respondendo,
-`.app-shell` presente e screenshot não branca; depois envia `WM_CLOSE` à janela
-nativa e exige cleanup confirmado. Numa segunda fase, captura toda a árvore de
-PIDs, encerra somente o supervisor raiz e exige zero descendentes, zero Host e
-zero listener em `1437`.
+`.app-shell` presente e screenshot não branca. Antes de enviar `WM_CLOSE` à
+janela nativa, ele captura a árvore corrente do supervisor e os processos do
+produto; o terminal exige zero PID observado, zero Host e zero listener em
+`1437`.
+
+Uma fase própria inicia o supervisor em console isolado, captura sua árvore,
+envia `CTRL_C_EVENT` pela API pública do Windows e exige os mesmos terminais
+vazios. Outra fase encerra somente o supervisor raiz de modo abrupto e prova o
+fallback `KILL_ON_JOB_CLOSE`. As fases finais cobrem falha de bootstrap e queda
+do próprio Vite. Ctrl+C e queda abrupta permanecem evidências distintas.
 
 Os dados brutos da rodada canônica ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica

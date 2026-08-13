@@ -1,5 +1,4 @@
 import { spawn, spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -230,26 +229,131 @@ function closeMainWindow(processId) {
   }
 }
 
+function sendCtrlC(processId) {
+  const script = String.raw`
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class MyAlbunsConsoleSignal {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool FreeConsole();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool AttachConsole(uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GenerateConsoleCtrlEvent(uint eventType, uint processGroupId);
+}
+'@
+
+[void][MyAlbunsConsoleSignal]::FreeConsole()
+if (-not [MyAlbunsConsoleSignal]::AttachConsole([uint32]$env:MYALBUNS_GATE_CTRL_C_PID)) {
+    throw "AttachConsole failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+}
+try {
+    if (-not [MyAlbunsConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) {
+        throw "SetConsoleCtrlHandler failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+    if (-not [MyAlbunsConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) {
+        throw "GenerateConsoleCtrlEvent failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+}
+finally {
+    [void][MyAlbunsConsoleSignal]::FreeConsole()
+}
+`;
+  const result = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    {
+      windowsHide: true,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        MYALBUNS_GATE_CTRL_C_PID: String(processId),
+      },
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(`CTRL+C delivery failed: ${result.stderr || result.stdout}`);
+  }
+}
+
 if (frontendServerProcessId() !== null || (await frontendResponds())) {
   throw new Error("The lifecycle gate requires port 1437 to be unowned before launch");
 }
 
 const driverPort = await freePort();
 const hostDebugPort = await freePort();
+
+function supervisorEnvironment() {
+  return {
+    ...process.env,
+    MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
+    MYALBUNS_DEV_WORKSPACE_ROOT: workspace,
+    MYALBUNS_DEV_PROJECT_PATH: projectPath,
+    MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
+  };
+}
+
 function launchSupervisor(launcherArguments = []) {
   return spawn(applicationPath, launcherArguments, {
     cwd: workspace,
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
-    env: {
-      ...process.env,
-      MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
-      MYALBUNS_DEV_WORKSPACE_ROOT: workspace,
-      MYALBUNS_DEV_PROJECT_PATH: projectPath,
-      MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
-      MYALBUNS_DEV_LIFECYCLE_GATE_RUN_ID: randomUUID(),
-    },
+    env: supervisorEnvironment(),
   });
+}
+
+function launchSupervisorInOwnConsole() {
+  const standardOutputPath = path.join(processDataRoot, "ctrl-c-supervisor.out.log");
+  const standardErrorPath = path.join(processDataRoot, "ctrl-c-supervisor.err.log");
+  const processIdPath = path.join(processDataRoot, "ctrl-c-supervisor.pid");
+  const launchResult = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$process = Start-Process -FilePath $env:MYALBUNS_GATE_SUPERVISOR_BINARY -WorkingDirectory $env:MYALBUNS_DEV_WORKSPACE_ROOT -PassThru -WindowStyle Hidden -RedirectStandardOutput $env:MYALBUNS_GATE_STDOUT -RedirectStandardError $env:MYALBUNS_GATE_STDERR; [IO.File]::WriteAllText($env:MYALBUNS_GATE_PROCESS_ID_PATH, [string]$process.Id)`,
+    ],
+    {
+      windowsHide: true,
+      stdio: "ignore",
+      env: {
+        ...supervisorEnvironment(),
+        MYALBUNS_GATE_SUPERVISOR_BINARY: applicationPath,
+        MYALBUNS_GATE_STDOUT: standardOutputPath,
+        MYALBUNS_GATE_STDERR: standardErrorPath,
+        MYALBUNS_GATE_PROCESS_ID_PATH: processIdPath,
+      },
+    },
+  );
+  if (launchResult.status !== 0 || !existsSync(processIdPath)) {
+    throw new Error("PowerShell could not start the CTRL+C supervisor console");
+  }
+  const processId = Number(readFileSync(processIdPath, "utf8").trim());
+  if (!Number.isInteger(processId) || processId <= 0) {
+    throw new Error(`PowerShell returned an invalid supervisor PID: ${processId}`);
+  }
+  return {
+    processId,
+    output: () =>
+      [standardOutputPath, standardErrorPath]
+        .map((candidate) => {
+          try {
+            return existsSync(candidate) ? readFileSync(candidate, "utf8") : "";
+          } catch (error) {
+            return `<log unavailable: ${error instanceof Error ? error.message : String(error)}>`;
+          }
+        })
+        .join("\n"),
+  };
 }
 
 const supervisor = launchSupervisor();
@@ -260,6 +364,8 @@ let driverOutput = () => "";
 let abruptSupervisor;
 let abruptSupervisorOutput = () => "";
 let abruptSupervisorPid;
+let ctrlCSupervisorOutput = () => "";
+let ctrlCSupervisorPid;
 let bootstrapFailureSupervisor;
 let bootstrapFailureOutput = () => "";
 let bootstrapFailureSupervisorPid;
@@ -398,6 +504,21 @@ try {
   }
   writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 
+  const normalTree = [
+    ...new Set([
+      ...processTreeIds(supervisorPid),
+      ...applicationProcesses().map((entry) => entry.processId),
+    ]),
+  ];
+  if (
+    !normalTree.includes(supervisorPid) ||
+    !normalTree.includes(hostPid) ||
+    !normalTree.includes(vitePid)
+  ) {
+    throw new Error(
+      `The normal lifecycle tree was incomplete before shutdown: ${JSON.stringify({ normalTree, supervisorPid, hostPid, vitePid })}`,
+    );
+  }
   closeMainWindow(hostPid);
   const cleanupDeadline = Date.now() + 30_000;
   while (Date.now() < cleanupDeadline) {
@@ -407,7 +528,15 @@ try {
       (entry) => entry.processId === supervisorPid,
     );
     const listenerGone = frontendServerProcessId() === null;
-    if (hostGone && supervisorGone && listenerGone && !(await frontendResponds())) break;
+    if (
+      aliveProcessIds(normalTree).length === 0 &&
+      hostGone &&
+      supervisorGone &&
+      listenerGone &&
+      !(await frontendResponds())
+    ) {
+      break;
+    }
     await delay(100);
   }
 
@@ -419,7 +548,9 @@ try {
   );
   const listenerGone = frontendServerProcessId() === null;
   const viteGone = vitePid === null || frontendServerProcessId() !== vitePid;
+  const normalAlive = aliveProcessIds(normalTree);
   if (
+    normalAlive.length !== 0 ||
     !hostGone ||
     !globalGone ||
     !supervisorGone ||
@@ -428,7 +559,7 @@ try {
     (await frontendResponds())
   ) {
     throw new Error(
-      `Development cleanup failed: ${JSON.stringify({ hostGone, globalGone, supervisorGone, listenerGone, viteGone })}`,
+      `Development cleanup failed: ${JSON.stringify({ normalTree, normalAlive, hostGone, globalGone, supervisorGone, listenerGone, viteGone })}`,
     );
   }
   if (!supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')) {
@@ -502,6 +633,86 @@ try {
   ) {
     throw new Error(
       `Abrupt supervisor termination left descendants alive: ${JSON.stringify({ abruptTree, abruptAlive })}`,
+    );
+  }
+
+  const ctrlCLaunch = launchSupervisorInOwnConsole();
+  ctrlCSupervisorOutput = ctrlCLaunch.output;
+  ctrlCSupervisorPid = ctrlCLaunch.processId;
+  let ctrlCVitePid;
+  let ctrlCTree = [];
+  let ctrlCObservation;
+  const ctrlCStartDeadline = Date.now() + Math.min(gateTimeoutMilliseconds, 60_000);
+  while (Date.now() < ctrlCStartDeadline) {
+    ctrlCVitePid ??= frontendServerProcessId();
+    const ctrlCApplications = applicationProcesses();
+    ctrlCTree = [
+      ...new Set([
+        ...processTreeIds(ctrlCSupervisorPid),
+        ...ctrlCApplications.map((entry) => entry.processId),
+      ]),
+    ];
+    const ctrlCFrontendResponding = await frontendResponds();
+    ctrlCObservation = {
+      ctrlCSupervisorPid,
+      ctrlCSupervisorPidType: typeof ctrlCSupervisorPid,
+      ctrlCVitePid,
+      ctrlCVitePidType: typeof ctrlCVitePid,
+      ctrlCTree,
+      applicationProcessIds: ctrlCApplications.map((entry) => entry.processId),
+      frontendResponding: ctrlCFrontendResponding,
+    };
+    if (
+      ctrlCVitePid &&
+      ctrlCTree.includes(ctrlCSupervisorPid) &&
+      ctrlCTree.includes(ctrlCVitePid) &&
+      ctrlCTree.length >= 3 &&
+      ctrlCApplications.length > 0 &&
+      ctrlCFrontendResponding
+    ) {
+      break;
+    }
+    if (aliveProcessIds([ctrlCSupervisorPid]).length === 0) {
+      throw new Error(
+        `The CTRL+C supervisor exited during startup: ${JSON.stringify(ctrlCObservation)}`,
+      );
+    }
+    await delay(100);
+  }
+  if (
+    !ctrlCVitePid ||
+    !ctrlCTree.includes(ctrlCSupervisorPid) ||
+    !ctrlCTree.includes(ctrlCVitePid) ||
+    ctrlCTree.length < 3 ||
+    applicationProcesses().length === 0 ||
+    !(await frontendResponds())
+  ) {
+    throw new Error(
+      `The CTRL+C process tree did not become observable: ${JSON.stringify(ctrlCObservation)}`,
+    );
+  }
+  sendCtrlC(ctrlCSupervisorPid);
+  const ctrlCCleanupDeadline = Date.now() + 30_000;
+  while (Date.now() < ctrlCCleanupDeadline) {
+    if (
+      aliveProcessIds(ctrlCTree).length === 0 &&
+      frontendServerProcessId() === null &&
+      applicationProcesses().length === 0 &&
+      !(await frontendResponds())
+    ) {
+      break;
+    }
+    await delay(100);
+  }
+  const ctrlCAlive = aliveProcessIds(ctrlCTree);
+  if (
+    ctrlCAlive.length !== 0 ||
+    frontendServerProcessId() !== null ||
+    applicationProcesses().length !== 0 ||
+    (await frontendResponds())
+  ) {
+    throw new Error(
+      `CTRL+C left development descendants alive: ${JSON.stringify({ ctrlCTree, ctrlCAlive })}`,
     );
   }
 
@@ -612,19 +823,24 @@ try {
       screenshotPath,
       cleanupCompleted: true,
       cleanupLogged: true,
+      normalTreeProcessCount: normalTree.length,
       abruptCleanupCompleted: true,
+      abruptTreeProcessCount: abruptTree.length,
+      ctrlCCleanupCompleted: true,
+      ctrlCTreeProcessCount: ctrlCTree.length,
       bootstrapFailureCleanupCompleted: true,
       frontendFailureCleanupCompleted: true,
     }),
   );
 } catch (error) {
   throw new Error(
-    `${error instanceof Error ? error.message : String(error)}\nSupervisor:\n${supervisorOutput()}\nAbrupt supervisor:\n${abruptSupervisorOutput()}\nBootstrap-failure supervisor:\n${bootstrapFailureOutput()}\nFrontend-failure supervisor:\n${frontendFailureOutput()}\nWebDriver:\n${driverOutput()}\nLogs:\n${desktopLogs().slice(-12_000)}`,
+    `${error instanceof Error ? error.message : String(error)}\nSupervisor:\n${supervisorOutput()}\nAbrupt supervisor:\n${abruptSupervisorOutput()}\nCTRL+C supervisor:\n${ctrlCSupervisorOutput()}\nBootstrap-failure supervisor:\n${bootstrapFailureOutput()}\nFrontend-failure supervisor:\n${frontendFailureOutput()}\nWebDriver:\n${driverOutput()}\nLogs:\n${desktopLogs().slice(-12_000)}`,
   );
 } finally {
   if (driver?.pid) terminateProcessTree(driver.pid);
   if (frontendFailureSupervisorPid) terminateProcessTree(frontendFailureSupervisorPid);
   if (bootstrapFailureSupervisorPid) terminateProcessTree(bootstrapFailureSupervisorPid);
+  if (ctrlCSupervisorPid) terminateProcessTree(ctrlCSupervisorPid);
   if (abruptSupervisorPid) terminateProcessTree(abruptSupervisorPid);
   if (supervisorPid) terminateProcessTree(supervisorPid);
   if (hostPid) terminateProcessTree(hostPid);
