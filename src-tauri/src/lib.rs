@@ -2,6 +2,10 @@ mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
 mod desktop_webview_policy;
+#[cfg(debug_assertions)]
+mod dev_host_lease;
+#[cfg(debug_assertions)]
+mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;

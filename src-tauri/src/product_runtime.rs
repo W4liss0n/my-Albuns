@@ -1,4 +1,8 @@
-use std::{io, time::Duration};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
@@ -43,12 +47,18 @@ pub(crate) fn run(
         return run_headless_process_gate(opened);
     }
 
+    #[cfg(debug_assertions)]
+    let dev_host_lease = crate::dev_host_lease::DevHostLease::connect_from_environment()?;
+
     let (request, project) = opened.into_parts();
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
-    let terminal = PendingHostTerminal::new(request);
+    let startup_handshake = ProjectStartupHandshake::new(
+        PendingHostTerminal::new(request),
+        projection_identity(&project_host)?,
+    );
     let mut context = tauri::generate_context!();
 
     // EdgeDriver's supported launch flow needs the single WebView2 instance to
@@ -66,7 +76,7 @@ pub(crate) fn run(
         project_config.visible = true;
     }
 
-    tauri::Builder::default()
+    let run_result = tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol(
             crate::cache_previews::CACHE_MEDIA_PROTOCOL_SCHEME,
             move |context, request, responder| {
@@ -80,6 +90,7 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
+        .manage(startup_handshake)
         .manage(cache_previews)
         .manage(CacheEngine::default())
         .manage(MediaRuntime::default())
@@ -90,6 +101,12 @@ pub(crate) fn run(
                 if window.label() != PROJECT_WINDOW_LABEL {
                     return;
                 }
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    window_label = window.label(),
+                    event = "project_window_close_requested",
+                );
                 api.prevent_close();
                 match window.state::<ProjectHost>().begin_close() {
                     Ok(ProjectCloseRequestOutcome::CloseImmediately) => {
@@ -121,12 +138,19 @@ pub(crate) fn run(
                 return;
             }
             if matches!(event, tauri::WindowEvent::Destroyed) {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    window_label = window.label(),
+                    event = "project_window_destroyed",
+                );
                 request_window_export_cancellation(window);
             }
         })
-        .setup(move |app| setup_host(app, setup_paths, terminal))
+        .setup(move |app| setup_host(app, setup_paths))
         .invoke_handler(tauri::generate_handler![
             crate::logging::frontend_log,
+            project_ui_ready,
             crate::project_commands::project_state,
             crate::project_commands::apply_project_intent,
             crate::project_commands::undo_project,
@@ -138,7 +162,10 @@ pub(crate) fn run(
             crate::export_commands::export_sheet,
             crate::export_commands::cancel_export,
         ])
-        .run(context)?;
+        .run(context);
+    #[cfg(debug_assertions)]
+    drop(dev_host_lease);
+    run_result?;
     Ok(())
 }
 
@@ -170,11 +197,7 @@ fn process_gate_headless_enabled() -> bool {
         && std::env::var_os(PROCESS_GATE_HEADLESS_ENV).as_deref() == Some(std::ffi::OsStr::new("1"))
 }
 
-fn setup_host(
-    app: &mut tauri::App,
-    app_paths: AppPaths,
-    mut terminal: PendingHostTerminal,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
     let projection = app
         .state::<ProjectHost>()
         .projection()
@@ -203,6 +226,7 @@ fn setup_host(
     };
     app.manage(app_paths);
     let app_handle = app.handle().clone();
+    let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
     start_linked_media_monitor(app_handle.clone());
     tauri::async_runtime::spawn(async move {
         let startup = async {
@@ -212,7 +236,18 @@ fn setup_host(
                 desktop_webview_policy::enforce(&project_window).await?;
                 project_window.show()?;
             }
-            terminal.emit_ready(&projection.state.project_id, projection.state.revision)?;
+            let transition = startup_handshake.mark_host_ready()?;
+            if transition.newly_observed {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    process_id = std::process::id(),
+                    window_label = PROJECT_WINDOW_LABEL,
+                    project_id = safe_log_identifier(&projection.state.project_id),
+                    revision = projection.state.revision,
+                    event = "host_ready",
+                );
+            }
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
         .await;
@@ -224,7 +259,7 @@ fn setup_host(
                 error = %error,
                 event = "project_host_initialization_failed",
             );
-            terminal.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
+            startup_handshake.emit_failed(FailureStage::Initialize, FailureCode::IoFailure);
             app_handle.exit(1);
             return;
         }
@@ -240,6 +275,46 @@ fn setup_host(
         );
     });
     Ok(())
+}
+
+fn projection_identity(project_host: &ProjectHost) -> Result<(String, u64), io::Error> {
+    let projection = project_host.projection().map_err(io::Error::other)?;
+    Ok((projection.state.project_id, projection.state.revision))
+}
+
+#[tauri::command]
+fn project_ui_ready(
+    window: tauri::WebviewWindow,
+    startup: tauri::State<'_, ProjectStartupHandshake>,
+) -> Result<(), String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("a confirmação de UI pertence somente à Janela do Projeto".into());
+    }
+
+    match startup.confirm_ui_ready() {
+        Ok(transition) => {
+            if transition.newly_observed {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::DesktopHost.as_str(),
+                    process_id = std::process::id(),
+                    window_label = PROJECT_WINDOW_LABEL,
+                    event = "project_ui_ready",
+                );
+            }
+            Ok(())
+        }
+        Err(error) => {
+            tracing::error!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::DesktopHost.as_str(),
+                error = %error,
+                event = "project_ui_ready_handshake_failed",
+            );
+            window.app_handle().exit(1);
+            Err("não foi possível concluir o handshake de inicialização".into())
+        }
+    }
 }
 
 fn start_linked_media_monitor(app: tauri::AppHandle) {
@@ -352,6 +427,9 @@ impl PendingHostTerminal {
     }
 
     fn emit_ready(&mut self, project_id: &str, revision: u64) -> io::Result<()> {
+        if self.emitted {
+            return Ok(());
+        }
         write_host_terminal(
             io::stdout().lock(),
             &HostTerminal::ready(&self.request, project_id.to_owned(), revision),
@@ -381,12 +459,119 @@ impl Drop for PendingHostTerminal {
     }
 }
 
+#[derive(Clone)]
+struct ProjectStartupHandshake {
+    state: Arc<Mutex<ProjectStartupState>>,
+}
+
+struct ProjectStartupState {
+    terminal: PendingHostTerminal,
+    project_id: String,
+    revision: u64,
+    readiness: StartupReadiness,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct StartupTransition {
+    newly_observed: bool,
+    ready_emitted: bool,
+}
+
+#[derive(Default)]
+struct StartupReadiness {
+    host_ready: bool,
+    ui_ready: bool,
+    emitted: bool,
+}
+
+impl StartupReadiness {
+    fn observe(&mut self, signal: StartupSignal) -> StartupTransition {
+        let target = match signal {
+            StartupSignal::HostReady => &mut self.host_ready,
+            StartupSignal::UiReady => &mut self.ui_ready,
+        };
+        let newly_observed = !*target;
+        *target = true;
+        let ready_emitted = self.host_ready && self.ui_ready && !self.emitted;
+        self.emitted |= ready_emitted;
+        StartupTransition {
+            newly_observed,
+            ready_emitted,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum StartupSignal {
+    HostReady,
+    UiReady,
+}
+
+impl ProjectStartupHandshake {
+    fn new(terminal: PendingHostTerminal, identity: (String, u64)) -> Self {
+        Self {
+            state: Arc::new(Mutex::new(ProjectStartupState {
+                terminal,
+                project_id: identity.0,
+                revision: identity.1,
+                readiness: StartupReadiness::default(),
+            })),
+        }
+    }
+
+    fn mark_host_ready(&self) -> io::Result<StartupTransition> {
+        self.transition(StartupSignal::HostReady)
+    }
+
+    fn confirm_ui_ready(&self) -> io::Result<StartupTransition> {
+        self.transition(StartupSignal::UiReady)
+    }
+
+    fn transition(&self, signal: StartupSignal) -> io::Result<StartupTransition> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| io::Error::other("o handshake de inicialização está indisponível"))?;
+        let transition = state.readiness.observe(signal);
+        if transition.ready_emitted {
+            let project_id = state.project_id.clone();
+            let revision = state.revision;
+            state.terminal.emit_ready(&project_id, revision)?;
+        }
+        Ok(transition)
+    }
+
+    fn emit_failed(&self, stage: FailureStage, code: FailureCode) {
+        if let Ok(mut state) = self.state.lock() {
+            state.terminal.emit_failed(stage, code);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::PROJECT_WINDOW_LABEL;
+    use super::{PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal};
 
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
         assert_eq!(PROJECT_WINDOW_LABEL, "project");
+    }
+
+    #[test]
+    fn ready_is_emitted_once_only_after_native_and_ui_readiness() {
+        for order in [
+            [StartupSignal::HostReady, StartupSignal::UiReady],
+            [StartupSignal::UiReady, StartupSignal::HostReady],
+        ] {
+            let mut readiness = StartupReadiness::default();
+            let first = readiness.observe(order[0]);
+            let second = readiness.observe(order[1]);
+            let duplicate = readiness.observe(order[1]);
+
+            assert!(!first.ready_emitted);
+            assert!(second.ready_emitted);
+            assert!(!duplicate.ready_emitted);
+            assert!(!duplicate.newly_observed);
+        }
     }
 }

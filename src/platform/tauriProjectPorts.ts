@@ -11,6 +11,7 @@ import {
   type ExportPort,
   type ExportProgressEvent,
   type MediaPreviewPort,
+  type ProjectStartupPort,
   type ProjectSessionPort,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
@@ -160,6 +161,10 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
         : toSaveProjectError(error);
     }
   },
+};
+
+export const tauriProjectStartupPort: ProjectStartupPort = {
+  confirmUiReady: () => invoke<void>("project_ui_ready"),
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {

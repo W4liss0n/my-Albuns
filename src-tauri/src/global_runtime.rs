@@ -124,7 +124,7 @@ async fn complete_graphics_gate(
             )
             .await;
             match &outcome {
-                ProjectLaunchOutcome::Opened => app.exit(0),
+                ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
                 ProjectLaunchOutcome::Failed { error } => {
                     state.record_startup_failure(error.clone());
                     show_existing_global_window(&app);
@@ -187,7 +187,7 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
 
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
     if outcome == ProjectLaunchOutcome::Opened {
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -267,7 +267,7 @@ async fn create_project(
     .await;
     if outcome == ProjectLaunchOutcome::Opened {
         provisional_decoratives.clear();
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -311,7 +311,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
     };
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
     if outcome == ProjectLaunchOutcome::Opened {
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -691,10 +691,20 @@ fn start_direct_project_without_global_window(
             ConfirmedLaunch::OpenExisting,
         ));
         match outcome {
-            ProjectLaunchOutcome::Opened => app.exit(0),
+            ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
             ProjectLaunchOutcome::Cancelled | ProjectLaunchOutcome::Failed { .. } => app.exit(1),
         }
     });
+}
+
+fn exit_global_after_handoff(app: &AppHandle) {
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::Global.as_str(),
+        process_id = std::process::id(),
+        event = "global_exited_after_project_handoff",
+    );
+    app.exit(0);
 }
 
 #[cfg(debug_assertions)]

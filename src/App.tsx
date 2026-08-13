@@ -14,6 +14,7 @@ import type {
   MediaPreview,
   MediaPreviewDemand,
   MediaPreviewPort,
+  ProjectStartupPort,
   ProjectSessionPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -30,6 +31,7 @@ import "./App.css";
 interface AppProps {
   exportPort: ExportPort;
   mediaPreviewPort: MediaPreviewPort;
+  projectStartupPort: ProjectStartupPort;
   projectSessionPort: ProjectSessionPort;
   projectWindowPort: ProjectWindowPort;
   graphicsProbe: GraphicsProbe;
@@ -40,6 +42,7 @@ interface AppProps {
 function App({
   exportPort,
   mediaPreviewPort,
+  projectStartupPort,
   projectSessionPort,
   projectWindowPort,
   graphicsProbe,
@@ -61,6 +64,7 @@ function App({
   });
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
+  const uiReadyProject = useRef("");
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -123,6 +127,23 @@ function App({
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId ?? "";
+  useEffect(() => {
+    if (!projectId || uiReadyProject.current === projectId) return;
+    uiReadyProject.current = projectId;
+    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+      if (uiReadyProject.current === projectId) {
+        uiReadyProject.current = "";
+      }
+      logger.write({
+        level: "error",
+        component: "application",
+        event: "project_ui_ready_failed",
+        projectId,
+        reason: logReasonFromError(error),
+      });
+      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
+    });
+  }, [logger, projectId, projectStartupPort]);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
     projectSessionPort,
