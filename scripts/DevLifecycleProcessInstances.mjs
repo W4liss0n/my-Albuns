@@ -145,21 +145,44 @@ export function processForestInstances(rootInstances) {
   return all.filter((candidate) => forestById.has(candidate.processId));
 }
 
+const exactProcessAuthorityPrelude = String.raw`
+$ErrorActionPreference = 'Stop'
+$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json
+
+function Test-MyAlbunsExactProcessInstance {
+    param($Expected, $Process)
+    if ($null -eq $Process -or $Process.HasExited) {
+        return $false
+    }
+    $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$Expected.processId)" -ErrorAction SilentlyContinue
+    return $null -ne $observed -and $observed.CreationDate.ToUniversalTime().ToString('O') -ceq [string]$Expected.creationTimeUtc
+}
+
+function Open-MyAlbunsExactProcessInstance {
+    param($Expected)
+    $candidate = Get-Process -Id ([int]$Expected.processId) -ErrorAction Stop
+    [void]$candidate.Handle
+    if (-not (Test-MyAlbunsExactProcessInstance -Expected $Expected -Process $candidate)) {
+        $candidate.Dispose()
+        throw 'process instance no longer matches'
+    }
+    return $candidate
+}
+
+function Assert-MyAlbunsExactProcessInstance {
+    param($Expected, $Process)
+    if (-not (Test-MyAlbunsExactProcessInstance -Expected $Expected -Process $Process)) {
+        throw 'process instance no longer matches'
+    }
+}
+
+$process = Open-MyAlbunsExactProcessInstance -Expected $expected
+`;
+
 export function closeMainWindow(expectedInstance) {
   powershellJson(
     String.raw`
-$ErrorActionPreference = 'Stop'
-$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json
-$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
-if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
-    throw 'process instance no longer matches'
-}
-$process = Get-Process -Id ([int]$expected.processId) -ErrorAction Stop
-[void]$process.Handle
-$confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
-if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
-    throw 'process instance no longer matches'
-}
+${exactProcessAuthorityPrelude}
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -209,11 +232,8 @@ $windowProcessId = [uint32]0
 if ([MyAlbunsWindowSignal]::GetWindowThreadProcessId($window, [ref]$windowProcessId) -eq 0 -or $windowProcessId -ne [uint32]$expected.processId) {
     throw 'main window no longer belongs to the exact process instance'
 }
-$finalInstance = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
-if ($process.HasExited -or $null -eq $finalInstance -or $finalInstance.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
-    throw 'process instance no longer matches'
-}
 $messageResult = [UIntPtr]::Zero
+Assert-MyAlbunsExactProcessInstance -Expected $expected -Process $process
 $sent = [MyAlbunsWindowSignal]::SendMessageTimeoutW(
     $window,
     0x0010,
@@ -237,7 +257,18 @@ export function terminateProcessInstance(expectedInstance) {
   if (!expectedInstance) return false;
   return (
     powershellJson(
-      `$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json; $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { [Console]::Out.Write('false'); exit 0 }; $process = Get-Process -Id ([int]$expected.processId) -ErrorAction SilentlyContinue; if ($null -eq $process) { [Console]::Out.Write('false'); exit 0 }; [void]$process.Handle; $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc -or $process.HasExited) { [Console]::Out.Write('false'); exit 0 }; $process.Kill(); [Console]::Out.Write('true')`,
+      String.raw`
+try {
+${exactProcessAuthorityPrelude}
+    Assert-MyAlbunsExactProcessInstance -Expected $expected -Process $process
+}
+catch {
+    [Console]::Out.Write('false')
+    exit 0
+}
+$process.Kill()
+[Console]::Out.Write('true')
+`,
       {
         MYALBUNS_GATE_PROCESS_INSTANCE: JSON.stringify(expectedInstance),
       },
@@ -247,12 +278,7 @@ export function terminateProcessInstance(expectedInstance) {
 
 export function sendCtrlC(expectedInstance) {
   const script = String.raw`
-$ErrorActionPreference = 'Stop'
-$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json
-$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
-if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
-    throw 'process instance no longer matches'
-}
+${exactProcessAuthorityPrelude}
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -277,13 +303,10 @@ if (-not [MyAlbunsConsoleSignal]::AttachConsole([uint32]$expected.processId)) {
     throw "AttachConsole failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
 }
 try {
-    $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
-    if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
-        throw 'process instance no longer matches'
-    }
     if (-not [MyAlbunsConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) {
         throw "SetConsoleCtrlHandler failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
     }
+    Assert-MyAlbunsExactProcessInstance -Expected $expected -Process $process
     if (-not [MyAlbunsConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) {
         throw "GenerateConsoleCtrlEvent failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
     }

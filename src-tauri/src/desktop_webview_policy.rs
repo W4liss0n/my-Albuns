@@ -44,7 +44,7 @@ impl WebviewPolicyReadiness {
     pub(crate) async fn wait(self) -> std::io::Result<()> {
         self.receiver
             .await
-            .map_err(|_| std::io::Error::other("a política nativa da WebView ficou indisponível"))?
+            .map_err(|_| std::io::Error::other("the native WebView policy became unavailable"))?
     }
 }
 
@@ -61,10 +61,12 @@ fn enforce_on_main_thread(window: &WebviewWindow) -> std::io::Result<()> {
 
         receiver
             .try_recv()
-            .map_err(|_| std::io::Error::other("a WebView não ficou disponível na main thread"))?
+            .map_err(|_| {
+                std::io::Error::other("the WebView did not become available on the main thread")
+            })?
             .map_err(|error| {
                 std::io::Error::other(format!(
-                    "não foi possível aplicar a política nativa da WebView: {error}"
+                    "could not apply the native WebView policy: {error}"
                 ))
             })?;
     }

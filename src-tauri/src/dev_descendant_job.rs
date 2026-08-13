@@ -34,7 +34,7 @@ pub(crate) fn install_if_supervised() -> io::Result<()> {
     }
     if std::env::var(DESCENDANT_JOB_FAILURE_PROBE_ENV).as_deref() == Ok("1") {
         return Err(io::Error::other(
-            "a sonda do gate recusou a contenção de descendentes",
+            "the gate probe rejected descendant containment",
         ));
     }
     match PROCESS_DESCENDANT_JOB.get_or_init(install_process_descendant_job) {

@@ -15,7 +15,7 @@ impl HostProcessInstanceId {
     pub(crate) fn from_process_handle(process_id: u32, process: HANDLE) -> io::Result<Self> {
         let creation_time = query_creation_time(process)?;
         Self::from_wire(process_id, creation_time.to_wire())
-            .ok_or_else(|| io::Error::other("a instância do processo Host capturada não é válida"))
+            .ok_or_else(|| io::Error::other("the captured Host process instance is invalid"))
     }
 
     pub(crate) fn from_wire(process_id: u32, creation_time: u64) -> Option<Self> {
@@ -65,5 +65,5 @@ fn query_creation_time(process: HANDLE) -> io::Result<ProcessCreationTime> {
     }
     let value = (u64::from(creation.dwHighDateTime) << 32) | u64::from(creation.dwLowDateTime);
     ProcessCreationTime::from_wire(value)
-        .ok_or_else(|| io::Error::other("o tempo de criação do processo Host é inválido"))
+        .ok_or_else(|| io::Error::other("the Host process creation time is invalid"))
 }

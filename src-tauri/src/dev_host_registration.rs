@@ -40,7 +40,7 @@ impl PendingHostLeaseAuthorization {
         )?;
         if response != HOST_LEASE_AUTHORIZED_RESPONSE {
             return Err(io::Error::other(
-                "o supervisor recusou a credencial de registro do Host",
+                "the supervisor rejected the Host registration credential",
             ));
         }
         Ok(())
@@ -61,14 +61,14 @@ pub(crate) fn prepare_host_command(
         (Some(endpoint), Some(authority)) => (endpoint, authority),
         _ => {
             return Err(io::Error::other(
-                "o contrato do supervisor de desenvolvimento está incompleto",
+                "the development supervisor contract is incomplete",
             ));
         }
     };
     let endpoint = parse_endpoint(&endpoint)?;
     let authority = authority
         .to_str()
-        .ok_or_else(|| io::Error::other("a autoridade do supervisor não é Unicode"))?;
+        .ok_or_else(|| io::Error::other("the supervisor authority is not Unicode"))?;
     validate_launch_nonce(launch_nonce)?;
 
     command
@@ -91,18 +91,18 @@ pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {
         (Some(endpoint), Some(credential)) => (endpoint, credential),
         _ => {
             return Err(io::Error::other(
-                "o contrato de registro do Host de desenvolvimento está incompleto",
+                "the development Host registration contract is incomplete",
             ));
         }
     };
     let endpoint = parse_endpoint(&endpoint)?;
     let credential = credential
         .to_str()
-        .ok_or_else(|| io::Error::other("a credencial do Host não é Unicode"))?;
+        .ok_or_else(|| io::Error::other("the Host credential is not Unicode"))?;
     validate_launch_nonce(credential)?;
     if credential != launch_nonce {
         return Err(io::Error::other(
-            "a credencial do Host diverge do nonce de bootstrap",
+            "the Host credential does not match the bootstrap nonce",
         ));
     }
 
@@ -112,7 +112,9 @@ pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {
         &format!("{REGISTER_HOST_LEASE_REQUEST} {credential} {process_id}\n"),
     )?;
     if response != HOST_LEASE_REGISTERED_RESPONSE {
-        return Err(io::Error::other("o supervisor recusou o registro do Host"));
+        return Err(io::Error::other(
+            "the supervisor rejected the Host registration",
+        ));
     }
     eprintln!(r#"{{"event":"dev_host_registered","processId":{process_id}}}"#);
     Ok(())
@@ -121,15 +123,15 @@ pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {
 fn parse_endpoint(value: &OsStr) -> io::Result<SocketAddr> {
     value
         .to_str()
-        .ok_or_else(|| io::Error::other("o endpoint do supervisor não é Unicode"))?
+        .ok_or_else(|| io::Error::other("the supervisor endpoint is not Unicode"))?
         .parse::<SocketAddr>()
-        .map_err(|_| io::Error::other("o endpoint do supervisor não é válido"))
+        .map_err(|_| io::Error::other("the supervisor endpoint is invalid"))
 }
 
 fn validate_launch_nonce(value: &str) -> io::Result<()> {
     uuid::Uuid::parse_str(value)
         .map(|_| ())
-        .map_err(|_| io::Error::other("o nonce de registro do Host não é válido"))
+        .map_err(|_| io::Error::other("the Host registration nonce is invalid"))
 }
 
 fn exchange(endpoint: SocketAddr, request: &str) -> io::Result<String> {

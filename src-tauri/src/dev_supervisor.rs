@@ -126,7 +126,7 @@ fn workspace_root() -> io::Result<PathBuf> {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .map(Path::to_path_buf)
-        .ok_or_else(|| io::Error::other("o workspace de desenvolvimento não foi localizado"))
+        .ok_or_else(|| io::Error::other("the development workspace could not be located"))
 }
 
 fn node_executable() -> OsString {
@@ -155,12 +155,12 @@ fn validate_development_inputs(workspace: &Path, node: &OsStr) -> io::Result<()>
         if !path.is_file() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("{label} não foi encontrado em {}", path.display()),
+                format!("{label} was not found at {}", path.display()),
             ));
         }
     }
     if node.is_empty() {
-        return Err(io::Error::other("o executável Node.js não foi informado"));
+        return Err(io::Error::other("the Node.js executable was not provided"));
     }
     Ok(())
 }
@@ -239,7 +239,7 @@ impl WorkerRole {
             Some("vite") => Ok(Self::Vite),
             Some("tauri") => Ok(Self::Tauri),
             _ => Err(io::Error::other(
-                "o papel interno do supervisor de desenvolvimento é inválido",
+                "the internal development supervisor role is invalid",
             )),
         }
     }
@@ -307,13 +307,13 @@ fn complete_worker_assignment(
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 if let Some(status) = child.try_wait()? {
                     return Err(io::Error::other(format!(
-                        "o worker encerrou antes da associação ao Job Object ({status})"
+                        "the worker exited before Job Object association ({status})"
                     )));
                 }
                 if Instant::now() >= deadline {
                     return Err(io::Error::new(
                         io::ErrorKind::TimedOut,
-                        "o worker não confirmou a barreira de associação ao Job Object",
+                        "the worker did not confirm the Job Object association barrier",
                     ));
                 }
                 thread::sleep(PROCESS_POLL_INTERVAL);
@@ -326,7 +326,7 @@ fn complete_worker_assignment(
 fn await_job_assignment() -> io::Result<()> {
     let endpoint = required_environment(WORKER_GATE_ENDPOINT_ENV)?
         .parse::<SocketAddr>()
-        .map_err(|_| io::Error::other("a barreira do Job Object possui endpoint inválido"))?;
+        .map_err(|_| io::Error::other("the Job Object barrier has an invalid endpoint"))?;
     let token = required_environment(WORKER_GATE_TOKEN_ENV)?;
     let mut stream = TcpStream::connect_timeout(&endpoint, WORKER_GATE_TIMEOUT)?;
     stream.set_read_timeout(Some(WORKER_GATE_TIMEOUT))?;
@@ -337,14 +337,14 @@ fn await_job_assignment() -> io::Result<()> {
     stream.read_exact(&mut release)?;
     if release != *b"1" {
         return Err(io::Error::other(
-            "a barreira do Job Object retornou confirmação inválida",
+            "the Job Object barrier returned an invalid confirmation",
         ));
     }
     Ok(())
 }
 
 fn required_environment(name: &str) -> io::Result<String> {
-    env::var(name).map_err(|_| io::Error::other(format!("a variável {name} não foi definida")))
+    env::var(name).map_err(|_| io::Error::other(format!("the {name} variable is not defined")))
 }
 
 fn wait_for_frontend(vite: &mut Child) -> io::Result<()> {
@@ -352,7 +352,7 @@ fn wait_for_frontend(vite: &mut Child) -> io::Result<()> {
     loop {
         if let Some(status) = vite.try_wait()? {
             return Err(io::Error::other(format!(
-                "o Vite encerrou antes de servir a UI ({status})"
+                "Vite exited before serving the UI ({status})"
             )));
         }
         if frontend_responds() {
@@ -361,7 +361,7 @@ fn wait_for_frontend(vite: &mut Child) -> io::Result<()> {
         if Instant::now() >= deadline {
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
-                "o Vite não serviu a UI de desenvolvimento no prazo",
+                "Vite did not serve the development UI before the deadline",
             ));
         }
         thread::sleep(PROCESS_POLL_INTERVAL);
@@ -374,7 +374,7 @@ fn ensure_frontend_port_is_free() -> io::Result<()> {
     {
         return Err(io::Error::new(
             io::ErrorKind::AddrInUse,
-            "a porta 1437 já pertence a outro processo",
+            "port 1437 already belongs to another process",
         ));
     }
     Ok(())
@@ -427,7 +427,7 @@ fn supervise_development(
             .try_wait()?
         {
             return Err(io::Error::other(format!(
-                "o Vite encerrou enquanto o ambiente ainda o possuía ({status})"
+                "Vite exited while the environment still owned it ({status})"
             )));
         }
 
@@ -463,9 +463,7 @@ fn supervise_development(
             Ok(event) => lifecycle.apply(event),
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => {
-                return Err(io::Error::other(
-                    "o monitor de Hosts de desenvolvimento foi encerrado",
-                ));
+                return Err(io::Error::other("the development Host monitor was closed"));
             }
         }
     }
@@ -548,10 +546,10 @@ impl DevelopmentLifecycle {
 
     fn decision(&self, handoff_expired: bool) -> LifecycleDecision {
         if self.tracking_failed {
-            return LifecycleDecision::Fail("o handle do Host ficou indisponível");
+            return LifecycleDecision::Fail("the Host handle became unavailable");
         }
         match self.cli_success {
-            Some(false) => LifecycleDecision::Fail("o Tauri CLI encerrou com falha"),
+            Some(false) => LifecycleDecision::Fail("the Tauri CLI exited with failure"),
             Some(true) if !self.active_hosts.is_empty() => LifecycleDecision::Wait,
             Some(true) if self.host_seen => LifecycleDecision::Complete,
             Some(true) if handoff_expired => LifecycleDecision::Complete,
@@ -794,7 +792,7 @@ impl ValidatedHostProcess {
             || observed.creation_time_wire() != expected.creation_time_wire()
         {
             return Err(io::Error::other(
-                "o PID do Host foi reutilizado por outra instância",
+                "the Host PID was reused by another process instance",
             ));
         }
         // GetProcessTimes remains valid after process termination. The lease's
@@ -804,13 +802,13 @@ impl ValidatedHostProcess {
             WAIT_TIMEOUT => {}
             WAIT_OBJECT_0 => {
                 return Err(io::Error::other(
-                    "o processo Host encerrou antes de adquirir o lease",
+                    "the Host process exited before acquiring the lease",
                 ));
             }
             WAIT_FAILED => return Err(io::Error::last_os_error()),
             wait => {
                 return Err(io::Error::other(format!(
-                    "resultado inesperado ao verificar o processo Host: {wait}"
+                    "unexpected result while checking the Host process: {wait}"
                 )));
             }
         }
@@ -997,7 +995,7 @@ impl KillOnCloseJob {
     fn assign_process_handle(&self, process: HANDLE) -> io::Result<()> {
         if self.terminated.load(Ordering::Acquire) {
             return Err(io::Error::other(
-                "o Job Object de desenvolvimento já foi encerrado",
+                "the development Job Object has already been closed",
             ));
         }
         if self.contains_process_handle(process)? {

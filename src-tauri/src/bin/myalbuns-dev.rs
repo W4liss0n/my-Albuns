@@ -7,7 +7,7 @@ fn main() {
     match dev_supervisor::run() {
         Ok(code) => std::process::exit(code),
         Err(error) => {
-            eprintln!("não foi possível supervisionar o ambiente de desenvolvimento: {error}");
+            eprintln!("could not supervise the development environment: {error}");
             std::process::exit(1);
         }
     }
@@ -15,6 +15,6 @@ fn main() {
 
 #[cfg(not(windows))]
 fn main() {
-    eprintln!("o supervisor de desenvolvimento do MyAlbuns exige Windows");
+    eprintln!("the MyAlbuns development supervisor requires Windows");
     std::process::exit(1);
 }

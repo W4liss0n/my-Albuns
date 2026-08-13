@@ -71,7 +71,7 @@ pub(crate) fn run(
             .windows
             .iter_mut()
             .find(|window| window.label == PROJECT_WINDOW_LABEL)
-            .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
+            .ok_or_else(|| io::Error::other("the Project window configuration does not exist"))?;
         project_config.create = true;
         project_config.visible = true;
     }
@@ -207,7 +207,7 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
     let (project_window, policy_readiness) = if desktop_webview_policy::automation_enabled() {
         (
             app.get_webview_window(PROJECT_WINDOW_LABEL)
-                .ok_or_else(|| io::Error::other("a WebView automatizada do Projeto não existe"))?,
+                .ok_or_else(|| io::Error::other("the automated Project WebView does not exist"))?,
             None,
         )
     } else {
@@ -220,7 +220,7 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
             .iter()
             .find(|window| window.label == PROJECT_WINDOW_LABEL)
             .cloned()
-            .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
+            .ok_or_else(|| io::Error::other("the Project window configuration does not exist"))?;
         let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
         let window = WebviewWindowBuilder::from_config(app, &project_config)?
             .data_directory(webview_data_directory)
@@ -292,7 +292,7 @@ fn project_ui_ready(
     startup: tauri::State<'_, ProjectStartupHandshake>,
 ) -> Result<(), String> {
     if window.label() != PROJECT_WINDOW_LABEL {
-        return Err("a confirmação de UI pertence somente à Janela do Projeto".into());
+        return Err("UI confirmation belongs only to the Project window".into());
     }
 
     match startup.confirm_ui_ready() {
@@ -316,7 +316,7 @@ fn project_ui_ready(
                 event = "project_ui_ready_handshake_failed",
             );
             window.app_handle().exit(1);
-            Err("não foi possível concluir o handshake de inicialização".into())
+            Err("could not complete the startup handshake".into())
         }
     }
 }
@@ -535,7 +535,7 @@ impl ProjectStartupHandshake {
         let mut state = self
             .state
             .lock()
-            .map_err(|_| io::Error::other("o handshake de inicialização está indisponível"))?;
+            .map_err(|_| io::Error::other("the startup handshake is unavailable"))?;
         let transition = state.readiness.observe(signal);
         if transition.ready_emitted {
             let project_id = state.project_id.clone();
