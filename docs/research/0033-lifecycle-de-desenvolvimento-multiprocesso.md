@@ -61,6 +61,13 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   milissegundos distingue o objeto ainda ativo (`WAIT_TIMEOUT`) do objeto já
   sinalizado (`WAIT_OBJECT_0`) sem introduzir espera temporal no handshake:
   [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
+- Em `tauri 2.11.5`, `with_webview` entrega o handle específico da plataforma
+  numa closure executada na main thread, enquanto `on_page_load` oferece o
+  terminal público `PageLoadEvent` da WebView. Como ambas as janelas usam
+  `create: false`, a política nativa é ligada ao `Finished` da primeira carga,
+  quando a WebView já pertence ao runtime:
+  [WebviewWindow::with_webview](https://docs.rs/tauri/2.11.5/tauri/webview/struct.WebviewWindow.html#method.with_webview) e
+  [WebviewWindowBuilder::on_page_load](https://docs.rs/tauri/2.11.5/tauri/webview/struct.WebviewWindowBuilder.html#method.on_page_load).
 - O WebDriver do Edge recomenda o modo *attach* quando há UI nativa ou mais de
   uma WebView. A aplicação é iniciada fora do driver, o Host recebe
   `--remote-debugging-port` e o driver usa `DebuggerAddress`:
@@ -127,6 +134,13 @@ Job Object, recolhendo Vite, Node, Global, Host e descendentes. O Global não é
 mantido artificialmente vivo. Se o usuário fecha normalmente apenas a Tela
 Global, sem iniciar Projeto, o supervisor reserva uma janela curta para um
 registro de Host atrasado e então conclui a sessão com sucesso.
+
+Global e Host constroem sua WebView oculta durante `setup` e instalam antes da
+criação um handshake de `PageLoadEvent::Finished`. Esse callback aplica a
+política pelo handle nativo e conclui uma readiness consumível. A janela só é
+exibida — e `host_ready` só pode ser publicado — depois desse terminal. Isso
+evita enfileirar `with_webview` enquanto o runtime ainda não registrou a WebView,
+sem transformar sleep, retry ou visibilidade em prova de prontidão.
 
 ## Ready causal
 

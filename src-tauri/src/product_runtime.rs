@@ -204,9 +204,12 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
     app.manage(OperationGate::new(&app_paths));
     app.manage(ImagingProcessor::default());
 
-    let project_window = if desktop_webview_policy::automation_enabled() {
-        app.get_webview_window(PROJECT_WINDOW_LABEL)
-            .ok_or_else(|| io::Error::other("a WebView automatizada do Projeto não existe"))?
+    let (project_window, policy_readiness) = if desktop_webview_policy::automation_enabled() {
+        (
+            app.get_webview_window(PROJECT_WINDOW_LABEL)
+                .ok_or_else(|| io::Error::other("a WebView automatizada do Projeto não existe"))?,
+            None,
+        )
     } else {
         let webview_namespace = project_data_namespace(&projection.state.project_id);
         let webview_data_directory = app_paths.webview_data_directory(&webview_namespace)?;
@@ -218,9 +221,14 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
             .find(|window| window.label == PROJECT_WINDOW_LABEL)
             .cloned()
             .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
-        WebviewWindowBuilder::from_config(app, &project_config)?
+        let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
+        let window = WebviewWindowBuilder::from_config(app, &project_config)?
             .data_directory(webview_data_directory)
-            .build()?
+            .on_page_load(move |window, payload| {
+                policy_signal.observe(&window, payload.event());
+            })
+            .build()?;
+        (window, Some(policy_readiness))
     };
     app.manage(app_paths);
     let app_handle = app.handle().clone();
@@ -228,12 +236,10 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
     start_linked_media_monitor(app_handle.clone());
     tauri::async_runtime::spawn(async move {
         let startup = async {
-            if desktop_webview_policy::automation_enabled() {
-                project_window.show()?;
-            } else {
-                desktop_webview_policy::enforce(&project_window).await?;
-                project_window.show()?;
+            if let Some(policy_readiness) = policy_readiness {
+                policy_readiness.wait().await?;
             }
+            project_window.show()?;
             let transition = startup_handshake.mark_host_ready()?;
             if transition.newly_observed {
                 tracing::info!(
