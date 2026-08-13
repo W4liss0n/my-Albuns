@@ -57,6 +57,10 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   Windows suportadas pelo produto:
   [GetProcessTimes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes) e
   [FILETIME](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime).
+- Um handle de processo permanece válido depois do término. Uma espera de zero
+  milissegundos distingue o objeto ainda ativo (`WAIT_TIMEOUT`) do objeto já
+  sinalizado (`WAIT_OBJECT_0`) sem introduzir espera temporal no handshake:
+  [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
 - O WebDriver do Edge recomenda o modo *attach* quando há UI nativa ou mais de
   uma WebView. A aplicação é iniciada fora do driver, o Host recebe
   `--remote-debugging-port` e o driver usa `DebuggerAddress`:
@@ -102,12 +106,13 @@ O Host produtivo de debug registra seu PID por esse canal local autenticado. O
 servidor reserva o nonce atomicamente uma única vez e, ainda antes de criar uma
 lease ou responder `REGISTERED`, abre um handle Windows com
 `SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION`, consulta `GetProcessTimes` e
-exige a mesma `HostProcessInstanceId`. PID diferente, criação diferente, Host já
-encerrado, falha da API ou replay são terminais fechados: a credencial permanece
-queimada, nenhum evento `Connected` é emitido e nenhum processo alheio é
-acompanhado. O PID permanece somente localizador e diagnóstico; a identidade de
-criação valida a aquisição e o handle exato validado passa a ser a autoridade de
-vida.
+exige a mesma `HostProcessInstanceId`. No mesmo ponto de linearização, uma
+espera não bloqueante exige que esse handle ainda esteja não sinalizado. PID
+diferente, criação diferente, Host já encerrado, falha da API ou replay são
+terminais fechados: a credencial permanece queimada, nenhum evento `Connected`
+é emitido e nenhum processo alheio é acompanhado. O PID permanece somente
+localizador e diagnóstico; a identidade de criação valida a aquisição e o
+handle exato validado passa a ser a autoridade de vida.
 
 Cada aquisição validada recebe um `HostLeaseId` opaco. Conexão e desconexão
 transportam o mesmo `HostLeaseId`; assim, uma notificação atrasada do handle

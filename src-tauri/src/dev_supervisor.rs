@@ -18,7 +18,7 @@ use std::{
 };
 
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0},
+    Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::{
         JobObjects::{
             AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -784,6 +784,23 @@ impl ValidatedHostProcess {
                 "o PID do Host foi reutilizado por outra instância",
             ));
         }
+        // GetProcessTimes remains valid after process termination. The lease's
+        // linearization point therefore also requires the exact handle to be
+        // unsignaled before Connected/REGISTERED can be published.
+        match unsafe { WaitForSingleObject(process.0, 0) } {
+            WAIT_TIMEOUT => {}
+            WAIT_OBJECT_0 => {
+                return Err(io::Error::other(
+                    "o processo Host encerrou antes de adquirir o lease",
+                ));
+            }
+            WAIT_FAILED => return Err(io::Error::last_os_error()),
+            wait => {
+                return Err(io::Error::other(format!(
+                    "resultado inesperado ao verificar o processo Host: {wait}"
+                )));
+            }
+        }
         Ok(process)
     }
 
@@ -1079,6 +1096,42 @@ mod tests {
         );
         assert_eq!(reauthorization_response, "REJECTED\n");
         assert_eq!(replay_response, "REJECTED\n");
+    }
+
+    #[test]
+    fn an_exited_process_cannot_acquire_a_host_lease() {
+        let server = HostLeaseServer::start().expect("lease server");
+        let credential = uuid::Uuid::from_u128(9).simple().to_string();
+        let mut process = spawn_waitable_child();
+        let process_instance = capture_process_instance(&process);
+        assert_eq!(
+            authorize_process_instance(&server, &credential, process_instance),
+            "AUTHORIZED\n"
+        );
+
+        process.kill().expect("child terminates");
+        process.wait().expect("child is reaped");
+
+        let registration = format!("REGISTER {credential} {}\n", process.id());
+        assert_eq!(
+            send_host_lease_request(server.endpoint(), &registration),
+            "REJECTED\n"
+        );
+        assert!(
+            server
+                .events()
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "an exited process must not create even a transient lease"
+        );
+        assert_eq!(
+            authorize_process_instance(&server, &credential, process_instance),
+            "REJECTED\n"
+        );
+        assert_eq!(
+            send_host_lease_request(server.endpoint(), &registration),
+            "REJECTED\n"
+        );
     }
 
     #[test]
