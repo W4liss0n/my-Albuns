@@ -146,24 +146,98 @@ export function processForestInstances(rootInstances) {
 }
 
 export function closeMainWindow(expectedInstance) {
-  const closed = powershellJson(
-    `$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json; $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { throw 'process instance no longer matches' }; $process = Get-Process -Id ([int]$expected.processId) -ErrorAction Stop; $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { throw 'process instance no longer matches' }; [Console]::Out.Write(($process.CloseMainWindow() | ConvertTo-Json -Compress))`,
+  powershellJson(
+    String.raw`
+$ErrorActionPreference = 'Stop'
+$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json
+$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
+if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
+    throw 'process instance no longer matches'
+}
+$process = Get-Process -Id ([int]$expected.processId) -ErrorAction Stop
+[void]$process.Handle
+$confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
+if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
+    throw 'process instance no longer matches'
+}
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class MyAlbunsWindowSignal {
+    public delegate bool EnumWindowsCallback(IntPtr window, IntPtr parameter);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr parameter);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindowVisible(IntPtr window);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr SendMessageTimeoutW(
+        IntPtr window,
+        uint message,
+        UIntPtr wParam,
+        IntPtr lParam,
+        uint flags,
+        uint timeoutMilliseconds,
+        out UIntPtr result);
+
+    public static IntPtr FindVisibleTopLevelWindow(uint expectedProcessId) {
+        IntPtr found = IntPtr.Zero;
+        EnumWindows((window, _) => {
+            uint processId;
+            GetWindowThreadProcessId(window, out processId);
+            if (processId == expectedProcessId && IsWindowVisible(window)) {
+                found = window;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        return found;
+    }
+}
+'@
+$window = [MyAlbunsWindowSignal]::FindVisibleTopLevelWindow([uint32]$expected.processId)
+if ($window -eq [IntPtr]::Zero) {
+    throw 'the exact process exposes no visible top-level window'
+}
+$windowProcessId = [uint32]0
+if ([MyAlbunsWindowSignal]::GetWindowThreadProcessId($window, [ref]$windowProcessId) -eq 0 -or $windowProcessId -ne [uint32]$expected.processId) {
+    throw 'main window no longer belongs to the exact process instance'
+}
+$finalInstance = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
+if ($process.HasExited -or $null -eq $finalInstance -or $finalInstance.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
+    throw 'process instance no longer matches'
+}
+$messageResult = [UIntPtr]::Zero
+$sent = [MyAlbunsWindowSignal]::SendMessageTimeoutW(
+    $window,
+    0x0010,
+    [UIntPtr]::Zero,
+    [IntPtr]::Zero,
+    0x0003,
+    5000,
+    [ref]$messageResult)
+if ($sent -eq [IntPtr]::Zero) {
+    throw 'bounded WM_CLOSE delivery timed out or failed'
+}
+[Console]::Out.Write('true')
+`,
     {
       MYALBUNS_GATE_PROCESS_INSTANCE: JSON.stringify(expectedInstance),
     },
   );
-  if (closed !== true) {
-    throw new Error(
-      `The Project Host exposed no closeable native window (${expectedInstance.processId})`,
-    );
-  }
 }
 
 export function terminateProcessInstance(expectedInstance) {
   if (!expectedInstance) return false;
   return (
     powershellJson(
-      `$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json; $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { [Console]::Out.Write('false'); exit 0 }; $process = Get-Process -Id ([int]$expected.processId) -ErrorAction Stop; [void]$process.Handle; $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc -or $process.HasExited) { [Console]::Out.Write('false'); exit 0 }; $process.Kill(); [Console]::Out.Write('true')`,
+      `$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json; $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { [Console]::Out.Write('false'); exit 0 }; $process = Get-Process -Id ([int]$expected.processId) -ErrorAction SilentlyContinue; if ($null -eq $process) { [Console]::Out.Write('false'); exit 0 }; [void]$process.Handle; $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc -or $process.HasExited) { [Console]::Out.Write('false'); exit 0 }; $process.Kill(); [Console]::Out.Write('true')`,
       {
         MYALBUNS_GATE_PROCESS_INSTANCE: JSON.stringify(expectedInstance),
       },

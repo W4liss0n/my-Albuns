@@ -65,6 +65,12 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   milissegundos distingue o objeto ainda ativo (`WAIT_TIMEOUT`) do objeto já
   sinalizado (`WAIT_OBJECT_0`) sem introduzir espera temporal no handshake:
   [WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject).
+- `GetWindowThreadProcessId` correlaciona uma janela ao PID proprietário e
+  `SendMessageTimeoutW` limita a espera por `WM_CLOSE`; retorno zero representa
+  falha ou timeout. O gate combina essa janela correlacionada com a identidade
+  de criação já validada do processo:
+  [GetWindowThreadProcessId](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid) e
+  [SendMessageTimeoutW](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw).
 - Em `tauri 2.11.5`, `with_webview` entrega o handle específico da plataforma
   numa closure executada na main thread, enquanto `on_page_load` oferece o
   terminal público `PageLoadEvent` da WebView. Como ambas as janelas usam
@@ -213,6 +219,11 @@ sinalizar o PID armazenado do Global ou Host. Um PID reutilizado falha fechado e
 não pode provar handoff, virar raiz nem receber fechamento. Uma regressão
 independente do runner usa um processo Windows real e um instante de criação
 divergente para provar os três terminais.
+
+O `WM_CLOSE` usa a janela nativa correlacionada à instância e
+`SendMessageTimeoutW` com limite de cinco segundos. Uma janela sem resposta
+falha o gate e entrega o controle ao cleanup exato, sem bloquear o instrumento;
+uma regressão cria uma janela Windows real sem message pump e prova esse limite.
 
 Antes de iniciar o supervisor, o gate exige zero instâncias preexistentes do
 mesmo binário desktop. A precondição torna a descoberta pertencente à rodada:
