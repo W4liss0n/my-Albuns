@@ -1,0 +1,55 @@
+﻿{
+    "schemaVersion":  1,
+    "gate":  "development-lifecycle",
+    "collectedAtUtc":  "2026-08-13T11:46:28.1548617Z",
+    "gitCommit":  "4afcae13add0d0102787ac8d688da4b4506badb2",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64"
+                 },
+    "supervisorPid":  24632,
+    "globalPid":  28460,
+    "hostPid":  17764,
+    "vitePid":  9124,
+    "webdriverMode":  "attach-existing-webview2",
+    "globalExitedAfterUiReady":  true,
+    "hostSurvivedGlobal":  true,
+    "viteSurvivedGlobal":  true,
+    "projectUiRendered":  true,
+    "nonWhiteSamples":  1200,
+    "sampleCount":  1200,
+    "cleanupCompleted":  true,
+    "cleanupLogged":  true,
+    "abruptCleanupCompleted":  true,
+    "bootstrapFailureCleanupCompleted":  true,
+    "frontendFailureCleanupCompleted":  true,
+    "nativeDriverVersion":  "151.0.4129.78",
+    "webView2RuntimeVersion":  "151.0.4129.78",
+    "checks":  [
+                   {
+                       "name":  "causal-ui-ready-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-webview-rendered",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "normal-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "abrupt-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "bootstrap-failure-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "frontend-failure-cleanup",
+                       "passed":  true
+                   }
+               ]
+}
