@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "react-aria-components";
 
 import type {
   ExportPort,
+  MediaPreview,
+  MediaPreviewDemand,
   ProjectWindowPort,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -25,7 +27,8 @@ interface ProjectWorkspaceProps {
   exportPort: ExportPort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
-  mediaPreviewUrls?: Readonly<Record<string, string>>;
+  mediaPreviews?: Readonly<Record<string, MediaPreview>>;
+  onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }
@@ -35,13 +38,55 @@ export function ProjectWorkspace({
   exportPort,
   projectWindowPort,
   runProjectMutation,
-  mediaPreviewUrls = {},
+  mediaPreviews = {},
+  onMediaDemandChange,
   onProjectionChange,
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const [canvasMediaDemand, setCanvasMediaDemand] =
+    useState<MediaPreviewDemand>({
+      visibleMediaIds: [],
+      preloadMediaIds: [],
+    });
+  const [panelMediaDemand, setPanelMediaDemand] =
+    useState<MediaPreviewDemand>({
+      visibleMediaIds: [],
+      preloadMediaIds: [],
+    });
+  const mediaPreviewUrls = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(mediaPreviews).flatMap(([mediaId, preview]) =>
+          preview.url ? [[mediaId, preview.url]] : [],
+        ),
+      ),
+    [mediaPreviews],
+  );
+  useEffect(() => {
+    if (!onMediaDemandChange) return;
+    const visible = Array.from(
+      new Set([
+        ...canvasMediaDemand.visibleMediaIds,
+        ...panelMediaDemand.visibleMediaIds,
+      ]),
+    );
+    const visibleSet = new Set(visible);
+    const preload = Array.from(
+      new Set(
+        [
+          ...canvasMediaDemand.preloadMediaIds,
+          ...panelMediaDemand.preloadMediaIds,
+        ].filter((mediaId) => !visibleSet.has(mediaId)),
+      ),
+    );
+    onMediaDemandChange({
+      visibleMediaIds: visible,
+      preloadMediaIds: preload,
+    });
+  }, [canvasMediaDemand, onMediaDemandChange, panelMediaDemand]);
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
@@ -176,6 +221,7 @@ export function ProjectWorkspace({
           <AlbumCanvas
             {...controller.canvasProps}
             mediaPreviewUrls={mediaPreviewUrls}
+            onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
           />
         </section>
@@ -217,7 +263,8 @@ export function ProjectWorkspace({
         <MediaPanel
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
-          mediaPreviewUrls={mediaPreviewUrls}
+          mediaPreviews={mediaPreviews}
+          onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
         />
       </div>

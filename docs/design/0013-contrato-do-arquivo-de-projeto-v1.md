@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # Contrato do Arquivo de Projeto v1
@@ -10,6 +10,10 @@ updated: 2026-08-10
 ## Objetivo
 
 Definir o envelope público, a fronteira persistente e o ciclo de evolução do Arquivo de Projeto sem levar JSON, I/O ou versões antigas ao `ProjectDomain`. Este design detalha o [ADR 0009](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md) e incorpora o codec nativo comprovado para caminhos Windows.
+
+Este documento permanece o contrato fechado da v1. A versão pública atual é a
+[v2](0016-contrato-do-arquivo-de-projeto-v2.md); o leitor conserva v1 e a migra
+sequencialmente apenas em memória.
 
 ## Documento público
 
@@ -168,7 +172,7 @@ A posição determina o Papel da Lâmina e a Numeração das Páginas; esses val
 
 No schema v1, todas as Lâminas herdam `visualDefaults` e começam sem Frames. Ausência de mídia é um estado válido: o fixture neutro produz a Lâmina opaca com o Background branco e o plano de composição correspondente não exige fontes externas. Background e Overlay globais referenciados pelo v1 precisam participar tanto do Canvas quanto da [Exportação do primeiro fluxo](0014-contrato-jpeg-do-primeiro-fluxo.md); o que permanece adiado são aplicações locais, transformações desses Decorativos e a Pilha visual completa.
 
-Aplicações locais, Frames, Fotos, Layouts, favoritos e demais edições posteriores estão além do primeiro fluxo persistente e exigirão um schema público seguinte quando forem integrados a Projetos reais; não aparecem como campos vazios ou reservados no v1.
+Aplicações locais, Frames, posicionamentos de Fotos, Layouts, favoritos e demais edições posteriores estão além do primeiro fluxo persistente e exigirão um schema público seguinte quando forem integrados a Projetos reais; não aparecem como campos vazios ou reservados no v1. A v2 amplia somente a categoria da lista de `MediaRef`, sem persistir posicionamentos.
 
 Não pertencem ao payload:
 
@@ -223,13 +227,17 @@ Como a barreira de exclusão é derivada da Identidade, a abertura editável man
 
 Os exemplos acompanham versões públicas reais, e não versões inventadas para testar infraestrutura:
 
-| Classe | Cobertura normativa enquanto a versão atual é v1 | Regra para a primeira v2 pública |
-|---|---|---|
-| documento válido | o envelope neutro completo deste design e os casos válidos da matriz abaixo são exemplos v1 | conservar ao menos um exemplo válido de cada versão ainda suportada |
-| migração | não há exemplo: `migrations = []` declara que não existe versão pública anterior nem transformação legítima | acrescentar no mesmo conjunto de alterações um documento v1, o resultado v2 esperado de `v1 -> v2` e a prova de abertura v1 sem escrita |
-| estados inválidos | a matriz abaixo vincula cada forma inválida ao resultado tipado esperado, incluindo versões futura, antiga sem cadeia e o schema 3 do spike | manter inválidos identificados por versão e acrescentar quebras próprias do novo DTO fechado |
+| Classe | Cobertura normativa atual |
+|---|---|
+| documento válido | o envelope neutro e a matriz abaixo permanecem exemplos v1; o contrato v2 conserva exemplos próprios |
+| migração | a cadeia é `[v1 -> v2]`, com entrada v1, resultado v2 esperado, abertura sem escrita e promoção somente após `Salvar` |
+| estados inválidos | a matriz abaixo preserva falhas v1; o contrato v2 acrescenta discriminadores e campos inválidos próprios do novo DTO fechado |
 
-`migrations = []` descreve honestamente o estado atual, mas não constitui um exemplo de migração. Um par versionado de entrada e resultado só pode existir quando houver uma segunda versão pública; não se preenche essa ausência com `v0` ou com o schema demonstrativo. Nenhum leitor ou escritor de v2 pode ser considerado completo antes de os exemplos de migração correspondentes existirem no controle de versão.
+O par normativo está em
+`project_document_v1_migration_input.myalbuns` e
+`project_document_v2_migration_expected.myalbuns`, sob
+`crates/myalbuns-core/tests/fixtures/`. Não se preenche a cadeia com `v0` nem
+com o schema demonstrativo 3.
 
 ## Salvamento
 
@@ -274,10 +282,15 @@ A implementação publica fixtures versionadas e testes para, no mínimo:
 | Cópia externa em abertura editável | recebe nova Identidade no mesmo schema antes da Sessão, sob as duas barreiras |
 | Cópia externa em entrada headless | `ExternalCopyRequiresInteractiveResolution`, sem escrita |
 
-Quando `schemaVersion: 2` existir, os casos dourados passam a incluir também o mesmo documento v1 seguido de `Salvar`, a correção de Identidade de uma Cópia externa ainda em v1 e a recusa de uma migração cujo resultado viole o DTO v2 ou as invariantes atuais. Não se cria hoje uma versão antiga fictícia apenas para exercitar a infraestrutura.
+Com `schemaVersion: 2` atual, os casos dourados incluem o mesmo documento v1
+seguido de `Salvar`, a abertura v1 sem escrita e a recusa de uma migração cujo
+resultado viole o DTO v2 ou as invariantes atuais. A correção de Identidade de
+uma Cópia externa continua pertencendo ao ticket próprio e não é absorvida pela
+migração. Não se cria uma versão antiga fictícia apenas para exercitar a
+infraestrutura.
 
 ## Fronteira modular
 
-`ProjectDocumentV1`, leitores, escritores e migradores pertencem ao `ProjectStore`. `ProjectDomain` não deriva `Serialize` ou `Deserialize` para satisfazer o arquivo e não conhece JSON, extensão, esquema ou versões antigas. Mapeadores explícitos são a única passagem entre DTO persistente e domínio atual.
+`ProjectDocumentV1`, `ProjectDocumentV2`, leitores, escritores e migradores pertencem ao `ProjectStore`. `ProjectDomain` não deriva `Serialize` ou `Deserialize` para satisfazer o arquivo e não conhece JSON, extensão, esquema ou versões antigas. Mapeadores explícitos são a única passagem entre DTO persistente e domínio atual.
 
 As representações de IPC e frontend continuam contratos separados. Compartilhar nomes ou pequenos valores não autoriza reutilizar o envelope persistente como mensagem entre processos.

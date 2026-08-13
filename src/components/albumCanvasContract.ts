@@ -1,5 +1,6 @@
 import type { CompositionPlan } from "../domain/project";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import type { MediaPreviewDemand } from "../application/projectPorts";
 import type { ViewportState } from "../state/viewport";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
 
@@ -44,5 +45,6 @@ export interface AlbumCanvasProps {
   onTransformPreview(preview: PhotoTransformPreview | null): void;
   onTransformCommit(delta: PhotoTransformDelta): Promise<boolean>;
   onCanvasMetricsChange?(metrics: CanvasMetrics): void;
+  onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }

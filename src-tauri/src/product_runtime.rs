@@ -1,15 +1,18 @@
-use std::io;
+use std::{io, time::Duration};
 
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
-    cache_activity_gate::CacheActivityGate,
+    cache_engine::{AuthorizedCacheNamespace, CacheEngine},
+    cache_previews::CachePreviewRegistry,
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
+    ipc_contract::LinkedMediaChanged,
     logging,
+    media_runtime::{MediaMonitor, MediaRuntime},
     operation_gate::OperationGate,
     project_bootstrap::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
@@ -24,6 +27,7 @@ use crate::{
 };
 
 pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
+pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
 
 #[cfg(debug_assertions)]
 const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
@@ -41,17 +45,32 @@ pub(crate) fn run(
 
     let (request, project) = opened.into_parts();
     let project_host = ProjectHost::new(project);
-    let linked_media_previews =
-        crate::linked_media_previews::LinkedMediaPreviewRegistry::new(PROJECT_WINDOW_LABEL);
-    let media_protocol_registry = linked_media_previews.clone();
+    let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
+    let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
     let terminal = PendingHostTerminal::new(request);
+    let mut context = tauri::generate_context!();
+
+    // EdgeDriver's supported launch flow needs the single WebView2 instance to
+    // be created by Tauri before the setup hook. Normal Project Hosts retain
+    // their explicit, policy-gated window construction below.
+    if desktop_webview_policy::automation_enabled() {
+        let project_config = context
+            .config_mut()
+            .app
+            .windows
+            .iter_mut()
+            .find(|window| window.label == PROJECT_WINDOW_LABEL)
+            .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
+        project_config.create = true;
+        project_config.visible = true;
+    }
 
     tauri::Builder::default()
         .register_asynchronous_uri_scheme_protocol(
-            crate::linked_media_previews::PROJECT_MEDIA_PROTOCOL_SCHEME,
+            crate::cache_previews::CACHE_MEDIA_PROTOCOL_SCHEME,
             move |context, request, responder| {
-                crate::linked_media_previews::respond_to_media_request(
+                crate::cache_previews::respond_to_cache_media_request(
                     media_protocol_registry.clone(),
                     context,
                     request,
@@ -61,7 +80,10 @@ pub(crate) fn run(
         )
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
-        .manage(linked_media_previews)
+        .manage(cache_previews)
+        .manage(CacheEngine::default())
+        .manage(MediaRuntime::default())
+        .manage(MediaMonitor::default())
         .manage(ExportAttempts::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -116,7 +138,7 @@ pub(crate) fn run(
             crate::export_commands::export_sheet,
             crate::export_commands::cancel_export,
         ])
-        .run(tauri::generate_context!())?;
+        .run(context)?;
     Ok(())
 }
 
@@ -157,29 +179,39 @@ fn setup_host(
         .state::<ProjectHost>()
         .projection()
         .map_err(io::Error::other)?;
-    let webview_data_directory =
-        app_paths.webview_data_directory(&project_data_namespace(&projection.state.project_id))?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
     app.manage(OperationGate::new(&app_paths));
-    app.manage(CacheActivityGate::default());
     app.manage(ImagingProcessor::default());
-    app.manage(app_paths);
 
-    let project_config = app
-        .config()
-        .app
-        .windows
-        .iter()
-        .find(|window| window.label == PROJECT_WINDOW_LABEL)
-        .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
-    let project_window = WebviewWindowBuilder::from_config(app, project_config)?
-        .data_directory(webview_data_directory)
-        .build()?;
+    let project_window = if desktop_webview_policy::automation_enabled() {
+        app.get_webview_window(PROJECT_WINDOW_LABEL)
+            .ok_or_else(|| io::Error::other("a WebView automatizada do Projeto não existe"))?
+    } else {
+        let webview_namespace = project_data_namespace(&projection.state.project_id);
+        let webview_data_directory = app_paths.webview_data_directory(&webview_namespace)?;
+        let project_config = app
+            .config()
+            .app
+            .windows
+            .iter()
+            .find(|window| window.label == PROJECT_WINDOW_LABEL)
+            .cloned()
+            .ok_or_else(|| io::Error::other("a configuração da janela do Projeto não existe"))?;
+        WebviewWindowBuilder::from_config(app, &project_config)?
+            .data_directory(webview_data_directory)
+            .build()?
+    };
+    app.manage(app_paths);
     let app_handle = app.handle().clone();
+    start_linked_media_monitor(app_handle.clone());
     tauri::async_runtime::spawn(async move {
         let startup = async {
-            desktop_webview_policy::enforce(&project_window).await?;
-            project_window.show()?;
+            if desktop_webview_policy::automation_enabled() {
+                project_window.show()?;
+            } else {
+                desktop_webview_policy::enforce(&project_window).await?;
+                project_window.show()?;
+            }
             terminal.emit_ready(&projection.state.project_id, projection.state.revision)?;
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
@@ -208,6 +240,102 @@ fn setup_host(
         );
     });
     Ok(())
+}
+
+fn start_linked_media_monitor(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            if app.get_webview_window(PROJECT_WINDOW_LABEL).is_none() {
+                break;
+            }
+            let catalog = match app.state::<ProjectHost>().authorized_media_catalog() {
+                Ok(catalog) => catalog,
+                Err(_) => break,
+            };
+            let monitor = app.state::<MediaMonitor>().inner().clone();
+            let runtime = app.state::<MediaRuntime>().inner().clone();
+            let bindings = catalog.bindings.clone();
+            let poll = match tauri::async_runtime::spawn_blocking(move || {
+                monitor.poll(&runtime, &bindings)
+            })
+            .await
+            {
+                Ok(poll) => poll,
+                Err(error) => {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "linked_media_monitor_poll_failed",
+                    );
+                    continue;
+                }
+            };
+            let Some(update) = poll.update() else {
+                continue;
+            };
+            let changed = update.changed_media_ids();
+            if !changed.is_empty() {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    changed_media_count = changed.len(),
+                    event = "linked_media_observation_applied",
+                );
+            }
+            let invalidated = update.invalidated_media_ids();
+            if !changed.is_empty() || !invalidated.is_empty() {
+                let app_paths = app.state::<AppPaths>();
+                match AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority) {
+                    Ok(namespace) => match app.state::<CacheEngine>().apply_monitor_media_update(
+                        &app_paths,
+                        &namespace,
+                        app.state::<CachePreviewRegistry>().inner(),
+                        update,
+                    ) {
+                        Ok(removed_generation_count) => {
+                            tracing::info!(
+                                target: "myalbuns.desktop",
+                                invalidated_media_count = invalidated.len(),
+                                removed_generation_count,
+                                event = "linked_media_cache_invalidated",
+                            );
+                        }
+                        Err(error) => {
+                            tracing::warn!(
+                                target: "myalbuns.desktop",
+                                stage = ?error.stage,
+                                error = %error.message,
+                                event = "linked_media_cache_invalidation_failed",
+                            );
+                        }
+                    },
+                    Err(error) => {
+                        tracing::warn!(
+                            target: "myalbuns.desktop",
+                            stage = ?error.stage,
+                            error = %error.message,
+                            event = "linked_media_cache_namespace_unavailable",
+                        );
+                    }
+                }
+            }
+            if !changed.is_empty()
+                && let Some(window) = app.get_webview_window(PROJECT_WINDOW_LABEL)
+                && let Err(error) = window.emit(
+                    LINKED_MEDIA_CHANGED_EVENT,
+                    LinkedMediaChanged {
+                        media_ids: changed.to_vec(),
+                    },
+                )
+            {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    error = %error,
+                    event = "linked_media_change_emit_failed",
+                );
+            }
+        }
+    });
 }
 
 struct PendingHostTerminal {

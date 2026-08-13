@@ -12,24 +12,43 @@ use serde_json::Value;
 use uuid::{Uuid, Version};
 
 use super::{DecodeFailure, DocumentFailure, PathFailure};
+use crate::MediaKind;
 use crate::project_document::{
-    ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
-    FrameBorder, MAX_SAFE_INTEGER, Overlay, OverlayContent, ProjectDocument, ProjectRevision,
+    ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, FrameBorder,
+    MAX_SAFE_INTEGER, MediaRef, Overlay, OverlayContent, ProjectDocument, ProjectRevision,
     ProjectSheet, Rgb, VisualDefaults, frame_border_width_is_valid, validate_project_state,
 };
 
 const DOCUMENT_TYPE: &str = "myalbuns.project";
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION_V1: u32 = 1;
+pub(super) const SCHEMA_VERSION_V2: u32 = 2;
 const UTF8_BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 
-pub(super) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
+pub(super) struct DecodedProjectRevision {
+    pub(super) revision: ProjectRevision,
+    pub(super) source_schema_version: u32,
+}
+
+pub(super) fn decode(bytes: &[u8]) -> Result<DecodedProjectRevision, DecodeFailure> {
     if bytes.starts_with(UTF8_BOM) {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    classify_header(bytes)?;
-    let document: ProjectDocumentV1 = serde_json::from_slice(bytes)
-        .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
-    map_document(document)
+    let schema_version = classify_header(bytes)?;
+    let document = match schema_version {
+        SCHEMA_VERSION_V1 => {
+            let document: ProjectDocumentV1 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            migrate_v1_to_v2(document)?
+        }
+        SCHEMA_VERSION_V2 => serde_json::from_slice::<ProjectDocumentV2>(bytes)
+            .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?,
+        _ => unreachable!("classify_header accepts only supported public schemas"),
+    };
+    let revision = map_document(document)?;
+    Ok(DecodedProjectRevision {
+        revision,
+        source_schema_version: schema_version,
+    })
 }
 
 pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
@@ -38,14 +57,14 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     if revision.revision > MAX_SAFE_INTEGER {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
-    let dto = ProjectDocumentV1::from_domain(revision)?;
+    let dto = ProjectDocumentV2::from_domain(revision)?;
     let mut bytes = serde_json::to_vec_pretty(&dto)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
     bytes.push(b'\n');
     Ok(bytes)
 }
 
-fn classify_header(bytes: &[u8]) -> Result<(), DecodeFailure> {
+fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let header = DocumentHeader::deserialize(&mut deserializer)
         .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
@@ -60,7 +79,7 @@ fn classify_header(bytes: &[u8]) -> Result<(), DecodeFailure> {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     };
     match version {
-        SCHEMA_VERSION => Ok(()),
+        SCHEMA_VERSION_V1 | SCHEMA_VERSION_V2 => Ok(version),
         0 => Err(document_failure(DocumentFailure::UnsupportedLegacySchema {
             version,
         })),
@@ -70,8 +89,8 @@ fn classify_header(bytes: &[u8]) -> Result<(), DecodeFailure> {
     }
 }
 
-fn map_document(document: ProjectDocumentV1) -> Result<ProjectRevision, DecodeFailure> {
-    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION {
+fn map_document(document: ProjectDocumentV2) -> Result<ProjectRevision, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V2 {
         return Err(document_failure(DocumentFailure::InvalidProjectDocument));
     }
     if document.revision > MAX_SAFE_INTEGER {
@@ -175,10 +194,14 @@ fn map_overlay_content(content: OverlayContentV1) -> Result<OverlayContent, Deco
     }
 }
 
-fn map_media(media: DecorativeMediaV1) -> Result<DecorativeMedia, DecodeFailure> {
+fn map_media(media: MediaRefV2) -> Result<MediaRef, DecodeFailure> {
     let path = decode_native_path(media.path)?;
     validate_external_path(&path).map_err(|_| DecodeFailure::Path(PathFailure::InvalidPath))?;
-    Ok(DecorativeMedia::new(parse_uuid_v4(&media.id)?, path))
+    let kind = match media.kind {
+        MediaKindV2::Decorative => MediaKind::Decorative,
+        MediaKindV2::Photo => MediaKind::Photo,
+    };
+    Ok(MediaRef::new(parse_uuid_v4(&media.id)?, kind, path))
 }
 
 fn map_sheet(sheet: SheetV1) -> Result<ProjectSheet, DecodeFailure> {
@@ -308,14 +331,24 @@ struct ProjectDocumentV1 {
     project: ProjectPayloadV1,
 }
 
-impl ProjectDocumentV1 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectDocumentV2 {
+    document_type: String,
+    schema_version: u32,
+    project_id: String,
+    revision: u64,
+    project: ProjectPayloadV2,
+}
+
+impl ProjectDocumentV2 {
     fn from_domain(revision: &ProjectRevision) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document_type: DOCUMENT_TYPE.into(),
-            schema_version: SCHEMA_VERSION,
+            schema_version: SCHEMA_VERSION_V2,
             project_id: revision.project_id.hyphenated().to_string(),
             revision: revision.revision,
-            project: ProjectPayloadV1::from_domain(&revision.project)?,
+            project: ProjectPayloadV2::from_domain(&revision.project)?,
         })
     }
 }
@@ -329,7 +362,16 @@ struct ProjectPayloadV1 {
     sheets: Vec<SheetV1>,
 }
 
-impl ProjectPayloadV1 {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProjectPayloadV2 {
+    document: DocumentSettingsV1,
+    visual_defaults: VisualDefaultsV1,
+    media: Vec<MediaRefV2>,
+    sheets: Vec<SheetV1>,
+}
+
+impl ProjectPayloadV2 {
     fn from_domain(project: &ProjectDocument) -> Result<Self, DecodeFailure> {
         Ok(Self {
             document: DocumentSettingsV1::from_domain(project.document()),
@@ -337,11 +379,35 @@ impl ProjectPayloadV1 {
             media: project
                 .media()
                 .iter()
-                .map(DecorativeMediaV1::from_domain)
+                .map(MediaRefV2::from_domain)
                 .collect(),
             sheets: project.sheets().iter().map(SheetV1::from_domain).collect(),
         })
     }
+}
+
+fn migrate_v1_to_v2(document: ProjectDocumentV1) -> Result<ProjectDocumentV2, DecodeFailure> {
+    if document.document_type != DOCUMENT_TYPE || document.schema_version != SCHEMA_VERSION_V1 {
+        return Err(document_failure(DocumentFailure::InvalidProjectDocument));
+    }
+    let ProjectPayloadV1 {
+        document: settings,
+        visual_defaults,
+        media,
+        sheets,
+    } = document.project;
+    Ok(ProjectDocumentV2 {
+        document_type: document.document_type,
+        schema_version: SCHEMA_VERSION_V2,
+        project_id: document.project_id,
+        revision: document.revision,
+        project: ProjectPayloadV2 {
+            document: settings,
+            visual_defaults,
+            media: media.into_iter().map(MediaRefV2::from_v1).collect(),
+            sheets,
+        },
+    })
 }
 
 #[derive(Deserialize, Serialize)]
@@ -537,15 +603,35 @@ impl FrameBorderV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct DecorativeMediaV1 {
     id: String,
-    kind: DecorativeKindV1,
+    kind: MediaKindV1,
     path: NativePathV1,
 }
 
-impl DecorativeMediaV1 {
-    fn from_domain(media: &DecorativeMedia) -> Self {
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MediaRefV2 {
+    id: String,
+    kind: MediaKindV2,
+    path: NativePathV1,
+}
+
+impl MediaRefV2 {
+    fn from_v1(media: DecorativeMediaV1) -> Self {
+        let MediaKindV1::Decorative = media.kind;
+        Self {
+            id: media.id,
+            kind: MediaKindV2::Decorative,
+            path: media.path,
+        }
+    }
+
+    fn from_domain(media: &MediaRef) -> Self {
         Self {
             id: media.id().hyphenated().to_string(),
-            kind: DecorativeKindV1::Decorative,
+            kind: match media.kind() {
+                MediaKind::Photo => MediaKindV2::Photo,
+                MediaKind::Decorative => MediaKindV2::Decorative,
+            },
             path: encode_native_path(media.path()),
         }
     }
@@ -553,7 +639,14 @@ impl DecorativeMediaV1 {
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
-enum DecorativeKindV1 {
+enum MediaKindV1 {
+    Decorative,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum MediaKindV2 {
+    Photo,
     Decorative,
 }
 

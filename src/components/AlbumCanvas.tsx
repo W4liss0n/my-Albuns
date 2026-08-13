@@ -14,6 +14,10 @@ import {
 import { useLogger } from "./loggingContext";
 import "./pixiRuntime";
 
+const isOpaqueCachePreview = (url: string) =>
+  url.startsWith("http://myalbuns-cache.localhost/") ||
+  url.startsWith("myalbuns-cache://localhost/");
+
 export type {
   AlbumCanvasProps,
   CanvasMetrics,
@@ -32,6 +36,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
   const materializedSceneRef = useRef<AlbumCanvasScene | null>(null);
+  const tracedPreviewUrlsRef = useRef(new Set<string>());
   const [graphicsState, setGraphicsState] = useState<
     "initializing" | "ready" | "recovering" | "failed"
   >("initializing");
@@ -50,6 +55,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     let activeDiagnostic: GraphicsDiagnostic | null = null;
     const instanceId = createLogInstanceId("canvas");
     const app = new Application();
+    tracedPreviewUrlsRef.current.clear();
     setGraphicsState("initializing");
     logger.write({
       level: "debug",
@@ -220,6 +226,19 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
             });
           },
           () => setPreviewTextureRevision((current) => current + 1),
+          (url) => {
+            if (tracedPreviewUrlsRef.current.has(url)) return;
+            tracedPreviewUrlsRef.current.add(url);
+            logger.write({
+              level: isOpaqueCachePreview(url) ? "info" : "warn",
+              component: "canvas",
+              event: isOpaqueCachePreview(url)
+                ? "canvas_opaque_preview_texture_loaded"
+                : "canvas_preview_texture_transport_rejected",
+              projectId: latestPropsRef.current.projectId,
+              instanceId,
+            });
+          },
         );
         sceneRef.current = ownedScene;
         sceneInstanceIdRef.current = instanceId;

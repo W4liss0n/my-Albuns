@@ -1,13 +1,12 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    EditableProject, EditorProjection, ProjectIntent, RenderSnapshot, SaveProjectError,
-    SaveProjectOutcome,
+    EditableProject, EditorProjection, ProjectIdentityAuthority, ProjectIntent, RenderSnapshot,
+    SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
+
+use crate::media_runtime::MediaBinding;
 
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
@@ -35,6 +34,12 @@ pub(crate) struct ProjectHostSaveResult {
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
     pub(crate) sources: Vec<RenderSource>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct AuthorizedMediaCatalog {
+    pub(crate) authority: ProjectIdentityAuthority,
+    pub(crate) bindings: Vec<MediaBinding>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -198,19 +203,21 @@ impl ProjectHost {
         }
     }
 
-    pub(crate) fn linked_media_sources(&self) -> Result<Vec<(String, PathBuf)>, String> {
-        Ok(self
-            .project()?
-            .project()
-            .media()
-            .iter()
-            .map(|media| {
-                (
-                    media.id().hyphenated().to_string(),
-                    media.path().to_path_buf(),
-                )
-            })
-            .collect())
+    pub(crate) fn authorized_media_catalog(&self) -> Result<AuthorizedMediaCatalog, String> {
+        let project = self.project()?;
+        Ok(AuthorizedMediaCatalog {
+            authority: project.identity_authority().clone(),
+            bindings: project
+                .project()
+                .media()
+                .iter()
+                .map(|media| MediaBinding {
+                    media_id: media.id().hyphenated().to_string(),
+                    kind: media.kind(),
+                    logical_path: media.path().to_path_buf(),
+                })
+                .collect(),
+        })
     }
 
     pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
@@ -325,7 +332,10 @@ mod tests {
             .capture(&project_path)
             .expect("the fixture root is captured");
         let project = ProjectCore::new()
-            .with_identity_lease_root(identity_lease_root.clone())
+            .with_identity_storage_roots(
+                identity_lease_root.clone(),
+                root.path().join("identities"),
+            )
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(project_path.clone(), context.freeze()),
                 initial,
@@ -350,7 +360,13 @@ mod tests {
             .capture(project_path)
             .expect("the reopened fixture root is captured");
         let project = ProjectCore::new()
-            .with_identity_lease_root(identity_lease_root.to_path_buf())
+            .with_identity_storage_roots(
+                identity_lease_root.to_path_buf(),
+                identity_lease_root
+                    .parent()
+                    .expect("the fixture lease root has a parent")
+                    .join("identities"),
+            )
             .open_editable(OpenProjectRequest::new(ProjectLocation::new(
                 project_path.to_path_buf(),
                 context.freeze(),
@@ -919,7 +935,7 @@ mod tests {
                 InitialFrameBorder::None,
             ));
         let project = ProjectCore::new()
-            .with_identity_lease_root(root.path().join("leases"))
+            .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(project_path, context.freeze()),
                 initial,
@@ -928,14 +944,21 @@ mod tests {
             .expect("the personalized Project is created");
         let host = ProjectHost::new(project);
 
-        let sources = host
-            .linked_media_sources()
-            .expect("the Host can resolve its persisted media catalog");
+        let catalog = host
+            .authorized_media_catalog()
+            .expect("the Host can authorize its persisted media catalog");
         let projection = host.projection().expect("the Project remains available");
 
-        assert_eq!(sources.len(), 1);
-        assert_eq!(sources[0].0, projection.state.album.media[0].id);
-        assert_eq!(sources[0].1, background_path);
+        assert_eq!(
+            catalog.authority.project_id().hyphenated().to_string(),
+            projection.state.project_id
+        );
+        assert_eq!(catalog.bindings.len(), 1);
+        assert_eq!(
+            catalog.bindings[0].media_id,
+            projection.state.album.media[0].id
+        );
+        assert_eq!(catalog.bindings[0].logical_path, background_path);
         let frontend_projection =
             serde_json::to_string(&projection).expect("the editor projection serializes");
         assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));

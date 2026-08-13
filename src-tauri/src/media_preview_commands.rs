@@ -1,20 +1,37 @@
-use tauri::{State, WebviewWindow};
+use std::collections::{HashMap, HashSet};
+
+use myalbuns_imaging_protocol::CacheMediaSource;
+use myalbuns_paths::AppPaths;
+use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::{
-    ipc_contract::{MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode},
-    linked_media_previews::{LinkedMediaPreviewError, LinkedMediaPreviewRegistry},
-    product_runtime::PROJECT_WINDOW_LABEL,
+    cache_activity_gate::{CacheCancellation, CacheCancellationReason},
+    cache_engine::{
+        self, AuthorizedCacheNamespace, CacheEngine, CacheFailure, CacheFailureStage,
+        CacheFlightClaim, CacheWork,
+    },
+    cache_previews::{CachePreviewError, CachePreviewRegistry},
+    imaging_processor::{
+        ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
+    },
+    ipc_contract::{
+        LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode,
+        MediaPreviewDemand, MediaPreviewState,
+    },
+    logging::LoggingState,
+    media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
+    path_io,
+    product_runtime::{LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL},
     project_host::ProjectHost,
 };
 
-impl From<LinkedMediaPreviewError> for MediaPreviewCommandError {
-    fn from(error: LinkedMediaPreviewError) -> Self {
+impl From<CachePreviewError> for MediaPreviewCommandError {
+    fn from(error: CachePreviewError) -> Self {
         let code = match error {
-            LinkedMediaPreviewError::Unavailable => MediaPreviewCommandErrorCode::Unavailable,
-            LinkedMediaPreviewError::UnsupportedImage => {
+            CachePreviewError::Unavailable => MediaPreviewCommandErrorCode::Unavailable,
+            CachePreviewError::InvalidDerivedArtifact => {
                 MediaPreviewCommandErrorCode::UnsupportedImage
             }
-            LinkedMediaPreviewError::ReadFailed => MediaPreviewCommandErrorCode::ReadFailed,
         };
         Self {
             code,
@@ -25,68 +42,364 @@ impl From<LinkedMediaPreviewError> for MediaPreviewCommandError {
 
 impl MediaPreviewCommandError {
     fn read_failed() -> Self {
-        LinkedMediaPreviewError::ReadFailed.into()
+        Self {
+            code: MediaPreviewCommandErrorCode::ReadFailed,
+            message: "Não foi possível preparar as representações reduzidas do Projeto.".into(),
+        }
     }
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn prepare_media_previews(
+    demand: MediaPreviewDemand,
     window: WebviewWindow,
-    state: State<'_, ProjectHost>,
-    registry: State<'_, LinkedMediaPreviewRegistry>,
+    app: AppHandle,
+    project_host: State<'_, ProjectHost>,
+    engine: State<'_, CacheEngine>,
+    registry: State<'_, CachePreviewRegistry>,
+    media_runtime: State<'_, MediaRuntime>,
+    media_monitor: State<'_, MediaMonitor>,
+    processor: State<'_, ImagingProcessor>,
+    logging: State<'_, LoggingState>,
+    app_paths: State<'_, AppPaths>,
 ) -> Result<Option<Vec<MediaPreview>>, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let sources = state
-        .linked_media_sources()
+    let catalog = project_host
+        .authorized_media_catalog()
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
-    let registry = registry.inner().clone();
-    let previews = tauri::async_runtime::spawn_blocking(move || registry.prepare(sources))
+    let ordered_demand = ordered_demand(&demand);
+    let catalog_by_id = catalog
+        .bindings
+        .iter()
+        .map(|binding| (binding.media_id.as_str(), binding))
+        .collect::<HashMap<_, _>>();
+    if ordered_demand
+        .iter()
+        .any(|media_id| !catalog_by_id.contains_key(media_id.as_str()))
+    {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
+    let namespace = AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority)
+        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let mut demand_revision = engine.reconcile_preview_demand(
+        registry.inner(),
+        namespace.project_id(),
+        demand.revision,
+        ordered_demand.iter().map(String::as_str),
+    );
+    if ordered_demand.is_empty() {
+        return Ok(Some(Vec::new()));
+    }
+    if !engine.demand_is_current(&demand_revision) {
+        return Ok(Some(Vec::new()));
+    }
+
+    let monitor = media_monitor.inner().clone();
+    let runtime = media_runtime.inner().clone();
+    let bindings = catalog.bindings.clone();
+    let poll = tauri::async_runtime::spawn_blocking(move || monitor.poll(&runtime, &bindings))
         .await
-        .map_err(|_| MediaPreviewCommandError::read_failed())?
-        .map_err(MediaPreviewCommandError::from)?;
+        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let runtime_update = poll.update().cloned();
+    let observations = poll
+        .confirmed_observation()
+        .map(|proposal| {
+            proposal
+                .observations()
+                .iter()
+                .map(|observation| (observation.media_id.as_str(), observation.availability))
+                .collect::<HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+    if let Some(runtime_update) = runtime_update.as_ref()
+        && (!runtime_update.changed_media_ids().is_empty()
+            || !runtime_update.invalidated_media_ids().is_empty())
+    {
+        let cache_update = engine
+            .apply_demand_media_update(
+                &app_paths,
+                &namespace,
+                registry.inner(),
+                &mut demand_revision,
+                runtime_update,
+            )
+            .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        if cache_update.retry_required() {
+            window
+                .emit(
+                    LINKED_MEDIA_CHANGED_EVENT,
+                    LinkedMediaChanged {
+                        media_ids: runtime_update.changed_media_ids().to_vec(),
+                    },
+                )
+                .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        }
+        if !cache_update.demand_can_resume() {
+            return Ok(Some(Vec::new()));
+        }
+    }
+    if !engine.demand_is_current(&demand_revision) {
+        return Ok(Some(Vec::new()));
+    }
+    let mut previews = Vec::with_capacity(ordered_demand.len());
+    for media_id in ordered_demand {
+        if !engine.demand_is_current(&demand_revision) {
+            return Ok(Some(Vec::new()));
+        }
+        let availability = observations
+            .get(media_id.as_str())
+            .copied()
+            .unwrap_or(MediaAvailability::Unavailable);
+        if availability != MediaAvailability::Candidate {
+            let state = match availability {
+                MediaAvailability::Absent => MediaPreviewState::Absent,
+                MediaAvailability::Candidate => unreachable!(),
+                MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
+            };
+            previews.push(if state == MediaPreviewState::Unavailable {
+                unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
+                    media_id,
+                )
+            } else {
+                MediaPreview {
+                    media_id,
+                    state,
+                    url: None,
+                }
+            });
+            continue;
+        }
+        let binding = catalog_by_id
+            .get(media_id.as_str())
+            .expect("validated demand remains in the immutable catalog");
+        let source = CacheMediaSource::new(
+            binding.media_id.clone(),
+            binding.kind,
+            binding.logical_path.clone(),
+        )
+        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        let root_bindings = match path_io::capture_root_bindings(vec![
+            namespace.paths().root().to_path_buf(),
+            source.source_path().to_path_buf(),
+        ])
+        .await
+        {
+            Ok(root_bindings) => root_bindings,
+            Err(_) => {
+                previews.push(unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
+                    media_id,
+                ));
+                continue;
+            }
+        };
+        let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
+        let work = CacheWork::new(request_id.clone(), namespace.clone(), source, root_bindings);
+        let Some(claim) = engine.claim_demanded(&demand_revision, &work) else {
+            return Ok(Some(Vec::new()));
+        };
+        let preview_publication_authority = claim.preview_publication_authority();
+        let execution = match claim {
+            CacheFlightClaim::Waiter(waiter) => waiter.wait().await,
+            CacheFlightClaim::Owner(owner) => {
+                let cancellation = owner.cancellation();
+                let result = execute_owned_cache(
+                    &app,
+                    &logging,
+                    &app_paths,
+                    &engine,
+                    &processor,
+                    work,
+                    cancellation,
+                )
+                .await;
+                owner.complete(result)
+            }
+        };
+        match execution {
+            Ok(execution) => {
+                if !engine.demand_is_current(&demand_revision) {
+                    return Ok(Some(Vec::new()));
+                }
+                if let Some(recovery) = execution.recovery {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        failed_process_id = recovery.failed_process_id,
+                        removed_temporary_count = recovery.removed_temporary_count,
+                        media_id,
+                        event = "cache_processor_recovered",
+                    );
+                }
+                let Some(preview) = engine.commit_claimed_preview_if_demanded(
+                    &demand_revision,
+                    &preview_publication_authority,
+                    || registry.publish(&app_paths, &namespace, execution.artifact()),
+                ) else {
+                    return Ok(Some(Vec::new()));
+                };
+                previews.push(preview.map_err(MediaPreviewCommandError::from)?);
+            }
+            Err(failure) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    stage = ?failure.stage,
+                    exit_code = failure.exit_code,
+                    message = failure.message,
+                    media_id,
+                    event = "cache_media_unavailable",
+                );
+                previews.push(unavailable_preview(
+                    &engine,
+                    &registry,
+                    &app_paths,
+                    &namespace,
+                    &demand_revision,
+                    media_id,
+                ));
+            }
+        }
+    }
     Ok(Some(previews))
+}
+
+fn unavailable_preview(
+    engine: &CacheEngine,
+    registry: &CachePreviewRegistry,
+    app_paths: &AppPaths,
+    namespace: &AuthorizedCacheNamespace,
+    demand: &cache_engine::CacheDemandRevision,
+    media_id: String,
+) -> MediaPreview {
+    engine
+        .retain_last_known_preview(app_paths, namespace, registry, demand, media_id.as_str())
+        .unwrap_or(MediaPreview {
+            media_id,
+            state: MediaPreviewState::Unavailable,
+            url: None,
+        })
+}
+
+fn ordered_demand(demand: &MediaPreviewDemand) -> Vec<String> {
+    let mut seen = HashSet::new();
+    demand
+        .visible_media_ids
+        .iter()
+        .chain(&demand.preload_media_ids)
+        .filter(|media_id| seen.insert(media_id.as_str()))
+        .cloned()
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn execute_owned_cache(
+    app: &AppHandle,
+    logging: &LoggingState,
+    app_paths: &myalbuns_paths::AppPaths,
+    engine: &CacheEngine,
+    processor: &ImagingProcessor,
+    work: CacheWork,
+    cancellation: CacheCancellation,
+) -> Result<cache_engine::CacheExecution, CacheFailure> {
+    loop {
+        match cancellation.reason() {
+            Some(CacheCancellationReason::Obsolete) => {
+                return Err(CacheFailure::new(
+                    CacheFailureStage::Cancelled,
+                    "A demanda de Cache ficou obsoleta.",
+                ));
+            }
+            Some(CacheCancellationReason::Paused) if !cancellation.resume_after_pause() => {
+                return Err(CacheFailure::new(
+                    CacheFailureStage::Cancelled,
+                    "A demanda de Cache não pôde ser retomada.",
+                ));
+            }
+            Some(CacheCancellationReason::Paused) | None => {}
+        }
+        let permit = engine.begin_cancellable_work(cancellation.clone()).await;
+        if cancellation.reason() == Some(CacheCancellationReason::Paused) {
+            drop(permit);
+            continue;
+        }
+        if cancellation.reason() == Some(CacheCancellationReason::Obsolete) {
+            drop(permit);
+            return Err(CacheFailure::new(
+                CacheFailureStage::Cancelled,
+                "A demanda de Cache ficou obsoleta.",
+            ));
+        }
+        let reservation = processor.reserve().await.map_err(|error| {
+            CacheFailure::new(
+                CacheFailureStage::Processor(InvocationFailureStage::ResolveSidecar),
+                error.to_string(),
+            )
+        })?;
+        if cancellation
+            .flag()
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            drop(reservation);
+            drop(permit);
+            continue;
+        }
+        let context = InvocationContext::new(
+            work.request_id.clone(),
+            Some(work.namespace.project_id().to_owned()),
+        );
+        let mut transport = TauriImagingTransport::new(app, logging, &reservation);
+        let result = engine
+            .execute(
+                &mut transport,
+                app_paths,
+                work.clone(),
+                &context,
+                &cancellation,
+            )
+            .await;
+        drop(reservation);
+        drop(permit);
+        if result.as_ref().is_err_and(|failure| {
+            matches!(
+                failure.stage,
+                CacheFailureStage::Cancelled
+                    | CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
+            ) && cancellation.reason() == Some(CacheCancellationReason::Paused)
+        }) {
+            continue;
+        }
+        return result;
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use crate::ipc_contract::MediaPreviewDemand;
 
-    use crate::{
-        ipc_contract::MediaPreviewCommandError, linked_media_previews::LinkedMediaPreviewError,
-    };
+    use super::ordered_demand;
 
     #[test]
-    fn linked_preview_failures_have_one_closed_serialized_contract() {
-        for (error, expected) in [
-            (
-                LinkedMediaPreviewError::Unavailable,
-                json!({
-                    "code": "unavailable",
-                    "message": "Uma Imagem decorativa vinculada não está disponível no local registrado.",
-                }),
-            ),
-            (
-                LinkedMediaPreviewError::UnsupportedImage,
-                json!({
-                    "code": "unsupported_image",
-                    "message": "Uma Imagem decorativa vinculada deixou de ser um arquivo JPEG ou PNG.",
-                }),
-            ),
-            (
-                LinkedMediaPreviewError::ReadFailed,
-                json!({
-                    "code": "read_failed",
-                    "message": "Não foi possível ler uma Imagem decorativa vinculada.",
-                }),
-            ),
-        ] {
-            assert_eq!(
-                serde_json::to_value(MediaPreviewCommandError::from(error))
-                    .expect("the media preview failure serializes"),
-                expected
-            );
-        }
+    fn visible_media_precedes_preload_and_equivalent_demands_are_grouped() {
+        let demand = MediaPreviewDemand {
+            revision: 1,
+            visible_media_ids: vec!["photo-visible".into(), "shared".into()],
+            preload_media_ids: vec!["shared".into(), "photo-preload".into()],
+        };
+
+        assert_eq!(
+            ordered_demand(&demand),
+            ["photo-visible", "shared", "photo-preload"]
+        );
     }
 }

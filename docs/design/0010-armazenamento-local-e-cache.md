@@ -1,7 +1,7 @@
 ---
 status: accepted
 document: design
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # Armazenamento local e Cache
@@ -165,12 +165,20 @@ Cache\
 original continua preservada no Projeto, no protocolo e em `metadata.json`;
 somente a chave opaca participa do nome do artefato.
 
-O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. Não existem tiles, pirâmides nem previews persistidos de Lâmina no MVP, salvo se o spike provar com medições que a representação única não atende.
+O baseline contém uma única representação visual reduzida por Foto ou Decorativo. A mesma representação atende ao Painel e ao Canvas; miniaturas de Lâmina podem ser montadas em memória. A [medição reproduzível do Programa 03A](../research/0032-representacao-reduzida-e-politica-de-decode.md) confirmou a representação única e rejeitou tiles, pirâmides e previews persistidos de Lâmina no MVP.
 
-Conteúdo opaco usa JPEG; conteúdo que precisa preservar transparência usa PNG.
+O maior lado mede no máximo `1.600 px`. Conteúdo opaco usa JPEG qualidade `84`; conteúdo que precisa preservar transparência usa PNG RGBA.
 O formato é propriedade do artefato derivado e integra seu caminho e o índice
 do Cache. Essa escolha não altera o original nem permite que a Exportação use a
-representação reduzida.
+representação reduzida. Ambos os formatos carregam o perfil canônico
+`sRGB2014.icc`; a orientação EXIF/TIFF é aplicada exatamente uma vez antes da
+redução.
+
+O Processador aceita JPEG, PNG e TIFF de uma página e recusa TIFF multipágina.
+Antes de materializar o raster, impõe `134.217.728` pixels e `512 MiB` de
+alocação planejada do decoder. Esses valores, os codecs e as variantes de cor
+aceitas pertencem à política versionada da representação e são rastreáveis ao
+spike; não são inferidos novamente por cada chamador.
 
 O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Importação, Cache ou Exportação existem somente em memória e não criam outra pasta, índice ou categoria sob `Cache`.
 
@@ -183,13 +191,18 @@ O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Import
 - schema e versão da representação;
 - Identidade do Projeto e último uso;
 - `mediaId`, `generationId` e nome do artefato;
-- dimensões, formato e orientação EXIF conhecidos;
+- dimensões, formato, orientação EXIF e quantidade de páginas quando aplicável;
+- perfil de cor básico (`srgb` nesta política medida);
 - tamanho e datas do original;
 - fingerprint versionado.
 
 Identidade da mídia, caminho original, categoria e decisões do usuário pertencem ao Projeto. Ausência ou corrupção do índice exige reconstrução, nunca perda de conteúdo.
 
-O fingerprint é um conjunto versionado de evidências do estado do original, não necessariamente um hash completo. O algoritmo exato permanece adiado.
+O fingerprint v1 é `sha256-full-file-v1`: SHA-256 dos bytes integrais abertos
+pelo Processador, acompanhado pelo tamanho e pelas datas de criação e
+modificação disponíveis no filesystem. Tamanho e datas permitem ao Monitor
+confirmar mudanças comuns; não substituem o hash integral nem autorizam pixels
+finais.
 
 ## Invalidação e propriedade
 
@@ -235,7 +248,4 @@ Nenhuma ação de Cache remove Projetos, itens do Painel, vínculos, Recuperaç�
 
 ## Decisões adiadas
 
-- formato e resolução da representação reduzida;
-- necessidade de tiles depois do spike;
-- algoritmo concreto do fingerprint;
 - retenção de Logs.

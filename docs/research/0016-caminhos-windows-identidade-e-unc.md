@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-12
 ---
 
 # Caminhos Windows, identidade física e UNC
@@ -13,38 +13,35 @@ updated: 2026-07-31
 Este gate verifica se a fundação de caminhos do aplicativo consegue operar no
 Windows sem tratar a forma textual de um caminho como identidade:
 
-- aceitar caminhos locais, UNC, unidades mapeadas e as formas Verbatim
-  suportadas;
-- preservar a escolha lógica do usuário, mas congelar uma raiz operacional
-  para toda a tentativa;
+- aceitar caminhos locais, UNC, unidades mapeadas e formas Verbatim suportadas;
+- preservar a escolha lógica do usuário, mas congelar uma raiz operacional para
+  toda a tentativa;
 - impedir que um remapeamento redirecione trabalho já iniciado;
 - diferenciar ausência, indisponibilidade, acesso negado e evidência de
   identidade inconclusiva;
 - comparar objetos existentes por handles;
-- transportar o mesmo plano ao host e ao Processador de Imagens sem conversão
-  textual com perda;
+- transportar o mesmo plano ao host e ao Processador sem conversão textual com
+  perda;
 - manter Cache local e staging de Exportação no Destino;
 - retirar da thread da interface qualquer captura que possa alcançar a rede.
 
 ## Contrato exercitado
 
-`OperationPathContext` pertence ao planejador. Ele captura cada raiz lógica
-uma única vez e produz um `RootBindingPlan` imutável. Uma unidade mapeada é
+`OperationPathContext` pertence ao planejador. Ele captura cada raiz lógica uma
+única vez e produz um `RootBindingPlan` imutável. Uma unidade mapeada é
 consultada por `WNetGetUniversalNameW`; o plano conserva a forma lógica
 escolhida pelo usuário e grava separadamente a raiz UNC operacional. Os
 participantes recebem somente o plano congelado. Raiz não capturada produz
 `UnboundRoot`, e outra tentativa precisa criar explicitamente outro contexto.
 
 Os caminhos do plano usam representação nativa opaca. No Windows, a
-serialização do protocolo 9 transporta unidades UTF-16, inclusive uma sequência
-com surrogate não pareado exercitada pelo teste de round-trip. A escolha do
-formato persistido do Projeto continua reservada ao ticket 02.
+serialização do protocolo 17 transporta unidades UTF-16, inclusive uma
+sequência com surrogate não pareado exercitada pelo teste de round-trip.
 
-Objetos existentes são abertos por handle. A resolução confirma o tipo
-esperado e a identidade física usa `FILE_ID_INFO`, combinando o identificador
-do volume e o identificador do arquivo. A comparação retorna somente `Same`,
-`Different` ou `Indeterminate`; falha de acesso ou de disponibilidade não é
-convertida em diferença.
+Objetos existentes são abertos por handle. A resolução confirma o tipo esperado
+e a identidade física usa `FILE_ID_INFO`, combinando o identificador do volume
+e o identificador do arquivo. A comparação retorna somente `Same`, `Different`
+ou `Indeterminate`; falha de acesso ou disponibilidade não vira diferença.
 
 O desktop e `MyAlbuns.Imaging.exe` incorporam o mesmo manifesto
 `longPathAware`. A captura de bindings chamada pelas fronteiras Tauri passa por
@@ -52,18 +49,25 @@ O desktop e `MyAlbuns.Imaging.exe` incorporam o mesmo manifesto
 
 ## Instrumento
 
-A execução canônica está em
+A execução canônica mais recente está em
 [`artifacts/0008-windows-path-gate.json`](artifacts/0008-windows-path-gate.json).
-Ela foi coletada no commit
-`dba3a07098bf73c6babf32241ce6b6f69c9d8d0a`, com
-`sourceInputsDirty: false`, no Windows `10.0.26200.0` x64.
+O JSON é a única fonte do `gitCommit`, dos PIDs, dos hashes e dos tempos daquela
+rodada. A coleta descrita na primeira versão desta pesquisa foi substituída por
+essa rodada posterior; elas não são apresentadas como a mesma execução.
+
+O campo `sourceInputsDirty` usa a mesma regra do gate de recuperação: inspeciona
+todo arquivo rastreado e todo arquivo novo não ignorado pelo Git, excluindo
+somente a própria evidência gerada. Isso inclui entradas da raiz, configurações
+de build e `resources/windows/myalbuns.manifest`; outputs declarados no
+`.gitignore` não são tratados como fontes. O commit e o estado são capturados
+antes e depois da jornada; mudança de HEAD ou sujeira em qualquer extremidade
+torna a proveniência suja.
 
 O runner cria duas raízes descartáveis no volume local e as expõe por SMB real
-através do compartilhamento administrativo loopback `C$`. Uma letra de unidade
-livre é mapeada para a primeira raiz, depois remapeada para a segunda durante o
-ensaio. O cenário também compila o desktop e o Processador em um target
-isolado, confirma previamente que ambos usam o protocolo 9 e extrai seus
-manifests.
+através do compartilhamento administrativo loopback `C$`. Uma letra livre é
+mapeada para a primeira raiz e depois remapeada para a segunda. O cenário
+compila desktop e Processador em targets isolados, confirma previamente que
+ambos usam o protocolo 17 e extrai seus manifests.
 
 Os 11 checks passaram:
 
@@ -85,16 +89,15 @@ Os 11 checks passaram:
 
 O primeiro plano transformou a raiz operacional da unidade mapeada em UNC e a
 reutilizou depois que a letra passou a apontar para outra pasta. A forma
-`VerbatimDisk` da mesma unidade também congelou a raiz UNC correta. Depois da
-falha, uma nova captura explícita gerou outro digest e passou a observar o
-binding atual; não houve repetição automática da ação final.
+`VerbatimDisk` da mesma unidade congelou a raiz UNC correta. Depois da falha,
+uma nova captura explícita gerou outro digest e passou a observar o binding
+atual; não houve repetição automática da ação final.
 
-No ensaio do sidecar, o mapeamento foi removido antes do despacho. O
-Processador consumiu o caminho operacional congelado, publicou a saída no UNC
-e removeu o staging. Em seguida, a raiz operacional foi temporariamente
-retirada do ar: a tentativa falhou em `Prepare`, não iniciou o Processador e
-não publicou arquivo. Somente após restauração e nova captura explícita a
-Exportação foi publicada.
+No ensaio do sidecar, o mapeamento foi removido antes do despacho. O Processador
+consumiu o caminho operacional congelado, publicou a saída no UNC e removeu o
+staging. Em seguida, a raiz operacional foi temporariamente retirada do ar: a
+tentativa falhou em `Prepare`, não iniciou o Processador e não publicou arquivo.
+Somente após restauração e nova captura explícita a Exportação foi publicada.
 
 ### Identidade e bloqueio
 
@@ -103,10 +106,9 @@ Os handles do caminho local, da unidade mapeada e do alias UNC produziram
 
 Uma trava de arquivo foi mantida por um processo e consultada por outros
 processos através do alias UNC. A segunda aquisição encontrou conflito, uma
-leitura real do conteúdo continuou permitida e outra aquisição só teve sucesso
-depois da queda do proprietário. Isso prova o mecanismo final de bloqueio do
-arquivo e a equivalência dos aliases para esse ensaio; não implementa ainda o
-guardião que focaliza uma sessão já aberta.
+leitura real continuou permitida e outra aquisição só teve sucesso depois da
+queda do proprietário. Isso prova a equivalência física dos aliases no ensaio;
+o guardião de Sessão do Projeto permanece uma responsabilidade separada.
 
 ### Exportação, Cache e caminhos longos
 
@@ -116,30 +118,30 @@ confirmada por SHA-256. O Cache permaneceu sob a Known Folder local temporária
 não ASCII com caminho superior a 260 caracteres foi aberto e publicado pelos
 handles esperados. Os dois executáveis anunciaram `longPathAware`.
 
+Os valores exatos de planos, output, PID e duração estão apenas no JSON
+canônico, evitando misturar resultados de execuções diferentes.
+
 ## Limites da conclusão
 
-- O compartilhamento `C$` exercita SMB real e aliases do mesmo volume, mas não
-  representa WAN, DFS, troca de servidor, DNS instável ou latência de rede.
-- Rede indisponível foi exercitada de ponta a ponta; acesso negado real não foi
-  reproduzido em um servidor com outra credencial.
-- O gate prova identidade e trava, mas ainda não implementa o guardião de
-  abertura, a focalização de uma única `ProjectSession` nem a política
-  fail-closed para `Indeterminate`.
-- O mesmo cenário não foi repetido separadamente nas topologias A e B.
-- `OperationGate` e `OperationLease` não participam deste ensaio e continuam
-  distintos da trava de arquivo.
+- o compartilhamento `C$` exercita SMB real e aliases do mesmo volume, mas não
+  representa WAN, DFS, troca de servidor, DNS instável ou latência de rede;
+- rede indisponível foi exercitada de ponta a ponta; acesso negado real não foi
+  reproduzido em servidor com outra credencial;
+- o gate prova identidade e trava, mas não implementa promoção de Identidade,
+  Cópia externa ou Religação;
+- `OperationGate` e `OperationLease` permanecem distintos da trava de arquivo e
+  são exercitados por outros gates;
 - `MyAlbuns2` continua sendo um namespace temporário para não misturar dados da
-  versão anterior. A árvore final e a migração permanecem abertas.
-- O plano transporta suas raízes sem perda; isso não decide a codificação
-  persistida de todos os caminhos no formato final do Projeto.
+  versão anterior;
+- o plano transporta raízes sem perda; isso não autoriza persistir observações
+  físicas ou bindings no Projeto.
 
 ## Conclusão
 
-A interface de caminhos é viável para o corte da fase 1. O trabalho distribuído
-usa uma captura imutável, não segue remapeamentos posteriores, preserva
-resultados inconclusivos, mantém operações potencialmente remotas fora da
-thread da interface e permite falha recuperável com nova tentativa explícita.
-Os limites acima permanecem gates próprios e não são inferidos por esta prova.
+A interface de caminhos é viável para o corte atual. O trabalho distribuído usa
+uma captura imutável, não segue remapeamentos posteriores, preserva resultados
+inconclusivos, mantém operações potencialmente remotas fora da thread da
+interface e permite falha recuperável com nova tentativa explícita.
 
 ## Repetição
 
@@ -150,3 +152,6 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File scripts\Test-WindowsPathGate.ps1 `
   -OutputPath docs\research\artifacts\0008-windows-path-gate.json
 ```
+
+O runner substitui o artefato somente depois que os 11 checks e as relações de
+evidência passam.

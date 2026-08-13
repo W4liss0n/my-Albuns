@@ -45,6 +45,7 @@ pub(crate) fn serialize_persisted_revision(state: &EditorState) -> Result<String
 pub struct ProjectCore {
     open_projects: Arc<Mutex<HashSet<String>>>,
     pub(crate) identity_lease_root: Option<PathBuf>,
+    pub(crate) identity_registry_root: Option<PathBuf>,
 }
 
 pub struct EditableProject {
@@ -62,15 +63,25 @@ impl ProjectCore {
         Self::default()
     }
 
-    /// Configures the process-independent ownership directory used by the
-    /// productive create/open seam. Read-only loading does not require it.
-    pub fn with_identity_lease_root(mut self, root: PathBuf) -> Self {
-        self.identity_lease_root = Some(root);
+    /// Configures the independent roots for live identity ownership and the
+    /// durable identity-to-location registry used by create/open operations.
+    /// Read-only loading does not require either root.
+    pub fn with_identity_storage_roots(
+        mut self,
+        identity_lease_root: PathBuf,
+        identity_registry_root: PathBuf,
+    ) -> Self {
+        self.identity_lease_root = Some(identity_lease_root);
+        self.identity_registry_root = Some(identity_registry_root);
         self
     }
 
     pub(crate) fn identity_lease_root(&self) -> Option<&Path> {
         self.identity_lease_root.as_deref()
+    }
+
+    pub(crate) fn identity_registry_root(&self) -> Option<&Path> {
+        self.identity_registry_root.as_deref()
     }
 
     pub fn open_demo_editable_session(&self, source: &str) -> Result<EditableProject, CoreError> {

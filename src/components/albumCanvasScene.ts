@@ -30,6 +30,7 @@ export class AlbumCanvasScene {
   private projectGeneration = 0;
   private canvasScale = 1;
   private lastCanvasMetrics: CanvasMetrics | null = null;
+  private lastMediaDemandSignature: string | null = null;
   private readonly previewTextures: ViewportTexturePool;
   private readonly photoInteractions: PhotoInteractionSession;
 
@@ -37,10 +38,12 @@ export class AlbumCanvasScene {
     private readonly app: Application,
     onPreviewTextureError: () => void = () => undefined,
     private readonly onPreviewTextureChange: () => void = () => undefined,
+    onPreviewTextureLoad: (url: string) => void = () => undefined,
   ) {
     this.previewTextures = new ViewportTexturePool(
       this.refreshAfterPreviewTextureChange,
       onPreviewTextureError,
+      onPreviewTextureLoad,
     );
     this.photoInteractions = new PhotoInteractionSession(
       this.photoNodes,
@@ -141,6 +144,7 @@ export class AlbumCanvasScene {
     this.clearMaterializedSheets();
     this.previewTextures.sync([]);
     this.lastCanvasMetrics = null;
+    this.lastMediaDemandSignature = null;
   }
 
   private resetTransientInteractions() {
@@ -192,16 +196,26 @@ export class AlbumCanvasScene {
     const visibleIndexes = layout.entries
       .filter(
         ({ left, right }) =>
+          right >= viewportLeft && left <= viewportRight,
+      )
+      .map(({ index }) => index);
+    const residentIndexes = layout.entries
+      .filter(
+        ({ left, right }) =>
           right >= viewportLeft - VIEWPORT_PRELOAD_PX &&
           left <= viewportRight + VIEWPORT_PRELOAD_PX,
       )
       .map(({ index }) => index);
-    const firstVisible = Math.max(0, (visibleIndexes[0] ?? 0) - PRELOAD_MARGIN);
+    const firstVisible = Math.max(0, (residentIndexes[0] ?? 0) - PRELOAD_MARGIN);
     const lastVisible = Math.min(
       sheets.length - 1,
-      (visibleIndexes[visibleIndexes.length - 1] ?? 0) + PRELOAD_MARGIN,
+      (residentIndexes[residentIndexes.length - 1] ?? 0) + PRELOAD_MARGIN,
     );
     const desiredSheets = sheets.slice(firstVisible, lastVisible + 1);
+    this.reportMediaDemand(
+      visibleIndexes.map((index) => sheets[index]),
+      desiredSheets,
+    );
     const desiredIds = new Set(desiredSheets.map((sheet) => sheet.sheetId));
     const desiredPreviewUrls = new Set<string>();
     const signatures = new Map<string, string>();
@@ -267,6 +281,25 @@ export class AlbumCanvasScene {
       }
       node.container.position.set(layout.entries[index].left, 0);
     }
+  }
+
+  private reportMediaDemand(
+    visibleSheets: readonly ComposedSheet[],
+    residentSheets: readonly ComposedSheet[],
+  ) {
+    if (!this.input?.onMediaDemandChange) return;
+    const visibleMediaIds = mediaIdsForSheets(visibleSheets);
+    const visible = new Set(visibleMediaIds);
+    const preloadMediaIds = mediaIdsForSheets(residentSheets).filter(
+      (mediaId) => !visible.has(mediaId),
+    );
+    const signature = JSON.stringify([visibleMediaIds, preloadMediaIds]);
+    if (signature === this.lastMediaDemandSignature) return;
+    this.lastMediaDemandSignature = signature;
+    this.input.onMediaDemandChange({
+      visibleMediaIds,
+      preloadMediaIds,
+    });
   }
 
   private clearMaterializedSheets() {
@@ -356,4 +389,20 @@ export class AlbumCanvasScene {
     });
     this.synchronizeCenteredSheet(layout, nextOffset, this.canvasScale);
   };
+}
+
+function mediaIdsForSheets(sheets: readonly ComposedSheet[]) {
+  const mediaIds = new Set<string>();
+  for (const sheet of sheets) {
+    for (const frame of sheet.frames) {
+      if (frame.photo) mediaIds.add(frame.photo.mediaId);
+    }
+    for (const background of sheet.backgrounds) {
+      if (background.kind === "media") mediaIds.add(background.mediaId);
+    }
+    for (const overlay of sheet.overlays) {
+      mediaIds.add(overlay.mediaId);
+    }
+  }
+  return [...mediaIds];
 }

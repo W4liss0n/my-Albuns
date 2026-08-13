@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import type {
   EditorProjection,
@@ -18,6 +19,7 @@ import type { CancelDisposition as IpcCancelDisposition } from "./generated/Canc
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
+import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
@@ -161,11 +163,16 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
 };
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
-  prepareMediaPreviews: () =>
-    invoke<IpcMediaPreview[] | null>("prepare_media_previews").catch(
+  prepareMediaPreviews: (demand) =>
+    invoke<IpcMediaPreview[] | null>("prepare_media_previews", { demand }).catch(
       (error: unknown) => {
         throw normalizeMediaPreviewError(error);
       },
+    ),
+  onMediaChanged: (listener) =>
+    listen<IpcLinkedMediaChanged>(
+      "myalbuns://linked-media-changed",
+      ({ payload }) => listener(payload.mediaIds),
     ),
 };
 

@@ -1,8 +1,9 @@
+#[cfg(debug_assertions)]
+use std::fs;
 #[cfg(not(test))]
 use std::fs::File;
 use std::{
     ffi::OsString,
-    fs,
     io::{BufReader, Cursor, Read, Write},
     process::ExitCode,
 };

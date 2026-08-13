@@ -35,7 +35,7 @@ pub(crate) enum SaveStoreResult {
 }
 
 pub(crate) struct SaveReceipt {
-    candidate: ProjectRevision,
+    candidate: Box<ProjectRevision>,
 }
 
 impl SaveReceipt {
@@ -60,6 +60,11 @@ impl PersistedBaseline {
     #[cfg(windows)]
     pub(super) fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
         self.lock.physical_identity()
+    }
+
+    #[cfg(windows)]
+    pub(super) fn matches(&self, resolved: &myalbuns_paths::ResolvedObject) -> bool {
+        self.lock.compare_physical(resolved) == myalbuns_paths::PhysicalIdentityEvidence::Same
     }
 }
 
@@ -337,7 +342,9 @@ fn verify_saved_candidate(
     }
     SaveCandidateResult::Saved {
         baseline: PersistedBaseline::new(lock, candidate_bytes),
-        receipt: SaveReceipt { candidate },
+        receipt: SaveReceipt {
+            candidate: Box::new(candidate),
+        },
     }
 }
 

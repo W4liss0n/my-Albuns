@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-03T02:39:37.3658446Z",
-    "gitCommit":  "52a664aea21d65bc8e7e69b29c6e8a4a90547b3d",
+    "collectedAtUtc":  "2026-08-12T23:29:51.1591404Z",
+    "gitCommit":  "29be09d1f6a2480edd920ef2a780aa5270ced0f5",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -11,48 +11,156 @@
                    {
                        "name":  "protocol",
                        "passed":  true,
-                       "elapsedMs":  29397
+                       "elapsedMs":  1127
                    },
                    {
                        "name":  "cache-temporary-cleanup",
                        "passed":  true,
-                       "elapsedMs":  22851
+                       "elapsedMs":  2186
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  6337
+                       "elapsedMs":  111673
                    },
                    {
                        "name":  "production-recovery-integration",
                        "passed":  true,
-                       "elapsedMs":  123423
+                       "elapsedMs":  56387
+                   },
+                   {
+                       "name":  "cache-webview-canvas-export-journey",
+                       "passed":  true,
+                       "elapsedMs":  1004
+                   },
+                   {
+                       "name":  "obsolete-cache-cancellation-integration",
+                       "passed":  true,
+                       "elapsedMs":  905
+                   },
+                   {
+                       "name":  "causal-cache-pause-integration",
+                       "passed":  true,
+                       "elapsedMs":  1488
+                   },
+                   {
+                       "name":  "actual-tauri-webview2-build",
+                       "passed":  true,
+                       "elapsedMs":  89315
+                   },
+                   {
+                       "name":  "actual-tauri-album-canvas-pixi-webview2",
+                       "passed":  true,
+                       "elapsedMs":  14520
                    }
                ],
     "evidence":  {
                      "cache":  {
-                                   "failedProcessId":  18420,
+                                   "failedProcessId":  18380,
                                    "foreignTemporarySurvivedCleanup":  true,
                                    "generatedCountAfterRestart":  1,
                                    "metadataExistedAfterFailure":  false,
                                    "metadataExistedAfterRestart":  true,
                                    "removedTemporaryCount":  1,
-                                   "restartedProcessId":  2280,
+                                   "restartedProcessId":  20912,
                                    "temporaryExistedAfterCleanup":  false,
                                    "temporaryObservedAfterFailure":  true
                                },
                      "export":  {
-                                    "failedProcessId":  26708,
-                                    "finalOutputSha256AfterExplicitRetry":  "845bb7b85113c9b1d60b96a51832dea148422bbbbfdedf617d5d0fd361addabb",
+                                    "failedProcessId":  34024,
+                                    "finalOutputSha256AfterExplicitRetry":  "9d29aa06810d45517e59fa6ef7531c5c959df4b11e2279da31f976ec3300c0c8",
                                     "partialPreparationObserved":  true,
                                     "previousOutputSha256AfterFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
                                     "previousOutputSha256BeforeFailure":  "30ea0007992ce2ad6109353b8683631daa9946cffbde801d0979f327a98b9c79",
                                     "processCountBeforeExplicitRetry":  1,
-                                    "projectSha256AfterFailure":  "2bff41c103c1b6acf7f9f01f64d8cfb158bf4e79252056cb5ed9e9d515cab193",
-                                    "projectSha256BeforeFailure":  "2bff41c103c1b6acf7f9f01f64d8cfb158bf4e79252056cb5ed9e9d515cab193",
-                                    "protocolVersion":  11,
-                                    "retryProcessId":  14328,
+                                    "projectSha256AfterFailure":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "projectSha256AfterSuccess":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "projectSha256BeforeFailure":  "1f53774c18a56b452565dbc2a6962ea711fb9a9e810d7cceed39071663b41279",
+                                    "protocolVersion":  17,
+                                    "retryProcessId":  12968,
                                     "successResponseBeforeExplicitRetry":  false
-                                }
+                                },
+                     "canvas":  {
+                                    "backgroundUrlOpaque":  true,
+                                    "canvasReferencePixel":  [
+                                                                 102,
+                                                                 64,
+                                                                 82
+                                                             ],
+                                    "channelDelta":  [
+                                                         0,
+                                                         1,
+                                                         0
+                                                     ],
+                                    "compositionMediaOrder":  [
+                                                                  "32356951-75d3-4d04-8721-1bf925f61e3b",
+                                                                  "2142e462-b366-4efd-b046-8117327382bb"
+                                                              ],
+                                    "equivalentBackgroundDemandCount":  2,
+                                    "finalJpegPixel":  [
+                                                           102,
+                                                           63,
+                                                           82
+                                                       ],
+                                    "finalOutputSha256":  "9c337fd61b8c1e4362091722f2c75dedc08d020e543dfc88aa0d23e7573891dd",
+                                    "finalSourceCount":  2,
+                                    "originalBytesExposedToWebView":  false,
+                                    "originalPathExposedToWebView":  false,
+                                    "overlayUrlOpaque":  true,
+                                    "processorIds":  [
+                                                         24372,
+                                                         31196,
+                                                         14068
+                                                     ],
+                                    "singleFlightGenerationId":  "g-f5049d08b56c48ec93ff23d840d3ca72",
+                                    "singleFlightProcessorCount":  1,
+                                    "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\aa69\\my-Albuns\\.scratch\\imaging-recovery-evidence-19292-639221739012677178\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                    "actualTauriApp":  true,
+                                    "actualAlbumCanvas":  true,
+                                    "actualPixiRuntime":  true,
+                                    "browserProcess":  "Tauri WebView2 via tauri-driver",
+                                    "tauriDriverVersion":  "2.0.6",
+                                    "nativeDriverVersion":  "151.0.4129.78",
+                                    "webView2RuntimeVersion":  "151.0.4129.78",
+                                    "opaqueResourceCount":  2,
+                                    "canvasScreenshotScope":  "canvas-element",
+                                    "actualCanvasSamplePoint":  [
+                                                                    574,
+                                                                    309
+                                                                ],
+                                    "actualCanvasPixel":  [
+                                                              103,
+                                                              65,
+                                                              83
+                                                          ],
+                                    "actualCanvasDelta":  [
+                                                              1,
+                                                              1,
+                                                              1
+                                                          ]
+                                },
+                     "obsolete":  {
+                                      "cacheIndexAfterCancellation":  false,
+                                      "cancellationReason":  "obsolete",
+                                      "cancelledProcessId":  31192,
+                                      "cancelledProcessReaped":  true,
+                                      "cancelledStage":  "cancelled",
+                                      "resumableAfterCancellation":  false,
+                                      "singleFlightDemandCount":  2,
+                                      "singleFlightProcessorCount":  1,
+                                      "waiterObservedCancellation":  true
+                                  },
+                     "pause":  {
+                                   "cacheBlockedWhileExportLease":  true,
+                                   "cacheIndexAfterCancellation":  false,
+                                   "cancelledProcessId":  25516,
+                                   "cancelledProcessReaped":  true,
+                                   "cancelledStage":  "cancelled",
+                                   "pauseReason":  "paused",
+                                   "processorExclusiveWhileExportLease":  true,
+                                   "resumedAfterExportTerminal":  true,
+                                   "resumedGenerationPublished":  true,
+                                   "resumedProcessId":  31856
+                               }
                  }
 }

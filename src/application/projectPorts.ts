@@ -3,9 +3,21 @@ import type {
   ProjectIntent,
 } from "../domain/project";
 
+export type MediaPreviewState = "ready" | "absent" | "unavailable";
+
 export interface MediaPreview {
   mediaId: string;
-  url: string;
+  state: MediaPreviewState;
+  url: string | null;
+}
+
+export interface MediaPreviewDemand {
+  visibleMediaIds: readonly string[];
+  preloadMediaIds: readonly string[];
+}
+
+export interface MediaPreviewRequest extends MediaPreviewDemand {
+  revision: number;
 }
 
 export type MediaPreviewErrorCode =
@@ -162,7 +174,12 @@ export interface ProjectSessionPort {
 }
 
 export interface MediaPreviewPort {
-  prepareMediaPreviews(): Promise<readonly MediaPreview[] | null>;
+  prepareMediaPreviews(
+    demand: MediaPreviewRequest,
+  ): Promise<readonly MediaPreview[] | null>;
+  onMediaChanged(
+    listener: (mediaIds: readonly string[]) => void,
+  ): Promise<() => void>;
 }
 
 export interface ExportPort {

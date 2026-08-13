@@ -4,7 +4,12 @@ mod event_stream;
 mod render;
 mod response;
 
-pub use cache::{CacheArtifact, CacheCompletion, CacheJob, CacheRequest};
+pub use cache::{
+    CACHE_FINGERPRINT_VERSION, CACHE_JPEG_QUALITY, CACHE_MAX_DECODED_PIXELS,
+    CACHE_MAX_DECODER_ALLOC_BYTES, CACHE_MAX_EDGE_PX, CACHE_REPRESENTATION_VERSION, CacheArtifact,
+    CacheArtifactProperties, CacheBasicColorProfile, CacheCompletion, CacheFingerprint, CacheJob,
+    CacheMediaSource, CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration,
+};
 pub use command::{
     ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
     decode_command, encode_command, root_binding_plan_sha256,
@@ -20,7 +25,7 @@ pub use render::{
 };
 pub use response::ImagingResponse;
 
-pub const IMAGING_PROTOCOL_VERSION: u32 = 16;
+pub const IMAGING_PROTOCOL_VERSION: u32 = 17;
 
 pub(crate) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()

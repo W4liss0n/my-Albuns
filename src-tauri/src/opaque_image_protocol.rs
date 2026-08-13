@@ -14,6 +14,13 @@ pub(crate) enum ImageFormat {
 }
 
 impl ImageFormat {
+    pub(crate) const fn extension(self) -> &'static str {
+        match self {
+            Self::Jpeg => "jpg",
+            Self::Png => "png",
+        }
+    }
+
     const fn content_type(self) -> &'static str {
         match self {
             Self::Jpeg => "image/jpeg",
@@ -29,9 +36,9 @@ pub(crate) enum ImageReadError {
 }
 
 pub(crate) struct ImagePayload {
-    format: ImageFormat,
-    source_bytes: u64,
-    body: Vec<u8>,
+    pub(crate) format: ImageFormat,
+    pub(crate) source_bytes: u64,
+    pub(crate) body: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -114,22 +121,29 @@ pub(crate) fn serve_opaque_image(
 ) -> tauri::http::Response<Vec<u8>> {
     use tauri::http::{Method, StatusCode};
 
+    let cors_origin = trusted_tauri_origin(&request);
     if !matches!(request.method(), &Method::GET | &Method::HEAD) {
-        return empty_response(StatusCode::METHOD_NOT_ALLOWED, Some(("allow", "GET, HEAD")));
+        return empty_response(
+            StatusCode::METHOD_NOT_ALLOWED,
+            Some(("allow", "GET, HEAD")),
+            cors_origin,
+        );
     }
     if webview_label != allowed_webview_label {
-        return empty_response(StatusCode::NOT_FOUND, None);
+        return empty_response(StatusCode::NOT_FOUND, None, cors_origin);
     }
     let Some(token) = token_from_path(request.uri().path()) else {
-        return empty_response(StatusCode::NOT_FOUND, None);
+        return empty_response(StatusCode::NOT_FOUND, None, cors_origin);
     };
     let include_body = request.method() == Method::GET;
     match read_source(token, include_body) {
-        Ok(payload) => success_response(payload),
+        Ok(payload) => success_response(payload, cors_origin),
         Err(ImageRequestError::UnsupportedImage) => {
-            empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, None)
+            empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, None, cors_origin)
         }
-        Err(ImageRequestError::NotFound) => empty_response(StatusCode::NOT_FOUND, None),
+        Err(ImageRequestError::NotFound) => {
+            empty_response(StatusCode::NOT_FOUND, None, cors_origin)
+        }
     }
 }
 
@@ -160,13 +174,32 @@ fn token_from_path(path: &str) -> Option<&str> {
     (!token.is_empty() && !token.contains('/')).then_some(token)
 }
 
-fn success_response(payload: ImagePayload) -> tauri::http::Response<Vec<u8>> {
-    tauri::http::Response::builder()
+fn trusted_tauri_origin(
+    request: &tauri::http::Request<Vec<u8>>,
+) -> Option<tauri::http::HeaderValue> {
+    let origin = request.headers().get("origin")?;
+    let value = origin.to_str().ok()?;
+    let trusted = matches!(
+        value,
+        "http://tauri.localhost" | "https://tauri.localhost" | "tauri://localhost"
+    ) || (cfg!(debug_assertions) && value == "http://localhost:1437");
+    trusted.then(|| origin.clone())
+}
+
+fn success_response(
+    payload: ImagePayload,
+    cors_origin: Option<tauri::http::HeaderValue>,
+) -> tauri::http::Response<Vec<u8>> {
+    let mut response = tauri::http::Response::builder()
         .status(tauri::http::StatusCode::OK)
         .header("content-type", payload.format.content_type())
         .header("content-length", payload.source_bytes.to_string())
         .header("cache-control", "no-store")
-        .header("x-content-type-options", "nosniff")
+        .header("x-content-type-options", "nosniff");
+    if let Some(origin) = cors_origin {
+        response = response.header("access-control-allow-origin", origin);
+    }
+    response
         .body(payload.body)
         .expect("the fixed opaque image response is valid")
 }
@@ -174,10 +207,14 @@ fn success_response(payload: ImagePayload) -> tauri::http::Response<Vec<u8>> {
 fn empty_response(
     status: tauri::http::StatusCode,
     header: Option<(&'static str, &'static str)>,
+    cors_origin: Option<tauri::http::HeaderValue>,
 ) -> tauri::http::Response<Vec<u8>> {
     let mut response = tauri::http::Response::builder().status(status);
     if let Some((name, value)) = header {
         response = response.header(name, value);
+    }
+    if let Some(origin) = cors_origin {
+        response = response.header("access-control-allow-origin", origin);
     }
     response
         .header("content-length", "0")

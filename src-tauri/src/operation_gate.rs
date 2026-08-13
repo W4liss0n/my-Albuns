@@ -159,7 +159,7 @@ mod tests {
 
     use super::{OperationGate, OperationGateError};
     use crate::{
-        cache_activity_gate::CacheActivityGate,
+        cache_engine::CacheEngine,
         imaging_processor::ImagingProcessor,
         operation_lease::{OperationLease, OperationLeaseError},
     };
@@ -223,7 +223,7 @@ mod tests {
                 thread::sleep(Duration::from_millis(20));
             }
 
-            let challenger_cache = CacheActivityGate::default();
+            let challenger_cache = CacheEngine::default();
             let challenger_processor = ImagingProcessor::default();
             assert!(matches!(
                 OperationLease::acquire(
@@ -256,7 +256,7 @@ mod tests {
         let root = std::path::PathBuf::from(root);
         let paths = app_paths(&root);
         tauri::async_runtime::block_on(async {
-            let cache = CacheActivityGate::default();
+            let cache = CacheEngine::default();
             let processor = ImagingProcessor::default();
             let _lease = OperationLease::acquire(&OperationGate::new(&paths), &cache, &processor)
                 .await

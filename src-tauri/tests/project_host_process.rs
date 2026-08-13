@@ -208,6 +208,7 @@ struct ProjectFixture {
     root_bindings: RootBindingPlan,
     project_id: Option<String>,
     identity_lease_root: PathBuf,
+    identity_registry_root: PathBuf,
     process_data_root: PathBuf,
     background_path: PathBuf,
     overlay_path: PathBuf,
@@ -217,7 +218,10 @@ impl ProjectFixture {
     fn new(label: &str) -> Self {
         let mut fixture = Self::new_uncreated(label);
         let project = ProjectCore::new()
-            .with_identity_lease_root(fixture.identity_lease_root.clone())
+            .with_identity_storage_roots(
+                fixture.identity_lease_root.clone(),
+                fixture.identity_registry_root.clone(),
+            )
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(fixture.project_path.clone(), fixture.root_bindings.clone()),
                 InitialProject::neutral(),
@@ -244,6 +248,7 @@ impl ProjectFixture {
             &process_data_root.join("Temporary"),
         );
         let identity_lease_root = app_paths.project_identity_leases_dir();
+        let identity_registry_root = app_paths.project_identities_dir();
         let background_path = directory.path().join("Fundo \u{e1}rvore.png");
         let overlay_path = directory.path().join("Overlay.png");
         fs::write(&background_path, b"\x89PNG\r\n\x1a\nbackground")
@@ -257,6 +262,7 @@ impl ProjectFixture {
             root_bindings,
             project_id: None,
             identity_lease_root,
+            identity_registry_root,
             process_data_root,
             background_path,
             overlay_path,
@@ -340,7 +346,10 @@ impl ProjectFixture {
 
     fn try_open(&self) -> Result<EditableProject, OpenProjectError> {
         ProjectCore::new()
-            .with_identity_lease_root(self.identity_lease_root.clone())
+            .with_identity_storage_roots(
+                self.identity_lease_root.clone(),
+                self.identity_registry_root.clone(),
+            )
             .open_editable(OpenProjectRequest::new(ProjectLocation::new(
                 self.project_path.clone(),
                 self.root_bindings.clone(),

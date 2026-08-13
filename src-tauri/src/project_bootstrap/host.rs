@@ -69,9 +69,11 @@ fn bootstrap_host_project_with_thread(
     let root_bindings = request.authority.root_bindings.clone();
     let intent = request.intent.clone();
     let identity_lease_root = app_paths.project_identity_leases_dir();
+    let identity_registry_root = app_paths.project_identities_dir();
     let worker = std::thread::spawn(move || {
         let worker_thread = std::thread::current().id();
-        let core = ProjectCore::new().with_identity_lease_root(identity_lease_root);
+        let core = ProjectCore::new()
+            .with_identity_storage_roots(identity_lease_root, identity_registry_root);
         let location = ProjectLocation::new(project_path, root_bindings);
         let project = match intent {
             BootstrapIntent::OpenExisting => core
@@ -284,8 +286,10 @@ mod tests {
         }
 
         fn create_project(&self) -> String {
-            let core = ProjectCore::new()
-                .with_identity_lease_root(self.paths.project_identity_leases_dir());
+            let core = ProjectCore::new().with_identity_storage_roots(
+                self.paths.project_identity_leases_dir(),
+                self.paths.project_identities_dir(),
+            );
             let project = core
                 .create_editable(CreateProjectRequest::new(
                     ProjectLocation::new(self.project_path.clone(), self.bindings()),
@@ -355,7 +359,10 @@ mod tests {
         assert!(fixture.project_path.is_file());
         assert!(matches!(
             ProjectCore::new()
-                .with_identity_lease_root(fixture.paths.project_identity_leases_dir())
+                .with_identity_storage_roots(
+                    fixture.paths.project_identity_leases_dir(),
+                    fixture.paths.project_identities_dir(),
+                )
                 .open_editable(OpenProjectRequest::new(ProjectLocation::new(
                     fixture.project_path.clone(),
                     fixture.bindings(),
@@ -392,7 +399,10 @@ mod tests {
 
         let protected = Fixture::new();
         let owner = ProjectCore::new()
-            .with_identity_lease_root(protected.paths.project_identity_leases_dir())
+            .with_identity_storage_roots(
+                protected.paths.project_identity_leases_dir(),
+                protected.paths.project_identities_dir(),
+            )
             .create_editable(CreateProjectRequest::new(
                 ProjectLocation::new(protected.project_path.clone(), protected.bindings()),
                 InitialProject::neutral(),

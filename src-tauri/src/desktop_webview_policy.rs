@@ -2,6 +2,8 @@ use std::error::Error;
 
 use tauri::WebviewWindow;
 
+const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
+
 #[cfg(windows)]
 use {
     webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3, windows::core::Interface,
@@ -30,6 +32,10 @@ pub(crate) async fn enforce(window: &WebviewWindow) -> Result<(), Box<dyn Error 
     let _ = window;
 
     Ok(())
+}
+
+pub(crate) fn automation_enabled() -> bool {
+    cfg!(debug_assertions) && std::env::var_os(TAURI_WEBVIEW_AUTOMATION_ENV).is_some()
 }
 
 #[cfg(windows)]

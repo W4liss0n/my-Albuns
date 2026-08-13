@@ -37,6 +37,10 @@ const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[cfg(debug_assertions)]
 const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
+#[cfg(debug_assertions)]
+const WEBDRIVER_PROJECT_ENV: &str = "MYALBUNS_TAURI_WEBDRIVER_PROJECT";
+#[cfg(debug_assertions)]
+const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
 
 #[derive(Clone)]
 struct GlobalRuntimeState {
@@ -671,18 +675,46 @@ fn process_gate_headless_enabled() -> bool {
 }
 
 #[cfg(debug_assertions)]
-fn start_headless_process_gate(app: AppHandle, state: GlobalRuntimeState) {
-    let GraphicsGateCompletion::Ready(Some(project_path)) =
-        state.graphics_gate.complete(debug_process_gate_report())
+fn start_direct_project_without_global_window(
+    app: AppHandle,
+    state: GlobalRuntimeState,
+    report: GraphicsGateReport,
+) {
+    let GraphicsGateCompletion::Ready(Some(project_path)) = state.graphics_gate.complete(report)
     else {
         return;
     };
-    tauri::async_runtime::spawn(async move {
-        match launch_confirmed_project(state, project_path, ConfirmedLaunch::OpenExisting).await {
+    std::thread::spawn(move || {
+        let outcome = tauri::async_runtime::block_on(launch_confirmed_project(
+            state,
+            project_path,
+            ConfirmedLaunch::OpenExisting,
+        ));
+        match outcome {
             ProjectLaunchOutcome::Opened => app.exit(0),
             ProjectLaunchOutcome::Cancelled | ProjectLaunchOutcome::Failed { .. } => app.exit(1),
         }
     });
+}
+
+#[cfg(debug_assertions)]
+fn webdriver_project_path(automation_enabled: bool, candidate: Option<PathBuf>) -> Option<PathBuf> {
+    candidate.filter(|path| {
+        automation_enabled
+            && path.is_absolute()
+            && path
+                .extension()
+                .and_then(std::ffi::OsStr::to_str)
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("myalbuns"))
+    })
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn webdriver_automation_project() -> Option<PathBuf> {
+    webdriver_project_path(
+        std::env::var_os(TAURI_WEBVIEW_AUTOMATION_ENV).is_some(),
+        std::env::var_os(WEBDRIVER_PROJECT_ENV).map(PathBuf::from),
+    )
 }
 
 pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
@@ -712,7 +744,11 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             let app_handle = app.handle().clone();
             #[cfg(debug_assertions)]
             if process_gate_headless_enabled() {
-                start_headless_process_gate(app_handle, setup_state.clone());
+                start_direct_project_without_global_window(
+                    app_handle,
+                    setup_state.clone(),
+                    debug_process_gate_report(),
+                );
                 return Ok(());
             }
             tauri::async_runtime::spawn(initialize_global_window(app_handle, setup_state.clone()));
@@ -737,6 +773,25 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn webdriver_adapter_accepts_only_an_automated_absolute_project_path() {
+        let project = PathBuf::from(r"C:\Projetos\Canvas real.myalbuns");
+
+        assert_eq!(
+            webdriver_project_path(true, Some(project.clone())),
+            Some(project.clone())
+        );
+        assert_eq!(webdriver_project_path(false, Some(project)), None);
+        assert_eq!(
+            webdriver_project_path(true, Some(PathBuf::from("relative.myalbuns"))),
+            None
+        );
+        assert_eq!(
+            webdriver_project_path(true, Some(PathBuf::from(r"C:\Projetos\Canvas.png"))),
+            None
+        );
+    }
 
     fn creation_launch() -> ConfirmedLaunch {
         ConfirmedLaunch::CreateNew {

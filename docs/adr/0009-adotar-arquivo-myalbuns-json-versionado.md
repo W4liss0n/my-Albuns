@@ -1,7 +1,7 @@
 ---
 status: accepted
 date: 2026-08-03
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 # Adotar `.myalbuns` como arquivo JSON versionado de Projeto
@@ -14,7 +14,9 @@ O primeiro contrato público começa em `schemaVersion: 1` e não promete compat
 
 Cada versão possui DTO fechado e rejeita campos desconhecidos. Versões públicas antigas suportadas são migradas sequencialmente apenas em memória; o arquivo só recebe o esquema atual em um Salvamento explícito. Versões futuras ou inválidas são recusadas sem modificar o arquivo. `ProjectStore` possui JSON, detecção, migração e escrita, enquanto `ProjectDomain` recebe somente o modelo atual já validado.
 
-Enquanto `schemaVersion: 1` for a única versão pública, a cadeia de migração é `migrations = []` e não existe exemplo de migração legítimo. A cadeia vazia registra a ausência de transformação; ela não é um exemplo. Não se inventa `v0`, não se promove o `schemaVersion: 3` dos spikes e não se cria uma transformação fictícia apenas para exercitar infraestrutura. A primeira mudança que aceitar `schemaVersion: 2` precisa incluir, no mesmo conjunto normativo e versionado, a transformação sequencial `v1 -> v2`, um exemplo de entrada v1 e seu resultado v2 esperado, além dos casos de abertura sem escrita e promoção somente após `Salvar`.
+Enquanto `schemaVersion: 1` foi a única versão pública, a cadeia de migração era `migrations = []` e não existia exemplo de migração legítimo. A cadeia vazia registrava a ausência de transformação; ela não era um exemplo. Não se inventa `v0`, não se promove o `schemaVersion: 3` dos spikes e não se cria uma transformação fictícia apenas para exercitar infraestrutura.
+
+O [Contrato do Arquivo de Projeto v2](../design/0016-contrato-do-arquivo-de-projeto-v2.md) é a primeira evolução pública. Ele inclui no mesmo conjunto normativo a transformação tipada e sequencial `v1 -> v2`, a entrada v1 e o resultado v2 esperado, a prova de abertura sem escrita e a promoção para v2 somente após `Salvar` explícito.
 
 ## Alternativas consideradas
 
@@ -23,7 +25,7 @@ ZIP, SQLite e formatos binários foram rejeitados porque as mídias permanecem e
 ## Consequências
 
 - Acrescentar ou alterar campos persistidos exige uma nova Versão do esquema do Projeto e uma migração explícita quando houver compatibilidade.
-- Uma nova versão pública não está completa sem os exemplos versionados válidos, inválidos e de migração correspondentes; no estado atual, só existem exemplos válidos e inválidos, porque não há versão pública anterior da qual migrar.
+- Uma nova versão pública não está completa sem os exemplos versionados válidos, inválidos e de migração correspondentes; a v2 conserva os exemplos v1 e acrescenta o par dourado `v1 -> v2`.
 - A extensão ajuda o Windows a encaminhar o arquivo, mas a identificação interna continua obrigatória e autoritativa.
 - O escritor pode produzir JSON determinístico e legível; leitores não dependem de espaços, quebras de linha ou ordem de propriedades.
 - A implementação deve manter DTOs persistentes separados dos tipos de domínio e das representações de IPC.

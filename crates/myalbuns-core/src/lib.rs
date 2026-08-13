@@ -21,19 +21,19 @@ pub use model::{
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
-    LoadedProjectRevision, OpenProjectError, OpenProjectRequest, SaveProjectError,
-    SaveProjectOutcome,
+    LoadedProjectRevision, OpenProjectError, OpenProjectRequest, ProjectIdentityAuthority,
+    SaveProjectError, SaveProjectOutcome,
 };
 pub use project::{
     EditableProject as DemoEditableProject, LoadedProjectRevision as DemoLoadedProjectRevision,
     ProjectCore,
 };
 pub use project_document::{
-    ActiveSides, Background, BackgroundContent, DecorativeMedia, DisplayUnit, DocumentSettings,
-    EndSheetFormat, FrameBorder, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
-    InitialOverlay, InitialOverlayContent, InitialProject, InitialProjectConfiguration,
-    InitialProjectPersonalization, InitialProjectValidationError, Overlay, OverlayContent,
-    ProjectDocument, ProjectSheet, Rgb, VisualDefaults,
+    ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat,
+    FrameBorder, InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+    InitialOverlayContent, InitialProject, InitialProjectConfiguration,
+    InitialProjectPersonalization, InitialProjectValidationError, MediaRef, Overlay,
+    OverlayContent, ProjectDocument, ProjectSheet, Rgb, VisualDefaults,
 };
 pub use project_store::{
     DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,

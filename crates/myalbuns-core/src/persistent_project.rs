@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalIdentityEvidence};
 use uuid::Uuid;
 
 use crate::{
@@ -11,8 +12,8 @@ use crate::{
     project_document::{InitialProject, ProjectDocument, ProjectRevision},
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
-        OpenStoreError, PathFailure, ProjectIdentityLease, ProjectLocation, ProjectStore,
-        SaveStoreError, SaveStoreResult,
+        IdentityRegistryLookup, OpenStoreError, PathFailure, ProjectIdentityLease,
+        ProjectIdentityRegistry, ProjectLocation, ProjectStore, SaveStoreError, SaveStoreResult,
     },
 };
 
@@ -106,17 +107,41 @@ pub enum SaveProjectError {
     SaveStateIndeterminate,
 }
 
+/// Opaque proof that one editable Project passed the identity-opening barrier.
+///
+/// Read-only loads never produce this value. Local state keyed by Project
+/// identity must require it instead of accepting an ID parsed from a document.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectIdentityAuthority {
+    project_id: Uuid,
+}
+
+impl ProjectIdentityAuthority {
+    pub fn project_id(&self) -> Uuid {
+        self.project_id
+    }
+
+    fn authorized(project_id: Uuid) -> Self {
+        Self { project_id }
+    }
+}
+
 #[derive(Debug)]
 pub struct EditableProject {
     session: PersistentProjectSession,
     store: ProjectStore,
     identity_lease: ProjectIdentityLease,
+    identity_authority: ProjectIdentityAuthority,
     session_valid: bool,
 }
 
 impl EditableProject {
     pub fn project_id(&self) -> Uuid {
         self.session.project_id()
+    }
+
+    pub fn identity_authority(&self) -> &ProjectIdentityAuthority {
+        &self.identity_authority
     }
 
     pub fn revision(&self) -> u64 {
@@ -215,7 +240,7 @@ impl EditableProject {
                 current,
             });
         }
-        if !self.has_unsaved_changes() {
+        if !self.session.requires_save() {
             return Ok(SaveProjectOutcome::AlreadyCurrent { revision: current });
         }
         let candidate = self.session.current_revision();
@@ -254,24 +279,9 @@ impl ProjectCore {
         request: project_store::LoadProjectRequest,
     ) -> Result<LoadedProjectRevision, project_store::LoadProjectError> {
         let loaded = project_store::load(request)?;
-        if let Some(lease_root) = self.identity_lease_root() {
-            match ProjectIdentityLease::observe(
-                lease_root,
-                loaded.revision.project_id,
-                loaded.physical_identity,
-            ) {
-                Ok(IdentityLeaseObservation::Inactive)
-                | Ok(IdentityLeaseObservation::SamePhysicalTarget) => {}
-                Ok(IdentityLeaseObservation::DifferentPhysicalTarget) => {
-                    return Err(
-                        project_store::LoadProjectError::ExternalCopyRequiresInteractiveResolution,
-                    );
-                }
-                Err(_) => {
-                    return Err(project_store::LoadProjectError::IdentityIndeterminate);
-                }
-            }
-        }
+        #[cfg(test)]
+        wait_at_identity_authorization_test_barrier(&loaded.project_path);
+        authorize_loaded_identity(self, &loaded)?;
         Ok(LoadedProjectRevision {
             revision: loaded.revision,
         })
@@ -320,15 +330,27 @@ impl ProjectCore {
                 return Err(error);
             }
         };
+        #[cfg(test)]
+        wait_at_identity_authorization_test_barrier(store.location().project_path());
+        if !store.location_still_matches_baseline() {
+            identity_lease.discard_unpublished();
+            return Err(CreateProjectError::IdentityIndeterminate);
+        }
+        if publish_identity_location(self, revision.project_id, &store).is_err() {
+            identity_lease.discard_unpublished();
+            return Err(CreateProjectError::CreateStateIndeterminate);
+        }
         if bind_identity_target(&identity_lease, &store).is_err() {
             identity_lease.discard_unpublished();
             return Err(CreateProjectError::IdentityIndeterminate);
         }
 
+        let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
-            session: PersistentProjectSession::from_persisted(revision),
+            session: PersistentProjectSession::from_persisted(revision, false),
             store,
             identity_lease,
+            identity_authority,
             session_valid: true,
         })
     }
@@ -344,14 +366,262 @@ impl ProjectCore {
             project_store::open_editable(request.location).map_err(map_open_store_error)?;
         let identity_lease = ProjectIdentityLease::acquire(lease_root, opened.revision.project_id)
             .map_err(map_open_identity_lease_error)?;
+        #[cfg(test)]
+        wait_at_identity_authorization_test_barrier(opened.store.location().project_path());
+        if !opened.store.location_still_matches_baseline() {
+            return Err(OpenProjectError::IdentityIndeterminate);
+        }
+        authorize_opened_identity(self, opened.revision.project_id, &opened.store)?;
         bind_identity_target(&identity_lease, &opened.store)
             .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
+        let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
-            session: PersistentProjectSession::from_persisted(opened.revision),
+            session: PersistentProjectSession::from_persisted(
+                opened.revision,
+                opened.requires_schema_upgrade,
+            ),
             store: opened.store,
             identity_lease,
+            identity_authority,
             session_valid: true,
         })
+    }
+}
+
+fn identity_registry(core: &ProjectCore) -> Result<ProjectIdentityRegistry, ()> {
+    core.identity_registry_root()
+        .map(|root| ProjectIdentityRegistry::new(root.to_path_buf()))
+        .ok_or(())
+}
+
+fn authorize_loaded_identity(
+    core: &ProjectCore,
+    loaded: &project_store::LoadedStoredRevision,
+) -> Result<(), project_store::LoadProjectError> {
+    let Some(lease_root) = core.identity_lease_root() else {
+        return Ok(());
+    };
+    let project_id = loaded.revision.project_id;
+    const AUTHORIZATION_WAIT_LIMIT: usize = 400;
+    const AUTHORIZATION_RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(5);
+
+    for _ in 0..AUTHORIZATION_WAIT_LIMIT {
+        match ProjectIdentityLease::observe(lease_root, project_id, loaded.physical_identity) {
+            Ok(IdentityLeaseObservation::SamePhysicalTarget) => return Ok(()),
+            Ok(IdentityLeaseObservation::DifferentPhysicalTarget) => {
+                return Err(
+                    project_store::LoadProjectError::ExternalCopyRequiresInteractiveResolution,
+                );
+            }
+            Ok(IdentityLeaseObservation::Inactive) => {}
+            Ok(IdentityLeaseObservation::Pending) => {
+                std::thread::sleep(AUTHORIZATION_RETRY_DELAY);
+                continue;
+            }
+            Err(_) => return Err(project_store::LoadProjectError::IdentityIndeterminate),
+        }
+        let lease = match ProjectIdentityLease::acquire(lease_root, project_id) {
+            Ok(lease) => lease,
+            Err(IdentityLeaseError::Conflict) => {
+                std::thread::sleep(AUTHORIZATION_RETRY_DELAY);
+                continue;
+            }
+            Err(IdentityLeaseError::Unavailable) => {
+                return Err(project_store::LoadProjectError::IdentityIndeterminate);
+            }
+        };
+        let physical_identity = loaded
+            .physical_identity
+            .ok_or(project_store::LoadProjectError::IdentityIndeterminate)?;
+        let current_candidate = loaded
+            .root_bindings
+            .resolve_existing(&loaded.project_path, ExpectedObject::RegularFile)
+            .map_err(|_| project_store::LoadProjectError::IdentityIndeterminate)?;
+        if loaded.resolved_object.compare_physical(&current_candidate)
+            != PhysicalIdentityEvidence::Same
+        {
+            lease.discard_unpublished();
+            return Err(project_store::LoadProjectError::IdentityIndeterminate);
+        }
+        if let Err(error) = authorize_identity_candidate(
+            core,
+            project_id,
+            &loaded.project_path,
+            loaded.physical_identity,
+        ) {
+            lease.discard_unpublished();
+            return Err(map_load_identity_error(error));
+        }
+        if lease.bind_target(physical_identity).is_err() {
+            lease.discard_unpublished();
+            return Err(project_store::LoadProjectError::IdentityIndeterminate);
+        }
+        return Ok(());
+    }
+    Err(project_store::LoadProjectError::IdentityIndeterminate)
+}
+
+#[cfg(test)]
+struct IdentityAuthorizationTestBarrier {
+    id: Uuid,
+    reached: std::sync::mpsc::SyncSender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+}
+
+#[cfg(test)]
+static IDENTITY_AUTHORIZATION_TEST_BARRIER: std::sync::OnceLock<
+    std::sync::Mutex<
+        std::collections::HashMap<std::path::PathBuf, IdentityAuthorizationTestBarrier>,
+    >,
+> = std::sync::OnceLock::new();
+
+#[cfg(test)]
+fn wait_at_identity_authorization_test_barrier(project_path: &Path) {
+    let barrier = {
+        let mut installed = IDENTITY_AUTHORIZATION_TEST_BARRIER
+            .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        installed.remove(project_path)
+    };
+    let Some(barrier) = barrier else { return };
+    barrier
+        .reached
+        .send(())
+        .expect("the identity authorization test observes the loaded handle");
+    barrier
+        .release
+        .recv()
+        .expect("the identity authorization test releases classification");
+}
+
+#[cfg(test)]
+fn install_identity_authorization_test_barrier(
+    project_path: std::path::PathBuf,
+    reached: std::sync::mpsc::SyncSender<()>,
+    release: std::sync::mpsc::Receiver<()>,
+) -> Uuid {
+    let id = Uuid::new_v4();
+    let previous = IDENTITY_AUTHORIZATION_TEST_BARRIER
+        .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(
+            project_path.clone(),
+            IdentityAuthorizationTestBarrier {
+                id,
+                reached,
+                release,
+            },
+        );
+    assert!(
+        previous.is_none(),
+        "one test barrier owns each Project pathname"
+    );
+    id
+}
+
+#[cfg(test)]
+fn clear_identity_authorization_test_barrier(id: Uuid) {
+    let mut installed = IDENTITY_AUTHORIZATION_TEST_BARRIER
+        .get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    installed.retain(|_, barrier| barrier.id != id);
+}
+
+fn publish_identity_location(
+    core: &ProjectCore,
+    project_id: Uuid,
+    store: &ProjectStore,
+) -> Result<(), ()> {
+    identity_registry(core)?
+        .publish(project_id, store.location().project_path())
+        .map_err(|_| ())
+}
+
+fn authorize_opened_identity(
+    core: &ProjectCore,
+    project_id: Uuid,
+    store: &ProjectStore,
+) -> Result<(), OpenProjectError> {
+    authorize_identity_candidate(
+        core,
+        project_id,
+        store.location().project_path(),
+        store.physical_identity(),
+    )
+    .map_err(map_open_identity_candidate_error)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum IdentityCandidateError {
+    ExternalCopy,
+    Indeterminate,
+}
+
+fn authorize_identity_candidate(
+    core: &ProjectCore,
+    project_id: Uuid,
+    candidate_location: &Path,
+    candidate_physical_identity: Option<myalbuns_paths::PhysicalFileIdentity>,
+) -> Result<(), IdentityCandidateError> {
+    let registry = identity_registry(core).map_err(|()| IdentityCandidateError::Indeterminate)?;
+    let previous_location = match registry
+        .lookup(project_id)
+        .map_err(|_| IdentityCandidateError::Indeterminate)?
+    {
+        IdentityRegistryLookup::Missing => {
+            return registry
+                .publish(project_id, candidate_location)
+                .map_err(|_| IdentityCandidateError::Indeterminate);
+        }
+        IdentityRegistryLookup::Location(location) => location,
+    };
+
+    let mut context = OperationPathContext::new();
+    context
+        .capture(&previous_location)
+        .map_err(|_| IdentityCandidateError::Indeterminate)?;
+    let previous = project_store::read(&ProjectLocation::new(previous_location, context.freeze()));
+    match previous {
+        Ok(previous) if previous.revision.project_id == project_id => {
+            match (previous.physical_identity, candidate_physical_identity) {
+                (Some(previous), Some(candidate)) => {
+                    if previous == candidate {
+                        Ok(())
+                    } else {
+                        Err(IdentityCandidateError::ExternalCopy)
+                    }
+                }
+                _ => Err(IdentityCandidateError::Indeterminate),
+            }
+        }
+        Ok(_) => Err(IdentityCandidateError::Indeterminate),
+        Err(project_store::DecodeFailure::Path(PathFailure::NotFound)) => {
+            Err(IdentityCandidateError::Indeterminate)
+        }
+        Err(_) => Err(IdentityCandidateError::Indeterminate),
+    }
+}
+
+fn map_open_identity_candidate_error(error: IdentityCandidateError) -> OpenProjectError {
+    match error {
+        IdentityCandidateError::ExternalCopy => {
+            OpenProjectError::ExternalCopyRequiresInteractiveResolution
+        }
+        IdentityCandidateError::Indeterminate => OpenProjectError::IdentityIndeterminate,
+    }
+}
+
+fn map_load_identity_error(error: IdentityCandidateError) -> project_store::LoadProjectError {
+    match error {
+        IdentityCandidateError::ExternalCopy => {
+            project_store::LoadProjectError::ExternalCopyRequiresInteractiveResolution
+        }
+        IdentityCandidateError::Indeterminate => {
+            project_store::LoadProjectError::IdentityIndeterminate
+        }
     }
 }
 
@@ -410,8 +680,15 @@ fn map_open_identity_lease_error(error: IdentityLeaseError) -> OpenProjectError 
 mod save_tests {
     use myalbuns_paths::OperationPathContext;
 
-    use super::{CreateAuthorization, CreateProjectRequest, OpenProjectRequest, SaveProjectError};
-    use crate::{CoreError, InitialProject, ProjectCore, ProjectIntent, ProjectLocation};
+    use super::{
+        CreateAuthorization, CreateProjectError, CreateProjectRequest, OpenProjectError,
+        OpenProjectRequest, SaveProjectError, clear_identity_authorization_test_barrier,
+        install_identity_authorization_test_barrier,
+    };
+    use crate::{
+        CoreError, InitialProject, LoadProjectError, LoadProjectRequest, ProjectCore,
+        ProjectIntent, ProjectLocation,
+    };
 
     fn location(path: &std::path::Path) -> ProjectLocation {
         let mut context = OperationPathContext::new();
@@ -425,7 +702,10 @@ mod save_tests {
     fn projection_and_render_snapshot_derive_the_non_ascii_project_name_from_its_native_path() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let project_path = directory.path().join("Casamento da Júlia.myalbuns");
-        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
         let project = core
             .create_editable(CreateProjectRequest::new(
                 location(&project_path),
@@ -455,7 +735,10 @@ mod save_tests {
     fn an_indeterminate_post_publication_state_is_not_confirmed_and_requires_reopening() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let project_path = directory.path().join("Estado inconclusivo.myalbuns");
-        let core = ProjectCore::new().with_identity_lease_root(directory.path().join("leases"));
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
         let mut project = core
             .create_editable(CreateProjectRequest::new(
                 location(&project_path),
@@ -507,5 +790,152 @@ mod save_tests {
         assert!(!reopened.has_unsaved_changes());
         assert!(!reopened.can_undo());
         assert!(!reopened.can_redo());
+    }
+
+    #[test]
+    fn read_only_first_observation_rejects_a_path_replaced_after_its_handle_was_read() {
+        let directory = tempfile::tempdir().expect("temporary identity race directory");
+        let project_path = directory.path().join("Projeto observado.myalbuns");
+        let displaced_path = directory.path().join("Projeto anterior.myalbuns");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
+        let project = core
+            .create_editable(CreateProjectRequest::new(
+                location(&project_path),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the first physical Project is created");
+        drop(project);
+        std::fs::remove_dir_all(directory.path().join("identities"))
+            .expect("the fixture resets only its durable identity evidence");
+        let replacement_bytes = std::fs::read(&project_path).expect("the Project bytes are read");
+        let (reached_tx, reached_rx) = std::sync::mpsc::sync_channel(0);
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel(0);
+        let barrier_id = install_identity_authorization_test_barrier(
+            project_path.clone(),
+            reached_tx,
+            release_rx,
+        );
+        let load_core = core.clone();
+        let load_path = project_path.clone();
+        let attempt = std::thread::spawn(move || {
+            load_core.load_persisted_revision(LoadProjectRequest::new(location(&load_path)))
+        });
+        reached_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("the first object was read before identity publication");
+        std::fs::rename(&project_path, &displaced_path)
+            .expect("the opened object is displaced atomically");
+        std::fs::write(&project_path, replacement_bytes)
+            .expect("a different physical object occupies the pathname");
+        release_tx
+            .send(())
+            .expect("identity classification resumes");
+
+        assert_eq!(
+            attempt
+                .join()
+                .expect("the read-only attempt does not panic")
+                .expect_err("the pathname no longer identifies the decoded object"),
+            LoadProjectError::IdentityIndeterminate
+        );
+        clear_identity_authorization_test_barrier(barrier_id);
+    }
+
+    #[test]
+    fn editable_open_rejects_a_path_replaced_after_its_baseline_was_locked() {
+        let directory = tempfile::tempdir().expect("temporary open race directory");
+        let project_path = directory.path().join("Projeto aberto.myalbuns");
+        let displaced_path = directory.path().join("Projeto aberto anterior.myalbuns");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
+        let created = core
+            .create_editable(CreateProjectRequest::new(
+                location(&project_path),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the editable fixture is created");
+        drop(created);
+        let replacement_bytes = std::fs::read(&project_path).expect("the Project bytes are read");
+        let (reached_tx, reached_rx) = std::sync::mpsc::sync_channel(0);
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel(0);
+        let barrier_id = install_identity_authorization_test_barrier(
+            project_path.clone(),
+            reached_tx,
+            release_rx,
+        );
+        let open_core = core.clone();
+        let open_path = project_path.clone();
+        let attempt = std::thread::spawn(move || {
+            open_core.open_editable(OpenProjectRequest::new(location(&open_path)))
+        });
+        reached_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("the editable baseline is locked before identity publication");
+        std::fs::rename(&project_path, &displaced_path)
+            .expect("the locked object is displaced atomically");
+        std::fs::write(&project_path, replacement_bytes)
+            .expect("a different physical object occupies the pathname");
+        release_tx.send(()).expect("editable authorization resumes");
+
+        assert_eq!(
+            attempt
+                .join()
+                .expect("the editable attempt does not panic")
+                .expect_err("the pathname no longer identifies the locked baseline"),
+            OpenProjectError::IdentityIndeterminate
+        );
+        clear_identity_authorization_test_barrier(barrier_id);
+    }
+
+    #[test]
+    fn editable_create_rejects_a_path_replaced_before_identity_publication() {
+        let directory = tempfile::tempdir().expect("temporary create race directory");
+        let project_path = directory.path().join("Projeto criado.myalbuns");
+        let displaced_path = directory.path().join("Projeto criado anterior.myalbuns");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            directory.path().join("leases"),
+            directory.path().join("identities"),
+        );
+        let (reached_tx, reached_rx) = std::sync::mpsc::sync_channel(0);
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel(0);
+        let barrier_id = install_identity_authorization_test_barrier(
+            project_path.clone(),
+            reached_tx,
+            release_rx,
+        );
+        let create_core = core.clone();
+        let create_path = project_path.clone();
+        let attempt = std::thread::spawn(move || {
+            create_core.create_editable(CreateProjectRequest::new(
+                location(&create_path),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+        });
+        reached_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("the created baseline is locked before identity publication");
+        let replacement_bytes = std::fs::read(&project_path).expect("the created bytes are read");
+        std::fs::rename(&project_path, &displaced_path)
+            .expect("the created object is displaced atomically");
+        std::fs::write(&project_path, replacement_bytes)
+            .expect("a different physical object occupies the pathname");
+        release_tx.send(()).expect("creation authorization resumes");
+
+        assert_eq!(
+            attempt
+                .join()
+                .expect("the creation attempt does not panic")
+                .expect_err("the pathname no longer identifies the created baseline"),
+            CreateProjectError::IdentityIndeterminate
+        );
+        clear_identity_authorization_test_barrier(barrier_id);
     }
 }

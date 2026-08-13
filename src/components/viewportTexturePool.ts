@@ -14,6 +14,7 @@ export class ViewportTexturePool {
   constructor(
     private readonly onChange: () => void,
     private readonly onError: () => void = () => undefined,
+    private readonly onLoad: (url: string) => void = () => undefined,
   ) {}
 
   sync(urls: Iterable<string>) {
@@ -62,7 +63,10 @@ export class ViewportTexturePool {
       entry.operation = Assets.load<Texture>(url)
         .then((texture) => {
           entry.texture = texture;
-          if (entry.desired && !this.destroyed) this.onChange();
+          if (entry.desired && !this.destroyed) {
+            this.onLoad(url);
+            this.onChange();
+          }
         })
         .catch(() => {
           entry.failed = true;

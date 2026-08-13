@@ -2,29 +2,43 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    sync::{
+        Arc,
+        atomic::{AtomicU32, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
 
-use image::{ImageFormat, Rgb, RgbImage};
-use myalbuns_core::ProjectCore;
+use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
+use myalbuns_core::{
+    ComposedBackground, ComposedDecorative, CreateAuthorization, CreateProjectRequest,
+    InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+    InitialOverlayContent, InitialProject, InitialProjectPersonalization, MediaKind, ProjectCore,
+    ProjectLocation,
+};
 use myalbuns_imaging_protocol::{
-    CacheArtifactFormat, IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingResponse, MediaSource,
-    RenderSource, encode_command,
+    CacheArtifactFormat, CacheMediaSource, IMAGING_PROTOCOL_VERSION, ImagingCommand,
+    ImagingResponse, RenderSource, encode_command,
 };
 use myalbuns_paths::{
     AppPaths, ExportPathPlan, ExportWriteAuthorization, OperationPathContext, RootBindingPlan,
-    project_data_namespace,
 };
 use sha2::{Digest, Sha256};
 
 use crate::{
-    cache_engine::{self, CacheWork},
+    cache_activity_gate::{CacheCancellation, CacheCancellationReason},
+    cache_engine::{
+        AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheFlightClaim, CacheWork,
+    },
+    cache_previews::CachePreviewRegistry,
     export_pipeline,
     imaging_processor::{
-        ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
+        ImagingOperation, ImagingProcessor, ImagingTransport, InvocationContext, InvocationControl,
         InvocationFailure, InvocationFailureStage, InvocationFuture, complete_invocation,
     },
+    operation_gate::OperationGate,
+    operation_lease::OperationLease,
     sample_project::SampleProject,
 };
 
@@ -80,6 +94,9 @@ pub(crate) struct RealProcessTransport {
     process_ids: Vec<u32>,
     partial_preparation_observed: bool,
     cache_metadata_existed_after_failure: bool,
+    progressive_decode_barrier: Option<PathBuf>,
+    started_process_id: Option<Arc<AtomicU32>>,
+    cancelled_process_reaped: bool,
 }
 
 impl RealProcessTransport {
@@ -91,6 +108,9 @@ impl RealProcessTransport {
             process_ids: Vec::new(),
             partial_preparation_observed: false,
             cache_metadata_existed_after_failure: false,
+            progressive_decode_barrier: None,
+            started_process_id: None,
+            cancelled_process_reaped: false,
         }
     }
 
@@ -98,10 +118,23 @@ impl RealProcessTransport {
         Self::new(executable, log_directory, CrashNext::Never)
     }
 
+    fn stable_with_barrier_and_probe(
+        executable: PathBuf,
+        log_directory: PathBuf,
+        progressive_decode_barrier: PathBuf,
+        started_process_id: Arc<AtomicU32>,
+    ) -> Self {
+        let mut transport = Self::stable(executable, log_directory);
+        transport.progressive_decode_barrier = Some(progressive_decode_barrier);
+        transport.started_process_id = Some(started_process_id);
+        transport
+    }
+
     fn invoke_process(
         &mut self,
         command: &ImagingCommand,
         operation: ImagingOperation,
+        control: InvocationControl<'_>,
     ) -> Result<ImagingResponse, InvocationFailure> {
         let payload = encode_command(command).map_err(|error| {
             InvocationFailure::at_stage(
@@ -116,6 +149,9 @@ impl RealProcessTransport {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(barrier) = &self.progressive_decode_barrier {
+            process.env("MYALBUNS_TEST_PROGRESSIVE_DECODE_BARRIER", barrier);
+        }
         let mut child = process.spawn().map_err(|error| {
             InvocationFailure::at_stage(
                 InvocationFailureStage::SpawnSidecar,
@@ -125,6 +161,9 @@ impl RealProcessTransport {
         })?;
         let process_id = child.id();
         self.process_ids.push(process_id);
+        if let Some(started_process_id) = &self.started_process_id {
+            started_process_id.store(process_id, Ordering::Release);
+        }
         child
             .stdin
             .take()
@@ -152,7 +191,12 @@ impl RealProcessTransport {
         if must_crash {
             self.crash_next = CrashNext::Never;
             let partial_path = partial_path(command, process_id).expect("crashable command");
-            wait_for_file_while_running(&mut child, &partial_path, Duration::from_secs(60));
+            wait_for_file_while_running(
+                &mut child,
+                &partial_path,
+                &self.log_directory,
+                Duration::from_secs(60),
+            );
             self.partial_preparation_observed = true;
             child
                 .kill()
@@ -167,10 +211,27 @@ impl RealProcessTransport {
             return complete_invocation(process_id, output.status.code(), &output.stdout);
         }
 
-        let output = child
-            .wait_with_output()
-            .expect("the real imaging process exits");
-        complete_invocation(process_id, output.status.code(), &output.stdout)
+        loop {
+            if control.is_cancelled() {
+                let _ = child.kill();
+                let _output = child
+                    .wait_with_output()
+                    .expect("the cancelled real imaging process is reaped");
+                self.cancelled_process_reaped = true;
+                return Err(InvocationFailure::cancelled(process_id));
+            }
+            if child
+                .try_wait()
+                .expect("the real imaging process remains observable")
+                .is_some()
+            {
+                let output = child
+                    .wait_with_output()
+                    .expect("the real imaging process exits");
+                return complete_invocation(process_id, output.status.code(), &output.stdout);
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
     }
 }
 
@@ -181,9 +242,9 @@ impl ImagingTransport for RealProcessTransport {
         _context: &'a InvocationContext,
         operation: ImagingOperation,
         _attempt: u8,
-        _control: InvocationControl<'a>,
+        control: InvocationControl<'a>,
     ) -> InvocationFuture<'a> {
-        let result = self.invoke_process(command, operation);
+        let result = self.invoke_process(command, operation, control);
         Box::pin(async move { result })
     }
 }
@@ -196,7 +257,7 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
                 .cache_paths
                 .preview_temporary_file(
                     job.source.media_id(),
-                    &job.generation_id,
+                    &job.candidate_generation_id,
                     CacheArtifactFormat::Jpeg,
                     process_id,
                 )
@@ -206,7 +267,12 @@ fn partial_path(command: &ImagingCommand, process_id: u32) -> Option<PathBuf> {
     }
 }
 
-fn wait_for_file_while_running(child: &mut std::process::Child, path: &Path, timeout: Duration) {
+fn wait_for_file_while_running(
+    child: &mut std::process::Child,
+    path: &Path,
+    log_directory: &Path,
+    timeout: Duration,
+) {
     let deadline = Instant::now() + timeout;
     loop {
         if path.is_file() {
@@ -218,8 +284,9 @@ fn wait_for_file_while_running(child: &mut std::process::Child, path: &Path, tim
                 let _ = stream.read_to_string(&mut stderr);
             }
             panic!(
-                "processor exited with {status} before materializing {}: {stderr}",
+                "processor exited with {status} before materializing {}: {stderr}\n{}",
                 path.display(),
+                read_test_logs(log_directory),
             );
         }
         assert!(
@@ -231,7 +298,7 @@ fn wait_for_file_while_running(child: &mut std::process::Child, path: &Path, tim
     }
 }
 
-fn real_source(directory: &Path) -> MediaSource {
+fn real_source(directory: &Path) -> CacheMediaSource {
     let source_path = directory.join("recovery-photo.jpg");
     let image = RgbImage::from_fn(3072, 2048, |x, y| {
         let mixed = x
@@ -246,14 +313,19 @@ fn real_source(directory: &Path) -> MediaSource {
     image
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the real JPEG fixture is written");
-    let bytes = std::fs::read(&source_path).expect("the real source is readable");
-    MediaSource::new(
-        "media-serra",
-        source_path,
-        bytes.len() as u64,
-        format!("{:x}", Sha256::digest(&bytes)),
+    CacheMediaSource::new("media-serra", MediaKind::Photo, source_path)
+        .expect("the real source is valid")
+}
+
+fn progressive_source(directory: &Path) -> CacheMediaSource {
+    let source_path = directory.join("causal-pause-progressive.jpg");
+    std::fs::write(
+        &source_path,
+        include_bytes!("../../crates/myalbuns-imaging/tests/fixtures/progressive-420-dri.jpg"),
     )
-    .expect("the real source is valid")
+    .expect("the progressive JPEG fixture is written");
+    CacheMediaSource::new("media-causal-pause", MediaKind::Photo, source_path)
+        .expect("the progressive source is valid")
 }
 
 fn export_snapshot() -> (
@@ -277,15 +349,37 @@ fn export_snapshot() -> (
 }
 
 fn write_evidence(name: &str, value: serde_json::Value) {
-    let Some(directory) = std::env::var_os(EVIDENCE_DIRECTORY_ENV) else {
+    let Some(directory) = evidence_directory() else {
         return;
     };
-    let path = PathBuf::from(directory).join(format!("{name}.json"));
+    let path = directory.join(format!("{name}.json"));
     std::fs::write(
         path,
         serde_json::to_vec_pretty(&value).expect("evidence serializes"),
     )
     .expect("evidence is writable");
+}
+
+fn write_evidence_bytes(name: &str, bytes: &[u8]) {
+    let Some(directory) = evidence_directory() else {
+        return;
+    };
+    std::fs::write(directory.join(name), bytes).expect("binary evidence is writable");
+}
+
+fn evidence_directory() -> Option<PathBuf> {
+    std::env::var_os(EVIDENCE_DIRECTORY_ENV).map(PathBuf::from)
+}
+
+fn read_test_logs(directory: &Path) -> String {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return String::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 #[test]
@@ -325,28 +419,39 @@ fn real_processor_recovery_flows_through_production_modules() {
         let source = real_source(fixture.path());
 
         let app_paths = AppPaths::discover().expect("the application paths are discoverable");
-        let project_id = format!("recovery-gate-{}", std::process::id());
-        let cache_paths = app_paths
-            .project_cache(&project_data_namespace(&project_id))
-            .expect("the Cache plan is valid");
+        let project_path = fixture.path().join("Recovery.myalbuns");
+        let mut project_context = OperationPathContext::new();
+        project_context
+            .capture(&project_path)
+            .expect("the recovery Project root is captured");
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(
+                fixture.path().join("leases"),
+                fixture.path().join("identities"),
+            )
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, project_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the recovery Project establishes identity authority");
+        let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
+            .expect("identity authority mounts the recovery Cache");
+        let project_id = namespace.project_id().to_owned();
+        let cache_paths = namespace.paths().clone();
         let cache_request_id = "cache-real-recovery";
         let cache_work = CacheWork::new(
             cache_request_id,
-            project_id.clone(),
-            cache_paths.clone(),
-            vec![source.clone()],
-            4096,
+            namespace,
+            source.clone(),
             root_bindings(&[cache_paths.root(), source.source_path()]),
         );
-        let generation_id = format!(
-            "{}-v1-4096",
-            source.source_sha256()[..16].to_ascii_lowercase()
-        );
+        let generation_id = "g-foreign-generation";
         let foreign_process_id = u32::MAX - 7;
         let foreign_temporary = cache_paths
             .preview_temporary_file(
                 source.media_id(),
-                &generation_id,
+                generation_id,
                 CacheArtifactFormat::Jpeg,
                 foreign_process_id,
             )
@@ -361,10 +466,18 @@ fn real_processor_recovery_flows_through_production_modules() {
         let mut cache_transport =
             RealProcessTransport::new(executable.clone(), log_directory.clone(), CrashNext::Cache);
 
-        let cache_execution =
-            cache_engine::execute(&mut cache_transport, &app_paths, cache_work, &cache_context)
-                .await
-                .expect("the Cache operation restarts the real sidecar once");
+        let cancellation = CacheCancellation::default();
+        let cache_owner = CacheEngine::default();
+        let cache_execution = cache_owner
+            .execute(
+                &mut cache_transport,
+                &app_paths,
+                cache_work,
+                &cache_context,
+                &cancellation,
+            )
+            .await
+            .expect("the Cache operation restarts the real sidecar once");
         let cache_recovery = cache_execution
             .recovery
             .expect("the successful Cache records its recovery");
@@ -535,6 +648,701 @@ fn real_processor_recovery_flows_through_production_modules() {
             .clear_project_cache(&cache_paths)
             .expect("the isolated Cache is removed");
     });
+}
+
+#[test]
+#[ignore = "executed by scripts/Test-ImagingRecovery.ps1 with the real sidecar"]
+fn real_obsolete_cache_demand_cancels_and_reaps_the_processor() {
+    tauri::async_runtime::block_on(async {
+        let executable = PathBuf::from(
+            std::env::var_os(PROCESSOR_ENV)
+                .expect("the real imaging executable path is configured"),
+        );
+        assert!(executable.is_file(), "the real sidecar exists");
+        let fixture = tempfile::tempdir().expect("temporary obsolete-demand fixture");
+        let app_paths = AppPaths::discover().expect("the application paths are discoverable");
+        let log_directory = fixture.path().join("logs");
+        std::fs::create_dir_all(&log_directory).expect("sidecar log directory");
+        let source = progressive_source(fixture.path());
+        let project_path = fixture.path().join("ObsoleteDemand.myalbuns");
+        let mut project_context = OperationPathContext::new();
+        project_context
+            .capture(&project_path)
+            .expect("the obsolete-demand Project root is captured");
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(
+                fixture.path().join("leases"),
+                fixture.path().join("identities"),
+            )
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, project_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the obsolete-demand Project establishes identity authority");
+        let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
+            .expect("identity authority mounts the obsolete-demand Cache");
+        let project_id = namespace.project_id().to_owned();
+        let cache_paths = namespace.paths().clone();
+        let bindings = root_bindings(&[cache_paths.root(), source.source_path()]);
+        let work = CacheWork::new("cache-real-obsolete-demand", namespace, source, bindings);
+        let engine = Arc::new(CacheEngine::default());
+        let processor = Arc::new(ImagingProcessor::default());
+        let demand = engine.reconcile_demand(&project_id, 1, [work.source.media_id()]);
+        let CacheFlightClaim::Owner(owner) = engine
+            .claim_demanded(&demand, &work)
+            .expect("the current real demand can claim its flight")
+        else {
+            panic!("the first real obsolete demand owns its flight");
+        };
+        let CacheFlightClaim::Waiter(waiter) = engine
+            .claim_demanded(&demand, &work)
+            .expect("the equivalent real demand can share its flight")
+        else {
+            panic!("the equivalent real demand waits on the same flight");
+        };
+        let cancellation = owner.cancellation();
+        let decode_barrier = fixture.path().join("progressive-obsolete-worker.pid");
+        let started_process_id = Arc::new(AtomicU32::new(0));
+
+        let worker_engine = Arc::clone(&engine);
+        let worker_processor = Arc::clone(&processor);
+        let worker_app_paths = app_paths.clone();
+        let worker_cancellation = cancellation.clone();
+        let worker_executable = executable;
+        let worker_log_directory = log_directory.clone();
+        let worker_barrier = decode_barrier.clone();
+        let worker_started_process_id = Arc::clone(&started_process_id);
+        let worker_context =
+            InvocationContext::new(work.request_id.clone(), Some(project_id.clone()));
+        let cache_worker = thread::spawn(move || {
+            tauri::async_runtime::block_on(async move {
+                let permit = worker_engine
+                    .begin_cancellable_work(worker_cancellation.clone())
+                    .await;
+                let reservation = worker_processor
+                    .reserve()
+                    .await
+                    .expect("the obsolete Cache reserves the shared real Processor");
+                let mut transport = RealProcessTransport::stable_with_barrier_and_probe(
+                    worker_executable,
+                    worker_log_directory,
+                    worker_barrier,
+                    worker_started_process_id,
+                );
+                let result = worker_engine
+                    .execute(
+                        &mut transport,
+                        &worker_app_paths,
+                        work,
+                        &worker_context,
+                        &worker_cancellation,
+                    )
+                    .await;
+                drop(reservation);
+                drop(permit);
+                (result, transport)
+            })
+        });
+
+        let barrier_deadline = Instant::now() + Duration::from_secs(60);
+        while !decode_barrier.is_file() {
+            if cache_worker.is_finished() {
+                let (early_result, early_transport) = cache_worker
+                    .join()
+                    .expect("the unexpectedly completed obsolete Cache worker joins");
+                panic!(
+                    "the obsolete Cache ended before the decode barrier: result={early_result:?}, processes={:?}, logs={}",
+                    early_transport.process_ids,
+                    read_test_logs(&log_directory),
+                );
+            }
+            assert!(
+                Instant::now() < barrier_deadline,
+                "the obsolete Cache did not reach the progressive decode barrier"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        let cancelled_process_id = started_process_id.load(Ordering::Acquire);
+        assert_ne!(cancelled_process_id, 0, "the real obsolete process started");
+
+        engine.reconcile_demand(&project_id, 2, std::iter::empty());
+        let (obsolete_result, obsolete_transport) = cache_worker
+            .join()
+            .expect("the obsolete Cache worker joins after cancellation");
+        let obsolete_failure = obsolete_result
+            .clone()
+            .expect_err("the obsolete Cache never publishes a generation");
+        assert_eq!(
+            obsolete_failure.stage,
+            CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
+        );
+        assert_eq!(
+            cancellation.reason(),
+            Some(CacheCancellationReason::Obsolete)
+        );
+        assert!(!cancellation.resume_after_pause());
+        assert_eq!(obsolete_transport.process_ids, [cancelled_process_id]);
+        assert!(obsolete_transport.cancelled_process_reaped);
+        assert!(!cache_paths.metadata_file().exists());
+        let shared_result = owner.complete(obsolete_result);
+        assert!(shared_result.is_err());
+        let waiter_failure = waiter
+            .wait()
+            .await
+            .expect_err("the equivalent waiter observes the obsolete cancellation");
+        assert_eq!(waiter_failure.stage, obsolete_failure.stage);
+        if decode_barrier.is_file() {
+            std::fs::remove_file(&decode_barrier)
+                .expect("the obsolete progressive worker barrier is removed");
+        }
+
+        write_evidence(
+            "obsolete",
+            serde_json::json!({
+                "cancelledProcessId": cancelled_process_id,
+                "cancelledProcessReaped": obsolete_transport.cancelled_process_reaped,
+                "cancelledStage": "cancelled",
+                "cancellationReason": "obsolete",
+                "singleFlightDemandCount": 2,
+                "singleFlightProcessorCount": obsolete_transport.process_ids.len(),
+                "waiterObservedCancellation": true,
+                "resumableAfterCancellation": false,
+                "cacheIndexAfterCancellation": cache_paths.metadata_file().exists(),
+            }),
+        );
+        app_paths
+            .clear_project_cache(&cache_paths)
+            .expect("the isolated obsolete-demand Cache is removed");
+    });
+}
+
+#[test]
+#[ignore = "executed by scripts/Test-ImagingRecovery.ps1 with the real sidecar"]
+fn real_cache_is_causally_paused_for_export_and_resumes_after_terminal() {
+    tauri::async_runtime::block_on(async {
+        let executable = PathBuf::from(
+            std::env::var_os(PROCESSOR_ENV)
+                .expect("the real imaging executable path is configured"),
+        );
+        assert!(executable.is_file(), "the real sidecar exists");
+        let fixture = tempfile::tempdir().expect("temporary causal-pause fixture");
+        let app_paths = AppPaths::discover().expect("the application paths are discoverable");
+        let log_directory = fixture.path().join("logs");
+        std::fs::create_dir_all(&log_directory).expect("sidecar log directory");
+        let source = progressive_source(fixture.path());
+        let project_path = fixture.path().join("CausalPause.myalbuns");
+        let mut project_context = OperationPathContext::new();
+        project_context
+            .capture(&project_path)
+            .expect("the causal-pause Project root is captured");
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(
+                fixture.path().join("leases"),
+                fixture.path().join("identities"),
+            )
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, project_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the causal-pause Project establishes identity authority");
+        let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
+            .expect("identity authority mounts the causal-pause Cache");
+        let project_id = namespace.project_id().to_owned();
+        let cache_paths = namespace.paths().clone();
+        let bindings = root_bindings(&[cache_paths.root(), source.source_path()]);
+        let work = CacheWork::new(
+            "cache-real-causal-pause",
+            namespace.clone(),
+            source.clone(),
+            bindings.clone(),
+        );
+        let cancellation = CacheCancellation::default();
+        let engine = Arc::new(CacheEngine::default());
+        let processor = Arc::new(ImagingProcessor::default());
+        let operation_gate = OperationGate::new(&app_paths);
+        let decode_barrier = fixture.path().join("progressive-worker.pid");
+        let started_process_id = Arc::new(AtomicU32::new(0));
+
+        let worker_engine = Arc::clone(&engine);
+        let worker_processor = Arc::clone(&processor);
+        let worker_app_paths = app_paths.clone();
+        let worker_cancellation = cancellation.clone();
+        let worker_executable = executable.clone();
+        let worker_log_directory = log_directory.clone();
+        let worker_barrier = decode_barrier.clone();
+        let worker_started_process_id = Arc::clone(&started_process_id);
+        let worker_context =
+            InvocationContext::new(work.request_id.clone(), Some(project_id.clone()));
+        let cache_worker = thread::spawn(move || {
+            tauri::async_runtime::block_on(async move {
+                let permit = worker_engine
+                    .begin_cancellable_work(worker_cancellation.clone())
+                    .await;
+                let reservation = worker_processor
+                    .reserve()
+                    .await
+                    .expect("the Cache reserves the shared real Processor");
+                let mut transport = RealProcessTransport::stable_with_barrier_and_probe(
+                    worker_executable,
+                    worker_log_directory,
+                    worker_barrier,
+                    worker_started_process_id,
+                );
+                let result = worker_engine
+                    .execute(
+                        &mut transport,
+                        &worker_app_paths,
+                        work,
+                        &worker_context,
+                        &worker_cancellation,
+                    )
+                    .await;
+                drop(reservation);
+                drop(permit);
+                (result, transport)
+            })
+        });
+
+        let barrier_deadline = Instant::now() + Duration::from_secs(60);
+        while !decode_barrier.is_file() {
+            if cache_worker.is_finished() {
+                let (early_result, early_transport) = cache_worker
+                    .join()
+                    .expect("the unexpectedly completed Cache worker joins");
+                panic!(
+                    "the real Cache ended before the decode barrier: result={early_result:?}, processes={:?}, logs={}",
+                    early_transport.process_ids,
+                    read_test_logs(&log_directory),
+                );
+            }
+            assert!(
+                Instant::now() < barrier_deadline,
+                "the real Cache did not reach the progressive decode barrier"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        let cancelled_process_id = started_process_id.load(Ordering::Acquire);
+        assert_ne!(cancelled_process_id, 0, "the real Cache process started");
+
+        let lease = OperationLease::acquire(&operation_gate, &engine, &processor)
+            .await
+            .expect("Export causally pauses Cache and owns the Processor exclusively");
+        let (cancelled_result, cancelled_transport) = cache_worker
+            .join()
+            .expect("the causally cancelled Cache worker joins");
+        let cancellation_failure =
+            cancelled_result.expect_err("the in-flight Cache is cancelled before Export");
+        assert_eq!(
+            cancellation_failure.stage,
+            CacheFailureStage::Processor(InvocationFailureStage::Cancelled)
+        );
+        assert_eq!(cancellation.reason(), Some(CacheCancellationReason::Paused));
+        assert_eq!(cancelled_transport.process_ids, [cancelled_process_id]);
+        assert!(cancelled_transport.cancelled_process_reaped);
+        assert!(!cache_paths.metadata_file().exists());
+        std::fs::remove_file(&decode_barrier)
+            .expect("the progressive worker barrier is released after cancellation");
+
+        let mut blocked_cache =
+            Box::pin(engine.begin_cancellable_work(CacheCancellation::default()));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut blocked_cache)
+                .await
+                .is_err(),
+            "Cache cannot resume while Export owns the causal pause"
+        );
+        let mut blocked_processor = Box::pin(processor.reserve());
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut blocked_processor)
+                .await
+                .is_err(),
+            "no Cache process can share the Processor reserved by Export"
+        );
+
+        drop(blocked_cache);
+        drop(blocked_processor);
+        drop(lease);
+        assert!(
+            cancellation.resume_after_pause(),
+            "the still-relevant Cache demand resumes after the Export terminal"
+        );
+        let resumed_permit = engine.begin_cancellable_work(cancellation.clone()).await;
+        let resumed_reservation = processor
+            .reserve()
+            .await
+            .expect("the shared Processor is released after Export");
+        let resumed_work = CacheWork::new("cache-real-after-export", namespace, source, bindings);
+        let resumed_context =
+            InvocationContext::new(resumed_work.request_id.clone(), Some(project_id));
+        let mut resumed_transport = RealProcessTransport::stable(executable, log_directory);
+        let resumed = engine
+            .execute(
+                &mut resumed_transport,
+                &app_paths,
+                resumed_work,
+                &resumed_context,
+                &cancellation,
+            )
+            .await
+            .expect("Cache starts a fresh real process and publishes after Export");
+        drop(resumed_reservation);
+        drop(resumed_permit);
+        let resumed_process_id = resumed_transport.process_ids[0];
+        assert_ne!(cancelled_process_id, resumed_process_id);
+        assert_eq!(resumed.completion.generated_count, 1);
+        assert!(cache_paths.metadata_file().is_file());
+
+        write_evidence(
+            "pause",
+            serde_json::json!({
+                "cancelledProcessId": cancelled_process_id,
+                "cancelledProcessReaped": cancelled_transport.cancelled_process_reaped,
+                "cancelledStage": "cancelled",
+                "cacheIndexAfterCancellation": false,
+                "pauseReason": "paused",
+                "cacheBlockedWhileExportLease": true,
+                "processorExclusiveWhileExportLease": true,
+                "resumedAfterExportTerminal": true,
+                "resumedProcessId": resumed_process_id,
+                "resumedGenerationPublished": cache_paths.metadata_file().is_file(),
+            }),
+        );
+        app_paths
+            .clear_project_cache(&cache_paths)
+            .expect("the isolated causal-pause Cache is removed");
+    });
+}
+
+#[test]
+#[ignore = "executed by scripts/Test-ImagingRecovery.ps1 with the real sidecar"]
+fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
+    tauri::async_runtime::block_on(async {
+        let executable = PathBuf::from(
+            std::env::var_os(PROCESSOR_ENV)
+                .expect("the real imaging executable path is configured"),
+        );
+        assert!(executable.is_file(), "the real sidecar exists");
+        let evidence_directory = evidence_directory()
+            .expect("the retained Canvas journey evidence directory is configured");
+        let fixture = evidence_directory.join("tauri-canvas-fixture");
+        std::fs::create_dir_all(&fixture).expect("retained Canvas journey fixture");
+        let log_directory = fixture.join("logs");
+        std::fs::create_dir_all(&log_directory).expect("sidecar log directory");
+        let background_path = fixture.join("background-original.png");
+        let overlay_path = fixture.join("overlay-original.png");
+        RgbaImage::from_pixel(64, 32, Rgba([32, 80, 120, 255]))
+            .save_with_format(&background_path, ImageFormat::Png)
+            .expect("the Background Original is written");
+        RgbaImage::from_pixel(64, 32, Rgba([220, 40, 20, 96]))
+            .save_with_format(&overlay_path, ImageFormat::Png)
+            .expect("the Overlay Original is written");
+        let background_original =
+            std::fs::read(&background_path).expect("the Background Original is readable");
+        let overlay_original =
+            std::fs::read(&overlay_path).expect("the Overlay Original is readable");
+
+        let project_path = fixture.join("CanvasJourney.myalbuns");
+        let mut project_context = OperationPathContext::new();
+        project_context
+            .capture(&project_path)
+            .expect("the journey Project root is captured");
+        let app_paths = AppPaths::discover().expect("isolated application paths are discoverable");
+        let initial_project =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: background_path.clone(),
+                    },
+                },
+                InitialOverlay::BothSides {
+                    both: Some(InitialOverlayContent::Media {
+                        path: overlay_path.clone(),
+                    }),
+                },
+                InitialFrameBorder::None,
+            ));
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(
+                app_paths.project_identity_leases_dir(),
+                app_paths.project_identities_dir(),
+            )
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path.clone(), project_context.freeze()),
+                initial_project,
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the journey Project establishes identity authority");
+        let background_media_id = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.path() == background_path)
+            .expect("the persisted Background MediaRef exists")
+            .id()
+            .hyphenated()
+            .to_string();
+        let overlay_media_id = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.path() == overlay_path)
+            .expect("the persisted Overlay MediaRef exists")
+            .id()
+            .hyphenated()
+            .to_string();
+        let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
+            .expect("identity authority mounts the journey Cache");
+        let project_id = namespace.project_id().to_owned();
+        let background = CacheMediaSource::new(
+            background_media_id,
+            MediaKind::Decorative,
+            background_path.clone(),
+        )
+        .expect("the Background source is valid");
+        let overlay = CacheMediaSource::new(
+            overlay_media_id,
+            MediaKind::Decorative,
+            overlay_path.clone(),
+        )
+        .expect("the Overlay source is valid");
+        let engine = CacheEngine::default();
+        let cancellation = CacheCancellation::default();
+        let mut transport = RealProcessTransport::stable(executable.clone(), log_directory.clone());
+
+        let background_work = CacheWork::new(
+            "cache-canvas-background",
+            namespace.clone(),
+            background.clone(),
+            root_bindings(&[namespace.paths().root(), background.source_path()]),
+        );
+        let demand =
+            engine.reconcile_demand(&project_id, 1, [background.media_id(), overlay.media_id()]);
+        let CacheFlightClaim::Owner(background_owner) = engine
+            .claim_demanded(&demand, &background_work)
+            .expect("the current Background demand can claim its flight")
+        else {
+            panic!("the first equivalent Background demand owns the flight");
+        };
+        let CacheFlightClaim::Waiter(background_waiter) = engine
+            .claim_demanded(&demand, &background_work)
+            .expect("the equivalent Background demand can join its flight")
+        else {
+            panic!("the second equivalent Background demand joins the flight");
+        };
+        let background_cancellation = background_owner.cancellation();
+        let background_execution = engine
+            .execute(
+                &mut transport,
+                &app_paths,
+                background_work,
+                &InvocationContext::new("cache-canvas-background", Some(project_id.clone())),
+                &background_cancellation,
+            )
+            .await;
+        let background_execution = background_owner
+            .complete(background_execution)
+            .expect("the real Processador publishes the Background representation");
+        let joined_background = background_waiter
+            .wait()
+            .await
+            .expect("the equivalent Background demand receives the same result");
+        assert_eq!(
+            joined_background.artifact().generation_id,
+            background_execution.artifact().generation_id,
+        );
+        assert_eq!(
+            transport.process_ids.len(),
+            1,
+            "two equivalent demands start only one real Processador"
+        );
+        let overlay_work = CacheWork::new(
+            "cache-canvas-overlay",
+            namespace.clone(),
+            overlay.clone(),
+            root_bindings(&[namespace.paths().root(), overlay.source_path()]),
+        );
+        let overlay_execution = engine
+            .execute(
+                &mut transport,
+                &app_paths,
+                overlay_work,
+                &InvocationContext::new("cache-canvas-overlay", Some(project_id.clone())),
+                &cancellation,
+            )
+            .await
+            .expect("the real Processador publishes the Overlay representation");
+
+        let registry = CachePreviewRegistry::new("project");
+        let background_preview = registry
+            .publish(&app_paths, &namespace, background_execution.artifact())
+            .expect("the Background crosses the opaque WebView boundary");
+        let overlay_preview = registry
+            .publish(&app_paths, &namespace, overlay_execution.artifact())
+            .expect("the Overlay crosses the opaque WebView boundary");
+        let background_url = background_preview
+            .url
+            .expect("Background has an opaque URL");
+        let overlay_url = overlay_preview.url.expect("Overlay has an opaque URL");
+        let background_preview_bytes = opaque_preview_bytes(&registry, &background_url);
+        let overlay_preview_bytes = opaque_preview_bytes(&registry, &overlay_url);
+        assert_eq!(
+            background_execution.artifact().format,
+            CacheArtifactFormat::Jpeg
+        );
+        assert_eq!(
+            overlay_execution.artifact().format,
+            CacheArtifactFormat::Png
+        );
+        write_evidence_bytes("canvas-background-preview.jpg", &background_preview_bytes);
+        write_evidence_bytes("canvas-overlay-preview.png", &overlay_preview_bytes);
+        for (url, original_path) in [
+            (&background_url, &background_path),
+            (&overlay_url, &overlay_path),
+        ] {
+            assert!(url.starts_with("http://myalbuns-cache.localhost/"));
+            assert!(!url.contains(original_path.to_string_lossy().as_ref()));
+            assert!(!url.contains("original"));
+        }
+        assert_ne!(background_preview_bytes, background_original);
+        assert_ne!(overlay_preview_bytes, overlay_original);
+
+        let (_, mut snapshot, sheet_id) = export_snapshot();
+        snapshot.dpi = 10;
+        let sheet = snapshot
+            .composition
+            .sheets
+            .iter_mut()
+            .find(|sheet| sheet.sheet_id == sheet_id)
+            .expect("the journey sheet exists");
+        let full_sheet = sheet.base.draw_rect.clone();
+        sheet.frames.clear();
+        sheet.backgrounds = vec![ComposedBackground::Media {
+            media_id: background.media_id().to_owned(),
+            name: "Background.png".into(),
+            draw_rect: full_sheet.clone(),
+        }];
+        sheet.overlays = vec![ComposedDecorative {
+            media_id: overlay.media_id().to_owned(),
+            name: "Overlay.png".into(),
+            draw_rect: full_sheet,
+        }];
+        assert_eq!(
+            sheet.referenced_media_ids().collect::<Vec<_>>(),
+            [background.media_id(), overlay.media_id()]
+        );
+        let output_path = fixture.join("canvas-reference-final.jpg");
+        let export_sources = vec![
+            RenderSource::new(background.media_id(), background_path.clone())
+                .expect("the exact Background Original belongs to Exportação"),
+            RenderSource::new(overlay.media_id(), overlay_path.clone())
+                .expect("the exact Overlay Original belongs to Exportação"),
+        ];
+        let export_plan = export_plan(
+            snapshot,
+            "export-canvas-reference",
+            output_path.clone(),
+            ExportWriteAuthorization::CreateOnly,
+            sheet_id,
+            export_sources,
+        );
+        let export_bindings = root_bindings(&export_plan.required_paths());
+        let export_control = export_pipeline::ExportExecutionControl::default();
+        let progress = |_| {};
+        let export_execution = export_pipeline::execute(
+            &mut transport,
+            export_plan,
+            &export_bindings,
+            &export_control,
+            &progress,
+            &InvocationContext::new("export-canvas-reference", Some(project_id)),
+        )
+        .await
+        .expect("the final JPEG uses the exact Background and Overlay Originals");
+        assert_eq!(export_execution.completion.source_count, 2);
+
+        let background_pixel = image::load_from_memory(&background_preview_bytes)
+            .expect("the opaque Background representation decodes")
+            .to_rgba8()
+            .get_pixel(32, 16)
+            .0;
+        let overlay_pixel = image::load_from_memory(&overlay_preview_bytes)
+            .expect("the opaque Overlay representation decodes")
+            .to_rgba8()
+            .get_pixel(32, 16)
+            .0;
+        let canvas_reference = alpha_over(background_pixel, overlay_pixel);
+        let final_image = image::open(&output_path)
+            .expect("the final JPEG decodes")
+            .to_rgb8();
+        let final_pixel = final_image
+            .get_pixel(final_image.width() / 2, final_image.height() / 2)
+            .0;
+        let channel_delta = [
+            canvas_reference[0].abs_diff(final_pixel[0]),
+            canvas_reference[1].abs_diff(final_pixel[1]),
+            canvas_reference[2].abs_diff(final_pixel[2]),
+        ];
+        assert!(
+            channel_delta.iter().all(|delta| *delta <= 12),
+            "the Canvas reference and final JPEG diverged: reference={canvas_reference:?}, final={final_pixel:?}, delta={channel_delta:?}"
+        );
+        assert_eq!(transport.process_ids.len(), 3);
+        assert_eq!(
+            transport
+                .process_ids
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
+            3,
+            "Cache Background, Cache Overlay and final Export run in real isolated processes"
+        );
+
+        write_evidence(
+            "canvas",
+            serde_json::json!({
+                "tauriProjectPath": project_path,
+                "processorIds": transport.process_ids,
+                "equivalentBackgroundDemandCount": 2,
+                "singleFlightProcessorCount": 1,
+                "singleFlightGenerationId": background_execution.artifact().generation_id,
+                "compositionMediaOrder": [background.media_id(), overlay.media_id()],
+                "backgroundUrlOpaque": true,
+                "overlayUrlOpaque": true,
+                "originalPathExposedToWebView": false,
+                "originalBytesExposedToWebView": false,
+                "canvasReferencePixel": canvas_reference,
+                "finalJpegPixel": final_pixel,
+                "channelDelta": channel_delta,
+                "finalSourceCount": export_execution.completion.source_count,
+                "finalOutputSha256": export_execution.completion.output_sha256,
+            }),
+        );
+        drop(project);
+    });
+}
+
+fn opaque_preview_bytes(registry: &CachePreviewRegistry, url: &str) -> Vec<u8> {
+    let token = url.rsplit('/').next().expect("the opaque URL has a token");
+    let request = tauri::http::Request::builder()
+        .method(tauri::http::Method::GET)
+        .uri(format!("/{token}"))
+        .body(Vec::new())
+        .expect("the opaque WebView request is valid");
+    let response = registry.serve("project", request);
+    assert_eq!(response.status(), tauri::http::StatusCode::OK);
+    response.into_body()
+}
+
+fn alpha_over(background: [u8; 4], foreground: [u8; 4]) -> [u8; 3] {
+    let alpha = f32::from(foreground[3]) / 255.0;
+    [
+        (f32::from(foreground[0]) * alpha + f32::from(background[0]) * (1.0 - alpha)) as u8,
+        (f32::from(foreground[1]) * alpha + f32::from(background[1]) * (1.0 - alpha)) as u8,
+        (f32::from(foreground[2]) * alpha + f32::from(background[2]) * (1.0 - alpha)) as u8,
+    ]
 }
 
 #[test]

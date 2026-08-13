@@ -81,7 +81,9 @@ impl ProjectHostBootstrap {
     }
 }
 
-fn new_open_request(authority: TargetAuthority) -> Result<BootstrapRequest, BootstrapFailure> {
+pub(crate) fn new_open_request(
+    authority: TargetAuthority,
+) -> Result<BootstrapRequest, BootstrapFailure> {
     new_request(authority, BootstrapIntent::OpenExisting)
 }
 

@@ -1,174 +1,86 @@
 use std::{
-    fs,
-    fs::File,
-    io::{BufReader, Cursor, Read},
-    path::Path,
+    io::{BufReader, Read},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, RgbaImage};
-use myalbuns_imaging_protocol::MediaSource;
+use myalbuns_imaging_protocol::CacheFingerprint;
+use myalbuns_paths::{ExpectedObject, ResolvedObject, RootBindingPlan};
 use sha2::{Digest, Sha256};
 
-struct DecodedJpeg {
-    image: RgbaImage,
-    exif_orientation: u8,
-}
-
-pub(crate) struct DecodedSource {
-    pub(crate) image: RgbaImage,
-    pub(crate) exif_orientation: Option<u8>,
-}
-
-pub(crate) fn read_verified_source(
-    source: &MediaSource,
-    operational_path: &Path,
-) -> Result<Vec<u8>, String> {
-    let metadata = fs::metadata(operational_path).map_err(|error| {
-        format!(
-            "não foi possível abrir a mídia {}: {error}",
-            source.media_id()
-        )
+pub(crate) fn fingerprint_source(
+    media_id: &str,
+    resolved: &ResolvedObject,
+) -> Result<CacheFingerprint, String> {
+    let file = resolved.reopen_for_read().map_err(|error| {
+        format!("não foi possível abrir a mídia {media_id} no Processador: {error}")
     })?;
-    if !metadata.is_file() || metadata.len() != source.source_bytes() {
-        return Err(source_changed_error(source));
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("não foi possível inspecionar a mídia {media_id}: {error}"))?;
+    if !metadata.is_file() {
+        return Err(format!("a mídia {media_id} não é um arquivo regular"));
     }
-    let bytes = fs::read(operational_path)
-        .map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
-    if bytes.len() as u64 != source.source_bytes()
-        || !format!("{:x}", Sha256::digest(&bytes)).eq_ignore_ascii_case(source.source_sha256())
-    {
-        return Err(source_changed_error(source));
-    }
-    Ok(bytes)
-}
-
-fn sha256_file(path: &Path) -> Result<String, String> {
-    let file =
-        File::open(path).map_err(|error| format!("não foi possível verificar a Foto: {error}"))?;
-    sha256_reader(&mut BufReader::new(file))
-        .map_err(|error| format!("não foi possível verificar a Foto: {error}"))
-}
-
-fn sha256_reader(reader: &mut impl Read) -> std::io::Result<String> {
+    let source_created_unix_ms = file_time_millis(metadata.created());
+    let source_modified_unix_ms = file_time_millis(metadata.modified());
+    let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
+    let mut observed_bytes = 0_u64;
     let mut buffer = [0_u8; 64 * 1024];
     loop {
-        let read = reader.read(&mut buffer)?;
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|error| format!("não foi possível verificar a mídia {media_id}: {error}"))?;
         if read == 0 {
             break;
         }
+        observed_bytes = observed_bytes
+            .checked_add(read as u64)
+            .ok_or_else(|| format!("o tamanho da mídia {media_id} excedeu o limite"))?;
         hasher.update(&buffer[..read]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    let final_metadata = reader
+        .get_ref()
+        .metadata()
+        .map_err(|error| format!("não foi possível reinspecionar a mídia {media_id}: {error}"))?;
+    if observed_bytes != metadata.len()
+        || final_metadata.len() != metadata.len()
+        || file_time_millis(final_metadata.created()) != source_created_unix_ms
+        || file_time_millis(final_metadata.modified()) != source_modified_unix_ms
+    {
+        return Err(format!(
+            "a mídia {media_id} mudou durante a leitura do Processador"
+        ));
+    }
+    CacheFingerprint::sha256_full_file_with_timestamps(
+        observed_bytes,
+        source_created_unix_ms,
+        source_modified_unix_ms,
+        format!("{:x}", hasher.finalize()),
+    )
 }
 
-pub(crate) fn verify_source_current(
-    source: &MediaSource,
-    operational_path: &Path,
+pub(crate) fn verify_source_fingerprint(
+    media_id: &str,
+    root_bindings: &RootBindingPlan,
+    source_path: &std::path::Path,
+    expected: &CacheFingerprint,
 ) -> Result<(), String> {
-    let metadata = fs::metadata(operational_path).map_err(|_| source_changed_error(source))?;
-    if !metadata.is_file()
-        || metadata.len() != source.source_bytes()
-        || !sha256_file(operational_path)?.eq_ignore_ascii_case(source.source_sha256())
-    {
-        return Err(source_changed_error(source));
+    let resolved = root_bindings
+        .resolve_existing(source_path, ExpectedObject::RegularFile)
+        .map_err(|error| {
+            format!("não foi possível reabrir a mídia {media_id} pelo plano da operação: {error}")
+        })?;
+    let current = fingerprint_source(media_id, &resolved)?;
+    if &current != expected {
+        return Err(format!(
+            "a mídia {media_id} mudou durante a produção da representação reduzida"
+        ));
     }
     Ok(())
 }
 
-fn decode_jpeg(media_id: &str, verified_bytes: &[u8]) -> Result<DecodedJpeg, String> {
-    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
-    let orientation = decoder
-        .orientation()
-        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))?;
-    let exif_orientation = orientation.to_exif();
-    let mut decoded = DynamicImage::from_decoder(decoder)
-        .map_err(|error| format!("não foi possível decodificar a Foto: {error}"))?;
-    decoded.apply_orientation(orientation);
-    Ok(DecodedJpeg {
-        image: decoded.to_rgba8(),
-        exif_orientation,
-    })
-}
-
-pub(crate) fn cache_source_orientation(
-    media_id: &str,
-    verified_bytes: &[u8],
-) -> Result<Option<u8>, String> {
-    match source_format(media_id, verified_bytes)? {
-        ImageFormat::Jpeg => jpeg_orientation(media_id, verified_bytes).map(Some),
-        ImageFormat::Png => Ok(None),
-        _ => Err(format!(
-            "a mídia {media_id} não usa um formato aceito pelo Cache"
-        )),
-    }
-}
-
-pub(crate) fn decode_source(
-    media_id: &str,
-    verified_bytes: &[u8],
-) -> Result<DecodedSource, String> {
-    match source_format(media_id, verified_bytes)? {
-        ImageFormat::Jpeg => {
-            let decoded = decode_jpeg(media_id, verified_bytes)?;
-            Ok(DecodedSource {
-                image: decoded.image,
-                exif_orientation: Some(decoded.exif_orientation),
-            })
-        }
-        ImageFormat::Png => {
-            let decoded = ImageReader::new(Cursor::new(verified_bytes))
-                .with_guessed_format()
-                .map_err(|error| {
-                    format!("não foi possível inspecionar a mídia {media_id}: {error}")
-                })?
-                .decode()
-                .map_err(|error| format!("não foi possível decodificar a mídia: {error}"))?;
-            Ok(DecodedSource {
-                image: decoded.to_rgba8(),
-                exif_orientation: None,
-            })
-        }
-        _ => Err(format!(
-            "a mídia {media_id} não usa um formato aceito pelo Cache"
-        )),
-    }
-}
-
-fn jpeg_orientation(media_id: &str, verified_bytes: &[u8]) -> Result<u8, String> {
-    let mut decoder = jpeg_decoder(media_id, verified_bytes)?;
-    decoder
-        .orientation()
-        .map(|orientation| orientation.to_exif())
-        .map_err(|error| format!("não foi possível ler a orientação EXIF: {error}"))
-}
-
-fn source_format(media_id: &str, verified_bytes: &[u8]) -> Result<ImageFormat, String> {
-    ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a mídia {media_id}: {error}"))?
-        .format()
-        .ok_or_else(|| format!("não foi possível identificar o formato da mídia {media_id}"))
-}
-
-fn jpeg_decoder<'a>(
-    media_id: &str,
-    verified_bytes: &'a [u8],
-) -> Result<impl ImageDecoder + 'a, String> {
-    let reader = ImageReader::new(Cursor::new(verified_bytes))
-        .with_guessed_format()
-        .map_err(|error| format!("não foi possível inspecionar a Foto {media_id}: {error}"))?;
-    if reader.format() != Some(ImageFormat::Jpeg) {
-        return Err(format!("a mídia {media_id} não é JPEG"));
-    }
-    reader
-        .into_decoder()
-        .map_err(|error| format!("não foi possível preparar o decoder JPEG: {error}"))
-}
-
-fn source_changed_error(source: &MediaSource) -> String {
-    format!(
-        "a mídia {} mudou desde o planejamento da operação",
-        source.media_id()
-    )
+fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
+    time.ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }

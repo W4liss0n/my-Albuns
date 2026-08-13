@@ -1,10 +1,12 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
 use myalbuns_paths::validate_external_path;
 use uuid::Uuid;
+
+use crate::model::MediaKind;
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
@@ -183,22 +185,27 @@ impl DocumentSettings {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DecorativeMedia {
+pub struct MediaRef {
     id: Uuid,
+    kind: MediaKind,
     path: PathBuf,
 }
 
-impl DecorativeMedia {
+impl MediaRef {
     pub fn id(&self) -> Uuid {
         self.id
+    }
+
+    pub fn kind(&self) -> MediaKind {
+        self.kind
     }
 
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    pub(crate) fn new(id: Uuid, path: PathBuf) -> Self {
-        Self { id, path }
+    pub(crate) fn new(id: Uuid, kind: MediaKind, path: PathBuf) -> Self {
+        Self { id, kind, path }
     }
 }
 
@@ -226,7 +233,7 @@ impl ProjectSheet {
 pub struct ProjectDocument {
     document: DocumentSettings,
     visual_defaults: VisualDefaults,
-    media: Vec<DecorativeMedia>,
+    media: Vec<MediaRef>,
     sheets: Vec<ProjectSheet>,
 }
 
@@ -239,7 +246,7 @@ impl ProjectDocument {
         &self.visual_defaults
     }
 
-    pub fn media(&self) -> &[DecorativeMedia] {
+    pub fn media(&self) -> &[MediaRef] {
         &self.media
     }
 
@@ -250,7 +257,7 @@ impl ProjectDocument {
     pub(crate) fn new(
         document: DocumentSettings,
         visual_defaults: VisualDefaults,
-        media: Vec<DecorativeMedia>,
+        media: Vec<MediaRef>,
         sheets: Vec<ProjectSheet>,
     ) -> Self {
         Self {
@@ -344,7 +351,7 @@ impl InitialProjectPersonalization {
         )
     }
 
-    fn into_domain(self) -> Result<(VisualDefaults, Vec<DecorativeMedia>), ()> {
+    fn into_domain(self) -> Result<(VisualDefaults, Vec<MediaRef>), ()> {
         let mut media = InitialMediaCatalog::default();
         let background = match self.background {
             InitialBackground::BothSides { both } => Background::BothSides {
@@ -389,7 +396,7 @@ impl InitialProjectPersonalization {
 
 #[derive(Default)]
 struct InitialMediaCatalog {
-    items: Vec<DecorativeMedia>,
+    items: Vec<MediaRef>,
 }
 
 impl InitialMediaCatalog {
@@ -399,11 +406,12 @@ impl InitialMediaCatalog {
             return Ok(existing.id());
         }
         let id = Uuid::new_v4();
-        self.items.push(DecorativeMedia::new(id, path));
+        self.items
+            .push(MediaRef::new(id, MediaKind::Decorative, path));
         Ok(id)
     }
 
-    fn into_items(self) -> Vec<DecorativeMedia> {
+    fn into_items(self) -> Vec<MediaRef> {
         self.items
     }
 }
@@ -616,18 +624,18 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         return Err(());
     }
 
-    let mut media_ids = HashSet::new();
+    let mut media_by_id = HashMap::new();
     let mut media_paths = HashSet::new();
     for media in project.media() {
         if validate_external_path(media.path()).is_err()
-            || !media_ids.insert(media.id())
-            || !media_paths.insert(media.path().to_path_buf())
+            || media_by_id.insert(media.id(), media.kind()).is_some()
+            || !media_paths.insert((media.kind(), media.path().to_path_buf()))
         {
             return Err(());
         }
     }
     for media_id in referenced_media(project.visual_defaults()) {
-        if !media_ids.contains(&media_id) {
+        if media_by_id.get(&media_id) != Some(&MediaKind::Decorative) {
             return Err(());
         }
     }
