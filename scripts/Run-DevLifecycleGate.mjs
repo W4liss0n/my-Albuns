@@ -100,9 +100,15 @@ async function waitForHttp(url, timeoutMilliseconds, label) {
   throw lastError ?? new Error(`${label} did not become ready`);
 }
 
-async function waitForProcessExit(child, timeoutMilliseconds, label) {
+async function waitForProcessExit(
+  child,
+  timeoutMilliseconds,
+  label,
+  observe = () => {},
+) {
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
+    observe();
     if (child.exitCode !== null) return child.exitCode;
     await delay(50);
   }
@@ -200,13 +206,29 @@ function terminateProcessTree(processId) {
   });
 }
 
-function processTreeIds(rootProcessId) {
+function processForestIds(rootProcessIds) {
+  const roots = [
+    ...new Set(
+      rootProcessIds.filter(
+        (processId) => Number.isInteger(processId) && processId > 0,
+      ),
+    ),
+  ];
+  if (roots.length === 0) return [];
   return (
     powershellJson(
-      `$all = @(Get-CimInstance Win32_Process -ErrorAction Stop); $ids = @([int]$env:MYALBUNS_GATE_ROOT_PROCESS_ID); do { $before = $ids.Count; $parents = $ids; $ids += @($all | Where-Object { $parents -contains [int]$_.ParentProcessId } | ForEach-Object { [int]$_.ProcessId }); $ids = @($ids | Sort-Object -Unique) } while ($ids.Count -gt $before); [Console]::Out.Write((ConvertTo-Json -InputObject $ids -Compress))`,
-      { MYALBUNS_GATE_ROOT_PROCESS_ID: String(rootProcessId) },
+      `$all = @(Get-CimInstance Win32_Process -ErrorAction Stop); $ids = @($env:MYALBUNS_GATE_ROOT_PROCESS_IDS -split ',' | ForEach-Object { [int]$_ }); do { $before = $ids.Count; $parents = $ids; $ids += @($all | Where-Object { $parents -contains [int]$_.ParentProcessId } | ForEach-Object { [int]$_.ProcessId }); $ids = @($ids | Sort-Object -Unique) } while ($ids.Count -gt $before); [Console]::Out.Write((ConvertTo-Json -InputObject $ids -Compress))`,
+      { MYALBUNS_GATE_ROOT_PROCESS_IDS: roots.join(",") },
     ) ?? []
   );
+}
+
+function captureDevelopmentForest(supervisorPid, applications, knownRoots = []) {
+  return processForestIds([
+    supervisorPid,
+    ...knownRoots,
+    ...applications.map((entry) => entry.processId),
+  ]);
 }
 
 function aliveProcessIds(processIds) {
@@ -216,6 +238,109 @@ function aliveProcessIds(processIds) {
       `$requested = @($env:MYALBUNS_GATE_PROCESS_IDS -split ',' | ForEach-Object { [int]$_ }); $alive = @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $requested -contains [int]$_.Id } | ForEach-Object { [int]$_.Id }); [Console]::Out.Write((ConvertTo-Json -InputObject $alive -Compress))`,
       { MYALBUNS_GATE_PROCESS_IDS: processIds.join(",") },
     ) ?? []
+  );
+}
+
+function projectHostProcess(applications) {
+  return applications.find((entry) =>
+    entry.commandLine.includes("--myalbuns-project-host"),
+  );
+}
+
+function globalProcess(applications) {
+  return applications.find(
+    (entry) => !entry.commandLine.includes("--myalbuns-project-host"),
+  );
+}
+
+async function waitForOwnedDevelopmentEnvironment({
+  label,
+  supervisorPid,
+  timeoutMilliseconds,
+  requireIndependentHost = false,
+}) {
+  let globalPid;
+  let hostPid;
+  let vitePid;
+  let observation;
+  const deadline = Date.now() + timeoutMilliseconds;
+  while (Date.now() < deadline) {
+    const applications = applicationProcesses();
+    globalPid ??= globalProcess(applications)?.processId;
+    hostPid ??= projectHostProcess(applications)?.processId;
+    vitePid ??= frontendServerProcessId();
+    const forest = captureDevelopmentForest(supervisorPid, applications, [
+      globalPid,
+      hostPid,
+    ]);
+    const hostForest = processForestIds([hostPid]);
+    const globalAlive = applications.some(
+      (entry) => entry.processId === globalPid,
+    );
+    const hostAlive = applications.some((entry) => entry.processId === hostPid);
+    const frontendResponding = await frontendResponds();
+    observation = {
+      supervisorPid,
+      globalPid,
+      hostPid,
+      vitePid,
+      forest,
+      hostForest,
+      globalAlive,
+      hostAlive,
+      frontendResponding,
+    };
+    const baseReady =
+      vitePid &&
+      forest.includes(supervisorPid) &&
+      forest.includes(vitePid) &&
+      applications.length > 0 &&
+      frontendResponding;
+    const handoffReady =
+      globalPid &&
+      hostPid &&
+      !globalAlive &&
+      hostAlive &&
+      hostForest.includes(hostPid) &&
+      hostForest.length >= 2;
+    if (baseReady && (!requireIndependentHost || handoffReady)) return observation;
+    if (aliveProcessIds([supervisorPid]).length === 0) {
+      throw new Error(
+        `${label} supervisor exited during startup: ${JSON.stringify(observation)}`,
+      );
+    }
+    await delay(100);
+  }
+  throw new Error(
+    `${label} process forest did not become observable: ${JSON.stringify(observation)}`,
+  );
+}
+
+async function assertDevelopmentCleanup(label, processForest) {
+  let observation;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    observation = {
+      processForest,
+      aliveProcessIds: aliveProcessIds(processForest),
+      applicationProcessIds: applicationProcesses().map(
+        (entry) => entry.processId,
+      ),
+      frontendProcessId: frontendServerProcessId(),
+      frontendResponding: await frontendResponds(),
+    };
+    if (
+      observation.aliveProcessIds.length === 0 &&
+      observation.applicationProcessIds.length === 0 &&
+      observation.frontendProcessId === null &&
+      !observation.frontendResponding
+    ) {
+      return;
+    }
+    await delay(100);
+  }
+  throw new Error(
+    `${label} left development descendants alive: ${JSON.stringify(observation)}`,
   );
 }
 
@@ -381,12 +506,8 @@ try {
   const handoffDeadline = Date.now() + gateTimeoutMilliseconds;
   while (Date.now() < handoffDeadline) {
     const processes = applicationProcesses();
-    globalPid ??= processes.find(
-      (entry) => !entry.commandLine.includes("--myalbuns-project-host"),
-    )?.processId;
-    hostPid ??= processes.find((entry) =>
-      entry.commandLine.includes("--myalbuns-project-host"),
-    )?.processId;
+    globalPid ??= globalProcess(processes)?.processId;
+    hostPid ??= projectHostProcess(processes)?.processId;
     vitePid ??= frontendServerProcessId();
     const globalAlive = processes.some((entry) => entry.processId === globalPid);
     const hostAlive = processes.some((entry) => entry.processId === hostPid);
@@ -504,64 +625,25 @@ try {
   }
   writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 
-  const normalTree = [
-    ...new Set([
-      ...processTreeIds(supervisorPid),
-      ...applicationProcesses().map((entry) => entry.processId),
-    ]),
-  ];
+  const normalApplications = applicationProcesses();
+  const normalHostForest = processForestIds([hostPid]);
+  const normalTree = captureDevelopmentForest(supervisorPid, normalApplications, [
+    globalPid,
+    hostPid,
+  ]);
   if (
     !normalTree.includes(supervisorPid) ||
     !normalTree.includes(hostPid) ||
-    !normalTree.includes(vitePid)
+    !normalTree.includes(vitePid) ||
+    normalHostForest.length < 2 ||
+    !normalHostForest.every((processId) => normalTree.includes(processId))
   ) {
     throw new Error(
-      `The normal lifecycle tree was incomplete before shutdown: ${JSON.stringify({ normalTree, supervisorPid, hostPid, vitePid })}`,
+      `The normal lifecycle forest was incomplete before shutdown: ${JSON.stringify({ normalTree, normalHostForest, supervisorPid, globalPid, hostPid, vitePid })}`,
     );
   }
   closeMainWindow(hostPid);
-  const cleanupDeadline = Date.now() + 30_000;
-  while (Date.now() < cleanupDeadline) {
-    const processes = applicationProcesses();
-    const hostGone = !processes.some((entry) => entry.processId === hostPid);
-    const supervisorGone = !supervisorProcesses().some(
-      (entry) => entry.processId === supervisorPid,
-    );
-    const listenerGone = frontendServerProcessId() === null;
-    if (
-      aliveProcessIds(normalTree).length === 0 &&
-      hostGone &&
-      supervisorGone &&
-      listenerGone &&
-      !(await frontendResponds())
-    ) {
-      break;
-    }
-    await delay(100);
-  }
-
-  const remaining = applicationProcesses();
-  const hostGone = !remaining.some((entry) => entry.processId === hostPid);
-  const globalGone = !remaining.some((entry) => entry.processId === globalPid);
-  const supervisorGone = !supervisorProcesses().some(
-    (entry) => entry.processId === supervisorPid,
-  );
-  const listenerGone = frontendServerProcessId() === null;
-  const viteGone = vitePid === null || frontendServerProcessId() !== vitePid;
-  const normalAlive = aliveProcessIds(normalTree);
-  if (
-    normalAlive.length !== 0 ||
-    !hostGone ||
-    !globalGone ||
-    !supervisorGone ||
-    !listenerGone ||
-    !viteGone ||
-    (await frontendResponds())
-  ) {
-    throw new Error(
-      `Development cleanup failed: ${JSON.stringify({ normalTree, normalAlive, hostGone, globalGone, supervisorGone, listenerGone, viteGone })}`,
-    );
-  }
+  await assertDevelopmentCleanup("Normal Host close", normalTree);
   if (!supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')) {
     throw new Error("The supervisor exited without confirming frontend cleanup");
   }
@@ -575,157 +657,54 @@ try {
   abruptSupervisor = launchSupervisor();
   abruptSupervisorOutput = collectOutput(abruptSupervisor);
   abruptSupervisorPid = abruptSupervisor.pid;
-  let abruptVitePid;
-  let abruptTree = [];
-  const abruptStartDeadline = Date.now() + gateTimeoutMilliseconds;
-  while (Date.now() < abruptStartDeadline) {
-    abruptVitePid ??= frontendServerProcessId();
-    abruptTree = processTreeIds(abruptSupervisorPid);
-    if (
-      abruptVitePid &&
-      abruptTree.includes(abruptVitePid) &&
-      abruptTree.length >= 3 &&
-      applicationProcesses().length > 0 &&
-      (await frontendResponds())
-    ) {
-      break;
-    }
-    if (abruptSupervisor.exitCode !== null) {
-      throw new Error(
-        `The abrupt-cleanup supervisor exited during startup (${abruptSupervisor.exitCode})`,
-      );
-    }
-    await delay(100);
-  }
-  if (
-    !abruptVitePid ||
-    !abruptTree.includes(abruptVitePid) ||
-    abruptTree.length < 3 ||
-    applicationProcesses().length === 0 ||
-    !(await frontendResponds())
-  ) {
-    throw new Error(
-      `The abrupt-cleanup process tree did not become observable: ${JSON.stringify({ abruptSupervisorPid, abruptVitePid, abruptTree })}`,
-    );
-  }
+  const abruptEnvironment = await waitForOwnedDevelopmentEnvironment({
+    label: "Abrupt-cleanup",
+    supervisorPid: abruptSupervisorPid,
+    timeoutMilliseconds: gateTimeoutMilliseconds,
+  });
+  const abruptTree = abruptEnvironment.forest;
   if (!abruptSupervisor.kill()) {
     throw new Error("Windows refused to terminate only the development supervisor root");
   }
-  const abruptCleanupDeadline = Date.now() + 30_000;
-  while (Date.now() < abruptCleanupDeadline) {
-    const alive = aliveProcessIds(abruptTree);
-    if (
-      alive.length === 0 &&
-      frontendServerProcessId() === null &&
-      applicationProcesses().length === 0 &&
-      !(await frontendResponds())
-    ) {
-      break;
-    }
-    await delay(100);
-  }
-  const abruptAlive = aliveProcessIds(abruptTree);
-  if (
-    abruptAlive.length !== 0 ||
-    frontendServerProcessId() !== null ||
-    applicationProcesses().length !== 0 ||
-    (await frontendResponds())
-  ) {
-    throw new Error(
-      `Abrupt supervisor termination left descendants alive: ${JSON.stringify({ abruptTree, abruptAlive })}`,
-    );
-  }
+  await assertDevelopmentCleanup("Abrupt supervisor termination", abruptTree);
 
   const ctrlCLaunch = launchSupervisorInOwnConsole();
   ctrlCSupervisorOutput = ctrlCLaunch.output;
   ctrlCSupervisorPid = ctrlCLaunch.processId;
-  let ctrlCVitePid;
-  let ctrlCTree = [];
-  let ctrlCObservation;
-  const ctrlCStartDeadline = Date.now() + Math.min(gateTimeoutMilliseconds, 60_000);
-  while (Date.now() < ctrlCStartDeadline) {
-    ctrlCVitePid ??= frontendServerProcessId();
-    const ctrlCApplications = applicationProcesses();
-    ctrlCTree = [
-      ...new Set([
-        ...processTreeIds(ctrlCSupervisorPid),
-        ...ctrlCApplications.map((entry) => entry.processId),
-      ]),
-    ];
-    const ctrlCFrontendResponding = await frontendResponds();
-    ctrlCObservation = {
-      ctrlCSupervisorPid,
-      ctrlCSupervisorPidType: typeof ctrlCSupervisorPid,
-      ctrlCVitePid,
-      ctrlCVitePidType: typeof ctrlCVitePid,
-      ctrlCTree,
-      applicationProcessIds: ctrlCApplications.map((entry) => entry.processId),
-      frontendResponding: ctrlCFrontendResponding,
-    };
-    if (
-      ctrlCVitePid &&
-      ctrlCTree.includes(ctrlCSupervisorPid) &&
-      ctrlCTree.includes(ctrlCVitePid) &&
-      ctrlCTree.length >= 3 &&
-      ctrlCApplications.length > 0 &&
-      ctrlCFrontendResponding
-    ) {
-      break;
-    }
-    if (aliveProcessIds([ctrlCSupervisorPid]).length === 0) {
-      throw new Error(
-        `The CTRL+C supervisor exited during startup: ${JSON.stringify(ctrlCObservation)}`,
-      );
-    }
-    await delay(100);
-  }
-  if (
-    !ctrlCVitePid ||
-    !ctrlCTree.includes(ctrlCSupervisorPid) ||
-    !ctrlCTree.includes(ctrlCVitePid) ||
-    ctrlCTree.length < 3 ||
-    applicationProcesses().length === 0 ||
-    !(await frontendResponds())
-  ) {
-    throw new Error(
-      `The CTRL+C process tree did not become observable: ${JSON.stringify(ctrlCObservation)}`,
-    );
-  }
+  const ctrlCEnvironment = await waitForOwnedDevelopmentEnvironment({
+    label: "CTRL+C",
+    supervisorPid: ctrlCSupervisorPid,
+    timeoutMilliseconds: Math.min(gateTimeoutMilliseconds, 60_000),
+    requireIndependentHost: true,
+  });
+  const ctrlCTree = ctrlCEnvironment.forest;
+  const ctrlCHostForest = ctrlCEnvironment.hostForest;
   sendCtrlC(ctrlCSupervisorPid);
-  const ctrlCCleanupDeadline = Date.now() + 30_000;
-  while (Date.now() < ctrlCCleanupDeadline) {
-    if (
-      aliveProcessIds(ctrlCTree).length === 0 &&
-      frontendServerProcessId() === null &&
-      applicationProcesses().length === 0 &&
-      !(await frontendResponds())
-    ) {
-      break;
-    }
-    await delay(100);
-  }
-  const ctrlCAlive = aliveProcessIds(ctrlCTree);
-  if (
-    ctrlCAlive.length !== 0 ||
-    frontendServerProcessId() !== null ||
-    applicationProcesses().length !== 0 ||
-    (await frontendResponds())
-  ) {
-    throw new Error(
-      `CTRL+C left development descendants alive: ${JSON.stringify({ ctrlCTree, ctrlCAlive })}`,
-    );
-  }
+  await assertDevelopmentCleanup("CTRL+C", ctrlCTree);
 
   bootstrapFailureSupervisor = launchSupervisor([
     "--myalbuns-invalid-development-option",
   ]);
   bootstrapFailureOutput = collectOutput(bootstrapFailureSupervisor);
   bootstrapFailureSupervisorPid = bootstrapFailureSupervisor.pid;
+  let bootstrapFailureTree = [];
   const bootstrapFailureExit = await waitForProcessExit(
     bootstrapFailureSupervisor,
     gateTimeoutMilliseconds,
     "Bootstrap-failure supervisor",
+    () => {
+      bootstrapFailureTree = [
+        ...new Set([
+          ...bootstrapFailureTree,
+          ...captureDevelopmentForest(
+            bootstrapFailureSupervisorPid,
+            applicationProcesses(),
+          ),
+        ]),
+      ];
+    },
   );
+  await assertDevelopmentCleanup("Bootstrap failure", bootstrapFailureTree);
   const bootstrapFailureText = bootstrapFailureOutput();
   if (
     bootstrapFailureExit === 0 ||
@@ -733,10 +712,7 @@ try {
     !bootstrapFailureText.includes('"event":"dev_environment_cleanup_completed"') ||
     supervisorProcesses().some(
       (entry) => entry.processId === bootstrapFailureSupervisorPid,
-    ) ||
-    applicationProcesses().length !== 0 ||
-    frontendServerProcessId() !== null ||
-    (await frontendResponds())
+    )
   ) {
     throw new Error(
       `Bootstrap failure did not clean its environment: ${JSON.stringify({ bootstrapFailureExit, bootstrapFailureSupervisorPid })}`,
@@ -746,66 +722,26 @@ try {
   frontendFailureSupervisor = launchSupervisor();
   frontendFailureOutput = collectOutput(frontendFailureSupervisor);
   frontendFailureSupervisorPid = frontendFailureSupervisor.pid;
-  let failedVitePid;
-  let frontendFailureTree = [];
-  const frontendFailureStartDeadline = Date.now() + gateTimeoutMilliseconds;
-  while (Date.now() < frontendFailureStartDeadline) {
-    failedVitePid ??= frontendServerProcessId();
-    frontendFailureTree = processTreeIds(frontendFailureSupervisorPid);
-    if (
-      failedVitePid &&
-      frontendFailureTree.includes(failedVitePid) &&
-      applicationProcesses().length > 0 &&
-      (await frontendResponds())
-    ) {
-      break;
-    }
-    if (frontendFailureSupervisor.exitCode !== null) {
-      throw new Error(
-        `The frontend-failure supervisor exited during startup (${frontendFailureSupervisor.exitCode})`,
-      );
-    }
-    await delay(100);
-  }
-  if (
-    !failedVitePid ||
-    !frontendFailureTree.includes(failedVitePid) ||
-    applicationProcesses().length === 0 ||
-    !(await frontendResponds())
-  ) {
-    throw new Error(
-      `The frontend-failure environment did not become observable: ${JSON.stringify({ frontendFailureSupervisorPid, failedVitePid, frontendFailureTree })}`,
-    );
-  }
+  const frontendFailureEnvironment = await waitForOwnedDevelopmentEnvironment({
+    label: "Frontend-failure",
+    supervisorPid: frontendFailureSupervisorPid,
+    timeoutMilliseconds: gateTimeoutMilliseconds,
+  });
+  const failedVitePid = frontendFailureEnvironment.vitePid;
+  const frontendFailureTree = frontendFailureEnvironment.forest;
   terminateProcessTree(failedVitePid);
   const frontendFailureExit = await waitForProcessExit(
     frontendFailureSupervisor,
     30_000,
     "Frontend-failure supervisor",
   );
-  const frontendFailureDeadline = Date.now() + 30_000;
-  while (Date.now() < frontendFailureDeadline) {
-    if (
-      aliveProcessIds(frontendFailureTree).length === 0 &&
-      applicationProcesses().length === 0 &&
-      frontendServerProcessId() === null &&
-      !(await frontendResponds())
-    ) {
-      break;
-    }
-    await delay(100);
-  }
-  const frontendFailureAlive = aliveProcessIds(frontendFailureTree);
+  await assertDevelopmentCleanup("Frontend failure", frontendFailureTree);
   if (
     frontendFailureExit === 0 ||
-    !frontendFailureOutput().includes('"event":"dev_environment_cleanup_completed"') ||
-    frontendFailureAlive.length !== 0 ||
-    applicationProcesses().length !== 0 ||
-    frontendServerProcessId() !== null ||
-    (await frontendResponds())
+    !frontendFailureOutput().includes('"event":"dev_environment_cleanup_completed"')
   ) {
     throw new Error(
-      `Frontend failure left descendants alive: ${JSON.stringify({ frontendFailureExit, frontendFailureTree, frontendFailureAlive })}`,
+      `Frontend failure returned the wrong terminal: ${JSON.stringify({ frontendFailureExit, frontendFailureTree })}`,
     );
   }
 
@@ -824,11 +760,14 @@ try {
       cleanupCompleted: true,
       cleanupLogged: true,
       normalTreeProcessCount: normalTree.length,
+      normalHostTreeProcessCount: normalHostForest.length,
       abruptCleanupCompleted: true,
       abruptTreeProcessCount: abruptTree.length,
       ctrlCCleanupCompleted: true,
       ctrlCTreeProcessCount: ctrlCTree.length,
+      ctrlCHostTreeProcessCount: ctrlCHostForest.length,
       bootstrapFailureCleanupCompleted: true,
+      bootstrapFailureTreeProcessCount: bootstrapFailureTree.length,
       frontendFailureCleanupCompleted: true,
     }),
   );

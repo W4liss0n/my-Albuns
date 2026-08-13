@@ -124,11 +124,14 @@ try {
         cleanupCompleted = [bool] $gate.cleanupCompleted
         cleanupLogged = [bool] $gate.cleanupLogged
         normalTreeProcessCount = [int] $gate.normalTreeProcessCount
+        normalHostTreeProcessCount = [int] $gate.normalHostTreeProcessCount
         abruptCleanupCompleted = [bool] $gate.abruptCleanupCompleted
         abruptTreeProcessCount = [int] $gate.abruptTreeProcessCount
         ctrlCCleanupCompleted = [bool] $gate.ctrlCCleanupCompleted
         ctrlCTreeProcessCount = [int] $gate.ctrlCTreeProcessCount
+        ctrlCHostTreeProcessCount = [int] $gate.ctrlCHostTreeProcessCount
         bootstrapFailureCleanupCompleted = [bool] $gate.bootstrapFailureCleanupCompleted
+        bootstrapFailureTreeProcessCount = [int] $gate.bootstrapFailureTreeProcessCount
         frontendFailureCleanupCompleted = [bool] $gate.frontendFailureCleanupCompleted
         nativeDriverVersion = $driver.nativeDriverVersion
         webView2RuntimeVersion = $driver.webView2RuntimeVersion

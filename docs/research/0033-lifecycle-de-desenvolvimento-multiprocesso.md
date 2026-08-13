@@ -122,15 +122,19 @@ Host. Essa porta e a variável WebView2 só existem em build de debug.
 
 Na fase normal, o gate exige Global encerrado, Host vivo, Vite respondendo,
 `.app-shell` presente e screenshot não branca. Antes de enviar `WM_CLOSE` à
-janela nativa, ele captura a árvore corrente do supervisor e os processos do
-produto; o terminal exige zero PID observado, zero Host e zero listener em
-`1437`.
+janela nativa, ele captura uma floresta recursiva cujas raízes são supervisor,
+Global já encerrado e cada processo atual do produto. A subárvore do Host deve
+conter o próprio Host e ao menos um descendente WebView2, e todos esses PIDs
+precisam pertencer à floresta. O terminal exige zero PID observado, zero Host e
+zero listener em `1437`.
 
-Uma fase própria inicia o supervisor em console isolado, captura sua árvore,
-envia `CTRL_C_EVENT` pela API pública do Windows e exige os mesmos terminais
-vazios. Outra fase encerra somente o supervisor raiz de modo abrupto e prova o
-fallback `KILL_ON_JOB_CLOSE`. As fases finais cobrem falha de bootstrap e queda
-do próprio Vite. Ctrl+C e queda abrupta permanecem evidências distintas.
+Uma fase própria inicia o supervisor em console isolado e só avança depois de
+observar o handoff completo: Global já encerrado, Host independente vivo e sua
+subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública do
+Windows e exige os mesmos terminais vazios. Outra fase encerra somente o
+supervisor raiz de modo abrupto e prova o fallback `KILL_ON_JOB_CLOSE`. As fases
+finais cobrem falha de bootstrap e queda do próprio Vite. Ctrl+C e queda
+abrupta permanecem evidências distintas.
 
 Os dados brutos da rodada canônica ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica
@@ -140,6 +144,6 @@ durante ou depois da execução.
 ## Isolamento da produção
 
 `tauri build` preserva `beforeBuildCommand` e `frontendDist: ../dist`. O binário
-`myalbuns-dev` exige a feature não padrão `dev-supervisor`; o lease e a porta de
-depuração do Host estão sob `debug_assertions`. O executável release não inicia,
-consulta nem depende de Vite.
+`myalbuns-dev` exige a feature não padrão `dev-supervisor`; o registro do Host e
+a porta de depuração estão sob `debug_assertions`. O executável release não
+inicia, consulta nem depende de Vite.
