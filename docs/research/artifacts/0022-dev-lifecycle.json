@@ -1,17 +1,17 @@
 ﻿{
     "schemaVersion":  1,
     "gate":  "development-lifecycle",
-    "collectedAtUtc":  "2026-08-13T11:46:28.1548617Z",
-    "gitCommit":  "4afcae13add0d0102787ac8d688da4b4506badb2",
+    "collectedAtUtc":  "2026-08-13T12:29:59.2337549Z",
+    "gitCommit":  "dc692e2a3578b7b8da8f74fbcc84ff4826fc5ebc",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64"
                  },
-    "supervisorPid":  24632,
-    "globalPid":  28460,
-    "hostPid":  17764,
-    "vitePid":  9124,
+    "supervisorPid":  25732,
+    "globalPid":  28480,
+    "hostPid":  24980,
+    "vitePid":  10920,
     "webdriverMode":  "attach-existing-webview2",
     "globalExitedAfterUiReady":  true,
     "hostSurvivedGlobal":  true,
@@ -21,7 +21,11 @@
     "sampleCount":  1200,
     "cleanupCompleted":  true,
     "cleanupLogged":  true,
+    "normalTreeProcessCount":  6,
     "abruptCleanupCompleted":  true,
+    "abruptTreeProcessCount":  17,
+    "ctrlCCleanupCompleted":  true,
+    "ctrlCTreeProcessCount":  16,
     "bootstrapFailureCleanupCompleted":  true,
     "frontendFailureCleanupCompleted":  true,
     "nativeDriverVersion":  "151.0.4129.78",
@@ -41,6 +45,10 @@
                    },
                    {
                        "name":  "abrupt-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "ctrl-c-tree-cleanup",
                        "passed":  true
                    },
                    {
