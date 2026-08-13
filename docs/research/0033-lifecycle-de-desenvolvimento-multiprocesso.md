@@ -219,6 +219,12 @@ mesmo binário desktop. A precondição torna a descoberta pertencente à rodada
 uma sessão debug alheia falha o instrumento antes do launch, em vez de ser
 promovida a Global, Host ou raiz de cleanup.
 
+A mesma autoridade de instância vale para todo sinal emitido pelo instrumento.
+O listener Vite, o WebDriver e cada supervisor são capturados com PID e instante
+de criação; `CTRL_C_EVENT`, término forçado e fallbacks de cleanup revalidam essa
+identidade imediatamente antes da operação. Uma reutilização de PID é tratada
+como instância ausente e nunca autoriza sinalizar uma árvore alheia.
+
 Uma fase própria inicia o supervisor em console isolado e só avança depois de
 observar o handoff completo: Global já encerrado, Host independente vivo e sua
 subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública do

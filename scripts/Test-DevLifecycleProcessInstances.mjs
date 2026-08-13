@@ -9,6 +9,8 @@ import {
   closeMainWindow,
   processInstanceKey,
   processForestInstances,
+  sendCtrlC,
+  terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
@@ -41,6 +43,11 @@ test("a reused PID cannot satisfy liveness, tree-root, or close authority", asyn
       () => closeMainWindow(reusedPid),
       /process instance no longer matches/i,
     );
+    assert.throws(
+      () => sendCtrlC(reusedPid),
+      /process instance no longer matches/i,
+    );
+    assert.equal(terminateProcessInstance(reusedPid), false);
     assert.deepEqual(aliveProcessInstances([instance]), [instance]);
     assert.ok(
       processForestInstances([instance]).some(
@@ -49,6 +56,10 @@ test("a reused PID cannot satisfy liveness, tree-root, or close authority", asyn
       ),
       "the exact live instance remains an authoritative tree root",
     );
+    const exit = new Promise((resolve) => child.once("exit", resolve));
+    assert.equal(terminateProcessInstance(instance), true);
+    await exit;
+    assert.deepEqual(aliveProcessInstances([instance]), []);
   } finally {
     child.kill();
   }

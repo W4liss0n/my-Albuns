@@ -12,12 +12,15 @@ import path from "node:path";
 import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
+  captureProcessInstance,
   closeMainWindow,
   mergeProcessInstances,
   powershellJson,
   processForestInstances,
   processInstancesByExecutable,
   sameProcessInstance,
+  sendCtrlC,
+  terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
@@ -157,10 +160,15 @@ function applicationProcesses() {
   return processInstancesByExecutable(desktopBinary, "myalbuns-desktop.exe");
 }
 
-function frontendServerProcessId() {
-  return powershellJson(
+function frontendServerProcessInstance() {
+  const processId = powershellJson(
     `$listener = Get-NetTCPConnection -LocalPort 1437 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -eq $listener) { [Console]::Out.Write('null') } else { [Console]::Out.Write(([int]$listener.OwningProcess | ConvertTo-Json -Compress)) }`,
   );
+  return Number.isInteger(processId) ? captureProcessInstance(processId) : null;
+}
+
+function frontendServerProcessId() {
+  return frontendServerProcessInstance()?.processId ?? null;
 }
 
 async function frontendResponds() {
@@ -188,14 +196,6 @@ function hasLogEvent(event) {
   return (
     logs.includes(`"event":"${event}"`) || logs.includes(`event="${event}"`)
   );
-}
-
-function terminateProcessTree(processId) {
-  if (!Number.isInteger(processId) || processId <= 0) return;
-  spawnSync("taskkill.exe", ["/PID", String(processId), "/T", "/F"], {
-    windowsHide: true,
-    stdio: "ignore",
-  });
 }
 
 function captureDevelopmentForest(
@@ -230,14 +230,15 @@ async function waitForOwnedDevelopmentEnvironment({
 }) {
   let globalInstance;
   let hostInstance;
-  let vitePid;
+  let viteInstance;
   let observation;
   const deadline = Date.now() + timeoutMilliseconds;
   while (Date.now() < deadline) {
     const applications = applicationProcesses();
     globalInstance ??= globalProcess(applications);
     hostInstance ??= projectHostProcess(applications);
-    vitePid ??= frontendServerProcessId();
+    viteInstance ??= frontendServerProcessInstance();
+    const vitePid = viteInstance?.processId;
     const forestInstances = captureDevelopmentForest(
       supervisorInstance,
       applications,
@@ -268,9 +269,11 @@ async function waitForOwnedDevelopmentEnvironment({
       frontendResponding: await frontendResponds(),
     };
     const baseReady =
-      vitePid &&
+      viteInstance &&
       forest.includes(supervisorInstance.processId) &&
-      forest.includes(vitePid) &&
+      forestInstances.some((entry) =>
+        sameProcessInstance(entry, viteInstance),
+      ) &&
       applications.length > 0 &&
       observation.frontendResponding;
     const handoffReady =
@@ -290,6 +293,7 @@ async function waitForOwnedDevelopmentEnvironment({
         ...observation,
         globalInstance,
         hostInstance,
+        viteInstance,
         forestInstances,
       };
     }
@@ -335,63 +339,6 @@ async function assertDevelopmentCleanup(
   throw new Error(
     `${label} left development descendants alive: ${JSON.stringify(observation)}`,
   );
-}
-
-function sendCtrlC(processId) {
-  const script = String.raw`
-$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-
-public static class MyAlbunsConsoleSignal {
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool FreeConsole();
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool AttachConsole(uint processId);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool GenerateConsoleCtrlEvent(uint eventType, uint processGroupId);
-}
-'@
-
-[void][MyAlbunsConsoleSignal]::FreeConsole()
-if (-not [MyAlbunsConsoleSignal]::AttachConsole([uint32]$env:MYALBUNS_GATE_CTRL_C_PID)) {
-    throw "AttachConsole failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-}
-try {
-    if (-not [MyAlbunsConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) {
-        throw "SetConsoleCtrlHandler failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-    }
-    if (-not [MyAlbunsConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) {
-        throw "GenerateConsoleCtrlEvent failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
-    }
-}
-finally {
-    [void][MyAlbunsConsoleSignal]::FreeConsole()
-}
-`;
-  const result = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", script],
-    {
-      windowsHide: true,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        MYALBUNS_GATE_CTRL_C_PID: String(processId),
-      },
-    },
-  );
-  if (result.status !== 0) {
-    throw new Error(
-      `CTRL+C delivery failed: ${result.stderr || result.stdout}`,
-    );
-  }
 }
 
 if (frontendServerProcessId() !== null || (await frontendResponds())) {
@@ -486,6 +433,7 @@ const supervisorInstance = await waitForProcessInstance(
   "Development supervisor",
 );
 let driver;
+let driverInstance;
 let driverOutput = () => "";
 let abruptSupervisor;
 let abruptSupervisorOutput = () => "";
@@ -512,6 +460,7 @@ let hostInstance;
 let globalPid;
 let hostPid;
 let vitePid;
+let viteInstance;
 
 try {
   const handoffDeadline = Date.now() + gateTimeoutMilliseconds;
@@ -521,7 +470,8 @@ try {
     hostInstance ??= projectHostProcess(processes);
     globalPid = globalInstance?.processId;
     hostPid = hostInstance?.processId;
-    vitePid ??= frontendServerProcessId();
+    viteInstance ??= frontendServerProcessInstance();
+    vitePid = viteInstance?.processId;
     const globalAlive = processes.some((entry) =>
       sameProcessInstance(entry, globalInstance),
     );
@@ -591,6 +541,7 @@ try {
     },
   );
   driverOutput = collectOutput(driver);
+  driverInstance = await waitForProcessInstance(driver.pid, "WebDriver");
   const driverBaseUrl = `http://127.0.0.1:${driverPort}`;
   await waitForHttp(
     `${driverBaseUrl}/status`,
@@ -670,7 +621,9 @@ try {
   if (
     !normalTree.includes(supervisorPid) ||
     !normalTree.includes(hostPid) ||
-    !normalTree.includes(vitePid) ||
+    !normalTreeInstances.some((entry) =>
+      sameProcessInstance(entry, viteInstance),
+    ) ||
     normalHostForest.length < 2 ||
     !normalHostForest.every((processId) => normalTree.includes(processId))
   ) {
@@ -681,9 +634,10 @@ try {
   // The attach-only WebDriver has already produced its evidence. Detach the
   // observer before exercising the native close terminal so the instrument is
   // no longer an active participant in the WebView being closed.
-  if (driver?.pid) {
-    terminateProcessTree(driver.pid);
+  if (driverInstance) {
+    terminateProcessInstance(driverInstance);
     driver = undefined;
+    driverInstance = undefined;
   }
   sessionId = undefined;
   closeMainWindow(hostInstance);
@@ -740,7 +694,7 @@ try {
   const ctrlCTree = ctrlCEnvironment.forest;
   const ctrlCTreeInstances = ctrlCEnvironment.forestInstances;
   const ctrlCHostForest = ctrlCEnvironment.hostForest;
-  sendCtrlC(ctrlCSupervisorPid);
+  sendCtrlC(ctrlCSupervisorInstance);
   await assertDevelopmentCleanup("CTRL+C", ctrlCTree, ctrlCTreeInstances);
 
   bootstrapFailureSupervisor = launchSupervisor([
@@ -860,11 +814,13 @@ try {
     supervisorInstance: frontendFailureSupervisorInstance,
     timeoutMilliseconds: gateTimeoutMilliseconds,
   });
-  const failedVitePid = frontendFailureEnvironment.vitePid;
+  const failedViteInstance = frontendFailureEnvironment.viteInstance;
   const frontendFailureTree = frontendFailureEnvironment.forest;
   const frontendFailureTreeInstances =
     frontendFailureEnvironment.forestInstances;
-  terminateProcessTree(failedVitePid);
+  if (!terminateProcessInstance(failedViteInstance)) {
+    throw new Error("The exact Vite process instance was not terminable");
+  }
   const frontendFailureExit = await waitForProcessExit(
     frontendFailureSupervisor,
     30_000,
@@ -919,14 +875,11 @@ try {
     `${error instanceof Error ? error.message : String(error)}\nSupervisor:\n${supervisorOutput()}\nAbrupt supervisor:\n${abruptSupervisorOutput()}\nCTRL+C supervisor:\n${ctrlCSupervisorOutput()}\nBootstrap-failure supervisor:\n${bootstrapFailureOutput()}\nContainment-failure supervisor:\n${containmentFailureOutput()}\nFrontend-failure supervisor:\n${frontendFailureOutput()}\nWebDriver:\n${driverOutput()}\nLogs:\n${desktopLogs().slice(-12_000)}`,
   );
 } finally {
-  if (driver?.pid) terminateProcessTree(driver.pid);
-  if (frontendFailureSupervisorPid)
-    terminateProcessTree(frontendFailureSupervisorPid);
-  if (containmentFailureSupervisorPid)
-    terminateProcessTree(containmentFailureSupervisorPid);
-  if (bootstrapFailureSupervisorPid)
-    terminateProcessTree(bootstrapFailureSupervisorPid);
-  if (ctrlCSupervisorPid) terminateProcessTree(ctrlCSupervisorPid);
-  if (abruptSupervisorPid) terminateProcessTree(abruptSupervisorPid);
-  if (supervisorPid) terminateProcessTree(supervisorPid);
+  terminateProcessInstance(driverInstance);
+  terminateProcessInstance(frontendFailureSupervisorInstance);
+  terminateProcessInstance(containmentFailureSupervisorInstance);
+  terminateProcessInstance(bootstrapFailureSupervisorInstance);
+  terminateProcessInstance(ctrlCSupervisorInstance);
+  terminateProcessInstance(abruptSupervisorInstance);
+  terminateProcessInstance(supervisorInstance);
 }

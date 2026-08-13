@@ -158,3 +158,81 @@ export function closeMainWindow(expectedInstance) {
     );
   }
 }
+
+export function terminateProcessInstance(expectedInstance) {
+  if (!expectedInstance) return false;
+  return (
+    powershellJson(
+      `$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json; $observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) { [Console]::Out.Write('false'); exit 0 }; $process = Get-Process -Id ([int]$expected.processId) -ErrorAction Stop; [void]$process.Handle; $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue; if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc -or $process.HasExited) { [Console]::Out.Write('false'); exit 0 }; $process.Kill(); [Console]::Out.Write('true')`,
+      {
+        MYALBUNS_GATE_PROCESS_INSTANCE: JSON.stringify(expectedInstance),
+      },
+    ) === true
+  );
+}
+
+export function sendCtrlC(expectedInstance) {
+  const script = String.raw`
+$ErrorActionPreference = 'Stop'
+$expected = $env:MYALBUNS_GATE_PROCESS_INSTANCE | ConvertFrom-Json
+$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
+if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
+    throw 'process instance no longer matches'
+}
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class MyAlbunsConsoleSignal {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool FreeConsole();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool AttachConsole(uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleCtrlHandler(IntPtr handler, bool add);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool GenerateConsoleCtrlEvent(uint eventType, uint processGroupId);
+}
+'@
+
+[void][MyAlbunsConsoleSignal]::FreeConsole()
+if (-not [MyAlbunsConsoleSignal]::AttachConsole([uint32]$expected.processId)) {
+    throw "AttachConsole failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+}
+try {
+    $confirmed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$expected.processId)" -ErrorAction SilentlyContinue
+    if ($null -eq $confirmed -or $confirmed.CreationDate.ToUniversalTime().ToString('O') -cne [string]$expected.creationTimeUtc) {
+        throw 'process instance no longer matches'
+    }
+    if (-not [MyAlbunsConsoleSignal]::SetConsoleCtrlHandler([IntPtr]::Zero, $true)) {
+        throw "SetConsoleCtrlHandler failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+    if (-not [MyAlbunsConsoleSignal]::GenerateConsoleCtrlEvent(0, 0)) {
+        throw "GenerateConsoleCtrlEvent failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+    }
+}
+finally {
+    [void][MyAlbunsConsoleSignal]::FreeConsole()
+}
+`;
+  const result = spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", script],
+    {
+      windowsHide: true,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        MYALBUNS_GATE_PROCESS_INSTANCE: JSON.stringify(expectedInstance),
+      },
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error(
+      `CTRL+C delivery failed: ${result.stderr || result.stdout}`,
+    );
+  }
+}
