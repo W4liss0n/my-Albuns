@@ -78,11 +78,22 @@ Cada worker primeiro se bloqueia numa barreira local autenticada. O supervisor
 o associa ao Job Object e só então libera a criação de descendentes. Isso fecha
 a janela entre `spawn` e `AssignProcessToJobObject`.
 
-O Host produtivo de debug registra seu PID por um canal local autenticado e
-fecha o socket depois do envio. O supervisor abre um handle Windows com direito
-de sincronização e espera o término desse processo. O TCP serve apenas para
-autenticar e transferir o PID; o handle do processo é a autoridade de vida,
-portanto a duração do socket não participa do lease.
+Antes de iniciar cada Host, o Global usa a autoridade da execução para autorizar
+como credencial consumível o `launch_nonce` já correlacionado à tentativa de
+bootstrap. A autoridade não é herdada pelo Host: seu comando recebe somente o
+endpoint e essa credencial individual. O servidor aceita a credencial uma única
+vez e também rejeita uma nova autorização do mesmo nonce; repetir uma mensagem
+capturada não cria outro registro enquanto a execução permanece ativa.
+
+O Host produtivo de debug registra seu PID por esse canal local autenticado e
+fecha o socket depois da confirmação. O supervisor abre um handle Windows com
+direito de sincronização e atribui àquele registro um `HostLeaseId` opaco e
+independente do PID. Conexão e desconexão transportam o mesmo `HostLeaseId`;
+assim, uma notificação atrasada do handle antigo não remove outro Host que tenha
+reutilizado o mesmo número de processo. O TCP serve apenas para autorizar e
+transferir o PID; o handle do processo é a autoridade de vida, portanto a
+duração do socket não participa do lease. Credenciais e IDs de lease não são
+gravados nos logs.
 
 O supervisor mantém Vite depois que a Tauri CLI e o Global terminam enquanto
 há ao menos um handle de Host ativo. O último Host libera o ambiente. Falha do

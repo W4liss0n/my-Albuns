@@ -81,7 +81,7 @@ impl ProjectHostBootstrap {
     }
 
     fn launch(&self, request: BootstrapRequest) -> Result<ReadyHost, BootstrapFailure> {
-        let child = spawn_host(&self.executable)?;
+        let child = spawn_host(&self.executable, &request.launch_nonce)?;
         supervise_child(child, &request, self.terminal_timeout)
     }
 }
@@ -117,7 +117,7 @@ fn new_request(
     })
 }
 
-fn spawn_host(executable: &Path) -> Result<Child, BootstrapFailure> {
+fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapFailure> {
     let mut command = Command::new(executable);
     command
         .arg(crate::runtime_role::PROJECT_HOST_ROLE_ARGUMENT)
@@ -126,6 +126,16 @@ fn spawn_host(executable: &Path) -> Result<Child, BootstrapFailure> {
         .stderr(Stdio::inherit());
     #[cfg(debug_assertions)]
     configure_host_webview_debugging(&mut command)?;
+    #[cfg(debug_assertions)]
+    crate::dev_host_registration::configure_host_command(&mut command, launch_nonce).map_err(
+        |_| BootstrapFailure {
+            kind: BootstrapFailureKind::HostUnavailable,
+            stage: Some(super::FailureStage::Transport),
+            code: Some(super::FailureCode::IoFailure),
+        },
+    )?;
+    #[cfg(not(debug_assertions))]
+    let _ = launch_nonce;
     command.spawn().map_err(|_| BootstrapFailure {
         kind: BootstrapFailureKind::HostUnavailable,
         stage: None,

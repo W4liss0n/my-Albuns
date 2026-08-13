@@ -9,7 +9,7 @@ use std::{
     process::{Child, Command, ExitStatus, Stdio},
     ptr,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver, RecvTimeoutError},
     },
@@ -32,7 +32,10 @@ use windows_sys::Win32::{
 #[path = "dev_supervisor_protocol.rs"]
 mod protocol;
 
-use protocol::{HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_TOKEN_ENV};
+use protocol::{
+    AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
+    HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
+};
 
 const WORKSPACE_ROOT_ENV: &str = "MYALBUNS_DEV_WORKSPACE_ROOT";
 const PROJECT_PATH_ENV: &str = "MYALBUNS_DEV_PROJECT_PATH";
@@ -50,6 +53,7 @@ const FRONTEND_START_TIMEOUT: Duration = Duration::from_secs(120);
 const HOST_HANDOFF_TIMEOUT: Duration = Duration::from_secs(10);
 const JOB_TERMINATION_EXIT_CODE: u32 = 1;
 const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
+const HOST_LEASE_REJECTED_RESPONSE: &str = "REJECTED\n";
 
 pub(crate) fn run() -> io::Result<i32> {
     if let Some(role) = env::var_os(WORKER_ROLE_ENV) {
@@ -87,7 +91,7 @@ fn run_supervisor() -> io::Result<i32> {
             HOST_LEASE_ENDPOINT_ENV,
             OsString::from(leases.endpoint().to_string()),
         ),
-        (HOST_LEASE_TOKEN_ENV, OsString::from(leases.token())),
+        (HOST_LEASE_AUTHORITY_ENV, OsString::from(leases.authority())),
     ];
     processes.tauri = Some(spawn_assigned_worker(
         &processes.job,
@@ -461,16 +465,39 @@ fn supervise_development(
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct HostLeaseId(uuid::Uuid);
+
+impl HostLeaseId {
+    fn new() -> Self {
+        Self(uuid::Uuid::new_v4())
+    }
+
+    #[cfg(test)]
+    fn from_u128(value: u128) -> Self {
+        Self(uuid::Uuid::from_u128(value))
+    }
+}
+
 #[derive(Debug)]
 enum HostLeaseEvent {
-    Connected(u32),
-    Disconnected(u32),
-    TrackingFailed(u32),
+    Connected {
+        lease_id: HostLeaseId,
+        process_id: u32,
+    },
+    Disconnected {
+        lease_id: HostLeaseId,
+        process_id: u32,
+    },
+    TrackingFailed {
+        lease_id: HostLeaseId,
+        process_id: u32,
+    },
 }
 
 #[derive(Default)]
 struct DevelopmentLifecycle {
-    active_hosts: HashSet<u32>,
+    active_hosts: HashSet<HostLeaseId>,
     host_seen: bool,
     cli_success: Option<bool>,
     tracking_failed: bool,
@@ -479,16 +506,26 @@ struct DevelopmentLifecycle {
 impl DevelopmentLifecycle {
     fn apply(&mut self, event: HostLeaseEvent) {
         match event {
-            HostLeaseEvent::Connected(process_id) => {
+            HostLeaseEvent::Connected {
+                lease_id,
+                process_id,
+            } => {
                 self.host_seen = true;
-                self.active_hosts.insert(process_id);
+                self.active_hosts.insert(lease_id);
                 eprintln!(r#"{{"event":"dev_host_connected","processId":{process_id}}}"#);
             }
-            HostLeaseEvent::Disconnected(process_id) => {
-                self.active_hosts.remove(&process_id);
+            HostLeaseEvent::Disconnected {
+                lease_id,
+                process_id,
+            } => {
+                self.active_hosts.remove(&lease_id);
                 eprintln!(r#"{{"event":"dev_host_disconnected","processId":{process_id}}}"#);
             }
-            HostLeaseEvent::TrackingFailed(process_id) => {
+            HostLeaseEvent::TrackingFailed {
+                lease_id,
+                process_id,
+            } => {
+                self.active_hosts.remove(&lease_id);
                 self.tracking_failed = true;
                 eprintln!(r#"{{"event":"dev_host_tracking_failed","processId":{process_id}}}"#);
             }
@@ -524,9 +561,52 @@ enum LifecycleDecision {
     Fail(&'static str),
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct HostRegistrationCredential(uuid::Uuid);
+
+impl HostRegistrationCredential {
+    fn parse(value: &str) -> Option<Self> {
+        uuid::Uuid::parse_str(value).ok().map(Self)
+    }
+}
+
+#[derive(Default)]
+struct HostRegistrationCredentials {
+    authorized: HashSet<HostRegistrationCredential>,
+    consumed: HashSet<HostRegistrationCredential>,
+}
+
+impl HostRegistrationCredentials {
+    fn authorize(&mut self, credential: HostRegistrationCredential) -> bool {
+        if self.authorized.contains(&credential) || self.consumed.contains(&credential) {
+            return false;
+        }
+        self.authorized.insert(credential)
+    }
+
+    fn consume(&mut self, credential: HostRegistrationCredential) -> bool {
+        if !self.authorized.remove(&credential) {
+            return false;
+        }
+        self.consumed.insert(credential);
+        true
+    }
+}
+
+enum HostLeaseRequest {
+    Authorize {
+        authority: String,
+        credential: HostRegistrationCredential,
+    },
+    Register {
+        credential: HostRegistrationCredential,
+        process_id: u32,
+    },
+}
+
 struct HostLeaseServer {
     endpoint: SocketAddr,
-    token: String,
+    authority: String,
     receiver: Receiver<HostLeaseEvent>,
     stop: Arc<AtomicBool>,
     accept_thread: Option<thread::JoinHandle<()>>,
@@ -537,8 +617,9 @@ impl HostLeaseServer {
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         listener.set_nonblocking(true)?;
         let endpoint = listener.local_addr()?;
-        let token = uuid::Uuid::new_v4().simple().to_string();
-        let expected_token = token.clone();
+        let authority = uuid::Uuid::new_v4().simple().to_string();
+        let expected_authority = authority.clone();
+        let credentials = Arc::new(Mutex::new(HostRegistrationCredentials::default()));
         let (sender, receiver) = mpsc::channel();
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = stop.clone();
@@ -547,9 +628,15 @@ impl HostLeaseServer {
                 match listener.accept() {
                     Ok((connection, _)) => {
                         let sender = sender.clone();
-                        let expected_token = expected_token.clone();
+                        let expected_authority = expected_authority.clone();
+                        let credentials = credentials.clone();
                         thread::spawn(move || {
-                            monitor_host_lease(connection, &expected_token, sender)
+                            handle_host_lease_connection(
+                                connection,
+                                &expected_authority,
+                                &credentials,
+                                sender,
+                            )
                         });
                     }
                     Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
@@ -561,7 +648,7 @@ impl HostLeaseServer {
         });
         Ok(Self {
             endpoint,
-            token,
+            authority,
             receiver,
             stop,
             accept_thread: Some(accept_thread),
@@ -572,8 +659,8 @@ impl HostLeaseServer {
         self.endpoint
     }
 
-    fn token(&self) -> &str {
-        &self.token
+    fn authority(&self) -> &str {
+        &self.authority
     }
 
     fn events(&self) -> &Receiver<HostLeaseEvent> {
@@ -590,9 +677,10 @@ impl Drop for HostLeaseServer {
     }
 }
 
-fn monitor_host_lease(
+fn handle_host_lease_connection(
     connection: TcpStream,
-    expected_token: &str,
+    expected_authority: &str,
+    credentials: &Mutex<HostRegistrationCredentials>,
     sender: mpsc::Sender<HostLeaseEvent>,
 ) {
     let mut reader = BufReader::new(connection);
@@ -603,42 +691,122 @@ fn monitor_host_lease(
     {
         return;
     }
+    let _ = reader
+        .get_mut()
+        .set_write_timeout(Some(WORKER_GATE_TIMEOUT));
     let mut line = String::new();
     if reader.read_line(&mut line).is_err() {
         return;
     }
-    let Some(process_id) = parse_host_lease_handshake(&line, expected_token) else {
+    let Some(request) = parse_host_lease_request(&line) else {
+        let _ = write_host_lease_response(reader.get_mut(), HOST_LEASE_REJECTED_RESPONSE);
         return;
     };
+    match request {
+        HostLeaseRequest::Authorize {
+            authority,
+            credential,
+        } => {
+            let accepted = authority == expected_authority
+                && credentials
+                    .lock()
+                    .ok()
+                    .is_some_and(|mut credentials| credentials.authorize(credential));
+            let response = if accepted {
+                HOST_LEASE_AUTHORIZED_RESPONSE
+            } else {
+                HOST_LEASE_REJECTED_RESPONSE
+            };
+            let _ = write_host_lease_response(reader.get_mut(), response);
+        }
+        HostLeaseRequest::Register {
+            credential,
+            process_id,
+        } => {
+            let accepted = credentials
+                .lock()
+                .ok()
+                .is_some_and(|mut credentials| credentials.consume(credential));
+            if !accepted {
+                let _ = write_host_lease_response(reader.get_mut(), HOST_LEASE_REJECTED_RESPONSE);
+                return;
+            }
+            track_host_lease(reader.into_inner(), process_id, sender);
+        }
+    }
+}
+
+fn track_host_lease(
+    mut connection: TcpStream,
+    process_id: u32,
+    sender: mpsc::Sender<HostLeaseEvent>,
+) {
+    let lease_id = HostLeaseId::new();
     // SAFETY: OpenProcess receives a non-zero PID authenticated by the
     // per-launch token; this thread closes the returned handle exactly once.
     let process = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, process_id) };
     if process.is_null() {
-        let _ = sender.send(HostLeaseEvent::TrackingFailed(process_id));
+        let _ = sender.send(HostLeaseEvent::TrackingFailed {
+            lease_id,
+            process_id,
+        });
+        let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     }
-    if sender.send(HostLeaseEvent::Connected(process_id)).is_err() {
+    if sender
+        .send(HostLeaseEvent::Connected {
+            lease_id,
+            process_id,
+        })
+        .is_err()
+    {
+        let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         unsafe { CloseHandle(process) };
         return;
     }
+    let _ = write_host_lease_response(&mut connection, HOST_LEASE_REGISTERED_RESPONSE);
+    drop(connection);
     // The authenticated process handle is the durable lease. TCP is only the
     // bootstrap channel; WebView2 may reset inherited sockets during handoff.
     let wait = unsafe { WaitForSingleObject(process, INFINITE) };
     unsafe { CloseHandle(process) };
     let event = if wait == WAIT_OBJECT_0 {
-        HostLeaseEvent::Disconnected(process_id)
+        HostLeaseEvent::Disconnected {
+            lease_id,
+            process_id,
+        }
     } else {
-        HostLeaseEvent::TrackingFailed(process_id)
+        HostLeaseEvent::TrackingFailed {
+            lease_id,
+            process_id,
+        }
     };
     let _ = sender.send(event);
 }
 
-fn parse_host_lease_handshake(line: &str, expected_token: &str) -> Option<u32> {
-    let (token, process_id) = line.trim_end().split_once(' ')?;
-    (token == expected_token)
-        .then(|| process_id.parse::<u32>().ok())
-        .flatten()
-        .filter(|process_id| *process_id != 0)
+fn write_host_lease_response(connection: &mut TcpStream, response: &str) -> io::Result<()> {
+    connection.write_all(response.as_bytes())?;
+    connection.flush()
+}
+
+fn parse_host_lease_request(line: &str) -> Option<HostLeaseRequest> {
+    let mut fields = line.split_whitespace();
+    let request = match fields.next()? {
+        AUTHORIZE_HOST_LEASE_REQUEST => HostLeaseRequest::Authorize {
+            authority: fields.next()?.to_owned(),
+            credential: HostRegistrationCredential::parse(fields.next()?)?,
+        },
+        REGISTER_HOST_LEASE_REQUEST => HostLeaseRequest::Register {
+            credential: HostRegistrationCredential::parse(fields.next()?)?,
+            process_id: fields
+                .next()?
+                .parse::<u32>()
+                .ok()
+                .filter(|process_id| *process_id != 0)?,
+        },
+        _ => return None,
+    };
+    fields.next().is_none().then_some(request)
 }
 
 struct DevelopmentProcesses {
@@ -745,27 +913,46 @@ impl Drop for KillOnCloseJob {
 #[cfg(test)]
 mod tests {
     use super::{
-        DevelopmentLifecycle, HostLeaseEvent, KillOnCloseJob, LifecycleDecision,
-        compose_tauri_cli_arguments, monitor_host_lease, parse_host_lease_handshake,
+        DevelopmentLifecycle, HostLeaseEvent, HostLeaseId, HostLeaseRequest, HostLeaseServer,
+        KillOnCloseJob, LifecycleDecision, compose_tauri_cli_arguments, parse_host_lease_request,
     };
     use std::ffi::OsString;
     use std::{
-        io::Write,
-        net::{TcpListener, TcpStream},
+        io::{BufRead, BufReader, Write},
+        net::TcpStream,
         process::{Command, Stdio},
-        sync::mpsc,
         thread,
         time::Duration,
     };
 
+    fn send_host_lease_request(endpoint: std::net::SocketAddr, request: &str) -> String {
+        let mut connection = TcpStream::connect(endpoint).expect("lease server connection");
+        connection
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("response timeout");
+        connection
+            .write_all(request.as_bytes())
+            .expect("lease request");
+        connection.flush().expect("lease request flush");
+        let mut response = String::new();
+        BufReader::new(connection)
+            .read_line(&mut response)
+            .expect("lease response");
+        response
+    }
+
     #[test]
-    fn host_lease_monitor_disconnects_only_after_the_process_exits() {
-        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("local listener");
-        let mut client = TcpStream::connect(listener.local_addr().expect("listener address"))
-            .expect("local client");
-        let (server, _) = listener.accept().expect("server connection");
-        let (sender, receiver) = mpsc::channel();
-        let monitor = thread::spawn(move || monitor_host_lease(server, "secret", sender));
+    fn a_host_registration_credential_is_consumed_and_cannot_be_replayed() {
+        let server = HostLeaseServer::start().expect("lease server");
+        let credential = uuid::Uuid::from_u128(7).simple().to_string();
+        assert_eq!(
+            send_host_lease_request(
+                server.endpoint(),
+                &format!("AUTHORIZE {} {credential}\n", server.authority()),
+            ),
+            "AUTHORIZED\n"
+        );
+
         let mut process = Command::new("cmd.exe")
             .args(["/d", "/c", "ping -n 30 127.0.0.1 >nul"])
             .stdin(Stdio::null())
@@ -773,24 +960,52 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .expect("waitable child process");
+        let registration = format!("REGISTER {credential} {}\n", process.id());
+        assert_eq!(
+            send_host_lease_request(server.endpoint(), &registration),
+            "REGISTERED\n"
+        );
+        let (lease_id, process_id) = match server
+            .events()
+            .recv_timeout(Duration::from_secs(1))
+            .expect("connected lease")
+        {
+            HostLeaseEvent::Connected {
+                lease_id,
+                process_id,
+            } => (lease_id, process_id),
+            event => panic!("unexpected lease event: {event:?}"),
+        };
+        assert_eq!(process_id, process.id());
 
-        client
-            .write_all(format!("secret {}\n", process.id()).as_bytes())
-            .expect("handshake");
-        assert!(matches!(
-            receiver.recv_timeout(Duration::from_secs(1)),
-            Ok(HostLeaseEvent::Connected(process_id)) if process_id == process.id()
-        ));
-        drop(client);
-        assert!(receiver.recv_timeout(Duration::from_millis(100)).is_err());
+        assert_eq!(
+            send_host_lease_request(
+                server.endpoint(),
+                &format!("AUTHORIZE {} {credential}\n", server.authority()),
+            ),
+            "REJECTED\n"
+        );
+        assert_eq!(
+            send_host_lease_request(server.endpoint(), &registration),
+            "REJECTED\n"
+        );
+        assert!(
+            server
+                .events()
+                .recv_timeout(Duration::from_millis(100))
+                .is_err(),
+            "a replay must not create another lease"
+        );
 
         process.kill().expect("child terminates");
         process.wait().expect("child is reaped");
         assert!(matches!(
-            receiver.recv_timeout(Duration::from_secs(1)),
-            Ok(HostLeaseEvent::Disconnected(process_id)) if process_id == process.id()
+            server.events().recv_timeout(Duration::from_secs(1)),
+            Ok(HostLeaseEvent::Disconnected {
+                lease_id: disconnected_lease,
+                process_id: disconnected_process,
+            }) if disconnected_lease == lease_id && disconnected_process == process_id
         ));
-        monitor.join().expect("monitor exits");
     }
 
     #[test]
@@ -850,20 +1065,31 @@ mod tests {
     }
 
     #[test]
-    fn host_lease_handshake_is_token_bound_and_pid_typed() {
-        assert_eq!(
-            parse_host_lease_handshake("secret 42\n", "secret"),
-            Some(42)
+    fn host_lease_requests_are_command_and_value_typed() {
+        let credential = uuid::Uuid::from_u128(7).simple().to_string();
+        assert!(matches!(
+            parse_host_lease_request(&format!("AUTHORIZE secret {credential}\n")),
+            Some(HostLeaseRequest::Authorize { authority, .. }) if authority == "secret"
+        ));
+        assert!(matches!(
+            parse_host_lease_request(&format!("REGISTER {credential} 42\n")),
+            Some(HostLeaseRequest::Register { process_id: 42, .. })
+        ));
+        assert!(parse_host_lease_request(&format!("REGISTER {credential} 0\n")).is_none());
+        assert!(parse_host_lease_request(&format!("REGISTER {credential} nope\n")).is_none());
+        assert!(parse_host_lease_request("REGISTER not-a-uuid 42\n").is_none());
+        assert!(
+            parse_host_lease_request(&format!("REGISTER {credential} 42 trailing\n")).is_none()
         );
-        assert_eq!(parse_host_lease_handshake("secret 42\n", "other"), None);
-        assert_eq!(parse_host_lease_handshake("secret 0\n", "secret"), None);
-        assert_eq!(parse_host_lease_handshake("secret nope\n", "secret"), None);
     }
 
     #[test]
     fn vite_remains_owned_after_cli_exit_while_a_host_is_alive() {
         let mut lifecycle = DevelopmentLifecycle::default();
-        lifecycle.apply(HostLeaseEvent::Connected(41));
+        lifecycle.apply(HostLeaseEvent::Connected {
+            lease_id: HostLeaseId::from_u128(1),
+            process_id: 41,
+        });
         lifecycle.cli_exited(true);
 
         assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
@@ -872,13 +1098,55 @@ mod tests {
     #[test]
     fn the_last_host_disconnect_completes_the_development_session() {
         let mut lifecycle = DevelopmentLifecycle::default();
-        lifecycle.apply(HostLeaseEvent::Connected(41));
-        lifecycle.apply(HostLeaseEvent::Connected(42));
+        let first_lease = HostLeaseId::from_u128(1);
+        let second_lease = HostLeaseId::from_u128(2);
+        lifecycle.apply(HostLeaseEvent::Connected {
+            lease_id: first_lease,
+            process_id: 41,
+        });
+        lifecycle.apply(HostLeaseEvent::Connected {
+            lease_id: second_lease,
+            process_id: 42,
+        });
         lifecycle.cli_exited(true);
-        lifecycle.apply(HostLeaseEvent::Disconnected(41));
+        lifecycle.apply(HostLeaseEvent::Disconnected {
+            lease_id: first_lease,
+            process_id: 41,
+        });
         assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
 
-        lifecycle.apply(HostLeaseEvent::Disconnected(42));
+        lifecycle.apply(HostLeaseEvent::Disconnected {
+            lease_id: second_lease,
+            process_id: 42,
+        });
+        assert_eq!(lifecycle.decision(false), LifecycleDecision::Complete);
+    }
+
+    #[test]
+    fn a_delayed_disconnect_cannot_remove_a_new_lease_that_reuses_the_pid() {
+        let old_lease = HostLeaseId::from_u128(1);
+        let new_lease = HostLeaseId::from_u128(2);
+        let mut lifecycle = DevelopmentLifecycle::default();
+        lifecycle.apply(HostLeaseEvent::Connected {
+            lease_id: old_lease,
+            process_id: 41,
+        });
+        lifecycle.apply(HostLeaseEvent::Connected {
+            lease_id: new_lease,
+            process_id: 41,
+        });
+        lifecycle.cli_exited(true);
+
+        lifecycle.apply(HostLeaseEvent::Disconnected {
+            lease_id: old_lease,
+            process_id: 41,
+        });
+        assert_eq!(lifecycle.decision(false), LifecycleDecision::Wait);
+
+        lifecycle.apply(HostLeaseEvent::Disconnected {
+            lease_id: new_lease,
+            process_id: 41,
+        });
         assert_eq!(lifecycle.decision(false), LifecycleDecision::Complete);
     }
 

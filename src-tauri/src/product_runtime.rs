@@ -47,10 +47,10 @@ pub(crate) fn run(
         return run_headless_process_gate(opened);
     }
 
-    #[cfg(debug_assertions)]
-    crate::dev_host_registration::register_from_environment()?;
-
     let (request, project) = opened.into_parts();
+    #[cfg(debug_assertions)]
+    crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
+
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();

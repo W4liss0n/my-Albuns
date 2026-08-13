@@ -1,40 +1,116 @@
 use std::{
     env,
-    io::{self, Write},
+    ffi::OsStr,
+    io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpStream},
+    process::Command,
     time::Duration,
 };
 
-use crate::dev_supervisor_protocol::{HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_TOKEN_ENV};
+use crate::dev_supervisor_protocol::{
+    AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
+    HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
+};
 
 const HOST_REGISTRATION_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+const HOST_LEASE_CREDENTIAL_ENV: &str = "MYALBUNS_DEV_HOST_LEASE_CREDENTIAL";
 
-pub(crate) fn register_from_environment() -> io::Result<()> {
+pub(crate) fn configure_host_command(command: &mut Command, launch_nonce: &str) -> io::Result<()> {
     let endpoint = env::var_os(HOST_LEASE_ENDPOINT_ENV);
-    let token = env::var_os(HOST_LEASE_TOKEN_ENV);
-    let (endpoint, token) = match (endpoint, token) {
-        (None, None) => return Ok(()),
-        (Some(endpoint), Some(token)) => (endpoint, token),
+    let authority = env::var_os(HOST_LEASE_AUTHORITY_ENV);
+    let (endpoint, authority) = match (endpoint, authority) {
+        (None, None) => {
+            command.env_remove(HOST_LEASE_CREDENTIAL_ENV);
+            return Ok(());
+        }
+        (Some(endpoint), Some(authority)) => (endpoint, authority),
         _ => {
             return Err(io::Error::other(
                 "o contrato do supervisor de desenvolvimento está incompleto",
             ));
         }
     };
-    let endpoint = endpoint
+    let endpoint = parse_endpoint(&endpoint)?;
+    let authority = authority
+        .to_str()
+        .ok_or_else(|| io::Error::other("a autoridade do supervisor não é Unicode"))?;
+    validate_launch_nonce(launch_nonce)?;
+
+    let response = exchange(
+        endpoint,
+        &format!("{AUTHORIZE_HOST_LEASE_REQUEST} {authority} {launch_nonce}\n"),
+    )?;
+    if response != HOST_LEASE_AUTHORIZED_RESPONSE {
+        return Err(io::Error::other(
+            "o supervisor recusou a credencial de registro do Host",
+        ));
+    }
+
+    command
+        .env(HOST_LEASE_ENDPOINT_ENV, endpoint.to_string())
+        .env_remove(HOST_LEASE_AUTHORITY_ENV)
+        .env(HOST_LEASE_CREDENTIAL_ENV, launch_nonce);
+    Ok(())
+}
+
+pub(crate) fn register_from_environment(launch_nonce: &str) -> io::Result<()> {
+    let endpoint = env::var_os(HOST_LEASE_ENDPOINT_ENV);
+    let credential = env::var_os(HOST_LEASE_CREDENTIAL_ENV);
+    let (endpoint, credential) = match (endpoint, credential) {
+        (None, None) => return Ok(()),
+        (Some(endpoint), Some(credential)) => (endpoint, credential),
+        _ => {
+            return Err(io::Error::other(
+                "o contrato de registro do Host de desenvolvimento está incompleto",
+            ));
+        }
+    };
+    let endpoint = parse_endpoint(&endpoint)?;
+    let credential = credential
+        .to_str()
+        .ok_or_else(|| io::Error::other("a credencial do Host não é Unicode"))?;
+    validate_launch_nonce(credential)?;
+    if credential != launch_nonce {
+        return Err(io::Error::other(
+            "a credencial do Host diverge do nonce de bootstrap",
+        ));
+    }
+
+    let process_id = std::process::id();
+    let response = exchange(
+        endpoint,
+        &format!("{REGISTER_HOST_LEASE_REQUEST} {credential} {process_id}\n"),
+    )?;
+    if response != HOST_LEASE_REGISTERED_RESPONSE {
+        return Err(io::Error::other("o supervisor recusou o registro do Host"));
+    }
+    eprintln!(r#"{{"event":"dev_host_registered","processId":{process_id}}}"#);
+    Ok(())
+}
+
+fn parse_endpoint(value: &OsStr) -> io::Result<SocketAddr> {
+    value
         .to_str()
         .ok_or_else(|| io::Error::other("o endpoint do supervisor não é Unicode"))?
         .parse::<SocketAddr>()
-        .map_err(|_| io::Error::other("o endpoint do supervisor não é válido"))?;
-    let token = token
-        .to_str()
-        .ok_or_else(|| io::Error::other("o token do supervisor não é Unicode"))?;
+        .map_err(|_| io::Error::other("o endpoint do supervisor não é válido"))
+}
 
-    let process_id = std::process::id();
+fn validate_launch_nonce(value: &str) -> io::Result<()> {
+    uuid::Uuid::parse_str(value)
+        .map(|_| ())
+        .map_err(|_| io::Error::other("o nonce de registro do Host não é válido"))
+}
+
+fn exchange(endpoint: SocketAddr, request: &str) -> io::Result<String> {
     let mut connection = TcpStream::connect_timeout(&endpoint, HOST_REGISTRATION_CONNECT_TIMEOUT)?;
     connection.set_nodelay(true)?;
-    connection.write_all(format!("{token} {process_id}\n").as_bytes())?;
+    connection.set_read_timeout(Some(HOST_REGISTRATION_CONNECT_TIMEOUT))?;
+    connection.set_write_timeout(Some(HOST_REGISTRATION_CONNECT_TIMEOUT))?;
+    connection.write_all(request.as_bytes())?;
     connection.flush()?;
-    eprintln!(r#"{{"event":"dev_host_registered","processId":{process_id}}}"#);
-    Ok(())
+
+    let mut response = String::new();
+    BufReader::new(connection).read_line(&mut response)?;
+    Ok(response)
 }
