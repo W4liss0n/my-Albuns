@@ -4,7 +4,7 @@ use std::{
     ffi::{OsStr, OsString, c_void},
     io::{self, BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
-    os::windows::io::AsRawHandle,
+    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     ptr,
@@ -21,12 +21,13 @@ use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::{
         JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-            SetInformationJobObject, TerminateJobObject,
+            AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JobObjectExtendedLimitInformation, SetInformationJobObject, TerminateJobObject,
         },
         Threading::{
-            INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, WaitForSingleObject,
+            INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA,
+            PROCESS_TERMINATE, WaitForSingleObject,
         },
     },
 };
@@ -71,8 +72,8 @@ fn run_supervisor() -> io::Result<i32> {
     let workspace = workspace_root()?;
     let node = node_executable();
     validate_development_inputs(&workspace, &node)?;
-    let leases = HostLeaseServer::start()?;
     let mut processes = DevelopmentProcesses::new()?;
+    let leases = HostLeaseServer::start(processes.job())?;
 
     ensure_frontend_port_is_free()?;
     processes.vite = Some(spawn_assigned_worker(
@@ -635,7 +636,7 @@ struct HostLeaseServer {
 }
 
 impl HostLeaseServer {
-    fn start() -> io::Result<Self> {
+    fn start(job: Arc<KillOnCloseJob>) -> io::Result<Self> {
         let listener = TcpListener::bind(("127.0.0.1", 0))?;
         listener.set_nonblocking(true)?;
         let endpoint = listener.local_addr()?;
@@ -650,11 +651,13 @@ impl HostLeaseServer {
                 match listener.accept() {
                     Ok((connection, _)) => {
                         let sender = sender.clone();
+                        let job = job.clone();
                         let expected_authority = expected_authority.clone();
                         let credentials = credentials.clone();
                         thread::spawn(move || {
                             handle_host_lease_connection(
                                 connection,
+                                &job,
                                 &expected_authority,
                                 &credentials,
                                 sender,
@@ -701,6 +704,7 @@ impl Drop for HostLeaseServer {
 
 fn handle_host_lease_connection(
     connection: TcpStream,
+    job: &KillOnCloseJob,
     expected_authority: &str,
     credentials: &Mutex<HostRegistrationCredentials>,
     sender: mpsc::Sender<HostLeaseEvent>,
@@ -753,7 +757,13 @@ fn handle_host_lease_connection(
                 let _ = write_host_lease_response(reader.get_mut(), HOST_LEASE_REJECTED_RESPONSE);
                 return;
             };
-            track_host_lease(reader.into_inner(), expected_process, process_id, sender);
+            track_host_lease(
+                reader.into_inner(),
+                job,
+                expected_process,
+                process_id,
+                sender,
+            );
         }
     }
 }
@@ -766,7 +776,10 @@ impl ValidatedHostProcess {
         // non-inheritable handle is wrapped immediately and closed once.
         let process = unsafe {
             OpenProcess(
-                PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+                PROCESS_SYNCHRONIZE
+                    | PROCESS_QUERY_LIMITED_INFORMATION
+                    | PROCESS_SET_QUOTA
+                    | PROCESS_TERMINATE,
                 0,
                 expected.process_id(),
             )
@@ -804,6 +817,10 @@ impl ValidatedHostProcess {
         Ok(process)
     }
 
+    fn as_raw_handle(&self) -> HANDLE {
+        self.0
+    }
+
     fn wait_for_exit(&self) -> io::Result<()> {
         // SAFETY: self owns a validated process handle with SYNCHRONIZE access.
         let wait = unsafe { WaitForSingleObject(self.0, INFINITE) };
@@ -827,6 +844,7 @@ impl Drop for ValidatedHostProcess {
 
 fn track_host_lease(
     mut connection: TcpStream,
+    job: &KillOnCloseJob,
     expected_process: HostProcessInstanceId,
     process_id: u32,
     sender: mpsc::Sender<HostLeaseEvent>,
@@ -839,6 +857,10 @@ fn track_host_lease(
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     };
+    if job.assign_process_handle(process.as_raw_handle()).is_err() {
+        let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
+        return;
+    }
     let lease_id = HostLeaseId::new();
     if sender
         .send(HostLeaseEvent::Connected {
@@ -898,7 +920,7 @@ fn parse_host_lease_request(line: &str) -> Option<HostLeaseRequest> {
 }
 
 struct DevelopmentProcesses {
-    job: KillOnCloseJob,
+    job: Arc<KillOnCloseJob>,
     vite: Option<Child>,
     tauri: Option<Child>,
 }
@@ -906,10 +928,14 @@ struct DevelopmentProcesses {
 impl DevelopmentProcesses {
     fn new() -> io::Result<Self> {
         Ok(Self {
-            job: KillOnCloseJob::new()?,
+            job: Arc::new(KillOnCloseJob::new()?),
             vite: None,
             tauri: None,
         })
+    }
+
+    fn job(&self) -> Arc<KillOnCloseJob> {
+        self.job.clone()
     }
 
     fn shutdown(&mut self) -> io::Result<()> {
@@ -930,7 +956,8 @@ impl Drop for DevelopmentProcesses {
 }
 
 struct KillOnCloseJob {
-    handle: HANDLE,
+    handle: OwnedHandle,
+    terminated: AtomicBool,
 }
 
 impl KillOnCloseJob {
@@ -955,46 +982,69 @@ impl KillOnCloseJob {
                 CloseHandle(handle);
                 return Err(error);
             }
-            Ok(Self { handle })
+            Ok(Self {
+                // SAFETY: CreateJobObjectW returned a uniquely owned handle.
+                handle: OwnedHandle::from_raw_handle(handle),
+                terminated: AtomicBool::new(false),
+            })
         }
     }
 
     fn assign(&self, child: &Child) -> io::Result<()> {
-        // SAFETY: Child owns a live process handle for the duration of this call.
-        let assigned = unsafe {
-            AssignProcessToJobObject(self.handle, child.as_raw_handle().cast::<c_void>())
-        };
+        self.assign_process_handle(child.as_raw_handle().cast::<c_void>())
+    }
+
+    fn assign_process_handle(&self, process: HANDLE) -> io::Result<()> {
+        if self.terminated.load(Ordering::Acquire) {
+            return Err(io::Error::other(
+                "o Job Object de desenvolvimento já foi encerrado",
+            ));
+        }
+        if self.contains_process_handle(process)? {
+            return Ok(());
+        }
+        let job = self.handle.as_raw_handle().cast::<c_void>();
+        // SAFETY: the validated process handle has SET_QUOTA and TERMINATE
+        // access, and the owned Job handle remains live through this call.
+        let assigned = unsafe { AssignProcessToJobObject(job, process) };
         if assigned == 0 {
             return Err(io::Error::last_os_error());
         }
         Ok(())
     }
 
-    fn terminate(&mut self) -> io::Result<()> {
-        if self.handle.is_null() {
+    fn contains_process_handle(&self, process: HANDLE) -> io::Result<bool> {
+        let mut result = 0;
+        // SAFETY: process and job are live handles for the duration of the call,
+        // and result points to initialized writable storage.
+        if unsafe {
+            IsProcessInJob(
+                process,
+                self.handle.as_raw_handle().cast::<c_void>(),
+                &mut result,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(result != 0)
+    }
+
+    fn terminate(&self) -> io::Result<()> {
+        if self.terminated.swap(true, Ordering::AcqRel) {
             return Ok(());
         }
-        // SAFETY: handle is the live Job Object owned exclusively by self.
-        let terminated = unsafe { TerminateJobObject(self.handle, JOB_TERMINATION_EXIT_CODE) };
-        let error = (terminated == 0).then(io::Error::last_os_error);
-        // SAFETY: handle is closed once and replaced with null immediately.
-        unsafe { CloseHandle(self.handle) };
-        self.handle = ptr::null_mut();
-        match error {
-            Some(error) => Err(error),
-            None => Ok(()),
+        // SAFETY: the Arc-owned Job handle remains live throughout this call.
+        if unsafe {
+            TerminateJobObject(
+                self.handle.as_raw_handle().cast::<c_void>(),
+                JOB_TERMINATION_EXIT_CODE,
+            )
+        } == 0
+        {
+            return Err(io::Error::last_os_error());
         }
-    }
-}
-
-impl Drop for KillOnCloseJob {
-    fn drop(&mut self) {
-        if !self.handle.is_null() {
-            // Closing the sole non-inheritable handle is the fail-closed path:
-            // Windows terminates every assigned worker and descendant.
-            unsafe { CloseHandle(self.handle) };
-            self.handle = ptr::null_mut();
-        }
+        Ok(())
     }
 }
 
@@ -1047,6 +1097,12 @@ mod tests {
             .expect("process instance")
     }
 
+    fn start_lease_server() -> (HostLeaseServer, Arc<KillOnCloseJob>) {
+        let job = Arc::new(KillOnCloseJob::new().expect("kill-on-close Job Object"));
+        let server = HostLeaseServer::start(job.clone()).expect("lease server");
+        (server, job)
+    }
+
     fn authorize_process_instance(
         server: &HostLeaseServer,
         credential: &str,
@@ -1065,7 +1121,7 @@ mod tests {
 
     #[test]
     fn a_registration_cannot_acquire_a_reused_pid_with_another_creation_time() {
-        let server = HostLeaseServer::start().expect("lease server");
+        let (server, _job) = start_lease_server();
         let credential = uuid::Uuid::from_u128(6).simple().to_string();
         let mut process = spawn_waitable_child();
 
@@ -1100,7 +1156,7 @@ mod tests {
 
     #[test]
     fn an_exited_process_cannot_acquire_a_host_lease() {
-        let server = HostLeaseServer::start().expect("lease server");
+        let (server, _job) = start_lease_server();
         let credential = uuid::Uuid::from_u128(9).simple().to_string();
         let mut process = spawn_waitable_child();
         let process_instance = capture_process_instance(&process);
@@ -1136,7 +1192,7 @@ mod tests {
 
     #[test]
     fn a_host_registration_credential_is_consumed_and_cannot_be_replayed() {
-        let server = HostLeaseServer::start().expect("lease server");
+        let (server, _job) = start_lease_server();
         let credential = uuid::Uuid::from_u128(7).simple().to_string();
         let mut process = spawn_waitable_child();
         let process_instance = capture_process_instance(&process);
@@ -1191,7 +1247,7 @@ mod tests {
 
     #[test]
     fn concurrent_registrations_can_reserve_a_credential_only_once() {
-        let server = HostLeaseServer::start().expect("lease server");
+        let (server, _job) = start_lease_server();
         let credential = uuid::Uuid::from_u128(8).simple().to_string();
         let mut process = spawn_waitable_child();
         let process_instance = capture_process_instance(&process);
@@ -1262,6 +1318,11 @@ mod tests {
             .spawn()
             .expect("long-running child");
         job.assign(&process).expect("child assigned to job");
+        assert!(
+            job.contains_process_handle(process.as_raw_handle().cast())
+                .expect("job membership is observable"),
+            "the assigned process must belong to the exact development Job"
+        );
 
         drop(job);
 

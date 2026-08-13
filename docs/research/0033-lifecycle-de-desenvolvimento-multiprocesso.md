@@ -41,8 +41,12 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   [dev.rs, linhas 322–348](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-cli/src/dev.rs#L322-L348).
 - Um Job Object gerencia processos como unidade. Processos filhos herdam o Job
   por padrão e `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` termina todos os associados
-  quando o último handle fecha:
+  quando o último handle fecha. Em Windows 8 ou posterior, Jobs podem ser
+  aninhados; `JOB_OBJECT_LIMIT_BREAKAWAY_OK` junto de
+  `CREATE_BREAKAWAY_FROM_JOB` retira o filho apenas do Job imediato até
+  encontrar um ancestral que não permite a separação:
   [AssignProcessToJobObject](https://learn.microsoft.com/en-us/windows/win32/api/jobapi2/nf-jobapi2-assignprocesstojobobject),
+  [Nested Jobs](https://learn.microsoft.com/en-us/windows/win32/procthread/nested-jobs),
   [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects) e
   [JOBOBJECT_BASIC_LIMIT_INFORMATION](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_basic_limit_information).
 - O PID identifica um processo apenas durante a vida de seu objeto e pode ser
@@ -112,14 +116,16 @@ seu comando recebe somente o endpoint e a credencial individual.
 O Host produtivo de debug registra seu PID por esse canal local autenticado. O
 servidor reserva o nonce atomicamente uma única vez e, ainda antes de criar uma
 lease ou responder `REGISTERED`, abre um handle Windows com
-`SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION`, consulta `GetProcessTimes` e
-exige a mesma `HostProcessInstanceId`. No mesmo ponto de linearização, uma
-espera não bloqueante exige que esse handle ainda esteja não sinalizado. PID
-diferente, criação diferente, Host já encerrado, falha da API ou replay são
-terminais fechados: a credencial permanece queimada, nenhum evento `Connected`
-é emitido e nenhum processo alheio é acompanhado. O PID permanece somente
-localizador e diagnóstico; a identidade de criação valida a aquisição e o
-handle exato validado passa a ser a autoridade de vida.
+`SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SET_QUOTA |
+PROCESS_TERMINATE`, consulta `GetProcessTimes` e exige a mesma
+`HostProcessInstanceId`. No mesmo ponto de linearização, uma espera não
+bloqueante exige que esse handle ainda esteja não sinalizado e o supervisor
+comprova/estabelece sua associação ao Job externo. Só depois publica
+`Connected` e `REGISTERED`. PID diferente, criação diferente, Host já encerrado,
+falha da API ou replay são terminais fechados: a credencial permanece queimada,
+nenhum evento `Connected` é emitido e nenhum processo alheio é acompanhado. O
+PID permanece somente localizador e diagnóstico; a identidade de criação valida
+a aquisição e o handle exato validado passa a ser a autoridade de vida.
 
 Cada aquisição validada recebe um `HostLeaseId` opaco. Conexão e desconexão
 transportam o mesmo `HostLeaseId`; assim, uma notificação atrasada do handle
@@ -141,6 +147,16 @@ política pelo handle nativo e conclui uma readiness consumível. A janela só �
 exibida — e `host_ready` só pode ser publicado — depois desse terminal. Isso
 evita enfileirar `with_webview` enquanto o runtime ainda não registrou a WebView,
 sem transformar sleep, retry ou visibilidade em prova de prontidão.
+
+Antes de Tauri criar qualquer WebView, cada processo desktop supervisionado
+instala também um Job local aninhado com `KILL_ON_JOB_CLOSE`. Assim, os processos
+brokerados do WebView2 encerram causalmente com o Global ou Host que os criou,
+mesmo quando sobrevivem ao PID principal por alguns segundos. O Job local da
+Global permite separação explícita; o comando do Host usa
+`CREATE_BREAKAWAY_FROM_JOB`, sai somente desse Job imediato, permanece no Job
+externo do supervisor e instala seu próprio Job local antes de registrar a
+lease. O handoff portanto não mantém a Global viva nem mata o Host ao fechar a
+Global.
 
 ## Ready causal
 
@@ -174,9 +190,10 @@ Na fase normal, o gate exige Global encerrado, Host vivo, Vite respondendo,
 `.app-shell` presente e screenshot não branca. Antes de enviar `WM_CLOSE` à
 janela nativa, ele captura uma floresta recursiva cujas raízes são supervisor,
 Global já encerrado e cada processo atual do produto. A subárvore do Host deve
-conter o próprio Host e ao menos um descendente WebView2, e todos esses PIDs
-precisam pertencer à floresta. O terminal exige zero PID observado, zero Host e
-zero listener em `1437`.
+conter o próprio Host e ao menos um descendente WebView2. O instrumento captura
+PID e instante de criação de cada objeto antes do terminal; o fechamento exige
+zero dessas instâncias exatas, sem confundir reutilização posterior de PID com
+processo órfão. Também exige zero Host e zero listener em `1437`.
 
 Uma fase própria inicia o supervisor em console isolado e só avança depois de
 observar o handoff completo: Global já encerrado, Host independente vivo e sua

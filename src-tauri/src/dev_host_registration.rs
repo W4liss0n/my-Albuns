@@ -3,7 +3,7 @@ use std::{
     ffi::OsStr,
     io::{self, BufRead, BufReader, Write},
     net::{SocketAddr, TcpStream},
-    os::windows::io::AsRawHandle,
+    os::windows::{io::AsRawHandle, process::CommandExt},
     process::{Child, Command},
     time::Duration,
 };
@@ -13,6 +13,7 @@ use crate::dev_supervisor_protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
 };
+use windows_sys::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB;
 
 const HOST_REGISTRATION_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
 const HOST_LEASE_CREDENTIAL_ENV: &str = "MYALBUNS_DEV_HOST_LEASE_CREDENTIAL";
@@ -71,6 +72,7 @@ pub(crate) fn prepare_host_command(
     validate_launch_nonce(launch_nonce)?;
 
     command
+        .creation_flags(CREATE_BREAKAWAY_FROM_JOB)
         .env(HOST_LEASE_ENDPOINT_ENV, endpoint.to_string())
         .env_remove(HOST_LEASE_AUTHORITY_ENV)
         .env(HOST_LEASE_CREDENTIAL_ENV, launch_nonce);

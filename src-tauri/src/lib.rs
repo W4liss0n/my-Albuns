@@ -3,6 +3,8 @@ mod cache_engine;
 mod cache_previews;
 mod desktop_webview_policy;
 #[cfg(debug_assertions)]
+mod dev_descendant_job;
+#[cfg(debug_assertions)]
 mod dev_host_registration;
 #[cfg(debug_assertions)]
 mod dev_process_identity;
@@ -40,6 +42,12 @@ mod sample_project;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(debug_assertions)]
+    if let Err(error) = dev_descendant_job::install_if_supervised() {
+        eprintln!("não foi possível conter a árvore WebView de desenvolvimento: {error}");
+        return;
+    }
+
     #[cfg(debug_assertions)]
     let result = match global_runtime::webdriver_automation_project() {
         Some(project_path) => run_webdriver_project_host(project_path),
