@@ -214,6 +214,11 @@ não pode provar handoff, virar raiz nem receber fechamento. Uma regressão
 independente do runner usa um processo Windows real e um instante de criação
 divergente para provar os três terminais.
 
+Antes de iniciar o supervisor, o gate exige zero instâncias preexistentes do
+mesmo binário desktop. A precondição torna a descoberta pertencente à rodada:
+uma sessão debug alheia falha o instrumento antes do launch, em vez de ser
+promovida a Global, Host ou raiz de cleanup.
+
 Uma fase própria inicia o supervisor em console isolado e só avança depois de
 observar o handoff completo: Global já encerrado, Host independente vivo e sua
 subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública do

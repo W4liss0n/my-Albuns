@@ -1,21 +1,33 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import path from "node:path";
 import test from "node:test";
 
 import {
   aliveProcessInstances,
+  assertNoPreexistingProcessInstances,
   closeMainWindow,
   processInstanceKey,
   processForestInstances,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
-test("a reused PID cannot satisfy liveness, tree-root, or close authority", async () => {
-  const child = spawn(
-    process.execPath,
-    ["-e", "setInterval(() => {}, 1000)"],
-    { windowsHide: true, stdio: "ignore" },
+test("a pre-existing application instance makes the gate fail closed before launch", () => {
+  assert.throws(
+    () =>
+      assertNoPreexistingProcessInstances(
+        process.execPath,
+        path.basename(process.execPath),
+      ),
+    /pre-existing application process instance/i,
   );
+});
+
+test("a reused PID cannot satisfy liveness, tree-root, or close authority", async () => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+    windowsHide: true,
+    stdio: "ignore",
+  });
   try {
     const instance = await waitForProcessInstance(child.pid, "Test child");
     const reusedPid = {

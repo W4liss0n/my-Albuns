@@ -11,6 +11,7 @@ import path from "node:path";
 
 import {
   aliveProcessInstances,
+  assertNoPreexistingProcessInstances,
   closeMainWindow,
   mergeProcessInstances,
   powershellJson,
@@ -153,10 +154,7 @@ function webdriverClient(baseUrl) {
 
 function applicationProcesses() {
   if (!existsSync(desktopBinary)) return [];
-  return processInstancesByExecutable(
-    desktopBinary,
-    "myalbuns-desktop.exe",
-  );
+  return processInstancesByExecutable(desktopBinary, "myalbuns-desktop.exe");
 }
 
 function frontendServerProcessId() {
@@ -477,6 +475,8 @@ function launchSupervisorInOwnConsole() {
         .join("\n"),
   };
 }
+
+assertNoPreexistingProcessInstances(desktopBinary, "myalbuns-desktop.exe");
 
 const supervisor = launchSupervisor();
 const supervisorOutput = collectOutput(supervisor);

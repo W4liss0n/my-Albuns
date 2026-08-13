@@ -50,6 +50,18 @@ export function processInstancesByExecutable(executablePath, executableName) {
   );
 }
 
+export function assertNoPreexistingProcessInstances(
+  executablePath,
+  executableName,
+) {
+  const existing = processInstancesByExecutable(executablePath, executableName);
+  if (existing.length !== 0) {
+    throw new Error(
+      `Development lifecycle gate found ${existing.length} pre-existing application process instance(s)`,
+    );
+  }
+}
+
 export function captureProcessInstance(processId) {
   return processInstances([processId])[0] ?? null;
 }
