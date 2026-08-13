@@ -158,6 +158,14 @@ externo do supervisor e instala seu próprio Job local antes de registrar a
 lease. O handoff portanto não mantém a Global viva nem mata o Host ao fechar a
 Global.
 
+A instalação desse Job local é parte fechada do bootstrap. Uma falha anterior à
+WebView emite o terminal estruturado `desktop_start_failed` com estágio e código
+estáveis, encerra o processo desktop com código diferente de zero e faz o
+supervisor recolher Vite e toda a árvore. Ela nunca percorre o terminal legítimo
+`dev_global_only_exited`. O gate possui uma sonda exclusiva do build de debug
+para provocar essa falha antes de criar a WebView e comprovar o caminho
+produtivo completo, sem depender de uma falha ambiental intermitente.
+
 ## Ready causal
 
 `Ready` agora é a conjunção fechada de dois sinais produtivos e idempotentes:
@@ -195,13 +203,24 @@ PID e instante de criação de cada objeto antes do terminal; o fechamento exige
 zero dessas instâncias exatas, sem confundir reutilização posterior de PID com
 processo órfão. Também exige zero Host e zero listener em `1437`.
 
+Global e Host deixam de ser números assim que são descobertos. O instrumento
+captura no mesmo snapshot o PID e o instante de criação e conserva esse valor
+imutável em todas as provas posteriores. Liveness compara a instância completa;
+a expansão de uma raiz aceita somente o mesmo objeto e descendentes criados
+depois dele; `WM_CLOSE` revalida a mesma instância imediatamente antes de
+sinalizar. O cleanup de contingência encerra o supervisor que possui o Job, sem
+sinalizar o PID armazenado do Global ou Host. Um PID reutilizado falha fechado e
+não pode provar handoff, virar raiz nem receber fechamento. Uma regressão
+independente do runner usa um processo Windows real e um instante de criação
+divergente para provar os três terminais.
+
 Uma fase própria inicia o supervisor em console isolado e só avança depois de
 observar o handoff completo: Global já encerrado, Host independente vivo e sua
 subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública do
 Windows e exige os mesmos terminais vazios. Outra fase encerra somente o
 supervisor raiz de modo abrupto e prova o fallback `KILL_ON_JOB_CLOSE`. As fases
-finais cobrem falha de bootstrap e queda do próprio Vite. Ctrl+C e queda
-abrupta permanecem evidências distintas.
+finais cobrem falha de bootstrap, falha de contenção anterior à WebView e queda
+do próprio Vite. Ctrl+C e queda abrupta permanecem evidências distintas.
 
 Os dados brutos da rodada canônica ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica

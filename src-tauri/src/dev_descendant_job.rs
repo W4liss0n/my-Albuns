@@ -18,6 +18,7 @@ use windows_sys::Win32::System::{
 use crate::dev_supervisor_protocol::HOST_LEASE_ENDPOINT_ENV;
 
 static PROCESS_DESCENDANT_JOB: OnceLock<Result<OwnedHandle, String>> = OnceLock::new();
+const DESCENDANT_JOB_FAILURE_PROBE_ENV: &str = "MYALBUNS_DEV_DESCENDANT_JOB_FAILURE_PROBE";
 
 /// Installs a process-local nested Job before Tauri creates either WebView.
 ///
@@ -30,6 +31,11 @@ static PROCESS_DESCENDANT_JOB: OnceLock<Result<OwnedHandle, String>> = OnceLock:
 pub(crate) fn install_if_supervised() -> io::Result<()> {
     if std::env::var_os(HOST_LEASE_ENDPOINT_ENV).is_none() {
         return Ok(());
+    }
+    if std::env::var(DESCENDANT_JOB_FAILURE_PROBE_ENV).as_deref() == Ok("1") {
+        return Err(io::Error::other(
+            "a sonda do gate recusou a contenção de descendentes",
+        ));
     }
     match PROCESS_DESCENDANT_JOB.get_or_init(install_process_descendant_job) {
         Ok(_) => Ok(()),

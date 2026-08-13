@@ -30,6 +30,8 @@ const PROJECT_HOST_ARGUMENT: &str = "--myalbuns-project-host";
 const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
 const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
 const PROCESS_GATE_GRAPHICS_SUPPORTED_ENV: &str = "MYALBUNS_PROCESS_GATE_GRAPHICS_SUPPORTED";
+const DEV_HOST_LEASE_ENDPOINT_ENV: &str = "MYALBUNS_DEV_HOST_LEASE_ENDPOINT";
+const DEV_DESCENDANT_JOB_FAILURE_PROBE_ENV: &str = "MYALBUNS_DEV_DESCENDANT_JOB_FAILURE_PROBE";
 const PROCESS_TIMEOUT: Duration = Duration::from_secs(30);
 const STILL_ACTIVE: u32 = 259;
 
@@ -122,6 +124,32 @@ fn real_global_process_rejects_graphics_before_starting_a_host_or_session() {
     }
 
     global.terminate();
+}
+
+#[test]
+fn a_supervised_desktop_fails_before_webview_when_descendant_containment_fails() {
+    let output = Command::new(desktop_binary())
+        .arg(PROJECT_HOST_ARGUMENT)
+        .env(DEV_HOST_LEASE_ENDPOINT_ENV, "127.0.0.1:1")
+        .env(DEV_DESCENDANT_JOB_FAILURE_PROBE_ENV, "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("the real supervised desktop process starts");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !output.status.success(),
+        "containment failure must not look like a successful Host terminal: stdout={}, stderr={stderr}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        stderr.contains(
+            r#"{"event":"desktop_start_failed","stage":"initialize","code":"dev_descendant_job_install_failed"}"#
+        ),
+        "the public process exposes a typed, path-free containment terminal: {stderr}"
+    );
 }
 
 fn prove_correlated_terminal_and_single_host_session(fixture: &ProjectFixture) {

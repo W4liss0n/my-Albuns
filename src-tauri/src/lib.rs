@@ -43,9 +43,11 @@ mod sample_project;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
-    if let Err(error) = dev_descendant_job::install_if_supervised() {
-        eprintln!("não foi possível conter a árvore WebView de desenvolvimento: {error}");
-        return;
+    if dev_descendant_job::install_if_supervised().is_err() {
+        eprintln!(
+            "{{\"event\":\"desktop_start_failed\",\"stage\":\"initialize\",\"code\":\"dev_descendant_job_install_failed\"}}"
+        );
+        std::process::exit(1);
     }
 
     #[cfg(debug_assertions)]
@@ -58,6 +60,7 @@ pub fn run() {
 
     if let Err(error) = result {
         eprintln!("não foi possível executar o MyAlbuns: {error}");
+        std::process::exit(1);
     }
 }
 

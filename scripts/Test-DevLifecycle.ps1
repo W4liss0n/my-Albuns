@@ -28,6 +28,15 @@ $sourceBefore = Get-GateSourceSnapshot `
 $runRootCleaned = $false
 
 try {
+    $node = (Get-Command node.exe -ErrorAction Stop).Source
+    $processInstanceTest = Join-Path `
+        $PSScriptRoot `
+        'Test-DevLifecycleProcessInstances.mjs'
+    & $node --test $processInstanceTest
+    if ($LASTEXITCODE -ne 0) {
+        throw "The process-instance lifecycle regression failed with exit code $LASTEXITCODE."
+    }
+
     $fixturePath = Join-Path `
         $workspaceRoot `
         'crates\myalbuns-core\tests\fixtures\project_document_v2_migration_expected.myalbuns'
@@ -50,7 +59,6 @@ try {
 
     $driver = & (Join-Path $PSScriptRoot 'Resolve-TauriWebDriver.ps1') |
         ConvertFrom-Json
-    $node = (Get-Command node.exe -ErrorAction Stop).Source
     $gateScript = Join-Path $PSScriptRoot 'Run-DevLifecycleGate.mjs'
     $gateOutput = & $node `
         $gateScript `
@@ -132,6 +140,8 @@ try {
         ctrlCHostTreeProcessCount = [int] $gate.ctrlCHostTreeProcessCount
         bootstrapFailureCleanupCompleted = [bool] $gate.bootstrapFailureCleanupCompleted
         bootstrapFailureTreeProcessCount = [int] $gate.bootstrapFailureTreeProcessCount
+        containmentFailureCleanupCompleted = [bool] $gate.containmentFailureCleanupCompleted
+        containmentFailureTreeProcessCount = [int] $gate.containmentFailureTreeProcessCount
         frontendFailureCleanupCompleted = [bool] $gate.frontendFailureCleanupCompleted
         nativeDriverVersion = $driver.nativeDriverVersion
         webView2RuntimeVersion = $driver.webView2RuntimeVersion
