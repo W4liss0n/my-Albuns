@@ -62,7 +62,7 @@ A rodada canônica registrada em
 `docs/research/artifacts/0023-productive-journey.json` executou 8/8 checks sobre
 o input limpo `8cb8dc3380911e18b3f9ec0e1f50458df10afeb3`, com
 `sourceInputsDirty=false`. O artefato foi publicado no commit posterior
-`ea0acf6f531f20bb5b196e516cbb22923e0e26b0`, que altera somente o JSON de
+`ea0acf6fe78b3aeebb5cbaad62bcfcb551abe66c`, que altera somente o JSON de
 evidência. A captura contém 1.271 de 1.271 amostras não brancas, os três PIDs
 distintos, Lâmina 02 dupla contra a primeira de página única, amostra RGB
 `31/64/95` com delta máximo 1 em relação ao Background salvo e
