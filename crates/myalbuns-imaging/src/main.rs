@@ -73,6 +73,7 @@ fn main() -> ExitCode {
         tracing::error!(
             target: "myalbuns.imaging",
             process_role = process_role.as_str(),
+            process_id = std::process::id(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
             stage,
             event = "imaging_process_failed",
@@ -85,6 +86,7 @@ fn main() -> ExitCode {
         tracing::info!(
             target: "myalbuns.imaging",
             process_role = process_role.as_str(),
+            process_id = std::process::id(),
             protocol_version = IMAGING_PROTOCOL_VERSION,
             event = "imaging_process_stopped",
             success = true,

@@ -10,12 +10,12 @@ import {
   type Logger,
 } from "./application/logging";
 import type {
-  ExportPort,
+  ExportPipelinePort,
   MediaPreview,
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
-  ProjectSessionPort,
+  ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { EditorProjection } from "./domain/project";
@@ -29,10 +29,10 @@ import { useProjectMutationRunner } from "./components/useProjectMutationRunner"
 import "./App.css";
 
 interface AppProps {
-  exportPort: ExportPort;
+  exportPipelinePort: ExportPipelinePort;
   mediaPreviewPort: MediaPreviewPort;
   projectStartupPort: ProjectStartupPort;
-  projectSessionPort: ProjectSessionPort;
+  projectCorePort: ProjectCorePort;
   projectWindowPort: ProjectWindowPort;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
@@ -40,10 +40,10 @@ interface AppProps {
 }
 
 function App({
-  exportPort,
+  exportPipelinePort,
   mediaPreviewPort,
   projectStartupPort,
-  projectSessionPort,
+  projectCorePort,
   projectWindowPort,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
@@ -76,7 +76,7 @@ function App({
       event: "project_load_started",
       operationId,
     });
-    projectSessionPort
+    projectCorePort
       .load(operationId)
       .then((value) => {
         if (active) {
@@ -111,7 +111,7 @@ function App({
     return () => {
       active = false;
     };
-  }, [graphics.supported, logger, projectSessionPort]);
+  }, [graphics.supported, logger, projectCorePort]);
 
   useEffect(() => {
     logger.write({
@@ -146,7 +146,7 @@ function App({
   }, [logger, projectId, projectStartupPort]);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
-    projectSessionPort,
+    projectCorePort,
   );
   useEffect(() => {
     if (!projectId) return;
@@ -286,7 +286,7 @@ function App({
       >
         <ProjectWorkspace
           projection={projection}
-          exportPort={exportPort}
+          exportPipelinePort={exportPipelinePort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
           mediaPreviews={mediaPreviews}

@@ -7,9 +7,6 @@ use std::{
     time::Duration,
 };
 
-#[cfg(debug_assertions)]
-use std::ffi::OsString;
-
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
     InitialProjectCreationConfiguration, TargetAuthority, TerminalValidationError,
@@ -162,33 +159,18 @@ fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapF
 
 #[cfg(debug_assertions)]
 fn configure_host_webview_debugging(command: &mut Command) -> Result<(), BootstrapFailure> {
-    if let Some(argument) =
-        host_webview_debug_argument(std::env::var_os(HOST_WEBVIEW_DEBUG_PORT_ENV))?
-    {
+    let argument = crate::desktop_webview_policy::remote_debugging_argument(std::env::var_os(
+        HOST_WEBVIEW_DEBUG_PORT_ENV,
+    ))
+    .map_err(|_| BootstrapFailure {
+        kind: BootstrapFailureKind::HostUnavailable,
+        stage: None,
+        code: None,
+    })?;
+    if let Some(argument) = argument {
         command.env("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", argument);
     }
     Ok(())
-}
-
-#[cfg(debug_assertions)]
-fn host_webview_debug_argument(
-    port: Option<OsString>,
-) -> Result<Option<OsString>, BootstrapFailure> {
-    let Some(port) = port else {
-        return Ok(None);
-    };
-    let port = port
-        .to_str()
-        .and_then(|port| port.parse::<u16>().ok())
-        .filter(|port| *port != 0)
-        .ok_or(BootstrapFailure {
-            kind: BootstrapFailureKind::HostUnavailable,
-            stage: None,
-            code: None,
-        })?;
-    Ok(Some(OsString::from(format!(
-        "--remote-debugging-port={port}"
-    ))))
 }
 
 fn supervise_child(
@@ -406,16 +388,29 @@ mod tests {
     #[test]
     fn development_host_debugging_accepts_only_a_nonzero_port() {
         assert_eq!(
-            host_webview_debug_argument(Some(OsString::from("9222"))).expect("valid debug port"),
-            Some(OsString::from("--remote-debugging-port=9222"))
+            crate::desktop_webview_policy::remote_debugging_argument(Some(
+                std::ffi::OsString::from("9222"),
+            ))
+            .expect("valid debug port"),
+            Some(std::ffi::OsString::from("--remote-debugging-port=9222"))
         );
         assert!(
-            host_webview_debug_argument(None)
+            crate::desktop_webview_policy::remote_debugging_argument(None)
                 .expect("absent port")
                 .is_none()
         );
-        assert!(host_webview_debug_argument(Some(OsString::from("0"))).is_err());
-        assert!(host_webview_debug_argument(Some(OsString::from("invalid"))).is_err());
+        assert!(
+            crate::desktop_webview_policy::remote_debugging_argument(Some(
+                std::ffi::OsString::from("0"),
+            ))
+            .is_err()
+        );
+        assert!(
+            crate::desktop_webview_policy::remote_debugging_argument(Some(
+                std::ffi::OsString::from("invalid"),
+            ))
+            .is_err()
+        );
     }
 
     #[test]

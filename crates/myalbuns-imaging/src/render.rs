@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use image::{Rgba, RgbaImage};
-use myalbuns_core::{ComposedBackground, ComposedFrame, ProjectedFrameBorder, RectUm};
+use myalbuns_core::{ComposedBackground, ComposedFrame, MediaId, ProjectedFrameBorder, RectUm};
 use myalbuns_imaging_protocol::{
     ImagingFailure, ImagingFailureCode, ImagingPathCode, ImagingProgressStage, ImagingRequest,
     RenderCompletion,
@@ -146,7 +146,7 @@ pub(crate) fn render_request(
 fn load_render_sources(
     request: &ImagingRequest,
     progress: &mut dyn FnMut(ImagingProgressStage, u32, u32) -> Result<(), String>,
-) -> Result<(HashMap<String, RgbaImage>, u64), RenderFailure> {
+) -> Result<(HashMap<MediaId, RgbaImage>, u64), RenderFailure> {
     let mut opened = Vec::new();
     opened
         .try_reserve_exact(request.sources.len())
@@ -221,7 +221,15 @@ fn load_render_sources(
                 ),
             ));
         }
-        opened.push((source.media_id().to_owned(), opened_source));
+        let media_id = source.media_id().parse::<MediaId>().map_err(|_| {
+            RenderFailure::typed(
+                ImagingFailureCode::CompositionFailed,
+                Some(source.media_id().to_owned()),
+                None,
+                "a fonte da Exportação possui Identidade de mídia inválida",
+            )
+        })?;
+        opened.push((media_id, opened_source));
     }
 
     let mut decoded = HashMap::new();
@@ -237,7 +245,7 @@ fn load_render_sources(
         let image = opened_source.decode().map_err(|failure| {
             RenderFailure::typed(
                 failure.code,
-                Some(media_id.clone()),
+                Some(media_id.to_string()),
                 failure.path_code,
                 failure.message,
             )
@@ -260,7 +268,7 @@ fn draw_frame(
     image: &mut RgbaImage,
     frame: &ComposedFrame,
     pixels_per_micrometer: f64,
-    sources: &HashMap<String, RgbaImage>,
+    sources: &HashMap<MediaId, RgbaImage>,
 ) -> Result<(), String> {
     let left = to_pixels_signed(frame.clip_rect.x, pixels_per_micrometer).max(0) as u32;
     let top = to_pixels_signed(frame.clip_rect.y, pixels_per_micrometer).max(0) as u32;

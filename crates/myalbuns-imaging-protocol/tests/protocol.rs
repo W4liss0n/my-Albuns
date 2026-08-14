@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 
-use myalbuns_core::{MediaKind, ProjectCore};
+use myalbuns_core::{
+    CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
+    InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization, MediaKind,
+    ProjectCore, ProjectLocation,
+};
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingEventStreamDecoder,
@@ -13,11 +17,6 @@ use myalbuns_paths::{
     AppPaths, CacheArtifactFormat, NativePathDto, OperationPathContext, ResolveError,
     RootBindingPlan,
 };
-
-#[path = "../../../tests/support/sample_project.rs"]
-mod sample_project;
-
-use sample_project::SampleProject;
 
 fn empty_cache_response(request_id: &str) -> ImagingResponse {
     ImagingResponse::cache_completed(
@@ -179,26 +178,57 @@ fn deterministic_failure_serializes_stable_code_and_optional_context() {
 
 #[test]
 fn host_and_processor_share_one_serialized_protocol() {
-    let source = SampleProject::Horizon
-        .persisted_source(2)
-        .expect("the sample project serializes");
-    let snapshot = ProjectCore::new()
-        .open_demo_editable_session(&source)
-        .expect("the sample project opens through ProjectCore")
-        .render_snapshot();
-    let prepared_output_path =
-        PathBuf::from(r"C:\Temp\.myalbuns-export-render-42.tmp\Album_001.jpg");
-    let sources = vec![
-        RenderSource::new("media-costa", PathBuf::from(r"C:\Photos\costa.jpg"))
-            .expect("the first native source is valid"),
-        RenderSource::new("media-campo", PathBuf::from(r"C:\Photos\campo.jpg"))
-            .expect("the second native source is valid"),
-        RenderSource::new(
-            "decorative-overlay",
-            PathBuf::from(r"C:\Photos\overlay.png"),
+    let fixture = tempfile::tempdir().expect("temporary productive protocol fixture");
+    let project_path = fixture.path().join("Protocol.myalbuns");
+    let original_path = fixture.path().join("background.jpg");
+    std::fs::write(&original_path, b"original owned by the Processor")
+        .expect("the linked original fixture is written");
+    let mut project_context = OperationPathContext::new();
+    project_context
+        .capture(&project_path)
+        .expect("the Project root is captured");
+    let project = ProjectCore::new()
+        .with_identity_storage_roots(
+            fixture.path().join("leases"),
+            fixture.path().join("identities"),
         )
-        .expect("the Decorative source is valid"),
-    ];
+        .create_editable(CreateProjectRequest::new(
+            ProjectLocation::new(project_path, project_context.freeze()),
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: original_path,
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project is created through ProjectCore");
+    let frozen = project.freeze_rendering();
+    let sheet_id = frozen.render_snapshot().composition.sheets[0]
+        .sheet_id
+        .clone();
+    let (snapshot, unit, frozen_sources) = frozen
+        .into_sheet(&sheet_id)
+        .expect("the selected sheet is frozen with exact originals")
+        .into_parts();
+    let sources = frozen_sources
+        .into_iter()
+        .map(|source| {
+            RenderSource::new(
+                source.id().hyphenated().to_string(),
+                source.path().to_path_buf(),
+            )
+            .expect("the exact native source is valid")
+        })
+        .collect::<Vec<_>>();
+    let source_media_id = sources[0].media_id().to_owned();
+    let prepared_output_path = fixture
+        .path()
+        .join(".myalbuns-export-render-42.tmp")
+        .join("Album_001.jpg");
     let mut path_context = OperationPathContext::new();
     path_context
         .capture(&prepared_output_path)
@@ -209,9 +239,6 @@ fn host_and_processor_share_one_serialized_protocol() {
             .expect("the source root is captured");
     }
     let root_bindings = path_context.freeze();
-    let unit = snapshot
-        .output_unit("lamina-01")
-        .expect("the selected sheet becomes one self-contained output unit");
     let request = ImagingRequest::new(
         "render-42",
         snapshot.project_id.clone(),
@@ -263,7 +290,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     );
     assert_eq!(
         request_json["request"]["unit"]["sheet"]["sheetId"],
-        "lamina-01"
+        sheet_id
     );
     assert_eq!(request_json["request"]["dpi"], 300);
     assert!(
@@ -272,7 +299,7 @@ fn host_and_processor_share_one_serialized_protocol() {
     );
     assert_eq!(
         request_json["request"]["sources"][0]["mediaId"],
-        "media-costa"
+        source_media_id
     );
     assert!(
         request_json["request"]["sources"][0]
@@ -364,7 +391,7 @@ fn host_and_processor_share_one_serialized_protocol() {
             width_px: 7087,
             height_px: 3543,
             dpi: 300,
-            source_count: 2,
+            source_count: 1,
             source_bytes: 3072,
             output_bytes: 4096,
             output_sha256: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"

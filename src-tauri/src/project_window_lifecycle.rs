@@ -13,6 +13,8 @@ use crate::export_attempts::ExportAttempts;
 pub(crate) const PROJECT_CLOSE_CONFIRMATION_EVENT: &str =
     "myalbuns://project-close-confirmation-requested";
 static CLOSE_COMPLETION_STARTED: AtomicBool = AtomicBool::new(false);
+#[cfg(debug_assertions)]
+const GLOBAL_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT";
 
 fn global_entry_command(executable: &Path) -> Command {
     let mut command = Command::new(executable);
@@ -34,7 +36,14 @@ fn global_entry_command(executable: &Path) -> Command {
 
 fn launch_clean_global_entry() -> io::Result<()> {
     let executable = std::env::current_exe()?;
-    global_entry_command(&executable).spawn().map(|_| ())
+    let mut command = global_entry_command(&executable);
+    #[cfg(debug_assertions)]
+    if let Some(argument) = crate::desktop_webview_policy::remote_debugging_argument(
+        std::env::var_os(GLOBAL_WEBVIEW_DEBUG_PORT_ENV),
+    )? {
+        command.env("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", argument);
+    }
+    command.spawn().map(|_| ())
 }
 
 pub(crate) fn request_window_export_cancellation(window: &Window) -> ExportAttempts {

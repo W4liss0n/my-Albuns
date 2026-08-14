@@ -12,10 +12,11 @@ use std::{
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{
-    ComposedBackground, ComposedDecorative, CreateAuthorization, CreateProjectRequest,
-    InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
-    InitialOverlayContent, InitialProject, InitialProjectPersonalization, MediaKind, ProjectCore,
-    ProjectLocation,
+    ComposedBackground, ComposedDecorative, ComposedFrame, ComposedPhoto, CreateAuthorization,
+    CreateProjectRequest, EditableProject, InitialBackground, InitialBackgroundContent,
+    InitialFrameBorder, InitialOverlay, InitialOverlayContent, InitialProject,
+    InitialProjectPersonalization, Matrix2, MediaKind, NormalizedPan, NumberRange, PhotoPlacement,
+    PhotoPlacementPlan, ProjectCore, ProjectLocation, RenderSnapshot, SizeUm, VectorUm,
 };
 use myalbuns_imaging_protocol::{
     CacheArtifactFormat, CacheMediaSource, IMAGING_PROTOCOL_VERSION, ImagingCommand,
@@ -39,7 +40,6 @@ use crate::{
     },
     operation_gate::OperationGate,
     operation_lease::OperationLease,
-    sample_project::SampleProject,
 };
 
 const PROCESSOR_ENV: &str = "MYALBUNS_REAL_IMAGING_PROCESSOR";
@@ -328,24 +328,106 @@ fn progressive_source(directory: &Path) -> CacheMediaSource {
         .expect("the progressive source is valid")
 }
 
-fn export_snapshot() -> (
-    myalbuns_core::DemoEditableProject,
-    myalbuns_core::RenderSnapshot,
-    String,
-) {
-    let source = SampleProject::Horizon
-        .persisted_source(2)
-        .expect("the sample project serializes");
-    let core = ProjectCore::new();
-    let session = core
-        .open_demo_editable_session(&source)
-        .expect("the sample project opens");
-    let mut snapshot = session.render_snapshot();
+struct ProductiveExportFixture {
+    _root: tempfile::TempDir,
+    project: EditableProject,
+}
+
+impl ProductiveExportFixture {
+    fn persisted_bytes(&self) -> Vec<u8> {
+        std::fs::read(self.project.project_path()).expect("the productive Project remains readable")
+    }
+
+    fn project_id(&self) -> String {
+        self.project.project_id().hyphenated().to_string()
+    }
+}
+
+fn export_snapshot() -> (ProductiveExportFixture, RenderSnapshot, String) {
+    let root = tempfile::tempdir().expect("temporary productive export Project");
+    let project_path = root.path().join("RecoveryExport.myalbuns");
+    let mut context = OperationPathContext::new();
+    context
+        .capture(&project_path)
+        .expect("the productive Project root is captured");
+    let project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .create_editable(CreateProjectRequest::new(
+            ProjectLocation::new(project_path, context.freeze()),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project is created through ProjectCore");
+    let mut snapshot = project.render_snapshot();
     let sheet = &mut snapshot.composition.sheets[0];
-    sheet.frames.truncate(1);
+    let draw_rect = sheet.base.draw_rect.clone();
+    sheet.frames = vec![ComposedFrame {
+        frame_id: "recovery-frame".into(),
+        clip_rect: draw_rect.clone(),
+        z_index: 1,
+        photo: Some(ComposedPhoto {
+            media_id: "00000000-0000-4000-8000-000000000010"
+                .parse()
+                .expect("the recovery media identity is canonical"),
+            name: "Recovery source.jpg".into(),
+            draw_rect: draw_rect.clone(),
+            placement: PhotoPlacementPlan {
+                current_pan: NormalizedPan { x: 0.0, y: 0.0 },
+                current_zoom: 1.0,
+                pan_range: NumberRange {
+                    minimum: -1.0,
+                    maximum: 1.0,
+                },
+                zoom_range: NumberRange {
+                    minimum: 1.0,
+                    maximum: 4.0,
+                },
+                current: PhotoPlacement {
+                    center: VectorUm {
+                        x: draw_rect.width as f64 / 2.0,
+                        y: draw_rect.height as f64 / 2.0,
+                    },
+                    size: SizeUm {
+                        width: draw_rect.width as f64,
+                        height: draw_rect.height as f64,
+                    },
+                },
+                pan_origin: VectorUm {
+                    x: draw_rect.width as f64 / 2.0,
+                    y: draw_rect.height as f64 / 2.0,
+                },
+                pan_to_center: Matrix2 {
+                    xx: 0.0,
+                    xy: 0.0,
+                    yx: 0.0,
+                    yy: 0.0,
+                },
+                pan_to_center_per_zoom: Matrix2 {
+                    xx: 0.0,
+                    xy: 0.0,
+                    yx: 0.0,
+                    yy: 0.0,
+                },
+                size_per_zoom: SizeUm {
+                    width: draw_rect.width as f64,
+                    height: draw_rect.height as f64,
+                },
+            },
+            rotation_degrees: 0.0,
+            mirror_x: false,
+            palette: ["#112233".into(), "#445566".into(), "#778899".into()],
+        }),
+    }];
     sheet.overlays.clear();
     let sheet_id = sheet.sheet_id.clone();
-    (session, snapshot, sheet_id)
+    (
+        ProductiveExportFixture {
+            _root: root,
+            project,
+        },
+        snapshot,
+        sheet_id,
+    )
 }
 
 fn write_evidence(name: &str, value: serde_json::Value) {
@@ -395,8 +477,7 @@ fn recovery_export_fixture_references_only_the_generated_source() {
         .photo
         .as_ref()
         .expect("the recovery frame contains a Photo")
-        .media_id
-        .as_str();
+        .media_id;
 
     assert_eq!(
         sheet.referenced_media_ids().collect::<Vec<_>>(),
@@ -532,14 +613,11 @@ fn real_processor_recovery_flows_through_production_modules() {
             .photo
             .as_ref()
             .expect("the recovery frame contains a Photo")
-            .media_id
-            .clone();
+            .media_id;
         let export_source = RenderSource::new(export_media_id, source.source_path().to_path_buf())
             .expect("the source for Exportação matches the recovery Frame");
-        let project_before = session
-            .persisted_revision()
-            .expect("the Project revision serializes before failure");
-        let project_sha256_before = format!("{:x}", Sha256::digest(project_before.as_bytes()));
+        let project_before = session.persisted_bytes();
+        let project_sha256_before = format!("{:x}", Sha256::digest(&project_before));
         let output_path = fixture.path().join("recoverable-output.jpg");
         let previous_output = b"previous completed export";
         std::fs::write(&output_path, previous_output).expect("the previous Export is writable");
@@ -580,10 +658,8 @@ fn real_processor_recovery_flows_through_production_modules() {
             std::fs::read(&output_path).expect("the previous Export remains readable");
         let output_sha256_after_failure = format!("{:x}", Sha256::digest(&output_after_failure));
         assert_eq!(output_sha256_after_failure, previous_output_sha256);
-        let project_after = session
-            .persisted_revision()
-            .expect("the Project revision serializes after failure");
-        let project_sha256_after = format!("{:x}", Sha256::digest(project_after.as_bytes()));
+        let project_after = session.persisted_bytes();
+        let project_sha256_after = format!("{:x}", Sha256::digest(&project_after));
         assert_eq!(project_sha256_after, project_sha256_before);
 
         let retry_request_id = "export-real-retry";
@@ -618,11 +694,8 @@ fn real_processor_recovery_flows_through_production_modules() {
         );
         let final_output_sha256 = published.completion.output_sha256;
         assert_ne!(final_output_sha256, previous_output_sha256);
-        let project_after_success = session
-            .persisted_revision()
-            .expect("the Project revision serializes after successful Export");
-        let project_sha256_after_success =
-            format!("{:x}", Sha256::digest(project_after_success.as_bytes()));
+        let project_after_success = session.persisted_bytes();
+        let project_sha256_after_success = format!("{:x}", Sha256::digest(&project_after_success));
         assert_eq!(project_sha256_after_success, project_sha256_before);
 
         write_evidence(
@@ -1219,18 +1292,33 @@ fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
         let full_sheet = sheet.base.draw_rect.clone();
         sheet.frames.clear();
         sheet.backgrounds = vec![ComposedBackground::Media {
-            media_id: background.media_id().to_owned(),
+            media_id: background
+                .media_id()
+                .parse()
+                .expect("the Background media identity is canonical"),
             name: "Background.png".into(),
             draw_rect: full_sheet.clone(),
         }];
         sheet.overlays = vec![ComposedDecorative {
-            media_id: overlay.media_id().to_owned(),
+            media_id: overlay
+                .media_id()
+                .parse()
+                .expect("the Overlay media identity is canonical"),
             name: "Overlay.png".into(),
             draw_rect: full_sheet,
         }];
         assert_eq!(
             sheet.referenced_media_ids().collect::<Vec<_>>(),
-            [background.media_id(), overlay.media_id()]
+            [
+                background
+                    .media_id()
+                    .parse()
+                    .expect("the Background media identity is canonical"),
+                overlay
+                    .media_id()
+                    .parse()
+                    .expect("the Overlay media identity is canonical"),
+            ]
         );
         let output_path = fixture.join("canvas-reference-final.jpg");
         let export_sources = vec![
@@ -1380,8 +1468,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
             .photo
             .as_ref()
             .expect("the Export frame contains a Photo")
-            .media_id
-            .clone();
+            .media_id;
         let source = RenderSource::new(media_id, source.source_path().to_path_buf())
             .expect("the mapped source matches the Frame used by Exportação");
         let output_path = logical_exports.join("Album-path-gate.jpg");
@@ -1410,10 +1497,8 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
         );
         let cancellation = export_pipeline::ExportExecutionControl::default();
         let progress = |_| {};
-        let unavailable_context = InvocationContext::new(
-            unavailable_request_id,
-            Some(session.state().project_id.clone()),
-        );
+        let unavailable_context =
+            InvocationContext::new(unavailable_request_id, Some(session.project_id()));
         let unavailable_failure = export_pipeline::execute(
             &mut unavailable_transport,
             unavailable_plan,
@@ -1467,7 +1552,7 @@ fn real_processor_consumes_the_frozen_unc_plan_after_the_drive_is_unmapped() {
         let log_directory = local_sidecar_root.join("logs");
         std::fs::create_dir_all(&log_directory).expect("the sidecar log directory exists");
         let mut transport = RealProcessTransport::new(executable, log_directory, CrashNext::Never);
-        let context = InvocationContext::new(request_id, Some(session.state().project_id));
+        let context = InvocationContext::new(request_id, Some(session.project_id()));
         let published = export_pipeline::execute(
             &mut transport,
             plan,

@@ -3,8 +3,8 @@
 use std::fs;
 
 use myalbuns_core::{
-    DocumentFailure, LoadProjectError, MediaKind, OpenProjectRequest, ProjectCore, ProjectIntent,
-    ProjectLocation, SaveProjectOutcome,
+    DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
+    ProjectIntent, ProjectLocation, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -183,6 +183,58 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
     assert_eq!(persisted["schemaVersion"], 2);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
+}
+
+#[test]
+fn a_frozen_sheet_owns_the_same_composition_and_only_its_exact_originals() {
+    let root = tempfile::tempdir().expect("temporary frozen v2 Project");
+    let project_path = root.path().join("Projeto congelado.myalbuns");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
+        .expect("the v2 fixture is written");
+    let project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the v2 Project is positively authorized");
+    let selected_sheet_id = project.projection().composition.sheets[1].sheet_id.clone();
+
+    let frozen = project.freeze_rendering();
+    assert_eq!(
+        frozen.projection().composition,
+        frozen.render_snapshot().composition,
+        "Canvas and Exportation must receive the same CompositionPlan",
+    );
+    let frozen_sheet = frozen
+        .into_sheet(&selected_sheet_id)
+        .expect("the selected sheet owns its exact sources");
+
+    assert_eq!(frozen_sheet.output_unit().sheet.sheet_id, selected_sheet_id);
+    let referenced = frozen_sheet
+        .output_unit()
+        .sheet
+        .referenced_media_ids()
+        .collect::<Vec<MediaId>>();
+    assert_eq!(
+        referenced.len(),
+        2,
+        "background and overlay both reference media"
+    );
+    assert!(
+        referenced
+            .iter()
+            .all(|media_id| media_id.to_string() == "00000000-0000-4000-8000-000000000011")
+    );
+    assert_eq!(
+        frozen_sheet
+            .sources()
+            .iter()
+            .map(|source| (source.kind(), source.path()))
+            .collect::<Vec<_>>(),
+        vec![(
+            MediaKind::Decorative,
+            std::path::Path::new(r"C:\Fotos\Overlay.png"),
+        ),],
+        "the unreferenced Foto is not frozen for this output unit",
+    );
 }
 
 #[test]

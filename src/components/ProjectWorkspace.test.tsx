@@ -10,11 +10,11 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
   ExportOutcome,
-  ExportPort,
+  ExportPipelinePort,
   ExportProgressEvent,
   MediaPreviewDemand,
   ProjectCloseResolution,
-  ProjectSessionPort,
+  ProjectCorePort,
   ProjectWindowPort,
 } from "../application/projectPorts";
 import {
@@ -151,7 +151,7 @@ function deferredProjection() {
   return { promise, resolve };
 }
 
-const exportPort: ExportPort = {
+const exportPipelinePort: ExportPipelinePort = {
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -190,9 +190,9 @@ function projectWindowHarness() {
   };
 }
 
-function projectSessionPortWithApply(
-  apply: ProjectSessionPort["apply"],
-): ProjectSessionPort {
+function projectCorePortWithApply(
+  apply: ProjectCorePort["apply"],
+): ProjectCorePort {
   return {
     load: async () => projection,
     apply,
@@ -208,19 +208,19 @@ type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
   "runProjectMutation" | "projectWindowPort"
 > & {
-  projectSessionPort: ProjectSessionPort;
+  projectCorePort: ProjectCorePort;
   projectWindowPort?: ProjectWindowPort;
 };
 
 function ProjectWorkspace({
-  projectSessionPort,
+  projectCorePort,
   projectWindowPort = inertProjectWindowPort,
   projection,
   ...props
 }: TestProjectWorkspaceProps) {
   const runProjectMutation = useProjectMutationRunner(
     projection.state.projectId,
-    projectSessionPort,
+    projectCorePort,
   );
   return (
     <ProjectWorkspaceView
@@ -291,9 +291,9 @@ test("offers the three close choices for a native request and Cancel keeps the P
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={dirtyProjection}
-      projectSessionPort={projectSessionPortWithApply(async () =>
+      projectCorePort={projectCorePortWithApply(async () =>
         dirtyProjection
       )}
       projectWindowPort={harness.port}
@@ -343,12 +343,12 @@ test("uses the same close decision for the application command and blocks it whi
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={{
         ...projection,
         state: { ...projection.state, dirty: true },
       }}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       projectWindowPort={harness.port}
       onProjectionChange={() => undefined}
     />,
@@ -383,9 +383,9 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
   const discardHarness = projectWindowHarness();
   const { unmount } = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       projectWindowPort={discardHarness.port}
       onProjectionChange={() => undefined}
     />,
@@ -411,9 +411,9 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
   });
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       projectWindowPort={failureHarness.port}
       onProjectionChange={() => undefined}
     />,
@@ -444,9 +444,9 @@ test("never resumes or reports success after an indeterminate close save", async
   });
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       projectWindowPort={harness.port}
       onProjectionChange={() => undefined}
     />,
@@ -478,7 +478,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   const completion = new Promise<ExportOutcome>((resolve) => {
     finish = resolve;
   });
-  const controlledExportPort: ExportPort = {
+  const controlledExportPipelinePort: ExportPipelinePort = {
     startSheet: (_sheetId, onEvent) => {
       emit = onEvent;
       return {
@@ -487,14 +487,14 @@ test("blocks only Project commands while its Export attempt is active", async ()
       };
     },
   };
-  const projectSessionPort = projectSessionPortWithApply(async () => projection);
-  projectSessionPort.undo = vi.fn(async () => projection);
+  const projectCorePort = projectCorePortWithApply(async () => projection);
+  projectCorePort.undo = vi.fn(async () => projection);
 
   render(
     <ProjectWorkspace
-      exportPort={controlledExportPort}
+      exportPipelinePort={controlledExportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={() => undefined}
     />,
   );
@@ -508,7 +508,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
     emit({ event: "started", cancellable: true });
   });
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
-  expect(projectSessionPort.undo).not.toHaveBeenCalled();
+  expect(projectCorePort.undo).not.toHaveBeenCalled();
 
   await act(async () => {
     finish({ status: "cancelled" });
@@ -516,7 +516,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   });
 
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
-  expect(projectSessionPort.undo).not.toHaveBeenCalled();
+  expect(projectCorePort.undo).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
@@ -533,9 +533,9 @@ test("forwards a fatal Canvas graphics diagnostic without interpreting it", () =
   };
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
       onGraphicsUnavailable={onGraphicsUnavailable}
     />,
@@ -552,9 +552,9 @@ test("restores accordion preferences after context changes and remounts", () => 
   const renderWorkspace = () =>
     render(
       <ProjectWorkspace
-        exportPort={exportPort}
+        exportPipelinePort={exportPipelinePort}
         projection={projection}
-        projectSessionPort={projectSessionPortWithApply(async () => projection)}
+        projectCorePort={projectCorePortWithApply(async () => projection)}
         onProjectionChange={() => undefined}
       />,
     );
@@ -588,9 +588,9 @@ test("restores accordion preferences after context changes and remounts", () => 
 test("uses the documented compact chrome and collapsible contextual sections", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -635,9 +635,9 @@ test("shows the physical configuration projected from the opened Project", () =>
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={configuredProjection}
-      projectSessionPort={projectSessionPortWithApply(
+      projectCorePort={projectCorePortWithApply(
         async () => configuredProjection,
       )}
       onProjectionChange={() => undefined}
@@ -687,14 +687,14 @@ test("applies one DPI change and renders the authoritative projection returned b
     },
   };
   const apply = vi.fn(async () => changedProjection);
-  const projectSessionPort = projectSessionPortWithApply(apply);
+  const projectCorePort = projectCorePortWithApply(apply);
   const onProjectionChange = vi.fn();
 
   const view = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={initialProjection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -715,9 +715,9 @@ test("applies one DPI change and renders the authoritative projection returned b
 
   view.rerender(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={changedProjection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -739,24 +739,24 @@ test("saves the visible revision and applies the authoritative saved projection"
       canUndo: true,
     },
   };
-  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+  const save = vi.fn<ProjectCorePort["save"]>(async () => ({
     outcome: {
       kind: "saved",
       revision: savedProjection.state.revision,
     },
     projection: savedProjection,
   }));
-  const projectSessionPort = projectSessionPortWithApply(
+  const projectCorePort = projectCorePortWithApply(
     async () => projection,
   );
-  projectSessionPort.save = save;
+  projectCorePort.save = save;
   const onProjectionChange = vi.fn();
 
   const view = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -771,9 +771,9 @@ test("saves the visible revision and applies the authoritative saved projection"
 
   view.rerender(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={savedProjection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -781,7 +781,7 @@ test("saves the visible revision and applies the authoritative saved projection"
 });
 
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {
-  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+  const save = vi.fn<ProjectCorePort["save"]>(async () => ({
     outcome: { kind: "saved", revision: projection.state.revision },
     projection: {
       ...projection,
@@ -792,15 +792,15 @@ test("uses Ctrl+S for Project save and prevents the browser default", async () =
       },
     },
   }));
-  const projectSessionPort = projectSessionPortWithApply(
+  const projectCorePort = projectCorePortWithApply(
     async () => projection,
   );
-  projectSessionPort.save = save;
+  projectCorePort.save = save;
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={() => undefined}
     />,
   );
@@ -822,10 +822,10 @@ test("uses Ctrl+S for Project save and prevents the browser default", async () =
 });
 
 test("shows the localized Project save failure", async () => {
-  const projectSessionPort = projectSessionPortWithApply(
+  const projectCorePort = projectCorePortWithApply(
     async () => projection,
   );
-  projectSessionPort.save = vi.fn(async () => {
+  projectCorePort.save = vi.fn(async () => {
     throw new SaveProjectError(
       "persisted_baseline_conflict",
       "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
@@ -833,9 +833,9 @@ test("shows the localized Project save failure", async () => {
   });
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       onProjectionChange={() => undefined}
     />,
   );
@@ -853,9 +853,9 @@ test("shows the localized Project save failure", async () => {
 test("renders each Grade item from its own composed sheet", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={twoSheetProjection}
-      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
+      projectCorePort={projectCorePortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -882,9 +882,9 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   };
   const view = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       mediaPreviews={mediaPreviews}
       onProjectionChange={() => undefined}
     />,
@@ -904,9 +904,9 @@ test("merges only Panel viewport and one-row preload margin with Canvas demand",
   const onMediaDemandChange = vi.fn();
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onMediaDemandChange={onMediaDemandChange}
       onProjectionChange={() => undefined}
     />,
@@ -950,9 +950,9 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
   };
   const view = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={decorativeProjection}
-      projectSessionPort={projectSessionPortWithApply(
+      projectCorePort={projectCorePortWithApply(
         async () => decorativeProjection,
       )}
       mediaPreviews={mediaPreviews}
@@ -980,9 +980,9 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
 test("renders media usage from the derived Editor projection", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -994,9 +994,9 @@ test("renders media usage from the derived Editor projection", () => {
 test("centers a Grade navigation target in the visible Canvas", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={twoSheetProjection}
-      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
+      projectCorePort={projectCorePortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1019,9 +1019,9 @@ test("centers a Grade navigation target in the visible Canvas", () => {
 test("completes Grade navigation requested before Canvas metrics exist", () => {
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={twoSheetProjection}
-      projectSessionPort={projectSessionPortWithApply(async () => twoSheetProjection)}
+      projectCorePort={projectCorePortWithApply(async () => twoSheetProjection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1044,9 +1044,9 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
 test("resizes both workspace panels with persistent splitters", () => {
   const firstView = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1096,9 +1096,9 @@ test("resizes both workspace panels with persistent splitters", () => {
   firstView.unmount();
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1118,9 +1118,9 @@ test("commits a slider zoom once without flashing a global busy state", async ()
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1161,9 +1161,9 @@ test("updates the contextual Zoom slider during a Canvas gesture", () => {
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1204,9 +1204,9 @@ test("discards a live Canvas value when its commit fails", async () => {
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1252,15 +1252,15 @@ test("does not let an old Project completion clear a new slider draft", async ()
   };
   const newApply = vi.fn(async () => otherProject);
   const onProjectionChange = vi.fn();
-  const oldProjectSessionPort = projectSessionPortWithApply(oldApply);
-  const newProjectSessionPort = projectSessionPortWithApply(newApply);
+  const oldProjectCorePort = projectCorePortWithApply(oldApply);
+  const newProjectCorePort = projectCorePortWithApply(newApply);
   useEditorView.setState({ selectedFrameId: "frame-001" });
 
   const view = render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={oldProjectSessionPort}
+      projectCorePort={oldProjectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -1274,9 +1274,9 @@ test("does not let an old Project completion clear a new slider draft", async ()
 
   view.rerender(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={otherProject}
-      projectSessionPort={newProjectSessionPort}
+      projectCorePort={newProjectCorePort}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -1311,9 +1311,9 @@ test("uses the Canvas-centered sheet for a media double click", () => {
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={twoSheetProjection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1331,7 +1331,7 @@ test("uses the Canvas-centered sheet for a media double click", () => {
 });
 
 test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {
-  const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
+  const startSheet = vi.fn<ExportPipelinePort["startSheet"]>(() => ({
     completion: Promise.resolve({
       status: "completed",
       result: { widthPx: 600, heightPx: 300 },
@@ -1341,9 +1341,9 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
 
   render(
     <ProjectWorkspace
-      exportPort={{ startSheet }}
+      exportPipelinePort={{ startSheet }}
       projection={twoSheetProjection}
-      projectSessionPort={projectSessionPortWithApply(async () =>
+      projectCorePort={projectCorePortWithApply(async () =>
         twoSheetProjection
       )}
       onProjectionChange={() => undefined}
@@ -1358,7 +1358,14 @@ test("starts Exportação for the Canvas-centered Lâmina even while focus remai
     screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
 
-  expect(startSheet).toHaveBeenCalledWith("sheet-002", expect.any(Function));
+  expect(startSheet).toHaveBeenCalledWith(
+    {
+      projectName: "Álbum Horizonte",
+      sheetId: "sheet-002",
+      sheetNumber: 2,
+    },
+    expect.any(Function),
+  );
 });
 
 test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
@@ -1366,9 +1373,9 @@ test("forwards simultaneous Canvas Pan and Zoom as one intent", () => {
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
   );
@@ -1394,16 +1401,16 @@ test("serializes Project mutations so projections cannot arrive out of order", a
   const first = deferredProjection();
   const second = deferredProjection();
   const apply = vi
-    .fn<ProjectSessionPort["apply"]>()
+    .fn<ProjectCorePort["apply"]>()
     .mockImplementationOnce(() => first.promise)
     .mockImplementationOnce(() => second.promise);
   const onProjectionChange = vi.fn();
 
   render(
     <ProjectWorkspace
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projection={projection}
-      projectSessionPort={projectSessionPortWithApply(apply)}
+      projectCorePort={projectCorePortWithApply(apply)}
       onProjectionChange={onProjectionChange}
     />,
   );

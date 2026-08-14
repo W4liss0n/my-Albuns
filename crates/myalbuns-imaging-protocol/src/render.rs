@@ -1,4 +1,4 @@
-use myalbuns_core::ComposedOutputUnit;
+use myalbuns_core::{ComposedOutputUnit, MediaId};
 use myalbuns_paths::{NativePathDto, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +113,11 @@ pub fn validate_render_content(
     let mut supplied_media = std::collections::HashSet::new();
     for source in sources {
         source.validate()?;
-        if !supplied_media.insert(source.media_id()) {
+        let media_id = source
+            .media_id()
+            .parse::<MediaId>()
+            .map_err(|_| "a fonte da Exportação possui Identidade de mídia inválida")?;
+        if !supplied_media.insert(media_id) {
             return Err("a Exportação contém mídia duplicada".into());
         }
     }

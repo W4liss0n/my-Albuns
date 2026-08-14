@@ -9,10 +9,10 @@ import {
   silentLogger,
 } from "./application/logging";
 import type {
-  ExportPort,
+  ExportPipelinePort,
   MediaPreviewPort,
   ProjectStartupPort,
-  ProjectSessionPort,
+  ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
 import {
@@ -81,7 +81,7 @@ vi.mock("./components/AlbumCanvas", () => ({
 
 const projection = createEmptyProjection();
 
-const projectSessionPort: ProjectSessionPort = {
+const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   apply: async () => projection,
   undo: async () => projection,
@@ -94,7 +94,7 @@ const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
   onMediaChanged: async () => () => undefined,
 };
-const exportPort: ExportPort = {
+const exportPipelinePort: ExportPipelinePort = {
   startSheet: () => ({
     completion: Promise.resolve({
       status: "completed",
@@ -131,14 +131,14 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
   const prepareMediaPreviews = vi.fn(async () => null);
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
       }}
-      projectSessionPort={{ ...projectSessionPort, load }}
+      projectCorePort={{ ...projectCorePort, load }}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -176,11 +176,11 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   const confirmUiReady = vi.fn(async () => undefined);
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={{ confirmUiReady }}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={mediaPreviewPort}
-      projectSessionPort={{ ...projectSessionPort, load }}
+      projectCorePort={{ ...projectCorePort, load }}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -240,14 +240,14 @@ test("prepares real media previews after opening without blocking the Workspace"
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
       }}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -299,7 +299,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
@@ -309,8 +309,8 @@ test("reprepares demanded media when the stable Monitor reports a change", async
           return () => undefined;
         },
       }}
-      projectSessionPort={{
-        ...projectSessionPort,
+      projectCorePort={{
+        ...projectCorePort,
         load: async () => representativeProjection,
       }}
       logger={silentLogger}
@@ -361,7 +361,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
@@ -371,8 +371,8 @@ test("keeps the last known preview when linked media becomes unavailable", async
           return () => undefined;
         },
       }}
-      projectSessionPort={{
-        ...projectSessionPort,
+      projectCorePort={{
+        ...projectCorePort,
         load: async () => representativeProjection,
       }}
       logger={silentLogger}
@@ -415,15 +415,15 @@ test("labels first-observation unavailability without claiming a previous previe
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
       }}
-      projectSessionPort={{
-        ...projectSessionPort,
+      projectCorePort={{
+        ...projectCorePort,
         load: async () => representativeProjection,
       }}
       logger={silentLogger}
@@ -456,11 +456,11 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews, onMediaChanged }}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -495,14 +495,14 @@ test("cancels resident media demand when runtime graphics become unavailable", a
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
       }}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({
@@ -550,14 +550,14 @@ test("logs the typed media preview failure code without replacing it with unknow
 
   render(
     <App
-      exportPort={exportPort}
+      exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
       }}
-      projectSessionPort={projectSessionPort}
+      projectCorePort={projectCorePort}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
       graphicsProbe={() => ({

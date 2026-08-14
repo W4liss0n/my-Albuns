@@ -8,9 +8,6 @@ use serde::Deserialize;
 
 pub(crate) const GRAPHICS_GATE_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[cfg(debug_assertions)]
-const PROCESS_GATE_GRAPHICS_SUPPORTED_ENV: &str = "MYALBUNS_PROCESS_GATE_GRAPHICS_SUPPORTED";
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "camelCase", tag = "status", deny_unknown_fields)]
 pub(crate) enum GraphicsGateReport {
@@ -99,17 +96,6 @@ impl GraphicsLaunchGate {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         state.status == GraphicsGateStatus::Pending && state.direct_project.is_some()
-    }
-}
-
-#[cfg(debug_assertions)]
-pub(crate) fn debug_process_gate_report() -> GraphicsGateReport {
-    if std::env::var_os(PROCESS_GATE_GRAPHICS_SUPPORTED_ENV).as_deref()
-        == Some(std::ffi::OsStr::new("1"))
-    {
-        GraphicsGateReport::Supported {}
-    } else {
-        GraphicsGateReport::Unsupported {}
     }
 }
 

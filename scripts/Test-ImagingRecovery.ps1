@@ -26,7 +26,7 @@ $scratchRoot = [System.IO.Path]::GetFullPath(
 $evidenceDirectory = [System.IO.Path]::GetFullPath(
     (Join-Path `
         $scratchRoot `
-        "imaging-recovery-evidence-$PID-$([DateTime]::UtcNow.Ticks)")
+        "ir-$PID-$([guid]::NewGuid().ToString('N').Substring(0, 6))")
 )
 $evidenceParent = [System.IO.Path]::GetDirectoryName($evidenceDirectory)
 if (-not [string]::Equals(

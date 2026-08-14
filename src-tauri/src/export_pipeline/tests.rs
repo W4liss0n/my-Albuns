@@ -7,7 +7,11 @@ use std::{
 };
 
 use image::{ImageFormat, Rgb, RgbImage};
-use myalbuns_core::ProjectCore;
+use myalbuns_core::{
+    CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
+    InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization, ProjectCore,
+    ProjectLocation, RenderSnapshot,
+};
 use myalbuns_imaging_protocol::{
     ImagingCommand, ImagingFailureCode, ImagingFailureStage, ImagingProgress, ImagingProgressStage,
     ImagingResponse, RenderCompletion, RenderSource, decode_command, encode_command,
@@ -20,12 +24,9 @@ use super::{
     ExportPlan, ExportProgressStage, ExportProgressUnits, bind_execution_paths, execute,
     execute_group, plan,
 };
-use crate::{
-    imaging_processor::{
-        ImagingOperation, ImagingTransport, InvocationContext, InvocationControl,
-        InvocationFailure, InvocationFuture,
-    },
-    sample_project::SampleProject,
+use crate::imaging_processor::{
+    ImagingOperation, ImagingTransport, InvocationContext, InvocationControl, InvocationFailure,
+    InvocationFuture,
 };
 
 struct ScriptedTransport {
@@ -215,22 +216,6 @@ fn export_plan_with_authorization(
     request_id: &str,
     authorization: ExportWriteAuthorization,
 ) -> ExportPlan {
-    let source = SampleProject::Horizon
-        .persisted_source(2)
-        .expect("the sample project serializes");
-    let core = ProjectCore::new();
-    let mut snapshot = core
-        .open_demo_editable_session(&source)
-        .expect("the sample project opens")
-        .render_snapshot();
-    snapshot.dpi = 25;
-    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
-    let mut media_ids = Vec::new();
-    for media_id in snapshot.composition.sheets[0].referenced_media_ids() {
-        if !media_ids.iter().any(|known| known == media_id) {
-            media_ids.push(media_id.to_owned());
-        }
-    }
     let source_directory = output
         .parent()
         .expect("the test Export output has a parent directory");
@@ -238,22 +223,21 @@ fn export_plan_with_authorization(
         .ancestors()
         .find(|directory| directory.exists())
         .expect("the test Export output has an existing ancestor");
-    let mut sources = Vec::with_capacity(media_ids.len());
-    for (index, media_id) in media_ids.into_iter().enumerate() {
-        let source_path = source_directory.join(format!(".test-original-{request_id}-{index}.jpg"));
-        RgbImage::from_fn(16, 12, |x, y| {
-            Rgb([
-                (x * 11) as u8,
-                (y * 17) as u8,
-                (index as u8).wrapping_mul(61).wrapping_add(24),
-            ])
-        })
+    let source_path = source_directory.join(format!(".test-original-{request_id}-0.jpg"));
+    RgbImage::from_fn(16, 12, |x, y| Rgb([(x * 11) as u8, (y * 17) as u8, 24]))
         .save_with_format(&source_path, ImageFormat::Jpeg)
         .expect("the test original is written");
-        sources.push(
-            RenderSource::new(media_id, source_path).expect("the test original source is valid"),
-        );
-    }
+    let mut snapshot = productive_snapshot(source_path.clone());
+    snapshot.dpi = 25;
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
+    let media_id = snapshot.composition.sheets[0]
+        .referenced_media_ids()
+        .next()
+        .expect("the productive fixture references its original");
+    let sources = vec![
+        RenderSource::new(media_id.to_string(), source_path)
+            .expect("the test original source is valid"),
+    ];
     plan(
         snapshot,
         ExportOptions::new(request_id, output, authorization, sheet_id, sources),
@@ -283,15 +267,9 @@ fn grouped_root_bindings(plans: &[&ExportPlan]) -> RootBindingPlan {
 
 #[test]
 fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
-    let source = SampleProject::Horizon
-        .persisted_source(2)
-        .expect("the sample project serializes");
-    let snapshot = ProjectCore::new()
-        .open_demo_editable_session(&source)
-        .expect("the sample project opens")
-        .render_snapshot();
-    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let destination = tempfile::tempdir().expect("temporary Export destination");
+    let snapshot = productive_snapshot(destination.path().join("missing-original.jpg"));
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
 
     let failure = plan(
         snapshot,
@@ -310,26 +288,17 @@ fn export_plan_rejects_missing_originals_at_the_typed_plan_stage() {
 
 #[test]
 fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
-    let source = SampleProject::Horizon
-        .persisted_source(2)
-        .expect("the sample Projeto serializes");
-    let snapshot = ProjectCore::new()
-        .open_demo_editable_session(&source)
-        .expect("the sample Projeto opens")
-        .render_snapshot();
-    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let root = tempfile::tempdir().expect("temporary dependency-plan fixture");
+    let planned_source = root.path().join("planned-0.jpg");
+    let snapshot = productive_snapshot(planned_source.clone());
+    let sheet_id = snapshot.composition.sheets[0].sheet_id.clone();
     let sources = snapshot.composition.sheets[0]
         .referenced_media_ids()
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
-        .enumerate()
-        .map(|(index, media_id)| {
-            RenderSource::new(
-                media_id.to_owned(),
-                root.path().join(format!("planned-{index}.jpg")),
-            )
-            .expect("the planned source descriptor is valid")
+        .map(|media_id| {
+            RenderSource::new(media_id.to_string(), planned_source.clone())
+                .expect("the planned source descriptor is valid")
         })
         .collect::<Vec<_>>();
     let planned = plan(
@@ -351,6 +320,30 @@ fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
             .all(|source| !source.source_path().exists()),
         "planning freezes descriptors without opening their originals"
     );
+}
+
+fn productive_snapshot(source_path: PathBuf) -> RenderSnapshot {
+    let root = tempfile::tempdir().expect("temporary productive Project");
+    let project_path = root.path().join("ExportFixture.myalbuns");
+    let mut project_context = OperationPathContext::new();
+    project_context
+        .capture(&project_path)
+        .expect("the productive Project root is captured");
+    let project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .create_editable(CreateProjectRequest::new(
+            ProjectLocation::new(project_path, project_context.freeze()),
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media { path: source_path },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            )),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project is created through ProjectCore");
+    project.render_snapshot()
 }
 
 #[test]

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
-    ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaUsage,
+    ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaId, MediaUsage,
     NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
     PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectedActiveSides, ProjectedBackground,
     ProjectedBackgroundContent, ProjectedOverlay, ProjectedOverlayContent,
@@ -84,7 +84,7 @@ pub(crate) fn derive_media_usage(
     album: &AlbumSnapshot,
     composition: &CompositionPlan,
 ) -> Vec<MediaUsage> {
-    let mut counts = HashMap::<&str, usize>::new();
+    let mut counts = HashMap::<MediaId, usize>::new();
     for media_id in composition
         .sheets
         .iter()
@@ -98,7 +98,12 @@ pub(crate) fn derive_media_usage(
         .iter()
         .map(|media| MediaUsage {
             media_id: media.id.clone(),
-            count: counts.get(media.id.as_str()).copied().unwrap_or_default(),
+            count: media
+                .id
+                .parse::<MediaId>()
+                .ok()
+                .and_then(|media_id| counts.get(&media_id).copied())
+                .unwrap_or_default(),
         })
         .collect()
 }
@@ -183,7 +188,10 @@ fn compose_background(
                 .copied()
                 .expect("validated Background media reference");
             ComposedBackground::Media {
-                media_id: media.id.clone(),
+                media_id: media
+                    .id
+                    .parse()
+                    .expect("validated Background media identity"),
                 name: media.name.clone(),
                 draw_rect,
             }
@@ -244,7 +252,7 @@ fn compose_overlay(
         .copied()
         .expect("validated Overlay media reference");
     ComposedDecorative {
-        media_id: media.id.clone(),
+        media_id: media.id.parse().expect("validated Overlay media identity"),
         name: media.name.clone(),
         draw_rect,
     }
@@ -340,7 +348,10 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     };
 
     ComposedPhoto {
-        media_id: photo.media_id.clone(),
+        media_id: photo
+            .media_id
+            .parse()
+            .expect("validated Photo media identity"),
         name: media.name.clone(),
         draw_rect: RectUm {
             x: frame.x + (current.center.x - current.size.width / 2.0).round() as i64,

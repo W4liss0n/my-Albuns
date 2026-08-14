@@ -1,21 +1,60 @@
-use std::path::Path;
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalIdentityEvidence};
 use uuid::Uuid;
 
 use crate::{
     composition::build_render_snapshot,
-    model::{CoreError, EditorProjection, ProjectIntent, RenderSnapshot},
+    model::{
+        ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
+    },
     persistent_projection,
     persistent_session::PersistentProjectSession,
-    project::ProjectCore,
-    project_document::{InitialProject, ProjectDocument, ProjectRevision},
+    project_document::{InitialProject, MediaRef, ProjectDocument, ProjectRevision},
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
         IdentityRegistryLookup, OpenStoreError, PathFailure, ProjectIdentityLease,
         ProjectIdentityRegistry, ProjectLocation, ProjectStore, SaveStoreError, SaveStoreResult,
     },
 };
+
+/// Small public seam for productive Project persistence and editable ownership.
+///
+/// Session, store and identity coordination remain private. Each process
+/// configures its live lease and durable identity roots, then creates, opens or
+/// loads Projects through this type.
+#[derive(Clone, Debug, Default)]
+pub struct ProjectCore {
+    identity_lease_root: Option<PathBuf>,
+    identity_registry_root: Option<PathBuf>,
+}
+
+impl ProjectCore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_identity_storage_roots(
+        mut self,
+        identity_lease_root: PathBuf,
+        identity_registry_root: PathBuf,
+    ) -> Self {
+        self.identity_lease_root = Some(identity_lease_root);
+        self.identity_registry_root = Some(identity_registry_root);
+        self
+    }
+
+    fn identity_lease_root(&self) -> Option<&Path> {
+        self.identity_lease_root.as_deref()
+    }
+
+    fn identity_registry_root(&self) -> Option<&Path> {
+        self.identity_registry_root.as_deref()
+    }
+}
 
 #[derive(Debug)]
 pub struct LoadedProjectRevision {
@@ -135,6 +174,79 @@ pub struct EditableProject {
     session_valid: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct FrozenProjectRendering {
+    projection: EditorProjection,
+    render_snapshot: RenderSnapshot,
+    sources: Vec<MediaRef>,
+}
+
+#[derive(Clone, Debug)]
+pub struct FrozenSheetRendering {
+    render_snapshot: RenderSnapshot,
+    output_unit: ComposedOutputUnit,
+    sources: Vec<MediaRef>,
+}
+
+impl FrozenProjectRendering {
+    pub fn projection(&self) -> &EditorProjection {
+        &self.projection
+    }
+
+    pub fn render_snapshot(&self) -> &RenderSnapshot {
+        &self.render_snapshot
+    }
+
+    pub fn sources(&self) -> &[MediaRef] {
+        &self.sources
+    }
+
+    pub fn into_parts(self) -> (EditorProjection, RenderSnapshot, Vec<MediaRef>) {
+        (self.projection, self.render_snapshot, self.sources)
+    }
+
+    pub fn into_sheet(self, sheet_id: &str) -> Result<FrozenSheetRendering, CoreError> {
+        let output_unit = self.render_snapshot.output_unit(sheet_id)?;
+        let referenced = output_unit
+            .sheet
+            .referenced_media_ids()
+            .collect::<HashSet<_>>();
+        let sources = self
+            .sources
+            .into_iter()
+            .filter(|source| referenced.contains(&MediaId::from_uuid(source.id())))
+            .collect::<Vec<_>>();
+        if sources.len() != referenced.len() {
+            return Err(CoreError::InvalidSnapshot(
+                "a composição congelada referencia uma fonte ausente".into(),
+            ));
+        }
+        Ok(FrozenSheetRendering {
+            render_snapshot: self.render_snapshot,
+            output_unit,
+            sources,
+        })
+    }
+}
+
+impl FrozenSheetRendering {
+    pub fn render_snapshot(&self) -> &RenderSnapshot {
+        &self.render_snapshot
+    }
+
+    pub fn output_unit(&self) -> &ComposedOutputUnit {
+        &self.output_unit
+    }
+
+    pub fn sources(&self) -> &[MediaRef] {
+        &self.sources
+    }
+
+    pub fn into_parts(self) -> (RenderSnapshot, ComposedOutputUnit, Vec<MediaRef>) {
+        (self.render_snapshot, self.output_unit, self.sources)
+    }
+}
+
 impl EditableProject {
     pub fn project_id(&self) -> Uuid {
         self.session.project_id()
@@ -203,6 +315,38 @@ impl EditableProject {
             projection.state.document.dpi,
             &projection.state.album,
         )
+    }
+
+    /// Freezes the public editor/render projections and only the exact linked
+    /// originals referenced by that same creative Revision.
+    pub fn freeze_rendering(&self) -> FrozenProjectRendering {
+        let projection = self.projection();
+        let render_snapshot = build_render_snapshot(
+            &projection.state.project_id,
+            &projection.state.project_name,
+            projection.state.revision,
+            projection.state.document.dpi,
+            &projection.state.album,
+        );
+        let referenced = render_snapshot
+            .composition
+            .sheets
+            .iter()
+            .flat_map(|sheet| sheet.referenced_media_ids())
+            .collect::<HashSet<_>>();
+        let sources = self
+            .project()
+            .media()
+            .iter()
+            .filter(|media| referenced.contains(&MediaId::from_uuid(media.id())))
+            .cloned()
+            .collect();
+
+        FrozenProjectRendering {
+            projection,
+            render_snapshot,
+            sources,
+        }
     }
 
     pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorProjection, CoreError> {

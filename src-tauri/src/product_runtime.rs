@@ -33,20 +33,10 @@ use crate::{
 pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
 pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
 
-#[cfg(debug_assertions)]
-const PROCESS_GATE_ROOT_ENV: &str = "MYALBUNS_PROCESS_GATE_DATA_ROOT";
-#[cfg(debug_assertions)]
-const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
-
 pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(debug_assertions)]
-    if process_gate_headless_enabled() {
-        return run_headless_process_gate(opened);
-    }
-
     let (request, project) = opened.into_parts();
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
@@ -165,34 +155,6 @@ pub(crate) fn run(
         .run(context);
     run_result?;
     Ok(())
-}
-
-/// Exercises the real executable, bootstrap and Project ownership when the
-/// caller itself runs in a restricted Windows environment that cannot create
-/// WebView2. Release builds do not contain this path, and normal development
-/// still reaches the productive Tauri composition root below.
-#[cfg(debug_assertions)]
-fn run_headless_process_gate(
-    opened: BootstrappedHostProject,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (request, project) = opened.into_parts();
-    let project_host = ProjectHost::new(project);
-    let projection = project_host.projection().map_err(io::Error::other)?;
-    let mut terminal = PendingHostTerminal::new(request);
-    terminal.emit_ready(&projection.state.project_id, projection.state.revision)?;
-
-    // The ProjectHost intentionally stays in this stack frame so its
-    // EditableProject and identity lease live exactly as long as the process.
-    let _project_host = project_host;
-    loop {
-        std::thread::park();
-    }
-}
-
-#[cfg(debug_assertions)]
-fn process_gate_headless_enabled() -> bool {
-    std::env::var_os(PROCESS_GATE_ROOT_ENV).is_some()
-        && std::env::var_os(PROCESS_GATE_HEADLESS_ENV).as_deref() == Some(std::ffi::OsStr::new("1"))
 }
 
 fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {

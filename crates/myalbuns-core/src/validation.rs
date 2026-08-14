@@ -1,9 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::model::{
-    AlbumSnapshot, ComposedBackground, ComposedOutputUnit, ComposedSheet, CoreError, MediaKind,
-    PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, ProjectedBackground,
-    ProjectedBackgroundContent, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
+    ComposedBackground, ComposedOutputUnit, ComposedSheet, CoreError, ProjectedFrameBorder,
     RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot,
 };
 use crate::project_document::{Rgb, frame_border_width_is_valid};
@@ -77,42 +75,31 @@ fn validate_composed_content(
             let (id, draw_rect) = match background {
                 ComposedBackground::Color { rgb, draw_rect } => {
                     validate_canonical_color(rgb, CoreError::InvalidSnapshot)?;
-                    ("Background", draw_rect)
+                    ("Background".to_owned(), draw_rect)
                 }
                 ComposedBackground::Media {
                     media_id,
                     draw_rect,
                     ..
-                } => {
-                    if media_id.trim().is_empty() {
-                        return Err(CoreError::InvalidSnapshot(
-                            "Identificador de Background vazio".into(),
-                        ));
-                    }
-                    (media_id.as_str(), draw_rect)
-                }
+                } => (media_id.to_string(), draw_rect),
             };
             validate_rect_within(
                 draw_rect,
                 sheet.width_um,
                 sheet.height_um,
                 "Background composto",
-                id,
+                &id,
                 CoreError::InvalidSnapshot,
             )?;
         }
         for overlay in &sheet.overlays {
-            if overlay.media_id.trim().is_empty() {
-                return Err(CoreError::InvalidSnapshot(
-                    "Identificador de Decorativo vazio".into(),
-                ));
-            }
+            let media_id = overlay.media_id.to_string();
             validate_rect_within(
                 &overlay.draw_rect,
                 sheet.width_um,
                 sheet.height_um,
                 "Decorativo composto",
-                &overlay.media_id,
+                &media_id,
                 CoreError::InvalidSnapshot,
             )?;
         }
@@ -143,16 +130,12 @@ fn validate_composed_content(
             previous_stack_key = Some(stack_key);
 
             if let Some(photo) = &frame.photo {
-                if photo.media_id.trim().is_empty() {
-                    return Err(CoreError::InvalidSnapshot(
-                        "Identificador de Foto vazio".into(),
-                    ));
-                }
+                let media_id = photo.media_id.to_string();
                 validate_positive_dimensions(
                     photo.draw_rect.width,
                     photo.draw_rect.height,
                     "Foto composta",
-                    &photo.media_id,
+                    &media_id,
                     CoreError::InvalidSnapshot,
                 )?;
                 if !photo.rotation_degrees.is_finite() {
@@ -161,203 +144,13 @@ fn validate_composed_content(
                         photo.media_id
                     )));
                 }
-                validate_palette(&photo.palette, &photo.media_id, CoreError::InvalidSnapshot)?;
+                validate_palette(&photo.palette, &media_id, CoreError::InvalidSnapshot)?;
             }
         }
     }
 
     validate_frame_border(frame_border, CoreError::InvalidSnapshot)?;
     Ok(())
-}
-
-pub(crate) fn validate_album(album: &AlbumSnapshot) -> Result<(), CoreError> {
-    if album.sheets.len() < 2 {
-        return Err(CoreError::InvalidProject(
-            "o Álbum precisa conter pelo menos duas Lâminas".into(),
-        ));
-    }
-
-    let mut media_by_id = HashMap::new();
-    for media in &album.media {
-        if media.id.trim().is_empty() || media_by_id.insert(media.id.as_str(), media.kind).is_some()
-        {
-            return Err(CoreError::InvalidProject(format!(
-                "Identificador de mídia vazio ou duplicado: {}",
-                media.id
-            )));
-        }
-        match media.kind {
-            MediaKind::Photo => {
-                let (Some(width), Some(height), Some(palette)) = (
-                    media.source_width_px,
-                    media.source_height_px,
-                    media.palette.as_ref(),
-                ) else {
-                    return Err(CoreError::InvalidProject(format!(
-                        "metadados de origem ausentes para a Foto {}",
-                        media.id
-                    )));
-                };
-                if width == 0 || height == 0 {
-                    return Err(CoreError::InvalidProject(format!(
-                        "dimensões de origem inválidas para a Foto {}",
-                        media.id
-                    )));
-                }
-                validate_palette(palette, &media.id, CoreError::InvalidProject)?;
-            }
-            MediaKind::Decorative => {
-                let metadata_count = usize::from(media.source_width_px.is_some())
-                    + usize::from(media.source_height_px.is_some())
-                    + usize::from(media.palette.is_some());
-                if !matches!(metadata_count, 0 | 3)
-                    || media.source_width_px.is_some_and(|width| width == 0)
-                    || media.source_height_px.is_some_and(|height| height == 0)
-                {
-                    return Err(CoreError::InvalidProject(format!(
-                        "metadados derivados incompletos para o Decorativo {}",
-                        media.id
-                    )));
-                }
-                if let Some(palette) = &media.palette {
-                    validate_palette(palette, &media.id, CoreError::InvalidProject)?;
-                }
-            }
-        }
-    }
-
-    validate_visual_defaults(album, &media_by_id)?;
-
-    let mut sheet_ids = HashSet::new();
-    let mut frame_ids = HashSet::new();
-    for sheet in &album.sheets {
-        if sheet.id.trim().is_empty() || !sheet_ids.insert(sheet.id.as_str()) {
-            return Err(CoreError::InvalidProject(format!(
-                "Identificador de Lâmina vazio ou duplicado: {}",
-                sheet.id
-            )));
-        }
-        validate_positive_dimensions(
-            sheet.width_um,
-            sheet.height_um,
-            "Lâmina",
-            &sheet.id,
-            CoreError::InvalidProject,
-        )?;
-        for frame in &sheet.frames {
-            if frame.id.trim().is_empty() || !frame_ids.insert(frame.id.as_str()) {
-                return Err(CoreError::InvalidProject(format!(
-                    "Identificador de Frame vazio ou duplicado: {}",
-                    frame.id
-                )));
-            }
-            validate_rect_within(
-                &frame.rect,
-                sheet.width_um,
-                sheet.height_um,
-                "Frame",
-                &frame.id,
-                CoreError::InvalidProject,
-            )?;
-
-            if let Some(photo) = &frame.photo {
-                match media_by_id.get(photo.media_id.as_str()) {
-                    Some(MediaKind::Photo) => {}
-                    Some(MediaKind::Decorative) => {
-                        return Err(CoreError::InvalidProject(format!(
-                            "Frame referencia um Decorativo: {}",
-                            photo.media_id
-                        )));
-                    }
-                    None => {
-                        return Err(CoreError::InvalidProject(format!(
-                            "Foto não pertence ao catálogo: {}",
-                            photo.media_id
-                        )));
-                    }
-                }
-                let transform = &photo.transform;
-                if !transform.pan_x.is_finite()
-                    || !transform.pan_y.is_finite()
-                    || !transform.user_zoom.is_finite()
-                    || !transform.fine_rotation_degrees.is_finite()
-                    || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&transform.pan_x)
-                    || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&transform.pan_y)
-                    || !(PHOTO_ZOOM_MIN..=PHOTO_ZOOM_MAX).contains(&transform.user_zoom)
-                {
-                    return Err(CoreError::InvalidProject(format!(
-                        "transformação inválida para a Foto {}",
-                        photo.media_id
-                    )));
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_visual_defaults(
-    album: &AlbumSnapshot,
-    media_by_id: &HashMap<&str, MediaKind>,
-) -> Result<(), CoreError> {
-    let validate_background = |content: &ProjectedBackgroundContent| match content {
-        ProjectedBackgroundContent::Color { rgb } => {
-            validate_canonical_color(rgb, CoreError::InvalidProject)
-        }
-        ProjectedBackgroundContent::Media { media_id } => {
-            validate_decorative_reference(media_id, "Background", media_by_id)
-        }
-    };
-    match &album.visual_defaults.background {
-        ProjectedBackground::BothSides { both } => validate_background(both)?,
-        ProjectedBackground::PerSide { left, right } => {
-            validate_background(left)?;
-            validate_background(right)?;
-        }
-    }
-
-    let validate_overlay = |content: &ProjectedOverlayContent| match content {
-        ProjectedOverlayContent::Media { media_id } => {
-            validate_decorative_reference(media_id, "Overlay", media_by_id)
-        }
-    };
-    match &album.visual_defaults.overlay {
-        ProjectedOverlay::BothSides { both } => {
-            if let Some(content) = both {
-                validate_overlay(content)?;
-            }
-        }
-        ProjectedOverlay::PerSide { left, right } => {
-            if let Some(content) = left {
-                validate_overlay(content)?;
-            }
-            if let Some(content) = right {
-                validate_overlay(content)?;
-            }
-        }
-    }
-
-    validate_frame_border(
-        &album.visual_defaults.frame_border,
-        CoreError::InvalidProject,
-    )
-}
-
-fn validate_decorative_reference(
-    media_id: &str,
-    role: &str,
-    media_by_id: &HashMap<&str, MediaKind>,
-) -> Result<(), CoreError> {
-    match media_by_id.get(media_id) {
-        Some(MediaKind::Decorative) => Ok(()),
-        Some(MediaKind::Photo) => Err(CoreError::InvalidProject(format!(
-            "{role} referencia uma Foto: {media_id}"
-        ))),
-        None => Err(CoreError::InvalidProject(format!(
-            "Decorativo não pertence ao catálogo: {media_id}"
-        ))),
-    }
 }
 
 fn validate_frame_border(

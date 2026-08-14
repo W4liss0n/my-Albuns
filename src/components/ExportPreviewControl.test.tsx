@@ -12,7 +12,7 @@ import type {
   ExportAttempt,
   ExportCancelStatus,
   ExportOutcome,
-  ExportPort,
+  ExportPipelinePort,
   ExportProgressEvent,
 } from "../application/projectPorts";
 import { ExportPreviewControl } from "./ExportPreviewControl";
@@ -26,7 +26,7 @@ interface AttemptHarness {
 
 function createExportHarness() {
   const attempts: AttemptHarness[] = [];
-  const startSheet = vi.fn<ExportPort["startSheet"]>((_sheetId, onEvent) => {
+  const startSheet = vi.fn<ExportPipelinePort["startSheet"]>((_selection, onEvent) => {
     let resolve!: (outcome: ExportOutcome) => void;
     let reject!: (error: unknown) => void;
     const completion = new Promise<ExportOutcome>(
@@ -50,8 +50,16 @@ function createExportHarness() {
 
   return {
     attempts,
-    port: { startSheet } satisfies ExportPort,
+    port: { startSheet } satisfies ExportPipelinePort,
     startSheet,
+  };
+}
+
+function selection(sheetId: string, sheetNumber = 1) {
+  return {
+    projectName: "Projeto de teste",
+    sheetId,
+    sheetNumber,
   };
 }
 
@@ -65,9 +73,9 @@ test("waits for the started event before showing progress", async () => {
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-002"
+      selection={selection("sheet-002", 2)}
     />,
   );
 
@@ -78,7 +86,7 @@ test("waits for the started event before showing progress", async () => {
 
   expect(exportButton).toBeDisabled();
   expect(harness.startSheet).toHaveBeenCalledWith(
-    "sheet-002",
+    selection("sheet-002", 2),
     expect.any(Function),
   );
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -110,10 +118,10 @@ test("rejects an attempt before started without opening a modal", async () => {
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   await user.click(
@@ -144,9 +152,9 @@ test("projects progress and follows the backend cancellation declaration", async
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   await user.click(
@@ -226,9 +234,9 @@ test("requests cancellation once and waits for completion before showing feedbac
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   await user.click(
@@ -286,9 +294,9 @@ test("closes progress and confirms a completed Export briefly", async () => {
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   fireEvent.click(
@@ -333,9 +341,9 @@ test("offers retry and close in feedback after an Export failure", async () => {
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   await user.click(
@@ -397,10 +405,10 @@ test("retires an active attempt when the Project changes or the control unmounts
   const onActiveChange = vi.fn();
   const view = render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
 
@@ -417,10 +425,10 @@ test("retires an active attempt when the Project changes or the control unmounts
 
   view.rerender(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-b"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
 
@@ -479,10 +487,10 @@ test("honors external disabling and keeps commands blocked until terminal feedba
   const view = render(
     <ExportPreviewControl
       disabled
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
 
@@ -495,10 +503,10 @@ test("honors external disabling and keeps commands blocked until terminal feedba
 
   view.rerender(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       onActiveChange={onActiveChange}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   fireEvent.click(
@@ -530,9 +538,9 @@ test("moves focus into progress and restores it after completion", async () => {
 
   render(
     <ExportPreviewControl
-      exportPort={harness.port}
+      exportPipelinePort={harness.port}
       projectId="project-a"
-      sheetId="sheet-001"
+      selection={selection("sheet-001")}
     />,
   );
   const exportButton = screen.getByRole("button", {
