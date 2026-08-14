@@ -86,6 +86,11 @@ Node.js `24.18.0`, `tauri-driver 2.0.6` e WebView2/EdgeDriver
   modo forçado e abrupto. O gate usa essa propriedade para matar apenas o
   supervisor e comprovar que o Job recolhe os descendentes:
   [Child process](https://nodejs.org/docs/latest-v24.x/api/child_process.html#subprocesskillsignal).
+- O mesmo contrato distingue os eventos `exit` e `close`: `exit` pode ocorrer
+  enquanto `stdout` ou `stderr` ainda estão abertos, e `close` só é emitido
+  depois que os streams fecham. Por isso o gate congela o resultado e procura o
+  terminal de limpeza somente após `close`:
+  [evento `close`](https://nodejs.org/docs/latest-v24.x/api/child_process.html#event-close).
 - No Windows, `Start-Process` abre por padrão uma nova janela; o gate solicita
   `WindowStyle Hidden`, sem reutilizar o console do runner. Um emissor pode
   liberar seu console, anexar-se ao console desse processo e gerar
@@ -254,7 +259,12 @@ subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública
 Windows e exige os mesmos terminais vazios. Outra fase encerra somente o
 supervisor raiz de modo abrupto e prova o fallback `KILL_ON_JOB_CLOSE`. As fases
 finais cobrem falha de bootstrap, falha de contenção anterior à WebView e queda
-do próprio Vite. Ctrl+C e queda abrupta permanecem evidências distintas.
+do próprio Vite. Falha de bootstrap e falha de contenção atravessam uma única
+fase proprietária de launch, autoridade exata, observação da floresta, terminal
+e cleanup; essa fase exige saída não zero, o terminal
+`dev_environment_cleanup_completed` e a autoridade encerrada antes de devolver
+o resultado. Cada chamador conserva somente sua asserção específica. Ctrl+C e
+queda abrupta permanecem evidências distintas.
 
 Os dados brutos da rodada canônica ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica

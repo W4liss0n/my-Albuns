@@ -17,6 +17,7 @@ import {
   sendCtrlC,
   startProcessInstanceInOwnConsole,
   terminateProcessInstance,
+  waitForChildProcessClose,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
@@ -124,6 +125,43 @@ test("a listening process is captured and revalidated as one exact instance", as
   } finally {
     child.kill();
   }
+});
+
+test("child completion waits for inherited output streams to close", async () => {
+  let output = "";
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      `const { spawn } = require("node:child_process");
+const descendant = spawn(
+  process.execPath,
+  ["-e", "setTimeout(() => console.log('OUTPUT_DRAINED'), 300)"],
+  { detached: true, windowsHide: true, stdio: ["ignore", "inherit", "inherit"] },
+);
+descendant.unref();`,
+    ],
+    { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+
+  await new Promise((resolve) => child.once("exit", resolve));
+  assert.doesNotMatch(
+    output,
+    /OUTPUT_DRAINED/,
+    "the parent exit must precede the inherited output terminal",
+  );
+
+  assert.equal(
+    await waitForChildProcessClose(child, 5_000, "Inherited output fixture"),
+    0,
+  );
+  assert.match(output, /OUTPUT_DRAINED/);
 });
 
 test("an unresponsive exact window makes bounded close fail without hanging cleanup", async () => {

@@ -21,6 +21,7 @@ import {
   sendCtrlC,
   startProcessInstanceInOwnConsole,
   terminateProcessInstance,
+  waitForChildProcessClose,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 
@@ -119,21 +120,6 @@ async function waitForHttp(url, timeoutMilliseconds, label) {
     await delay(100);
   }
   throw lastError ?? new Error(`${label} did not become ready`);
-}
-
-async function waitForProcessExit(
-  child,
-  timeoutMilliseconds,
-  label,
-  observe = () => {},
-) {
-  const deadline = Date.now() + timeoutMilliseconds;
-  while (Date.now() < deadline) {
-    observe();
-    if (child.exitCode !== null) return child.exitCode;
-    await delay(50);
-  }
-  throw new Error(`${label} did not exit within ${timeoutMilliseconds} ms`);
 }
 
 function webdriverClient(baseUrl) {
@@ -406,7 +392,7 @@ async function runSupervisorFailurePhase({
     );
     observeProcessForest();
     terminal = {
-      exitCode: await waitForProcessExit(
+      exitCode: await waitForChildProcessClose(
         supervisor,
         gateTimeoutMilliseconds,
         `${label} supervisor`,
@@ -423,14 +409,12 @@ async function runSupervisorFailurePhase({
       } else if (supervisor.exitCode === null) {
         supervisor.kill();
       }
-      if (supervisor.exitCode === null) {
-        await waitForProcessExit(
-          supervisor,
-          cleanupTimeoutMilliseconds,
-          `${label} supervisor cleanup`,
-          observeProcessForest,
-        );
-      }
+      await waitForChildProcessClose(
+        supervisor,
+        cleanupTimeoutMilliseconds,
+        `${label} supervisor cleanup`,
+        observeProcessForest,
+      );
       await assertDevelopmentCleanup(label, processIds, processInstances);
     } catch (error) {
       cleanupError = error;
@@ -449,9 +433,22 @@ async function runSupervisorFailurePhase({
     );
   }
 
+  const output = readOutput();
+  if (terminal.exitCode === 0) {
+    throw new Error(`${label} supervisor unexpectedly exited successfully`);
+  }
+  if (!output.includes('"event":"dev_environment_cleanup_completed"')) {
+    throw new Error(`${label} supervisor omitted its typed cleanup terminal`);
+  }
+  if (aliveProcessInstances([authority]).length !== 0) {
+    throw new Error(
+      `${label} supervisor authority remained alive after cleanup`,
+    );
+  }
+
   return {
     authority,
-    output: readOutput(),
+    output,
     terminal,
     processForest: {
       processIds,
@@ -703,9 +700,11 @@ try {
   // no longer an active participant in the WebView being closed.
   if (driverInstance) {
     if (!driver || !terminateProcessInstance(driverInstance)) {
-      throw new Error("The exact WebDriver process instance was not terminable");
+      throw new Error(
+        "The exact WebDriver process instance was not terminable",
+      );
     }
-    await waitForProcessExit(driver, 10_000, "WebDriver");
+    await waitForChildProcessClose(driver, 10_000, "WebDriver");
     driver = undefined;
     driverInstance = undefined;
   }
@@ -768,13 +767,9 @@ try {
     label: "Bootstrap failure",
     launcherArguments: ["--myalbuns-invalid-development-option"],
   });
-  const bootstrapFailureTerminalObserved =
-    bootstrapFailure.terminal.exitCode !== 0 &&
-    bootstrapFailure.output.includes('"event":"dev_frontend_ready"') &&
-    bootstrapFailure.output.includes(
-      '"event":"dev_environment_cleanup_completed"',
-    ) &&
-    aliveProcessInstances([bootstrapFailure.authority]).length === 0;
+  const bootstrapFailureTerminalObserved = bootstrapFailure.output.includes(
+    '"event":"dev_frontend_ready"',
+  );
   if (!bootstrapFailureTerminalObserved) {
     throw new Error(
       `Bootstrap failure did not clean its environment: ${JSON.stringify({ exitCode: bootstrapFailure.terminal.exitCode, supervisorPid: bootstrapFailure.authority.processId })}`,
@@ -788,15 +783,10 @@ try {
     },
   });
   const containmentFailureTerminalObserved =
-    containmentFailure.terminal.exitCode !== 0 &&
     containmentFailure.output.includes(
       '"event":"desktop_start_failed","stage":"initialize","code":"dev_descendant_job_install_failed"',
     ) &&
-    containmentFailure.output.includes(
-      '"event":"dev_environment_cleanup_completed"',
-    ) &&
-    !containmentFailure.output.includes('"event":"dev_global_only_exited"') &&
-    aliveProcessInstances([containmentFailure.authority]).length === 0;
+    !containmentFailure.output.includes('"event":"dev_global_only_exited"');
   if (!containmentFailureTerminalObserved) {
     throw new Error(
       `Containment failure did not fail closed: ${JSON.stringify({ exitCode: containmentFailure.terminal.exitCode, supervisorPid: containmentFailure.authority.processId })}`,
@@ -822,7 +812,7 @@ try {
   if (!terminateProcessInstance(failedViteInstance)) {
     throw new Error("The exact Vite process instance was not terminable");
   }
-  const frontendFailureExit = await waitForProcessExit(
+  const frontendFailureExit = await waitForChildProcessClose(
     frontendFailureSupervisor,
     30_000,
     "Frontend-failure supervisor",

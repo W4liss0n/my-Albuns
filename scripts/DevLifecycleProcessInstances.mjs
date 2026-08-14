@@ -187,6 +187,66 @@ export async function waitForProcessInstance(
   throw new Error(`${label} process instance did not become observable`);
 }
 
+export async function waitForChildProcessClose(
+  child,
+  timeoutMilliseconds,
+  label,
+  observe = () => {},
+) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      finish(
+        reject,
+        new Error(`${label} did not close within ${timeoutMilliseconds} ms`),
+      );
+    }, timeoutMilliseconds);
+    const observation = setInterval(() => {
+      try {
+        observe();
+      } catch (error) {
+        finish(reject, error);
+      }
+    }, 50);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      clearInterval(observation);
+      child.off("close", onClose);
+      child.off("error", onError);
+    };
+    const finish = (complete, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      complete(value);
+    };
+    const onClose = (exitCode) => {
+      try {
+        observe();
+        finish(resolve, exitCode);
+      } catch (error) {
+        finish(reject, error);
+      }
+    };
+    const onError = (error) => finish(reject, error);
+
+    child.once("close", onClose);
+    child.once("error", onError);
+    try {
+      observe();
+      const streams = [child.stdout, child.stderr].filter(Boolean);
+      if (
+        (child.exitCode !== null || child.signalCode !== null) &&
+        streams.every((stream) => stream.closed)
+      ) {
+        finish(resolve, child.exitCode);
+      }
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}
+
 export function processInstanceKey(instance) {
   return `${instance.processId}:${instance.creationTimeUtc}`;
 }
