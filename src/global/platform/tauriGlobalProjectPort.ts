@@ -17,12 +17,6 @@ const openFallbackFailure: ProjectLaunchFailure = {
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
-const newProjectWindowFallback: ProjectLaunchFailure = {
-  code: "new_project_window_unavailable",
-  message: "Não foi possível abrir a janela de criação do Projeto.",
-  action: "Tente novamente.",
-};
-
 const graphicsGateFallbackFailure: ProjectLaunchFailure = {
   code: "graphics_gate_unavailable",
   message: "Não foi possível confirmar o requisito gráfico do editor.",
@@ -56,17 +50,6 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
       return {
         status: "failed",
         error: toProjectLaunchFailure(error, graphicsGateFallbackFailure),
-      };
-    }
-  },
-  showNewProjectWindow: async () => {
-    try {
-      await invoke<void>("show_new_project_window");
-      return { status: "opened" };
-    } catch (error) {
-      return {
-        status: "failed",
-        error: toProjectLaunchFailure(error, newProjectWindowFallback),
       };
     }
   },

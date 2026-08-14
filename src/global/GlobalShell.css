@@ -23,6 +23,17 @@ body,
   grid-area: header;
 }
 
+.global-shell--new-project {
+  grid-template-areas:
+    "header"
+    "creation";
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.global-shell--new-project > .new-project-flow {
+  grid-area: creation;
+}
+
 .global-primary-actions {
   display: flex;
   min-width: 0;

@@ -70,5 +70,4 @@ export const tauriNewProjectPort: NewProjectPort = {
       // The process-scoped registry is also cleared when this window closes.
     }
   },
-  closeWindow: () => invoke<void>("close_new_project_window"),
 };

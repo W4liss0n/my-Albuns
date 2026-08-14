@@ -11,9 +11,11 @@ import type { GraphicsDiagnostic } from "../application/graphics";
 import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
+  NewProjectPort,
   OpenProjectOutcome,
   RecentProjectSummary,
 } from "./application/globalProjectPort";
+import { NewProjectFlow } from "./NewProjectFlow";
 import {
   ActionButton,
   AppIcon,
@@ -23,6 +25,7 @@ import {
 
 interface GlobalShellProps {
   graphicsDiagnostic: GraphicsDiagnostic;
+  newProjectPort: NewProjectPort;
   projectPort: GlobalProjectPort;
 }
 
@@ -31,10 +34,13 @@ const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
   graphicsDiagnostic,
+  newProjectPort,
   projectPort,
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [surface, setSurface] = useState<"welcome" | "newProject">(
+    "welcome",
+  );
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
   >([]);
@@ -92,25 +98,43 @@ export function GlobalShell({
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
-  const startCreation = async () => {
+  const startCreation = () => {
     openingAttempt.current += 1;
-    setIsCreating(true);
-    const outcome = await projectPort.showNewProjectWindow();
-    if (outcome.status === "failed") {
-      await projectPort.showLaunchFailure(outcome.error);
-    }
-    setIsCreating(false);
+    setSurface("newProject");
   };
 
   if (!graphicsDiagnostic.supported) {
     return <SafeApplicationShell diagnostic={graphicsDiagnostic} />;
   }
 
+  if (surface === "newProject") {
+    return (
+      <div className="global-shell global-shell--new-project">
+        <ApplicationHeader status="Novo Projeto" />
+        <NewProjectFlow
+          onCancel={() => setSurface("welcome")}
+          onChooseDecorative={() =>
+            newProjectPort.chooseProvisionalDecorative()
+          }
+          onCreate={(configuration) =>
+            newProjectPort.createProject(configuration)
+          }
+          onReleaseDecorative={(selectionId) =>
+            newProjectPort.releaseProvisionalDecorative(selectionId)
+          }
+          onValidate={(configuration) =>
+            newProjectPort.validateProjectConfiguration(configuration)
+          }
+        />
+      </div>
+    );
+  }
+
   return (
-    <main className="global-shell">
+    <div className="global-shell">
       <ApplicationHeader status="diagramação de Álbuns" />
 
-        <section className="global-recent-projects">
+        <main className="global-recent-projects">
           <div className="global-section-heading">
             <h1>Projetos recentes</h1>
           </div>
@@ -125,7 +149,7 @@ export function GlobalShell({
                 <li key={project.id}>
                   <button
                     aria-label={project.name}
-                    disabled={isOpening || isCreating}
+                    disabled={isOpening}
                     onClick={() => openRecentProject(project.id)}
                     type="button"
                   >
@@ -159,15 +183,15 @@ export function GlobalShell({
               ))}
             </ul>
           )}
-        </section>
+        </main>
 
         <aside aria-label="Ações principais" className="global-primary-actions">
           <BrandWordmark subtitle="diagramação de Álbuns · versão 0.1.0" />
           <div className="global-action-stack">
             <ActionButton
               aria-label="Novo Projeto"
-              disabled={isOpening || isCreating}
-              onClick={() => void startCreation()}
+              disabled={isOpening}
+              onClick={startCreation}
               variant="primary"
             >
               <AppIcon icon={Plus} size={16} />
@@ -176,7 +200,7 @@ export function GlobalShell({
             </ActionButton>
             <ActionButton
               aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
-              disabled={isOpening || isCreating}
+              disabled={isOpening}
               onClick={openProject}
             >
               <AppIcon icon={FolderOpen} size={16} />
@@ -199,6 +223,6 @@ export function GlobalShell({
             </button>
           </div>
         </aside>
-    </main>
+    </div>
   );
 }

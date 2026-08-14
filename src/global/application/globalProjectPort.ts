@@ -111,7 +111,6 @@ export interface GlobalProjectPort {
   completeGraphicsGate(
     supported: boolean,
   ): Promise<ProjectLaunchOutcome | null>;
-  showNewProjectWindow(): Promise<ProjectLaunchOutcome>;
   openProject(): Promise<OpenProjectOutcome>;
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
@@ -128,5 +127,4 @@ export interface NewProjectPort {
   ): Promise<ProjectLaunchOutcome>;
   chooseProvisionalDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
   releaseProvisionalDecorative(selectionId: string): Promise<void>;
-  closeWindow(): Promise<void>;
 }

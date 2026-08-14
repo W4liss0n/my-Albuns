@@ -12,7 +12,7 @@ use tauri::{AppHandle, Runtime, State, UriSchemeContext, UriSchemeResponder, Web
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    global_runtime::{GLOBAL_WINDOW_LABEL, NEW_PROJECT_WINDOW_LABEL},
+    global_runtime::GLOBAL_WINDOW_LABEL,
     opaque_image_protocol::{
         ImagePayload, ImageReadError, ImageRequestError, opaque_image_url, read_image,
         respond_to_opaque_image_request, serve_opaque_image, sniff_image,
@@ -342,12 +342,8 @@ impl ProvisionalDecorativeRegistry {
         webview_label: &str,
         request: tauri::http::Request<Vec<u8>>,
     ) -> tauri::http::Response<Vec<u8>> {
-        let authorized_window = match webview_label {
-            GLOBAL_WINDOW_LABEL | NEW_PROJECT_WINDOW_LABEL => webview_label,
-            _ => GLOBAL_WINDOW_LABEL,
-        };
         serve_opaque_image(
-            authorized_window,
+            GLOBAL_WINDOW_LABEL,
             webview_label,
             request,
             |selection_id, include_body| {
@@ -394,7 +390,7 @@ pub(crate) async fn choose_provisional_decorative(
     window: WebviewWindow,
     registry: State<'_, ProvisionalDecorativeRegistry>,
 ) -> Result<Option<ProvisionalDecorativeSelection>, ProvisionalDecorativeFailure> {
-    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+    if window.label() != GLOBAL_WINDOW_LABEL {
         return Err(ProvisionalDecorativeFailure::invalid_surface());
     }
     let (sender, receiver) = tokio::sync::oneshot::channel();
@@ -427,8 +423,8 @@ pub(crate) fn release_provisional_decorative(
     selection_id: String,
     registry: State<'_, ProvisionalDecorativeRegistry>,
 ) -> Result<bool, String> {
-    if window.label() != NEW_PROJECT_WINDOW_LABEL {
-        return Err("only the New Project window can release provisional selections".into());
+    if window.label() != GLOBAL_WINDOW_LABEL {
+        return Err("only the global New Project flow can release provisional selections".into());
     }
     Ok(registry.release(&selection_id))
 }
@@ -727,7 +723,7 @@ mod tests {
         assert_eq!(
             registry
                 .serve(
-                    NEW_PROJECT_WINDOW_LABEL,
+                    GLOBAL_WINDOW_LABEL,
                     request(Method::GET, &selected.preview_url)
                 )
                 .status(),

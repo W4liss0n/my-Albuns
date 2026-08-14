@@ -370,7 +370,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
   );
 });
 
-test("preserves provisional personalization and delegates final cancellation cleanup to its owner", async () => {
+test("preserves provisional personalization and releases it when creation is cancelled", async () => {
   const user = userEvent.setup();
   const onCancel = vi.fn();
   const onReleaseDecorative = vi.fn();
@@ -411,7 +411,8 @@ test("preserves provisional personalization and delegates final cancellation cle
   expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(onReleaseDecorative).not.toHaveBeenCalled();
+  expect(onReleaseDecorative).toHaveBeenCalledOnce();
+  expect(onReleaseDecorative).toHaveBeenCalledWith(selection.selectionId);
   expect(onCancel).toHaveBeenCalledOnce();
 });
 

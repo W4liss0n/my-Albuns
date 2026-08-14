@@ -6,7 +6,10 @@
       "commands": {
         "allow": [
           "complete_graphics_gate",
-          "show_new_project_window",
+          "validate_project_configuration",
+          "create_project",
+          "choose_provisional_decorative",
+          "release_provisional_decorative",
           "open_project",
           "recent_projects",
           "open_recent_project",

@@ -178,9 +178,6 @@ mod tests {
         let project_dialog_capability: serde_json::Value =
             serde_json::from_str(include_str!("../capabilities/project-dialog.json"))
                 .expect("valid project dialog capability");
-        let new_project_capability: serde_json::Value =
-            serde_json::from_str(include_str!("../capabilities/new-project.json"))
-                .expect("valid new project capability");
         let project_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/project-window.json"))
                 .expect("valid project permission");
@@ -190,9 +187,6 @@ mod tests {
         let project_dialog_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/project-dialog-window.json"))
                 .expect("valid project dialog permission");
-        let new_project_permission: serde_json::Value =
-            serde_json::from_str(include_str!("../permissions/new-project-window.json"))
-                .expect("valid new project permission");
 
         assert_eq!(
             project_capability["windows"],
@@ -256,17 +250,6 @@ mod tests {
                 "core:window:allow-start-dragging"
             ])
         );
-        assert_eq!(
-            new_project_capability["windows"],
-            serde_json::json!(["new-project"])
-        );
-        assert_eq!(
-            new_project_capability["permissions"],
-            serde_json::json!([
-                "new-project-window-commands",
-                "core:window:allow-start-dragging"
-            ])
-        );
         assert!(
             allowed_commands(&project_permission)
                 .is_disjoint(&allowed_commands(&global_permission))
@@ -282,19 +265,15 @@ mod tests {
                 "submit_project_dialog_action"
             ])
         );
-        assert!(
-            allowed_commands(&new_project_permission)
-                .is_disjoint(&allowed_commands(&global_permission))
-        );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);
-        let new_project_commands = allowed_commands(&new_project_permission);
         for command in [
+            "create_project",
+            "validate_project_configuration",
             "choose_provisional_decorative",
             "release_provisional_decorative",
         ] {
-            assert!(new_project_commands.contains(command));
-            assert!(!global_commands.contains(command));
+            assert!(global_commands.contains(command));
             assert!(!project_commands.contains(command));
         }
     }

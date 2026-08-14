@@ -163,6 +163,9 @@ export function NewProjectFlow({
 
   const cancelFlow = () => {
     validationRequest.current += 1;
+    for (const selection of provisionalSelections(personalization)) {
+      void onReleaseDecorative(selection.selectionId);
+    }
     onCancel();
   };
 

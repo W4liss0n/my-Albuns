@@ -3,12 +3,10 @@ import globalWindowCapability from "../../src-tauri/capabilities/global.json?raw
 import dialogWindowCapability from "../../src-tauri/capabilities/dialog.json?raw";
 import progressDialogWindowCapability from "../../src-tauri/capabilities/dialog-progress.json?raw";
 import projectDialogWindowCapability from "../../src-tauri/capabilities/project-dialog.json?raw";
-import newProjectWindowCapability from "../../src-tauri/capabilities/new-project.json?raw";
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
 import globalWindowPermission from "../../src-tauri/permissions/global-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
-import newProjectWindowPermission from "../../src-tauri/permissions/new-project-window.json?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   eager: true,
@@ -26,15 +24,16 @@ const tauriCommandSources = {
   projectDialog: [
     "../project-dialog/platform/tauriProjectDialogClient.ts",
   ],
-  newProject: ["../global/platform/tauriNewProjectPort.ts"],
-  global: ["../global/platform/tauriGlobalProjectPort.ts"],
+  global: [
+    "../global/platform/tauriGlobalProjectPort.ts",
+    "../global/platform/tauriNewProjectPort.ts",
+  ],
 } as const;
 
 const compositionRoots = new Set([
   "../dialog/main.tsx",
   "../global/main.tsx",
   "../main.tsx",
-  "../new-project/main.tsx",
   "../project-dialog/main.tsx",
 ]);
 const platformDirectories = [
@@ -128,7 +127,6 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     ...tauriCommandSources.shared,
     ...tauriCommandSources.project,
     ...tauriCommandSources.projectDialog,
-    ...tauriCommandSources.newProject,
     ...tauriCommandSources.global,
   ];
 
@@ -192,23 +190,6 @@ test("limits the Project dialog to state hydration and semantic actions", () => 
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-close",
-    "core:window:allow-start-dragging",
-  ]);
-  expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
-});
-
-test("isolates New Project commands in the owned creation window", () => {
-  const invokedCommands = extractInvokedCommands(
-    tauriCommandSources.newProject,
-  );
-  const { capability, allowedCommands } = parseSurfaceContract(
-    newProjectWindowCapability,
-    newProjectWindowPermission,
-  );
-
-  expect(capability.windows).toEqual(["new-project"]);
-  expect(capability.permissions).toEqual([
-    "new-project-window-commands",
     "core:window:allow-start-dragging",
   ]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());

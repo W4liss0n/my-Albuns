@@ -16,18 +16,6 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset();
 });
 
-test("opens creation as an owned native window and closes it through its own port", async () => {
-  vi.mocked(invoke).mockResolvedValue(undefined);
-
-  await expect(tauriGlobalProjectPort.showNewProjectWindow()).resolves.toEqual({
-    status: "opened",
-  });
-  await tauriNewProjectPort.closeWindow();
-
-  expect(invoke).toHaveBeenNthCalledWith(1, "show_new_project_window");
-  expect(invoke).toHaveBeenNthCalledWith(2, "close_new_project_window");
-});
-
 const configuration: NewProjectConfiguration = {
   document: {
     displayUnit: "mm",

@@ -1,14 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import type { GlobalProjectPort } from "./global/application/globalProjectPort";
+import type {
+  GlobalProjectPort,
+  NewProjectPort,
+} from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import "./App.css";
 import "./global/GlobalShell.css";
 
 const projectPort: GlobalProjectPort = {
   completeGraphicsGate: async () => null,
-  showNewProjectWindow: async () => ({ status: "opened" }),
   openProject: async () => {
     if (new URLSearchParams(window.location.search).has("progress")) {
       await new Promise<never>(() => undefined);
@@ -29,6 +31,13 @@ const projectPort: GlobalProjectPort = {
   showLaunchFailure: async () => undefined,
 };
 
+const newProjectPort: NewProjectPort = {
+  chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
+  createProject: async () => ({ status: "cancelled" }),
+  releaseProvisionalDecorative: async () => undefined,
+  validateProjectConfiguration: async () => ({ status: "valid" }),
+};
+
 const supportedGraphics = {
   supported: true,
   renderer: "NVIDIA GeForce RTX",
@@ -44,6 +53,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
+      newProjectPort={newProjectPort}
       projectPort={projectPort}
     />
   </React.StrictMode>,

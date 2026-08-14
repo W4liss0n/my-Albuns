@@ -15,7 +15,6 @@ export default defineConfig(() => ({
       input: {
         dialog: "dialog.html",
         global: "global.html",
-        newProject: "new-project.html",
         project: "index.html",
         projectDialog: "project-dialog.html",
       },

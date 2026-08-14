@@ -35,7 +35,6 @@ use crate::{
 use crate::graphics_launch_gate::debug_process_gate_report;
 
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
-pub(crate) const NEW_PROJECT_WINDOW_LABEL: &str = "new-project";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[cfg(debug_assertions)]
@@ -217,12 +216,12 @@ async fn create_project(
     window: WebviewWindow,
     configuration: ProvisionalProjectCreationConfiguration,
 ) -> ProjectLaunchOutcome {
-    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+    if window.label() != GLOBAL_WINDOW_LABEL {
         return ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "invalid_creation_surface",
-                "A criação deve ser iniciada pela janela de Novo Projeto.",
-                "Feche esta janela e tente novamente.",
+                "A criação deve ser iniciada pelo fluxo de Novo Projeto.",
+                "Volte à Tela de Boas-vindas e tente novamente.",
             ),
         };
     }
@@ -287,7 +286,7 @@ async fn create_project(
             authorization: destination.1,
         },
         LaunchProgressKind::Creating,
-        NEW_PROJECT_WINDOW_LABEL,
+        GLOBAL_WINDOW_LABEL,
         true,
     )
     .await;
@@ -371,48 +370,6 @@ async fn show_project_failure_dialog(app: AppHandle, error: ProjectLaunchFailure
             event = "project_failure_dialog_unavailable",
         );
     }
-}
-
-#[tauri::command]
-async fn show_new_project_window(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
-    if window.label() != GLOBAL_WINDOW_LABEL {
-        return Err("the New Project window belongs only to Global".into());
-    }
-    if let Some(existing) = app.get_webview_window(NEW_PROJECT_WINDOW_LABEL) {
-        return native_dialog_window::display_transition_dialog(&window, &existing)
-            .map_err(|error| error.to_string());
-    }
-
-    let new_project = native_dialog_window::build_hidden_owned_window(
-        &app,
-        &window,
-        NEW_PROJECT_WINDOW_LABEL,
-        "new-project.html",
-        1040.0,
-        680.0,
-        true,
-        true,
-    )
-    .await
-    .map_err(|error| error.to_string())?;
-    let owner_after_close = window.clone();
-    let registry = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
-    new_project.on_window_event(move |event| {
-        if matches!(event, tauri::WindowEvent::Destroyed) {
-            registry.clear();
-            native_dialog_window::restore_owner(&owner_after_close);
-        }
-    });
-    native_dialog_window::display_transition_dialog(&window, &new_project)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-fn close_new_project_window(window: WebviewWindow) -> Result<(), String> {
-    if window.label() != NEW_PROJECT_WINDOW_LABEL {
-        return Err("only the New Project window can close this flow".into());
-    }
-    window.destroy().map_err(|error| error.to_string())
 }
 
 async fn launch_confirmed_project_with_progress(
@@ -909,8 +866,6 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         })
         .invoke_handler(tauri::generate_handler![
             complete_graphics_gate,
-            show_new_project_window,
-            close_new_project_window,
             create_project,
             open_project,
             recent_projects,
