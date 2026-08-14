@@ -1,0 +1,70 @@
+﻿{
+    "schemaVersion":  1,
+    "gate":  "development-lifecycle",
+    "collectedAtUtc":  "2026-08-14T12:30:19.7059054Z",
+    "gitCommit":  "51882f475181d3fcd7b031d521cb8b86ec3554dc",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64"
+                 },
+    "supervisorPid":  29348,
+    "globalPid":  26080,
+    "hostPid":  6088,
+    "vitePid":  14204,
+    "webdriverMode":  "attach-existing-webview2",
+    "globalExitedAfterUiReady":  true,
+    "hostSurvivedGlobal":  true,
+    "viteSurvivedGlobal":  true,
+    "projectUiRendered":  true,
+    "nonWhiteSamples":  1200,
+    "sampleCount":  1200,
+    "cleanupCompleted":  true,
+    "cleanupLogged":  true,
+    "normalTreeProcessCount":  12,
+    "normalHostTreeProcessCount":  7,
+    "abruptCleanupCompleted":  true,
+    "abruptTreeProcessCount":  23,
+    "ctrlCCleanupCompleted":  true,
+    "ctrlCTreeProcessCount":  12,
+    "ctrlCHostTreeProcessCount":  7,
+    "bootstrapFailureCleanupCompleted":  true,
+    "bootstrapFailureCleanupTerminalObserved":  true,
+    "bootstrapFailureTreeProcessCount":  0,
+    "containmentFailureCleanupCompleted":  true,
+    "containmentFailureTerminalObserved":  true,
+    "containmentFailureTreeProcessCount":  11,
+    "frontendFailureCleanupCompleted":  true,
+    "nativeDriverVersion":  "151.0.4129.78",
+    "webView2RuntimeVersion":  "151.0.4129.78",
+    "checks":  [
+                   {
+                       "name":  "causal-ui-ready-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-webview-rendered",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "normal-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "abrupt-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "ctrl-c-tree-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "bootstrap-failure-cleanup",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "frontend-failure-cleanup",
+                       "passed":  true
+                   }
+               ]
+}

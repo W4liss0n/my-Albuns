@@ -2,6 +2,16 @@ mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
 mod desktop_webview_policy;
+#[cfg(debug_assertions)]
+mod dev_descendant_job;
+#[cfg(debug_assertions)]
+mod dev_host_registration;
+#[cfg(debug_assertions)]
+mod dev_job;
+#[cfg(debug_assertions)]
+mod dev_process_identity;
+#[cfg(debug_assertions)]
+mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;
@@ -35,6 +45,14 @@ mod sample_project;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]
+    if dev_descendant_job::install_if_supervised().is_err() {
+        eprintln!(
+            "{{\"event\":\"desktop_start_failed\",\"stage\":\"initialize\",\"code\":\"dev_descendant_job_install_failed\"}}"
+        );
+        std::process::exit(1);
+    }
+
+    #[cfg(debug_assertions)]
     let result = match global_runtime::webdriver_automation_project() {
         Some(project_path) => run_webdriver_project_host(project_path),
         None => run_selected_runtime_role(),
@@ -44,6 +62,7 @@ pub fn run() {
 
     if let Err(error) = result {
         eprintln!("não foi possível executar o MyAlbuns: {error}");
+        std::process::exit(1);
     }
 }
 

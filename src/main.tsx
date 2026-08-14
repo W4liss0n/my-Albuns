@@ -8,6 +8,7 @@ import {
 import {
   tauriExportPort,
   tauriMediaPreviewPort,
+  tauriProjectStartupPort,
   tauriProjectSessionPort,
 } from "./platform/tauriProjectPorts";
 import { installDesktopWebViewPolicy } from "./platform/desktopWebViewPolicy";
@@ -21,6 +22,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <App
       exportPort={tauriExportPort}
       mediaPreviewPort={tauriMediaPreviewPort}
+      projectStartupPort={tauriProjectStartupPort}
       projectSessionPort={tauriProjectSessionPort}
       projectWindowPort={tauriProjectWindowPort}
       graphicsProbe={probeGraphics}

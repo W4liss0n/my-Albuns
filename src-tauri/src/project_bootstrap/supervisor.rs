@@ -7,6 +7,9 @@ use std::{
     time::Duration,
 };
 
+#[cfg(debug_assertions)]
+use std::ffi::OsString;
+
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
     InitialProjectCreationConfiguration, TargetAuthority, TerminalValidationError,
@@ -14,6 +17,8 @@ use super::{
 };
 
 const MAX_TERMINAL_BYTES: usize = 32 * 1024;
+#[cfg(debug_assertions)]
+const HOST_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT";
 
 #[derive(Clone, Debug)]
 pub(crate) struct ProjectHostBootstrap {
@@ -76,7 +81,7 @@ impl ProjectHostBootstrap {
     }
 
     fn launch(&self, request: BootstrapRequest) -> Result<ReadyHost, BootstrapFailure> {
-        let child = spawn_host(&self.executable)?;
+        let child = spawn_host(&self.executable, &request.launch_nonce)?;
         supervise_child(child, &request, self.terminal_timeout)
     }
 }
@@ -112,18 +117,78 @@ fn new_request(
     })
 }
 
-fn spawn_host(executable: &Path) -> Result<Child, BootstrapFailure> {
-    Command::new(executable)
+fn spawn_host(executable: &Path, launch_nonce: &str) -> Result<Child, BootstrapFailure> {
+    let mut command = Command::new(executable);
+    command
         .arg(crate::runtime_role::PROJECT_HOST_ROLE_ARGUMENT)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|_| BootstrapFailure {
+        .stderr(Stdio::inherit());
+    #[cfg(debug_assertions)]
+    configure_host_webview_debugging(&mut command)?;
+    #[cfg(debug_assertions)]
+    let pending_host_lease =
+        crate::dev_host_registration::prepare_host_command(&mut command, launch_nonce).map_err(
+            |_| BootstrapFailure {
+                kind: BootstrapFailureKind::HostUnavailable,
+                stage: Some(super::FailureStage::Transport),
+                code: Some(super::FailureCode::IoFailure),
+            },
+        )?;
+    #[cfg(not(debug_assertions))]
+    let _ = launch_nonce;
+    let child = command.spawn().map_err(|_| BootstrapFailure {
+        kind: BootstrapFailureKind::HostUnavailable,
+        stage: None,
+        code: None,
+    })?;
+    #[cfg(debug_assertions)]
+    let mut child = child;
+    #[cfg(debug_assertions)]
+    if pending_host_lease
+        .as_ref()
+        .is_some_and(|authorization| authorization.authorize_spawned_host(&child).is_err())
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(BootstrapFailure {
+            kind: BootstrapFailureKind::HostUnavailable,
+            stage: Some(super::FailureStage::Transport),
+            code: Some(super::FailureCode::IoFailure),
+        });
+    }
+    Ok(child)
+}
+
+#[cfg(debug_assertions)]
+fn configure_host_webview_debugging(command: &mut Command) -> Result<(), BootstrapFailure> {
+    if let Some(argument) =
+        host_webview_debug_argument(std::env::var_os(HOST_WEBVIEW_DEBUG_PORT_ENV))?
+    {
+        command.env("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", argument);
+    }
+    Ok(())
+}
+
+#[cfg(debug_assertions)]
+fn host_webview_debug_argument(
+    port: Option<OsString>,
+) -> Result<Option<OsString>, BootstrapFailure> {
+    let Some(port) = port else {
+        return Ok(None);
+    };
+    let port = port
+        .to_str()
+        .and_then(|port| port.parse::<u16>().ok())
+        .filter(|port| *port != 0)
+        .ok_or(BootstrapFailure {
             kind: BootstrapFailureKind::HostUnavailable,
             stage: None,
             code: None,
-        })
+        })?;
+    Ok(Some(OsString::from(format!(
+        "--remote-debugging-port={port}"
+    ))))
 }
 
 fn supervise_child(
@@ -336,6 +401,21 @@ mod tests {
         assert!(!first.launch_nonce.is_empty());
         assert_ne!(first.attempt_id, second.attempt_id);
         assert_ne!(first.launch_nonce, second.launch_nonce);
+    }
+
+    #[test]
+    fn development_host_debugging_accepts_only_a_nonzero_port() {
+        assert_eq!(
+            host_webview_debug_argument(Some(OsString::from("9222"))).expect("valid debug port"),
+            Some(OsString::from("--remote-debugging-port=9222"))
+        );
+        assert!(
+            host_webview_debug_argument(None)
+                .expect("absent port")
+                .is_none()
+        );
+        assert!(host_webview_debug_argument(Some(OsString::from("0"))).is_err());
+        assert!(host_webview_debug_argument(Some(OsString::from("invalid"))).is_err());
     }
 
     #[test]

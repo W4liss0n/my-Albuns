@@ -124,7 +124,7 @@ async fn complete_graphics_gate(
             )
             .await;
             match &outcome {
-                ProjectLaunchOutcome::Opened => app.exit(0),
+                ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
                 ProjectLaunchOutcome::Failed { error } => {
                     state.record_startup_failure(error.clone());
                     show_existing_global_window(&app);
@@ -187,7 +187,7 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
 
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
     if outcome == ProjectLaunchOutcome::Opened {
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -267,7 +267,7 @@ async fn create_project(
     .await;
     if outcome == ProjectLaunchOutcome::Opened {
         provisional_decoratives.clear();
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -311,7 +311,7 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
     };
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
     if outcome == ProjectLaunchOutcome::Opened {
-        app.exit(0);
+        exit_global_after_handoff(&app);
     }
     outcome
 }
@@ -610,7 +610,15 @@ fn staged_failure(
     }
 }
 
-async fn build_global_window(app: &AppHandle) -> Result<WebviewWindow, std::io::Error> {
+fn build_global_window(
+    app: &AppHandle,
+) -> Result<
+    (
+        WebviewWindow,
+        desktop_webview_policy::WebviewPolicyReadiness,
+    ),
+    std::io::Error,
+> {
     let config = app
         .config()
         .app
@@ -618,14 +626,15 @@ async fn build_global_window(app: &AppHandle) -> Result<WebviewWindow, std::io::
         .iter()
         .find(|window| window.label == GLOBAL_WINDOW_LABEL)
         .ok_or_else(|| std::io::Error::other("the Global window configuration does not exist"))?;
+    let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
     let window = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
+        .on_page_load(move |window, payload| {
+            policy_signal.observe(&window, payload.event());
+        })
         .build()
         .map_err(std::io::Error::other)?;
-    desktop_webview_policy::enforce(&window)
-        .await
-        .map_err(std::io::Error::other)?;
-    Ok(window)
+    Ok((window, policy_readiness))
 }
 
 fn show_existing_global_window(app: &AppHandle) {
@@ -634,21 +643,23 @@ fn show_existing_global_window(app: &AppHandle) {
     }
 }
 
-async fn initialize_global_window(app: AppHandle, state: GlobalRuntimeState) {
+async fn initialize_global_window(
+    app: AppHandle,
+    state: GlobalRuntimeState,
+    window: WebviewWindow,
+    policy_readiness: desktop_webview_policy::WebviewPolicyReadiness,
+) {
     let direct_project_pending = state.graphics_gate.has_pending_direct_project();
-    let window = match build_global_window(&app).await {
-        Ok(window) => window,
-        Err(error) => {
-            tracing::error!(
-                target: "myalbuns.desktop",
-                process_role = ProcessRole::Global.as_str(),
-                error = %error,
-                event = "global_window_initialization_failed",
-            );
-            app.exit(1);
-            return;
-        }
-    };
+    if let Err(error) = policy_readiness.wait().await {
+        tracing::error!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::Global.as_str(),
+            error = %error,
+            event = "global_window_initialization_failed",
+        );
+        app.exit(1);
+        return;
+    }
     if !direct_project_pending {
         if let Err(error) = window.show() {
             tracing::error!(
@@ -691,10 +702,20 @@ fn start_direct_project_without_global_window(
             ConfirmedLaunch::OpenExisting,
         ));
         match outcome {
-            ProjectLaunchOutcome::Opened => app.exit(0),
+            ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
             ProjectLaunchOutcome::Cancelled | ProjectLaunchOutcome::Failed { .. } => app.exit(1),
         }
     });
+}
+
+fn exit_global_after_handoff(app: &AppHandle) {
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::Global.as_str(),
+        process_id = std::process::id(),
+        event = "global_exited_after_project_handoff",
+    );
+    app.exit(0);
 }
 
 #[cfg(debug_assertions)]
@@ -751,7 +772,16 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
                 );
                 return Ok(());
             }
-            tauri::async_runtime::spawn(initialize_global_window(app_handle, setup_state.clone()));
+            // Both configured windows use `create: false`. Install the first
+            // owned WebView before setup returns; the page-load terminal then
+            // proves that Wry registered it before native policy is applied.
+            let (window, policy_readiness) = build_global_window(&app_handle)?;
+            tauri::async_runtime::spawn(initialize_global_window(
+                app_handle,
+                setup_state.clone(),
+                window,
+                policy_readiness,
+            ));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

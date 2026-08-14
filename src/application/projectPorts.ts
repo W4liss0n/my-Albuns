@@ -165,6 +165,10 @@ export interface ProjectWindowPort {
   resolveClose(choice: ProjectCloseChoice): Promise<ProjectCloseResolution>;
 }
 
+export interface ProjectStartupPort {
+  confirmUiReady(): Promise<void>;
+}
+
 export interface ProjectSessionPort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;

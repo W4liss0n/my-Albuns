@@ -11,6 +11,7 @@ import {
 import type {
   ExportPort,
   MediaPreviewPort,
+  ProjectStartupPort,
   ProjectSessionPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -110,6 +111,9 @@ const projectWindowPort: ProjectWindowPort = {
   requestClose: async () => ({ kind: "closed" }),
   resolveClose: async () => ({ kind: "closed" }),
 };
+const projectStartupPort: ProjectStartupPort = {
+  confirmUiReady: async () => undefined,
+};
 const canvasGraphicsDiagnosticProbe = () =>
   ({
     supported: true,
@@ -128,6 +132,7 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -168,9 +173,11 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     write: (event) => logEvents.push(event),
   };
   const load = vi.fn(async (_operationId: string) => projection);
+  const confirmUiReady = vi.fn(async () => undefined);
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={{ confirmUiReady }}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={mediaPreviewPort}
       projectSessionPort={{ ...projectSessionPort, load }}
@@ -195,6 +202,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   expect(
     screen.getByRole("navigation", { name: "Menu principal" }),
   ).toBeInTheDocument();
+  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
   expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
   expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
   expect(logEvents).toEqual(
@@ -233,6 +241,7 @@ test("prepares real media previews after opening without blocking the Workspace"
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -291,6 +300,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -352,6 +362,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -405,6 +416,7 @@ test("labels first-observation unavailability without claiming a previous previe
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -445,6 +457,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews, onMediaChanged }}
       projectSessionPort={projectSessionPort}
@@ -483,6 +496,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -537,6 +551,7 @@ test("logs the typed media preview failure code without replacing it with unknow
   render(
     <App
       exportPort={exportPort}
+      projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,

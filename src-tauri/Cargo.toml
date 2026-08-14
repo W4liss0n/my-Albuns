@@ -1,10 +1,23 @@
 [package]
 name = "myalbuns-desktop"
+default-run = "myalbuns-desktop"
 version.workspace = true
 description = "Editor desktop de diagramação de álbuns"
 authors = ["MyAlbuns"]
 edition.workspace = true
 license.workspace = true
+
+[features]
+dev-supervisor = []
+
+[[bin]]
+name = "myalbuns-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "myalbuns-dev"
+path = "src/bin/myalbuns-dev.rs"
+required-features = ["dev-supervisor"]
 
 [lib]
 name = "myalbuns_desktop_lib"

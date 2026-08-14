@@ -18,6 +18,16 @@ try {
         exit $LASTEXITCODE
     }
 
+    & $script:CargoExecutable test `
+        -p myalbuns-desktop `
+        --bin myalbuns-dev `
+        --features dev-supervisor `
+        -- `
+        --test-threads=1
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
     & $script:CargoExecutable build `
         -p myalbuns-imaging `
         --bin myalbuns-imaging

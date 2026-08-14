@@ -6,6 +6,7 @@
       "commands": {
         "allow": [
           "frontend_log",
+          "project_ui_ready",
           "project_state",
           "apply_project_intent",
           "undo_project",

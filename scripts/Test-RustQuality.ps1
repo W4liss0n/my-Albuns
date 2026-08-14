@@ -10,6 +10,16 @@ try {
     }
 
     & $script:CargoExecutable clippy --workspace --all-targets -- -D warnings
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+
+    & $script:CargoExecutable clippy `
+        -p myalbuns-desktop `
+        --bin myalbuns-dev `
+        --features dev-supervisor `
+        -- `
+        -D warnings
     exit $LASTEXITCODE
 }
 finally {
