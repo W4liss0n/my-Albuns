@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -12,14 +12,14 @@ import path from "node:path";
 import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
-  captureProcessInstance,
+  captureListeningProcessInstance,
   closeMainWindow,
   mergeProcessInstances,
-  powershellJson,
   processForestInstances,
   processInstancesByExecutable,
   sameProcessInstance,
   sendCtrlC,
+  startProcessInstanceInOwnConsole,
   terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
@@ -162,10 +162,7 @@ function applicationProcesses() {
 }
 
 function frontendServerProcessInstance() {
-  const processId = powershellJson(
-    `$listener = Get-NetTCPConnection -LocalPort 1437 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($null -eq $listener) { [Console]::Out.Write('null') } else { [Console]::Out.Write(([int]$listener.OwningProcess | ConvertTo-Json -Compress)) }`,
-  );
-  return Number.isInteger(processId) ? captureProcessInstance(processId) : null;
+  return captureListeningProcessInstance(1437);
 }
 
 function frontendServerProcessId() {
@@ -379,38 +376,20 @@ function launchSupervisorInOwnConsole() {
     processDataRoot,
     "ctrl-c-supervisor.err.log",
   );
-  const processIdPath = path.join(processDataRoot, "ctrl-c-supervisor.pid");
-  const launchResult = spawnSync(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-Command",
-      `$process = Start-Process -FilePath $env:MYALBUNS_GATE_SUPERVISOR_BINARY -WorkingDirectory $env:MYALBUNS_DEV_WORKSPACE_ROOT -PassThru -WindowStyle Hidden -RedirectStandardOutput $env:MYALBUNS_GATE_STDOUT -RedirectStandardError $env:MYALBUNS_GATE_STDERR; [IO.File]::WriteAllText($env:MYALBUNS_GATE_PROCESS_ID_PATH, [string]$process.Id)`,
-    ],
-    {
-      windowsHide: true,
-      stdio: "ignore",
-      env: {
-        ...supervisorEnvironment(),
-        MYALBUNS_GATE_SUPERVISOR_BINARY: applicationPath,
-        MYALBUNS_GATE_STDOUT: standardOutputPath,
-        MYALBUNS_GATE_STDERR: standardErrorPath,
-        MYALBUNS_GATE_PROCESS_ID_PATH: processIdPath,
-      },
-    },
+  const authorityPath = path.join(
+    processDataRoot,
+    "ctrl-c-supervisor.instance.json",
   );
-  if (launchResult.status !== 0 || !existsSync(processIdPath)) {
-    throw new Error("PowerShell could not start the CTRL+C supervisor console");
-  }
-  const processId = Number(readFileSync(processIdPath, "utf8").trim());
-  if (!Number.isInteger(processId) || processId <= 0) {
-    throw new Error(
-      `PowerShell returned an invalid supervisor PID: ${processId}`,
-    );
-  }
+  const processInstance = startProcessInstanceInOwnConsole({
+    executablePath: applicationPath,
+    workingDirectory: workspace,
+    standardOutputPath,
+    standardErrorPath,
+    authorityPath,
+    environment: supervisorEnvironment(),
+  });
   return {
-    processId,
+    processInstance,
     output: () =>
       [standardOutputPath, standardErrorPath]
         .map((candidate) => {
@@ -684,11 +663,8 @@ try {
 
   const ctrlCLaunch = launchSupervisorInOwnConsole();
   ctrlCSupervisorOutput = ctrlCLaunch.output;
-  ctrlCSupervisorPid = ctrlCLaunch.processId;
-  ctrlCSupervisorInstance = await waitForProcessInstance(
-    ctrlCSupervisorPid,
-    "CTRL+C supervisor",
-  );
+  ctrlCSupervisorInstance = ctrlCLaunch.processInstance;
+  ctrlCSupervisorPid = ctrlCSupervisorInstance.processId;
   const ctrlCEnvironment = await waitForOwnedDevelopmentEnvironment({
     label: "CTRL+C",
     supervisorInstance: ctrlCSupervisorInstance,

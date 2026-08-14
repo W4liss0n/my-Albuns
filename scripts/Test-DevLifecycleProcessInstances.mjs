@@ -1,15 +1,21 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
+  captureListeningProcessInstance,
+  captureProcessInstance,
   closeMainWindow,
   processInstanceKey,
   processForestInstances,
+  sameProcessInstance,
   sendCtrlC,
+  startProcessInstanceInOwnConsole,
   terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
@@ -25,7 +31,7 @@ function waitForOutput(child, marker, label, timeoutMilliseconds = 10_000) {
       output += chunk.toString();
       if (output.includes(marker)) {
         cleanup();
-        resolve();
+        resolve(output);
       }
     };
     const onExit = (code) => {
@@ -51,6 +57,73 @@ test("a pre-existing application instance makes the gate fail closed before laun
       ),
     /pre-existing application process instance/i,
   );
+});
+
+test("an isolated launch returns the exact process instance without a PID handoff", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), "myalbuns-exact-launch-"));
+  const standardOutputPath = path.join(root, "fixture.out.log");
+  const standardErrorPath = path.join(root, "fixture.err.log");
+  const authorityPath = path.join(root, "fixture.instance.json");
+  const instance = startProcessInstanceInOwnConsole({
+    executablePath: path.join(
+      process.env.SystemRoot,
+      "System32",
+      "notepad.exe",
+    ),
+    workingDirectory: root,
+    standardOutputPath,
+    standardErrorPath,
+    authorityPath,
+  });
+  try {
+    assert.ok(
+      sameProcessInstance(instance, captureProcessInstance(instance.processId)),
+      "the launch authority must identify the exact process object",
+    );
+    const exitDeadline = Date.now() + 10_000;
+    assert.equal(terminateProcessInstance(instance), true);
+    while (
+      aliveProcessInstances([instance]).length !== 0 &&
+      Date.now() < exitDeadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.deepEqual(aliveProcessInstances([instance]), []);
+  } finally {
+    terminateProcessInstance(instance);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a listening process is captured and revalidated as one exact instance", async () => {
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      "const net=require('node:net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>console.log('READY:'+server.address().port));",
+    ],
+    { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  try {
+    const output = await waitForOutput(
+      child,
+      "READY:",
+      "Listening process fixture",
+    );
+    const port = Number(/READY:(\d+)/.exec(output)?.[1]);
+    assert.ok(Number.isInteger(port) && port > 0);
+    const instance = captureListeningProcessInstance(port);
+    assert.ok(
+      sameProcessInstance(instance, captureProcessInstance(child.pid)),
+      "the listener authority must identify the exact owning process",
+    );
+    const exit = new Promise((resolve) => child.once("exit", resolve));
+    assert.equal(terminateProcessInstance(instance), true);
+    await exit;
+    assert.equal(captureListeningProcessInstance(port), null);
+  } finally {
+    child.kill();
+  }
 });
 
 test("an unresponsive exact window makes bounded close fail without hanging cleanup", async () => {

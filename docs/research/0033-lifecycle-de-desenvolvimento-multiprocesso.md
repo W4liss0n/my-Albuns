@@ -240,6 +240,14 @@ de criação; `CTRL_C_EVENT`, término forçado e fallbacks de cleanup revalidam
 identidade imediatamente antes da operação. Uma reutilização de PID é tratada
 como instância ausente e nunca autoriza sinalizar uma árvore alheia.
 
+A aquisição também é atômica na primeira observação. O launcher isolado publica
+PID e instante de criação obtidos do mesmo objeto retornado por
+`Start-Process -PassThru`, antes de liberar esse objeto; não existe arquivo
+intermediário contendo só PID. Para Vite, uma única operação materializa o
+processo proprietário do listener, captura sua criação e revalida tanto o
+objeto quanto a porta antes de devolver a autoridade. Regressões Windows reais
+comprovam as duas fronteiras, além do ABA posterior à aquisição.
+
 Uma fase própria inicia o supervisor em console isolado e só avança depois de
 observar o handoff completo: Global já encerrado, Host independente vivo e sua
 subárvore WebView2 materializada. Então envia `CTRL_C_EVENT` pela API pública do

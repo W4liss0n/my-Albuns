@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -64,6 +65,112 @@ export function assertNoPreexistingProcessInstances(
 
 export function captureProcessInstance(processId) {
   return processInstances([processId])[0] ?? null;
+}
+
+export function captureListeningProcessInstance(port) {
+  if (!Number.isInteger(port) || port <= 0 || port > 65_535) {
+    throw new Error(`Invalid listener port: ${port}`);
+  }
+  return powershellJson(
+    String.raw`
+$port = [int]$env:MYALBUNS_GATE_LISTENER_PORT
+$listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($null -eq $listener) {
+    [Console]::Out.Write('null')
+    exit 0
+}
+$process = Get-Process -Id ([int]$listener.OwningProcess) -ErrorAction SilentlyContinue
+if ($null -eq $process) {
+    [Console]::Out.Write('null')
+    exit 0
+}
+[void]$process.Handle
+if ($process.HasExited) {
+    [Console]::Out.Write('null')
+    exit 0
+}
+$startTimeUtc = $process.StartTime.ToUniversalTime()
+$creationTimeUtc = $startTimeUtc.AddTicks(-($startTimeUtc.Ticks % 10)).ToString('O')
+$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$process.Id)" -ErrorAction SilentlyContinue
+$confirmedListener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Where-Object { [int]$_.OwningProcess -eq [int]$process.Id } | Select-Object -First 1
+if ($null -eq $observed -or $null -eq $confirmedListener -or $process.HasExited -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne $creationTimeUtc) {
+    [Console]::Out.Write('null')
+    exit 0
+}
+$instance = [ordered]@{ processId = [int]$observed.ProcessId; parentProcessId = [int]$observed.ParentProcessId; creationTimeUtc = $creationTimeUtc; name = [string]$observed.Name; commandLine = [string]$observed.CommandLine }
+[Console]::Out.Write((ConvertTo-Json -InputObject $instance -Compress))
+`,
+    { MYALBUNS_GATE_LISTENER_PORT: String(port) },
+  );
+}
+
+export function startProcessInstanceInOwnConsole({
+  executablePath,
+  arguments: processArguments = [],
+  workingDirectory,
+  standardOutputPath,
+  standardErrorPath,
+  authorityPath,
+  environment = {},
+}) {
+  const request = {
+    executablePath,
+    arguments: processArguments,
+    workingDirectory,
+    standardOutputPath,
+    standardErrorPath,
+    authorityPath,
+  };
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      String.raw`
+$ErrorActionPreference = 'Stop'
+$request = $env:MYALBUNS_GATE_PROCESS_LAUNCH | ConvertFrom-Json
+$start = @{
+    FilePath = [string]$request.executablePath
+    WorkingDirectory = [string]$request.workingDirectory
+    PassThru = $true
+    WindowStyle = 'Hidden'
+    RedirectStandardOutput = [string]$request.standardOutputPath
+    RedirectStandardError = [string]$request.standardErrorPath
+}
+if (@($request.arguments).Count -gt 0) {
+    $start.ArgumentList = [string[]]$request.arguments
+}
+$process = Start-Process @start
+[void]$process.Handle
+if ($process.HasExited) {
+    throw 'launched process exited before exact instance capture'
+}
+$startTimeUtc = $process.StartTime.ToUniversalTime()
+$creationTimeUtc = $startTimeUtc.AddTicks(-($startTimeUtc.Ticks % 10)).ToString('O')
+if ($process.HasExited) {
+    throw 'launched process instance could not be validated'
+}
+$instance = [ordered]@{ processId = [int]$process.Id; parentProcessId = 0; creationTimeUtc = $creationTimeUtc; name = [string]$process.ProcessName; commandLine = '' }
+[IO.File]::WriteAllText([string]$request.authorityPath, (ConvertTo-Json -InputObject $instance -Compress), [Text.UTF8Encoding]::new($false))
+$process.Dispose()
+[Environment]::Exit(0)
+`,
+    ],
+    {
+      windowsHide: true,
+      stdio: "ignore",
+      env: {
+        ...process.env,
+        ...environment,
+        MYALBUNS_GATE_PROCESS_LAUNCH: JSON.stringify(request),
+      },
+    },
+  );
+  if (result.status !== 0) {
+    throw new Error("Exact process launch failed");
+  }
+  return JSON.parse(readFileSync(authorityPath, "utf8"));
 }
 
 export async function waitForProcessInstance(
