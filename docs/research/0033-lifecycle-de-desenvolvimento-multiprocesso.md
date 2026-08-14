@@ -190,6 +190,13 @@ dois sinais. Somente então o Global registra
 `global_exited_after_project_handoff` e encerra. Não há espera temporal usada
 como prova de prontidão.
 
+O instrumento mantém um estado explícito para essa conjunção causal e falha
+fechado se o prazo terminar antes de observar os três eventos. A observação
+consolida os arquivos estruturados do desktop com o stdout produtivo possuído
+pelo supervisor, pois o encerramento da Global pode anteceder o flush final do
+arquivo sem perder o terminal já emitido. O campo
+`globalExitedAfterUiReady` deriva desse estado observado; não é uma constante.
+
 ## Gate Windows real
 
 O comando reproduzível é:
@@ -263,15 +270,19 @@ do próprio Vite. Falha de bootstrap e falha de contenção atravessam uma únic
 fase proprietária de launch, autoridade exata, observação da floresta, terminal
 e cleanup; essa fase exige saída não zero, o terminal
 `dev_environment_cleanup_completed` e a autoridade encerrada antes de devolver
-o resultado. Cada chamador conserva somente sua asserção específica. Ctrl+C e
-queda abrupta permanecem evidências distintas.
+o resultado. Para bootstrap, o JSON expõe honestamente
+`bootstrapFailureCleanupTerminalObserved`; `dev_frontend_ready` comprova apenas
+a prontidão anterior do Vite e não é apresentado como terminal de falha. A
+contenção preserva separadamente seu terminal específico
+`desktop_start_failed`. Cada chamador conserva somente sua asserção específica.
+Ctrl+C e queda abrupta permanecem evidências distintas.
 
 Os dados brutos da rodada canônica pós-reboot ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica
-o commit de entrada limpo `439b4d9369ae6070a08c8a4f6987dedf80750bbb`, registra
+o commit de entrada limpo `51882f475181d3fcd7b031d521cb8b86ec3554dc`, registra
 `sourceInputsDirty=false`, sete de sete checks aprovados, 1.200 de 1.200
 amostras não brancas, os dois terminais tipados e todos os cleanups. O commit
-imediatamente posterior `592b4f9192e6b84410dd4038ba3530e52ccd8ce8` altera
+imediatamente posterior `d0d43efdc212da92a7a900a0df575f6e72e648a8` altera
 somente esse relatório; assim, a evidência prova exatamente o input nomeado.
 
 Antes do reboot, uma execução sobre o input limpo `c686cfa3` ficou bloqueada
