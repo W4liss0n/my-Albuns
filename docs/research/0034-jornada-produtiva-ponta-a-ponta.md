@@ -58,11 +58,12 @@ captura. Portanto, `sourceInputsDirty=false` atribui a rodada ao commit indicado
 em `gitCommit`; mudança concorrente de `HEAD`, arquivo rastreado ou não
 rastreado fecha o gate.
 
-A rodada registrada em
+A rodada canônica registrada em
 `docs/research/artifacts/0023-productive-journey.json` executou 8/8 checks sobre
-o input limpo `2f10be59159cdb6d9966fad3ad135007e41cb28b`. O artefato foi publicado no
-commit posterior `953c66f815cbbdcc4380a94e4afeb46767fb4615`, que altera somente o JSON de
-evidência. Essa rodada permanece histórica para aquele input: ela antecede a
-prova de Lâminas distinguíveis e não será atribuída ao runner corrente. Uma
-nova rodada canônica só pode substituí-la após executar 8/8 sobre um novo input
-limpo, com `sourceInputsDirty=false`.
+o input limpo `1086665d262d1c17d98fcd7f106ee88d82440275`, com
+`sourceInputsDirty=false`. O artefato foi publicado no commit posterior
+`ee8d411109fe2c6f1cdb4a97786e49ce5d2196e8`, que altera somente o JSON de
+evidência. A captura contém 1.271 de 1.271 amostras não brancas, os três PIDs
+distintos, Lâmina 02 dupla contra a primeira de página única, amostra RGB
+`31/64/95` com delta máximo 1 em relação ao Background salvo e
+`cleanupCompleted=true`.
