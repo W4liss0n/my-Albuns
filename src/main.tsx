@@ -6,10 +6,10 @@ import {
   probeGraphics,
 } from "./platform/graphics";
 import {
-  tauriExportPort,
+  tauriExportPipelinePort,
   tauriMediaPreviewPort,
   tauriProjectStartupPort,
-  tauriProjectSessionPort,
+  tauriProjectCorePort,
 } from "./platform/tauriProjectPorts";
 import { installDesktopWebViewPolicy } from "./platform/desktopWebViewPolicy";
 import { tauriLogger } from "./platform/tauriLogger";
@@ -20,10 +20,10 @@ installDesktopWebViewPolicy(document);
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <App
-      exportPort={tauriExportPort}
+      exportPipelinePort={tauriExportPipelinePort}
       mediaPreviewPort={tauriMediaPreviewPort}
       projectStartupPort={tauriProjectStartupPort}
-      projectSessionPort={tauriProjectSessionPort}
+      projectCorePort={tauriProjectCorePort}
       projectWindowPort={tauriProjectWindowPort}
       graphicsProbe={probeGraphics}
       canvasGraphicsDiagnosticProbe={probeCanvasGraphics}

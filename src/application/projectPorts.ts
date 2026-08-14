@@ -169,7 +169,7 @@ export interface ProjectStartupPort {
   confirmUiReady(): Promise<void>;
 }
 
-export interface ProjectSessionPort {
+export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
@@ -186,9 +186,15 @@ export interface MediaPreviewPort {
   ): Promise<() => void>;
 }
 
-export interface ExportPort {
+export interface ExportSheetSelection {
+  projectName: string;
+  sheetId: string;
+  sheetNumber: number;
+}
+
+export interface ExportPipelinePort {
   startSheet(
-    sheetId: string,
+    selection: ExportSheetSelection,
     onEvent: (event: ExportProgressEvent) => void,
   ): ExportAttempt;
 }

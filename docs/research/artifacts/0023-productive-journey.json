@@ -1,0 +1,101 @@
+{
+    "schemaVersion":  1,
+    "gate":  "productive-end-to-end-journey",
+    "collectedAtUtc":  "2026-08-14T19:33:01.2698992Z",
+    "gitCommit":  "8cb8dc3380911e18b3f9ec0e1f50458df10afeb3",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "nativeDriverVersion":  "151.0.4129.78",
+                     "webView2RuntimeVersion":  "151.0.4129.78"
+                 },
+    "checks":  [
+                   {
+                       "name":  "cancel-before-project-core",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "create-only-causal-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-core-save-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "cancel-before-export-pipeline",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "distinguishable-sheet-two-jpeg-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "saved-project-unchanged-by-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "independent-host-reopen-empty-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "correlated-process-terminals-cleanup",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "cancelledCreationBeforeCore":  true,
+                     "cancelledExportBeforePipeline":  true,
+                     "createAuthorization":  "createOnly",
+                     "exportedSheetNumber":  2,
+                     "selectedSheetId":  "ab171c86-21a9-4068-8830-ce75bddabd5e",
+                     "selectedSheetActiveSides":  "both",
+                     "firstSheetDimensions":  {
+                                                  "width":  360,
+                                                  "height":  360
+                                              },
+                     "selectedSheetDimensions":  {
+                                                     "width":  720,
+                                                     "height":  360
+                                                 },
+                     "expectedBackgroundRgb":  "#204060",
+                     "exportedDpi":  360,
+                     "savedRevision":  1,
+                     "savedDpi":  300,
+                     "jpeg":  {
+                                  "width":  720,
+                                  "height":  360,
+                                  "byteCount":  10760,
+                                  "sha256":  "20c65377b66cc634e2d10f7963956683c1c91c42f391fc2a6fa3746e1b4cb218",
+                                  "backgroundSample":  {
+                                                           "x":  360,
+                                                           "y":  180,
+                                                           "red":  31,
+                                                           "green":  64,
+                                                           "blue":  95,
+                                                           "maxChannelDelta":  1
+                                                       }
+                              },
+                     "processIds":  {
+                                        "global":  15824,
+                                        "host":  27060,
+                                        "imaging":  34464
+                                    },
+                     "correlations":  {
+                                          "bootstraps":  2,
+                                          "imagingAttempts":  1
+                                      },
+                     "reopenedInIndependentHost":  true,
+                     "reopenedHistoryEmpty":  true,
+                     "sourcePathExposedToWebView":  false,
+                     "terminalCounts":  {
+                                            "globalHandoffs":  2,
+                                            "hostReady":  2,
+                                            "imagingStopped":  1
+                                        },
+                     "canvasNonWhiteSamples":  1271,
+                     "canvasSampleCount":  1271,
+                     "cleanupCompleted":  true
+                 }
+}

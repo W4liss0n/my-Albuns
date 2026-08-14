@@ -9,9 +9,9 @@ import {
 } from "../application/projectPorts";
 import { representativeProjection } from "../test/projectFixtures";
 import {
-  tauriExportPort,
+  tauriExportPipelinePort,
   tauriMediaPreviewPort,
-  tauriProjectSessionPort,
+  tauriProjectCorePort,
 } from "./tauriProjectPorts";
 
 const tauriBoundary = vi.hoisted(() => ({
@@ -20,6 +20,12 @@ const tauriBoundary = vi.hoisted(() => ({
 const eventBoundary = vi.hoisted(() => ({
   listeners: [] as Array<(event: { payload: unknown }) => void>,
 }));
+
+const exportSelection = {
+  projectName: "Projeto de teste",
+  sheetId: "sheet-001",
+  sheetNumber: 1,
+};
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve(undefined)),
@@ -58,14 +64,23 @@ test("completes an Export attempt with the backend result", async () => {
   };
   vi.mocked(invoke).mockResolvedValueOnce(result);
 
-  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
+  const attempt = tauriExportPipelinePort.startSheet(
+    {
+      projectName: "Álbum de teste",
+      sheetId: "sheet-001",
+      sheetNumber: 3,
+    },
+    vi.fn(),
+  );
 
   await expect(attempt.completion).resolves.toEqual({
     status: "completed",
     result,
   });
   expect(invoke).toHaveBeenCalledWith("export_sheet", {
+    projectName: "Álbum de teste",
     sheetId: "sheet-001",
+    sheetNumber: 3,
     onEvent: tauriBoundary.channels[0],
   });
 });
@@ -73,7 +88,7 @@ test("completes an Export attempt with the backend result", async () => {
 test("forwards Export events without exposing the backend operation id", () => {
   const onEvent = vi.fn();
 
-  tauriExportPort.startSheet("sheet-001", onEvent);
+  tauriExportPipelinePort.startSheet(exportSelection, onEvent);
   tauriBoundary.channels[0].onmessage({
     event: "started",
     data: {
@@ -117,7 +132,7 @@ test("cancels an Export attempt using the operation id kept inside the adapter",
   );
   vi.mocked(invoke).mockResolvedValueOnce("requested");
 
-  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
   tauriBoundary.channels[0].onmessage({
     event: "started",
     data: {
@@ -143,7 +158,7 @@ test("maps the backend cancelled error to a cancelled Export outcome", async () 
     message: "A Exportação foi cancelada.",
   });
 
-  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
 
   await expect(attempt.completion).resolves.toEqual({
     status: "cancelled",
@@ -160,7 +175,7 @@ test("keeps a cancellation requested before started until the operation id arriv
   );
   vi.mocked(invoke).mockResolvedValueOnce("requested");
 
-  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
   const cancellation = attempt.cancel();
   await Promise.resolve();
 
@@ -193,7 +208,7 @@ test("resolves a queued cancellation as not_found when completion fails before s
   };
   vi.mocked(invoke).mockRejectedValueOnce(failure);
 
-  const attempt = tauriExportPort.startSheet("sheet-001", vi.fn());
+  const attempt = tauriExportPipelinePort.startSheet(exportSelection, vi.fn());
   const cancellation = attempt.cancel();
 
   await expect(attempt.completion).rejects.toBe(failure);
@@ -208,10 +223,10 @@ test("maps the Project and media ports to the desktop commands", async () => {
     mediaId: "media-campo",
   };
 
-  await tauriProjectSessionPort.load("project-load-1");
-  await tauriProjectSessionPort.apply(intent);
-  await tauriProjectSessionPort.undo();
-  await tauriProjectSessionPort.redo();
+  await tauriProjectCorePort.load("project-load-1");
+  await tauriProjectCorePort.apply(intent);
+  await tauriProjectCorePort.undo();
+  await tauriProjectCorePort.redo();
   vi.mocked(invoke).mockResolvedValueOnce([
     {
       mediaId: "media-a-001",
@@ -272,7 +287,7 @@ test("returns the authoritative projection from a confirmed Project save", async
   };
   vi.mocked(invoke).mockResolvedValueOnce(result);
 
-  await expect(tauriProjectSessionPort.save(25)).resolves.toEqual(
+  await expect(tauriProjectCorePort.save(25)).resolves.toEqual(
     result,
   );
   expect(invoke).toHaveBeenCalledWith("save_project", {
@@ -295,7 +310,7 @@ test("accepts an already-current Project save envelope", async () => {
   };
   vi.mocked(invoke).mockResolvedValueOnce(result);
 
-  await expect(tauriProjectSessionPort.save(25)).resolves.toEqual(
+  await expect(tauriProjectCorePort.save(25)).resolves.toEqual(
     result,
   );
 });
@@ -312,7 +327,7 @@ test("rejects a Project save envelope whose projection does not confirm its outc
     },
   });
 
-  await expect(tauriProjectSessionPort.save(25)).rejects.toMatchObject({
+  await expect(tauriProjectCorePort.save(25)).rejects.toMatchObject({
     code: "invalid_response",
     message: "Não foi possível confirmar o resultado do Salvamento.",
   });
@@ -325,7 +340,7 @@ test("rejects malformed stale-revision context as an unavailable save", async ()
     currentRevision: 25,
   });
 
-  await expect(tauriProjectSessionPort.save(25)).rejects.toMatchObject({
+  await expect(tauriProjectCorePort.save(25)).rejects.toMatchObject({
     code: "save_unavailable",
     message: "Não foi possível iniciar o Salvamento do Projeto.",
   });
@@ -405,7 +420,7 @@ test.each([
   async ({ wire, code, message, ...expected }) => {
     vi.mocked(invoke).mockRejectedValueOnce(wire);
 
-    const failure = tauriProjectSessionPort.save(25);
+    const failure = tauriProjectCorePort.save(25);
 
     await expect(failure).rejects.toBeInstanceOf(SaveProjectError);
     await expect(failure).rejects.toMatchObject({

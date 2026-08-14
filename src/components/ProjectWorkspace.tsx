@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "react-aria-components";
 
 import type {
-  ExportPort,
+  ExportPipelinePort,
   MediaPreview,
   MediaPreviewDemand,
   ProjectWindowPort,
@@ -24,7 +24,7 @@ import {
 
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
-  exportPort: ExportPort;
+  exportPipelinePort: ExportPipelinePort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
@@ -35,7 +35,7 @@ interface ProjectWorkspaceProps {
 
 export function ProjectWorkspace({
   projection,
-  exportPort,
+  exportPipelinePort,
   projectWindowPort,
   runProjectMutation,
   mediaPreviews = {},
@@ -116,6 +116,16 @@ export function ProjectWorkspace({
     displayedPhotoPanX,
     photoCount,
   } = controller;
+  const exportSheet = projection.composition.sheets.find(
+    (sheet) => sheet.sheetId === controller.canvasProps.centeredSheetId,
+  );
+  const exportSelection = exportSheet
+    ? {
+        projectName: projection.state.projectName,
+        sheetId: exportSheet.sheetId,
+        sheetNumber: exportSheet.number,
+      }
+    : null;
 
   return (
     <div className="app-shell">
@@ -201,10 +211,10 @@ export function ProjectWorkspace({
         <div className="command-spacer" />
         <ExportPreviewControl
           disabled={Boolean(busy) || projectClose.interactionBlocked}
-          exportPort={exportPort}
+          exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
-          sheetId={controller.canvasProps.centeredSheetId}
+          selection={exportSelection}
         />
       </div>
 

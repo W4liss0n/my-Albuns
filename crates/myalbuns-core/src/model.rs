@@ -1,15 +1,87 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use thiserror::Error;
 use ts_rs::TS;
+use uuid::{Uuid, Version};
 
 use crate::project_document::{DisplayUnit, DocumentSettings};
 
-pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
 pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 5;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MAX: f32 = 4.0;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct MediaId(Uuid);
+
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[error("Identidade de mídia inválida; esperado UUID v4 canônico")]
+pub struct ParseMediaIdError;
+
+impl MediaId {
+    pub(crate) fn from_uuid(value: Uuid) -> Self {
+        Self::try_from(value).expect("a identidade interna de mídia deve ser UUID v4")
+    }
+
+    pub const fn into_uuid(self) -> Uuid {
+        self.0
+    }
+}
+
+impl TryFrom<Uuid> for MediaId {
+    type Error = ParseMediaIdError;
+
+    fn try_from(value: Uuid) -> Result<Self, Self::Error> {
+        if value.get_version() != Some(Version::Random) {
+            return Err(ParseMediaIdError);
+        }
+        Ok(Self(value))
+    }
+}
+
+impl std::fmt::Display for MediaId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::str::FromStr for MediaId {
+    type Err = ParseMediaIdError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let parsed = Uuid::parse_str(value).map_err(|_| ParseMediaIdError)?;
+        if parsed.get_version() != Some(Version::Random) || parsed.hyphenated().to_string() != value
+        {
+            return Err(ParseMediaIdError);
+        }
+        Ok(Self(parsed))
+    }
+}
+
+impl From<MediaId> for String {
+    fn from(value: MediaId) -> Self {
+        value.to_string()
+    }
+}
+
+impl Serialize for MediaId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.0.hyphenated().to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for MediaId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        value.parse().map_err(de::Error::custom)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -105,17 +177,9 @@ impl Default for MediaTransform {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoSnapshot {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub transform: MediaTransform,
-}
-
-impl PhotoSnapshot {
-    pub(crate) fn for_media(media_id: String) -> Self {
-        Self {
-            media_id,
-            transform: MediaTransform::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -176,8 +240,13 @@ pub enum MediaKind {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedBackgroundContent {
-    Color { rgb: String },
-    Media { media_id: String },
+    Color {
+        rgb: String,
+    },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -205,7 +274,10 @@ pub enum ProjectedBackground {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedOverlayContent {
-    Media { media_id: String },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -274,7 +346,8 @@ pub struct SheetSnapshot {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCatalogItem {
-    pub id: String,
+    #[ts(type = "string")]
+    pub id: MediaId,
     pub kind: MediaKind,
     pub name: String,
     pub source_width_px: Option<u32>,
@@ -312,10 +385,6 @@ impl DocumentSnapshot {
             safety_um: settings.safety_um(),
         }
     }
-
-    pub(crate) fn neutral() -> Self {
-        Self::from_settings(&DocumentSettings::neutral())
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
@@ -335,7 +404,8 @@ pub struct EditorState {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedPhoto {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub name: String,
     pub draw_rect: RectUm,
     pub placement: PhotoPlacementPlan,
@@ -356,7 +426,8 @@ pub struct ComposedFrame {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct ComposedDecorative {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub name: String,
     pub draw_rect: RectUm,
 }
@@ -381,7 +452,8 @@ pub enum ComposedBackground {
         draw_rect: RectUm,
     },
     Media {
-        media_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
         name: String,
         draw_rect: RectUm,
     },
@@ -402,24 +474,20 @@ pub struct ComposedSheet {
 }
 
 impl ComposedSheet {
-    pub fn referenced_media_ids(&self) -> impl Iterator<Item = &str> {
+    pub fn referenced_media_ids(&self) -> impl Iterator<Item = MediaId> + '_ {
         self.backgrounds
             .iter()
             .filter_map(|background| match background {
                 ComposedBackground::Color { .. } => None,
-                ComposedBackground::Media { media_id, .. } => Some(media_id.as_str()),
+                ComposedBackground::Media { media_id, .. } => Some(*media_id),
             })
             .chain(
                 self.frames
                     .iter()
                     .filter_map(|frame| frame.photo.as_ref())
-                    .map(|photo| photo.media_id.as_str()),
+                    .map(|photo| photo.media_id),
             )
-            .chain(
-                self.overlays
-                    .iter()
-                    .map(|overlay| overlay.media_id.as_str()),
-            )
+            .chain(self.overlays.iter().map(|overlay| overlay.media_id))
     }
 }
 
@@ -446,7 +514,8 @@ impl ComposedOutputUnit {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUsage {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub count: usize,
 }
 
@@ -509,7 +578,8 @@ pub enum ProjectIntent {
     },
     FillLeftmostPlaceholder {
         sheet_id: String,
-        media_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
     },
 }
 

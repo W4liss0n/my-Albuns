@@ -38,10 +38,6 @@ mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;
 mod runtime_role;
-#[cfg(test)]
-#[path = "../../tests/support/sample_project.rs"]
-mod sample_project;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(debug_assertions)]

@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    EditableProject, EditorProjection, ProjectIdentityAuthority, ProjectIntent, RenderSnapshot,
-    SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIdentityAuthority,
+    ProjectIntent, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -33,6 +33,7 @@ pub(crate) struct ProjectHostSaveResult {
 #[derive(Debug)]
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
+    pub(crate) output_unit: ComposedOutputUnit,
     pub(crate) sources: Vec<RenderSource>,
 }
 
@@ -221,38 +222,28 @@ impl ProjectHost {
     }
 
     pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
-        let project = self.project()?;
-        let snapshot = project.render_snapshot();
-        let sheet = snapshot
-            .composition
-            .sheets
-            .iter()
-            .find(|sheet| sheet.sheet_id == sheet_id)
-            .ok_or_else(|| "A Lâmina solicitada não existe no snapshot.".to_string())?;
-        let mut sources = Vec::new();
-        for media_id in sheet.referenced_media_ids() {
-            if sources
-                .iter()
-                .any(|source: &RenderSource| source.media_id() == media_id)
-            {
-                continue;
-            }
-            let media = project
-                .project()
-                .media()
-                .iter()
-                .find(|media| media.id().hyphenated().to_string() == media_id)
-                .ok_or_else(|| {
-                    format!(
-                        "A fonte original da mídia {media_id} não pertence à mesma Revisão do Projeto."
-                    )
-                })?;
-            sources.push(
-                RenderSource::new(media_id, media.path().to_path_buf())
-                    .map_err(|error| format!("A fonte original congelada é inválida: {error}"))?,
-            );
-        }
-        Ok(FrozenSheetExport { snapshot, sources })
+        let frozen = self
+            .project()?
+            .freeze_rendering()
+            .into_sheet(sheet_id)
+            .map_err(|error| error.to_string())?;
+        let (snapshot, output_unit, frozen_sources) = frozen.into_parts();
+        let sources = frozen_sources
+            .into_iter()
+            .map(|media| {
+                RenderSource::new(
+                    MediaId::try_from(media.id())
+                        .expect("persisted MediaRef identities are canonical UUID v4"),
+                    media.path().to_path_buf(),
+                )
+                .map_err(|error| format!("A fonte original congelada é inválida: {error}"))
+            })
+            .collect::<Result<_, _>>()?;
+        Ok(FrozenSheetExport {
+            snapshot,
+            output_unit,
+            sources,
+        })
     }
 
     fn project(&self) -> Result<ActiveProject<'_>, String> {
@@ -956,7 +947,7 @@ mod tests {
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,
-            projection.state.album.media[0].id
+            projection.state.album.media[0].id.to_string()
         );
         assert_eq!(catalog.bindings[0].logical_path, background_path);
         let frontend_projection =

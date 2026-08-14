@@ -1,5 +1,8 @@
 use std::sync::{Arc, Mutex};
 
+#[cfg(debug_assertions)]
+use std::{ffi::OsString, io};
+
 use tauri::{WebviewWindow, webview::PageLoadEvent};
 
 const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
@@ -79,6 +82,21 @@ fn enforce_on_main_thread(window: &WebviewWindow) -> std::io::Result<()> {
 
 pub(crate) fn automation_enabled() -> bool {
     cfg!(debug_assertions) && std::env::var_os(TAURI_WEBVIEW_AUTOMATION_ENV).is_some()
+}
+
+#[cfg(debug_assertions)]
+pub(crate) fn remote_debugging_argument(port: Option<OsString>) -> io::Result<Option<OsString>> {
+    let Some(port) = port else {
+        return Ok(None);
+    };
+    let port = port
+        .to_str()
+        .and_then(|port| port.parse::<u16>().ok())
+        .filter(|port| *port != 0)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "invalid WebView debug port"))?;
+    Ok(Some(OsString::from(format!(
+        "--remote-debugging-port={port}"
+    ))))
 }
 
 #[cfg(windows)]

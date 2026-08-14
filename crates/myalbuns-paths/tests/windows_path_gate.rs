@@ -161,7 +161,7 @@ fn real_windows_paths_freeze_mapped_bindings_and_keep_unc_export_recoverable() {
     let local_data = app_data.join("local");
     std::fs::create_dir_all(&roaming_data).expect("the roaming Known Folder exists");
     std::fs::create_dir_all(&local_data).expect("the local Known Folder exists");
-    let app_paths = AppPaths::from_roots(&roaming_data, &local_data, &app_data);
+    let app_paths = AppPaths::from_roots(&roaming_data, &local_data);
     let cache = app_paths
         .project_cache("windows-path-gate")
         .expect("the local Cache is planned");

@@ -247,7 +247,7 @@ mod tests {
         let local_root = root.path().join("local");
         std::fs::create_dir_all(&roaming_root).expect("the roaming root is available");
         std::fs::create_dir_all(&local_root).expect("the local root is available");
-        let app_paths = AppPaths::from_roots(&roaming_root, &local_root, root.path());
+        let app_paths = AppPaths::from_roots(&roaming_root, &local_root);
         let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
             .expect("the authority mounts the Cache namespace");
         let derived_path = namespace

@@ -15,7 +15,7 @@ mod project_transition_barrier;
 mod resolve;
 mod windows_path;
 
-pub use app_paths::{AppPaths, PreparedExportPreviewDirectory, project_data_namespace};
+pub use app_paths::{AppPaths, project_data_namespace};
 pub use atomic_publish::{publish_new_file, replace_existing_file};
 pub use cache::{
     CacheArtifactFormat, CachePathPlan, PendingCachePublication, PreparedCacheStorage,

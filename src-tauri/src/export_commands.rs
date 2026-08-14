@@ -1,5 +1,5 @@
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
@@ -8,12 +8,13 @@ use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingFailureCode, ImagingPathCode, root_binding_plan_sha256,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
+use myalbuns_paths::ExportWriteAuthorization;
 use tauri::{AppHandle, State, WebviewWindow, ipc::Channel};
 
 use crate::{
     cache_engine::CacheEngine,
-    export_attempts::ExportAttempts,
-    export_pipeline,
+    export_attempts::{ExportAttempt, ExportAttempts},
+    export_pipeline::{self, ExportPlan},
     imaging_processor::{ImagingProcessor, InvocationContext, TauriImagingTransport},
     ipc_contract::{
         CancelDisposition, ExportCommandError, ExportCommandErrorCode, ExportEvent, ExportPathCode,
@@ -22,12 +23,35 @@ use crate::{
     logging::{LoggingState, log_imaging_failure},
     native_project_dialog,
     operation_gate::{OperationGate, OperationGateError},
-    operation_lease::OperationLease,
+    operation_lease::{OperationLease, OperationLeaseAcquisition},
     path_io,
-    project_host::ProjectHost,
+    project_host::{FrozenSheetExport, ProjectHost},
 };
 
 static EXPORT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug)]
+struct ConfirmedExportDestination {
+    path: PathBuf,
+    authorization: ExportWriteAuthorization,
+}
+
+#[derive(Clone, Copy)]
+struct ExportSelection<'a> {
+    sheet_id: &'a str,
+    project_name: &'a str,
+    sheet_number: usize,
+}
+
+#[derive(Debug)]
+struct PreparedExportCommand {
+    acquisition: OperationLeaseAcquisition,
+    attempt: ExportAttempt,
+    operation_paths: Vec<PathBuf>,
+    plan: ExportPlan,
+    project_id: Option<String>,
+    request_id: String,
+}
 
 impl ExportEvent {
     fn started(operation_id: impl Into<String>) -> Self {
@@ -140,6 +164,98 @@ impl ExportCommandError {
     }
 }
 
+fn confirmed_export_destination(
+    destination: native_project_dialog::ExportSaveDialogOutcome,
+) -> Result<ConfirmedExportDestination, ExportCommandError> {
+    let native_project_dialog::ExportSaveDialogOutcome::Selected {
+        path,
+        authorization,
+    } = destination
+    else {
+        return Err(ExportCommandError::cancelled());
+    };
+
+    Ok(ConfirmedExportDestination {
+        path,
+        authorization,
+    })
+}
+
+fn prepare_export_command(
+    destination: native_project_dialog::ExportSaveDialogOutcome,
+    selection: ExportSelection<'_>,
+    window_label: &str,
+    operation_gate: &OperationGate,
+    attempts: &ExportAttempts,
+    freeze: impl FnOnce(&str) -> Result<FrozenSheetExport, String>,
+) -> Result<PreparedExportCommand, ExportCommandError> {
+    let destination = confirmed_export_destination(destination)?;
+    let frozen = freeze(selection.sheet_id).map_err(ExportCommandError::failed)?;
+    let sheet = &frozen.output_unit.sheet;
+    if frozen.snapshot.project_name != selection.project_name
+        || sheet.sheet_id != selection.sheet_id
+        || sheet.number != selection.sheet_number
+    {
+        return Err(ExportCommandError::failed(
+            "O Projeto mudou enquanto o Destino da Exportação era escolhido.",
+        ));
+    }
+
+    let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let request_id = format!("export-{}-{export_sequence}", std::process::id());
+    let project_id = safe_log_identifier(&frozen.snapshot.project_id).map(str::to_owned);
+    let frozen_sheet_id = frozen.output_unit.sheet.sheet_id;
+    let plan = export_pipeline::plan(
+        frozen.snapshot,
+        export_pipeline::ExportOptions::new(
+            request_id.clone(),
+            destination.path,
+            destination.authorization,
+            frozen_sheet_id,
+            frozen.sources,
+        ),
+    )
+    .map_err(|failure| {
+        log_imaging_failure(
+            "export_failed",
+            &request_id,
+            project_id.as_deref(),
+            failure.stage.as_str(),
+            failure.exit_code,
+        );
+        ExportCommandError::from_pipeline(failure)
+    })?;
+    let operation_paths = plan
+        .required_paths()
+        .into_iter()
+        .map(Path::to_path_buf)
+        .collect();
+    let acquisition = OperationLease::begin(operation_gate).map_err(|error| {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            operation_id = request_id.as_str(),
+            project_id = project_id.as_deref(),
+            window_label,
+            reason = %error,
+            event = "export_start_rejected",
+        );
+        ExportCommandError::from_gate(error)
+    })?;
+    let attempt = attempts
+        .begin(request_id.clone(), window_label)
+        .map_err(|error| ExportCommandError::failed(error.to_string()))?;
+
+    Ok(PreparedExportCommand {
+        acquisition,
+        attempt,
+        operation_paths,
+        plan,
+        project_id,
+        request_id,
+    })
+}
+
 impl From<ImagingFailureCode> for ExportCommandErrorCode {
     fn from(code: ImagingFailureCode) -> Self {
         match code {
@@ -198,6 +314,8 @@ pub(crate) async fn export_sheet(
     app: AppHandle,
     window: WebviewWindow,
     sheet_id: String,
+    project_name: String,
+    sheet_number: usize,
     on_event: Channel<ExportEvent>,
     state: State<'_, ProjectHost>,
     logging: State<'_, LoggingState>,
@@ -206,17 +324,7 @@ pub(crate) async fn export_sheet(
     processor: State<'_, ImagingProcessor>,
     attempts: State<'_, ExportAttempts>,
 ) -> Result<ExportResult, ExportCommandError> {
-    let frozen = state
-        .freeze_sheet_export(&sheet_id)
-        .map_err(ExportCommandError::failed)?;
-    let sheet = frozen
-        .snapshot
-        .composition
-        .sheets
-        .iter()
-        .find(|sheet| sheet.sheet_id == sheet_id)
-        .ok_or_else(|| ExportCommandError::failed("A Lâmina selecionada não existe."))?;
-    let suggested_filename = suggested_export_filename(&frozen.snapshot.project_name, sheet.number);
+    let suggested_filename = suggested_export_filename(&project_name, sheet_number);
     let destination = native_project_dialog::choose_export_destination(&window, suggested_filename)
         .await
         .map_err(|error| {
@@ -224,57 +332,25 @@ pub(crate) async fn export_sheet(
                 "Não foi possível escolher o Destino da Exportação: {error}"
             ))
         })?;
-    let native_project_dialog::ExportSaveDialogOutcome::Selected {
-        path: output_path,
-        authorization,
-    } = destination
-    else {
-        return Err(ExportCommandError::cancelled());
-    };
-
-    let export_sequence = EXPORT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let request_id = format!("export-{}-{export_sequence}", std::process::id());
-    let project_id = safe_log_identifier(&frozen.snapshot.project_id).map(str::to_owned);
-    let plan = export_pipeline::plan(
-        frozen.snapshot,
-        export_pipeline::ExportOptions::new(
-            request_id.clone(),
-            output_path,
-            authorization,
-            sheet_id,
-            frozen.sources,
-        ),
-    )
-    .map_err(|failure| {
-        log_imaging_failure(
-            "export_failed",
-            &request_id,
-            project_id.as_deref(),
-            failure.stage.as_str(),
-            failure.exit_code,
-        );
-        ExportCommandError::from_pipeline(failure)
-    })?;
-    let operation_paths = plan
-        .required_paths()
-        .into_iter()
-        .map(Path::to_path_buf)
-        .collect();
-    let acquisition = OperationLease::begin(&operation_gate).map_err(|error| {
-        tracing::warn!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::DesktopHost.as_str(),
-            operation_id = request_id.as_str(),
-            project_id = project_id.as_deref(),
-            window_label = window.label(),
-            reason = %error,
-            event = "export_start_rejected",
-        );
-        ExportCommandError::from_gate(error)
-    })?;
-    let attempt = attempts
-        .begin(request_id.clone(), window.label())
-        .map_err(|error| ExportCommandError::failed(error.to_string()))?;
+    let PreparedExportCommand {
+        acquisition,
+        attempt,
+        operation_paths,
+        plan,
+        project_id,
+        request_id,
+    } = prepare_export_command(
+        destination,
+        ExportSelection {
+            sheet_id: &sheet_id,
+            project_name: &project_name,
+            sheet_number,
+        },
+        window.label(),
+        &operation_gate,
+        &attempts,
+        |selected_sheet_id| state.freeze_sheet_export(selected_sheet_id),
+    )?;
     if on_event
         .send(ExportEvent::started(request_id.clone()))
         .is_err()
@@ -500,25 +576,33 @@ fn suggested_export_filename(project_name: &str, sheet_number: usize) -> String 
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     use myalbuns_imaging_protocol::{
         ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
     };
+    use myalbuns_paths::AppPaths;
     use serde_json::json;
     use tauri::ipc::{Channel, InvokeResponseBody};
 
     use crate::{
+        export_attempts::ExportAttempts,
         export_pipeline::{
             ExportFailure, ExportFailureStage, ExportProgress, ExportProgressStage,
             ExportProgressUnits,
         },
-        operation_gate::OperationGateError,
+        native_project_dialog,
+        operation_gate::{OperationGate, OperationGateError},
     };
 
-    use crate::ipc_contract::{ExportCommandError, ExportEvent};
+    use crate::ipc_contract::{
+        CancelDisposition, ExportCommandError, ExportCommandErrorCode, ExportEvent,
+    };
 
-    use super::suggested_export_filename;
+    use super::{ExportSelection, prepare_export_command, suggested_export_filename};
 
     #[test]
     fn suggested_jpeg_name_uses_the_project_and_sheet_position_safely() {
@@ -603,6 +687,49 @@ mod tests {
                 "code": "cancelled",
                 "message": "A Exportação foi cancelada.",
             })
+        );
+    }
+
+    #[test]
+    fn cancelled_destination_never_freezes_the_project_or_starts_an_export_attempt() {
+        let directory = tempfile::tempdir().expect("temporary Export destination");
+        let final_path = directory.path().join("Nunca exportado.jpg");
+        let temporary_path = directory.path().join(".myalbuns-export-cancelled.tmp");
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
+        let operation_gate = OperationGate::new(&paths);
+        let attempts = ExportAttempts::default();
+        let freeze_calls = AtomicUsize::new(0);
+
+        let error = prepare_export_command(
+            native_project_dialog::ExportSaveDialogOutcome::Cancelled,
+            ExportSelection {
+                sheet_id: "sheet-never-read",
+                project_name: "Projeto nunca lido",
+                sheet_number: 7,
+            },
+            "project",
+            &operation_gate,
+            &attempts,
+            |_| {
+                freeze_calls.fetch_add(1, Ordering::Relaxed);
+                Err("the ProjectCore boundary must not be reached".into())
+            },
+        )
+        .expect_err("the native destination cancellation is terminal");
+
+        assert_eq!(error.code, ExportCommandErrorCode::Cancelled);
+        assert_eq!(freeze_calls.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            attempts.request_cancel("never-started", "project"),
+            CancelDisposition::NotFound
+        );
+        assert!(!temporary_path.exists());
+        assert!(!final_path.exists());
+        assert!(
+            std::fs::read_dir(directory.path())
+                .expect("the cancellation root is readable")
+                .next()
+                .is_none()
         );
     }
 

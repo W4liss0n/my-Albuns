@@ -8,11 +8,11 @@ import type {
 import {
   MediaPreviewError,
   SaveProjectError,
-  type ExportPort,
+  type ExportPipelinePort,
   type ExportProgressEvent,
   type MediaPreviewPort,
   type ProjectStartupPort,
-  type ProjectSessionPort,
+  type ProjectCorePort,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
@@ -143,7 +143,7 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
   };
 }
 
-export const tauriProjectSessionPort: ProjectSessionPort = {
+export const tauriProjectCorePort: ProjectCorePort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
   apply: (intent: ProjectIntent) =>
@@ -181,9 +181,9 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
     ),
 };
 
-export const tauriExportPort: ExportPort = {
+export const tauriExportPipelinePort: ExportPipelinePort = {
   startSheet: (
-    sheetId: string,
+    { projectName, sheetId, sheetNumber },
     emitEvent: (event: ExportProgressEvent) => void,
   ) => {
     const onEvent = new Channel<IpcExportEvent>();
@@ -221,7 +221,9 @@ export const tauriExportPort: ExportPort = {
       });
     };
     const completion = invoke<IpcExportResult>("export_sheet", {
+      projectName,
       sheetId,
+      sheetNumber,
       onEvent,
     })
       .then((result) => ({

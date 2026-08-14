@@ -14,7 +14,7 @@ import {
 } from "react";
 import { expect, test, vi } from "vitest";
 
-import type { ProjectSessionPort } from "../application/projectPorts";
+import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
 import { representativeProjection } from "../test/projectFixtures";
 import { useProjectMutationRunner } from "./useProjectMutationRunner";
@@ -27,7 +27,7 @@ function deferredProjection() {
   return { promise, resolve };
 }
 
-function projectSessionPort(): ProjectSessionPort {
+function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
     apply: async () => representativeProjection,
@@ -44,7 +44,7 @@ function StrictModeWrapper({ children }: { children: ReactNode }) {
 }
 
 test("remains current after StrictMode replays its mount effect", async () => {
-  const port = projectSessionPort();
+  const port = projectCorePort();
   const view = renderHook(
     () => useProjectMutationRunner("project-001", port),
     { wrapper: StrictModeWrapper },
@@ -63,7 +63,7 @@ test("keeps Project mutations serial and applies them in request order", async (
   const second = deferredProjection();
   const firstOperation = vi.fn(() => first.promise);
   const secondOperation = vi.fn(() => second.promise);
-  const port = projectSessionPort();
+  const port = projectCorePort();
   const view = renderHook(() =>
     useProjectMutationRunner("project-001", port),
   );
@@ -113,7 +113,7 @@ test("continues the Project queue after a mutation fails", async () => {
     throw failure;
   });
   const secondOperation = vi.fn(async () => nextProjection);
-  const port = projectSessionPort();
+  const port = projectCorePort();
   const view = renderHook(() =>
     useProjectMutationRunner("project-001", port),
   );
@@ -134,8 +134,8 @@ test("continues the Project queue after a mutation fails", async () => {
 });
 
 test("keeps the committed Project context when a concurrent render is abandoned", async () => {
-  const firstPort = projectSessionPort();
-  const secondPort = projectSessionPort();
+  const firstPort = projectCorePort();
+  const secondPort = projectCorePort();
   const suspended = new Promise<never>(() => undefined);
   let runCommittedMutation!: ReturnType<
     typeof useProjectMutationRunner
@@ -168,7 +168,7 @@ test("keeps the committed Project context when a concurrent render is abandoned"
     ),
   );
   const operation = vi.fn(
-    async (_port: ProjectSessionPort) => representativeProjection,
+    async (_port: ProjectCorePort) => representativeProjection,
   );
 
   beginSuspendedRender();
@@ -183,8 +183,8 @@ test("keeps the committed Project context when a concurrent render is abandoned"
 
 test("starts a new Project queue immediately and discards obsolete queued work", async () => {
   const first = deferredProjection();
-  const firstPort = projectSessionPort();
-  const secondPort = projectSessionPort();
+  const firstPort = projectCorePort();
+  const secondPort = projectCorePort();
   const obsoleteQueuedOperation = vi.fn(
     async () => representativeProjection,
   );
@@ -194,7 +194,7 @@ test("starts a new Project queue immediately and discards obsolete queued work",
       port,
     }: {
       projectId: string;
-      port: ProjectSessionPort;
+      port: ProjectCorePort;
     }) => useProjectMutationRunner(projectId, port),
     {
       initialProps: {
@@ -220,7 +220,7 @@ test("starts a new Project queue immediately and discards obsolete queued work",
     },
   };
   const currentOperation = vi.fn(
-    async (port: ProjectSessionPort) => {
+    async (port: ProjectCorePort) => {
       expect(port).toBe(secondPort);
       return currentProjection;
     },

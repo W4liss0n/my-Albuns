@@ -7,7 +7,7 @@ use myalbuns_paths::AppPaths;
 fn logging_materializes_only_the_logs_category_under_temporary_roots() {
     let roaming_data = tempfile::tempdir().expect("temporary roaming data root");
     let local_data = tempfile::tempdir().expect("temporary local data root");
-    let app_paths = AppPaths::from_roots(roaming_data.path(), local_data.path(), local_data.path());
+    let app_paths = AppPaths::from_roots(roaming_data.path(), local_data.path());
 
     assert!(!app_paths.roaming_root().exists());
     assert!(!app_paths.local_root().exists());

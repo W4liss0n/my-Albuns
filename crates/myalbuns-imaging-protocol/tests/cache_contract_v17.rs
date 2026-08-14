@@ -12,7 +12,6 @@ fn cache_paths() -> myalbuns_paths::CachePathPlan {
     AppPaths::from_roots(
         PathBuf::from(r"C:\Roaming").as_path(),
         PathBuf::from(r"C:\Local").as_path(),
-        PathBuf::from(r"C:\Temp").as_path(),
     )
     .project_cache("project-a")
     .expect("the project Cache path is valid")

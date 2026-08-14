@@ -225,7 +225,7 @@ mod tests {
 
         fn with_relative_path(relative_path: &Path) -> Self {
             let root = tempfile::tempdir().expect("temporary Host fixture");
-            let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+            let paths = AppPaths::from_roots(root.path(), root.path());
             let project_path = root.path().join(relative_path);
             std::fs::create_dir_all(
                 project_path

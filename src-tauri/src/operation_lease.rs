@@ -103,7 +103,7 @@ mod tests {
     };
 
     fn app_paths(root: &Path) -> AppPaths {
-        AppPaths::from_roots(&root.join("roaming"), &root.join("local"), root)
+        AppPaths::from_roots(&root.join("roaming"), &root.join("local"))
     }
 
     #[test]

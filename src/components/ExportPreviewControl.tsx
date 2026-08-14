@@ -4,18 +4,19 @@ import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 
 import type {
   ExportAttempt,
-  ExportPort,
+  ExportPipelinePort,
   ExportProgressEvent,
   ExportProgressStage,
+  ExportSheetSelection,
 } from "../application/projectPorts";
 import "./ExportPreviewControl.css";
 
 interface ExportPreviewControlProps {
   disabled?: boolean;
-  exportPort: ExportPort;
+  exportPipelinePort: ExportPipelinePort;
   onActiveChange?(active: boolean): void;
   projectId: string;
-  sheetId: string | null;
+  selection: ExportSheetSelection | null;
 }
 
 interface ExportNotification {
@@ -25,10 +26,10 @@ interface ExportNotification {
 
 export function ExportPreviewControl({
   disabled = false,
-  exportPort,
+  exportPipelinePort,
   onActiveChange,
   projectId,
-  sheetId,
+  selection,
 }: ExportPreviewControlProps) {
   const [phase, setPhase] = useState<
     "idle" | "starting" | "running" | "cancelled" | "failed"
@@ -72,7 +73,7 @@ export function ExportPreviewControl({
   }, [projectId]);
 
   function startExport() {
-    if (disabled || !sheetId || currentAttemptId.current !== null) {
+    if (disabled || !selection || currentAttemptId.current !== null) {
       return;
     }
 
@@ -88,7 +89,7 @@ export function ExportPreviewControl({
 
     let attempt: ExportAttempt;
     try {
-      attempt = exportPort.startSheet(sheetId, (event) => {
+      attempt = exportPipelinePort.startSheet(selection, (event) => {
         if (currentAttemptId.current !== attemptId) {
           return;
         }
@@ -254,7 +255,7 @@ export function ExportPreviewControl({
       <button
         className="export-preview-trigger"
         type="button"
-        disabled={disabled || !sheetId || phase !== "idle"}
+        disabled={disabled || !selection || phase !== "idle"}
         onClick={startExport}
       >
         Exportar Lâmina
@@ -326,7 +327,7 @@ export function ExportPreviewControl({
             {phase === "cancelled"
               ? "A Exportação foi cancelada."
               : failureMessage ??
-                "Não foi possível exportar a prova."}
+                "Não foi possível exportar a Lâmina."}
           </p>
           <div className="export-preview-actions">
             <button
@@ -368,7 +369,7 @@ function messageFromError(error: unknown) {
   ) {
     return error.message;
   }
-  return "Não foi possível exportar a prova.";
+  return "Não foi possível exportar a Lâmina.";
 }
 
 function ExportModal({
@@ -397,18 +398,18 @@ function ExportModal({
 function progressStageLabel(stage: ExportProgressStage) {
   switch (stage) {
     case "preparing":
-      return "Preparando a prova";
+      return "Preparando a Exportação";
     case "loading_sources":
       return "Carregando os originais";
     case "composing":
-      return "Compondo a prova";
+      return "Compondo a Exportação";
     case "encoding_output":
-      return "Codificando a prova";
+      return "Codificando o JPEG";
     case "verifying":
-      return "Verificando a prova";
+      return "Verificando o JPEG";
     case "publishing":
-      return "Publicando a prova";
+      return "Publicando o JPEG";
     case "completed":
-      return "Finalizando a prova";
+      return "Finalizando a Exportação";
   }
 }

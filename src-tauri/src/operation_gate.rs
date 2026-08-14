@@ -168,7 +168,7 @@ mod tests {
     const OWNER_READY_ENV: &str = "MYALBUNS_OPERATION_GATE_OWNER_READY";
 
     fn app_paths(root: &Path) -> AppPaths {
-        AppPaths::from_roots(&root.join("roaming"), &root.join("local"), root)
+        AppPaths::from_roots(&root.join("roaming"), &root.join("local"))
     }
 
     #[test]

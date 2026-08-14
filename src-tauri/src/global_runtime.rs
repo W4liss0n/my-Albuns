@@ -29,14 +29,10 @@ use crate::{
     recent_projects::{RecentProjectSummary, RecentProjectsStore},
 };
 
-#[cfg(debug_assertions)]
-use crate::graphics_launch_gate::debug_process_gate_report;
-
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
+const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[cfg(debug_assertions)]
-const PROCESS_GATE_HEADLESS_ENV: &str = "MYALBUNS_PROCESS_GATE_HEADLESS";
 #[cfg(debug_assertions)]
 const WEBDRIVER_PROJECT_ENV: &str = "MYALBUNS_TAURI_WEBDRIVER_PROJECT";
 #[cfg(debug_assertions)]
@@ -612,6 +608,7 @@ fn staged_failure(
 
 fn build_global_window(
     app: &AppHandle,
+    webview_data_directory: PathBuf,
 ) -> Result<
     (
         WebviewWindow,
@@ -629,6 +626,7 @@ fn build_global_window(
     let (policy_signal, policy_readiness) = desktop_webview_policy::page_load_handshake();
     let window = WebviewWindowBuilder::from_config(app, config)
         .map_err(std::io::Error::other)?
+        .data_directory(webview_data_directory)
         .on_page_load(move |window, payload| {
             policy_signal.observe(&window, payload.event());
         })
@@ -680,34 +678,6 @@ async fn initialize_global_window(
     }
 }
 
-#[cfg(debug_assertions)]
-fn process_gate_headless_enabled() -> bool {
-    std::env::var_os(PROCESS_GATE_HEADLESS_ENV).as_deref() == Some(std::ffi::OsStr::new("1"))
-}
-
-#[cfg(debug_assertions)]
-fn start_direct_project_without_global_window(
-    app: AppHandle,
-    state: GlobalRuntimeState,
-    report: GraphicsGateReport,
-) {
-    let GraphicsGateCompletion::Ready(Some(project_path)) = state.graphics_gate.complete(report)
-    else {
-        return;
-    };
-    std::thread::spawn(move || {
-        let outcome = tauri::async_runtime::block_on(launch_confirmed_project(
-            state,
-            project_path,
-            ConfirmedLaunch::OpenExisting,
-        ));
-        match outcome {
-            ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
-            ProjectLaunchOutcome::Cancelled | ProjectLaunchOutcome::Failed { .. } => app.exit(1),
-        }
-    });
-}
-
 fn exit_global_after_handoff(app: &AppHandle) {
     tracing::info!(
         target: "myalbuns.desktop",
@@ -740,6 +710,8 @@ pub(crate) fn webdriver_automation_project() -> Option<PathBuf> {
 
 pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
     let app_paths = AppPaths::discover()?;
+    let global_webview_data_directory =
+        app_paths.webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)?;
     let state = GlobalRuntimeState::new(&app_paths, direct_project)?;
     let setup_state = state.clone();
     let provisional_decoratives =
@@ -763,19 +735,11 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
             let app_handle = app.handle().clone();
-            #[cfg(debug_assertions)]
-            if process_gate_headless_enabled() {
-                start_direct_project_without_global_window(
-                    app_handle,
-                    setup_state.clone(),
-                    debug_process_gate_report(),
-                );
-                return Ok(());
-            }
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
             // proves that Wry registered it before native policy is applied.
-            let (window, policy_readiness) = build_global_window(&app_handle)?;
+            let (window, policy_readiness) =
+                build_global_window(&app_handle, global_webview_data_directory.clone())?;
             tauri::async_runtime::spawn(initialize_global_window(
                 app_handle,
                 setup_state.clone(),
@@ -858,7 +822,7 @@ mod tests {
     #[tokio::test]
     async fn graphics_gate_precedes_open_and_create_host_boundaries() {
         let directory = tempfile::tempdir().expect("temporary Global state root");
-        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
         let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
 
         for (name, launch) in [
@@ -929,7 +893,7 @@ mod tests {
     #[test]
     fn startup_failure_reads_are_idempotent_for_strict_mode_mounts() {
         let directory = tempfile::tempdir().expect("temporary Global state root");
-        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
         let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
         let failure = simple_failure("invalid_project_document", "Inválido.", "Escolha outro.");
         state.record_startup_failure(failure.clone());

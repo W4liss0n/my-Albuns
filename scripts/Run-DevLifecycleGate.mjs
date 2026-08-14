@@ -6,7 +6,6 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
-import net from "node:net";
 import path from "node:path";
 
 import {
@@ -30,6 +29,10 @@ import {
   waitForChildProcessClose,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
+import {
+  createWebDriverClient,
+  findFreeTcpPort,
+} from "./GateWebDriver.mjs";
 
 const [
   workspaceArgument,
@@ -87,20 +90,6 @@ mkdirSync(processDataRoot, { recursive: true });
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(address.port);
-      });
-    });
-  });
-}
-
 function collectOutput(child) {
   let output = "";
   child.stdout?.on("data", (chunk) => {
@@ -126,26 +115,6 @@ async function waitForHttp(url, timeoutMilliseconds, label) {
     await delay(100);
   }
   throw lastError ?? new Error(`${label} did not become ready`);
-}
-
-function webdriverClient(baseUrl) {
-  return async (method, endpoint, body, timeout = 5_000) => {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      method,
-      headers:
-        body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeout),
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : { value: null };
-    if (!response.ok || payload.value?.error) {
-      throw new Error(
-        `${method} ${endpoint} failed (${response.status}): ${JSON.stringify(payload)}`,
-      );
-    }
-    return payload.value;
-  };
 }
 
 function applicationProcesses() {
@@ -334,8 +303,8 @@ if (frontendServerProcessId() !== null || (await frontendResponds())) {
   );
 }
 
-const driverPort = await freePort();
-const hostDebugPort = await freePort();
+const driverPort = await findFreeTcpPort();
+const hostDebugPort = await findFreeTcpPort();
 
 function supervisorEnvironment() {
   return {
@@ -625,7 +594,9 @@ try {
     30_000,
     "Microsoft Edge WebDriver",
   );
-  const request = webdriverClient(driverBaseUrl);
+  const request = createWebDriverClient(driverBaseUrl, {
+    defaultTimeoutMilliseconds: 5_000,
+  });
   const session = await request(
     "POST",
     "/session",

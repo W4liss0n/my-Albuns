@@ -3,6 +3,8 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use tauri::Manager;
 
+#[cfg(windows)]
+use myalbuns_logging::ProcessRole;
 use myalbuns_paths::ExportWriteAuthorization;
 
 use crate::project_bootstrap::CreateWriteAuthorization;
@@ -160,12 +162,28 @@ mod windows_dialog {
 
     use super::{
         CreateWriteAuthorization, ExportSaveDialogOutcome, ExportWriteAuthorization,
-        NativeProjectDialogError, ProjectSaveDialogOutcome,
+        NativeProjectDialogError, ProcessRole, ProjectSaveDialogOutcome,
     };
 
     enum SaveDialogKind<'a> {
         Project,
         Export { suggested_filename: &'a str },
+    }
+
+    impl SaveDialogKind<'_> {
+        fn operation(&self) -> &'static str {
+            match self {
+                Self::Project => "create_project",
+                Self::Export { .. } => "export_sheet",
+            }
+        }
+
+        fn process_role(&self) -> ProcessRole {
+            match self {
+                Self::Project => ProcessRole::Global,
+                Self::Export { .. } => ProcessRole::DesktopHost,
+            }
+        }
     }
 
     enum SaveDialogOutcome {
@@ -332,6 +350,15 @@ mod windows_dialog {
         owner: isize,
         kind: SaveDialogKind<'_>,
     ) -> Result<SaveDialogOutcome, NativeProjectDialogError> {
+        let operation = kind.operation();
+        let process_role = kind.process_role();
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = process_role.as_str(),
+            process_id = std::process::id(),
+            operation,
+            event = "native_save_dialog_initializing",
+        );
         let _apartment = ComApartment::initialize()?;
         // SAFETY: COM is initialized as an STA on this thread; the resulting interfaces never
         // leave it and are released before `ComApartment` is dropped.
@@ -392,13 +419,30 @@ mod windows_dialog {
         let events_interface: IFileDialogEvents = events.into();
         // SAFETY: `events_interface` remains alive until after `Unadvise`.
         let cookie = unsafe { dialog.Advise(&events_interface)? };
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = process_role.as_str(),
+            process_id = std::process::id(),
+            operation,
+            event = "native_save_dialog_opening",
+        );
         // SAFETY: `owner` is the HWND captured from the live global Tauri window.
         let shown = unsafe { dialog.Show(Some(HWND(owner as *mut _))) };
         // SAFETY: `cookie` was returned by `Advise` on this dialog.
         let unadvised = unsafe { dialog.Unadvise(cookie) };
 
         match shown {
-            Err(error) if is_cancelled(&error) => return Ok(SaveDialogOutcome::Cancelled),
+            Err(error) if is_cancelled(&error) => {
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    process_role = process_role.as_str(),
+                    process_id = std::process::id(),
+                    operation,
+                    outcome = "cancelled",
+                    event = "native_save_dialog_closed",
+                );
+                return Ok(SaveDialogOutcome::Cancelled);
+            }
             Err(error) => return Err(error.into()),
             Ok(()) => unadvised?,
         }
@@ -417,6 +461,14 @@ mod windows_dialog {
         };
         let path = shell_item_path(&result)?;
 
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = process_role.as_str(),
+            process_id = std::process::id(),
+            operation,
+            outcome = "selected",
+            event = "native_save_dialog_closed",
+        );
         Ok(SaveDialogOutcome::Selected {
             path,
             replacement_confirmed,

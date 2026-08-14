@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo } from "react";
 
-import type { ProjectSessionPort } from "../application/projectPorts";
+import type { ProjectCorePort } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
 
 export type ProjectMutationOutcome =
@@ -9,7 +9,7 @@ export type ProjectMutationOutcome =
   | { status: "obsolete" };
 
 export type ProjectMutationOperation = (
-  port: ProjectSessionPort,
+  port: ProjectCorePort,
 ) => Promise<EditorProjection>;
 
 export type ProjectMutationRunner = (
@@ -17,7 +17,7 @@ export type ProjectMutationRunner = (
 ) => Promise<ProjectMutationOutcome>;
 
 interface ProjectMutationContext {
-  port: ProjectSessionPort;
+  port: ProjectCorePort;
   current: boolean;
   active: boolean;
   tail: Promise<void>;
@@ -25,7 +25,7 @@ interface ProjectMutationContext {
 
 export function useProjectMutationRunner(
   projectId: string,
-  port: ProjectSessionPort,
+  port: ProjectCorePort,
 ): ProjectMutationRunner {
   const context = useMemo(
     () => createContext(port),
@@ -49,7 +49,7 @@ export function useProjectMutationRunner(
 }
 
 function createContext(
-  port: ProjectSessionPort,
+  port: ProjectCorePort,
 ): ProjectMutationContext {
   return {
     port,
