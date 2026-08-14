@@ -129,6 +129,13 @@ try {
         -not $gate.cancelledExportBeforePipeline -or
         $gate.createAuthorization -ne 'createOnly' -or
         $gate.exportedSheetNumber -ne 2 -or
+        $gate.selectedSheetId -notmatch '^[0-9a-f-]{36}$' -or
+        $gate.selectedSheetActiveSides -ne 'both' -or
+        $gate.firstSheetDimensions.width -ne 360 -or
+        $gate.firstSheetDimensions.height -ne 360 -or
+        $gate.selectedSheetDimensions.width -ne 720 -or
+        $gate.selectedSheetDimensions.height -ne 360 -or
+        $gate.expectedBackgroundRgb -ne '#204060' -or
         $gate.exportedDpi -ne 360 -or
         $gate.savedRevision -ne 1 -or
         $gate.savedDpi -ne 300 -or
@@ -147,6 +154,42 @@ try {
     ) {
         throw 'The productive journey result did not satisfy its public contract.'
     }
+    Add-Type -AssemblyName System.Drawing
+    $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
+    $jpegBitmap = [System.Drawing.Bitmap]::FromFile($jpegPath)
+    try {
+        $sampleX = [Math]::Floor($jpegBitmap.Width / 2)
+        $sampleY = [Math]::Floor($jpegBitmap.Height / 2)
+        $backgroundSample = $jpegBitmap.GetPixel($sampleX, $sampleY)
+    }
+    finally {
+        $jpegBitmap.Dispose()
+    }
+    $backgroundChannelDeltas = @(
+        [Math]::Abs([int] $backgroundSample.R - 0x20),
+        [Math]::Abs([int] $backgroundSample.G - 0x40),
+        [Math]::Abs([int] $backgroundSample.B - 0x60)
+    )
+    $backgroundMaxChannelDelta = [int] (
+        $backgroundChannelDeltas | Measure-Object -Maximum
+    ).Maximum
+    if ($backgroundMaxChannelDelta -gt 8) {
+        throw "The JPEG did not preserve the saved Background personalization: $($backgroundSample.R),$($backgroundSample.G),$($backgroundSample.B)."
+    }
+    $jpegEvidence = [ordered]@{
+        width = [int] $gate.jpeg.width
+        height = [int] $gate.jpeg.height
+        byteCount = [int64] $gate.jpeg.byteCount
+        sha256 = $gate.jpeg.sha256
+        backgroundSample = [ordered]@{
+            x = [int] $sampleX
+            y = [int] $sampleY
+            red = [int] $backgroundSample.R
+            green = [int] $backgroundSample.G
+            blue = [int] $backgroundSample.B
+            maxChannelDelta = $backgroundMaxChannelDelta
+        }
+    }
     $processIds = @(
         [int] $gate.processIds.global,
         [int] $gate.processIds.host,
@@ -156,7 +199,6 @@ try {
         throw 'Global, Host and Processor were not three distinct processes.'
     }
 
-    Add-Type -AssemblyName System.Drawing
     $bitmap = [System.Drawing.Bitmap]::FromFile($gate.screenshotPath)
     try {
         $stepX = [Math]::Max(1, [Math]::Floor($bitmap.Width / 40))
@@ -212,7 +254,7 @@ try {
             [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
             [ordered]@{ name = 'project-core-save-history'; passed = $true },
             [ordered]@{ name = 'cancel-before-export-pipeline'; passed = $true },
-            [ordered]@{ name = 'canvas-sheet-two-export'; passed = $true },
+            [ordered]@{ name = 'distinguishable-sheet-two-jpeg-export'; passed = $true },
             [ordered]@{ name = 'saved-project-unchanged-by-export'; passed = $true },
             [ordered]@{ name = 'independent-host-reopen-empty-history'; passed = $true },
             [ordered]@{ name = 'correlated-process-terminals-cleanup'; passed = $true }
@@ -222,10 +264,15 @@ try {
             cancelledExportBeforePipeline = [bool] $gate.cancelledExportBeforePipeline
             createAuthorization = $gate.createAuthorization
             exportedSheetNumber = [int] $gate.exportedSheetNumber
+            selectedSheetId = $gate.selectedSheetId
+            selectedSheetActiveSides = $gate.selectedSheetActiveSides
+            firstSheetDimensions = $gate.firstSheetDimensions
+            selectedSheetDimensions = $gate.selectedSheetDimensions
+            expectedBackgroundRgb = $gate.expectedBackgroundRgb
             exportedDpi = [int] $gate.exportedDpi
             savedRevision = [int] $gate.savedRevision
             savedDpi = [int] $gate.savedDpi
-            jpeg = $gate.jpeg
+            jpeg = $jpegEvidence
             processIds = $gate.processIds
             correlations = $gate.correlations
             reopenedInIndependentHost = [bool] $gate.reopenedInIndependentHost

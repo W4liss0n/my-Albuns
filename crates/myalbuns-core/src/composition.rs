@@ -16,7 +16,7 @@ impl CompositionCore {
         let media_by_id = album
             .media
             .iter()
-            .map(|media| (media.id.as_str(), media))
+            .map(|media| (media.id, media))
             .collect::<HashMap<_, _>>();
         CompositionPlan {
             frame_border: album.visual_defaults.frame_border.clone(),
@@ -35,7 +35,7 @@ impl CompositionCore {
                             z_index: frame.z_index,
                             photo: frame.photo.as_ref().map(|photo| {
                                 let media = media_by_id
-                                    .get(photo.media_id.as_str())
+                                    .get(&photo.media_id)
                                     .copied()
                                     .expect("validated Frame media reference");
                                 compose_photo(&frame.rect, photo, media)
@@ -97,13 +97,8 @@ pub(crate) fn derive_media_usage(
         .media
         .iter()
         .map(|media| MediaUsage {
-            media_id: media.id.clone(),
-            count: media
-                .id
-                .parse::<MediaId>()
-                .ok()
-                .and_then(|media_id| counts.get(&media_id).copied())
-                .unwrap_or_default(),
+            media_id: media.id,
+            count: counts.get(&media.id).copied().unwrap_or_default(),
         })
         .collect()
 }
@@ -147,7 +142,7 @@ fn compose_backgrounds(
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedBackground> {
     let surface = active_surface_rect(active_sides, full_width_um, height_um);
     match background {
@@ -175,7 +170,7 @@ fn compose_backgrounds(
 fn compose_background(
     content: &ProjectedBackgroundContent,
     draw_rect: RectUm,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> ComposedBackground {
     match content {
         ProjectedBackgroundContent::Color { rgb } => ComposedBackground::Color {
@@ -184,14 +179,11 @@ fn compose_background(
         },
         ProjectedBackgroundContent::Media { media_id } => {
             let media = media_by_id
-                .get(media_id.as_str())
+                .get(media_id)
                 .copied()
                 .expect("validated Background media reference");
             ComposedBackground::Media {
-                media_id: media
-                    .id
-                    .parse()
-                    .expect("validated Background media identity"),
+                media_id: media.id,
                 name: media.name.clone(),
                 draw_rect,
             }
@@ -204,7 +196,7 @@ fn compose_overlays(
     active_sides: ProjectedActiveSides,
     full_width_um: i64,
     height_um: i64,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> Vec<ComposedDecorative> {
     let surface = active_surface_rect(active_sides, full_width_um, height_um);
     match overlay {
@@ -244,15 +236,15 @@ fn compose_overlays(
 fn compose_overlay(
     content: &ProjectedOverlayContent,
     draw_rect: RectUm,
-    media_by_id: &HashMap<&str, &MediaCatalogItem>,
+    media_by_id: &HashMap<MediaId, &MediaCatalogItem>,
 ) -> ComposedDecorative {
     let ProjectedOverlayContent::Media { media_id } = content;
     let media = media_by_id
-        .get(media_id.as_str())
+        .get(media_id)
         .copied()
         .expect("validated Overlay media reference");
     ComposedDecorative {
-        media_id: media.id.parse().expect("validated Overlay media identity"),
+        media_id: media.id,
         name: media.name.clone(),
         draw_rect,
     }
@@ -348,10 +340,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     };
 
     ComposedPhoto {
-        media_id: photo
-            .media_id
-            .parse()
-            .expect("validated Photo media identity"),
+        media_id: photo.media_id,
         name: media.name.clone(),
         draw_rect: RectUm {
             x: frame.x + (current.center.x - current.size.width / 2.0).round() as i64,

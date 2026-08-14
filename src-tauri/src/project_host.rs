@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, ProjectIdentityAuthority, ProjectIntent,
-    RenderSnapshot, SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIdentityAuthority,
+    ProjectIntent, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -232,7 +232,8 @@ impl ProjectHost {
             .into_iter()
             .map(|media| {
                 RenderSource::new(
-                    media.id().hyphenated().to_string(),
+                    MediaId::try_from(media.id())
+                        .expect("persisted MediaRef identities are canonical UUID v4"),
                     media.path().to_path_buf(),
                 )
                 .map_err(|error| format!("A fonte original congelada é inválida: {error}"))
@@ -946,7 +947,7 @@ mod tests {
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,
-            projection.state.album.media[0].id
+            projection.state.album.media[0].id.to_string()
         );
         assert_eq!(catalog.bindings[0].logical_path, background_path);
         let frontend_projection =

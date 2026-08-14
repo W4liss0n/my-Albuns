@@ -171,7 +171,7 @@ fn load_render_sources(
             .map_err(|error| {
                 RenderFailure::typed(
                     ImagingFailureCode::SourceUnavailable,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     Some(ImagingPathCode::from_resolve_error(error)),
                     format!("não foi possível aplicar o plano de caminhos: {error}"),
                 )
@@ -179,7 +179,7 @@ fn load_render_sources(
         let opened_source = open_render_source(&resolved).map_err(|failure| {
             RenderFailure::typed(
                 failure.code,
-                Some(source.media_id().to_owned()),
+                Some(source.media_id().to_string()),
                 failure.path_code,
                 failure.message,
             )
@@ -189,7 +189,7 @@ fn load_render_sources(
             .ok_or_else(|| {
                 RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     None,
                     "o tamanho total das fontes excedeu o limite",
                 )
@@ -198,7 +198,7 @@ fn load_render_sources(
             .checked_add(opened_source.pixel_count().map_err(|failure| {
                 RenderFailure::typed(
                     failure.code,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     failure.path_code,
                     failure.message,
                 )
@@ -206,7 +206,7 @@ fn load_render_sources(
             .ok_or_else(|| {
                 RenderFailure::typed(
                     ImagingFailureCode::ResourceLimitExceeded,
-                    Some(source.media_id().to_owned()),
+                    Some(source.media_id().to_string()),
                     None,
                     "a soma dos pixels das fontes excedeu o intervalo seguro",
                 )
@@ -214,22 +214,14 @@ fn load_render_sources(
         if source_pixels > MAX_DECODED_SOURCE_PIXELS_TOTAL {
             return Err(RenderFailure::typed(
                 ImagingFailureCode::ResourceLimitExceeded,
-                Some(source.media_id().to_owned()),
+                Some(source.media_id().to_string()),
                 None,
                 format!(
                     "as fontes teriam {source_pixels} pixels e excedem o limite de {MAX_DECODED_SOURCE_PIXELS_TOTAL}"
                 ),
             ));
         }
-        let media_id = source.media_id().parse::<MediaId>().map_err(|_| {
-            RenderFailure::typed(
-                ImagingFailureCode::CompositionFailed,
-                Some(source.media_id().to_owned()),
-                None,
-                "a fonte da Exportação possui Identidade de mídia inválida",
-            )
-        })?;
-        opened.push((media_id, opened_source));
+        opened.push((source.media_id(), opened_source));
     }
 
     let mut decoded = HashMap::new();

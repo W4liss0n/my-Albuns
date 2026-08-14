@@ -327,7 +327,7 @@ export function ExportPreviewControl({
             {phase === "cancelled"
               ? "A Exportação foi cancelada."
               : failureMessage ??
-                "Não foi possível exportar a prova."}
+                "Não foi possível exportar a Lâmina."}
           </p>
           <div className="export-preview-actions">
             <button
@@ -369,7 +369,7 @@ function messageFromError(error: unknown) {
   ) {
     return error.message;
   }
-  return "Não foi possível exportar a prova.";
+  return "Não foi possível exportar a Lâmina.";
 }
 
 function ExportModal({
@@ -398,18 +398,18 @@ function ExportModal({
 function progressStageLabel(stage: ExportProgressStage) {
   switch (stage) {
     case "preparing":
-      return "Preparando a prova";
+      return "Preparando a Exportação";
     case "loading_sources":
       return "Carregando os originais";
     case "composing":
-      return "Compondo a prova";
+      return "Compondo a Exportação";
     case "encoding_output":
-      return "Codificando a prova";
+      return "Codificando o JPEG";
     case "verifying":
-      return "Verificando a prova";
+      return "Verificando o JPEG";
     case "publishing":
-      return "Publicando a prova";
+      return "Publicando o JPEG";
     case "completed":
-      return "Finalizando a prova";
+      return "Finalizando a Exportação";
   }
 }

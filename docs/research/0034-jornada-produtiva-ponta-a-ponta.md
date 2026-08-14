@@ -33,13 +33,15 @@ ordem:
 
 1. cancelamento do primeiro diálogo de criação sem arquivo e sem Host;
 2. autorização `CreateOnly`, criação e handoff causal Global → Host;
-3. materialização do Canvas e seleção da segunda Lâmina;
+3. criação de extremidades de página única, Background `#204060`,
+   materialização do Canvas e seleção observada da segunda Lâmina;
 4. DPI 300, Desfazer, Refazer e persistência da revisão 1;
 5. DPI 360 ainda não salvo;
 6. cancelamento do diálogo de Exportação antes da `ExportPipeline` e do
    Processador;
-7. Exportação JPEG da segunda Lâmina em 720 × 360 px, sem alterar o Projeto
-   salvo nem o histórico pendente;
+7. Exportação JPEG da segunda Lâmina dupla em 720 × 360 px, distinguível
+   da primeira Lâmina de 360 × 360 px, com amostra do Background salvo e
+   sem alterar o Projeto nem o histórico pendente;
 8. fechamento com descarte, reabertura em outro Host e histórico vazio;
 9. terminais exatamente correlacionados por PID para Global, Host e
    Processador, seguidos de cleanup completo.
@@ -56,9 +58,11 @@ captura. Portanto, `sourceInputsDirty=false` atribui a rodada ao commit indicado
 em `gitCommit`; mudança concorrente de `HEAD`, arquivo rastreado ou não
 rastreado fecha o gate.
 
-A rodada canônica registrada em
+A rodada registrada em
 `docs/research/artifacts/0023-productive-journey.json` executou 8/8 checks sobre
 o input limpo `2f10be59159cdb6d9966fad3ad135007e41cb28b`. O artefato foi publicado no
 commit posterior `953c66f815cbbdcc4380a94e4afeb46767fb4615`, que altera somente o JSON de
-evidência. A captura contém 991 de 1.271 amostras não brancas, os três PIDs
-distintos e `cleanupCompleted=true`.
+evidência. Essa rodada permanece histórica para aquele input: ela antecede a
+prova de Lâminas distinguíveis e não será atribuída ao runner corrente. Uma
+nova rodada canônica só pode substituí-la após executar 8/8 sobre um novo input
+limpo, com `sourceInputsDirty=false`.

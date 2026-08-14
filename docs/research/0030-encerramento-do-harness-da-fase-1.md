@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 01-plataforma-e-arquitetura
 date: 2026-08-02
-updated: 2026-08-02
+updated: 2026-08-14
 ---
 
 # Encerramento do harness da Fase 1
@@ -45,9 +45,12 @@ consumidor de produção. `OperationGate` passou a representar somente sua
 concessão exclusiva global; rótulos para lote e manutenção serão introduzidos
 apenas se alterarem uma política real. O comando IPC `ResetCache` foi removido do
 Processador de Imagens, enquanto a primitiva segura de limpeza permaneceu em
-`AppPaths` para o futuro fluxo que vier a possuí-la. A mídia do Projeto demo,
-ainda necessária enquanto criar/abrir não existe, passou a pertencer à categoria
-central `State\Demo\Media` em vez de criar uma raiz de dados própria.
+`AppPaths` para o futuro fluxo que vier a possuí-la. A mídia do Projeto demo foi
+um resíduo transitório enquanto criar/abrir ainda não existia. O fechamento do
+esqueleto produtivo na issue #8 removeu esse resíduo e a categoria
+`State\Demo\Media`; a jornada corrente usa exclusivamente o Projeto persistido,
+seus Originais vinculados e as fronteiras reais descritas na
+[jornada produtiva ponta a ponta](0034-jornada-produtiva-ponta-a-ponta.md).
 
 ## Verificações que continuam correntes
 
@@ -64,6 +67,10 @@ adotada:
   Processador de Imagens;
 - `npm run test:windows-path` preserva os casos de caminhos Windows, Unicode,
   nomes longos e identidade de arquivos.
+- `npm run test:dev-lifecycle` preserva o handoff Global → Host e a posse do
+  frontend de desenvolvimento;
+- `npm run test:productive-journey` atravessa a criação, o Host independente,
+  o Canvas, a Exportação JPEG e a reabertura pelas fronteiras produtivas.
 
 Os gates de comparação A/B, distribuição do spike, processo global candidato e
 falhas sintéticas não possuem substituto corrente porque verificavam

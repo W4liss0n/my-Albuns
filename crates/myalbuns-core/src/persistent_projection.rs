@@ -3,7 +3,7 @@ use uuid::Uuid;
 use crate::{
     composition::{CompositionCore, derive_media_usage},
     model::{
-        AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, MediaCatalogItem,
+        AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, MediaCatalogItem, MediaId,
         MediaKind, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
         ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
         SheetRole, SheetSnapshot,
@@ -50,7 +50,7 @@ pub(crate) fn editor_projection(
             .media()
             .iter()
             .map(|media| MediaCatalogItem {
-                id: media.id().hyphenated().to_string(),
+                id: MediaId::from_uuid(media.id()),
                 kind: media.kind(),
                 name: media
                     .path()
@@ -132,7 +132,7 @@ fn projected_background_content(content: &BackgroundContent) -> ProjectedBackgro
             rgb: rgb.canonical_hex(),
         },
         BackgroundContent::Media { media_id } => ProjectedBackgroundContent::Media {
-            media_id: media_id.hyphenated().to_string(),
+            media_id: MediaId::from_uuid(*media_id),
         },
     }
 }
@@ -140,7 +140,7 @@ fn projected_background_content(content: &BackgroundContent) -> ProjectedBackgro
 fn projected_overlay_content(content: &OverlayContent) -> ProjectedOverlayContent {
     match content {
         OverlayContent::Media { media_id } => ProjectedOverlayContent::Media {
-            media_id: media_id.hyphenated().to_string(),
+            media_id: MediaId::from_uuid(*media_id),
         },
     }
 }

@@ -90,3 +90,84 @@ export function assertCorrelatedJourneyTerminals(
     imagingAttempts: imagingAttempts.length,
   };
 }
+
+const MICROMETERS_PER_INCH = 25_400;
+
+function rasterDimensions(document, sheet, dpi) {
+  const widthUm =
+    sheet.activeSides === "both"
+      ? document.sheetWidthUm
+      : Math.floor(document.sheetWidthUm / 2);
+  return {
+    width: Math.round((widthUm * dpi) / MICROMETERS_PER_INCH),
+    height: Math.round(
+      (document.sheetHeightUm * dpi) / MICROMETERS_PER_INCH,
+    ),
+  };
+}
+
+export function assertDistinguishableSheetExport({
+  document,
+  sheets,
+  visualDefaults,
+  expectedBackgroundRgb,
+  selectedSheetNumber,
+  exportedDpi,
+  jpegDimensions,
+}) {
+  if (
+    !Number.isInteger(selectedSheetNumber) ||
+    selectedSheetNumber <= 1 ||
+    selectedSheetNumber > sheets.length
+  ) {
+    throw new Error("The productive journey did not select a non-initial sheet");
+  }
+  const firstSheet = sheets[0];
+  const selectedSheet = sheets[selectedSheetNumber - 1];
+  const firstSheetDimensions = rasterDimensions(
+    document,
+    firstSheet,
+    exportedDpi,
+  );
+  const selectedSheetDimensions = rasterDimensions(
+    document,
+    selectedSheet,
+    exportedDpi,
+  );
+  if (
+    firstSheetDimensions.width === selectedSheetDimensions.width &&
+    firstSheetDimensions.height === selectedSheetDimensions.height
+  ) {
+    throw new Error(
+      "The productive journey sheets are not distinguishable in the JPEG output",
+    );
+  }
+  if (
+    jpegDimensions.width !== selectedSheetDimensions.width ||
+    jpegDimensions.height !== selectedSheetDimensions.height ||
+    (jpegDimensions.width === firstSheetDimensions.width &&
+      jpegDimensions.height === firstSheetDimensions.height)
+  ) {
+    throw new Error(
+      "The JPEG does not prove the selected non-initial sheet was exported",
+    );
+  }
+  const background = visualDefaults?.background;
+  if (
+    background?.scope !== "bothSides" ||
+    background.both?.kind !== "color" ||
+    background.both.rgb !== expectedBackgroundRgb
+  ) {
+    throw new Error(
+      "The saved Project does not contain the expected personalization",
+    );
+  }
+  return {
+    exportedSheetNumber: selectedSheetNumber,
+    selectedSheetId: selectedSheet.id,
+    selectedSheetActiveSides: selectedSheet.activeSides,
+    selectedSheetDimensions,
+    firstSheetDimensions,
+    expectedBackgroundRgb,
+  };
+}

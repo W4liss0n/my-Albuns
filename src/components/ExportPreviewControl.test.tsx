@@ -174,7 +174,7 @@ test("projects progress and follows the backend cancellation declaration", async
     });
   });
 
-  expect(screen.getByText("Preparando a prova")).toBeInTheDocument();
+  expect(screen.getByText("Preparando a Exportação")).toBeInTheDocument();
   expect(screen.getByRole("progressbar")).not.toHaveAttribute(
     "aria-valuenow",
   );
@@ -193,7 +193,7 @@ test("projects progress and follows the backend cancellation declaration", async
     });
   });
 
-  expect(screen.getByText("Compondo a prova")).toBeInTheDocument();
+  expect(screen.getByText("Compondo a Exportação")).toBeInTheDocument();
   expect(screen.getByText("2 de 5")).toBeInTheDocument();
   expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
   expect(
@@ -222,7 +222,8 @@ test("projects progress and follows the backend cancellation declaration", async
     });
   });
 
-  expect(screen.getByText("Publicando a prova")).toBeInTheDocument();
+  expect(screen.getByText("Publicando o JPEG")).toBeInTheDocument();
+  expect(screen.queryByText(/prova/i)).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Cancelar Exportação" }),
   ).toBeInTheDocument();

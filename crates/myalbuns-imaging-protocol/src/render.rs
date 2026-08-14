@@ -113,11 +113,7 @@ pub fn validate_render_content(
     let mut supplied_media = std::collections::HashSet::new();
     for source in sources {
         source.validate()?;
-        let media_id = source
-            .media_id()
-            .parse::<MediaId>()
-            .map_err(|_| "a fonte da Exportação possui Identidade de mídia inválida")?;
-        if !supplied_media.insert(media_id) {
+        if !supplied_media.insert(source.media_id()) {
             return Err("a Exportação contém mídia duplicada".into());
         }
     }
@@ -130,25 +126,22 @@ pub fn validate_render_content(
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderSource {
-    media_id: String,
+    media_id: MediaId,
     source_path: NativePathDto,
 }
 
 impl RenderSource {
-    pub fn new(
-        media_id: impl Into<String>,
-        source_path: impl Into<NativePathDto>,
-    ) -> Result<Self, String> {
+    pub fn new(media_id: MediaId, source_path: impl Into<NativePathDto>) -> Result<Self, String> {
         let source = Self {
-            media_id: media_id.into(),
+            media_id,
             source_path: source_path.into(),
         };
         source.validate()?;
         Ok(source)
     }
 
-    pub fn media_id(&self) -> &str {
-        &self.media_id
+    pub fn media_id(&self) -> MediaId {
+        self.media_id
     }
 
     pub fn source_path(&self) -> &std::path::Path {
@@ -156,7 +149,13 @@ impl RenderSource {
     }
 
     fn validate(&self) -> Result<(), String> {
-        validate_media_identity_path(&self.media_id, self.source_path())
+        if !self.source_path().is_absolute() {
+            return Err(format!(
+                "o caminho da mídia {} não é absoluto",
+                self.media_id
+            ));
+        }
+        Ok(())
     }
 }
 

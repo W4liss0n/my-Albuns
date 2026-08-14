@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use myalbuns_core::{
     CreateAuthorization, CreateProjectRequest, InitialBackground, InitialBackgroundContent,
-    InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization, MediaKind,
-    ProjectCore, ProjectLocation,
+    InitialFrameBorder, InitialOverlay, InitialProject, InitialProjectPersonalization, MediaId,
+    MediaKind, ProjectCore, ProjectLocation,
 };
 use myalbuns_imaging_protocol::{
     CacheCompletion, CacheJob, CacheMediaSource, CacheRepresentationPolicy, CacheRequest,
@@ -218,13 +218,21 @@ fn host_and_processor_share_one_serialized_protocol() {
         .into_iter()
         .map(|source| {
             RenderSource::new(
-                source.id().hyphenated().to_string(),
+                MediaId::try_from(source.id())
+                    .expect("persisted MediaRef identities are canonical UUID v4"),
                 source.path().to_path_buf(),
             )
             .expect("the exact native source is valid")
         })
         .collect::<Vec<_>>();
-    let source_media_id = sources[0].media_id().to_owned();
+    let mut invalid_source =
+        serde_json::to_value(&sources[0]).expect("the RenderSource serializes");
+    invalid_source["mediaId"] = serde_json::json!("not-a-canonical-media-id");
+    assert!(
+        serde_json::from_value::<RenderSource>(invalid_source).is_err(),
+        "the protocol boundary rejects a noncanonical MediaId while decoding"
+    );
+    let source_media_id = sources[0].media_id().to_string();
     let prepared_output_path = fixture
         .path()
         .join(".myalbuns-export-render-42.tmp")

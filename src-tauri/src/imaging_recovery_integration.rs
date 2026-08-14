@@ -1322,10 +1322,22 @@ fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
         );
         let output_path = fixture.join("canvas-reference-final.jpg");
         let export_sources = vec![
-            RenderSource::new(background.media_id(), background_path.clone())
-                .expect("the exact Background Original belongs to Exportação"),
-            RenderSource::new(overlay.media_id(), overlay_path.clone())
-                .expect("the exact Overlay Original belongs to Exportação"),
+            RenderSource::new(
+                background
+                    .media_id()
+                    .parse()
+                    .expect("the Background media identity is canonical"),
+                background_path.clone(),
+            )
+            .expect("the exact Background Original belongs to Exportação"),
+            RenderSource::new(
+                overlay
+                    .media_id()
+                    .parse()
+                    .expect("the Overlay media identity is canonical"),
+                overlay_path.clone(),
+            )
+            .expect("the exact Overlay Original belongs to Exportação"),
         ];
         let export_plan = export_plan(
             snapshot,

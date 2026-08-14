@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
+  assertDistinguishableSheetExport,
 } from "./ProductiveJourneyObservations.mjs";
 
 const completeJourney = [
@@ -82,5 +83,78 @@ test("correlates one terminal to each bootstrap and imaging attempt", () => {
         },
       ),
     /project_ui_ready.*203.*2/,
+  );
+});
+
+test("proves the selected non-initial sheet from distinguishable JPEG dimensions", () => {
+  const input = {
+    document: {
+      sheetWidthUm: 50_800,
+      sheetHeightUm: 25_400,
+    },
+    sheets: [
+      { id: "sheet-001", activeSides: "right" },
+      { id: "sheet-002", activeSides: "both" },
+      { id: "sheet-003", activeSides: "left" },
+    ],
+    visualDefaults: {
+      background: {
+        scope: "bothSides",
+        both: { kind: "color", rgb: "#204060" },
+      },
+    },
+    expectedBackgroundRgb: "#204060",
+    selectedSheetNumber: 2,
+    exportedDpi: 360,
+  };
+
+  assert.deepEqual(
+    assertDistinguishableSheetExport({
+      ...input,
+      jpegDimensions: { width: 720, height: 360 },
+    }),
+    {
+      exportedSheetNumber: 2,
+      selectedSheetId: "sheet-002",
+      selectedSheetActiveSides: "both",
+      selectedSheetDimensions: { width: 720, height: 360 },
+      firstSheetDimensions: { width: 360, height: 360 },
+      expectedBackgroundRgb: "#204060",
+    },
+  );
+
+  assert.throws(
+    () =>
+      assertDistinguishableSheetExport({
+        ...input,
+        jpegDimensions: { width: 360, height: 360 },
+      }),
+    /selected non-initial sheet/,
+  );
+  assert.throws(
+    () =>
+      assertDistinguishableSheetExport({
+        ...input,
+        sheets: input.sheets.map((sheet) => ({
+          ...sheet,
+          activeSides: "both",
+        })),
+        jpegDimensions: { width: 720, height: 360 },
+      }),
+    /distinguishable/,
+  );
+  assert.throws(
+    () =>
+      assertDistinguishableSheetExport({
+        ...input,
+        visualDefaults: {
+          background: {
+            scope: "bothSides",
+            both: { kind: "color", rgb: "#FFFFFF" },
+          },
+        },
+        jpegDimensions: { width: 720, height: 360 },
+      }),
+    /personalization/,
   );
 });

@@ -21,6 +21,7 @@ import {
 import {
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
+  assertDistinguishableSheetExport,
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
 
@@ -45,6 +46,7 @@ const processDataRoot = path.join(scratch, "process-data");
 const projectPath = path.join(scratch, "Jornada produtiva.myalbuns");
 const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
 const screenshotPath = path.join(scratch, "project-canvas.png");
+const personalizedBackgroundRgb = "#204060";
 const nativeDialogDriver = path.join(
   workspace,
   "scripts",
@@ -289,6 +291,46 @@ async function replaceInput(driver, using, value, text, label) {
   return elementId;
 }
 
+async function changeFormControl(driver, using, value, nextValue, label) {
+  const elementId = await findElement(driver, using, value, label);
+  const observedValue = await driver.request(
+    "POST",
+    `/session/${driver.sessionId}/execute/sync`,
+    {
+      script: `
+        const element = arguments[0];
+        const nextValue = arguments[1];
+        const descriptor = Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(element),
+          "value",
+        );
+        if (!descriptor || typeof descriptor.set !== "function") {
+          throw new Error("The public form control has no writable value");
+        }
+        descriptor.set.call(element, nextValue);
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        return element.value;
+      `,
+      args: [
+        { "element-6066-11e4-a52e-4f735466cecf": elementId },
+        nextValue,
+      ],
+    },
+  );
+  if (observedValue !== nextValue) {
+    throw new Error(`${label} did not retain its public value`);
+  }
+  return elementId;
+}
+
+async function elementText(driver, elementId) {
+  return driver.request(
+    "GET",
+    `/session/${driver.sessionId}/element/${encodeURIComponent(elementId)}/text`,
+  );
+}
+
 async function elementAttribute(driver, elementId, attribute) {
   return driver.request(
     "GET",
@@ -502,11 +544,27 @@ try {
       label,
     );
   }
+  for (const label of ["Primeira Lâmina", "Última Lâmina"]) {
+    await changeFormControl(
+      globalDriver,
+      "xpath",
+      `//label[.//span[normalize-space()='${label}']]//select`,
+      "singlePage",
+      label,
+    );
+  }
   await click(
     globalDriver,
     "xpath",
     "//button[normalize-space()='Próximo']",
     "creation next action",
+  );
+  await changeFormControl(
+    globalDriver,
+    "xpath",
+    "//label[.//span[normalize-space()='Cor do Background']]//input[@type='color']",
+    personalizedBackgroundRgb.toLowerCase(),
+    "Background color",
   );
   await clickWhenEnabled(
     globalDriver,
@@ -572,6 +630,20 @@ try {
     ".sheet-grid > button:nth-child(2)",
     "second sheet",
   );
+  const activeSheetNumber = Number(
+    await elementText(
+      hostDriver,
+      await findElement(
+        hostDriver,
+        "css selector",
+        ".sheet-grid > button.active > span",
+        "active sheet number",
+      ),
+    ),
+  );
+  if (!Number.isInteger(activeSheetNumber)) {
+    throw new Error("The productive UI exposed no active sheet number");
+  }
   await click(
     hostDriver,
     "xpath",
@@ -678,11 +750,15 @@ try {
   await waitForLogEvent("imaging_process_stopped", 1, "Processador terminal");
   const exported = readFileSync(exportPath);
   const dimensions = jpegDimensions(exported);
-  if (dimensions.width !== 720 || dimensions.height !== 360) {
-    throw new Error(
-      `The non-initial sheet was not exported at unsaved 360 DPI: ${JSON.stringify(dimensions)}`,
-    );
-  }
+  const sheetEvidence = assertDistinguishableSheetExport({
+    document: savedDocument.project.document,
+    sheets: savedDocument.project.sheets,
+    visualDefaults: savedDocument.project.visualDefaults,
+    expectedBackgroundRgb: personalizedBackgroundRgb,
+    selectedSheetNumber: activeSheetNumber,
+    exportedDpi: 360,
+    jpegDimensions: dimensions,
+  });
   if (!readFileSync(projectPath).equals(savedProject)) {
     throw new Error("Export mutated the saved Project document");
   }
@@ -858,7 +934,7 @@ try {
       cancelledCreationBeforeCore: true,
       cancelledExportBeforePipeline: true,
       createAuthorization: "createOnly",
-      exportedSheetNumber: 2,
+      ...sheetEvidence,
       exportedDpi: 360,
       savedRevision: savedDocument.revision,
       savedDpi: savedDocument.project.document.dpi,

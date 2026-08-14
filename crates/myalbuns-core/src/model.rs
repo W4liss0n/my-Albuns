@@ -20,16 +20,22 @@ pub struct ParseMediaIdError;
 
 impl MediaId {
     pub(crate) fn from_uuid(value: Uuid) -> Self {
-        assert_eq!(
-            value.get_version(),
-            Some(Version::Random),
-            "a identidade interna de mídia deve ser UUID v4"
-        );
-        Self(value)
+        Self::try_from(value).expect("a identidade interna de mídia deve ser UUID v4")
     }
 
     pub const fn into_uuid(self) -> Uuid {
         self.0
+    }
+}
+
+impl TryFrom<Uuid> for MediaId {
+    type Error = ParseMediaIdError;
+
+    fn try_from(value: Uuid) -> Result<Self, Self::Error> {
+        if value.get_version() != Some(Version::Random) {
+            return Err(ParseMediaIdError);
+        }
+        Ok(Self(value))
     }
 }
 
@@ -171,7 +177,8 @@ impl Default for MediaTransform {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoSnapshot {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub transform: MediaTransform,
 }
 
@@ -233,8 +240,13 @@ pub enum MediaKind {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedBackgroundContent {
-    Color { rgb: String },
-    Media { media_id: String },
+    Color {
+        rgb: String,
+    },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -262,7 +274,10 @@ pub enum ProjectedBackground {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectedOverlayContent {
-    Media { media_id: String },
+    Media {
+        #[ts(type = "string")]
+        media_id: MediaId,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
@@ -331,7 +346,8 @@ pub struct SheetSnapshot {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaCatalogItem {
-    pub id: String,
+    #[ts(type = "string")]
+    pub id: MediaId,
     pub kind: MediaKind,
     pub name: String,
     pub source_width_px: Option<u32>,
@@ -498,7 +514,8 @@ impl ComposedOutputUnit {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct MediaUsage {
-    pub media_id: String,
+    #[ts(type = "string")]
+    pub media_id: MediaId,
     pub count: usize,
 }
 
@@ -561,7 +578,8 @@ pub enum ProjectIntent {
     },
     FillLeftmostPlaceholder {
         sheet_id: String,
-        media_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
     },
 }
 

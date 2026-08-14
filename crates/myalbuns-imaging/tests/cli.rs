@@ -312,7 +312,7 @@ fn visible_noninitial_sheet_uses_unsaved_dpi_personalization_and_exact_originals
                 .find(|media| media.id() == media_id.into_uuid())
                 .expect("every composed Imagem decorativa belongs to the frozen Revisão");
             sources.push(
-                RenderSource::new(media_id.to_string(), media.path().to_path_buf())
+                RenderSource::new(media_id, media.path().to_path_buf())
                     .expect("the exact original descriptor is valid"),
             );
         }
@@ -847,7 +847,7 @@ fn processor_rejects_tiff_by_detected_content_with_a_stable_code() {
         render_failure(&result, "unsupported-format"),
         ImagingFailure {
             code: ImagingFailureCode::UnsupportedSourceFormat,
-            media_id: Some(media_id),
+            media_id: Some(media_id.to_string()),
             path_code: None,
         }
     );
@@ -1229,8 +1229,8 @@ fn single_source_render_request(
         .next()
         .expect("the productive fixture references its decorative original");
     let sheet_id = sheet.sheet_id.clone();
-    let source = RenderSource::new(media_id.to_string(), source_path.to_path_buf())
-        .expect("the linked source is valid");
+    let source =
+        RenderSource::new(media_id, source_path.to_path_buf()).expect("the linked source is valid");
     render_request_for_sheet(
         snapshot,
         &sheet_id,

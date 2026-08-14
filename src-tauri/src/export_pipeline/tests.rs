@@ -234,10 +234,8 @@ fn export_plan_with_authorization(
         .referenced_media_ids()
         .next()
         .expect("the productive fixture references its original");
-    let sources = vec![
-        RenderSource::new(media_id.to_string(), source_path)
-            .expect("the test original source is valid"),
-    ];
+    let sources =
+        vec![RenderSource::new(media_id, source_path).expect("the test original source is valid")];
     plan(
         snapshot,
         ExportOptions::new(request_id, output, authorization, sheet_id, sources),
@@ -297,7 +295,7 @@ fn render_descriptor_plan_freezes_identity_and_path_without_reading_sources() {
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .map(|media_id| {
-            RenderSource::new(media_id.to_string(), planned_source.clone())
+            RenderSource::new(media_id, planned_source.clone())
                 .expect("the planned source descriptor is valid")
         })
         .collect::<Vec<_>>();
