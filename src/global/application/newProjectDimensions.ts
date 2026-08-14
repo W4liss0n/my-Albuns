@@ -6,13 +6,16 @@ import type {
 } from "./globalProjectPort";
 
 export type PhysicalFieldName =
-  | "sheetWidth"
+  | "closedSheetWidth"
   | "sheetHeight"
   | "bleed"
   | "safety";
 
 export type DimensionsFieldName =
-  | PhysicalFieldName
+  | "sheetWidth"
+  | "sheetHeight"
+  | "bleed"
+  | "safety"
   | "dpi"
   | "sheetCount";
 
@@ -24,7 +27,7 @@ interface PhysicalFieldDraft {
 
 export interface NewProjectDimensionsDraft {
   displayUnit: ProjectDisplayUnit;
-  sheetWidth: PhysicalFieldDraft;
+  closedSheetWidth: PhysicalFieldDraft;
   sheetHeight: PhysicalFieldDraft;
   dpiText: string;
   sheetCountText: string;
@@ -139,14 +142,14 @@ export function createDefaultDimensionsDraft(): NewProjectDimensionsDraft {
   const displayUnit = "mm";
   return {
     displayUnit,
-    sheetWidth: physicalField(600_000, displayUnit),
+    closedSheetWidth: physicalField(300_000, displayUnit),
     sheetHeight: physicalField(300_000, displayUnit),
     dpiText: "300",
-    sheetCountText: "2",
+    sheetCountText: "18",
     firstSheet: "double",
     lastSheet: "double",
     bleed: physicalField(3_000, displayUnit),
-    safety: physicalField(3_000, displayUnit),
+    safety: physicalField(5_000, displayUnit),
   };
 }
 
@@ -177,7 +180,10 @@ export function changeDisplayUnit(
   return {
     ...draft,
     displayUnit,
-    sheetWidth: physicalField(draft.sheetWidth.valueUm, displayUnit),
+    closedSheetWidth: physicalField(
+      draft.closedSheetWidth.valueUm,
+      displayUnit,
+    ),
     sheetHeight: physicalField(draft.sheetHeight.valueUm, displayUnit),
     bleed: physicalField(draft.bleed.valueUm, displayUnit),
     safety: physicalField(draft.safety.valueUm, displayUnit),
@@ -191,14 +197,26 @@ export function formatMicrometers(
   return formatMicrometerFraction(valueUm, 1, unit);
 }
 
+export function displayUnitLabel(unit: ProjectDisplayUnit): string {
+  return unit === "in" ? "pol" : unit;
+}
+
 export function getLocalInputErrors(
   draft: NewProjectDimensionsDraft,
 ): DimensionsErrors {
   const errors: DimensionsErrors = {};
-  addPhysicalInputError(errors, "sheetWidth", draft.sheetWidth);
+  addPhysicalInputError(errors, "sheetWidth", draft.closedSheetWidth);
   addPhysicalInputError(errors, "sheetHeight", draft.sheetHeight);
   addPhysicalInputError(errors, "bleed", draft.bleed);
   addPhysicalInputError(errors, "safety", draft.safety);
+  if (
+    draft.closedSheetWidth.hasExactValue &&
+    !Number.isSafeInteger(draft.closedSheetWidth.valueUm * 2)
+  ) {
+    errors.sheetWidth = [
+      "A largura aberta da Lâmina excede o intervalo suportado.",
+    ];
+  }
 
   if (parseIntegerText(draft.dpiText) === null) {
     errors.dpi = ["Informe o DPI como um número inteiro suportado."];
@@ -224,10 +242,12 @@ export function toNewProjectConfiguration(
     return null;
   }
 
+  const sheetWidthUm = draft.closedSheetWidth.valueUm * 2;
+
   return {
     document: {
       displayUnit: draft.displayUnit,
-      sheetWidthUm: draft.sheetWidth.valueUm,
+      sheetWidthUm,
       sheetHeightUm: draft.sheetHeight.valueUm,
       dpi,
       bleedUm: draft.bleed.valueUm,
@@ -253,27 +273,6 @@ export function presentConfigurationValidationErrors(
     ];
   }
   return errors;
-}
-
-export function dimensionsSummary(
-  draft: NewProjectDimensionsDraft,
-): string {
-  const width = draft.sheetWidth.hasExactValue
-    ? draft.sheetWidth.text
-    : "—";
-  const pageWidth = draft.sheetWidth.hasExactValue
-    ? formatMicrometerFraction(
-        draft.sheetWidth.valueUm,
-        2,
-        draft.displayUnit,
-      )
-    : "—";
-  const height = draft.sheetHeight.hasExactValue
-    ? draft.sheetHeight.text
-    : "—";
-  const dpi = parseIntegerText(draft.dpiText);
-
-  return `Lâmina ${width} × ${height} ${draft.displayUnit} · Página ${pageWidth} × ${height} ${draft.displayUnit} · ${dpi ?? "—"} DPI`;
 }
 
 function formatMicrometerFraction(
@@ -348,7 +347,7 @@ function parseIntegerText(text: string): number | null {
 
 function addPhysicalInputError(
   errors: DimensionsErrors,
-  name: PhysicalFieldName,
+  name: DimensionsFieldName,
   field: PhysicalFieldDraft,
 ) {
   if (!field.hasExactValue) {

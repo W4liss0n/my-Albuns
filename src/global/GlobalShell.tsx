@@ -212,8 +212,10 @@ export function GlobalShell({
           </div>
           <div aria-hidden="true" className="global-action-divider" />
           <div className="global-secondary-actions">
+            {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
             <button
               aria-label="Exportar vários Álbuns de uma vez"
+              data-placeholder-feature="batch-export"
               disabled
               title="A Exportação em lote ainda não está disponível"
               type="button"

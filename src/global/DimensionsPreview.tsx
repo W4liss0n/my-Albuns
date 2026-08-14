@@ -1,11 +1,15 @@
-import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
+import {
+  displayUnitLabel,
+  formatMicrometers,
+  type NewProjectDimensionsDraft,
+} from "./application/newProjectDimensions";
 
 interface DimensionsPreviewProps {
   draft: NewProjectDimensionsDraft;
 }
 
 export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
-  const width = Math.max(1, draft.sheetWidth.valueUm);
+  const width = Math.max(1, draft.closedSheetWidth.valueUm * 2);
   const height = Math.max(1, draft.sheetHeight.valueUm);
   const smallestSide = Math.min(width, height);
   const bleed = Math.max(
@@ -23,7 +27,8 @@ export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
       <p className="new-project-preview-metadata">
         <span>Lâmina aberta</span>
         <strong>
-          {draft.sheetWidth.text} × {draft.sheetHeight.text} {draft.displayUnit}
+          {formatMicrometers(width, draft.displayUnit)} × {draft.sheetHeight.text}{" "}
+          {displayUnitLabel(draft.displayUnit)}
         </strong>
         <span>· {draft.sheetCountText || "0"} Lâminas</span>
         <span className="new-project-guide new-project-guide--bleed">
@@ -43,21 +48,14 @@ export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
           xmlns="http://www.w3.org/2000/svg"
         >
           <title>Prévia das Dimensões</title>
-          <rect fill="#ffffff" height={height} width={width} />
-          <rect
-            fill="#e5e2dc"
-            height={Math.max(1, height - bleed * 2)}
-            width={Math.max(1, width - bleed * 2)}
-            x={bleed}
-            y={bleed}
-          />
+          <rect fill="#fbfaf8" height={height} width={width} />
           <line
-            stroke="#ffffff"
-            strokeWidth={Math.max(1, height * 0.008)}
+            stroke="#d7d2c8"
+            strokeWidth={Math.max(1, height * 0.003)}
             x1={width / 2}
             x2={width / 2}
-            y1={bleed}
-            y2={height - bleed}
+            y1={0}
+            y2={height}
           />
           <rect
             fill="none"

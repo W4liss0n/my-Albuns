@@ -13,60 +13,77 @@ O fluxo de `Novo Projeto` coleta apenas as definições iniciais do Álbum. Nome
 
 A criação possui exatamente duas etapas dentro do aplicativo:
 
-1. `Dimensões`, dedicada à base física e estrutural do Álbum;
+1. `Configurações`, dedicada à base física e estrutural do Álbum;
 2. `Personalização`, dedicada aos padrões visuais iniciais.
 
-### Dimensões
+### Configurações
 
-A primeira etapa é um formulário simples dividido em três grupos.
+A primeira etapa mantém uma prévia proporcional da Lâmina aberta à esquerda e
+organiza os controles à direita nesta ordem:
 
-`Documento` contém:
-
+- Predefinição;
 - Unidade de medida;
-- largura e altura da Lâmina;
-- DPI.
-
-`Estrutura` contém:
-
+- Dimensão da Lâmina fechada;
+- Sangria e Área de segurança;
 - quantidade inicial de Lâminas;
-- formato da primeira Lâmina;
-- formato da última Lâmina.
+- Configurações avançadas, inicialmente recolhidas.
 
-`Áreas técnicas` contém:
+`Configurações avançadas` contém a Resolução do Projeto e a Configuração das
+extremidades. Esses campos continuam fazendo parte da validação mesmo quando o
+grupo estiver recolhido.
 
-- Sangria;
-- Área de segurança.
+A largura informada em `Dimensão da Lâmina fechada` corresponde à largura da
+Página. A interface deriva a largura da Dimensão da Lâmina aberta multiplicando
+esse valor por dois; a altura é a mesma nas duas representações. O núcleo recebe
+e valida sempre a Dimensão da Lâmina aberta.
 
-Largura e altura representam a Lâmina inteira. A largura de cada Página é calculada como sua metade.
+A quantidade começa em 18 Lâminas e os botões do contador alteram o valor em
+passos de duas. A interface não inventa um máximo funcional: o núcleo continua
+dono da validade da quantidade, inclusive para Álbuns longos. A Unidade interna
+`in` é apresentada à pessoa como `pol` em botões, campos e prévias.
 
-A etapa não possui reprodução gráfica da Lâmina. Um resumo somente de leitura apresenta continuamente a dimensão da Lâmina, a dimensão calculada de cada Página e o DPI, por exemplo:
+As medidas, a Sangria do Projeto e a Área de segurança valem para o Álbum
+inteiro. Uma nota ao final dos controles informa que esses valores podem ser
+alterados posteriormente nas Configurações do Projeto.
 
-`Lâmina 60 × 24 cm · Páginas 30 × 24 cm · 300 DPI`
+#### Estado temporário das Predefinições
+
+`Predefinição` é um **PLACEHOLDER UI** enquanto não existir contrato de
+aplicação e persistência no backend. As opções incorporadas e as opções salvas
+pelo usuário funcionam somente na sessão atual da tela e guardam, em memória, os
+valores de `Configurações` e `Personalização`. Reabrir o aplicativo descarta as
+predefinições criadas nessa sessão.
+
+O código que materializa esse comportamento deve permanecer marcado com
+`PLACEHOLDER UI` e `data-placeholder-feature="new-project-presets"` até a
+substituição por uma porta de aplicação real. A marcação não deve ser removida
+apenas porque o fluxo local funciona visualmente.
+
+A linha superior da prévia identifica a dimensão da Lâmina aberta, a quantidade
+de Lâminas e as guias técnicas. As medidas e o DPI permanecem nos próprios
+controles, sem repetir essas informações em um card de resumo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Dimensões                                                       │
+│  Configurações                                                   │
+├───────────────────────────────────────────┬──────────────────────┤
+│  Lâmina aberta · quantidade · guias       │  Predefinição        │
+│                                           │  Unidade              │
+│          prévia proporcional              │  Dimensão fechada     │
+│                                           │  Sangria · Segurança │
+│                                           │  Lâminas              │
+│                                           │  ▸ Avançadas          │
+│                                           │  Nota                 │
 ├──────────────────────────────────────────────────────────────────┤
-│  Documento                                                       │
-│  Unidade · Largura · Altura · DPI                                │
-│                                                                  │
-│  Estrutura                                                       │
-│  Quantidade · Primeira Lâmina · Última Lâmina                    │
-│                                                                  │
-│  Áreas técnicas                                                  │
-│  Sangria · Área de segurança                                     │
-│                                                                  │
-│  Lâmina 60 × 24 cm · Páginas 30 × 24 cm · 300 DPI               │
-├──────────────────────────────────────────────────────────────────┤
-│  Cancelar                                             Próximo    │
+│  Cancelar                                           Continuar    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 ### Validação
 
-`Próximo` valida todos os campos da etapa `Dimensões` e só avança quando o conjunto estiver válido. Cada problema aparece em texto junto ao campo correspondente, e o foco é transferido para o primeiro campo inválido.
+`Continuar` valida todos os campos da etapa `Configurações` e só avança quando o conjunto estiver válido. Cada problema aparece em texto junto ao campo correspondente, e o foco é transferido para o primeiro campo inválido.
 
-O fluxo não usa um modal genérico para listar erros de preenchimento. Corrigir um campo atualiza seu estado e o resumo calculado imediatamente.
+O fluxo não usa um modal genérico para listar erros de preenchimento. Corrigir um campo atualiza seu estado e a prévia imediatamente.
 
 ### Personalização
 
@@ -86,7 +103,7 @@ A etapa `Personalização` contém uma reprodução de Lâmina com Frames de dem
 - o Overlay atual;
 - a presença, a cor e a espessura da Borda padrão dos Frames.
 
-A reprodução mostra sempre uma Lâmina dupla e mantém a proporção de largura e altura definida na etapa `Dimensões`. O formato escolhido para a primeira ou a última Lâmina não desativa lados nessa demonstração, pois sua finalidade é permitir a configuração conjunta dos escopos esquerdo, direito e de Ambos os lados.
+A reprodução mostra sempre uma Lâmina dupla e mantém a proporção de largura e altura definida na etapa `Configurações`. O formato escolhido para a primeira ou a última Lâmina não desativa lados nessa demonstração, pois sua finalidade é permitir a configuração conjunta dos escopos esquerdo, direito e de Ambos os lados.
 
 Qualquer alteração nesses controles atualiza a reprodução imediatamente. As imagens provisórias escolhidas para Background ou Overlay também são compostas na prévia antes da criação do Projeto.
 

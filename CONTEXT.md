@@ -111,6 +111,12 @@ Unidade física única usada pelas medidas de um Projeto, como milímetro, cent�
 **Dimensão da Lâmina**:
 Largura e altura físicas da superfície dupla definida para o Projeto.
 
+**Dimensão da Lâmina fechada**:
+Representação de entrada usada pela interface de criação quando a Lâmina está
+dobrada. Sua largura corresponde à largura da Dimensão da Página, sua altura é a
+mesma da Dimensão da Lâmina e sua abertura deriva uma Dimensão da Lâmina com o
+dobro da largura informada.
+
 **Dimensão da Página**:
 Metade da largura da Dimensão da Lâmina e a mesma altura.
 

@@ -1,11 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import type {
-  GlobalProjectPort,
-  NewProjectPort,
-} from "./global/application/globalProjectPort";
+import type { GlobalProjectPort } from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
+import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
 import "./App.css";
 import "./global/GlobalShell.css";
 
@@ -31,12 +29,7 @@ const projectPort: GlobalProjectPort = {
   showLaunchFailure: async () => undefined,
 };
 
-const newProjectPort: NewProjectPort = {
-  chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
-  createProject: async () => ({ status: "cancelled" }),
-  releaseProvisionalDecorative: async () => undefined,
-  validateProjectConfiguration: async () => ({ status: "valid" }),
-};
+const newProjectPort = createNewProjectPortStub();
 
 const supportedGraphics = {
   supported: true,

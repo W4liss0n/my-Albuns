@@ -1,4 +1,5 @@
 import { forwardRef, useId, useRef, useState } from "react";
+import { Minus, Plus, Save } from "lucide-react";
 
 import type {
   NewProjectConfiguration,
@@ -12,8 +13,8 @@ import type {
 import {
   changeDisplayUnit,
   createDefaultDimensionsDraft,
-  dimensionsSummary,
   DIMENSIONS_FIELD_ORDER,
+  displayUnitLabel,
   editPhysicalField,
   getLocalInputErrors,
   presentConfigurationValidationErrors,
@@ -30,7 +31,11 @@ import {
   type NewProjectCreationConfiguration,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
-import { ActionButton, InlineNotice } from "../ui";
+import {
+  createBuiltInProjectPresets,
+  type NewProjectPreset,
+} from "./application/newProjectPresets";
+import { ActionButton, AppIcon, InlineNotice } from "../ui";
 import { DimensionsPreview } from "./DimensionsPreview";
 import { PersonalizationStep } from "./PersonalizationStep";
 import "./NewProjectFlow.css";
@@ -47,7 +52,7 @@ interface NewProjectFlowProps {
   onReleaseDecorative?(selectionId: string): Promise<void> | void;
 }
 
-type CreationStep = "dimensions" | "personalization";
+type CreationStep = "configuration" | "personalization";
 
 export function NewProjectFlow({
   onCancel,
@@ -56,11 +61,14 @@ export function NewProjectFlow({
   onReleaseDecorative = ignoreReleasedDecorative,
   onValidate,
 }: NewProjectFlowProps) {
-  const [step, setStep] = useState<CreationStep>("dimensions");
+  const [step, setStep] = useState<CreationStep>("configuration");
   const [draft, setDraft] = useState(createDefaultDimensionsDraft);
   const [personalization, setPersonalization] = useState(
     createDefaultPersonalizationDraft,
   );
+  // PLACEHOLDER UI: coleção local e não persistida; ver newProjectPresets.ts.
+  const [presets, setPresets] = useState(createBuiltInProjectPresets);
+  const [selectedPresetId, setSelectedPresetId] = useState("");
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [failure, setFailure] = useState<ProjectLaunchFailure | null>(null);
@@ -72,6 +80,7 @@ export function NewProjectFlow({
   const [validatedConfiguration, setValidatedConfiguration] =
     useState<NewProjectConfiguration | null>(null);
   const validationRequest = useRef(0);
+  const nextCustomPreset = useRef(1);
   const fieldRefs = useRef<
     Partial<Record<DimensionsFieldName, HTMLInputElement>>
   >({});
@@ -150,6 +159,7 @@ export function NewProjectFlow({
     changedFields: readonly DimensionsFieldName[],
   ) => {
     setDraft(candidateDraft);
+    setSelectedPresetId("");
     setValidatedConfiguration(null);
     if (validationAttempted) {
       void validateDraft(candidateDraft, false, false, changedFields);
@@ -163,7 +173,10 @@ export function NewProjectFlow({
 
   const cancelFlow = () => {
     validationRequest.current += 1;
-    for (const selection of provisionalSelections(personalization)) {
+    for (const selection of ownedProvisionalSelections(
+      personalization,
+      presets,
+    )) {
       void onReleaseDecorative(selection.selectionId);
     }
     onCancel();
@@ -173,7 +186,7 @@ export function NewProjectFlow({
     nextPersonalization: NewProjectPersonalizationDraft,
   ) => {
     const retainedIds = new Set(
-      provisionalSelections(nextPersonalization).map(
+      ownedProvisionalSelections(nextPersonalization, presets).map(
         (selection) => selection.selectionId,
       ),
     );
@@ -183,13 +196,49 @@ export function NewProjectFlow({
       }
     }
     setPersonalization(nextPersonalization);
+    setSelectedPresetId("");
+  };
+
+  const applyProjectPreset = (presetId: string) => {
+    if (!presetId) {
+      setSelectedPresetId("");
+      return;
+    }
+    const preset = presets.find((candidate) => candidate.id === presetId);
+    if (!preset) {
+      return;
+    }
+    validationRequest.current += 1;
+    setIsValidating(false);
+    setValidationFailure(null);
+    setValidatedConfiguration(null);
+    setDraft(preset.dimensions);
+    updatePersonalization(preset.personalization);
+    setSelectedPresetId(preset.id);
+    if (validationAttempted) {
+      void validateDraft(preset.dimensions, false, false);
+    } else {
+      setValidationErrors({});
+    }
+  };
+
+  const saveProjectPreset = (name: string) => {
+    const preset: NewProjectPreset = {
+      id: `custom-${nextCustomPreset.current}`,
+      name,
+      dimensions: draft,
+      personalization: { ...personalization, hoveredScope: null },
+    };
+    nextCustomPreset.current += 1;
+    setPresets((current) => [preset, ...current]);
+    setSelectedPresetId(preset.id);
   };
 
   const createProject = async () => {
     const configuration = validatedConfiguration;
     if (!configuration) {
       setValidationAttempted(true);
-      setStep("dimensions");
+      setStep("configuration");
       void validateDraft(draft, false, true);
       return;
     }
@@ -201,93 +250,107 @@ export function NewProjectFlow({
     if (outcome.status === "failed") {
       setFailure(outcome.error);
     }
+    if (outcome.status === "opened") {
+      const consumedIds = new Set(
+        provisionalSelections(personalization).map(
+          (selection) => selection.selectionId,
+        ),
+      );
+      for (const selection of provisionalSelectionsInPresets(presets)) {
+        if (!consumedIds.has(selection.selectionId)) {
+          void onReleaseDecorative(selection.selectionId);
+        }
+      }
+    }
     setIsCreating(false);
   };
 
   return (
-      <main
-        aria-labelledby="new-project-step-title"
-        className="new-project-flow"
-      >
-        <header className="new-project-header">
-          <h1>Novo Projeto</h1>
-          <h2 className="ui-visually-hidden" id="new-project-step-title">
-            {step === "dimensions" ? "Dimensões" : "Personalização"}
-          </h2>
-          <ol aria-label="Etapas da criação" className="new-project-steps">
-            <li aria-current={step === "dimensions" ? "step" : undefined}>
-              <span>1</span>
-              Dimensões
-            </li>
-            <li
-              aria-current={
-                step === "personalization" ? "step" : undefined
-              }
+    <main
+      aria-labelledby="new-project-step-title"
+      className="new-project-flow"
+    >
+      <header className="new-project-header">
+        <h1>Novo Projeto</h1>
+        <h2 className="ui-visually-hidden" id="new-project-step-title">
+          {step === "configuration" ? "Configurações" : "Personalização"}
+        </h2>
+        <ol aria-label="Etapas da criação" className="new-project-steps">
+          <li aria-current={step === "configuration" ? "step" : undefined}>
+            <span>1</span>
+            Configurações
+          </li>
+          <li
+            aria-current={step === "personalization" ? "step" : undefined}
+          >
+            <span>2</span>
+            Personalização
+          </li>
+        </ol>
+      </header>
+
+      {step === "configuration" ? (
+        <ConfigurationStep
+          attempted={validationAttempted}
+          draft={draft}
+          errors={validationErrors}
+          fieldRefs={fieldRefs}
+          onApplyPreset={applyProjectPreset}
+          onChange={updateDraft}
+          onSavePreset={saveProjectPreset}
+          presets={presets}
+          selectedPresetId={selectedPresetId}
+          validationFailure={validationFailure}
+        />
+      ) : (
+        <PersonalizationStep
+          failure={failure}
+          heightUm={draft.sheetHeight.valueUm}
+          onChange={updatePersonalization}
+          onChooseDecorative={onChooseDecorative}
+          personalization={personalization}
+          widthUm={draft.closedSheetWidth.valueUm * 2}
+        />
+      )}
+
+      <footer className="new-project-footer">
+        <div>
+          {step === "personalization" ? (
+            <ActionButton
+              disabled={isCreating}
+              onClick={() => setStep("configuration")}
+              variant="quiet"
             >
-              <span>2</span>
-              Personalização
-            </li>
-          </ol>
-        </header>
-
-        {step === "dimensions" ? (
-          <DimensionsStep
-            attempted={validationAttempted}
-            draft={draft}
-            errors={validationErrors}
-            fieldRefs={fieldRefs}
-            onChange={updateDraft}
-            validationFailure={validationFailure}
-          />
-        ) : (
-          <PersonalizationStep
-            failure={failure}
-            heightUm={draft.sheetHeight.valueUm}
-            onChange={updatePersonalization}
-            onChooseDecorative={onChooseDecorative}
-            personalization={personalization}
-            widthUm={draft.sheetWidth.valueUm}
-          />
-        )}
-
-        <footer className="new-project-footer">
-          <div>
-            {step === "personalization" ? (
-              <ActionButton
-                disabled={isCreating}
-                onClick={() => setStep("dimensions")}
-                variant="quiet"
-              >
-                Voltar
-              </ActionButton>
-            ) : null}
-          </div>
-          <div className="new-project-footer-actions">
-            <ActionButton disabled={isCreating} onClick={cancelFlow}>
-              Cancelar
+              Voltar
             </ActionButton>
-            {step === "dimensions" ? (
-              <ActionButton
-                aria-label="Próximo"
-                disabled={isValidating}
-                onClick={goToPersonalization}
-                variant="primary"
-              >
-                {isValidating ? "Validando…" : "Continuar"}
-              </ActionButton>
-            ) : (
-              <ActionButton
-                aria-label="Criar"
-                disabled={isCreating}
-                onClick={() => void createProject()}
-                variant="primary"
-              >
-                {isCreating ? "Criando Projeto…" : "Criar Projeto"}
-              </ActionButton>
-            )}
-          </div>
-        </footer>
-      </main>
+          ) : null}
+        </div>
+        <div className="new-project-footer-actions">
+          <ActionButton disabled={isCreating} onClick={cancelFlow}>
+            Cancelar
+          </ActionButton>
+          {step === "configuration" ? (
+            <ActionButton
+              aria-label="Continuar"
+              disabled={isValidating}
+              onClick={goToPersonalization}
+              variant="primary"
+            >
+              {isValidating ? "Validando…" : "Continuar"}
+            </ActionButton>
+          ) : (
+            <ActionButton
+              aria-label="Criar"
+              disabled={isCreating}
+              onClick={() => void createProject()}
+              variant="primary"
+            >
+              {isCreating ? "Criando Projeto…" : "Criar Projeto"}
+            </ActionButton>
+          )}
+        </div>
+      </footer>
+    </main>
   );
 }
 
@@ -296,6 +359,34 @@ function noDecorativeSelection() {
 }
 
 function ignoreReleasedDecorative() {}
+
+function provisionalSelectionsInPresets(
+  presets: readonly NewProjectPreset[],
+) {
+  const selections = presets.flatMap((preset) =>
+    provisionalSelections(preset.personalization),
+  );
+  return uniqueSelections(selections);
+}
+
+function ownedProvisionalSelections(
+  personalization: NewProjectPersonalizationDraft,
+  presets: readonly NewProjectPreset[],
+) {
+  return uniqueSelections([
+    ...provisionalSelections(personalization),
+    ...provisionalSelectionsInPresets(presets),
+  ]);
+}
+
+function uniqueSelections(
+  selections: readonly ReturnType<typeof provisionalSelections>[number][],
+) {
+  const byId = new Map(
+    selections.map((selection) => [selection.selectionId, selection]),
+  );
+  return [...byId.values()];
+}
 
 function mergeLiveValidationErrors(
   currentErrors: DimensionsErrors,
@@ -315,12 +406,16 @@ function mergeLiveValidationErrors(
   return nextErrors;
 }
 
-function DimensionsStep({
+function ConfigurationStep({
   attempted,
   draft,
   errors,
   fieldRefs,
+  onApplyPreset,
   onChange,
+  onSavePreset,
+  presets,
+  selectedPresetId,
   validationFailure,
 }: {
   attempted: boolean;
@@ -329,14 +424,20 @@ function DimensionsStep({
   fieldRefs: React.RefObject<
     Partial<Record<DimensionsFieldName, HTMLInputElement>>
   >;
+  onApplyPreset(presetId: string): void;
   onChange(
     draft: NewProjectDimensionsDraft,
     changedFields: readonly DimensionsFieldName[],
   ): void;
+  onSavePreset(name: string): void;
+  presets: readonly NewProjectPreset[];
+  selectedPresetId: string;
   validationFailure: ProjectLaunchFailure | null;
 }) {
   const updatePhysical = (field: PhysicalFieldName, text: string) => {
-    onChange(editPhysicalField(draft, field, text), [field]);
+    const validationField =
+      field === "closedSheetWidth" ? "sheetWidth" : field;
+    onChange(editPhysicalField(draft, field, text), [validationField]);
   };
   const registerField = (field: DimensionsFieldName) =>
     (element: HTMLInputElement | null) => {
@@ -344,87 +445,118 @@ function DimensionsStep({
         fieldRefs.current[field] = element;
       }
     };
+  const parsedSheetCount = Number.parseInt(draft.sheetCountText, 10);
+  const adjustSheetCount = (offset: -2 | 2) => {
+    if (!Number.isSafeInteger(parsedSheetCount)) {
+      return;
+    }
+    const sheetCountText = String(parsedSheetCount + offset);
+    onChange({ ...draft, sheetCountText }, ["sheetCount"]);
+  };
 
   return (
     <div className="new-project-content new-project-dimensions">
       <DimensionsPreview draft={draft} />
       <div className="new-project-dimensions-controls">
-        <FormGroup kind="document" title="Configurações">
-          <label className="new-project-field">
-            <span>Unidade</span>
-            <select
-              onChange={(event) =>
-                onChange(
-                  changeDisplayUnit(
-                    draft,
-                    event.target.value as ProjectDisplayUnit,
-                  ),
-                  ["sheetWidth", "sheetHeight", "bleed", "safety"],
-                )
-              }
-              value={draft.displayUnit}
-            >
-              <option value="mm">mm</option>
-              <option value="cm">cm</option>
-              <option value="in">in</option>
-            </select>
-          </label>
-          <NumericField
-            attempted={attempted}
-            error={errors.sheetWidth}
-            inputMode="decimal"
-            label="Largura da Lâmina"
-            onChange={(text) => updatePhysical("sheetWidth", text)}
-            ref={registerField("sheetWidth")}
-            suffix={draft.displayUnit}
-            value={draft.sheetWidth.text}
+        <PresetControl
+          onApply={onApplyPreset}
+          onSave={onSavePreset}
+          presets={presets}
+          selectedPresetId={selectedPresetId}
+        />
+
+        <ControlSection title="Unidade">
+          <UnitSelector
+            onChange={(displayUnit) =>
+              onChange(changeDisplayUnit(draft, displayUnit), [
+                "sheetWidth",
+                "sheetHeight",
+                "bleed",
+                "safety",
+              ])
+            }
+            value={draft.displayUnit}
           />
+        </ControlSection>
+
+        <ControlSection title="Dimensão da Lâmina fechada">
+          <div className="new-project-size-fields">
+            <NumericField
+              attempted={attempted}
+              error={errors.sheetWidth}
+              hideLabel
+              inputMode="decimal"
+              label="Largura da Lâmina fechada"
+              onChange={(text) => updatePhysical("closedSheetWidth", text)}
+              ref={registerField("sheetWidth")}
+              suffix={displayUnitLabel(draft.displayUnit)}
+              value={draft.closedSheetWidth.text}
+            />
+            <span aria-hidden="true" className="new-project-size-separator">
+              ×
+            </span>
+            <NumericField
+              attempted={attempted}
+              error={errors.sheetHeight}
+              hideLabel
+              inputMode="decimal"
+              label="Altura da Lâmina fechada"
+              onChange={(text) => updatePhysical("sheetHeight", text)}
+              ref={registerField("sheetHeight")}
+              suffix={displayUnitLabel(draft.displayUnit)}
+              value={draft.sheetHeight.text}
+            />
+          </div>
+        </ControlSection>
+
+        <ControlSection title="Sangria e Área de segurança">
+          <div className="new-project-paired-fields">
+            <NumericField
+              attempted={attempted}
+              error={errors.bleed}
+              inputMode="decimal"
+              label="Sangria"
+              onChange={(text) => updatePhysical("bleed", text)}
+              ref={registerField("bleed")}
+              suffix={displayUnitLabel(draft.displayUnit)}
+              value={draft.bleed.text}
+            />
+            <NumericField
+              attempted={attempted}
+              error={errors.safety}
+              inputMode="decimal"
+              label="Área de segurança"
+              onChange={(text) => updatePhysical("safety", text)}
+              ref={registerField("safety")}
+              suffix={displayUnitLabel(draft.displayUnit)}
+              value={draft.safety.text}
+            />
+          </div>
+        </ControlSection>
+
+        <ControlSection className="new-project-sheet-count" title="Lâminas">
           <NumericField
             attempted={attempted}
-            error={errors.sheetHeight}
-            inputMode="decimal"
-            label="Altura da Lâmina"
-            onChange={(text) => updatePhysical("sheetHeight", text)}
-            ref={registerField("sheetHeight")}
-            suffix={draft.displayUnit}
-            value={draft.sheetHeight.text}
-          />
-          <NumericField
-            attempted={attempted}
-            error={errors.dpi}
-            inputMode="numeric"
-            label="DPI"
-            onChange={(dpiText) => onChange({ ...draft, dpiText }, ["dpi"])}
-            ref={registerField("dpi")}
-            value={draft.dpiText}
-          />
-        </FormGroup>
-        <FormGroup kind="areas" title="Sangria e Área de segurança">
-          <NumericField
-            attempted={attempted}
-            error={errors.bleed}
-            inputMode="decimal"
-            label="Sangria"
-            onChange={(text) => updatePhysical("bleed", text)}
-            ref={registerField("bleed")}
-            suffix={draft.displayUnit}
-            value={draft.bleed.text}
-          />
-          <NumericField
-            attempted={attempted}
-            error={errors.safety}
-            inputMode="decimal"
-            label="Área de segurança"
-            onChange={(text) => updatePhysical("safety", text)}
-            ref={registerField("safety")}
-            suffix={draft.displayUnit}
-            value={draft.safety.text}
-          />
-        </FormGroup>
-        <FormGroup kind="structure" title="Lâminas">
-          <NumericField
-            attempted={attempted}
+            controls={
+              <span className="new-project-stepper-actions">
+                <button
+                  aria-label="Diminuir quantidade de Lâminas"
+                  onClick={() => adjustSheetCount(-2)}
+                  type="button"
+                >
+                  <AppIcon icon={Minus} size={12} />
+                </button>
+                <button
+                  aria-label="Aumentar quantidade de Lâminas"
+                  onClick={() => adjustSheetCount(2)}
+                  type="button"
+                >
+                  <AppIcon icon={Plus} size={12} />
+                </button>
+              </span>
+            }
             error={errors.sheetCount}
+            hideLabel
             inputMode="numeric"
             label="Quantidade de Lâminas"
             onChange={(sheetCountText) =>
@@ -433,28 +565,62 @@ function DimensionsStep({
             ref={registerField("sheetCount")}
             value={draft.sheetCountText}
           />
-          <SelectField
-            label="Primeira Lâmina"
-            onChange={(firstSheet) => onChange({ ...draft, firstSheet }, [])}
-            value={draft.firstSheet}
-          />
-          <SelectField
-            label="Última Lâmina"
-            onChange={(lastSheet) => onChange({ ...draft, lastSheet }, [])}
-            value={draft.lastSheet}
-          />
-        </FormGroup>
-        <p aria-live="polite" className="new-project-summary">
-          {dimensionsSummary(draft)}
+        </ControlSection>
+
+        <details className="new-project-advanced">
+          <summary>Configurações avançadas</summary>
+          <div className="new-project-advanced-fields">
+            <ControlSection title="Resolução do Projeto">
+              <NumericField
+                attempted={attempted}
+                error={errors.dpi}
+                hideLabel
+                inputMode="numeric"
+                label="DPI"
+                onChange={(dpiText) =>
+                  onChange({ ...draft, dpiText }, ["dpi"])
+                }
+                ref={registerField("dpi")}
+                suffix="DPI"
+                value={draft.dpiText}
+              />
+            </ControlSection>
+            <ControlSection title="Configuração das extremidades">
+              <div className="new-project-paired-fields">
+                <SelectField
+                  label="Primeira Lâmina"
+                  onChange={(firstSheet) =>
+                    onChange({ ...draft, firstSheet }, [])
+                  }
+                  value={draft.firstSheet}
+                />
+                <SelectField
+                  label="Última Lâmina"
+                  onChange={(lastSheet) =>
+                    onChange({ ...draft, lastSheet }, [])
+                  }
+                  value={draft.lastSheet}
+                />
+              </div>
+            </ControlSection>
+          </div>
+        </details>
+
+        <p className="new-project-dimensions-note">
+          Medidas, Sangria e Área de segurança valem para o Álbum inteiro e
+          podem ser alteradas depois nas Configurações do Projeto.
         </p>
+
         {validationFailure ? (
           <InlineNotice
             role="alert"
-            title="Não foi possível validar as Dimensões"
+            title="Não foi possível validar as Configurações"
             tone="error"
           >
             <p>{validationFailure.message}</p>
-            {validationFailure.action ? <p>{validationFailure.action}</p> : null}
+            {validationFailure.action ? (
+              <p>{validationFailure.action}</p>
+            ) : null}
           </InlineNotice>
         ) : null}
       </div>
@@ -462,29 +628,156 @@ function DimensionsStep({
   );
 }
 
-function FormGroup({
+function ControlSection({
   children,
-  kind,
+  className,
+  dataPlaceholderFeature,
   title,
 }: {
   children: React.ReactNode;
-  kind: "areas" | "document" | "structure";
+  className?: string;
+  dataPlaceholderFeature?: string;
   title: string;
 }) {
   return (
     <section
-      className="new-project-value-group new-project-form-group"
-      data-group={kind}
+      className={`new-project-control-section${className ? ` ${className}` : ""}`}
+      data-placeholder-feature={dataPlaceholderFeature}
     >
       <h2>{title}</h2>
-      <div className="new-project-form-fields">{children}</div>
+      {children}
     </section>
+  );
+}
+
+function PresetControl({
+  onApply,
+  onSave,
+  presets,
+  selectedPresetId,
+}: {
+  onApply(presetId: string): void;
+  onSave(name: string): void;
+  presets: readonly NewProjectPreset[];
+  selectedPresetId: string;
+}) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [name, setName] = useState("");
+  const presetId = useId();
+  const presetNameId = useId();
+
+  const confirmSave = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      return;
+    }
+    onSave(trimmedName);
+    setName("");
+    setIsSaving(false);
+  };
+
+  return (
+    <ControlSection
+      className="new-project-preset-control"
+      dataPlaceholderFeature="new-project-presets"
+      title="Predefinição"
+    >
+      <div className="new-project-preset-row">
+        <label className="ui-visually-hidden" htmlFor={presetId}>
+          Predefinição
+        </label>
+        <select
+          id={presetId}
+          onChange={(event) => onApply(event.target.value)}
+          value={selectedPresetId}
+        >
+          <option value="">Nenhuma</option>
+          {presets.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+        <button
+          aria-label="Salvar configuração atual como predefinição"
+          onClick={() => setIsSaving((current) => !current)}
+          type="button"
+        >
+          <AppIcon icon={Save} size={14} />
+        </button>
+        {isSaving ? (
+          <form
+            aria-label="Salvar predefinição"
+            className="new-project-save-preset"
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmSave();
+            }}
+          >
+            <strong>Salvar predefinição</strong>
+            <label className="ui-visually-hidden" htmlFor={presetNameId}>
+              Nome da predefinição
+            </label>
+            <input
+              autoFocus
+              id={presetNameId}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Nome da predefinição"
+              type="text"
+              value={name}
+            />
+            <div>
+              <button
+                onClick={() => {
+                  setName("");
+                  setIsSaving(false);
+                }}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button disabled={!name.trim()} type="submit">
+                Salvar
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+      <p>A predefinição guarda os dois passos: medidas e personalização.</p>
+    </ControlSection>
+  );
+}
+
+const UNIT_OPTIONS: readonly ProjectDisplayUnit[] = ["mm", "cm", "in"];
+
+function UnitSelector({
+  onChange,
+  value,
+}: {
+  onChange(value: ProjectDisplayUnit): void;
+  value: ProjectDisplayUnit;
+}) {
+  return (
+    <div aria-label="Unidade" className="new-project-unit-selector" role="group">
+      {UNIT_OPTIONS.map((option) => (
+        <button
+          aria-pressed={value === option}
+          key={option}
+          onClick={() => onChange(option)}
+          type="button"
+        >
+          {displayUnitLabel(option)}
+        </button>
+      ))}
+    </div>
   );
 }
 
 interface NumericFieldProps {
   attempted: boolean;
+  controls?: React.ReactNode;
   error?: readonly string[];
+  hideLabel?: boolean;
   inputMode: "decimal" | "numeric";
   label: string;
   onChange(value: string): void;
@@ -494,16 +787,34 @@ interface NumericFieldProps {
 
 const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
   function NumericField(
-    { attempted, error, inputMode, label, onChange, suffix, value },
+    {
+      attempted,
+      controls,
+      error,
+      hideLabel,
+      inputMode,
+      label,
+      onChange,
+      suffix,
+      value,
+    },
     ref,
   ) {
     const inputId = useId();
     const errorId = `${inputId}-error`;
     const visibleErrors = attempted ? error : undefined;
+    const hasControls = Boolean(controls);
     return (
       <div className="new-project-field">
-        <label htmlFor={inputId}>{label}</label>
-        <span className="new-project-input-with-suffix">
+        <label
+          className={hideLabel ? "ui-visually-hidden" : undefined}
+          htmlFor={inputId}
+        >
+          {label}
+        </label>
+        <span
+          className={`new-project-input-shell${suffix ? " new-project-input-shell--suffix" : ""}${hasControls ? " new-project-input-shell--controlled" : ""}`}
+        >
           <input
             aria-describedby={visibleErrors?.length ? errorId : undefined}
             aria-invalid={visibleErrors?.length ? true : undefined}
@@ -514,7 +825,12 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
             type="text"
             value={value}
           />
-          {suffix ? <span aria-hidden="true">{suffix}</span> : null}
+          {suffix ? (
+            <span aria-hidden="true" className="new-project-input-suffix">
+              {suffix}
+            </span>
+          ) : null}
+          {controls}
         </span>
         {visibleErrors?.length ? (
           <span className="new-project-field-errors" id={errorId}>

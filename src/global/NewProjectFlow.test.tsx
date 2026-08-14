@@ -58,33 +58,58 @@ test("validates and creates with the complete neutral configuration", async () =
     />,
   );
 
-  expect(screen.getByRole("combobox", { name: "Unidade" })).toHaveValue(
-    "mm",
+  expect(screen.getByRole("button", { name: "mm" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
-  ).toHaveValue("600");
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+  ).toHaveValue("300");
   expect(
-    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
   ).toHaveValue("300");
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("300");
   expect(
     screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
-  ).toHaveValue("2");
+  ).toHaveValue("18");
+  expect(
+    screen.getByRole("combobox", { name: "Predefinição" }).closest("section"),
+  ).toHaveAttribute("data-placeholder-feature", "new-project-presets");
+  await user.click(
+    screen.getByRole("button", {
+      name: "Aumentar quantidade de Lâminas",
+    }),
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+  ).toHaveValue("20");
+  await user.click(
+    screen.getByRole("button", {
+      name: "Diminuir quantidade de Lâminas",
+    }),
+  );
   expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("3");
   expect(
     screen.getByRole("textbox", { name: "Área de segurança" }),
-  ).toHaveValue("3");
+  ).toHaveValue("5");
+  expect(
+    screen.queryByText(
+      "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
+    ),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("Configurações avançadas").closest("details"),
+  ).not.toHaveAttribute("open");
   expect(
     screen.getByText(
-      "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
+      "Medidas, Sangria e Área de segurança valem para o Álbum inteiro e podem ser alteradas depois nas Configurações do Projeto.",
     ),
   ).toBeInTheDocument();
   expect(
     screen.queryByLabelText("Reprodução da Lâmina"),
   ).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(
     await screen.findByRole("heading", { name: "Personalização" }),
   ).toBeInTheDocument();
@@ -96,10 +121,10 @@ test("validates and creates with the complete neutral configuration", async () =
       sheetHeightUm: 300_000,
       dpi: 300,
       bleedUm: 3_000,
-      safetyUm: 3_000,
+      safetyUm: 5_000,
     },
     structure: {
-      sheetCount: 2,
+      sheetCount: 18,
       firstSheet: "double",
       lastSheet: "double",
     },
@@ -129,7 +154,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
     />,
   );
 
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(
     await screen.findByRole("img", { name: "Reprodução da Lâmina" }),
@@ -178,7 +203,7 @@ test("hover only highlights while the fixed scope drives immediate Background ch
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   const both = await screen.findByRole("button", {
     name: "Ambos os lados",
@@ -237,7 +262,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
     await screen.findByRole("checkbox", { name: "Borda dos Frames" }),
   );
@@ -306,7 +331,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   await user.click(
     await screen.findByRole("button", { name: "Lado esquerdo" }),
@@ -393,7 +418,7 @@ test("preserves provisional personalization and releases it when creation is can
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
     screen.getByRole("button", { name: "Escolher imagem de Background" }),
   );
@@ -407,13 +432,103 @@ test("preserves provisional personalization and releases it when creation is can
   expect(onReleaseDecorative).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Voltar" }));
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
   expect(onReleaseDecorative).toHaveBeenCalledOnce();
   expect(onReleaseDecorative).toHaveBeenCalledWith(selection.selectionId);
   expect(onCancel).toHaveBeenCalledOnce();
+});
+
+test("applies a reusable preset across both creation steps", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Predefinição" }),
+    "builtin-graphic-30",
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+  ).toHaveValue("300");
+  expect(
+    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+  ).toHaveValue("18");
+  expect(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("5");
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  expect(
+    await screen.findByRole("button", {
+      name: "Usar Background #f7f5f0",
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("keeps a custom preset across both steps for the current placeholder session", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  await user.click(
+    await screen.findByRole("button", {
+      name: "Usar Background #1d2a3a",
+    }),
+  );
+  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    { target: { value: "320" } },
+  );
+
+  await user.click(
+    screen.getByRole("button", {
+      name: "Salvar configuração atual como predefinição",
+    }),
+  );
+  await user.type(
+    screen.getByRole("textbox", { name: "Nome da predefinição" }),
+    "Estúdio 32 × 30",
+  );
+  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  expect(
+    screen.getByRole("combobox", { name: "Predefinição" }),
+  ).toHaveDisplayValue("Estúdio 32 × 30");
+
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+    { target: { value: "300" } },
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Predefinição" }),
+    "custom-1",
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
+  ).toHaveValue("320");
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  expect(
+    await screen.findByRole("button", {
+      name: "Usar Background #1d2a3a",
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("shows a typed native picker failure without changing personalization", async () => {
@@ -435,7 +550,7 @@ test("shows a typed native picker failure without changing personalization", asy
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
     screen.getByRole("button", { name: "Escolher imagem de Background" }),
   );
@@ -475,7 +590,7 @@ test("releases a provisional image as soon as it is no longer referenced", async
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   const chooseBackground = await screen.findByRole("button", {
     name: "Escolher imagem de Background",
   });
@@ -502,22 +617,25 @@ test("converts periodic display values without changing physical values and keep
     />,
   );
 
-  const unit = screen.getByRole("combobox", { name: "Unidade" });
   const width = screen.getByRole("textbox", {
-    name: "Largura da Lâmina",
+    name: "Largura da Lâmina fechada",
   });
   const height = screen.getByRole("textbox", {
-    name: "Altura da Lâmina",
+    name: "Altura da Lâmina fechada",
   });
-  await user.selectOptions(unit, "in");
-  expect(width).toHaveValue("23.622047244094488");
+  await user.click(screen.getByRole("button", { name: "pol" }));
+  expect(width).toHaveValue("11.811023622047244");
   expect(height).toHaveValue("11.811023622047244");
-  await user.selectOptions(unit, "mm");
-  expect(width).toHaveValue("600");
+  expect(width.closest(".new-project-input-shell")).toHaveTextContent("pol");
+  expect(width.closest(".new-project-input-shell")).not.toHaveTextContent(
+    "in",
+  );
+  await user.click(screen.getByRole("button", { name: "mm" }));
+  expect(width).toHaveValue("300");
   expect(height).toHaveValue("300");
 
-  await user.selectOptions(unit, "cm");
-  fireEvent.change(width, { target: { value: "50.8" } });
+  await user.click(screen.getByRole("button", { name: "cm" }));
+  fireEvent.change(width, { target: { value: "25.4" } });
   fireEvent.change(height, { target: { value: "25.4" } });
   fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
     target: { value: "600" },
@@ -534,7 +652,7 @@ test("converts periodic display values without changing physical values and keep
     target: { value: "0" },
   });
 
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(
     await screen.findByLabelText("Prévia do formato da Lâmina"),
   ).toHaveStyle({ aspectRatio: "508000 / 254000" });
@@ -546,7 +664,7 @@ test("converts periodic display values without changing physical values and keep
       sheetHeightUm: 254_000,
       dpi: 600,
       bleedUm: 0,
-      safetyUm: 3_000,
+      safetyUm: 5_000,
     },
     structure: {
       sheetCount: 4,
@@ -569,12 +687,12 @@ test("blocks locally unrepresentable text, then revalidates through the Core aft
     />,
   );
   const width = screen.getByRole("textbox", {
-    name: "Largura da Lâmina",
+    name: "Largura da Lâmina fechada",
   });
   fireEvent.change(width, { target: { value: "60.0001" } });
   expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(width).toHaveFocus();
   expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
   expect(onValidate).not.toHaveBeenCalled();
@@ -585,7 +703,7 @@ test("blocks locally unrepresentable text, then revalidates through the Core aft
     expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument(),
   );
   expect(
-    screen.getByRole("heading", { name: "Dimensões" }),
+    screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
 });
 
@@ -610,17 +728,17 @@ test("shows every Core error, focuses the first field and refreshes errors after
       onValidate={onValidate}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(await screen.findByText(/altura.*maior que zero/i)).toBeInTheDocument();
   expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
   expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
   expect(
-    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
   ).toHaveFocus();
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
     { target: { value: "250" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
@@ -629,7 +747,7 @@ test("shows every Core error, focuses the first field and refreshes errors after
   );
   expect(screen.queryByText(/DPI inteiro entre/i)).not.toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "Dimensões" }),
+    screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
 });
 
@@ -651,7 +769,7 @@ test("preserves errors from untouched fields during live validation", async () =
       onValidate={onValidate}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(
     await screen.findByText(/DPI inteiro entre 1 e 1\.200/i),
@@ -659,7 +777,7 @@ test("preserves errors from untouched fields during live validation", async () =
   expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Altura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
     { target: { value: "250" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
@@ -667,7 +785,7 @@ test("preserves errors from untouched fields during live validation", async () =
   expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
 
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "600.0001" } },
   );
   expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
@@ -699,10 +817,10 @@ test("ignores a late validation response after a newer edit", async () => {
       onValidate={onValidate}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await waitFor(() => expect(onValidate).toHaveBeenCalledOnce());
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "500" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
@@ -720,7 +838,7 @@ test("ignores a late validation response after a newer edit", async () => {
   });
   expect(screen.getByText(/micrômetros pares/i)).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "Dimensões" }),
+    screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
 });
 
@@ -742,14 +860,14 @@ test("blocks navigation and shows an actionable operational validation failure",
       })}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
 
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "A validação está indisponível.",
   );
   expect(screen.getByRole("alert")).toHaveTextContent("Tente novamente.");
   expect(
-    screen.getByRole("heading", { name: "Dimensões" }),
+    screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
   expect(onCreate).not.toHaveBeenCalled();
 });
@@ -795,24 +913,24 @@ test("preserves the draft after native cancellation and structured creation fail
     />,
   );
   fireEvent.change(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "500" } },
   );
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(await screen.findByRole("button", { name: "Criar" }));
   await act(async () => nativeCreation.resolve({ status: "cancelled" }));
 
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
   ).toHaveValue("500");
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(await screen.findByRole("button", { name: "Criar" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Outro objeto passou a ocupar este destino.",
   );
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
-    screen.getByRole("textbox", { name: "Largura da Lâmina" }),
+    screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
   ).toHaveValue("500");
 });

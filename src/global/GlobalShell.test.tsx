@@ -4,12 +4,12 @@ import { expect, test, vi } from "vitest";
 
 import type {
   GlobalProjectPort,
-  NewProjectPort,
   OpenProjectFailure,
   OpenProjectOutcome,
 } from "./application/globalProjectPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { GlobalShell } from "./GlobalShell";
+import { createNewProjectPortStub } from "./testing/newProjectPortStub";
 
 const supportedGraphics: GraphicsDiagnostic = {
   supported: true,
@@ -52,25 +52,13 @@ function createProjectPort(
   };
 }
 
-function createNewProjectPort(
-  overrides: Partial<NewProjectPort> = {},
-): NewProjectPort {
-  return {
-    chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
-    createProject: async () => ({ status: "cancelled" }),
-    releaseProvisionalDecorative: async () => undefined,
-    validateProjectConfiguration: async () => ({ status: "valid" }),
-    ...overrides,
-  };
-}
-
 test("shows the global welcome surface without a Project workspace", () => {
   const projectPort = createProjectPort({ openProject: vi.fn() });
 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={projectPort}
     />,
   );
@@ -84,11 +72,14 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(
     screen.getByRole("button", { name: "Abrir Projeto" }),
   ).toBeEnabled();
-  expect(
-    screen.getByRole("button", {
-      name: "Exportar vários Álbuns de uma vez",
-    }),
-  ).toBeDisabled();
+  const batchExportPlaceholder = screen.getByRole("button", {
+    name: "Exportar vários Álbuns de uma vez",
+  });
+  expect(batchExportPlaceholder).toBeDisabled();
+  expect(batchExportPlaceholder).toHaveAttribute(
+    "data-placeholder-feature",
+    "batch-export",
+  );
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 
@@ -100,7 +91,7 @@ test("blocks Project hosts at the global graphics boundary when hardware WebGL2 
   render(
     <GlobalShell
       graphicsDiagnostic={unavailableGraphics}
-      newProjectPort={createNewProjectPort({ createProject })}
+      newProjectPort={createNewProjectPortStub({ createProject })}
       projectPort={createProjectPort({
         completeGraphicsGate,
         openProject,
@@ -131,7 +122,7 @@ test("replaces welcome with New Project in the same window and restores welcome 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort()}
     />,
   );
@@ -161,7 +152,7 @@ test("keeps opening progress out of the welcome document", async () => {
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({ openProject })}
     />,
   );
@@ -196,7 +187,7 @@ test("shows an actionable structured failure without exposing a pathname", async
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({ openProject, showLaunchFailure })}
     />,
   );
@@ -219,7 +210,7 @@ test("loads and renders recent Projects by name", async () => {
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({ listRecentProjects })}
     />,
   );
@@ -243,7 +234,7 @@ test("reopens a recent Project using only its opaque id", async () => {
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         listRecentProjects: async () => [
           { id: "recent-ana", name: "Álbum da Ana" },
@@ -276,7 +267,7 @@ test("shows the startup failure from a direct Windows opening", async () => {
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         showLaunchFailure,
         startupOpenFailure,
@@ -302,7 +293,7 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      newProjectPort={createNewProjectPort()}
+      newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         openProject: async () => ({ status: "cancelled" }),
         showLaunchFailure,

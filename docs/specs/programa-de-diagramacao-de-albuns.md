@@ -110,9 +110,9 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero escolher a quantidade inicial de Lâminas, para começar com a estrutura desejada.
 1. Como pessoa diagramadora, quero escolher independentemente se as extremidades serão duplas ou de página única, para representar diferentes modelos de álbum.
 1. Como pessoa diagramadora, quero configurar os padrões iniciais de Background, Overlay e Frame, para que novos elementos adotem a identidade visual do Projeto.
-1. Como pessoa diagramadora, quero começar sem personalizações com duas Lâminas duplas, Background branco, sem Overlay, borda, Frame ou Foto, para receber um Projeto válido e neutro.
+1. Como pessoa diagramadora, quero começar sem personalizações com 18 Lâminas duplas, Background branco, sem Overlay, borda, Frame ou Foto, para receber um Projeto válido e neutro.
 1. Como pessoa diagramadora, quero informar Sangria e segurança na Unidade do Projeto, para manter todas as medidas físicas consistentes.
-1. Como pessoa diagramadora, quero que Sangria e segurança comecem no equivalente físico a `3 mm`, para ter valores iniciais consistentes entre Unidades.
+1. Como pessoa diagramadora, quero que Sangria e segurança comecem, respectivamente, no equivalente físico a `3 mm` e `5 mm`, para ter valores iniciais consistentes entre Unidades.
 1. Como pessoa diagramadora, quero definir Sangria ou segurança como zero separadamente, para desativar a guia que não utilizarei.
 1. Como pessoa diagramadora, quero escolher Nome e Localização em um diálogo nativo depois de configurar o Projeto, para decidir onde o arquivo será criado.
 1. Como pessoa diagramadora, quero voltar às configurações preenchidas ao cancelar o diálogo nativo, para não refazer minhas escolhas.
@@ -499,17 +499,18 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Criação de Projeto
 
-- `Novo Projeto` abre um fluxo do próprio aplicativo composto por exatamente duas etapas: `Dimensões` e `Personalização`.
-- `Dimensões` contém Unidade, largura e altura da Lâmina, DPI, quantidade inicial de Lâminas, formato da primeira e da última Lâmina, Sangria e Área de segurança.
-- A etapa organiza esses campos nos grupos `Documento`, `Estrutura` e `Áreas técnicas`, respectivamente.
-- Não há reprodução gráfica nessa etapa. Um resumo somente de leitura mostra continuamente a dimensão da Lâmina, a dimensão calculada de cada Página e o DPI.
-- `Próximo` valida todos os campos de `Dimensões` e só avança quando o conjunto estiver válido.
+- `Novo Projeto` abre um fluxo do próprio aplicativo composto por exatamente duas etapas: `Configurações` e `Personalização`.
+- `Configurações` apresenta Predefinição, Unidade, Dimensão da Lâmina fechada, Sangria, Área de segurança e quantidade inicial de Lâminas; Resolução do Projeto e Configuração das extremidades permanecem em `Configurações avançadas`, inicialmente recolhidas.
+- A largura informada para a Dimensão da Lâmina fechada corresponde à largura da Página; a interface mostra e envia ao núcleo a Dimensão da Lâmina aberta com o dobro dessa largura e a mesma altura.
+- Uma prévia proporcional da Lâmina aberta ocupa a região principal. Medidas e DPI não são repetidos em um card de resumo.
+- `Predefinição` é um placeholder de interface enquanto não possuir contrato de aplicação e persistência. As opções incorporadas ou salvas guardam `Configurações` e `Personalização` somente durante a sessão atual e permanecem marcadas no código como `PLACEHOLDER UI`.
+- `Continuar` valida todos os campos de `Configurações` e só avança quando o conjunto estiver válido.
 - Erros aparecem junto aos respectivos campos e o foco vai para o primeiro inválido; o fluxo não abre um modal genérico de validação.
 - `Personalização` contém Background padrão, Overlay padrão e Padrão dos Frames.
 - Background e Overlay permitem `Escolher imagem...` pelo seletor nativo do Windows. A seleção permanece provisória e só é vinculada à aba `Decorativos` depois que a criação for concluída com sucesso.
 - Cancelar o fluxo não importa ou copia imagens provisórias nem altera seus arquivos originais.
 - `Personalização` apresenta uma reprodução viva de uma Lâmina com Frames de demonstração, atualizada imediatamente para mostrar Background, Overlay e presença, cor e espessura da Borda padrão.
-- A reprodução respeita a proporção de largura e altura escolhida em `Dimensões`, mas sempre representa uma Lâmina dupla, independentemente do formato das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
+- A reprodução respeita a proporção de largura e altura escolhida em `Configurações`, mas sempre representa uma Lâmina dupla, independentemente da Configuração das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
 - Essa reprodução reutiliza o seletor espacial de `Design do Álbum`: hover realça esquerda, direita ou ambos pela região central; o clique fixa o escopo usado pelos controles de Background e Overlay.
 - O hover sem clique é apenas feedback temporário e não muda o escopo configurado.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
