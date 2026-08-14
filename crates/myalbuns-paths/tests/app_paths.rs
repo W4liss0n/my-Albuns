@@ -11,11 +11,10 @@ use myalbuns_paths::{
 };
 
 #[test]
-fn derives_temporary_application_roots_from_injected_roots() {
+fn derives_application_roots_from_injected_known_folders() {
     let paths = AppPaths::from_roots(
         Path::new(r"C:\Users\Pessoa\AppData\Roaming"),
         Path::new(r"C:\Users\Pessoa\AppData\Local"),
-        Path::new(r"C:\Users\Pessoa\AppData\Local\Temp"),
     );
 
     assert_eq!(
@@ -29,28 +28,8 @@ fn derives_temporary_application_roots_from_injected_roots() {
 }
 
 #[test]
-fn prepares_the_export_preview_directory_through_the_central_path_policy() {
-    let root = tempfile::tempdir().expect("temporary known folders");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
-
-    let directory = paths
-        .prepare_export_preview_directory()
-        .expect("the central path policy prepares its preview directory");
-
-    assert_eq!(
-        directory.path(),
-        root.path().join("MyAlbuns2").join("ExportPreview")
-    );
-    assert!(directory.path().is_dir());
-}
-
-#[test]
 fn exposes_each_data_category_under_its_approved_root() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.settings_file(),
@@ -77,11 +56,7 @@ fn exposes_each_data_category_under_its_approved_root() {
 
 #[test]
 fn derives_the_recent_projects_state_file_from_the_central_local_root() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.recent_projects_file(),
@@ -91,11 +66,7 @@ fn derives_the_recent_projects_state_file_from_the_central_local_root() {
 
 #[test]
 fn derives_the_project_identity_lease_root_from_the_central_local_state() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     assert_eq!(
         paths.project_identity_leases_dir(),
@@ -105,11 +76,7 @@ fn derives_the_project_identity_lease_root_from_the_central_local_state() {
 
 #[test]
 fn derives_only_safe_webview_host_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     for unsafe_namespace in [
         "",
@@ -132,11 +99,7 @@ fn derives_only_safe_webview_host_namespaces() {
 
 #[test]
 fn project_identity_derives_stable_isolated_internal_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
     let first = project_data_namespace("project-01");
 
     assert_eq!(
@@ -159,11 +122,7 @@ fn project_identity_derives_stable_isolated_internal_namespaces() {
 
 #[test]
 fn derives_only_safe_project_cache_namespaces() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
     let cache = paths
         .project_cache("project-01.ABC")
@@ -266,11 +225,7 @@ fn derives_only_safe_project_cache_namespaces() {
 
 #[test]
 fn validates_cache_artifacts_without_choosing_a_transport_protocol() {
-    let paths = AppPaths::from_roots(
-        Path::new(r"C:\Roaming"),
-        Path::new(r"C:\Local"),
-        Path::new(r"C:\Temp"),
-    );
+    let paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
     let preview = paths
         .project_cache("project-01")
         .expect("project namespace is safe")
@@ -609,7 +564,7 @@ fn a_publication_failure_discards_only_its_preparation() {
 #[test]
 fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");
@@ -626,12 +581,8 @@ fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
 fn rejects_a_cache_plan_from_another_local_data_root() {
     let authorized_root = tempfile::tempdir().expect("authorized LocalAppData root");
     let other_root = tempfile::tempdir().expect("different LocalAppData root");
-    let paths = AppPaths::from_roots(
-        authorized_root.path(),
-        authorized_root.path(),
-        authorized_root.path(),
-    );
-    let other_paths = AppPaths::from_roots(other_root.path(), other_root.path(), other_root.path());
+    let paths = AppPaths::from_roots(authorized_root.path(), authorized_root.path());
+    let other_paths = AppPaths::from_roots(other_root.path(), other_root.path());
     let other_cache = other_paths
         .project_cache("project-01")
         .expect("the other Cache plan is structurally valid");
@@ -645,7 +596,7 @@ fn rejects_a_cache_plan_from_another_local_data_root() {
 #[test]
 fn creates_and_publishes_cache_files_below_the_held_directory() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");
@@ -693,7 +644,7 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
 #[test]
 fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-incomplete")
         .expect("the Cache plan is valid");
@@ -730,7 +681,7 @@ fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
 #[test]
 fn removes_only_one_validated_cache_artifact_from_the_held_namespace() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-targeted-cleanup")
         .expect("the Cache plan is valid");
@@ -768,7 +719,7 @@ fn removes_only_one_validated_cache_artifact_from_the_held_namespace() {
 #[test]
 fn sweeps_only_unreferenced_final_generations_below_the_held_media_directory() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-orphan-sweep")
         .expect("the Cache plan is valid");
@@ -807,7 +758,7 @@ fn sweeps_only_unreferenced_final_generations_below_the_held_media_directory() {
 #[test]
 fn rejects_using_the_same_cache_path_as_temporary_and_final() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-same-path")
         .expect("the Cache plan is valid");
@@ -827,7 +778,7 @@ fn rejects_using_the_same_cache_path_as_temporary_and_final() {
 #[test]
 fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-recovery")
         .expect("the Cache plan is valid");
@@ -882,31 +833,10 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
 }
 
 #[test]
-fn rejects_an_export_preview_namespace_redirected_by_a_directory_link() {
-    let root = tempfile::tempdir().expect("temporary path roots");
-    let external = tempfile::tempdir().expect("external directory");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
-    let application_root = root.path().join("MyAlbuns2");
-    if let Err(error) = create_directory_link(external.path(), &application_root) {
-        if error.kind() == std::io::ErrorKind::PermissionDenied
-            || error.raw_os_error() == Some(1314)
-        {
-            return;
-        }
-        panic!("the directory link could not be created: {error}");
-    }
-
-    assert_eq!(
-        paths.prepare_export_preview_directory().unwrap_err(),
-        AppPathsError::ExportStorageOutsideDestination
-    );
-}
-
-#[test]
 fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let external = tempfile::tempdir().expect("external directory");
-    let paths = AppPaths::from_roots(root.path(), root.path(), root.path());
+    let paths = AppPaths::from_roots(root.path(), root.path());
     let cache = paths
         .project_cache("project-01")
         .expect("the Cache plan is valid");

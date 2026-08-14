@@ -79,7 +79,9 @@ function Get-ExactExecutableProcesses([string] $ExecutablePath) {
 try {
     New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
     $node = (Get-Command node.exe -ErrorAction Stop).Source
-    & $node --test (Join-Path $PSScriptRoot 'Test-ProductiveJourneyObservations.mjs')
+    & $node --test `
+        (Join-Path $PSScriptRoot 'Test-ProductiveJourneyObservations.mjs') `
+        (Join-Path $PSScriptRoot 'Test-GateWebDriver.mjs')
     if ($LASTEXITCODE -ne 0) {
         throw "The productive journey observation tests failed with exit code $LASTEXITCODE."
     }

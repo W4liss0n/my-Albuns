@@ -6,7 +6,6 @@ use sha2::{Digest, Sha256};
 use crate::{
     AppPathsError, CachePathPlan, PreparedCacheStorage,
     cache::{clear_project_cache, discard_project_cache_temporaries, prepare_cache_storage},
-    guarded_fs::{DirectoryGuard, GuardedFsError, ensure_direct_child, open_directory},
 };
 
 /// Temporary namespace that keeps this development version's data separate
@@ -36,48 +35,26 @@ fn opaque_data_key(kind: &str, identity: &str) -> String {
 pub struct AppPaths {
     pub(crate) roaming_root: PathBuf,
     pub(crate) local_root: PathBuf,
-    temporary_root: PathBuf,
-}
-
-/// Keeps the temporary application namespace and preview directory physically
-/// contained while an Export preview is planned and published.
-#[derive(Debug)]
-pub struct PreparedExportPreviewDirectory {
-    _temporary_base: DirectoryGuard,
-    _application_root: DirectoryGuard,
-    preview: DirectoryGuard,
-}
-
-impl PreparedExportPreviewDirectory {
-    pub fn path(&self) -> &Path {
-        &self.preview.logical_path
-    }
 }
 
 impl AppPaths {
     pub fn discover() -> Result<Self, AppPathsError> {
         #[cfg(debug_assertions)]
         if let Some(root) = debug_process_gate_root()? {
-            return Ok(Self::from_roots(
-                &root.join("Roaming"),
-                &root.join("Local"),
-                &root.join("Temporary"),
-            ));
+            return Ok(Self::from_roots(&root.join("Roaming"), &root.join("Local")));
         }
 
         let known_folders = BaseDirs::new().ok_or(AppPathsError::KnownFoldersUnavailable)?;
         Ok(Self::from_roots(
             known_folders.data_dir(),
             known_folders.data_local_dir(),
-            &std::env::temp_dir(),
         ))
     }
 
-    pub fn from_roots(roaming_data: &Path, local_data: &Path, temporary_data: &Path) -> Self {
+    pub fn from_roots(roaming_data: &Path, local_data: &Path) -> Self {
         Self {
             roaming_root: roaming_data.join(TEMPORARY_APP_DIRECTORY_NAME),
             local_root: local_data.join(TEMPORARY_APP_DIRECTORY_NAME),
-            temporary_root: temporary_data.join(TEMPORARY_APP_DIRECTORY_NAME),
         }
     }
 
@@ -174,27 +151,6 @@ impl AppPaths {
     pub fn logs_dir(&self) -> PathBuf {
         self.local_root.join("Logs")
     }
-
-    pub fn prepare_export_preview_directory(
-        &self,
-    ) -> Result<PreparedExportPreviewDirectory, AppPathsError> {
-        let temporary_base_path = self
-            .temporary_root
-            .parent()
-            .ok_or(AppPathsError::ExportStorageUnavailable)?;
-        let temporary_base =
-            open_directory(temporary_base_path).map_err(export_preview_storage_error)?;
-        let application_root = ensure_direct_child(&temporary_base, &self.temporary_root)
-            .map_err(export_preview_storage_error)?;
-        let preview_path = self.temporary_root.join("ExportPreview");
-        let preview = ensure_direct_child(&application_root, &preview_path)
-            .map_err(export_preview_storage_error)?;
-        Ok(PreparedExportPreviewDirectory {
-            _temporary_base: temporary_base,
-            _application_root: application_root,
-            preview,
-        })
-    }
 }
 
 /// Isolates real-process integration gates from the user's application data.
@@ -213,13 +169,6 @@ fn debug_process_gate_root() -> Result<Option<PathBuf>, AppPathsError> {
         return Err(AppPathsError::KnownFoldersUnavailable);
     }
     Ok(Some(root))
-}
-
-fn export_preview_storage_error(error: GuardedFsError) -> AppPathsError {
-    match error {
-        GuardedFsError::Unavailable => AppPathsError::ExportStorageUnavailable,
-        GuardedFsError::OutsideRoot => AppPathsError::ExportStorageOutsideDestination,
-    }
 }
 
 pub(crate) fn valid_namespace_component(value: &str) -> bool {

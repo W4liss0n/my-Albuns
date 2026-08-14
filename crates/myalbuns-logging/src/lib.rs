@@ -154,11 +154,7 @@ mod tests {
     #[test]
     fn sidecar_directory_defaults_to_the_central_application_paths() {
         if std::env::var_os(LOG_DIRECTORY_ENV).is_none() {
-            let app_paths = AppPaths::from_roots(
-                Path::new(r"C:\Roaming"),
-                Path::new(r"C:\Local"),
-                Path::new(r"C:\Temp"),
-            );
+            let app_paths = AppPaths::from_roots(Path::new(r"C:\Roaming"), Path::new(r"C:\Local"));
 
             assert_eq!(
                 sidecar_log_directory(&app_paths),

@@ -822,7 +822,7 @@ mod tests {
     #[tokio::test]
     async fn graphics_gate_precedes_open_and_create_host_boundaries() {
         let directory = tempfile::tempdir().expect("temporary Global state root");
-        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
         let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
 
         for (name, launch) in [
@@ -893,7 +893,7 @@ mod tests {
     #[test]
     fn startup_failure_reads_are_idempotent_for_strict_mode_mounts() {
         let directory = tempfile::tempdir().expect("temporary Global state root");
-        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
         let state = GlobalRuntimeState::new(&paths, None).expect("Global state initializes");
         let failure = simple_failure("invalid_project_document", "Inválido.", "Escolha outro.");
         state.record_startup_failure(failure.clone());

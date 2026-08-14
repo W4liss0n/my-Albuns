@@ -695,7 +695,7 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary Export destination");
         let final_path = directory.path().join("Nunca exportado.jpg");
         let temporary_path = directory.path().join(".myalbuns-export-cancelled.tmp");
-        let paths = AppPaths::from_roots(directory.path(), directory.path(), directory.path());
+        let paths = AppPaths::from_roots(directory.path(), directory.path());
         let operation_gate = OperationGate::new(&paths);
         let attempts = ExportAttempts::default();
         let freeze_calls = AtomicUsize::new(0);

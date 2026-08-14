@@ -1682,7 +1682,7 @@ mod tests {
         let local = root.path().join("local");
         std::fs::create_dir_all(&roaming).expect("the roaming root is available");
         std::fs::create_dir_all(&local).expect("the local root is available");
-        let app_paths = AppPaths::from_roots(&roaming, &local, root.path());
+        let app_paths = AppPaths::from_roots(&roaming, &local);
         let project_path = root.path().join("Projeto.myalbuns");
         let mut project_context = OperationPathContext::new();
         project_context
@@ -1939,7 +1939,6 @@ mod tests {
         let app_paths = myalbuns_paths::AppPaths::from_roots(
             &root.path().join("roaming"),
             &root.path().join("local"),
-            root.path(),
         );
 
         let namespace = AuthorizedCacheNamespace::mount(&app_paths, project.identity_authority())
@@ -1960,7 +1959,6 @@ mod tests {
         let paths = myalbuns_paths::AppPaths::from_roots(
             &root.path().join("roaming"),
             &root.path().join("local"),
-            root.path(),
         );
         let project_path = root.path().join("Projeto.myalbuns");
         let mut project_context = OperationPathContext::new();

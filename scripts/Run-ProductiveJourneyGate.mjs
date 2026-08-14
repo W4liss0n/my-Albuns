@@ -7,7 +7,6 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
-import net from "node:net";
 import path from "node:path";
 
 import {
@@ -24,6 +23,10 @@ import {
   assertDistinguishableSheetExport,
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
+import {
+  createWebDriverClient,
+  findFreeTcpPort,
+} from "./GateWebDriver.mjs";
 
 const [workspaceArgument, scratchArgument, applicationArgument, driverArgument] =
   process.argv.slice(2);
@@ -78,20 +81,6 @@ if (existsSync(projectPath) || existsSync(exportPath)) {
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(address.port);
-      });
-    });
-  });
-}
-
 async function waitForHttp(url, label, timeout = 30_000) {
   const deadline = Date.now() + timeout;
   let lastError;
@@ -110,32 +99,12 @@ async function waitForHttp(url, label, timeout = 30_000) {
   throw lastError ?? new Error(`${label} did not become ready`);
 }
 
-function webdriverClient(baseUrl) {
-  return async (method, endpoint, body, timeout = 10_000) => {
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      method,
-      headers:
-        body === undefined ? undefined : { "content-type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeout),
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : { value: null };
-    if (!response.ok || payload.value?.error) {
-      throw new Error(
-        `${method} ${endpoint} failed (${response.status}): ${JSON.stringify(payload)}`,
-      );
-    }
-    return payload.value;
-  };
-}
-
 async function startAttachedWebDriver(debugPort, label) {
   await waitForHttp(
     `http://127.0.0.1:${debugPort}/json/version`,
     `${label} DevTools endpoint`,
   );
-  const driverPort = await freePort();
+  const driverPort = await findFreeTcpPort();
   const child = spawn(
     nativeDriverPath,
     [`--port=${driverPort}`, "--host=127.0.0.1"],
@@ -155,7 +124,7 @@ async function startAttachedWebDriver(debugPort, label) {
   const instance = await waitForProcessInstance(child.pid, `${label} WebDriver`);
   const baseUrl = `http://127.0.0.1:${driverPort}`;
   await waitForHttp(`${baseUrl}/status`, `${label} WebDriver`);
-  const request = webdriverClient(baseUrl);
+  const request = createWebDriverClient(baseUrl);
   const session = await request("POST", "/session", {
     capabilities: {
       alwaysMatch: {
@@ -486,8 +455,8 @@ async function waitForLogEvent(event, count, label) {
   );
 }
 
-const globalDebugPort = await freePort();
-const hostDebugPort = await freePort();
+const globalDebugPort = await findFreeTcpPort();
+const hostDebugPort = await findFreeTcpPort();
 const applicationEnvironment = {
   ...process.env,
   MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,

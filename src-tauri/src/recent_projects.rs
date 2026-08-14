@@ -238,8 +238,7 @@ mod tests {
     fn an_absent_recent_projects_file_is_an_empty_list() {
         let roaming = tempfile::tempdir().expect("temporary roaming root");
         let local = tempfile::tempdir().expect("temporary local root");
-        let temporary = tempfile::tempdir().expect("temporary data root");
-        let paths = AppPaths::from_roots(roaming.path(), local.path(), temporary.path());
+        let paths = AppPaths::from_roots(roaming.path(), local.path());
 
         let projects = RecentProjectsStore::new(&paths)
             .list()
@@ -253,8 +252,7 @@ mod tests {
     fn promoting_a_project_moves_its_single_entry_to_the_top() {
         let roaming = tempfile::tempdir().expect("temporary roaming root");
         let local = tempfile::tempdir().expect("temporary local root");
-        let temporary = tempfile::tempdir().expect("temporary data root");
-        let paths = AppPaths::from_roots(roaming.path(), local.path(), temporary.path());
+        let paths = AppPaths::from_roots(roaming.path(), local.path());
         let store = RecentProjectsStore::new(&paths);
         let horizon = NativePathDto::from(PathBuf::from(r"C:\Albuns\Horizonte.myalbuns"));
         let aurora = NativePathDto::from(PathBuf::from(r"C:\Albuns\Aurora.myalbuns"));
@@ -291,8 +289,7 @@ mod tests {
     fn replacing_a_project_at_the_same_native_path_removes_the_previous_identity() {
         let roaming = tempfile::tempdir().expect("temporary roaming root");
         let local = tempfile::tempdir().expect("temporary local root");
-        let temporary = tempfile::tempdir().expect("temporary data root");
-        let paths = AppPaths::from_roots(roaming.path(), local.path(), temporary.path());
+        let paths = AppPaths::from_roots(roaming.path(), local.path());
         let store = RecentProjectsStore::new(&paths);
         let path = NativePathDto::from(PathBuf::from(r"C:\Albuns\Horizonte.myalbuns"));
 
