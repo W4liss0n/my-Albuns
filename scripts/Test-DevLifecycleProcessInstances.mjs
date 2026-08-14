@@ -34,17 +34,17 @@ function waitForOutput(child, marker, label, timeoutMilliseconds = 10_000) {
         resolve(output);
       }
     };
-    const onExit = (code) => {
+    const onClose = (code) => {
       cleanup();
       reject(new Error(`${label} exited ${code} before emitting ${marker}`));
     };
     const cleanup = () => {
       clearTimeout(timeout);
       child.stdout.off("data", onData);
-      child.off("exit", onExit);
+      child.off("close", onClose);
     };
     child.stdout.on("data", onData);
-    child.once("exit", onExit);
+    child.once("close", onClose);
   });
 }
 

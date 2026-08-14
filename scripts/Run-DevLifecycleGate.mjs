@@ -367,6 +367,99 @@ function launchSupervisor(launcherArguments = [], environment = {}) {
   });
 }
 
+async function runSupervisorFailurePhase({
+  label,
+  launcherArguments = [],
+  environment = {},
+}) {
+  const supervisor = launchSupervisor(launcherArguments, environment);
+  const readOutput = collectOutput(supervisor);
+  let authority;
+  let terminal;
+  let phaseError;
+  let cleanupError;
+  let processIds = [];
+  let processInstances = [];
+
+  const observeProcessForest = () => {
+    if (!authority) return;
+    const observedInstances = captureDevelopmentForest(
+      authority,
+      applicationProcesses(),
+    );
+    processIds = [
+      ...new Set([
+        ...processIds,
+        ...observedInstances.map((instance) => instance.processId),
+      ]),
+    ];
+    processInstances = mergeProcessInstances(
+      processInstances,
+      observedInstances,
+    );
+  };
+
+  try {
+    authority = await waitForProcessInstance(
+      supervisor.pid,
+      `${label} supervisor`,
+    );
+    observeProcessForest();
+    terminal = {
+      exitCode: await waitForProcessExit(
+        supervisor,
+        gateTimeoutMilliseconds,
+        `${label} supervisor`,
+        observeProcessForest,
+      ),
+    };
+  } catch (error) {
+    phaseError = error;
+  } finally {
+    try {
+      observeProcessForest();
+      if (authority) {
+        terminateProcessInstance(authority);
+      } else if (supervisor.exitCode === null) {
+        supervisor.kill();
+      }
+      if (supervisor.exitCode === null) {
+        await waitForProcessExit(
+          supervisor,
+          cleanupTimeoutMilliseconds,
+          `${label} supervisor cleanup`,
+          observeProcessForest,
+        );
+      }
+      await assertDevelopmentCleanup(label, processIds, processInstances);
+    } catch (error) {
+      cleanupError = error;
+    }
+  }
+
+  if (cleanupError) {
+    throw new Error(
+      `${label} cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}\n${readOutput()}`,
+    );
+  }
+
+  if (phaseError) {
+    throw new Error(
+      `${label} failed: ${phaseError instanceof Error ? phaseError.message : String(phaseError)}\n${readOutput()}`,
+    );
+  }
+
+  return {
+    authority,
+    output: readOutput(),
+    terminal,
+    processForest: {
+      processIds,
+      instances: processInstances,
+    },
+  };
+}
+
 function launchSupervisorInOwnConsole() {
   const standardOutputPath = path.join(
     processDataRoot,
@@ -422,14 +515,8 @@ let abruptSupervisorInstance;
 let ctrlCSupervisorOutput = () => "";
 let ctrlCSupervisorPid;
 let ctrlCSupervisorInstance;
-let bootstrapFailureSupervisor;
-let bootstrapFailureOutput = () => "";
-let bootstrapFailureSupervisorPid;
-let bootstrapFailureSupervisorInstance;
-let containmentFailureSupervisor;
-let containmentFailureOutput = () => "";
-let containmentFailureSupervisorPid;
-let containmentFailureSupervisorInstance;
+let bootstrapFailure;
+let containmentFailure;
 let frontendFailureSupervisor;
 let frontendFailureOutput = () => "";
 let frontendFailureSupervisorPid;
@@ -677,108 +764,42 @@ try {
   sendCtrlC(ctrlCSupervisorInstance);
   await assertDevelopmentCleanup("CTRL+C", ctrlCTree, ctrlCTreeInstances);
 
-  bootstrapFailureSupervisor = launchSupervisor([
-    "--myalbuns-invalid-development-option",
-  ]);
-  bootstrapFailureOutput = collectOutput(bootstrapFailureSupervisor);
-  bootstrapFailureSupervisorPid = bootstrapFailureSupervisor.pid;
-  bootstrapFailureSupervisorInstance = await waitForProcessInstance(
-    bootstrapFailureSupervisorPid,
-    "Bootstrap-failure supervisor",
-  );
-  let bootstrapFailureTree = [];
-  let bootstrapFailureTreeInstances = [];
-  const bootstrapFailureExit = await waitForProcessExit(
-    bootstrapFailureSupervisor,
-    gateTimeoutMilliseconds,
-    "Bootstrap-failure supervisor",
-    () => {
-      const observedInstances = captureDevelopmentForest(
-        bootstrapFailureSupervisorInstance,
-        applicationProcesses(),
-      );
-      const observedTree = observedInstances.map(
-        (instance) => instance.processId,
-      );
-      bootstrapFailureTree = [
-        ...new Set([...bootstrapFailureTree, ...observedTree]),
-      ];
-      bootstrapFailureTreeInstances = mergeProcessInstances(
-        bootstrapFailureTreeInstances,
-        observedInstances,
-      );
-    },
-  );
-  await assertDevelopmentCleanup(
-    "Bootstrap failure",
-    bootstrapFailureTree,
-    bootstrapFailureTreeInstances,
-  );
-  const bootstrapFailureText = bootstrapFailureOutput();
-  if (
-    bootstrapFailureExit === 0 ||
-    !bootstrapFailureText.includes('"event":"dev_frontend_ready"') ||
-    !bootstrapFailureText.includes(
+  bootstrapFailure = await runSupervisorFailurePhase({
+    label: "Bootstrap failure",
+    launcherArguments: ["--myalbuns-invalid-development-option"],
+  });
+  const bootstrapFailureTerminalObserved =
+    bootstrapFailure.terminal.exitCode !== 0 &&
+    bootstrapFailure.output.includes('"event":"dev_frontend_ready"') &&
+    bootstrapFailure.output.includes(
       '"event":"dev_environment_cleanup_completed"',
-    ) ||
-    aliveProcessInstances([bootstrapFailureSupervisorInstance]).length !== 0
-  ) {
+    ) &&
+    aliveProcessInstances([bootstrapFailure.authority]).length === 0;
+  if (!bootstrapFailureTerminalObserved) {
     throw new Error(
-      `Bootstrap failure did not clean its environment: ${JSON.stringify({ bootstrapFailureExit, bootstrapFailureSupervisorPid })}`,
+      `Bootstrap failure did not clean its environment: ${JSON.stringify({ exitCode: bootstrapFailure.terminal.exitCode, supervisorPid: bootstrapFailure.authority.processId })}`,
     );
   }
 
-  containmentFailureSupervisor = launchSupervisor([], {
-    MYALBUNS_DEV_DESCENDANT_JOB_FAILURE_PROBE: "1",
-  });
-  containmentFailureOutput = collectOutput(containmentFailureSupervisor);
-  containmentFailureSupervisorPid = containmentFailureSupervisor.pid;
-  containmentFailureSupervisorInstance = await waitForProcessInstance(
-    containmentFailureSupervisorPid,
-    "Containment-failure supervisor",
-  );
-  let containmentFailureTree = [];
-  let containmentFailureTreeInstances = [];
-  const containmentFailureExit = await waitForProcessExit(
-    containmentFailureSupervisor,
-    gateTimeoutMilliseconds,
-    "Containment-failure supervisor",
-    () => {
-      const observedInstances = captureDevelopmentForest(
-        containmentFailureSupervisorInstance,
-        applicationProcesses(),
-      );
-      containmentFailureTree = [
-        ...new Set([
-          ...containmentFailureTree,
-          ...observedInstances.map((instance) => instance.processId),
-        ]),
-      ];
-      containmentFailureTreeInstances = mergeProcessInstances(
-        containmentFailureTreeInstances,
-        observedInstances,
-      );
+  containmentFailure = await runSupervisorFailurePhase({
+    label: "Descendant containment failure",
+    environment: {
+      MYALBUNS_DEV_DESCENDANT_JOB_FAILURE_PROBE: "1",
     },
-  );
-  await assertDevelopmentCleanup(
-    "Descendant containment failure",
-    containmentFailureTree,
-    containmentFailureTreeInstances,
-  );
-  const containmentFailureText = containmentFailureOutput();
-  if (
-    containmentFailureExit === 0 ||
-    !containmentFailureText.includes(
+  });
+  const containmentFailureTerminalObserved =
+    containmentFailure.terminal.exitCode !== 0 &&
+    containmentFailure.output.includes(
       '"event":"desktop_start_failed","stage":"initialize","code":"dev_descendant_job_install_failed"',
-    ) ||
-    !containmentFailureText.includes(
+    ) &&
+    containmentFailure.output.includes(
       '"event":"dev_environment_cleanup_completed"',
-    ) ||
-    containmentFailureText.includes('"event":"dev_global_only_exited"') ||
-    aliveProcessInstances([containmentFailureSupervisorInstance]).length !== 0
-  ) {
+    ) &&
+    !containmentFailure.output.includes('"event":"dev_global_only_exited"') &&
+    aliveProcessInstances([containmentFailure.authority]).length === 0;
+  if (!containmentFailureTerminalObserved) {
     throw new Error(
-      `Containment failure did not fail closed: ${JSON.stringify({ containmentFailureExit, containmentFailureSupervisorPid })}`,
+      `Containment failure did not fail closed: ${JSON.stringify({ exitCode: containmentFailure.terminal.exitCode, supervisorPid: containmentFailure.authority.processId })}`,
     );
   }
 
@@ -844,21 +865,23 @@ try {
       ctrlCTreeProcessCount: ctrlCTree.length,
       ctrlCHostTreeProcessCount: ctrlCHostForest.length,
       bootstrapFailureCleanupCompleted: true,
-      bootstrapFailureTreeProcessCount: bootstrapFailureTree.length,
+      bootstrapFailureTerminalObserved,
+      bootstrapFailureTreeProcessCount:
+        bootstrapFailure.processForest.processIds.length,
       containmentFailureCleanupCompleted: true,
-      containmentFailureTreeProcessCount: containmentFailureTree.length,
+      containmentFailureTerminalObserved,
+      containmentFailureTreeProcessCount:
+        containmentFailure.processForest.processIds.length,
       frontendFailureCleanupCompleted: true,
     }),
   );
 } catch (error) {
   throw new Error(
-    `${error instanceof Error ? error.message : String(error)}\nSupervisor:\n${supervisorOutput()}\nAbrupt supervisor:\n${abruptSupervisorOutput()}\nCTRL+C supervisor:\n${ctrlCSupervisorOutput()}\nBootstrap-failure supervisor:\n${bootstrapFailureOutput()}\nContainment-failure supervisor:\n${containmentFailureOutput()}\nFrontend-failure supervisor:\n${frontendFailureOutput()}\nWebDriver:\n${driverOutput()}\nLogs:\n${desktopLogs().slice(-12_000)}`,
+    `${error instanceof Error ? error.message : String(error)}\nSupervisor:\n${supervisorOutput()}\nAbrupt supervisor:\n${abruptSupervisorOutput()}\nCTRL+C supervisor:\n${ctrlCSupervisorOutput()}\nBootstrap-failure supervisor:\n${bootstrapFailure?.output ?? ""}\nContainment-failure supervisor:\n${containmentFailure?.output ?? ""}\nFrontend-failure supervisor:\n${frontendFailureOutput()}\nWebDriver:\n${driverOutput()}\nLogs:\n${desktopLogs().slice(-12_000)}`,
   );
 } finally {
   terminateProcessInstance(driverInstance);
   terminateProcessInstance(frontendFailureSupervisorInstance);
-  terminateProcessInstance(containmentFailureSupervisorInstance);
-  terminateProcessInstance(bootstrapFailureSupervisorInstance);
   terminateProcessInstance(ctrlCSupervisorInstance);
   terminateProcessInstance(abruptSupervisorInstance);
   terminateProcessInstance(supervisorInstance);

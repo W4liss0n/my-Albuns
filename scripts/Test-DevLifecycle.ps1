@@ -72,6 +72,12 @@ try {
         throw "The real development lifecycle gate failed with exit code $LASTEXITCODE."
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
+    if (
+        -not $gate.bootstrapFailureTerminalObserved -or
+        -not $gate.containmentFailureTerminalObserved
+    ) {
+        throw 'The shared failure-phase runner did not preserve both typed terminals.'
+    }
 
     Add-Type -AssemblyName System.Drawing
     $bitmap = [System.Drawing.Bitmap]::FromFile($screenshotPath)
@@ -139,8 +145,10 @@ try {
         ctrlCTreeProcessCount = [int] $gate.ctrlCTreeProcessCount
         ctrlCHostTreeProcessCount = [int] $gate.ctrlCHostTreeProcessCount
         bootstrapFailureCleanupCompleted = [bool] $gate.bootstrapFailureCleanupCompleted
+        bootstrapFailureTerminalObserved = [bool] $gate.bootstrapFailureTerminalObserved
         bootstrapFailureTreeProcessCount = [int] $gate.bootstrapFailureTreeProcessCount
         containmentFailureCleanupCompleted = [bool] $gate.containmentFailureCleanupCompleted
+        containmentFailureTerminalObserved = [bool] $gate.containmentFailureTerminalObserved
         containmentFailureTreeProcessCount = [int] $gate.containmentFailureTreeProcessCount
         frontendFailureCleanupCompleted = [bool] $gate.frontendFailureCleanupCompleted
         nativeDriverVersion = $driver.nativeDriverVersion
