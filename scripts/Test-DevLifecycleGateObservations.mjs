@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertCausalHandoffObserved,
   isCausalHandoffObserved,
+  observesLogEvent,
   observesTypedCleanupTerminal,
 } from "./DevLifecycleGateObservations.mjs";
 
@@ -34,6 +35,19 @@ test("bootstrap failure evidence requires the typed cleanup terminal", () => {
   assert.equal(
     observesTypedCleanupTerminal(
       '{"event":"dev_environment_cleanup_completed"}',
+    ),
+    true,
+  );
+});
+
+test("a causal event remains observable from supervisor output when the process log ends first", () => {
+  assert.equal(
+    observesLogEvent(
+      [
+        '{"event":"application_started"}',
+        'process_role="global" event="global_exited_after_project_handoff"',
+      ],
+      "global_exited_after_project_handoff",
     ),
     true,
   );

@@ -27,5 +27,13 @@ export function assertCausalHandoffObserved(observed) {
 }
 
 export function observesTypedCleanupTerminal(output) {
-  return output.includes('"event":"dev_environment_cleanup_completed"');
+  return observesLogEvent([output], "dev_environment_cleanup_completed");
+}
+
+export function observesLogEvent(outputs, event) {
+  return outputs.some(
+    (output) =>
+      output.includes(`"event":"${event}"`) ||
+      output.includes(`event="${event}"`),
+  );
 }

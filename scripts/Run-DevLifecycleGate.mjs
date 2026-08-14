@@ -12,6 +12,7 @@ import path from "node:path";
 import {
   assertCausalHandoffObserved,
   isCausalHandoffObserved,
+  observesLogEvent,
   observesTypedCleanupTerminal,
 } from "./DevLifecycleGateObservations.mjs";
 import {
@@ -180,11 +181,8 @@ function desktopLogs() {
     .join("\n");
 }
 
-function hasLogEvent(event) {
-  const logs = desktopLogs();
-  return (
-    logs.includes(`"event":"${event}"`) || logs.includes(`event="${event}"`)
-  );
+function hasLogEvent(event, supplementalOutput) {
+  return observesLogEvent([desktopLogs(), supplementalOutput], event);
 }
 
 function captureDevelopmentForest(
@@ -566,10 +564,11 @@ try {
         hostProcessObserved: Boolean(hostPid),
         globalExited: !globalAlive,
         hostAlive,
-        hostReady: hasLogEvent("host_ready"),
-        projectUiReady: hasLogEvent("project_ui_ready"),
+        hostReady: hasLogEvent("host_ready", supervisorOutput()),
+        projectUiReady: hasLogEvent("project_ui_ready", supervisorOutput()),
         globalExitedAfterProjectHandoff: hasLogEvent(
           "global_exited_after_project_handoff",
+          supervisorOutput(),
         ),
       })
     ) {
