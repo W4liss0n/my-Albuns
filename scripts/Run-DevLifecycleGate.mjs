@@ -10,6 +10,11 @@ import net from "node:net";
 import path from "node:path";
 
 import {
+  assertCausalHandoffObserved,
+  isCausalHandoffObserved,
+  observesTypedCleanupTerminal,
+} from "./DevLifecycleGateObservations.mjs";
+import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
   captureListeningProcessInstance,
@@ -437,7 +442,8 @@ async function runSupervisorFailurePhase({
   if (!Number.isInteger(terminal.exitCode) || terminal.exitCode === 0) {
     throw new Error(`${label} supervisor did not return a nonzero exit code`);
   }
-  if (!output.includes('"event":"dev_environment_cleanup_completed"')) {
+  const cleanupTerminalObserved = observesTypedCleanupTerminal(output);
+  if (!cleanupTerminalObserved) {
     throw new Error(`${label} supervisor omitted its typed cleanup terminal`);
   }
   if (aliveProcessInstances([authority]).length !== 0) {
@@ -448,6 +454,7 @@ async function runSupervisorFailurePhase({
 
   return {
     authority,
+    cleanupTerminalObserved,
     output,
     terminal,
     processForest: {
@@ -525,6 +532,7 @@ let globalPid;
 let hostPid;
 let vitePid;
 let viteInstance;
+let causalHandoffObserved = false;
 
 try {
   const handoffDeadline = Date.now() + gateTimeoutMilliseconds;
@@ -553,18 +561,24 @@ try {
       );
     }
     if (
-      globalPid &&
-      hostPid &&
-      !globalAlive &&
-      hostAlive &&
-      hasLogEvent("host_ready") &&
-      hasLogEvent("project_ui_ready") &&
-      hasLogEvent("global_exited_after_project_handoff")
+      isCausalHandoffObserved({
+        globalProcessObserved: Boolean(globalPid),
+        hostProcessObserved: Boolean(hostPid),
+        globalExited: !globalAlive,
+        hostAlive,
+        hostReady: hasLogEvent("host_ready"),
+        projectUiReady: hasLogEvent("project_ui_ready"),
+        globalExitedAfterProjectHandoff: hasLogEvent(
+          "global_exited_after_project_handoff",
+        ),
+      })
     ) {
+      causalHandoffObserved = true;
       break;
     }
     await delay(100);
   }
+  assertCausalHandoffObserved(causalHandoffObserved);
 
   const postHandoffProcesses = applicationProcesses();
   const globalAlive = postHandoffProcesses.some((entry) =>
@@ -772,12 +786,11 @@ try {
     label: "Bootstrap failure",
     launcherArguments: ["--myalbuns-invalid-development-option"],
   });
-  const bootstrapFailureTerminalObserved = bootstrapFailure.output.includes(
-    '"event":"dev_frontend_ready"',
-  );
-  if (!bootstrapFailureTerminalObserved) {
+  const bootstrapFailureCleanupTerminalObserved =
+    bootstrapFailure.cleanupTerminalObserved;
+  if (!bootstrapFailureCleanupTerminalObserved) {
     throw new Error(
-      `Bootstrap failure did not clean its environment: ${JSON.stringify({ exitCode: bootstrapFailure.terminal.exitCode, supervisorPid: bootstrapFailure.authority.processId })}`,
+      `Bootstrap failure omitted its typed cleanup terminal: ${JSON.stringify({ exitCode: bootstrapFailure.terminal.exitCode, supervisorPid: bootstrapFailure.authority.processId })}`,
     );
   }
 
@@ -845,7 +858,7 @@ try {
       supervisorPid,
       vitePid,
       webdriverMode: "attach-existing-webview2",
-      globalExitedAfterUiReady: true,
+      globalExitedAfterUiReady: causalHandoffObserved,
       hostSurvivedGlobal: true,
       viteSurvivedGlobal: true,
       projectUiRendered: true,
@@ -860,7 +873,7 @@ try {
       ctrlCTreeProcessCount: ctrlCTree.length,
       ctrlCHostTreeProcessCount: ctrlCHostForest.length,
       bootstrapFailureCleanupCompleted: true,
-      bootstrapFailureTerminalObserved,
+      bootstrapFailureCleanupTerminalObserved,
       bootstrapFailureTreeProcessCount:
         bootstrapFailure.processForest.processIds.length,
       containmentFailureCleanupCompleted: true,

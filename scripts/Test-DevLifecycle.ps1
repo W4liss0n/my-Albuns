@@ -32,9 +32,12 @@ try {
     $processInstanceTest = Join-Path `
         $PSScriptRoot `
         'Test-DevLifecycleProcessInstances.mjs'
-    & $node --test $processInstanceTest
+    $gateObservationTest = Join-Path `
+        $PSScriptRoot `
+        'Test-DevLifecycleGateObservations.mjs'
+    & $node --test $processInstanceTest $gateObservationTest
     if ($LASTEXITCODE -ne 0) {
-        throw "The process-instance lifecycle regression failed with exit code $LASTEXITCODE."
+        throw "The development lifecycle regressions failed with exit code $LASTEXITCODE."
     }
 
     $fixturePath = Join-Path `
@@ -73,10 +76,10 @@ try {
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
     if (
-        -not $gate.bootstrapFailureTerminalObserved -or
+        -not $gate.bootstrapFailureCleanupTerminalObserved -or
         -not $gate.containmentFailureTerminalObserved
     ) {
-        throw 'The shared failure-phase runner did not preserve both typed terminals.'
+        throw 'The shared failure-phase runner did not preserve its typed cleanup and containment terminals.'
     }
 
     Add-Type -AssemblyName System.Drawing
@@ -145,7 +148,7 @@ try {
         ctrlCTreeProcessCount = [int] $gate.ctrlCTreeProcessCount
         ctrlCHostTreeProcessCount = [int] $gate.ctrlCHostTreeProcessCount
         bootstrapFailureCleanupCompleted = [bool] $gate.bootstrapFailureCleanupCompleted
-        bootstrapFailureTerminalObserved = [bool] $gate.bootstrapFailureTerminalObserved
+        bootstrapFailureCleanupTerminalObserved = [bool] $gate.bootstrapFailureCleanupTerminalObserved
         bootstrapFailureTreeProcessCount = [int] $gate.bootstrapFailureTreeProcessCount
         containmentFailureCleanupCompleted = [bool] $gate.containmentFailureCleanupCompleted
         containmentFailureTerminalObserved = [bool] $gate.containmentFailureTerminalObserved
