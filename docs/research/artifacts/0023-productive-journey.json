@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-14T17:43:00.5194557Z",
-    "gitCommit":  "2f10be59159cdb6d9966fad3ad135007e41cb28b",
+    "collectedAtUtc":  "2026-08-14T18:37:40.3897785Z",
+    "gitCommit":  "1086665d262d1c17d98fcd7f106ee88d82440275",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -28,7 +28,7 @@
                        "passed":  true
                    },
                    {
-                       "name":  "canvas-sheet-two-export",
+                       "name":  "distinguishable-sheet-two-jpeg-export",
                        "passed":  true
                    },
                    {
@@ -49,19 +49,38 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
+                     "selectedSheetId":  "94a72d39-3443-4a23-9cd0-25d88a3c98c6",
+                     "selectedSheetActiveSides":  "both",
+                     "firstSheetDimensions":  {
+                                                  "width":  360,
+                                                  "height":  360
+                                              },
+                     "selectedSheetDimensions":  {
+                                                     "width":  720,
+                                                     "height":  360
+                                                 },
+                     "expectedBackgroundRgb":  "#204060",
                      "exportedDpi":  360,
                      "savedRevision":  1,
                      "savedDpi":  300,
                      "jpeg":  {
-                                  "height":  360,
                                   "width":  720,
-                                  "byteCount":  10757,
-                                  "sha256":  "56623459ff0b4e2ea77d38331ea7397629706e26733422ac50c02b90f9069665"
+                                  "height":  360,
+                                  "byteCount":  10760,
+                                  "sha256":  "20c65377b66cc634e2d10f7963956683c1c91c42f391fc2a6fa3746e1b4cb218",
+                                  "backgroundSample":  {
+                                                           "x":  360,
+                                                           "y":  180,
+                                                           "red":  31,
+                                                           "green":  64,
+                                                           "blue":  95,
+                                                           "maxChannelDelta":  1
+                                                       }
                               },
                      "processIds":  {
-                                        "global":  32340,
-                                        "host":  11680,
-                                        "imaging":  33688
+                                        "global":  19204,
+                                        "host":  17612,
+                                        "imaging":  30072
                                     },
                      "correlations":  {
                                           "bootstraps":  2,
@@ -75,7 +94,7 @@
                                             "hostReady":  2,
                                             "imagingStopped":  1
                                         },
-                     "canvasNonWhiteSamples":  991,
+                     "canvasNonWhiteSamples":  1271,
                      "canvasSampleCount":  1271,
                      "cleanupCompleted":  true
                  }
