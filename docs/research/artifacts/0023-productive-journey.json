@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-14T18:37:40.3897785Z",
-    "gitCommit":  "1086665d262d1c17d98fcd7f106ee88d82440275",
+    "collectedAtUtc":  "2026-08-14T19:33:01.2698992Z",
+    "gitCommit":  "8cb8dc3380911e18b3f9ec0e1f50458df10afeb3",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -49,7 +49,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "94a72d39-3443-4a23-9cd0-25d88a3c98c6",
+                     "selectedSheetId":  "ab171c86-21a9-4068-8830-ce75bddabd5e",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  360,
@@ -78,9 +78,9 @@
                                                        }
                               },
                      "processIds":  {
-                                        "global":  19204,
-                                        "host":  17612,
-                                        "imaging":  30072
+                                        "global":  15824,
+                                        "host":  27060,
+                                        "imaging":  34464
                                     },
                      "correlations":  {
                                           "bootstraps":  2,
