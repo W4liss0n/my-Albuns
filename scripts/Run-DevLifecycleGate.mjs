@@ -434,8 +434,8 @@ async function runSupervisorFailurePhase({
   }
 
   const output = readOutput();
-  if (terminal.exitCode === 0) {
-    throw new Error(`${label} supervisor unexpectedly exited successfully`);
+  if (!Number.isInteger(terminal.exitCode) || terminal.exitCode === 0) {
+    throw new Error(`${label} supervisor did not return a nonzero exit code`);
   }
   if (!output.includes('"event":"dev_environment_cleanup_completed"')) {
     throw new Error(`${label} supervisor omitted its typed cleanup terminal`);
@@ -714,6 +714,11 @@ try {
     "Normal Host close",
     normalTree,
     normalTreeInstances,
+  );
+  await waitForChildProcessClose(
+    supervisor,
+    cleanupTimeoutMilliseconds,
+    "Normal supervisor output",
   );
   if (
     !supervisorOutput().includes('"event":"dev_environment_cleanup_completed"')
