@@ -1,0 +1,82 @@
+{
+    "schemaVersion":  1,
+    "gate":  "productive-end-to-end-journey",
+    "collectedAtUtc":  "2026-08-14T17:43:00.5194557Z",
+    "gitCommit":  "2f10be59159cdb6d9966fad3ad135007e41cb28b",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "nativeDriverVersion":  "151.0.4129.78",
+                     "webView2RuntimeVersion":  "151.0.4129.78"
+                 },
+    "checks":  [
+                   {
+                       "name":  "cancel-before-project-core",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "create-only-causal-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-core-save-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "cancel-before-export-pipeline",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "canvas-sheet-two-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "saved-project-unchanged-by-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "independent-host-reopen-empty-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "correlated-process-terminals-cleanup",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "cancelledCreationBeforeCore":  true,
+                     "cancelledExportBeforePipeline":  true,
+                     "createAuthorization":  "createOnly",
+                     "exportedSheetNumber":  2,
+                     "exportedDpi":  360,
+                     "savedRevision":  1,
+                     "savedDpi":  300,
+                     "jpeg":  {
+                                  "height":  360,
+                                  "width":  720,
+                                  "byteCount":  10757,
+                                  "sha256":  "56623459ff0b4e2ea77d38331ea7397629706e26733422ac50c02b90f9069665"
+                              },
+                     "processIds":  {
+                                        "global":  32340,
+                                        "host":  11680,
+                                        "imaging":  33688
+                                    },
+                     "correlations":  {
+                                          "bootstraps":  2,
+                                          "imagingAttempts":  1
+                                      },
+                     "reopenedInIndependentHost":  true,
+                     "reopenedHistoryEmpty":  true,
+                     "sourcePathExposedToWebView":  false,
+                     "terminalCounts":  {
+                                            "globalHandoffs":  2,
+                                            "hostReady":  2,
+                                            "imagingStopped":  1
+                                        },
+                     "canvasNonWhiteSamples":  991,
+                     "canvasSampleCount":  1271,
+                     "cleanupCompleted":  true
+                 }
+}
