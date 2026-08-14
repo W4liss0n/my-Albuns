@@ -184,19 +184,7 @@ try {
     if ((Get-ExactExecutableProcesses $driver.nativeDriverPath).Count -ne 0) {
         throw 'The productive journey left a native WebDriver alive.'
     }
-    $relatedProcesses = @(
-        Get-CimInstance Win32_Process |
-            Where-Object {
-                -not [string]::IsNullOrWhiteSpace($_.CommandLine) -and
-                $_.CommandLine.IndexOf(
-                    $runRoot,
-                    [System.StringComparison]::OrdinalIgnoreCase
-                ) -ge 0
-            }
-    )
-    if ($relatedProcesses.Count -ne 0) {
-        throw 'The productive journey left a scratch-bound process alive.'
-    }
+    Wait-GatePathProcessesExit -Path $runRoot
 
     Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
     $runRootCleaned = $true
