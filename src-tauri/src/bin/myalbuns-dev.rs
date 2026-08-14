@@ -1,4 +1,8 @@
 #[cfg(windows)]
+#[path = "../dev_job.rs"]
+mod dev_job;
+
+#[cfg(windows)]
 #[path = "../dev_supervisor.rs"]
 mod dev_supervisor;
 

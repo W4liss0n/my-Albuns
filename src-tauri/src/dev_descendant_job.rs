@@ -1,21 +1,18 @@
 use std::{
     ffi::c_void,
     io,
-    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
-    ptr,
+    os::windows::io::{AsRawHandle, OwnedHandle},
     sync::OnceLock,
 };
 
 use windows_sys::Win32::System::{
     JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_BREAKAWAY_OK,
-        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JobObjectExtendedLimitInformation, SetInformationJobObject,
+        AssignProcessToJobObject, JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     },
     Threading::GetCurrentProcess,
 };
 
-use crate::dev_supervisor_protocol::HOST_LEASE_ENDPOINT_ENV;
+use crate::{dev_job::create_job_with_limits, dev_supervisor_protocol::HOST_LEASE_ENDPOINT_ENV};
 
 static PROCESS_DESCENDANT_JOB: OnceLock<Result<OwnedHandle, String>> = OnceLock::new();
 const DESCENDANT_JOB_FAILURE_PROBE_ENV: &str = "MYALBUNS_DEV_DESCENDANT_JOB_FAILURE_PROBE";
@@ -44,7 +41,9 @@ pub(crate) fn install_if_supervised() -> io::Result<()> {
 }
 
 fn install_process_descendant_job() -> Result<OwnedHandle, String> {
-    let job = create_kill_on_close_job().map_err(|error| error.to_string())?;
+    let job =
+        create_job_with_limits(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK)
+            .map_err(|error| error.to_string())?;
     // SAFETY: GetCurrentProcess returns the pseudo-handle for this live
     // process; job is an owned handle with ASSIGN_PROCESS access.
     if unsafe {
@@ -54,29 +53,4 @@ fn install_process_descendant_job() -> Result<OwnedHandle, String> {
         return Err(io::Error::last_os_error().to_string());
     }
     Ok(job)
-}
-
-fn create_kill_on_close_job() -> io::Result<OwnedHandle> {
-    // SAFETY: null name/security creates an unnamed Job; limits remains valid
-    // for SetInformationJobObject, and a successful raw handle is owned here.
-    unsafe {
-        let handle = CreateJobObjectW(ptr::null(), ptr::null());
-        if handle.is_null() {
-            return Err(io::Error::last_os_error());
-        }
-        let job = OwnedHandle::from_raw_handle(handle);
-        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        limits.BasicLimitInformation.LimitFlags =
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK;
-        if SetInformationJobObject(
-            job.as_raw_handle().cast::<c_void>(),
-            JobObjectExtendedLimitInformation,
-            ptr::from_ref(&limits).cast_mut().cast::<c_void>(),
-            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-        ) == 0
-        {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(job)
-    }
 }

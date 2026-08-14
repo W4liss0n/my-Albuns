@@ -7,6 +7,8 @@ mod dev_descendant_job;
 #[cfg(debug_assertions)]
 mod dev_host_registration;
 #[cfg(debug_assertions)]
+mod dev_job;
+#[cfg(debug_assertions)]
 mod dev_process_identity;
 #[cfg(debug_assertions)]
 mod dev_supervisor_protocol;

@@ -4,7 +4,7 @@ use std::{
     ffi::{OsStr, OsString, c_void},
     io::{self, BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream, ToSocketAddrs},
-    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    os::windows::io::{AsRawHandle, OwnedHandle},
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     ptr,
@@ -21,9 +21,8 @@ use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
     System::{
         JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob,
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-            JobObjectExtendedLimitInformation, SetInformationJobObject, TerminateJobObject,
+            AssignProcessToJobObject, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            TerminateJobObject,
         },
         Threading::{
             INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA,
@@ -37,6 +36,7 @@ mod process_identity;
 #[path = "dev_supervisor_protocol.rs"]
 mod protocol;
 
+use crate::dev_job::create_job_with_limits;
 use process_identity::HostProcessInstanceId;
 use protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
@@ -960,32 +960,10 @@ struct KillOnCloseJob {
 
 impl KillOnCloseJob {
     fn new() -> io::Result<Self> {
-        // SAFETY: the null pointers request an unnamed Job Object with default
-        // security, and the initialized structure remains live for the call.
-        unsafe {
-            let handle = CreateJobObjectW(ptr::null(), ptr::null());
-            if handle.is_null() {
-                return Err(io::Error::last_os_error());
-            }
-            let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-            if SetInformationJobObject(
-                handle,
-                JobObjectExtendedLimitInformation,
-                ptr::from_ref(&limits).cast::<c_void>(),
-                size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
-            ) == 0
-            {
-                let error = io::Error::last_os_error();
-                CloseHandle(handle);
-                return Err(error);
-            }
-            Ok(Self {
-                // SAFETY: CreateJobObjectW returned a uniquely owned handle.
-                handle: OwnedHandle::from_raw_handle(handle),
-                terminated: AtomicBool::new(false),
-            })
-        }
+        Ok(Self {
+            handle: create_job_with_limits(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)?,
+            terminated: AtomicBool::new(false),
+        })
     }
 
     fn assign(&self, child: &Child) -> io::Result<()> {

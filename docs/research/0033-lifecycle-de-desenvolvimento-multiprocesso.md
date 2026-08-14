@@ -266,10 +266,21 @@ e cleanup; essa fase exige saída não zero, o terminal
 o resultado. Cada chamador conserva somente sua asserção específica. Ctrl+C e
 queda abrupta permanecem evidências distintas.
 
-Os dados brutos da rodada canônica ficam em
+Os dados brutos da última rodada histórica bem-sucedida ficam em
 [0022-dev-lifecycle.json](artifacts/0022-dev-lifecycle.json). O JSON identifica
-o commit de entrada e marca qualquer mudança rastreada ou não rastreada antes,
-durante ou depois da execução.
+o commit de entrada `3e86c9c7f354447b30c69340d76ae9a3b87d2334` e registra que
+essa execução não observou inputs sujos. Ele prova somente aquele input: não é
+evidência para `c686cfa3c0ec5d1a878ddc0fe2f6409166ff45fe` nem para seus
+descendentes.
+
+Uma execução posterior sobre o input limpo `c686cfa3` ficou bloqueada antes do
+handoff: o Vite respondeu em `1437` e o WebView2 iniciou a requisição de
+`global.html`, mas nenhum `PageLoadEvent::Started` ou
+`PageLoadEvent::Finished` chegou ao aplicativo. A Global terminou de modo
+fail-closed com `global_window_initialization_failed`. Essa observação delimita
+o bloqueio atual, mas não demonstra sua causa. Por isso nenhum novo JSON foi
+publicado e a rodada histórica não deve ser apresentada como prova da árvore
+atual.
 
 ## Isolamento da produção
 
