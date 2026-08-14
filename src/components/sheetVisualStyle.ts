@@ -1,8 +1,8 @@
 export const SHEET_VISUAL_STYLE = {
   surface: {
-    fill: "#f1ece2",
-    outline: "#ffffff",
-    outlineOpacity: 0.65,
+    fill: "#f3f1ec",
+    outline: "#d8d3c9",
+    outlineOpacity: 0.85,
     outlineWidthPx: 1,
     cornerRadiusPx: 3,
   },
@@ -12,7 +12,7 @@ export const SHEET_VISUAL_STYLE = {
     widthPx: 1,
   },
   inactiveSide: {
-    fill: "#c8c6c1",
+    fill: "#d8d4cc",
     opacity: 0.88,
   },
   photo: {
@@ -40,8 +40,8 @@ export const SHEET_VISUAL_STYLE = {
     outlineWidthPx: 1,
   },
   overlay: {
-    outline: "#d4b279",
-    outlineOpacity: 0.45,
+    outline: "#2f7fba",
+    outlineOpacity: 0.52,
     outlineWidthPx: 2,
     insetPx: 8,
     cornerRadiusPx: 2,

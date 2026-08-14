@@ -145,8 +145,8 @@ export function PersonalizationPreview({
               ? "Realce do lado esquerdo"
               : "Realce do lado direito"
         }
-        fill="#D3AB77"
-        fillOpacity="0.18"
+        fill="#2F7FBA"
+        fillOpacity="0.16"
         height={heightUm}
         pointerEvents="none"
         width={highlightedScope === "both" ? widthUm : pageWidth}

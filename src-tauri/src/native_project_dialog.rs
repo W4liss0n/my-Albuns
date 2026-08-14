@@ -1,8 +1,5 @@
 use std::path::PathBuf;
 
-#[cfg(windows)]
-use tauri::Manager;
-
 use myalbuns_paths::ExportWriteAuthorization;
 
 use crate::project_bootstrap::CreateWriteAuthorization;
@@ -28,8 +25,6 @@ pub(crate) enum ExportSaveDialogOutcome {
 #[derive(Debug)]
 pub(crate) enum NativeProjectDialogError {
     #[cfg(windows)]
-    GlobalWindowUnavailable,
-    #[cfg(windows)]
     NativeWindowUnavailable(tauri::Error),
     #[cfg(windows)]
     DialogThreadUnavailable(String),
@@ -43,14 +38,10 @@ impl std::fmt::Display for NativeProjectDialogError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             #[cfg(windows)]
-            Self::GlobalWindowUnavailable => {
-                formatter.write_str("a janela global não está disponível")
-            }
-            #[cfg(windows)]
             Self::NativeWindowUnavailable(error) => {
                 write!(
                     formatter,
-                    "o HWND da janela global não está disponível: {error}"
+                    "o HWND da janela proprietária não está disponível: {error}"
                 )
             }
             #[cfg(windows)]
@@ -77,13 +68,10 @@ impl From<windows::core::Error> for NativeProjectDialogError {
 }
 
 pub(crate) async fn choose_project_destination(
-    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
 ) -> Result<ProjectSaveDialogOutcome, NativeProjectDialogError> {
     #[cfg(windows)]
     {
-        let window = app
-            .get_webview_window(crate::global_runtime::GLOBAL_WINDOW_LABEL)
-            .ok_or(NativeProjectDialogError::GlobalWindowUnavailable)?;
         let owner = window
             .hwnd()
             .map_err(NativeProjectDialogError::NativeWindowUnavailable)?
@@ -96,7 +84,7 @@ pub(crate) async fn choose_project_destination(
 
     #[cfg(not(windows))]
     {
-        let _ = app;
+        let _ = window;
         Err(NativeProjectDialogError::UnsupportedPlatform)
     }
 }

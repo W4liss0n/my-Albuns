@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "lucide-react": "^1.31.0",
     "pixi.js": "^8.19.0",
     "react": "^19.1.0",
     "react-aria-components": "^1.19.0",

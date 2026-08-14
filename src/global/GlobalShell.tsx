@@ -1,19 +1,33 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  ChevronRight,
+  Download,
+  FolderOpen,
+  Plus,
+  Star,
+} from "lucide-react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
-  OpenProjectFailure,
   OpenProjectOutcome,
   RecentProjectSummary,
 } from "./application/globalProjectPort";
-import { NewProjectFlow } from "./NewProjectFlow";
+import {
+  ActionButton,
+  AppIcon,
+  ApplicationHeader,
+  BrandWordmark,
+} from "../ui";
 
 interface GlobalShellProps {
   graphicsDiagnostic: GraphicsDiagnostic;
   projectPort: GlobalProjectPort;
 }
+
+const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
+const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
   graphicsDiagnostic,
@@ -21,7 +35,6 @@ export function GlobalShell({
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [failure, setFailure] = useState<OpenProjectFailure | null>(null);
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
   >([]);
@@ -35,7 +48,7 @@ export function GlobalShell({
       .completeGraphicsGate(graphicsDiagnostic.supported)
       .then((outcome) => {
         if (outcome?.status === "failed") {
-          setFailure(outcome.error);
+          void projectPort.showLaunchFailure(outcome.error);
         }
       });
   }, [graphicsDiagnostic.supported, projectPort]);
@@ -54,7 +67,7 @@ export function GlobalShell({
         startupFailure &&
         openingAttempt.current === startupAttempt
       ) {
-        setFailure(startupFailure);
+        void projectPort.showLaunchFailure(startupFailure);
       }
     });
     return () => {
@@ -67,10 +80,9 @@ export function GlobalShell({
   ) => {
     openingAttempt.current += 1;
     setIsOpening(true);
-    setFailure(null);
     const outcome = await attempt();
     if (outcome.status === "failed") {
-      setFailure(outcome.error);
+      await projectPort.showLaunchFailure(outcome.error);
     }
     setIsOpening(false);
   };
@@ -80,10 +92,14 @@ export function GlobalShell({
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
-  const startCreation = () => {
+  const startCreation = async () => {
     openingAttempt.current += 1;
-    setFailure(null);
     setIsCreating(true);
+    const outcome = await projectPort.showNewProjectWindow();
+    if (outcome.status === "failed") {
+      await projectPort.showLaunchFailure(outcome.error);
+    }
+    setIsCreating(false);
   };
 
   if (!graphicsDiagnostic.supported) {
@@ -91,30 +107,53 @@ export function GlobalShell({
   }
 
   return (
-    <>
-      <main className="global-shell">
-        <header className="global-shell-header">
-          <span aria-hidden="true" className="global-brand-mark">
-            M
-          </span>
-          <span>MyAlbuns</span>
-        </header>
+    <main className="global-shell">
+      <ApplicationHeader status="diagramação de Álbuns" />
 
         <section className="global-recent-projects">
-          <p className="global-eyebrow">Boas-vindas</p>
-          <h1>Projetos recentes</h1>
+          <div className="global-section-heading">
+            <h1>Projetos recentes</h1>
+          </div>
           {recentProjects.length === 0 ? (
-            <p>Os Projetos abertos recentemente aparecerão aqui.</p>
+            <div className="global-empty-state">
+              <strong>Nenhum Projeto recente</strong>
+              <p>Os Projetos abertos recentemente aparecerão aqui.</p>
+            </div>
           ) : (
             <ul aria-label="Projetos recentes" className="global-recent-list">
-              {recentProjects.map((project) => (
+              {recentProjects.map((project, index) => (
                 <li key={project.id}>
                   <button
+                    aria-label={project.name}
                     disabled={isOpening || isCreating}
                     onClick={() => openRecentProject(project.id)}
                     type="button"
                   >
-                    {project.name}
+                    <span
+                      aria-hidden="true"
+                      className="global-project-thumbnail"
+                      data-shape={
+                        portraitCoverIndexes.has(index % 7)
+                          ? "portrait"
+                          : "square"
+                      }
+                      data-variant={recentCoverVariants[index % 7]}
+                    >
+                      <i />
+                      <span className="global-project-pin">
+                        <AppIcon icon={Star} size={12} />
+                      </span>
+                    </span>
+                    <span className="global-project-summary">
+                      <strong>{project.name}</strong>
+                      <small>Projeto MyAlbuns</small>
+                      <small className="global-project-when">
+                        Aberto recentemente
+                      </small>
+                    </span>
+                    <span aria-hidden="true" className="global-project-open">
+                      <AppIcon icon={ChevronRight} size={12} />
+                    </span>
                   </button>
                 </li>
               ))}
@@ -123,59 +162,43 @@ export function GlobalShell({
         </section>
 
         <aside aria-label="Ações principais" className="global-primary-actions">
-          <button
-            disabled={isOpening || isCreating}
-            onClick={startCreation}
-            type="button"
-          >
-            Novo Projeto
-          </button>
-          <button
-            className="global-secondary-action"
-            disabled={isOpening || isCreating}
-            onClick={openProject}
-            type="button"
-          >
-            {isOpening
-              ? "Abrindo Projeto…"
-              : failure
-                ? "Tentar novamente"
-                : "Abrir Projeto"}
-          </button>
-          {isOpening ? (
-            <p aria-live="polite" role="status">
-              Preparando a Janela do Projeto…
-            </p>
-          ) : null}
-          {failure ? (
-            <section className="global-open-error" role="alert">
-              <h2>Não foi possível abrir o Projeto</h2>
-              <p>{failure.message}</p>
-              {failure.action ? <p>{failure.action}</p> : null}
-            </section>
-          ) : null}
+          <BrandWordmark subtitle="diagramação de Álbuns · versão 0.1.0" />
+          <div className="global-action-stack">
+            <ActionButton
+              aria-label="Novo Projeto"
+              disabled={isOpening || isCreating}
+              onClick={() => void startCreation()}
+              variant="primary"
+            >
+              <AppIcon icon={Plus} size={16} />
+              <span>Novo Projeto</span>
+              <kbd>Ctrl+N</kbd>
+            </ActionButton>
+            <ActionButton
+              aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
+              disabled={isOpening || isCreating}
+              onClick={openProject}
+            >
+              <AppIcon icon={FolderOpen} size={16} />
+              <span>
+                {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
+              </span>
+              <kbd>Ctrl+O</kbd>
+            </ActionButton>
+          </div>
+          <div aria-hidden="true" className="global-action-divider" />
+          <div className="global-secondary-actions">
+            <button
+              aria-label="Exportar vários Álbuns de uma vez"
+              disabled
+              title="A Exportação em lote ainda não está disponível"
+              type="button"
+            >
+              <AppIcon icon={Download} size={14} />
+              <span>Exportar vários Álbuns de uma vez</span>
+            </button>
+          </div>
         </aside>
-      </main>
-      {isCreating ? (
-        <NewProjectFlow
-          onCancel={() => {
-            void projectPort.clearProvisionalDecoratives();
-            setIsCreating(false);
-          }}
-          onChooseDecorative={() =>
-            projectPort.chooseProvisionalDecorative()
-          }
-          onCreate={(configuration) =>
-            projectPort.createProject(configuration)
-          }
-          onReleaseDecorative={(selectionId) =>
-            projectPort.releaseProvisionalDecorative(selectionId)
-          }
-          onValidate={(configuration) =>
-            projectPort.validateProjectConfiguration(configuration)
-          }
-        />
-      ) : null}
-    </>
+    </main>
   );
 }

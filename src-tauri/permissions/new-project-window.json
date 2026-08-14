@@ -1,0 +1,18 @@
+{
+  "permission": [
+    {
+      "identifier": "new-project-window-commands",
+      "description": "Allows only validation, provisional decorative selection, creation, and closing from the New Project window.",
+      "commands": {
+        "allow": [
+          "validate_project_configuration",
+          "create_project",
+          "choose_provisional_decorative",
+          "release_provisional_decorative",
+          "close_new_project_window"
+        ],
+        "deny": []
+      }
+    }
+  ]
+}

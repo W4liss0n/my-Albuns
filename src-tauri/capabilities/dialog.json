@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dialog",
+  "description": "Minimum permissions for the owned standard message dialog",
+  "local": true,
+  "windows": ["dialog-project-failure"],
+  "permissions": [
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
+}

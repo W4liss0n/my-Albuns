@@ -30,6 +30,8 @@ import {
   type NewProjectCreationConfiguration,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
+import { ActionButton, InlineNotice } from "../ui";
+import { DimensionsPreview } from "./DimensionsPreview";
 import { PersonalizationStep } from "./PersonalizationStep";
 import "./NewProjectFlow.css";
 
@@ -200,22 +202,18 @@ export function NewProjectFlow({
   };
 
   return (
-    <div className="new-project-backdrop">
-      <section
-        aria-labelledby="new-project-title"
-        aria-modal="true"
+      <main
+        aria-labelledby="new-project-step-title"
         className="new-project-flow"
-        role="dialog"
       >
         <header className="new-project-header">
-          <div>
-            <p className="global-eyebrow">Novo Projeto</p>
-            <h1 id="new-project-title">
-              {step === "dimensions" ? "Dimensões" : "Personalização"}
-            </h1>
-          </div>
+          <h1>Novo Projeto</h1>
+          <h2 className="ui-visually-hidden" id="new-project-step-title">
+            {step === "dimensions" ? "Dimensões" : "Personalização"}
+          </h2>
           <ol aria-label="Etapas da criação" className="new-project-steps">
             <li aria-current={step === "dimensions" ? "step" : undefined}>
+              <span>1</span>
               Dimensões
             </li>
             <li
@@ -223,6 +221,7 @@ export function NewProjectFlow({
                 step === "personalization" ? "step" : undefined
               }
             >
+              <span>2</span>
               Personalização
             </li>
           </ol>
@@ -251,42 +250,41 @@ export function NewProjectFlow({
         <footer className="new-project-footer">
           <div>
             {step === "personalization" ? (
-              <button
+              <ActionButton
                 disabled={isCreating}
                 onClick={() => setStep("dimensions")}
-                type="button"
+                variant="quiet"
               >
                 Voltar
-              </button>
+              </ActionButton>
             ) : null}
           </div>
           <div className="new-project-footer-actions">
-            <button disabled={isCreating} onClick={cancelFlow} type="button">
+            <ActionButton disabled={isCreating} onClick={cancelFlow}>
               Cancelar
-            </button>
+            </ActionButton>
             {step === "dimensions" ? (
-              <button
-                className="new-project-primary-action"
+              <ActionButton
+                aria-label="Próximo"
                 disabled={isValidating}
                 onClick={goToPersonalization}
-                type="button"
+                variant="primary"
               >
-                {isValidating ? "Validando…" : "Próximo"}
-              </button>
+                {isValidating ? "Validando…" : "Continuar"}
+              </ActionButton>
             ) : (
-              <button
-                className="new-project-primary-action"
+              <ActionButton
+                aria-label="Criar"
                 disabled={isCreating}
                 onClick={() => void createProject()}
-                type="button"
+                variant="primary"
               >
-                {isCreating ? "Criando Projeto…" : "Criar"}
-              </button>
+                {isCreating ? "Criando Projeto…" : "Criar Projeto"}
+              </ActionButton>
             )}
           </div>
         </footer>
-      </section>
-    </div>
+      </main>
   );
 }
 
@@ -346,124 +344,135 @@ function DimensionsStep({
 
   return (
     <div className="new-project-content new-project-dimensions">
-      <FormGroup title="Documento">
-        <label className="new-project-field">
-          <span>Unidade</span>
-          <select
-            onChange={(event) =>
-              onChange(
-                changeDisplayUnit(
-                  draft,
-                  event.target.value as ProjectDisplayUnit,
-                ),
-                ["sheetWidth", "sheetHeight", "bleed", "safety"],
-              )
+      <DimensionsPreview draft={draft} />
+      <div className="new-project-dimensions-controls">
+        <FormGroup kind="document" title="Configurações">
+          <label className="new-project-field">
+            <span>Unidade</span>
+            <select
+              onChange={(event) =>
+                onChange(
+                  changeDisplayUnit(
+                    draft,
+                    event.target.value as ProjectDisplayUnit,
+                  ),
+                  ["sheetWidth", "sheetHeight", "bleed", "safety"],
+                )
+              }
+              value={draft.displayUnit}
+            >
+              <option value="mm">mm</option>
+              <option value="cm">cm</option>
+              <option value="in">in</option>
+            </select>
+          </label>
+          <NumericField
+            attempted={attempted}
+            error={errors.sheetWidth}
+            inputMode="decimal"
+            label="Largura da Lâmina"
+            onChange={(text) => updatePhysical("sheetWidth", text)}
+            ref={registerField("sheetWidth")}
+            suffix={draft.displayUnit}
+            value={draft.sheetWidth.text}
+          />
+          <NumericField
+            attempted={attempted}
+            error={errors.sheetHeight}
+            inputMode="decimal"
+            label="Altura da Lâmina"
+            onChange={(text) => updatePhysical("sheetHeight", text)}
+            ref={registerField("sheetHeight")}
+            suffix={draft.displayUnit}
+            value={draft.sheetHeight.text}
+          />
+          <NumericField
+            attempted={attempted}
+            error={errors.dpi}
+            inputMode="numeric"
+            label="DPI"
+            onChange={(dpiText) => onChange({ ...draft, dpiText }, ["dpi"])}
+            ref={registerField("dpi")}
+            value={draft.dpiText}
+          />
+        </FormGroup>
+        <FormGroup kind="areas" title="Sangria e Área de segurança">
+          <NumericField
+            attempted={attempted}
+            error={errors.bleed}
+            inputMode="decimal"
+            label="Sangria"
+            onChange={(text) => updatePhysical("bleed", text)}
+            ref={registerField("bleed")}
+            suffix={draft.displayUnit}
+            value={draft.bleed.text}
+          />
+          <NumericField
+            attempted={attempted}
+            error={errors.safety}
+            inputMode="decimal"
+            label="Área de segurança"
+            onChange={(text) => updatePhysical("safety", text)}
+            ref={registerField("safety")}
+            suffix={draft.displayUnit}
+            value={draft.safety.text}
+          />
+        </FormGroup>
+        <FormGroup kind="structure" title="Lâminas">
+          <NumericField
+            attempted={attempted}
+            error={errors.sheetCount}
+            inputMode="numeric"
+            label="Quantidade de Lâminas"
+            onChange={(sheetCountText) =>
+              onChange({ ...draft, sheetCountText }, ["sheetCount"])
             }
-            value={draft.displayUnit}
+            ref={registerField("sheetCount")}
+            value={draft.sheetCountText}
+          />
+          <SelectField
+            label="Primeira Lâmina"
+            onChange={(firstSheet) => onChange({ ...draft, firstSheet }, [])}
+            value={draft.firstSheet}
+          />
+          <SelectField
+            label="Última Lâmina"
+            onChange={(lastSheet) => onChange({ ...draft, lastSheet }, [])}
+            value={draft.lastSheet}
+          />
+        </FormGroup>
+        <p aria-live="polite" className="new-project-summary">
+          {dimensionsSummary(draft)}
+        </p>
+        {validationFailure ? (
+          <InlineNotice
+            role="alert"
+            title="Não foi possível validar as Dimensões"
+            tone="error"
           >
-            <option value="mm">mm</option>
-            <option value="cm">cm</option>
-            <option value="in">in</option>
-          </select>
-        </label>
-        <NumericField
-          attempted={attempted}
-          error={errors.sheetWidth}
-          inputMode="decimal"
-          label="Largura da Lâmina"
-          onChange={(text) => updatePhysical("sheetWidth", text)}
-          ref={registerField("sheetWidth")}
-          suffix={draft.displayUnit}
-          value={draft.sheetWidth.text}
-        />
-        <NumericField
-          attempted={attempted}
-          error={errors.sheetHeight}
-          inputMode="decimal"
-          label="Altura da Lâmina"
-          onChange={(text) => updatePhysical("sheetHeight", text)}
-          ref={registerField("sheetHeight")}
-          suffix={draft.displayUnit}
-          value={draft.sheetHeight.text}
-        />
-        <NumericField
-          attempted={attempted}
-          error={errors.dpi}
-          inputMode="numeric"
-          label="DPI"
-          onChange={(dpiText) => onChange({ ...draft, dpiText }, ["dpi"])}
-          ref={registerField("dpi")}
-          value={draft.dpiText}
-        />
-      </FormGroup>
-      <FormGroup title="Estrutura">
-        <NumericField
-          attempted={attempted}
-          error={errors.sheetCount}
-          inputMode="numeric"
-          label="Quantidade de Lâminas"
-          onChange={(sheetCountText) =>
-            onChange({ ...draft, sheetCountText }, ["sheetCount"])
-          }
-          ref={registerField("sheetCount")}
-          value={draft.sheetCountText}
-        />
-        <SelectField
-          label="Primeira Lâmina"
-          onChange={(firstSheet) => onChange({ ...draft, firstSheet }, [])}
-          value={draft.firstSheet}
-        />
-        <SelectField
-          label="Última Lâmina"
-          onChange={(lastSheet) => onChange({ ...draft, lastSheet }, [])}
-          value={draft.lastSheet}
-        />
-      </FormGroup>
-      <FormGroup title="Áreas técnicas">
-        <NumericField
-          attempted={attempted}
-          error={errors.bleed}
-          inputMode="decimal"
-          label="Sangria"
-          onChange={(text) => updatePhysical("bleed", text)}
-          ref={registerField("bleed")}
-          suffix={draft.displayUnit}
-          value={draft.bleed.text}
-        />
-        <NumericField
-          attempted={attempted}
-          error={errors.safety}
-          inputMode="decimal"
-          label="Área de segurança"
-          onChange={(text) => updatePhysical("safety", text)}
-          ref={registerField("safety")}
-          suffix={draft.displayUnit}
-          value={draft.safety.text}
-        />
-      </FormGroup>
-      <p aria-live="polite" className="new-project-summary">
-        {dimensionsSummary(draft)}
-      </p>
-      {validationFailure ? (
-        <section className="global-open-error" role="alert">
-          <h2>Não foi possível validar as Dimensões</h2>
-          <p>{validationFailure.message}</p>
-          {validationFailure.action ? <p>{validationFailure.action}</p> : null}
-        </section>
-      ) : null}
+            <p>{validationFailure.message}</p>
+            {validationFailure.action ? <p>{validationFailure.action}</p> : null}
+          </InlineNotice>
+        ) : null}
+      </div>
     </div>
   );
 }
 
 function FormGroup({
   children,
+  kind,
   title,
 }: {
   children: React.ReactNode;
+  kind: "areas" | "document" | "structure";
   title: string;
 }) {
   return (
-    <section className="new-project-value-group new-project-form-group">
+    <section
+      className="new-project-value-group new-project-form-group"
+      data-group={kind}
+    >
       <h2>{title}</h2>
       <div className="new-project-form-fields">{children}</div>
     </section>

@@ -18,6 +18,7 @@ import type {
   ProjectSessionPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
+import type { ProjectDialogPort } from "./application/projectDialogPort";
 import type { EditorProjection } from "./domain/project";
 import { LoggingProvider } from "./components/loggingContext";
 import {
@@ -26,6 +27,7 @@ import {
 } from "./components/canvasGraphicsDiagnosticProbeContext";
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
+import { BrandWordmark, InlineNotice } from "./ui";
 import "./App.css";
 
 interface AppProps {
@@ -33,6 +35,7 @@ interface AppProps {
   mediaPreviewPort: MediaPreviewPort;
   projectStartupPort: ProjectStartupPort;
   projectSessionPort: ProjectSessionPort;
+  projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
@@ -44,6 +47,7 @@ function App({
   mediaPreviewPort,
   projectStartupPort,
   projectSessionPort,
+  projectDialogPort,
   projectWindowPort,
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
@@ -260,9 +264,10 @@ function App({
     return (
       <main className="startup-surface">
         <section className="startup-card" role="alert">
+          <BrandWordmark compact />
           <p className="eyebrow">MyAlbuns</p>
           <h1>Não foi possível abrir o Projeto</h1>
-          <p>{loadError}</p>
+          <InlineNotice tone="error">{loadError}</InlineNotice>
         </section>
       </main>
     );
@@ -272,6 +277,7 @@ function App({
     return (
       <main className="startup-surface" aria-busy="true">
         <section className="startup-card">
+          <BrandWordmark compact />
           <span className="loading-mark" aria-hidden="true" />
           <p>Preparando o editor…</p>
         </section>
@@ -287,6 +293,7 @@ function App({
         <ProjectWorkspace
           projection={projection}
           exportPort={exportPort}
+          projectDialogPort={projectDialogPort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
           mediaPreviews={mediaPreviews}
@@ -307,13 +314,14 @@ function ProjectGraphicsFailure({
   return (
     <main className="startup-surface">
       <section className="startup-card" role="alert">
+        <BrandWordmark compact />
         <p className="eyebrow">Editor indisponível</p>
         <h1>O Canvas não pôde ser iniciado</h1>
-        <p>{diagnostic.reason}</p>
-        <p className="support-note">
+        <InlineNotice tone="error">{diagnostic.reason}</InlineNotice>
+        <InlineNotice className="support-note">
           Feche esta Janela do Projeto e use o Diagnóstico gráfico da
           Boas-vindas antes de tentar novamente.
-        </p>
+        </InlineNotice>
       </section>
     </main>
   );

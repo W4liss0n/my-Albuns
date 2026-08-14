@@ -8,11 +8,11 @@ use myalbuns_paths::{
     ExpectedObject, NativePathDto, OperationPathContext, ResolveError, RootBindingPlan,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Runtime, State, UriSchemeContext, UriSchemeResponder};
+use tauri::{AppHandle, Runtime, State, UriSchemeContext, UriSchemeResponder, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    global_runtime::GLOBAL_WINDOW_LABEL,
+    global_runtime::{GLOBAL_WINDOW_LABEL, NEW_PROJECT_WINDOW_LABEL},
     opaque_image_protocol::{
         ImagePayload, ImageReadError, ImageRequestError, opaque_image_url, read_image,
         respond_to_opaque_image_request, serve_opaque_image, sniff_image,
@@ -136,6 +136,14 @@ pub(crate) struct ProvisionalDecorativeFailure {
 }
 
 impl ProvisionalDecorativeFailure {
+    const fn invalid_surface() -> Self {
+        Self {
+            code: "invalid_creation_surface",
+            message: "A seleção pertence apenas à janela de Novo Projeto.",
+            action: "Feche esta janela e tente novamente.",
+        }
+    }
+
     const fn dialog_unavailable() -> Self {
         Self {
             code: "decorative_picker_unavailable",
@@ -334,8 +342,12 @@ impl ProvisionalDecorativeRegistry {
         webview_label: &str,
         request: tauri::http::Request<Vec<u8>>,
     ) -> tauri::http::Response<Vec<u8>> {
+        let authorized_window = match webview_label {
+            GLOBAL_WINDOW_LABEL | NEW_PROJECT_WINDOW_LABEL => webview_label,
+            _ => GLOBAL_WINDOW_LABEL,
+        };
         serve_opaque_image(
-            GLOBAL_WINDOW_LABEL,
+            authorized_window,
             webview_label,
             request,
             |selection_id, include_body| {
@@ -379,11 +391,16 @@ impl ProvisionalDecorativeRegistry {
 #[tauri::command]
 pub(crate) async fn choose_provisional_decorative(
     app: AppHandle,
+    window: WebviewWindow,
     registry: State<'_, ProvisionalDecorativeRegistry>,
 ) -> Result<Option<ProvisionalDecorativeSelection>, ProvisionalDecorativeFailure> {
+    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+        return Err(ProvisionalDecorativeFailure::invalid_surface());
+    }
     let (sender, receiver) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
+        .set_parent(&window)
         .add_filter("Imagens JPEG e PNG", &["jpg", "jpeg", "png"])
         .pick_file(move |selection| {
             let _ = sender.send(selection);
@@ -406,17 +423,14 @@ pub(crate) async fn choose_provisional_decorative(
 
 #[tauri::command]
 pub(crate) fn release_provisional_decorative(
+    window: WebviewWindow,
     selection_id: String,
     registry: State<'_, ProvisionalDecorativeRegistry>,
-) -> bool {
-    registry.release(&selection_id)
-}
-
-#[tauri::command]
-pub(crate) fn clear_provisional_decoratives(
-    registry: State<'_, ProvisionalDecorativeRegistry>,
-) -> usize {
-    registry.clear()
+) -> Result<bool, String> {
+    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+        return Err("only the New Project window can release provisional selections".into());
+    }
+    Ok(registry.release(&selection_id))
 }
 
 pub(crate) fn respond_to_preview_request<R: Runtime>(
@@ -710,6 +724,15 @@ mod tests {
             .expect("selection is accepted")
             .expect("an image was selected");
 
+        assert_eq!(
+            registry
+                .serve(
+                    NEW_PROJECT_WINDOW_LABEL,
+                    request(Method::GET, &selected.preview_url)
+                )
+                .status(),
+            StatusCode::OK
+        );
         assert_eq!(
             registry
                 .serve("project", request(Method::GET, &selected.preview_url))

@@ -17,6 +17,10 @@ import type {
   ProjectSessionPort,
   ProjectWindowPort,
 } from "../application/projectPorts";
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+} from "../application/projectDialogPort";
 import {
   ProjectCloseError,
   SaveProjectError,
@@ -170,6 +174,33 @@ const inertProjectWindowPort: ProjectWindowPort = {
   resolveClose: async () => ({ kind: "closed" }),
 };
 
+const inertProjectDialogPort: ProjectDialogPort = {
+  dismiss: async () => undefined,
+  onAction: async () => () => undefined,
+  present: async () => undefined,
+};
+
+function projectDialogHarness() {
+  const listeners = new Set<(action: ProjectDialogAction) => void>();
+  const dismiss = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
+  const onAction = vi.fn<ProjectDialogPort["onAction"]>(async (nextListener) => {
+    listeners.add(nextListener);
+    return () => {
+      listeners.delete(nextListener);
+    };
+  });
+  return {
+    dismiss,
+    emit: (action: ProjectDialogAction) => {
+      for (const listener of listeners) listener(action);
+    },
+    onAction,
+    port: { dismiss, onAction, present } satisfies ProjectDialogPort,
+    present,
+  };
+}
+
 function projectWindowHarness() {
   let closeRequested: (() => void) | null = null;
   const port: ProjectWindowPort = {
@@ -185,6 +216,7 @@ function projectWindowHarness() {
     resolveClose: vi.fn(async () => ({ kind: "closed" as const })),
   };
   return {
+    dialog: projectDialogHarness(),
     port,
     emitCloseRequested: () => closeRequested?.(),
   };
@@ -206,13 +238,15 @@ function projectSessionPortWithApply(
 
 type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
-  "runProjectMutation" | "projectWindowPort"
+  "runProjectMutation" | "projectDialogPort" | "projectWindowPort"
 > & {
+  projectDialogPort?: ProjectDialogPort;
   projectSessionPort: ProjectSessionPort;
   projectWindowPort?: ProjectWindowPort;
 };
 
 function ProjectWorkspace({
+  projectDialogPort = inertProjectDialogPort,
   projectSessionPort,
   projectWindowPort = inertProjectWindowPort,
   projection,
@@ -225,11 +259,23 @@ function ProjectWorkspace({
   return (
     <ProjectWorkspaceView
       {...props}
+      projectDialogPort={projectDialogPort}
       projection={projection}
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
     />
   );
+}
+
+function getApplicationCommand(
+  menuName: "Arquivo" | "Editar",
+  commandName: string,
+) {
+  const menu = screen.getByRole("button", { name: menuName });
+  if (menu.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(menu);
+  }
+  return screen.getByRole("menuitem", { name: commandName });
 }
 
 beforeEach(() => {
@@ -296,38 +342,32 @@ test("offers the three close choices for a native request and Cancel keeps the P
       projectSessionPort={projectSessionPortWithApply(async () =>
         dirtyProjection
       )}
+      projectDialogPort={harness.dialog.port}
       projectWindowPort={harness.port}
       onProjectionChange={() => undefined}
     />,
   );
   await waitFor(() => {
     expect(harness.emitCloseRequested()).toBeUndefined();
-    expect(
-      screen.getByRole("dialog", {
-        name: "Salvar alterações antes de fechar?",
-      }),
-    ).toBeInTheDocument();
+    expect(harness.dialog.present).toHaveBeenCalledWith({
+      busy: false,
+      kind: "projectCloseConfirmation",
+    });
   });
 
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Salvar e fechar" }),
-  ).toBeEnabled();
-  expect(
-    screen.getByRole("button", { name: "Descartar e fechar" }),
-  ).toBeEnabled();
-  expect(screen.getByRole("button", { name: "Cancelar" })).toBeEnabled();
-  expect(
-    screen.getByRole("button", { name: "Desfazer", hidden: true }),
+    screen.getByRole("button", { name: "Editar", hidden: true }),
   ).toBeDisabled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+  act(() => harness.dialog.emit("cancelProjectClose"));
 
   await waitFor(() => {
     expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(harness.dialog.dismiss).toHaveBeenCalled();
   });
   expect(
-    await screen.findByRole("button", { name: "Desfazer" }),
+    getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
 });
 
@@ -349,6 +389,7 @@ test("uses the same close decision for the application command and blocks it whi
         state: { ...projection.state, dirty: true },
       }}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={harness.dialog.port}
       projectWindowPort={harness.port}
       onProjectionChange={() => undefined}
     />,
@@ -357,25 +398,26 @@ test("uses the same close decision for the application command and blocks it whi
   fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
   expect(harness.port.requestClose).toHaveBeenCalledOnce();
-  expect(
-    await screen.findByRole("dialog", {
-      name: "Salvar alterações antes de fechar?",
+  await waitFor(() =>
+    expect(harness.dialog.present).toHaveBeenCalledWith({
+      busy: false,
+      kind: "projectCloseConfirmation",
     }),
-  ).toBeInTheDocument();
+  );
 
-  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+  act(() => harness.dialog.emit("saveAndClose"));
   expect(harness.port.resolveClose).toHaveBeenCalledWith("saveAndClose");
-  expect(screen.getByRole("button", { name: "Salvar e fechar" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Descartar e fechar" })).toBeDisabled();
-  expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
+  expect(harness.dialog.present).toHaveBeenLastCalledWith({
+    busy: true,
+    kind: "projectCloseConfirmation",
+  });
   expect(
     screen.getByRole("button", { name: "Exportar Lâmina", hidden: true }),
   ).toBeDisabled();
 
   await act(async () => finish());
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
-    await screen.findByRole("button", { name: "Desfazer" }),
+    screen.getByRole("button", { name: "Editar" }),
   ).toBeDisabled();
 });
 
@@ -386,17 +428,16 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={discardHarness.dialog.port}
       projectWindowPort={discardHarness.port}
       onProjectionChange={() => undefined}
     />,
   );
   await waitFor(() => {
     discardHarness.emitCloseRequested();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(discardHarness.dialog.present).toHaveBeenCalled();
   });
-  fireEvent.click(
-    screen.getByRole("button", { name: "Descartar e fechar" }),
-  );
+  act(() => discardHarness.dialog.emit("discardAndClose"));
   expect(discardHarness.port.resolveClose).toHaveBeenCalledWith(
     "discardAndClose",
   );
@@ -414,23 +455,27 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={failureHarness.dialog.port}
       projectWindowPort={failureHarness.port}
       onProjectionChange={() => undefined}
     />,
   );
   await waitFor(() => {
     failureHarness.emitCloseRequested();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(failureHarness.dialog.present).toHaveBeenCalled();
   });
-  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+  act(() => failureHarness.dialog.emit("saveAndClose"));
 
+  await waitFor(() =>
+    expect(failureHarness.dialog.present).toHaveBeenLastCalledWith({
+      kind: "projectCloseFailure",
+      message: "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+    }),
+  );
+  act(() => failureHarness.dialog.emit("dismissProjectCloseFailure"));
+  await screen.findByRole("button", { name: "Editar" });
   expect(
-    await screen.findByText(
-      "O arquivo do Projeto foi alterado fora do MyAlbuns.",
-    ),
-  ).toBeInTheDocument();
-  expect(
-    await screen.findByRole("button", { name: "Desfazer" }),
+    getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
 });
 
@@ -447,25 +492,27 @@ test("never resumes or reports success after an indeterminate close save", async
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={harness.dialog.port}
       projectWindowPort={harness.port}
       onProjectionChange={() => undefined}
     />,
   );
   await waitFor(() => {
     harness.emitCloseRequested();
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(harness.dialog.present).toHaveBeenCalled();
   });
 
-  fireEvent.click(screen.getByRole("button", { name: "Salvar e fechar" }));
+  act(() => harness.dialog.emit("saveAndClose"));
 
+  await waitFor(() =>
+    expect(harness.dialog.present).toHaveBeenLastCalledWith({
+      kind: "projectCloseFailure",
+      message: "Não foi possível confirmar qual revisão ficou no arquivo.",
+    }),
+  );
+  act(() => harness.dialog.emit("dismissProjectCloseFailure"));
   expect(
-    await screen.findByText(
-      "Não foi possível confirmar qual revisão ficou no arquivo.",
-    ),
-  ).toBeInTheDocument();
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(
-    await screen.findByRole("button", { name: "Desfazer" }),
+    screen.getByRole("button", { name: "Editar" }),
   ).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Exportar Lâmina" }),
@@ -488,12 +535,14 @@ test("blocks only Project commands while its Export attempt is active", async ()
     },
   };
   const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  const dialog = projectDialogHarness();
   projectSessionPort.undo = vi.fn(async () => projection);
 
   render(
     <ProjectWorkspace
       exportPort={controlledExportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={() => undefined}
     />,
@@ -502,7 +551,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   fireEvent.click(
     screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Editar" })).toBeDisabled();
 
   act(() => {
     emit({ event: "started", cancellable: true });
@@ -518,8 +567,8 @@ test("blocks only Project commands while its Export attempt is active", async ()
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   expect(projectSessionPort.undo).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Fechar" }));
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+  act(() => dialog.emit("dismissExport"));
+  expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
 test("forwards a fatal Canvas graphics diagnostic without interpreting it", () => {
@@ -585,7 +634,7 @@ test("restores accordion preferences after context changes and remounts", () => 
   ).toHaveAttribute("aria-expanded", "false");
 });
 
-test("uses the documented compact chrome and collapsible contextual sections", () => {
+test("uses the reference chrome and collapsible contextual sections", () => {
   render(
     <ProjectWorkspace
       exportPort={exportPort}
@@ -595,8 +644,9 @@ test("uses the documented compact chrome and collapsible contextual sections", (
     />,
   );
 
-  expect(screen.queryByLabelText("MyAlbuns")).not.toBeInTheDocument();
-  expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("MyAlbuns")).toBeInTheDocument();
+  expect(screen.getByText("Álbum Horizonte")).toBeInTheDocument();
+  expect(screen.getByText("300×300 mm · 1 Lâmina")).toBeInTheDocument();
   expect(screen.queryByText("Intel(R) UHD Graphics")).not.toBeInTheDocument();
   expect(screen.queryByText("revisão 25")).not.toBeInTheDocument();
   expect(screen.queryByText("3 Fotos vinculadas")).not.toBeInTheDocument();
@@ -726,7 +776,7 @@ test("applies one DPI change and renders the authoritative projection returned b
     "600 DPI",
   );
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+  expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
 test("saves the visible revision and applies the authoritative saved projection", async () => {
@@ -761,8 +811,9 @@ test("saves the visible revision and applies the authoritative saved projection"
     />,
   );
 
+  const saveCommand = getApplicationCommand("Arquivo", "Salvar");
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    fireEvent.click(saveCommand);
     await Promise.resolve();
   });
 
@@ -777,7 +828,7 @@ test("saves the visible revision and applies the authoritative saved projection"
       onProjectionChange={onProjectionChange}
     />,
   );
-  expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+  expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {
@@ -840,8 +891,9 @@ test("shows the localized Project save failure", async () => {
     />,
   );
 
+  const saveCommand = getApplicationCommand("Arquivo", "Salvar");
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    fireEvent.click(saveCommand);
     await Promise.resolve();
   });
 

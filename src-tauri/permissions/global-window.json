@@ -6,15 +6,12 @@
       "commands": {
         "allow": [
           "complete_graphics_gate",
-          "create_project",
+          "show_new_project_window",
           "open_project",
           "recent_projects",
           "open_recent_project",
-          "startup_open_failure",
-          "validate_project_configuration",
-          "choose_provisional_decorative",
-          "release_provisional_decorative",
-          "clear_provisional_decoratives"
+          "show_project_failure_dialog",
+          "startup_open_failure"
         ],
         "deny": []
       }

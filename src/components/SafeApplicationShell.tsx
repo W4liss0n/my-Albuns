@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
+import { ActionButton, ApplicationHeader, InlineNotice } from "../ui";
 
 type SafeSurface = "welcome" | "settings" | "diagnostic";
 type SafeSettingsSection = "performance" | "photoshop";
@@ -15,51 +16,50 @@ export function SafeApplicationShell({
   const [surface, setSurface] = useState<SafeSurface>("welcome");
 
   return (
-    <main className="startup-surface">
-      <section className="startup-card safe-shell">
-        <div className="brand-lockup" aria-label="MyAlbuns">
-          <span className="brand-mark" aria-hidden="true">
-            M
-          </span>
-          <span>MyAlbuns</span>
-        </div>
-        <nav
-          className="safe-shell-navigation"
-          aria-label="Superfícies globais"
-        >
-          <SurfaceButton
-            active={surface === "welcome"}
-            onPress={() => setSurface("welcome")}
+    <main className="safe-application-shell">
+      <ApplicationHeader status="modo seguro" />
+      <div className="safe-application-shell__body">
+        <section className="startup-card safe-shell">
+          <nav
+            className="safe-shell-navigation"
+            aria-label="Superfícies globais"
           >
-            Boas-vindas
-          </SurfaceButton>
-          <SurfaceButton
-            active={surface === "settings"}
-            onPress={() => setSurface("settings")}
-          >
-            Configurações
-          </SurfaceButton>
-          <SurfaceButton
-            active={surface === "diagnostic"}
-            onPress={() => setSurface("diagnostic")}
-          >
-            Diagnóstico
-          </SurfaceButton>
-        </nav>
-        {surface === "welcome" && (
-          <WelcomeSurface
-            diagnostic={diagnostic}
-            onOpenDiagnostic={() => setSurface("diagnostic")}
-            onOpenSettings={() => setSurface("settings")}
-          />
-        )}
-        {surface === "settings" && (
-          <SettingsSurface onOpenDiagnostic={() => setSurface("diagnostic")} />
-        )}
-        {surface === "diagnostic" && (
-          <DiagnosticSurface diagnostic={diagnostic} />
-        )}
-      </section>
+            <SurfaceButton
+              active={surface === "welcome"}
+              onPress={() => setSurface("welcome")}
+            >
+              Boas-vindas
+            </SurfaceButton>
+            <SurfaceButton
+              active={surface === "settings"}
+              onPress={() => setSurface("settings")}
+            >
+              Configurações
+            </SurfaceButton>
+            <SurfaceButton
+              active={surface === "diagnostic"}
+              onPress={() => setSurface("diagnostic")}
+            >
+              Diagnóstico
+            </SurfaceButton>
+          </nav>
+          {surface === "welcome" && (
+            <WelcomeSurface
+              diagnostic={diagnostic}
+              onOpenDiagnostic={() => setSurface("diagnostic")}
+              onOpenSettings={() => setSurface("settings")}
+            />
+          )}
+          {surface === "settings" && (
+            <SettingsSurface
+              onOpenDiagnostic={() => setSurface("diagnostic")}
+            />
+          )}
+          {surface === "diagnostic" && (
+            <DiagnosticSurface diagnostic={diagnostic} />
+          )}
+        </section>
+      </div>
     </main>
   );
 }
@@ -74,13 +74,14 @@ function SurfaceButton({
   onPress(): void;
 }) {
   return (
-    <button
-      type="button"
+    <ActionButton
       aria-pressed={active}
+      density="compact"
       onClick={onPress}
+      variant={active ? "primary" : "quiet"}
     >
       {children}
-    </button>
+    </ActionButton>
   );
 }
 
@@ -103,25 +104,17 @@ function WelcomeSurface({
       </p>
       <p role="status">{diagnostic.reason}</p>
       <div className="safe-shell-actions">
-        <button
-          className="safe-shell-action"
-          type="button"
-          onClick={onOpenSettings}
-        >
+        <ActionButton onClick={onOpenSettings}>
           Abrir Configurações
-        </button>
-        <button
-          className="safe-shell-action"
-          type="button"
-          onClick={onOpenDiagnostic}
-        >
+        </ActionButton>
+        <ActionButton onClick={onOpenDiagnostic}>
           Ver diagnóstico
-        </button>
+        </ActionButton>
       </div>
-      <p className="support-note">
+      <InlineNotice>
         Somente o editor está bloqueado. Estas superfícies globais continuam
         funcionando sem iniciar uma Sessão do Projeto ou um Canvas.
-      </p>
+      </InlineNotice>
     </div>
   );
 }
@@ -167,13 +160,9 @@ function SettingsSurface({
             O editor exige WebGL2 com aceleração por hardware. Cache e outras
             preferências globais permanecem fora da Sessão do Projeto.
           </p>
-          <button
-            className="safe-shell-action"
-            type="button"
-            onClick={onOpenDiagnostic}
-          >
+          <ActionButton onClick={onOpenDiagnostic}>
             Ver diagnóstico gráfico
-          </button>
+          </ActionButton>
         </section>
       ) : (
         <section
@@ -186,9 +175,9 @@ function SettingsSurface({
             A integração com Photoshop é uma preferência global e não depende
             da inicialização do editor.
           </p>
-          <p className="support-note">
+          <InlineNotice>
             Nenhuma instalação foi consultada por este diagnóstico gráfico.
-          </p>
+          </InlineNotice>
         </section>
       )}
       <p className="safe-shell-scope-note">
@@ -258,10 +247,10 @@ function DiagnosticSurface({
           </>
         )}
       </dl>
-      <p className="support-note">
+      <InlineNotice tone="warning">
         Reative a aceleração por hardware para abrir o editor com desempenho e
         composição visual consistentes.
-      </p>
+      </InlineNotice>
     </div>
   );
 }

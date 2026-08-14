@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Image as ImageIcon, X } from "lucide-react";
 
 import type {
   ProjectLaunchFailure,
@@ -18,6 +19,7 @@ import {
   setOverlayImage,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
+import { ActionButton, AppIcon, InlineNotice } from "../ui";
 import { PersonalizationPreview } from "./PersonalizationPreview";
 
 interface PersonalizationStepProps {
@@ -45,6 +47,7 @@ export function PersonalizationStep({
   const highlightedScope =
     personalization.hoveredScope ?? personalization.fixedScope;
   const selectedOverlay = overlayForFixedScope(personalization);
+  const scopeLabel = personalizationScopeLabel(personalization.fixedScope);
   const chooseBackground = async () => {
     setPickerFailure(null);
     const outcome = await onChooseDecorative();
@@ -67,6 +70,13 @@ export function PersonalizationStep({
   return (
     <div className="new-project-content new-project-personalization">
       <div className="new-project-preview">
+        <div className="new-project-personalization-heading">
+          <strong>{scopeLabel}</strong>
+          <span>
+            Lâmina aberta {formatPreviewMeasurement(widthUm)} ×{" "}
+            {formatPreviewMeasurement(heightUm)} mm
+          </span>
+        </div>
         <div
           aria-label="Prévia do formato da Lâmina"
           className="new-project-preview-stage"
@@ -110,29 +120,58 @@ export function PersonalizationStep({
             ))}
           </div>
         </div>
+        <p className="new-project-preview-caption">
+          Background e Overlay acompanham o escopo selecionado. Clique em uma
+          Página para editar somente aquele Lado.
+        </p>
       </div>
       <div className="new-project-visual-values">
+        <p className="new-project-scope-label">{scopeLabel}</p>
         <section className="new-project-value-group">
           <h2>Background</h2>
-          <label className="new-project-field">
-            <span>Cor do Background</span>
-            <input
-              onChange={(event) =>
-                onChange(
-                  setBackgroundColor(personalization, event.target.value),
-                )
-              }
-              type="color"
-              value={backgroundColor}
-            />
-          </label>
-          <button
-            aria-label="Escolher imagem de Background"
-            onClick={() => void chooseBackground()}
-            type="button"
+          <div
+            aria-label="Cores de Background"
+            className="new-project-color-swatches"
+            role="group"
           >
-            Escolher imagem…
-          </button>
+            {BACKGROUND_SWATCHES.map((color) => (
+              <button
+                aria-label={`Usar Background ${color}`}
+                aria-pressed={
+                  selectedBackground.kind === "color" &&
+                  selectedBackground.rgb.toLowerCase() === color.toLowerCase()
+                }
+                key={color}
+                onClick={() =>
+                  onChange(setBackgroundColor(personalization, color))
+                }
+                style={{ background: color }}
+                type="button"
+              />
+            ))}
+            <label className="new-project-color-picker">
+              <span className="ui-visually-hidden">Cor do Background</span>
+              <input
+                aria-label="Cor do Background"
+                onChange={(event) =>
+                  onChange(
+                    setBackgroundColor(personalization, event.target.value),
+                  )
+                }
+                type="color"
+                value={backgroundColor}
+              />
+            </label>
+          </div>
+          <ActionButton
+            aria-label="Escolher imagem de Background"
+            className="new-project-image-action"
+            density="compact"
+            onClick={() => void chooseBackground()}
+          >
+            <AppIcon icon={ImageIcon} size={14} />
+            Usar imagem…
+          </ActionButton>
           {selectedBackground.kind === "image" ? (
             <p className="new-project-selection-name">
               {selectedBackground.selection.displayName}
@@ -141,33 +180,40 @@ export function PersonalizationStep({
         </section>
         <section className="new-project-value-group">
           <h2>Overlay</h2>
-          <button
+          <ActionButton
             aria-label="Escolher imagem de Overlay"
+            className="new-project-image-action new-project-image-action--dashed"
+            density="compact"
             onClick={() => void chooseOverlay()}
-            type="button"
           >
+            <AppIcon icon={ImageIcon} size={14} />
             Escolher imagem…
-          </button>
+          </ActionButton>
           {selectedOverlay ? (
             <>
               <p className="new-project-selection-name">
                 {selectedOverlay.selection.displayName}
               </p>
-              <button
+              <ActionButton
+                aria-label="Remover Overlay"
+                density="compact"
                 onClick={() => onChange(clearOverlay(personalization))}
-                type="button"
+                variant="quiet"
               >
-                Remover Overlay
-              </button>
+                <AppIcon icon={X} size={12} />
+                Remover
+              </ActionButton>
             </>
           ) : (
             <p className="new-project-native-note">Sem Overlay</p>
           )}
         </section>
         <section className="new-project-value-group">
-          <h2>Padrão dos Frames</h2>
+          <p className="new-project-group-eyebrow">Todas as Lâminas</p>
+          <h2>Frames</h2>
           <label className="new-project-toggle">
             <input
+              aria-label="Borda dos Frames"
               checked={personalization.frameBorder.kind === "solid"}
               onChange={(event) =>
                 onChange(
@@ -179,7 +225,7 @@ export function PersonalizationStep({
               }
               type="checkbox"
             />
-            <span>Borda dos Frames</span>
+            <span>Borda padrão</span>
           </label>
           {personalization.frameBorder.kind === "solid" ? (
             <div className="new-project-frame-border-fields">
@@ -223,20 +269,52 @@ export function PersonalizationStep({
           Nome e Localização serão escolhidos no diálogo do Windows ao criar.
         </p>
         {pickerFailure ? (
-          <section className="global-open-error" role="alert">
-            <h2>Não foi possível escolher a Imagem decorativa</h2>
+          <InlineNotice
+            role="alert"
+            title="Não foi possível escolher a Imagem decorativa"
+            tone="error"
+          >
             <p>{pickerFailure.message}</p>
             {pickerFailure.action ? <p>{pickerFailure.action}</p> : null}
-          </section>
+          </InlineNotice>
         ) : null}
         {failure ? (
-          <section className="global-open-error" role="alert">
-            <h2>Não foi possível criar o Projeto</h2>
+          <InlineNotice
+            role="alert"
+            title="Não foi possível criar o Projeto"
+            tone="error"
+          >
             <p>{failure.message}</p>
             {failure.action ? <p>{failure.action}</p> : null}
-          </section>
+          </InlineNotice>
         ) : null}
       </div>
     </div>
   );
+}
+
+const BACKGROUND_SWATCHES = [
+  "#ffffff",
+  "#f7f5f0",
+  "#eee6d8",
+  "#d9dbd4",
+  "#2c2924",
+  "#1d2a3a",
+] as const;
+
+const previewMeasurementFormatter = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 2,
+  useGrouping: false,
+});
+
+function personalizationScopeLabel(
+  scope: NewProjectPersonalizationDraft["fixedScope"],
+) {
+  if (scope === "left") return "Página esquerda";
+  if (scope === "right") return "Página direita";
+  return "Ambos os lados";
+}
+
+function formatPreviewMeasurement(micrometers: number) {
+  return previewMeasurementFormatter.format(micrometers / 1_000);
 }

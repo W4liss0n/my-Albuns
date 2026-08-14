@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "react-aria-components";
 
 import type {
   ExportPort,
@@ -7,13 +6,14 @@ import type {
   MediaPreviewDemand,
   ProjectWindowPort,
 } from "../application/projectPorts";
+import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { ExportPreviewControl } from "./ExportPreviewControl";
 import { InspectorPanel } from "./InspectorPanel";
+import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { MediaPanel } from "./MediaPanel";
-import { ProjectCloseDialog } from "./ProjectCloseDialog";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -21,9 +21,13 @@ import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
 } from "./workspacePanelLayout";
+import { ApplicationHeader } from "../ui";
+
+type OpenApplicationMenu = "edit" | "file" | null;
 
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
+  projectDialogPort: ProjectDialogPort;
   exportPort: ExportPort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
@@ -35,6 +39,7 @@ interface ProjectWorkspaceProps {
 
 export function ProjectWorkspace({
   projection,
+  projectDialogPort,
   exportPort,
   projectWindowPort,
   runProjectMutation,
@@ -44,7 +49,7 @@ export function ProjectWorkspace({
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
-  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<OpenApplicationMenu>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
@@ -91,13 +96,14 @@ export function ProjectWorkspace({
     setCloseMessage(value);
   }, []);
   const projectClose = useProjectCloseController({
+    projectDialogPort,
     projectWindowPort,
     onProjectionChange,
     onError: reportCloseError,
   });
   useEffect(() => {
     if (projectClose.interactionBlocked) {
-      setFileMenuOpen(false);
+      setOpenMenu(null);
     }
   }, [projectClose.interactionBlocked]);
   const controller = useProjectEditorController({
@@ -116,90 +122,166 @@ export function ProjectWorkspace({
     displayedPhotoPanX,
     photoCount,
   } = controller;
+  const projectMetadata = projectAlbumMetadata(projection);
 
   return (
     <div className="app-shell">
-      <header className="titlebar">
+      <ApplicationHeader
+        context={projection.state.projectName}
+        metadata={projectMetadata}
+        status={projection.state.dirty ? "alterações não salvas" : "salvo"}
+      />
+
+      <div className="commandbar">
         <nav className="app-menu" aria-label="Menu principal">
           <div className="app-menu-entry">
             <button
-              aria-expanded={fileMenuOpen}
+              aria-expanded={openMenu === "file"}
               aria-haspopup="menu"
+              disabled={
+                Boolean(busy) ||
+                exportActive ||
+                projectClose.interactionBlocked
+              }
               type="button"
-              onClick={() => setFileMenuOpen((open) => !open)}
+              onClick={() =>
+                setOpenMenu((current) =>
+                  current === "file" ? null : "file",
+                )
+              }
             >
               Arquivo
             </button>
-            {fileMenuOpen && (
+            {openMenu === "file" && (
               <div className="app-menu-popup" role="menu">
                 <button
+                  aria-label="Salvar"
+                  disabled={
+                    Boolean(busy) ||
+                    exportActive ||
+                    projectClose.interactionBlocked
+                  }
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    void controller.save();
+                  }}
+                >
+                  <span>Salvar</span>
+                  <span className="app-menu-shortcut">Ctrl+S</span>
+                </button>
+                <span className="app-menu-separator" />
+                <button
+                  aria-label="Fechar Projeto"
                   disabled={projectClose.interactionBlocked}
                   role="menuitem"
                   type="button"
                   onClick={() => {
-                    setFileMenuOpen(false);
+                    setOpenMenu(null);
                     void projectClose.requestClose();
                   }}
                 >
-                  Fechar Projeto
+                  <span>Fechar Projeto</span>
+                  <span className="app-menu-shortcut">Ctrl+W</span>
                 </button>
               </div>
             )}
           </div>
-          <button type="button">Editar</button>
-          <button type="button">Lâmina</button>
-          <button type="button">Exibir</button>
-          <button type="button">Ferramentas</button>
-          <button type="button">Ajuda</button>
-        </nav>
-      </header>
-
-      <div className="commandbar">
-        <div className="command-group">
-          <Button
-            className="icon-command"
-            aria-label="Salvar"
-            isDisabled={
+          <div className="app-menu-entry">
+            <button
+              aria-expanded={openMenu === "edit"}
+              aria-haspopup="menu"
+              disabled={
+                Boolean(busy) ||
+                exportActive ||
+                projectClose.interactionBlocked
+              }
+              type="button"
+              onClick={() =>
+                setOpenMenu((current) =>
+                  current === "edit" ? null : "edit",
+                )
+              }
+            >
+              Editar
+            </button>
+            {openMenu === "edit" && (
+              <div className="app-menu-popup" role="menu">
+                <button
+                  aria-label="Desfazer"
+                  disabled={
+                    !projection.state.canUndo ||
+                    Boolean(busy) ||
+                    exportActive ||
+                    projectClose.interactionBlocked
+                  }
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    void controller.undo();
+                  }}
+                >
+                  <span>Desfazer</span>
+                  <span className="app-menu-shortcut">Ctrl+Z</span>
+                </button>
+                <button
+                  aria-label="Refazer"
+                  disabled={
+                    !projection.state.canRedo ||
+                    Boolean(busy) ||
+                    exportActive ||
+                    projectClose.interactionBlocked
+                  }
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    void controller.redo();
+                  }}
+                >
+                  <span>Refazer</span>
+                  <span className="app-menu-shortcut">Ctrl+Shift+Z</span>
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            disabled={
               Boolean(busy) || exportActive || projectClose.interactionBlocked
             }
-            onPress={controller.save}
+            type="button"
           >
-            ⇩
-          </Button>
-          <Button
-            className="icon-command"
-            aria-label="Desfazer"
-            isDisabled={
-              !projection.state.canUndo ||
-              Boolean(busy) ||
-              exportActive ||
-              projectClose.interactionBlocked
+            Inserir
+          </button>
+          <button
+            disabled={
+              Boolean(busy) || exportActive || projectClose.interactionBlocked
             }
-            onPress={controller.undo}
+            type="button"
           >
-            ↶
-          </Button>
-          <Button
-            className="icon-command"
-            aria-label="Refazer"
-            isDisabled={
-              !projection.state.canRedo ||
-              Boolean(busy) ||
-              exportActive ||
-              projectClose.interactionBlocked
+            Lâmina
+          </button>
+          <button
+            disabled={
+              Boolean(busy) || exportActive || projectClose.interactionBlocked
             }
-            onPress={controller.redo}
+            type="button"
           >
-            ↷
-          </Button>
-        </div>
-        <span className="command-divider" />
-        <div className="tool-active">
-          <span aria-hidden="true">↖</span>
-          <span>Selecionar</span>
-        </div>
-        <div className="command-spacer" />
+            Visualizar
+          </button>
+          <button
+            disabled={
+              Boolean(busy) || exportActive || projectClose.interactionBlocked
+            }
+            type="button"
+          >
+            Ajuda
+          </button>
+        </nav>
         <ExportPreviewControl
+          dialogPort={projectDialogPort}
           disabled={Boolean(busy) || projectClose.interactionBlocked}
           exportPort={exportPort}
           onActiveChange={setExportActive}
@@ -298,12 +380,29 @@ export function ProjectWorkspace({
         </div>
       )}
 
-      {projectClose.confirmationVisible && (
-        <ProjectCloseDialog
-          busy={projectClose.resolving}
-          onChoose={(choice) => void projectClose.resolveClose(choice)}
-        />
-      )}
     </div>
   );
+}
+
+const projectMetadataFormatter = new Intl.NumberFormat("pt-BR", {
+  maximumFractionDigits: 2,
+  useGrouping: false,
+});
+
+function projectAlbumMetadata(projection: EditorProjection) {
+  const { album, document } = projection.state;
+  const width = projectMetadataFormatter.format(
+    micrometersToDisplayUnits(
+      document.sheetWidthUm / 2,
+      document.displayUnit,
+    ),
+  );
+  const height = projectMetadataFormatter.format(
+    micrometersToDisplayUnits(
+      document.sheetHeightUm,
+      document.displayUnit,
+    ),
+  );
+  const sheetLabel = album.sheets.length === 1 ? "Lâmina" : "Lâminas";
+  return `${width}×${height} ${document.displayUnit} · ${album.sheets.length} ${sheetLabel}`;
 }

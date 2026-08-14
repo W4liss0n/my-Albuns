@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Image as ImageIcon,
+  Search,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import type {
   MediaPreview,
@@ -10,6 +15,7 @@ import type {
   MediaKind,
   MediaUsage,
 } from "../domain/project";
+import { AppIcon } from "../ui";
 import "./MediaPanel.css";
 
 export interface MediaPanelProps {
@@ -93,27 +99,33 @@ export function MediaPanel({
       aria-label="Painel de imagens"
     >
       <div className="media-panel-head">
-        <div className="media-tabs">
+        <div className="media-tabs" aria-label="Tipo de recurso">
           <button
+            aria-label="Fotos"
             className={activeMediaKind === "photo" ? "active" : undefined}
             type="button"
             onClick={() => setActiveMediaKind("photo")}
           >
-            Fotos
+            <AppIcon icon={ImageIcon} size={16} />
           </button>
           <button
+            aria-label="Decorativos"
             className={
               activeMediaKind === "decorative" ? "active" : undefined
             }
             type="button"
             onClick={() => setActiveMediaKind("decorative")}
           >
-            Decorativos
+            <AppIcon icon={SlidersHorizontal} size={16} />
           </button>
         </div>
+        <span className="media-kind-chip">
+          {activeMediaKind === "photo" ? "Todas" : "Decorativos"}
+          <small>{activeMediaItems.length}</small>
+        </span>
         <label className="media-search">
-          <span aria-hidden="true">⌕</span>
-          <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
+          <AppIcon icon={Search} size={12} />
+          <input aria-label="Buscar imagens" placeholder="Buscar…" />
         </label>
       </div>
       <div className="media-strip" ref={stripRef}>
@@ -170,14 +182,6 @@ export function MediaPanel({
               </span>
             </button>
           ))}
-        {activeMediaKind === "photo" && (
-          <div className="media-tip">
-            <kbd>2×</kbd>
-            <span>
-              Preenche o placeholder mais à esquerda da Lâmina centralizada
-            </span>
-          </div>
-        )}
       </div>
     </section>
   );

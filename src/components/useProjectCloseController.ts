@@ -1,5 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+} from "../application/projectDialogPort";
 import {
   ProjectCloseError,
   type ProjectCloseChoice,
@@ -7,9 +11,16 @@ import {
 } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
 
-type ClosePhase = "idle" | "requesting" | "deciding" | "resolving" | "terminal";
+type ClosePhase =
+  | "idle"
+  | "requesting"
+  | "deciding"
+  | "resolving"
+  | "failed"
+  | "terminal";
 
 interface ProjectCloseControllerOptions {
+  projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
   onProjectionChange(projection: EditorProjection): void;
   onError(message: string): void;
@@ -23,87 +34,151 @@ function closeErrorMessage(error: unknown) {
 }
 
 export function useProjectCloseController({
+  projectDialogPort,
   projectWindowPort,
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
   const [phase, setPhase] = useState<ClosePhase>("idle");
+  const phaseRef = useRef<ClosePhase>("idle");
+  const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
+    () => undefined,
+  );
 
-  useEffect(() => {
-    let active = true;
-    let unsubscribe: (() => void) | undefined;
+  const transition = useCallback((nextPhase: ClosePhase) => {
+    phaseRef.current = nextPhase;
+    setPhase(nextPhase);
+  }, []);
 
-    projectWindowPort
-      .onCloseRequested(() => {
-        if (active) {
-          setPhase((current) =>
-            current === "terminal" || current === "resolving"
-              ? current
-              : "deciding",
-          );
-        }
-      })
-      .then((registeredUnsubscribe) => {
-        if (active) {
-          unsubscribe = registeredUnsubscribe;
-        } else {
-          registeredUnsubscribe();
-        }
-      })
+  const presentConfirmation = useCallback(() => {
+    transition("deciding");
+    void projectDialogPort
+      .present({ busy: false, kind: "projectCloseConfirmation" })
       .catch((error: unknown) => {
-        if (active) {
-          onError(closeErrorMessage(error));
-        }
+        if (phaseRef.current === "deciding") transition("idle");
+        onError(closeErrorMessage(error));
       });
-
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [onError, projectWindowPort]);
+  }, [onError, projectDialogPort, transition]);
 
   const requestClose = useCallback(async () => {
-    if (phase !== "idle") return;
-    setPhase("requesting");
+    if (phaseRef.current !== "idle") return;
+    transition("requesting");
     try {
       const outcome = await projectWindowPort.requestClose();
-      setPhase(
-        outcome.kind === "confirmationRequired" ? "deciding" : "terminal",
-      );
+      if (outcome.kind === "confirmationRequired") {
+        presentConfirmation();
+      } else {
+        transition("terminal");
+      }
     } catch (error: unknown) {
-      setPhase("idle");
+      transition("idle");
       onError(closeErrorMessage(error));
     }
-  }, [onError, phase, projectWindowPort]);
+  }, [onError, presentConfirmation, projectWindowPort, transition]);
 
   const resolveClose = useCallback(
     async (choice: ProjectCloseChoice) => {
-      if (phase !== "deciding") return;
-      setPhase("resolving");
+      if (phaseRef.current !== "deciding") return;
+      transition("resolving");
+      void projectDialogPort
+        .present({ busy: true, kind: "projectCloseConfirmation" })
+        .catch((error: unknown) => onError(closeErrorMessage(error)));
+
       try {
         const resolution = await projectWindowPort.resolveClose(choice);
         if (resolution.kind === "cancelled") {
           onProjectionChange(resolution.projection);
-          setPhase("idle");
+          transition("idle");
+          void projectDialogPort.dismiss().catch(() => undefined);
           return;
         }
-        setPhase("terminal");
+        transition("terminal");
       } catch (error: unknown) {
+        const message = closeErrorMessage(error);
         const indeterminate =
           error instanceof ProjectCloseError &&
           error.code === "save_state_indeterminate";
-        setPhase(indeterminate ? "terminal" : "idle");
-        onError(closeErrorMessage(error));
+        transition(indeterminate ? "terminal" : "failed");
+        void projectDialogPort
+          .present({ kind: "projectCloseFailure", message })
+          .catch(() => onError(message));
       }
     },
-    [onError, onProjectionChange, phase, projectWindowPort],
+    [
+      onError,
+      onProjectionChange,
+      projectDialogPort,
+      projectWindowPort,
+      transition,
+    ],
   );
 
+  dialogActionListener.current = (action) => {
+    switch (action) {
+      case "cancelProjectClose":
+        void resolveClose("cancel");
+        break;
+      case "discardAndClose":
+        void resolveClose("discardAndClose");
+        break;
+      case "saveAndClose":
+        void resolveClose("saveAndClose");
+        break;
+      case "dismissProjectCloseFailure":
+        void projectDialogPort.dismiss().catch(() => undefined);
+        if (phaseRef.current === "failed") transition("idle");
+        break;
+      default:
+        break;
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void projectDialogPort
+      .onAction((action) => dialogActionListener.current(action))
+      .then((registeredUnsubscribe) => {
+        if (active) unsubscribe = registeredUnsubscribe;
+        else registeredUnsubscribe();
+      })
+      .catch((error: unknown) => {
+        if (active) onError(closeErrorMessage(error));
+      });
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, [onError, projectDialogPort]);
+
+  useEffect(() => {
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void projectWindowPort
+      .onCloseRequested(() => {
+        if (
+          active &&
+          phaseRef.current !== "terminal" &&
+          phaseRef.current !== "resolving"
+        ) {
+          presentConfirmation();
+        }
+      })
+      .then((registeredUnsubscribe) => {
+        if (active) unsubscribe = registeredUnsubscribe;
+        else registeredUnsubscribe();
+      })
+      .catch((error: unknown) => {
+        if (active) onError(closeErrorMessage(error));
+      });
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, [onError, presentConfirmation, projectWindowPort]);
+
   return {
-    confirmationVisible: phase === "deciding" || phase === "resolving",
     interactionBlocked: phase !== "idle",
-    resolving: phase === "resolving",
     requestClose,
-    resolveClose,
   };
 }

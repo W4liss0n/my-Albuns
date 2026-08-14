@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dialog-progress",
+  "description": "Minimum permissions for the owned non-closable progress dialog",
+  "local": true,
+  "windows": ["dialog-opening-progress"],
+  "permissions": ["core:window:allow-start-dragging"]
+}

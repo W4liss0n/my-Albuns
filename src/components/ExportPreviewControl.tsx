@@ -1,16 +1,21 @@
-import type { ReactNode } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Dialog, Modal, ModalOverlay } from "react-aria-components";
 
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+  ProjectDialogState,
+} from "../application/projectDialogPort";
 import type {
   ExportAttempt,
   ExportPort,
   ExportProgressEvent,
   ExportProgressStage,
 } from "../application/projectPorts";
+import { ActionButton, InlineNotice } from "../ui";
 import "./ExportPreviewControl.css";
 
 interface ExportPreviewControlProps {
+  dialogPort: ProjectDialogPort;
   disabled?: boolean;
   exportPort: ExportPort;
   onActiveChange?(active: boolean): void;
@@ -24,6 +29,7 @@ interface ExportNotification {
 }
 
 export function ExportPreviewControl({
+  dialogPort,
   disabled = false,
   exportPort,
   onActiveChange,
@@ -33,14 +39,6 @@ export function ExportPreviewControl({
   const [phase, setPhase] = useState<
     "idle" | "starting" | "running" | "cancelled" | "failed"
   >("idle");
-  const [progress, setProgress] = useState<
-    Extract<ExportProgressEvent, { event: "progress" }> | undefined
-  >();
-  const [cancellable, setCancellable] = useState(false);
-  const [cancelRequested, setCancelRequested] = useState(false);
-  const [failureMessage, setFailureMessage] = useState<string | null>(
-    null,
-  );
   const [notification, setNotification] =
     useState<ExportNotification | null>(null);
   const nextAttemptId = useRef(0);
@@ -56,20 +54,60 @@ export function ExportPreviewControl({
   >(undefined);
   const interactionActive = useRef(false);
   const notificationTimer = useRef<number | undefined>(undefined);
+  const lastDialogState = useRef<ProjectDialogState | undefined>(undefined);
+  const dialogPresentationFailed = useRef(false);
+  const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
+    () => undefined,
+  );
+
+  dialogActionListener.current = (action) => {
+    switch (action) {
+      case "cancelExport":
+        requestCancellation();
+        break;
+      case "retryExport":
+        retryExport();
+        break;
+      case "dismissExport":
+        dismissFeedback();
+        break;
+      default:
+        break;
+    }
+  };
+
+  useLayoutEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void dialogPort
+      .onAction((action) => dialogActionListener.current(action))
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+        } else {
+          dispose();
+        }
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [dialogPort]);
 
   useLayoutEffect(() => {
     setPhase("idle");
-    setProgress(undefined);
-    setCancellable(false);
-    setCancelRequested(false);
-    setFailureMessage(null);
     clearNotification();
+    lastDialogState.current = undefined;
+    dialogPresentationFailed.current = false;
+    void dialogPort.dismiss().catch(() => undefined);
 
     return () => {
       retireActiveAttempt();
       clearNotificationTimer();
+      lastDialogState.current = undefined;
+      void dialogPort.dismiss().catch(() => undefined);
     };
-  }, [projectId]);
+  }, [dialogPort, projectId]);
 
   function startExport() {
     if (disabled || !sheetId || currentAttemptId.current !== null) {
@@ -80,11 +118,8 @@ export function ExportPreviewControl({
     currentAttemptId.current = attemptId;
     beginInteraction();
     setPhase("starting");
-    setProgress(undefined);
-    setCancellable(false);
     clearNotification();
-    setCancelRequested(false);
-    setFailureMessage(null);
+    dialogPresentationFailed.current = false;
 
     let attempt: ExportAttempt;
     try {
@@ -95,13 +130,21 @@ export function ExportPreviewControl({
 
         if (event.event === "started") {
           startedAttemptId.current = attemptId;
-          setCancellable(event.cancellable);
           setPhase("running");
+          presentDialog({
+            cancelRequested: false,
+            cancellable: event.cancellable,
+            kind: "exportProgress",
+            progress: {
+              kind: "indeterminate",
+              note: "sem estimativa de tempo",
+              status: "Iniciando a Exportação",
+            },
+          });
           return;
         }
 
-        setCancellable(event.cancellable);
-        setProgress(event);
+        presentDialog(progressDialogState(event));
       });
     } catch (error: unknown) {
       finishAttemptWithFailure(attemptId, error);
@@ -121,13 +164,23 @@ export function ExportPreviewControl({
     void attempt.completion.then(
       (outcome) => {
         const finished = finishActiveAttempt(attemptId);
-        if (!finished) {
-          return;
-        }
+        if (!finished) return;
 
         if (outcome.status === "cancelled") {
           if (finished.started) {
+            if (dialogPresentationFailed.current) {
+              setPhase("idle");
+              lastDialogState.current = undefined;
+              endInteraction();
+              return;
+            }
             setPhase("cancelled");
+            presentDialog({
+              cancelled: true,
+              kind: "exportFailure",
+              message: "A Exportação foi cancelada.",
+              retryDisabled: false,
+            });
           } else {
             setPhase("idle");
             endInteraction();
@@ -137,37 +190,66 @@ export function ExportPreviewControl({
 
         setPhase("idle");
         endInteraction();
+        lastDialogState.current = undefined;
+        void dialogPort.dismiss().catch(() => undefined);
         showNotification({
           kind: "success",
           message: "Exportação concluída",
         });
       },
-      (error: unknown) => {
-        finishAttemptWithFailure(attemptId, error);
-      },
+      (error: unknown) => finishAttemptWithFailure(attemptId, error),
     );
+  }
+
+  function retryExport() {
+    if (phase !== "cancelled" && phase !== "failed") return;
+    const current = lastDialogState.current;
+    if (current?.kind === "exportFailure") {
+      presentDialog({ ...current, retryDisabled: true });
+    }
+    startExport();
   }
 
   function requestCancellation() {
     const current = activeAttempt.current;
-    if (!current || current.cancelRequested) {
-      return;
-    }
+    if (!current || current.cancelRequested) return;
 
     current.cancelRequested = true;
-    setCancelRequested(true);
+    const dialogState = lastDialogState.current;
+    if (dialogState?.kind === "exportProgress") {
+      presentDialog({ ...dialogState, cancelRequested: true });
+    }
     void current.attempt.cancel().catch(() => undefined);
   }
 
   function dismissFeedback() {
+    if (phase !== "cancelled" && phase !== "failed") return;
     setPhase("idle");
+    lastDialogState.current = undefined;
+    void dialogPort.dismiss().catch(() => undefined);
     endInteraction();
   }
 
+  function presentDialog(state: ProjectDialogState) {
+    lastDialogState.current = state;
+    void dialogPort.present(state).catch((error: unknown) => {
+      if (dialogPresentationFailed.current) return;
+      dialogPresentationFailed.current = true;
+      showNotification({ kind: "error", message: messageFromError(error) });
+      const current = activeAttempt.current;
+      if (current && !current.cancelRequested) {
+        current.cancelRequested = true;
+        void current.attempt.cancel().catch(() => undefined);
+      } else if (!current) {
+        setPhase("idle");
+        lastDialogState.current = undefined;
+        endInteraction();
+      }
+    });
+  }
+
   function finishActiveAttempt(attemptId: number) {
-    if (currentAttemptId.current !== attemptId) {
-      return false;
-    }
+    if (currentAttemptId.current !== attemptId) return false;
 
     currentAttemptId.current = null;
     activeAttempt.current = undefined;
@@ -178,14 +260,23 @@ export function ExportPreviewControl({
 
   function finishAttemptWithFailure(attemptId: number, error: unknown) {
     const finished = finishActiveAttempt(attemptId);
-    if (!finished) {
-      return;
-    }
+    if (!finished) return;
 
     const message = messageFromError(error);
     if (finished.started) {
-      setFailureMessage(message);
+      if (dialogPresentationFailed.current) {
+        setPhase("idle");
+        lastDialogState.current = undefined;
+        endInteraction();
+        return;
+      }
       setPhase("failed");
+      presentDialog({
+        cancelled: false,
+        kind: "exportFailure",
+        message,
+        retryDisabled: false,
+      });
       return;
     }
 
@@ -208,20 +299,14 @@ export function ExportPreviewControl({
   }
 
   function beginInteraction() {
-    if (interactionActive.current) {
-      return;
-    }
-
+    if (interactionActive.current) return;
     interactionActive.current = true;
     activeChangeListener.current = onActiveChange;
     onActiveChange?.(true);
   }
 
   function endInteraction() {
-    if (!interactionActive.current) {
-      return;
-    }
-
+    if (!interactionActive.current) return;
     interactionActive.current = false;
     const notify = activeChangeListener.current;
     activeChangeListener.current = undefined;
@@ -251,115 +336,55 @@ export function ExportPreviewControl({
 
   return (
     <div className="export-preview-control">
-      <button
+      <ActionButton
+        aria-label="Exportar Lâmina"
         className="export-preview-trigger"
-        type="button"
         disabled={disabled || !sheetId || phase !== "idle"}
         onClick={startExport}
+        variant="primary"
       >
-        Exportar Lâmina
-      </button>
+        Exportar
+      </ActionButton>
 
-      {phase === "running" && (
-        <ExportModal title="Exportando">
-          {progress ? (
-            <>
-              <p aria-live="polite">
-                {progressStageLabel(progress.stage)}
-              </p>
-              {progress.units.kind === "measured" ? (
-                <>
-                  <progress
-                    className="export-preview-progress"
-                    aria-label="Progresso da Exportação"
-                    aria-valuemax={progress.units.totalUnits}
-                    aria-valuenow={progress.units.completedUnits}
-                    max={progress.units.totalUnits}
-                    value={progress.units.completedUnits}
-                  />
-                  <p className="export-preview-count">
-                    {progress.units.completedUnits} de{" "}
-                    {progress.units.totalUnits}
-                  </p>
-                </>
-              ) : (
-                <progress
-                  className="export-preview-progress"
-                  aria-label="Progresso da Exportação"
-                />
-              )}
-            </>
-          ) : (
-            <>
-              <p aria-live="polite">Iniciando a Exportação</p>
-              <progress
-                className="export-preview-progress"
-                aria-label="Progresso da Exportação"
-              />
-            </>
-          )}
-          {cancellable && (
-            <div className="export-preview-actions">
-              <button
-                type="button"
-                disabled={cancelRequested}
-                onClick={requestCancellation}
-              >
-                {cancelRequested
-                  ? "Cancelando…"
-                  : "Cancelar Exportação"}
-              </button>
-            </div>
-          )}
-        </ExportModal>
-      )}
-
-      {(phase === "cancelled" || phase === "failed") && (
-        <ExportModal
-          title={
-            phase === "cancelled"
-              ? "Exportação cancelada"
-              : "Exportação não concluída"
-          }
-        >
-          <p>
-            {phase === "cancelled"
-              ? "A Exportação foi cancelada."
-              : failureMessage ??
-                "Não foi possível exportar a prova."}
-          </p>
-          <div className="export-preview-actions">
-            <button
-              className="export-preview-action-primary"
-              type="button"
-              disabled={disabled}
-              onClick={startExport}
-            >
-              Tentar novamente
-            </button>
-            <button type="button" onClick={dismissFeedback}>
-              Fechar
-            </button>
-          </div>
-        </ExportModal>
-      )}
-
-      {notification && (
-        <div
-          className={`export-preview-notification export-preview-notification-${notification.kind}`}
+      {notification ? (
+        <InlineNotice
+          className="export-preview-notification"
           role={notification.kind === "error" ? "alert" : "status"}
+          tone={notification.kind}
         >
-          {notification.message}
-        </div>
-      )}
+          <p>{notification.message}</p>
+        </InlineNotice>
+      ) : null}
     </div>
   );
 }
 
+function progressDialogState(
+  event: Extract<ExportProgressEvent, { event: "progress" }>,
+): ProjectDialogState {
+  const status = progressStageLabel(event.stage);
+  return {
+    cancelRequested: false,
+    cancellable: event.cancellable,
+    kind: "exportProgress",
+    progress:
+      event.units.kind === "measured"
+        ? {
+            completed: event.units.completedUnits,
+            kind: "determinate",
+            status,
+            total: event.units.totalUnits,
+          }
+        : {
+            kind: "indeterminate",
+            note: "sem estimativa de tempo",
+            status,
+          },
+  };
+}
+
 function messageFromError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
+  if (error instanceof Error) return error.message;
   if (
     typeof error === "object" &&
     error !== null &&
@@ -369,29 +394,6 @@ function messageFromError(error: unknown) {
     return error.message;
   }
   return "Não foi possível exportar a prova.";
-}
-
-function ExportModal({
-  children,
-  title,
-}: {
-  children: ReactNode;
-  title: string;
-}) {
-  return (
-    <ModalOverlay
-      className="export-preview-backdrop"
-      isKeyboardDismissDisabled
-      isOpen
-    >
-      <Modal className="export-preview-modal">
-        <Dialog aria-label={title} className="export-preview-dialog">
-          <h2>{title}</h2>
-          {children}
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
-  );
 }
 
 function progressStageLabel(stage: ExportProgressStage) {

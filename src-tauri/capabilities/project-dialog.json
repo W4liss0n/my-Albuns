@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "project-dialog",
+  "description": "Minimum permissions for the owned Project dialog window",
+  "local": true,
+  "windows": ["project-dialog"],
+  "permissions": [
+    "project-dialog-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ]
+}

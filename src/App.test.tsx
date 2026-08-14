@@ -15,6 +15,7 @@ import type {
   ProjectSessionPort,
   ProjectWindowPort,
 } from "./application/projectPorts";
+import type { ProjectDialogPort } from "./application/projectDialogPort";
 import {
   createEmptyProjection,
   representativeProjection,
@@ -111,6 +112,11 @@ const projectWindowPort: ProjectWindowPort = {
   requestClose: async () => ({ kind: "closed" }),
   resolveClose: async () => ({ kind: "closed" }),
 };
+const projectDialogPort: ProjectDialogPort = {
+  dismiss: async () => undefined,
+  onAction: async () => () => undefined,
+  present: async () => undefined,
+};
 const projectStartupPort: ProjectStartupPort = {
   confirmUiReady: async () => undefined,
 };
@@ -133,6 +139,7 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -178,6 +185,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     <App
       exportPort={exportPort}
       projectStartupPort={{ confirmUiReady }}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={mediaPreviewPort}
       projectSessionPort={{ ...projectSessionPort, load }}
@@ -203,7 +211,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     screen.getByRole("navigation", { name: "Menu principal" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
-  expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
+  expect(screen.getByText("Álbum Horizonte")).toBeInTheDocument();
   expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
   expect(logEvents).toEqual(
     expect.arrayContaining([
@@ -242,6 +250,7 @@ test("prepares real media previews after opening without blocking the Workspace"
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -301,6 +310,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -363,6 +373,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -417,6 +428,7 @@ test("labels first-observation unavailability without claiming a previous previe
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -458,6 +470,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{ prepareMediaPreviews, onMediaChanged }}
       projectSessionPort={projectSessionPort}
@@ -497,6 +510,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,
@@ -552,6 +566,7 @@ test("logs the typed media preview failure code without replacing it with unknow
     <App
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
+      projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         prepareMediaPreviews,

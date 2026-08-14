@@ -6,7 +6,7 @@ use std::{
 
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
@@ -15,7 +15,9 @@ use crate::{
     graphics_launch_gate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
     },
-    logging, native_project_dialog, path_io,
+    logging,
+    native_dialog_window::{self, LaunchProgressKind},
+    native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
         FailureStage, InitialProjectConfiguration, InitialProjectCreationConfiguration,
@@ -33,6 +35,7 @@ use crate::{
 use crate::graphics_launch_gate::debug_process_gate_report;
 
 pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
+pub(crate) const NEW_PROJECT_WINDOW_LABEL: &str = "new-project";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[cfg(debug_assertions)]
@@ -81,7 +84,7 @@ impl GlobalRuntimeState {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ProjectLaunchFailure {
     code: String,
@@ -185,7 +188,16 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
         };
     };
 
-    let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
+    let outcome = launch_confirmed_project_with_progress(
+        &app,
+        state,
+        path,
+        ConfirmedLaunch::OpenExisting,
+        LaunchProgressKind::Opening,
+        GLOBAL_WINDOW_LABEL,
+        false,
+    )
+    .await;
     if outcome == ProjectLaunchOutcome::Opened {
         exit_global_after_handoff(&app);
     }
@@ -202,8 +214,18 @@ fn validate_project_configuration(
 #[tauri::command]
 async fn create_project(
     app: AppHandle,
+    window: WebviewWindow,
     configuration: ProvisionalProjectCreationConfiguration,
 ) -> ProjectLaunchOutcome {
+    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+        return ProjectLaunchOutcome::Failed {
+            error: simple_failure(
+                "invalid_creation_surface",
+                "A criação deve ser iniciada pela janela de Novo Projeto.",
+                "Feche esta janela e tente novamente.",
+            ),
+        };
+    }
     let state = app.state::<GlobalRuntimeState>().inner().clone();
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
@@ -231,7 +253,7 @@ async fn create_project(
             };
         }
     };
-    let destination = match native_project_dialog::choose_project_destination(&app).await {
+    let destination = match native_project_dialog::choose_project_destination(&window).await {
         Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
             return ProjectLaunchOutcome::Cancelled;
         }
@@ -256,13 +278,17 @@ async fn create_project(
         }
     };
 
-    let outcome = launch_confirmed_project(
+    let outcome = launch_confirmed_project_with_progress(
+        &app,
         state,
         destination.0,
         ConfirmedLaunch::CreateNew {
             configuration: Box::new(configuration),
             authorization: destination.1,
         },
+        LaunchProgressKind::Creating,
+        NEW_PROJECT_WINDOW_LABEL,
+        true,
     )
     .await;
     if outcome == ProjectLaunchOutcome::Opened {
@@ -309,7 +335,16 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
             };
         }
     };
-    let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
+    let outcome = launch_confirmed_project_with_progress(
+        &app,
+        state,
+        path,
+        ConfirmedLaunch::OpenExisting,
+        LaunchProgressKind::Opening,
+        GLOBAL_WINDOW_LABEL,
+        false,
+    )
+    .await;
     if outcome == ProjectLaunchOutcome::Opened {
         exit_global_after_handoff(&app);
     }
@@ -321,6 +356,94 @@ fn startup_open_failure(
     state: tauri::State<'_, GlobalRuntimeState>,
 ) -> Option<ProjectLaunchFailure> {
     state.startup_failure()
+}
+
+#[tauri::command]
+async fn show_project_failure_dialog(app: AppHandle, error: ProjectLaunchFailure) {
+    if let Err(dialog_error) =
+        native_dialog_window::show_project_failure(&app, &error.message, error.action.as_deref())
+            .await
+    {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::Global.as_str(),
+            error = %dialog_error,
+            event = "project_failure_dialog_unavailable",
+        );
+    }
+}
+
+#[tauri::command]
+async fn show_new_project_window(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+    if window.label() != GLOBAL_WINDOW_LABEL {
+        return Err("the New Project window belongs only to Global".into());
+    }
+    if let Some(existing) = app.get_webview_window(NEW_PROJECT_WINDOW_LABEL) {
+        return native_dialog_window::display_transition_dialog(&window, &existing)
+            .map_err(|error| error.to_string());
+    }
+
+    let new_project = native_dialog_window::build_hidden_owned_window(
+        &app,
+        &window,
+        NEW_PROJECT_WINDOW_LABEL,
+        "new-project.html",
+        1040.0,
+        680.0,
+        true,
+        true,
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    let owner_after_close = window.clone();
+    let registry = app.state::<ProvisionalDecorativeRegistry>().inner().clone();
+    new_project.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            registry.clear();
+            native_dialog_window::restore_owner(&owner_after_close);
+        }
+    });
+    native_dialog_window::display_transition_dialog(&window, &new_project)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn close_new_project_window(window: WebviewWindow) -> Result<(), String> {
+    if window.label() != NEW_PROJECT_WINDOW_LABEL {
+        return Err("only the New Project window can close this flow".into());
+    }
+    window.destroy().map_err(|error| error.to_string())
+}
+
+async fn launch_confirmed_project_with_progress(
+    app: &AppHandle,
+    state: GlobalRuntimeState,
+    project_path: PathBuf,
+    launch: ConfirmedLaunch,
+    progress_kind: LaunchProgressKind,
+    progress_owner_label: &str,
+    restore_owner_on_failure: bool,
+) -> ProjectLaunchOutcome {
+    let progress =
+        match native_dialog_window::show_launch_progress(app, progress_owner_label, progress_kind)
+            .await
+        {
+            Ok(progress) => Some(progress),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    error = %error,
+                    event = "project_launch_progress_dialog_unavailable",
+                );
+                None
+            }
+        };
+    let outcome = launch_confirmed_project(state, project_path, launch).await;
+    if let Some(progress) = progress {
+        progress.finish(restore_owner_on_failure && outcome != ProjectLaunchOutcome::Opened);
+    }
+    outcome
 }
 
 async fn launch_confirmed_project(
@@ -786,15 +909,17 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         })
         .invoke_handler(tauri::generate_handler![
             complete_graphics_gate,
+            show_new_project_window,
+            close_new_project_window,
             create_project,
             open_project,
             recent_projects,
             open_recent_project,
+            show_project_failure_dialog,
             startup_open_failure,
             validate_project_configuration,
             crate::provisional_decoratives::choose_provisional_decorative,
             crate::provisional_decoratives::release_provisional_decorative,
-            crate::provisional_decoratives::clear_provisional_decoratives,
         ])
         .run(tauri::generate_context!())?;
     Ok(())

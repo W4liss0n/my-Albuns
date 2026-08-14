@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import type {
   ComposedPhoto,
@@ -13,7 +14,9 @@ import {
   readInspectorSectionPreference,
   writeInspectorSectionPreference,
 } from "../state/workspacePreferences";
+import { AppIcon } from "../ui";
 import { DocumentDpiControl } from "./DocumentDpiControl";
+import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { SheetPreview } from "./SheetPreview";
 import "./InspectorPanel.css";
 
@@ -138,6 +141,7 @@ export function InspectorPanel({
         ) : (
           <>
             <InspectorSection
+              accessibleTitle="Informações do Álbum"
               key="album-information"
               title="Informações do Álbum"
               preferenceKey="album.information"
@@ -197,6 +201,7 @@ export function InspectorPanel({
               />
             </InspectorSection>
             <InspectorSection
+              accessibleTitle="Design do Álbum"
               key="album-design"
               title="Design do Álbum"
               preferenceKey="album.design"
@@ -210,6 +215,7 @@ export function InspectorPanel({
               </div>
             </InspectorSection>
             <InspectorSection
+              accessibleTitle="Grade de Lâminas"
               key="album-sheet-grid"
               title="Grade de Lâminas"
               preferenceKey="album.sheet-grid"
@@ -244,11 +250,13 @@ export function InspectorPanel({
 }
 
 function InspectorSection({
+  accessibleTitle,
   title,
   preferenceKey,
   defaultOpen = false,
   children,
 }: {
+  accessibleTitle?: string;
   title: string;
   preferenceKey: string;
   defaultOpen?: boolean;
@@ -269,13 +277,14 @@ function InspectorSection({
   return (
     <section className="inspector-section">
       <button
+        aria-label={accessibleTitle}
         type="button"
         className="inspector-section-trigger"
         aria-expanded={open}
         onClick={toggle}
       >
+        <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
         <span>{title}</span>
-        <span aria-hidden="true">{open ? "−" : "+"}</span>
       </button>
       {open && <div className="inspector-section-content">{children}</div>}
     </section>
@@ -291,12 +300,6 @@ function PropertyRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const MICROMETERS_PER_UNIT = {
-  mm: 1_000,
-  cm: 10_000,
-  in: 25_400,
-} as const;
-
 const measurementFormatter = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 6,
   useGrouping: false,
@@ -307,7 +310,7 @@ function formatMeasurement(
   unit: DocumentSnapshot["displayUnit"],
 ) {
   return `${measurementFormatter.format(
-    micrometers / MICROMETERS_PER_UNIT[unit],
+    micrometersToDisplayUnits(micrometers, unit),
   )} ${unit}`;
 }
 
@@ -317,10 +320,10 @@ function formatDimensions(
   unit: DocumentSnapshot["displayUnit"],
 ) {
   const width = measurementFormatter.format(
-    widthUm / MICROMETERS_PER_UNIT[unit],
+    micrometersToDisplayUnits(widthUm, unit),
   );
   const height = measurementFormatter.format(
-    heightUm / MICROMETERS_PER_UNIT[unit],
+    micrometersToDisplayUnits(heightUm, unit),
   );
   return `${width} × ${height} ${unit}`;
 }

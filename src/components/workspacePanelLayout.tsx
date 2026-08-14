@@ -37,7 +37,7 @@ const PANEL_DEFINITIONS: Record<
   inspector: {
     className: "inspector-splitter",
     controls: "contextual-panel",
-    defaultSize: 286,
+    defaultSize: 310,
     dimension: "width",
     increaseKey: "ArrowLeft",
     label: "Redimensionar Painel contextual",
@@ -49,7 +49,7 @@ const PANEL_DEFINITIONS: Record<
   media: {
     className: "media-splitter",
     controls: "media-panel",
-    defaultSize: 190,
+    defaultSize: 202,
     dimension: "height",
     increaseKey: "ArrowUp",
     label: "Redimensionar Painel de imagens",

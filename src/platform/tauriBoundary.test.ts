@@ -1,8 +1,14 @@
 import { expect, test } from "vitest";
 import globalWindowCapability from "../../src-tauri/capabilities/global.json?raw";
+import dialogWindowCapability from "../../src-tauri/capabilities/dialog.json?raw";
+import progressDialogWindowCapability from "../../src-tauri/capabilities/dialog-progress.json?raw";
+import projectDialogWindowCapability from "../../src-tauri/capabilities/project-dialog.json?raw";
+import newProjectWindowCapability from "../../src-tauri/capabilities/new-project.json?raw";
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
 import globalWindowPermission from "../../src-tauri/permissions/global-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
+import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
+import newProjectWindowPermission from "../../src-tauri/permissions/new-project-window.json?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   eager: true,
@@ -12,12 +18,30 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
-  project: ["./tauriProjectPorts.ts", "./tauriProjectWindowPort.ts"],
+  project: [
+    "./tauriProjectDialogPort.ts",
+    "./tauriProjectPorts.ts",
+    "./tauriProjectWindowPort.ts",
+  ],
+  projectDialog: [
+    "../project-dialog/platform/tauriProjectDialogClient.ts",
+  ],
+  newProject: ["../global/platform/tauriNewProjectPort.ts"],
   global: ["../global/platform/tauriGlobalProjectPort.ts"],
 } as const;
 
-const compositionRoots = new Set(["../main.tsx", "../global/main.tsx"]);
-const platformDirectories = ["../platform/", "../global/platform/"];
+const compositionRoots = new Set([
+  "../dialog/main.tsx",
+  "../global/main.tsx",
+  "../main.tsx",
+  "../new-project/main.tsx",
+  "../project-dialog/main.tsx",
+]);
+const platformDirectories = [
+  "../platform/",
+  "../global/platform/",
+  "../project-dialog/platform/",
+];
 
 function findOffenders(
   isOffender: (path: string, source: string) => boolean,
@@ -103,6 +127,8 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
   const assignedSources = [
     ...tauriCommandSources.shared,
     ...tauriCommandSources.project,
+    ...tauriCommandSources.projectDialog,
+    ...tauriCommandSources.newProject,
     ...tauriCommandSources.global,
   ];
 
@@ -124,6 +150,11 @@ test("keeps the project-window capability aligned with the invoked commands", ()
     "project-window-commands",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
   ]);
   expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
 });
@@ -146,7 +177,65 @@ test("keeps the global-window capability isolated from project commands", () => 
   ).toEqual([]);
 });
 
-test("uses only the minimal Tauri core and event bridges", () => {
+test("limits the Project dialog to state hydration and semantic actions", () => {
+  const invokedCommands = extractInvokedCommands(
+    tauriCommandSources.projectDialog,
+  );
+  const { capability, allowedCommands } = parseSurfaceContract(
+    projectDialogWindowCapability,
+    projectDialogWindowPermission,
+  );
+
+  expect(capability.windows).toEqual(["project-dialog"]);
+  expect(capability.permissions).toEqual([
+    "project-dialog-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+  ]);
+  expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
+});
+
+test("isolates New Project commands in the owned creation window", () => {
+  const invokedCommands = extractInvokedCommands(
+    tauriCommandSources.newProject,
+  );
+  const { capability, allowedCommands } = parseSurfaceContract(
+    newProjectWindowCapability,
+    newProjectWindowPermission,
+  );
+
+  expect(capability.windows).toEqual(["new-project"]);
+  expect(capability.permissions).toEqual([
+    "new-project-window-commands",
+    "core:window:allow-start-dragging",
+  ]);
+  expect([...allowedCommands].sort()).toEqual([...invokedCommands].sort());
+});
+
+test("gives each standard dialog only the abilities exposed by its titlebar", () => {
+  const messageCapability = JSON.parse(dialogWindowCapability) as {
+    windows: string[];
+    permissions: string[];
+  };
+  const progressCapability = JSON.parse(progressDialogWindowCapability) as {
+    windows: string[];
+    permissions: string[];
+  };
+
+  expect(messageCapability.windows).toEqual(["dialog-project-failure"]);
+  expect(messageCapability.permissions).toEqual([
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+  ]);
+  expect(progressCapability.windows).toEqual(["dialog-opening-progress"]);
+  expect(progressCapability.permissions).toEqual([
+    "core:window:allow-start-dragging",
+  ]);
+});
+
+test("uses only the minimal Tauri core, event, and window bridges", () => {
   const tauriPackages = new Set(
     Object.values(sourceFiles).flatMap((source) =>
       Array.from(
@@ -159,6 +248,7 @@ test("uses only the minimal Tauri core and event bridges", () => {
   expect([...tauriPackages].sort()).toEqual([
     "@tauri-apps/api/core",
     "@tauri-apps/api/event",
+    "@tauri-apps/api/window",
   ]);
   expect(projectWindowCapability).not.toContain("dialog:");
 });

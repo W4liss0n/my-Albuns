@@ -1,0 +1,554 @@
+.ui-visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.ui-app-icon {
+  display: block;
+  flex: none;
+}
+
+.ui-brand {
+  display: inline-flex;
+  color: var(--ui-text);
+  flex-direction: column;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.ui-brand small {
+  margin-top: 7px;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.ui-brand--compact {
+  color: var(--ui-accent);
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.ui-application-header {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: var(--ui-titlebar-height);
+  align-items: center;
+  padding: 0;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  gap: 12px;
+  isolation: isolate;
+  user-select: none;
+}
+
+.ui-titlebar-drag-region {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  app-region: drag;
+}
+
+.ui-window-controls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+
+.ui-window-control {
+  appearance: none;
+  display: grid;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #4b4640;
+  background: transparent;
+  place-items: center;
+}
+
+.ui-window-control:hover {
+  background: #e8e5df;
+}
+
+.ui-window-control--close:hover {
+  color: #fff;
+  background: #c42b1c;
+}
+
+.ui-application-header__identity {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  left: 50%;
+  max-width: calc(100% - 560px);
+  gap: 10px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.ui-application-header[data-window-controls="close"]
+  .ui-application-header__identity {
+  max-width: calc(100% - 116px);
+}
+
+.ui-application-header[data-window-controls="none"]
+  .ui-application-header__identity {
+  max-width: calc(100% - 24px);
+}
+
+.ui-application-header__identity strong {
+  overflow: hidden;
+  color: #3a3630;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-application-header__identity small,
+.ui-application-header__status {
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.ui-application-header__status {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  max-width: calc(50% - 160px);
+  flex: none;
+  margin-left: auto;
+  padding: 0 12px;
+  pointer-events: none;
+  text-overflow: ellipsis;
+}
+
+.ui-header-separator {
+  color: #c7c1b7;
+}
+
+.ui-action-button {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  font-size: 0.75rem;
+  font-weight: 550;
+  gap: 8px;
+  transition:
+    border-color 100ms ease,
+    background 100ms ease,
+    color 100ms ease;
+}
+
+.ui-action-button--regular {
+  min-height: 34px;
+  padding: 0 14px;
+}
+
+.ui-action-button--compact {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 0.7rem;
+}
+
+.ui-action-button--primary {
+  border-color: var(--ui-accent);
+  color: #fff;
+  background: var(--ui-accent);
+}
+
+.ui-action-button--primary:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+  background: var(--ui-accent-hover);
+}
+
+.ui-action-button--secondary {
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+}
+
+.ui-action-button--secondary:hover:not(:disabled),
+.ui-action-button--quiet:hover:not(:disabled) {
+  border-color: #c9c3b8;
+  background: #f0eee9;
+}
+
+.ui-action-button--quiet {
+  border-color: transparent;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.ui-action-button--danger {
+  border-color: #dfb3ae;
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.ui-action-button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.ui-inline-notice {
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.ui-inline-notice h2,
+.ui-inline-notice p {
+  margin: 0;
+}
+
+.ui-inline-notice h2 {
+  margin-bottom: 5px;
+  color: var(--ui-text);
+  font-size: 0.76rem;
+}
+
+.ui-inline-notice p + p {
+  margin-top: 4px;
+}
+
+.ui-inline-notice--error {
+  border-color: var(--ui-danger-border);
+  color: var(--ui-danger-text);
+  background: var(--ui-danger-soft);
+}
+
+.ui-inline-notice--success {
+  border-color: var(--ui-success-border);
+  color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+
+.ui-inline-notice--warning {
+  border-color: var(--ui-warning-border);
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.ui-dialog-window {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.ui-owned-window-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface-raised);
+  grid-template-rows: var(--ui-titlebar-height) minmax(0, 1fr);
+}
+
+.ui-owned-window-shell > .ui-application-header {
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+}
+
+.ui-owned-window-shell > .ui-dialog-window {
+  min-height: 0;
+}
+
+.ui-dialog-window__header {
+  padding: 16px 18px 6px;
+}
+
+.ui-dialog-window__header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.ui-dialog-window__body {
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.ui-dialog-window__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 11px 14px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  gap: 8px;
+}
+
+.ui-dialog-window--progress .ui-dialog-window__header {
+  min-height: 0;
+}
+
+.ui-dialog-window--progress .ui-dialog-window__body {
+  padding: 0 18px 16px;
+}
+
+.ui-dialog-window--message {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.ui-dialog-window--message .ui-dialog-window__body {
+  padding: 18px;
+}
+
+.ui-dialog-window__footer .ui-action-button {
+  min-height: 31px;
+  padding: 0 15px;
+  border-radius: 5px;
+  font-size: 12.5px;
+}
+
+.ui-dialog-window__footer .ui-action-button--primary,
+.ui-dialog-window__footer .ui-action-button--danger {
+  padding-inline: 18px;
+}
+
+.ui-dialog-window__footer .ui-action-button--danger {
+  border-color: var(--ui-danger);
+  color: #fff;
+  background: var(--ui-danger);
+}
+
+.ui-dialog-window__footer .ui-action-button--danger:hover:not(:disabled) {
+  border-color: var(--ui-danger-hover);
+  background: var(--ui-danger-hover);
+}
+
+.ui-dialog-action-spacer,
+.ui-progress-dialog__meta-spacer {
+  flex: 1;
+}
+
+.ui-progress-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ui-progress-dialog__status,
+.ui-progress-dialog__note {
+  margin: 0;
+}
+
+.ui-progress-dialog__status {
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+}
+
+.ui-progress-dialog__track {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 5px;
+  border-radius: 99px;
+  background: #e9e5dc;
+}
+
+.ui-progress-dialog__indicator {
+  display: block;
+  width: var(--ui-progress-width);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ui-accent);
+}
+
+.ui-progress-dialog__indicator--indeterminate {
+  position: absolute;
+  width: 30%;
+  animation: ui-progress-indeterminate 1.5s cubic-bezier(0.6, 0.05, 0.35, 0.95)
+    infinite;
+}
+
+.ui-progress-dialog__meta,
+.ui-progress-dialog__note {
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.ui-progress-dialog__meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-progress-dialog__current-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  color: var(--ui-text);
+  font-size: 12.5px;
+  gap: 9px;
+}
+
+.ui-progress-dialog__spinner {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  border: 2px solid var(--ui-accent);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ui-progress-spin 850ms linear infinite;
+}
+
+.ui-progress-dialog__item-name {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-progress-dialog__item-status {
+  flex: none;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: 10.5px;
+}
+
+.ui-standard-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.ui-standard-message__icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  place-items: center;
+}
+
+.ui-standard-message__icon[data-tone="question"] {
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
+.ui-standard-message__icon[data-tone="danger"],
+.ui-standard-message__icon[data-tone="error"] {
+  color: var(--ui-danger);
+  background: var(--ui-danger-soft);
+}
+
+.ui-standard-message__icon[data-tone="success"] {
+  color: var(--ui-success);
+  background: var(--ui-success-soft);
+}
+
+.ui-standard-message__content {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ui-standard-message__title {
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.ui-standard-message__description {
+  color: var(--ui-text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.ui-standard-message__description p {
+  margin: 0;
+}
+
+.ui-standard-message__description p + p {
+  margin-top: 6px;
+}
+
+.ui-standard-message__extra {
+  margin-top: 4px;
+}
+
+.ui-standard-message__detail {
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-standard-message[data-tone="error"] .ui-standard-message__detail {
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 5px;
+  background: var(--ui-surface-muted);
+}
+
+@keyframes ui-progress-indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+@keyframes ui-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-progress-dialog__indicator--indeterminate,
+  .ui-progress-dialog__spinner {
+    animation-duration: 3s;
+  }
+}

@@ -3,10 +3,10 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-left: 1px solid rgb(255 255 255 / 4%);
-  background: #20272d;
-  grid-area: inspector;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
   flex-direction: column;
+  grid-area: inspector;
 }
 
 .inspector-scroll {
@@ -17,136 +17,137 @@
 }
 
 .inspector-section {
-  border-bottom: 1px solid #12181d;
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .inspector-section-trigger {
   display: flex;
   width: 100%;
-  min-height: 46px;
+  min-height: 39px;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 18px;
+  justify-content: flex-start;
+  padding: 0 13px;
   border: 0;
-  color: #d7dde1;
-  background: #20272d;
-  font-size: 0.7rem;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-size: 0.72rem;
   font-weight: 650;
-  letter-spacing: 0.035em;
+  gap: 9px;
   text-align: left;
-  cursor: pointer;
 }
 
 .inspector-section-trigger:hover {
-  background: #252d34;
+  background: #f3f1ec;
 }
 
-.inspector-section-trigger > span:last-child {
-  color: #9da7ae;
-  font-size: 1rem;
-  font-weight: 400;
+.inspector-section-trigger > span {
+  flex: 1;
 }
 
 .inspector-section-content {
-  padding: 0 18px 18px;
+  padding: 0 13px 14px;
 }
 
 .context-heading {
-  padding: 20px 18px;
-  border-bottom: 1px solid rgb(255 255 255 / 7%);
+  padding: 16px 13px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
 }
 
 .context-heading span {
-  color: #8d979e;
-  font-size: 0.64rem;
-  font-weight: 700;
+  color: var(--ui-accent);
+  font-family: var(--ui-font-mono);
+  font-size: 0.56rem;
+  font-weight: 650;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .context-heading h2 {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   overflow: hidden;
-  color: #e5e8ea;
-  font-family: Georgia, serif;
-  font-size: 1.28rem;
-  font-weight: 500;
-  line-height: 1.25;
+  color: var(--ui-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.3;
   text-overflow: ellipsis;
 }
 
 .property-row {
   display: flex;
-  min-height: 42px;
+  min-height: 34px;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgb(255 255 255 / 5%);
-  gap: 16px;
+  border-bottom: 1px solid #efede8;
+  gap: 12px;
 }
 
 .property-row span {
-  color: #8e989f;
-  font-size: 0.69rem;
+  color: var(--ui-text-muted);
+  font-size: 0.65rem;
 }
 
 .property-row strong {
-  color: #d1d7db;
-  font-size: 0.7rem;
-  font-weight: 600;
+  color: var(--ui-text-secondary);
+  font-family: var(--ui-font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
   text-align: right;
 }
 
 .document-settings-group {
   display: grid;
-  gap: 14px;
+  gap: 11px;
 }
 
 .document-settings-group h3 {
   margin: 0;
-  color: #b7c0c6;
-  font-size: 0.68rem;
+  color: var(--ui-text-secondary);
+  font-size: 0.66rem;
   font-weight: 650;
-  letter-spacing: 0.04em;
 }
 
 .document-dpi-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
 }
 
 .document-dpi-control label {
   display: grid;
   min-width: 0;
-  color: #8e989f;
-  font-size: 0.69rem;
-  gap: 6px;
+  color: var(--ui-text-muted);
+  font-size: 0.64rem;
+  gap: 5px;
 }
 
 .document-dpi-control input {
   min-width: 0;
-  height: 32px;
-  padding: 0 9px;
-  border: 1px solid #39434b;
-  border-radius: 6px;
-  color: #d1d7db;
-  background: #192027;
-  font: inherit;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text);
+  background: #fff;
 }
 
 .document-dpi-control input[aria-invalid="true"] {
-  border-color: #b76c64;
+  border-color: var(--ui-danger);
 }
 
 .document-dpi-control button {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid #4a5660;
-  border-radius: 6px;
-  color: #d7dde1;
-  background: #2a333b;
-  font-size: 0.68rem;
+  height: 29px;
+  padding: 0 9px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-size: 0.64rem;
+}
+
+.document-dpi-control button:hover:not(:disabled) {
+  background: #efede7;
 }
 
 .document-dpi-control button:disabled {
@@ -154,35 +155,36 @@
 }
 
 .document-dpi-control [role="alert"] {
-  grid-column: 1 / -1;
-  color: #d5958d;
-  font-size: 0.65rem;
+  color: var(--ui-danger);
+  font-size: 0.62rem;
   line-height: 1.35;
+  grid-column: 1 / -1;
 }
 
 .photo-zoom-control {
   display: grid;
-  padding-top: 16px;
-  gap: 11px;
+  padding-top: 13px;
+  gap: 9px;
 }
 
 .photo-zoom-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #8e989f;
-  font-size: 0.69rem;
+  color: var(--ui-text-muted);
+  font-size: 0.64rem;
 }
 
 .photo-zoom-label output {
-  color: #d1d7db;
-  font-size: 0.7rem;
-  font-weight: 600;
+  color: var(--ui-text-secondary);
+  font-family: var(--ui-font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
 }
 
 .photo-zoom-control input {
   width: 100%;
-  accent-color: #c99a5d;
+  accent-color: var(--ui-accent);
   cursor: ew-resize;
 }
 
@@ -192,24 +194,30 @@
 
 .sheet-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
 }
 
 .sheet-tile {
   display: grid;
   min-width: 0;
-  padding: 8px;
-  border: 1px solid rgb(255 255 255 / 7%);
-  border-radius: 8px;
-  color: #8c979e;
-  background: #252d34;
-  font-size: 0.62rem;
-  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 3px;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  font-family: var(--ui-font-mono);
+  font-size: 0.56rem;
+  gap: 5px;
+}
+
+.sheet-tile:hover {
+  border-color: #a8cbe2;
 }
 
 .sheet-tile.active {
-  border-color: rgb(201 154 93 / 62%);
-  color: #d9bd98;
-  background: rgb(201 154 93 / 8%);
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: 0 0 0 1px var(--ui-accent);
 }

@@ -111,6 +111,15 @@ export interface GlobalProjectPort {
   completeGraphicsGate(
     supported: boolean,
   ): Promise<ProjectLaunchOutcome | null>;
+  showNewProjectWindow(): Promise<ProjectLaunchOutcome>;
+  openProject(): Promise<OpenProjectOutcome>;
+  listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
+  openRecentProject(id: string): Promise<OpenProjectOutcome>;
+  startupOpenFailure(): Promise<OpenProjectFailure | null>;
+  showLaunchFailure(failure: OpenProjectFailure): Promise<void>;
+}
+
+export interface NewProjectPort {
   validateProjectConfiguration(
     configuration: NewProjectConfiguration,
   ): Promise<ProjectConfigurationValidationOutcome>;
@@ -119,9 +128,5 @@ export interface GlobalProjectPort {
   ): Promise<ProjectLaunchOutcome>;
   chooseProvisionalDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
   releaseProvisionalDecorative(selectionId: string): Promise<void>;
-  clearProvisionalDecoratives(): Promise<void>;
-  openProject(): Promise<OpenProjectOutcome>;
-  listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
-  openRecentProject(id: string): Promise<OpenProjectOutcome>;
-  startupOpenFailure(): Promise<OpenProjectFailure | null>;
+  closeWindow(): Promise<void>;
 }

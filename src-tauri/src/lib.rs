@@ -24,6 +24,7 @@ pub mod ipc_contract;
 mod logging;
 mod media_preview_commands;
 mod media_runtime;
+mod native_dialog_window;
 mod native_project_dialog;
 mod opaque_image_protocol;
 mod operation_gate;
@@ -33,6 +34,7 @@ mod product_runtime;
 mod project_bootstrap;
 mod project_close_commands;
 mod project_commands;
+mod project_dialog_window;
 mod project_host;
 mod project_window_lifecycle;
 mod provisional_decoratives;
@@ -167,12 +169,30 @@ mod tests {
         let global_capability: serde_json::Value =
             serde_json::from_str(include_str!("../capabilities/global.json"))
                 .expect("valid global capability");
+        let dialog_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/dialog.json"))
+                .expect("valid dialog capability");
+        let progress_dialog_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/dialog-progress.json"))
+                .expect("valid progress dialog capability");
+        let project_dialog_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/project-dialog.json"))
+                .expect("valid project dialog capability");
+        let new_project_capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/new-project.json"))
+                .expect("valid new project capability");
         let project_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/project-window.json"))
                 .expect("valid project permission");
         let global_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/global-window.json"))
                 .expect("valid global permission");
+        let project_dialog_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-dialog-window.json"))
+                .expect("valid project dialog permission");
+        let new_project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/new-project-window.json"))
+                .expect("valid new project permission");
 
         assert_eq!(
             project_capability["windows"],
@@ -180,31 +200,118 @@ mod tests {
         );
         assert_eq!(global_capability["windows"], serde_json::json!(["global"]));
         assert_eq!(
+            dialog_capability["windows"],
+            serde_json::json!(["dialog-project-failure"])
+        );
+        assert_eq!(
+            dialog_capability["permissions"],
+            serde_json::json!([
+                "core:window:allow-close",
+                "core:window:allow-start-dragging"
+            ])
+        );
+        assert_eq!(
+            progress_dialog_capability["windows"],
+            serde_json::json!(["dialog-opening-progress"])
+        );
+        assert_eq!(
+            progress_dialog_capability["permissions"],
+            serde_json::json!(["core:window:allow-start-dragging"])
+        );
+        assert_eq!(
             project_capability["permissions"],
             serde_json::json!([
                 "project-window-commands",
                 "core:event:allow-listen",
-                "core:event:allow-unlisten"
+                "core:event:allow-unlisten",
+                "core:window:allow-close",
+                "core:window:allow-minimize",
+                "core:window:allow-toggle-maximize",
+                "core:window:allow-start-dragging",
+                "core:window:allow-internal-toggle-maximize"
             ])
         );
         assert_eq!(
             global_capability["permissions"],
-            serde_json::json!(["global-window-commands"])
+            serde_json::json!([
+                "global-window-commands",
+                "core:window:allow-close",
+                "core:window:allow-minimize",
+                "core:window:allow-toggle-maximize",
+                "core:window:allow-start-dragging",
+                "core:window:allow-internal-toggle-maximize"
+            ])
+        );
+        assert_eq!(
+            project_dialog_capability["windows"],
+            serde_json::json!(["project-dialog"])
+        );
+        assert_eq!(
+            project_dialog_capability["permissions"],
+            serde_json::json!([
+                "project-dialog-window-commands",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten",
+                "core:window:allow-close",
+                "core:window:allow-start-dragging"
+            ])
+        );
+        assert_eq!(
+            new_project_capability["windows"],
+            serde_json::json!(["new-project"])
+        );
+        assert_eq!(
+            new_project_capability["permissions"],
+            serde_json::json!([
+                "new-project-window-commands",
+                "core:window:allow-start-dragging"
+            ])
         );
         assert!(
             allowed_commands(&project_permission)
                 .is_disjoint(&allowed_commands(&global_permission))
         );
+        assert!(
+            allowed_commands(&project_dialog_permission)
+                .is_disjoint(&allowed_commands(&project_permission))
+        );
+        assert_eq!(
+            allowed_commands(&project_dialog_permission),
+            BTreeSet::from([
+                "current_project_dialog_state",
+                "submit_project_dialog_action"
+            ])
+        );
+        assert!(
+            allowed_commands(&new_project_permission)
+                .is_disjoint(&allowed_commands(&global_permission))
+        );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);
+        let new_project_commands = allowed_commands(&new_project_permission);
         for command in [
             "choose_provisional_decorative",
             "release_provisional_decorative",
-            "clear_provisional_decoratives",
         ] {
-            assert!(global_commands.contains(command));
+            assert!(new_project_commands.contains(command));
+            assert!(!global_commands.contains(command));
             assert!(!project_commands.contains(command));
         }
+    }
+
+    #[test]
+    fn application_windows_use_the_shared_custom_titlebar() {
+        let config = config();
+        let windows = config["app"]["windows"]
+            .as_array()
+            .expect("application windows are configured");
+
+        assert!(!windows.is_empty());
+        assert!(
+            windows
+                .iter()
+                .all(|window| { window["decorations"] == serde_json::Value::Bool(false) })
+        );
     }
 
     #[test]

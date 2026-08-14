@@ -273,7 +273,7 @@ export function createSheetRenderNode(
     }
     const selectionOutline = new Graphics()
       .rect(0, 0, frameWidth, frameHeight)
-      .stroke({ color: 0xb8874f, width: 3, alpha: 1 });
+      .stroke({ color: 0x2f7fba, width: 3, alpha: 1 });
     selectionOutline.label = `frame-selection-${frame.frameId}`;
     selectionOutline.eventMode = "none";
     selectionOutline.visible = false;
@@ -342,7 +342,7 @@ export function createSheetRenderNode(
 
   const focusOutline = new Graphics()
     .roundRect(-5, -5, width + 10, height + 10, 7)
-    .stroke({ color: 0xc99a5d, width: 2, alpha: 0.9 });
+    .stroke({ color: 0x2f7fba, width: 2, alpha: 0.9 });
   focusOutline.label = `sheet-focus-${sheet.sheetId}`;
   focusOutline.eventMode = "none";
   focusOutline.visible = false;

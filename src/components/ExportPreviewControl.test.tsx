@@ -1,13 +1,11 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+} from "../application/projectDialogPort";
 import type {
   ExportAttempt,
   ExportCancelStatus,
@@ -29,22 +27,13 @@ function createExportHarness() {
   const startSheet = vi.fn<ExportPort["startSheet"]>((_sheetId, onEvent) => {
     let resolve!: (outcome: ExportOutcome) => void;
     let reject!: (error: unknown) => void;
-    const completion = new Promise<ExportOutcome>(
-      (resolvePromise, rejectPromise) => {
-        resolve = resolvePromise;
-        reject = rejectPromise;
-      },
-    );
+    const completion = new Promise<ExportOutcome>((resolvePromise, rejectPromise) => {
+      resolve = resolvePromise;
+      reject = rejectPromise;
+    });
     const cancel = vi.fn(async (): Promise<ExportCancelStatus> => "requested");
     const attempt: ExportAttempt = { completion, cancel };
-
-    attempts.push({
-      cancel,
-      emit: onEvent,
-      reject,
-      resolve,
-    });
-
+    attempts.push({ cancel, emit: onEvent, reject, resolve });
     return attempt;
   });
 
@@ -55,516 +44,289 @@ function createExportHarness() {
   };
 }
 
+function createDialogHarness() {
+  let listener: ((action: ProjectDialogAction) => void) | undefined;
+  const dismiss = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
+  const unlisten = vi.fn();
+  const onAction = vi.fn<ProjectDialogPort["onAction"]>(async (nextListener) => {
+    listener = nextListener;
+    return unlisten;
+  });
+
+  return {
+    dismiss,
+    emit(action: ProjectDialogAction) {
+      act(() => listener?.(action));
+    },
+    onAction,
+    port: { dismiss, onAction, present } satisfies ProjectDialogPort,
+    present,
+    unlisten,
+  };
+}
+
+function renderControl({
+  dialog = createDialogHarness(),
+  exportHarness = createExportHarness(),
+  onActiveChange,
+  projectId = "project-a",
+}: {
+  dialog?: ReturnType<typeof createDialogHarness>;
+  exportHarness?: ReturnType<typeof createExportHarness>;
+  onActiveChange?: (active: boolean) => void;
+  projectId?: string;
+} = {}) {
+  const view = render(
+    <ExportPreviewControl
+      dialogPort={dialog.port}
+      exportPort={exportHarness.port}
+      onActiveChange={onActiveChange}
+      projectId={projectId}
+      sheetId="sheet-001"
+    />,
+  );
+  return { dialog, exportHarness, view };
+}
+
 afterEach(() => {
   vi.useRealTimers();
 });
 
-test("waits for the started event before showing progress", async () => {
+test("waits for the backend started event before opening the native progress window", async () => {
   const user = userEvent.setup();
-  const harness = createExportHarness();
+  const { dialog, exportHarness } = renderControl();
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
 
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-002"
-    />,
-  );
-
-  const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
-  });
-  await user.click(exportButton);
-
-  expect(exportButton).toBeDisabled();
-  expect(harness.startSheet).toHaveBeenCalledWith(
-    "sheet-002",
+  expect(exportHarness.startSheet).toHaveBeenCalledWith(
+    "sheet-001",
     expect.any(Function),
   );
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(dialog.present).not.toHaveBeenCalled();
 
   act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: false,
-    });
+    exportHarness.attempts[0].emit({ event: "started", cancellable: false });
   });
 
-  expect(
-    screen.getByRole("dialog", { name: "Exportando" }),
-  ).toBeInTheDocument();
-  expect(screen.getByText("Iniciando a Exportação")).toBeInTheDocument();
-  expect(screen.getByRole("progressbar")).not.toHaveAttribute(
-    "aria-valuenow",
-  );
-  expect(
-    screen.queryByRole("button", { name: "Cancelar Exportação" }),
-  ).not.toBeInTheDocument();
-  expect(screen.queryByText(/ de /)).not.toBeInTheDocument();
-});
-
-test("rejects an attempt before started without opening a modal", async () => {
-  const user = userEvent.setup();
-  const harness = createExportHarness();
-  const onActiveChange = vi.fn();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      onActiveChange={onActiveChange}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-
-  await act(async () => {
-    harness.attempts[0].reject({
-      code: "conflict",
-      message: "Outra operação exclusiva já está em andamento.",
-    });
-    await Promise.resolve();
+  expect(dialog.present).toHaveBeenCalledWith({
+    cancelRequested: false,
+    cancellable: false,
+    kind: "exportProgress",
+    progress: {
+      kind: "indeterminate",
+      note: "sem estimativa de tempo",
+      status: "Iniciando a Exportação",
+    },
   });
-
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Outra operação exclusiva já está em andamento.",
-  );
-  expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  ).toBeEnabled();
-  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
-test("projects progress and follows the backend cancellation declaration", async () => {
+test("projects measured and unmeasured progress through the dialog port", async () => {
   const user = userEvent.setup();
-  const harness = createExportHarness();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-
+  const { dialog, exportHarness } = renderControl();
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-    harness.attempts[0].emit({
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
+    exportHarness.attempts[0].emit({
       event: "progress",
       stage: "preparing",
       units: { kind: "unmeasured" },
       cancellable: true,
     });
-  });
-
-  expect(screen.getByText("Preparando a prova")).toBeInTheDocument();
-  expect(screen.getByRole("progressbar")).not.toHaveAttribute(
-    "aria-valuenow",
-  );
-  expect(screen.queryByText(/ de /)).not.toBeInTheDocument();
-
-  act(() => {
-    harness.attempts[0].emit({
+    exportHarness.attempts[0].emit({
       event: "progress",
       stage: "composing",
-      units: {
-        kind: "measured",
-        completedUnits: 2,
-        totalUnits: 5,
-      },
+      units: { kind: "measured", completedUnits: 2, totalUnits: 5 },
       cancellable: true,
     });
   });
 
-  expect(screen.getByText("Compondo a prova")).toBeInTheDocument();
-  expect(screen.getByText("2 de 5")).toBeInTheDocument();
-  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "2");
-  expect(
-    screen.getByRole("button", { name: "Cancelar Exportação" }),
-  ).toBeInTheDocument();
-
-  act(() => {
-    harness.attempts[0].emit({
-      event: "progress",
-      stage: "verifying",
-      units: { kind: "unmeasured" },
-      cancellable: false,
-    });
+  expect(dialog.present).toHaveBeenNthCalledWith(2, {
+    cancelRequested: false,
+    cancellable: true,
+    kind: "exportProgress",
+    progress: {
+      kind: "indeterminate",
+      note: "sem estimativa de tempo",
+      status: "Preparando a prova",
+    },
   });
-
-  expect(
-    screen.queryByRole("button", { name: "Cancelar Exportação" }),
-  ).not.toBeInTheDocument();
-
-  act(() => {
-    harness.attempts[0].emit({
-      event: "progress",
-      stage: "publishing",
-      units: { kind: "unmeasured" },
-      cancellable: true,
-    });
+  expect(dialog.present).toHaveBeenNthCalledWith(3, {
+    cancelRequested: false,
+    cancellable: true,
+    kind: "exportProgress",
+    progress: {
+      completed: 2,
+      kind: "determinate",
+      status: "Compondo a prova",
+      total: 5,
+    },
   });
-
-  expect(screen.getByText("Publicando a prova")).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Cancelar Exportação" }),
-  ).toBeInTheDocument();
 });
 
-test("requests cancellation once and waits for completion before showing feedback", async () => {
+test("handles cancellation actions from the child window and keeps feedback there", async () => {
   const user = userEvent.setup();
-  const harness = createExportHarness();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
+  const { dialog, exportHarness } = renderControl();
+  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-    harness.attempts[0].emit({
-      event: "progress",
-      stage: "composing",
-      units: {
-        kind: "measured",
-        completedUnits: 2,
-        totalUnits: 5,
-      },
-      cancellable: true,
-    });
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
 
-  const cancelButton = screen.getByRole("button", {
-    name: "Cancelar Exportação",
+  dialog.emit("cancelExport");
+  dialog.emit("cancelExport");
+  expect(exportHarness.attempts[0].cancel).toHaveBeenCalledOnce();
+  expect(dialog.present).toHaveBeenLastCalledWith({
+    cancelRequested: true,
+    cancellable: true,
+    kind: "exportProgress",
+    progress: expect.objectContaining({ kind: "indeterminate" }),
   });
-  await user.click(cancelButton);
-  await user.click(cancelButton);
-
-  expect(harness.attempts[0].cancel).toHaveBeenCalledOnce();
-  expect(
-    screen.getByRole("dialog", { name: "Exportando" }),
-  ).toBeInTheDocument();
-  expect(screen.getByText("Cancelando…")).toBeInTheDocument();
 
   await act(async () => {
-    harness.attempts[0].resolve({ status: "cancelled" });
+    exportHarness.attempts[0].resolve({ status: "cancelled" });
     await Promise.resolve();
   });
-
-  expect(
-    screen.queryByRole("dialog", { name: "Exportando" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("dialog", { name: "Exportação cancelada" }),
-  ).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Tentar novamente" }),
-  ).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Fechar" })).toBeInTheDocument();
+  expect(dialog.present).toHaveBeenLastCalledWith({
+    cancelled: true,
+    kind: "exportFailure",
+    message: "A Exportação foi cancelada.",
+    retryDisabled: false,
+  });
 });
 
-test("closes progress and confirms a completed Export briefly", async () => {
-  vi.useFakeTimers();
-  const harness = createExportHarness();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-  act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-  });
-
-  await act(async () => {
-    harness.attempts[0].resolve({
-      status: "completed",
-      result: {
-        widthPx: 7_087,
-        heightPx: 3_543,
-      },
-    });
-    await Promise.resolve();
-  });
-
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Exportação concluída",
-  );
-  expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  ).toBeEnabled();
-
-  act(() => {
-    vi.advanceTimersByTime(4_000);
-  });
-
-  expect(screen.queryByRole("status")).not.toBeInTheDocument();
-});
-
-test("offers retry and close in feedback after an Export failure", async () => {
+test("keeps a pre-start conflict inline because no child window was opened", async () => {
   const user = userEvent.setup();
-  const harness = createExportHarness();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-  act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-  });
+  const onActiveChange = vi.fn();
+  const { dialog, exportHarness } = renderControl({ onActiveChange });
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
 
   await act(async () => {
-    harness.attempts[0].reject({
+    exportHarness.attempts[0].reject({
       code: "conflict",
       message: "Outra operação exclusiva já está em andamento.",
     });
     await Promise.resolve();
   });
 
-  expect(
-    screen.queryByRole("dialog", { name: "Exportando" }),
-  ).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("dialog", { name: "Exportação não concluída" }),
-  ).toHaveTextContent("Outra operação exclusiva já está em andamento.");
-
-  await user.click(
-    screen.getByRole("button", { name: "Tentar novamente" }),
+  expect(dialog.present).not.toHaveBeenCalled();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Outra operação exclusiva já está em andamento.",
   );
-
-  expect(harness.startSheet).toHaveBeenCalledTimes(2);
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  ).toBeDisabled();
-
-  act(() => {
-    harness.attempts[1].emit({
-      event: "started",
-      cancellable: true,
-    });
-  });
-  await act(async () => {
-    harness.attempts[1].reject(new Error("still unavailable"));
-    await Promise.resolve();
-  });
-  await user.click(screen.getByRole("button", { name: "Fechar" }));
-
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  ).toBeEnabled();
+  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
-test("retires an active attempt when the Project changes or the control unmounts", async () => {
+test("recovers after the native progress window cannot be presented", async () => {
   const user = userEvent.setup();
-  const harness = createExportHarness();
   const onActiveChange = vi.fn();
-  const view = render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      onActiveChange={onActiveChange}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
+  const dialog = createDialogHarness();
+  dialog.present.mockRejectedValue(
+    new Error("Não foi possível abrir a janela de progresso."),
+  );
+  const { exportHarness } = renderControl({ dialog, onActiveChange });
+
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  act(() => {
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
+  });
+
+  await waitFor(() => {
+    expect(exportHarness.attempts[0].cancel).toHaveBeenCalledOnce();
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Não foi possível abrir a janela de progresso.",
   );
 
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-  act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
+  await act(async () => {
+    exportHarness.attempts[0].resolve({ status: "cancelled" });
+    await Promise.resolve();
   });
-  expect(onActiveChange.mock.calls).toEqual([[true]]);
+
+  expect(dialog.present).toHaveBeenCalledOnce();
+  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
+});
+
+test("dismisses native progress on success and uses the shared inline notice", async () => {
+  vi.useFakeTimers();
+  const { dialog, exportHarness } = renderControl();
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  act(() => {
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
+  });
+  await act(async () => {
+    exportHarness.attempts[0].resolve({
+      status: "completed",
+      result: { widthPx: 7_087, heightPx: 3_543 },
+    });
+    await Promise.resolve();
+  });
+
+  expect(dialog.dismiss).toHaveBeenCalled();
+  expect(screen.getByRole("status")).toHaveTextContent("Exportação concluída");
+  act(() => vi.advanceTimersByTime(4_000));
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+});
+
+test("retries and dismisses terminal feedback from semantic child-window actions", async () => {
+  const user = userEvent.setup();
+  const { dialog, exportHarness } = renderControl();
+  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  act(() => {
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
+  });
+  await act(async () => {
+    exportHarness.attempts[0].reject(new Error("Mídia indisponível"));
+    await Promise.resolve();
+  });
+
+  expect(dialog.present).toHaveBeenLastCalledWith({
+    cancelled: false,
+    kind: "exportFailure",
+    message: "Mídia indisponível",
+    retryDisabled: false,
+  });
+  dialog.emit("retryExport");
+  expect(exportHarness.startSheet).toHaveBeenCalledTimes(2);
+  expect(dialog.present).toHaveBeenLastCalledWith(
+    expect.objectContaining({ kind: "exportFailure", retryDisabled: true }),
+  );
+
+  act(() => {
+    exportHarness.attempts[1].emit({ event: "started", cancellable: true });
+  });
+  await act(async () => {
+    exportHarness.attempts[1].reject(new Error("Ainda indisponível"));
+    await Promise.resolve();
+  });
+  dialog.emit("dismissExport");
+  expect(dialog.dismiss).toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Exportar Lâmina" })).toBeEnabled();
+});
+
+test("retires the attempt and native presentation when the Project changes", async () => {
+  const user = userEvent.setup();
+  const onActiveChange = vi.fn();
+  const dialog = createDialogHarness();
+  const exportHarness = createExportHarness();
+  const { view } = renderControl({ dialog, exportHarness, onActiveChange });
+  await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  act(() => {
+    exportHarness.attempts[0].emit({ event: "started", cancellable: true });
+  });
 
   view.rerender(
     <ExportPreviewControl
-      exportPort={harness.port}
+      dialogPort={dialog.port}
+      exportPort={exportHarness.port}
       onActiveChange={onActiveChange}
       projectId="project-b"
       sheetId="sheet-001"
     />,
   );
 
-  expect(harness.attempts[0].cancel).toHaveBeenCalledOnce();
+  expect(exportHarness.attempts[0].cancel).toHaveBeenCalledOnce();
+  expect(dialog.dismiss).toHaveBeenCalled();
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
-  act(() => {
-    harness.attempts[0].emit({
-      event: "progress",
-      stage: "publishing",
-      units: { kind: "unmeasured" },
-      cancellable: false,
-    });
-  });
-  await act(async () => {
-    harness.attempts[0].resolve({
-      status: "completed",
-      result: {
-        widthPx: 100,
-        heightPx: 50,
-      },
-    });
-    await Promise.resolve();
-  });
-
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(screen.queryByRole("status")).not.toBeInTheDocument();
-
-  await user.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-  expect(onActiveChange.mock.calls).toEqual([[true], [false], [true]]);
-
-  view.unmount();
-
-  expect(harness.attempts[1].cancel).toHaveBeenCalledOnce();
-  expect(onActiveChange.mock.calls).toEqual([
-    [true],
-    [false],
-    [true],
-    [false],
-  ]);
-
-  await act(async () => {
-    harness.attempts[1].resolve({ status: "cancelled" });
-    await Promise.resolve();
-  });
-  expect(onActiveChange).toHaveBeenCalledTimes(4);
-});
-
-test("honors external disabling and keeps commands blocked until terminal feedback closes", async () => {
-  const user = userEvent.setup();
-  const harness = createExportHarness();
-  const onActiveChange = vi.fn();
-  const view = render(
-    <ExportPreviewControl
-      disabled
-      exportPort={harness.port}
-      onActiveChange={onActiveChange}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-
-  const disabledButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
-  });
-  expect(disabledButton).toBeDisabled();
-  fireEvent.click(disabledButton);
-  expect(harness.startSheet).not.toHaveBeenCalled();
-
-  view.rerender(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      onActiveChange={onActiveChange}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  fireEvent.click(
-    screen.getByRole("button", { name: "Exportar Lâmina" }),
-  );
-
-  expect(onActiveChange.mock.calls).toEqual([[true]]);
-
-  act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-  });
-  await act(async () => {
-    harness.attempts[0].resolve({ status: "cancelled" });
-    await Promise.resolve();
-  });
-
-  expect(onActiveChange.mock.calls).toEqual([[true]]);
-
-  await user.click(screen.getByRole("button", { name: "Fechar" }));
-  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
-});
-
-test("moves focus into progress and restores it after completion", async () => {
-  const user = userEvent.setup();
-  const harness = createExportHarness();
-
-  render(
-    <ExportPreviewControl
-      exportPort={harness.port}
-      projectId="project-a"
-      sheetId="sheet-001"
-    />,
-  );
-  const exportButton = screen.getByRole("button", {
-    name: "Exportar Lâmina",
-  });
-  await user.click(exportButton);
-
-  act(() => {
-    harness.attempts[0].emit({
-      event: "started",
-      cancellable: true,
-    });
-  });
-
-  await waitFor(() => {
-    expect(
-      screen.getByRole("dialog", { name: "Exportando" }),
-    ).toHaveFocus();
-  });
-
-  await act(async () => {
-    harness.attempts[0].resolve({
-      status: "completed",
-      result: {
-        widthPx: 7_087,
-        heightPx: 3_543,
-      },
-    });
-    await Promise.resolve();
-  });
-
-  await waitFor(() => {
-    expect(exportButton).toHaveFocus();
-  });
 });

@@ -6,6 +6,7 @@ import type {
   NewProjectCreationConfiguration,
 } from "../application/globalProjectPort";
 import { tauriGlobalProjectPort } from "./tauriGlobalProjectPort";
+import { tauriNewProjectPort } from "./tauriNewProjectPort";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -13,6 +14,18 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+});
+
+test("opens creation as an owned native window and closes it through its own port", async () => {
+  vi.mocked(invoke).mockResolvedValue(undefined);
+
+  await expect(tauriGlobalProjectPort.showNewProjectWindow()).resolves.toEqual({
+    status: "opened",
+  });
+  await tauriNewProjectPort.closeWindow();
+
+  expect(invoke).toHaveBeenNthCalledWith(1, "show_new_project_window");
+  expect(invoke).toHaveBeenNthCalledWith(2, "close_new_project_window");
 });
 
 const configuration: NewProjectConfiguration = {
@@ -71,7 +84,7 @@ test("starts creation with exactly the normalized configuration and no pathname 
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
 
   await expect(
-    tauriGlobalProjectPort.createProject(creationConfiguration),
+    tauriNewProjectPort.createProject(creationConfiguration),
   ).resolves.toEqual({ status: "cancelled" });
   expect(invoke).toHaveBeenCalledWith("create_project", {
     configuration: creationConfiguration,
@@ -87,7 +100,7 @@ test("chooses a provisional decorative without exposing native path data", async
   });
 
   await expect(
-    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+    tauriNewProjectPort.chooseProvisionalDecorative(),
   ).resolves.toEqual({
     status: "selected",
     selection: {
@@ -109,10 +122,10 @@ test("keeps picker cancellation distinct from a malformed response", async () =>
     });
 
   await expect(
-    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+    tauriNewProjectPort.chooseProvisionalDecorative(),
   ).resolves.toEqual({ status: "cancelled" });
   await expect(
-    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+    tauriNewProjectPort.chooseProvisionalDecorative(),
   ).resolves.toEqual({
     status: "failed",
     error: {
@@ -132,7 +145,7 @@ test("preserves an actionable typed picker failure", async () => {
   });
 
   await expect(
-    tauriGlobalProjectPort.chooseProvisionalDecorative(),
+    tauriNewProjectPort.chooseProvisionalDecorative(),
   ).resolves.toEqual({
     status: "failed",
     error: {
@@ -143,30 +156,23 @@ test("preserves an actionable typed picker failure", async () => {
   });
 });
 
-test("releases one opaque provisional selection and can clear the registry", async () => {
+test("releases one opaque provisional selection", async () => {
   vi.mocked(invoke).mockResolvedValue(undefined);
 
-  await tauriGlobalProjectPort.releaseProvisionalDecorative(
+  await tauriNewProjectPort.releaseProvisionalDecorative(
     "selection-background",
   );
-  await tauriGlobalProjectPort.clearProvisionalDecoratives();
 
-  expect(invoke).toHaveBeenNthCalledWith(
-    1,
-    "release_provisional_decorative",
-    { selectionId: "selection-background" },
-  );
-  expect(invoke).toHaveBeenNthCalledWith(
-    2,
-    "clear_provisional_decoratives",
-  );
+  expect(invoke).toHaveBeenCalledWith("release_provisional_decorative", {
+    selectionId: "selection-background",
+  });
 });
 
 test("validates the normalized configuration through the Core boundary", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ errors: [] });
 
   await expect(
-    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+    tauriNewProjectPort.validateProjectConfiguration(configuration),
   ).resolves.toEqual({ status: "valid" });
   expect(invoke).toHaveBeenCalledWith("validate_project_configuration", {
     configuration,
@@ -182,7 +188,7 @@ test("preserves all structured Core validation codes", async () => {
   });
 
   await expect(
-    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+    tauriNewProjectPort.validateProjectConfiguration(configuration),
   ).resolves.toEqual({
     status: "invalid",
     errors: [
@@ -200,7 +206,7 @@ test("turns an unavailable Core validation into an actionable failure", async ()
   });
 
   await expect(
-    tauriGlobalProjectPort.validateProjectConfiguration(configuration),
+    tauriNewProjectPort.validateProjectConfiguration(configuration),
   ).resolves.toEqual({
     status: "failed",
     error: {
@@ -215,7 +221,7 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
   vi.mocked(invoke).mockRejectedValueOnce(new Error("command unavailable"));
 
   await expect(
-    tauriGlobalProjectPort.createProject(creationConfiguration),
+    tauriNewProjectPort.createProject(creationConfiguration),
   ).resolves.toEqual({
     status: "failed",
     error: {
@@ -328,4 +334,20 @@ test("ignores an unavailable startup diagnostic", async () => {
   await expect(
     tauriGlobalProjectPort.startupOpenFailure(),
   ).resolves.toBeNull();
+});
+
+test("delegates a launch failure to the owned native dialog window", async () => {
+  const error = {
+    code: "project_in_use",
+    message: "Este Projeto já está aberto em outra janela.",
+    action: "Feche a outra janela e tente novamente.",
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(undefined);
+
+  await expect(
+    tauriGlobalProjectPort.showLaunchFailure(error),
+  ).resolves.toBeUndefined();
+  expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
+    error,
+  });
 });

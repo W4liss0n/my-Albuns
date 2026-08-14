@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -42,15 +42,12 @@ function createProjectPort(
 ): GlobalProjectPort {
   return {
     completeGraphicsGate: async () => null,
-    validateProjectConfiguration: async () => ({ status: "valid" }),
-    createProject: async () => ({ status: "cancelled" }),
-    chooseProvisionalDecorative: async () => ({ status: "cancelled" }),
-    releaseProvisionalDecorative: async () => undefined,
-    clearProvisionalDecoratives: async () => undefined,
+    showNewProjectWindow: async () => ({ status: "opened" }),
     openProject: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
     openRecentProject: async () => ({ status: "cancelled" }),
     startupOpenFailure: async () => null,
+    showLaunchFailure: async () => undefined,
     ...overrides,
   };
 }
@@ -74,20 +71,25 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(
     screen.getByRole("button", { name: "Abrir Projeto" }),
   ).toBeEnabled();
+  expect(
+    screen.getByRole("button", {
+      name: "Exportar vários Álbuns de uma vez",
+    }),
+  ).toBeDisabled();
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
 });
 
 test("blocks Project hosts at the global graphics boundary when hardware WebGL2 is unavailable", async () => {
   const completeGraphicsGate = vi.fn(async () => null);
   const openProject = vi.fn(async () => ({ status: "cancelled" as const }));
-  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
+  const showNewProjectWindow = vi.fn(async () => ({ status: "opened" as const }));
 
   render(
     <GlobalShell
       graphicsDiagnostic={unavailableGraphics}
       projectPort={createProjectPort({
         completeGraphicsGate,
-        createProject,
+        showNewProjectWindow,
         openProject,
       })}
     />,
@@ -107,116 +109,29 @@ test("blocks Project hosts at the global graphics boundary when hardware WebGL2 
   ).not.toBeInTheDocument();
   expect(completeGraphicsGate).toHaveBeenCalledWith(false);
   expect(openProject).not.toHaveBeenCalled();
-  expect(createProject).not.toHaveBeenCalled();
+  expect(showNewProjectWindow).not.toHaveBeenCalled();
 });
 
-test("opens and cancels the creation assistant without starting Project creation", async () => {
+test("opens creation in a separate native window without adding a modal to welcome", async () => {
   const user = userEvent.setup();
-  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
-  const clearProvisionalDecoratives = vi.fn(async () => undefined);
-
-  render(
-    <GlobalShell
-      graphicsDiagnostic={supportedGraphics}
-      projectPort={createProjectPort({
-        createProject,
-        clearProvisionalDecoratives,
-      })}
-    />,
-  );
-
-  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
-  expect(screen.getByRole("dialog")).toHaveAccessibleName("Dimensões");
-
-  await user.click(screen.getByRole("button", { name: "Cancelar" }));
-  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  expect(createProject).not.toHaveBeenCalled();
-  expect(clearProvisionalDecoratives).toHaveBeenCalledOnce();
-});
-
-test("connects provisional selection and owns final registry cleanup in Global", async () => {
-  const user = userEvent.setup();
-  const selection = {
-    selectionId: "selection-background",
-    displayName: "Textura.jpg",
-    previewUrl: "myalbuns-preview://localhost/selection-background",
-  };
-  const chooseProvisionalDecorative = vi.fn(async () => ({
-    status: "selected" as const,
-    selection,
+  const showNewProjectWindow = vi.fn(async () => ({
+    status: "opened" as const,
   }));
-  const releaseProvisionalDecorative = vi.fn(async () => undefined);
-  const clearProvisionalDecoratives = vi.fn(async () => undefined);
 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      projectPort={createProjectPort({
-        chooseProvisionalDecorative,
-        releaseProvisionalDecorative,
-        clearProvisionalDecoratives,
-      })}
+      projectPort={createProjectPort({ showNewProjectWindow })}
     />,
   );
 
   await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
-  await user.click(screen.getByRole("button", { name: /Pr.*ximo/ }));
-  await user.click(
-    await screen.findByRole("button", {
-      name: "Escolher imagem de Background",
-    }),
-  );
 
-  expect(chooseProvisionalDecorative).toHaveBeenCalledOnce();
-  expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
-
-  await user.click(screen.getByRole("button", { name: "Cancelar" }));
-
-  expect(releaseProvisionalDecorative).not.toHaveBeenCalled();
-  expect(clearProvisionalDecoratives).toHaveBeenCalledOnce();
+  expect(showNewProjectWindow).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
-test("forwards the completed dimensions configuration to creation", async () => {
-  const user = userEvent.setup();
-  const createProject = vi.fn(async () => ({ status: "cancelled" as const }));
-
-  render(
-    <GlobalShell
-      graphicsDiagnostic={supportedGraphics}
-      projectPort={createProjectPort({ createProject })}
-    />,
-  );
-
-  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
-  await user.click(screen.getByRole("button", { name: "Próximo" }));
-  await user.click(await screen.findByRole("button", { name: "Criar" }));
-
-  expect(createProject).toHaveBeenCalledWith({
-    document: {
-      displayUnit: "mm",
-      sheetWidthUm: 600_000,
-      sheetHeightUm: 300_000,
-      dpi: 300,
-      bleedUm: 3_000,
-      safetyUm: 3_000,
-    },
-    structure: {
-      sheetCount: 2,
-      firstSheet: "double",
-      lastSheet: "double",
-    },
-    visualDefaults: {
-      background: {
-        scope: "bothSides",
-        both: { kind: "color", rgb: "#FFFFFF" },
-      },
-      overlay: { scope: "bothSides", both: null },
-      frameBorder: { kind: "none" },
-    },
-  });
-});
-
-test("starts one opening attempt and reports that it is in progress", async () => {
+test("keeps opening progress out of the welcome document", async () => {
   const user = userEvent.setup();
   const opening = deferred<OpenProjectOutcome>();
   const openProject = vi.fn(() => opening.promise);
@@ -232,40 +147,41 @@ test("starts one opening attempt and reports that it is in progress", async () =
 
   expect(openProject).toHaveBeenCalledOnce();
   expect(
-    screen.getByRole("button", { name: "Abrindo Projeto…" }),
+    screen.getByRole("button", {
+      name: "Abrindo Projeto…",
+    }),
   ).toBeDisabled();
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Preparando a Janela do Projeto",
-  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(
+    document.querySelector(".global-primary-actions [role='status']"),
+  ).not.toBeInTheDocument();
 });
 
 test("shows an actionable structured failure without exposing a pathname", async () => {
   const user = userEvent.setup();
+  const showLaunchFailure = vi.fn(async () => undefined);
+  const failure = {
+    code: "project_in_use",
+    message: "Este Projeto já está aberto em outra janela.",
+    action: "Feche a outra janela e tente novamente.",
+  };
   const openProject = vi.fn(async () => ({
     status: "failed" as const,
-    error: {
-      code: "project_in_use",
-      message: "Este Projeto já está aberto em outra janela.",
-      action: "Feche a outra janela e tente novamente.",
-    },
+    error: failure,
   }));
 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      projectPort={createProjectPort({ openProject })}
+      projectPort={createProjectPort({ openProject, showLaunchFailure })}
     />,
   );
   await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Este Projeto já está aberto em outra janela.",
-  );
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Feche a outra janela e tente novamente.",
-  );
+  expect(showLaunchFailure).toHaveBeenCalledWith(failure);
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Tentar novamente" }),
+    screen.getByRole("button", { name: "Abrir Projeto" }),
   ).toBeEnabled();
   expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
 });
@@ -289,6 +205,7 @@ test("loads and renders recent Projects by name", async () => {
   expect(
     screen.getByRole("button", { name: "Álbum da Bia" }),
   ).toBeEnabled();
+  expect(screen.getAllByText("Aberto recentemente")).toHaveLength(2);
   expect(listRecentProjects).toHaveBeenCalledOnce();
 });
 
@@ -319,12 +236,11 @@ test("reopens a recent Project using only its opaque id", async () => {
   expect(openRecentProject).toHaveBeenCalledWith("recent-ana");
   expect(openProject).not.toHaveBeenCalled();
   expect(recentProject).toBeDisabled();
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Preparando a Janela do Projeto",
-  );
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("shows the startup failure from a direct Windows opening", async () => {
+  const showLaunchFailure = vi.fn(async () => undefined);
   const startupOpenFailure = vi.fn(async () => ({
     code: "invalid_project",
     message: "O arquivo selecionado não é um Projeto válido.",
@@ -334,28 +250,34 @@ test("shows the startup failure from a direct Windows opening", async () => {
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
-      projectPort={createProjectPort({ startupOpenFailure })}
+      projectPort={createProjectPort({
+        showLaunchFailure,
+        startupOpenFailure,
+      })}
     />,
   );
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "O arquivo selecionado não é um Projeto válido.",
-  );
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Escolha outro arquivo .myalbuns.",
-  );
+  await waitFor(() => {
+    expect(showLaunchFailure).toHaveBeenCalledWith({
+      code: "invalid_project",
+      message: "O arquivo selecionado não é um Projeto válido.",
+      action: "Escolha outro arquivo .myalbuns.",
+    });
+  });
   expect(startupOpenFailure).toHaveBeenCalledOnce();
 });
 
 test("does not overwrite a newer opening attempt with a late startup failure", async () => {
   const user = userEvent.setup();
   const startupFailure = deferred<OpenProjectFailure | null>();
+  const showLaunchFailure = vi.fn(async () => undefined);
 
   render(
     <GlobalShell
       graphicsDiagnostic={supportedGraphics}
       projectPort={createProjectPort({
         openProject: async () => ({ status: "cancelled" }),
+        showLaunchFailure,
         startupOpenFailure: () => startupFailure.promise,
       })}
     />,
@@ -369,5 +291,5 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
     });
   });
 
-  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(showLaunchFailure).not.toHaveBeenCalled();
 });
