@@ -2,17 +2,18 @@ use std::collections::HashMap;
 
 use crate::model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
-    ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaId, MediaUsage,
-    NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
-    PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectedActiveSides, ProjectedBackground,
-    ProjectedBackgroundContent, ProjectedOverlay, ProjectedOverlayContent,
-    RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
+    ComposedPhoto, ComposedSheet, CompositionPlan, EditorProjection, EditorState, Matrix2,
+    MediaCatalogItem, MediaId, MediaUsage, NormalizedPan, NumberRange, PHOTO_PAN_MAX,
+    PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan,
+    PhotoSnapshot, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
+    ProjectedOverlay, ProjectedOverlayContent, RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm,
+    RenderSnapshot, SizeUm, VectorUm,
 };
 
-pub(crate) struct CompositionCore;
+struct CompositionCore;
 
 impl CompositionCore {
-    pub(crate) fn compose(album: &AlbumSnapshot) -> CompositionPlan {
+    fn compose(album: &AlbumSnapshot) -> CompositionPlan {
         let media_by_id = album
             .media
             .iter()
@@ -80,10 +81,7 @@ impl CompositionCore {
     }
 }
 
-pub(crate) fn derive_media_usage(
-    album: &AlbumSnapshot,
-    composition: &CompositionPlan,
-) -> Vec<MediaUsage> {
+fn derive_media_usage(album: &AlbumSnapshot, composition: &CompositionPlan) -> Vec<MediaUsage> {
     let mut counts = HashMap::<MediaId, usize>::new();
     for media_id in composition
         .sheets
@@ -101,6 +99,17 @@ pub(crate) fn derive_media_usage(
             count: counts.get(&media.id).copied().unwrap_or_default(),
         })
         .collect()
+}
+
+/// The crate's only entry point that resolves an Album into a CompositionPlan.
+pub(crate) fn resolve_editor_projection(state: EditorState) -> EditorProjection {
+    let composition = CompositionCore::compose(&state.album);
+    let media_usage = derive_media_usage(&state.album, &composition);
+    EditorProjection {
+        state,
+        composition,
+        media_usage,
+    }
 }
 
 fn active_surface_rect(
@@ -250,21 +259,16 @@ fn compose_overlay(
     }
 }
 
-pub(crate) fn build_render_snapshot(
-    project_id: &str,
-    project_name: &str,
-    revision: u64,
-    dpi: u32,
-    album: &AlbumSnapshot,
-) -> RenderSnapshot {
+/// Packages an already resolved CompositionPlan for rendering without recomposing its Album.
+pub(crate) fn render_snapshot_from_projection(projection: &EditorProjection) -> RenderSnapshot {
     RenderSnapshot {
         schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
-        project_id: project_id.into(),
-        project_name: project_name.into(),
-        revision,
-        dpi,
+        project_id: projection.state.project_id.clone(),
+        project_name: projection.state.project_name.clone(),
+        revision: projection.state.revision,
+        dpi: projection.state.document.dpi,
         unit: "micrometers".into(),
-        composition: CompositionCore::compose(album),
+        composition: projection.composition.clone(),
     }
 }
 

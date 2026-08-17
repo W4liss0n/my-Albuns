@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use crate::{
-    composition::{CompositionCore, derive_media_usage},
+    composition::resolve_editor_projection,
     model::{
         AlbumSnapshot, DocumentSnapshot, EditorProjection, EditorState, MediaCatalogItem, MediaId,
         MediaKind, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
@@ -79,13 +79,7 @@ pub(crate) fn editor_projection(
         can_redo,
         album,
     };
-    let composition = CompositionCore::compose(&state.album);
-    let media_usage = derive_media_usage(&state.album, &composition);
-    EditorProjection {
-        composition,
-        state,
-        media_usage,
-    }
+    resolve_editor_projection(state)
 }
 
 fn projected_active_sides(active_sides: ActiveSides) -> ProjectedActiveSides {
