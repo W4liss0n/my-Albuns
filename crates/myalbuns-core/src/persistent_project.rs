@@ -7,9 +7,9 @@ use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalIdentityEvide
 use uuid::Uuid;
 
 use crate::{
-    composition::render_snapshot_from_projection,
     model::{
         ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
+        RenderSnapshotMetadata, RenderSnapshotRef,
     },
     persistent_projection,
     persistent_session::PersistentProjectSession,
@@ -192,21 +192,22 @@ impl FrozenProjectRendering {
         &self.projection
     }
 
-    pub fn render_snapshot(&self) -> RenderSnapshot {
-        render_snapshot_from_projection(&self.projection)
+    pub fn render_snapshot(&self) -> RenderSnapshotRef<'_> {
+        RenderSnapshotRef::from_resolved(
+            RenderSnapshotMetadata::from(&self.projection.state),
+            &self.projection.composition,
+        )
     }
 
     pub fn sources(&self) -> &[MediaRef] {
         &self.sources
     }
 
-    pub fn into_parts(self) -> (EditorProjection, RenderSnapshot, Vec<MediaRef>) {
-        let render_snapshot = render_snapshot_from_projection(&self.projection);
-        (self.projection, render_snapshot, self.sources)
-    }
-
     pub fn into_sheet(self, sheet_id: &str) -> Result<FrozenSheetRendering, CoreError> {
-        let render_snapshot = render_snapshot_from_projection(&self.projection);
+        let render_snapshot = RenderSnapshot::from_resolved(
+            RenderSnapshotMetadata::from(&self.projection.state),
+            self.projection.composition,
+        );
         let output_unit = render_snapshot.output_unit(sheet_id)?;
         let referenced = output_unit
             .sheet
@@ -309,7 +310,10 @@ impl EditableProject {
 
     pub fn render_snapshot(&self) -> RenderSnapshot {
         let projection = self.projection();
-        render_snapshot_from_projection(&projection)
+        RenderSnapshot::from_resolved(
+            RenderSnapshotMetadata::from(&projection.state),
+            projection.composition,
+        )
     }
 
     /// Freezes one resolved editor projection and only the exact linked

@@ -6,8 +6,7 @@ use crate::model::{
     MediaCatalogItem, MediaId, MediaUsage, NormalizedPan, NumberRange, PHOTO_PAN_MAX,
     PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoPlacement, PhotoPlacementPlan,
     PhotoSnapshot, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
-    ProjectedOverlay, ProjectedOverlayContent, RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm,
-    RenderSnapshot, SizeUm, VectorUm,
+    ProjectedOverlay, ProjectedOverlayContent, RectUm, SizeUm, VectorUm,
 };
 
 struct CompositionCore;
@@ -256,19 +255,6 @@ fn compose_overlay(
         media_id: media.id,
         name: media.name.clone(),
         draw_rect,
-    }
-}
-
-/// Packages an already resolved CompositionPlan for rendering without recomposing its Album.
-pub(crate) fn render_snapshot_from_projection(projection: &EditorProjection) -> RenderSnapshot {
-    RenderSnapshot {
-        schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
-        project_id: projection.state.project_id.clone(),
-        project_name: projection.state.project_name.clone(),
-        revision: projection.state.revision,
-        dpi: projection.state.document.dpi,
-        unit: "micrometers".into(),
-        composition: projection.composition.clone(),
     }
 }
 

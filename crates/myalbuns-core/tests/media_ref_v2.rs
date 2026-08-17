@@ -4,7 +4,7 @@ use std::fs;
 
 use myalbuns_core::{
     DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, RenderSnapshot, SaveProjectOutcome,
+    ProjectIntent, ProjectLocation, RenderSnapshotRef, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -186,7 +186,7 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
 }
 
 #[test]
-fn frozen_rendering_materializes_canvas_and_export_from_one_resolved_plan() {
+fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
     let root = tempfile::tempdir().expect("temporary frozen v2 Project");
     let project_path = root.path().join("Projeto congelado.myalbuns");
     fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
@@ -198,7 +198,11 @@ fn frozen_rendering_materializes_canvas_and_export_from_one_resolved_plan() {
     let selected_sheet_id = "00000000-0000-4000-8000-000000000002".to_owned();
 
     let frozen = project.freeze_rendering();
-    let snapshot: RenderSnapshot = frozen.render_snapshot();
+    let snapshot: RenderSnapshotRef<'_> = frozen.render_snapshot();
+    assert!(
+        std::ptr::eq(snapshot.composition, &frozen.projection().composition),
+        "Canvas and Export must borrow the same resolved CompositionPlan"
+    );
     assert_eq!(snapshot.project_id, "550e8400-e29b-41d4-a716-446655440000");
     assert_eq!(snapshot.project_name, "Projeto congelado");
     assert_eq!(snapshot.revision, 0);

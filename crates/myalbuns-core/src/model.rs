@@ -527,6 +527,54 @@ pub struct EditorProjection {
     pub media_usage: Vec<MediaUsage>,
 }
 
+/// Borrowed rendering envelope over one already resolved CompositionPlan.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RenderSnapshotRef<'a> {
+    pub schema_version: u32,
+    pub project_id: &'a str,
+    pub project_name: &'a str,
+    pub revision: u64,
+    pub dpi: u32,
+    pub unit: &'static str,
+    pub composition: &'a CompositionPlan,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RenderSnapshotMetadata<'a> {
+    project_id: &'a str,
+    project_name: &'a str,
+    revision: u64,
+    dpi: u32,
+}
+
+impl<'a> From<&'a EditorState> for RenderSnapshotMetadata<'a> {
+    fn from(state: &'a EditorState) -> Self {
+        Self {
+            project_id: &state.project_id,
+            project_name: &state.project_name,
+            revision: state.revision,
+            dpi: state.document.dpi,
+        }
+    }
+}
+
+impl<'a> RenderSnapshotRef<'a> {
+    pub(crate) fn from_resolved(
+        metadata: RenderSnapshotMetadata<'a>,
+        composition: &'a CompositionPlan,
+    ) -> Self {
+        Self {
+            schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
+            project_id: metadata.project_id,
+            project_name: metadata.project_name,
+            revision: metadata.revision,
+            dpi: metadata.dpi,
+            unit: "micrometers",
+            composition,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderSnapshot {
@@ -540,6 +588,21 @@ pub struct RenderSnapshot {
 }
 
 impl RenderSnapshot {
+    pub(crate) fn from_resolved(
+        metadata: RenderSnapshotMetadata<'_>,
+        composition: CompositionPlan,
+    ) -> Self {
+        Self {
+            schema_version: RENDER_SNAPSHOT_SCHEMA_VERSION,
+            project_id: metadata.project_id.to_owned(),
+            project_name: metadata.project_name.to_owned(),
+            revision: metadata.revision,
+            dpi: metadata.dpi,
+            unit: "micrometers".into(),
+            composition,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), CoreError> {
         crate::validation::validate_render_snapshot(self)
     }
