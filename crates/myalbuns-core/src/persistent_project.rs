@@ -7,9 +7,9 @@ use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalIdentityEvide
 use uuid::Uuid;
 
 use crate::{
-    composition::build_render_snapshot,
     model::{
         ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
+        RenderSnapshotMetadata, RenderSnapshotRef,
     },
     persistent_projection,
     persistent_session::PersistentProjectSession,
@@ -177,7 +177,6 @@ pub struct EditableProject {
 #[derive(Clone, Debug)]
 pub struct FrozenProjectRendering {
     projection: EditorProjection,
-    render_snapshot: RenderSnapshot,
     sources: Vec<MediaRef>,
 }
 
@@ -193,20 +192,23 @@ impl FrozenProjectRendering {
         &self.projection
     }
 
-    pub fn render_snapshot(&self) -> &RenderSnapshot {
-        &self.render_snapshot
+    pub fn render_snapshot(&self) -> RenderSnapshotRef<'_> {
+        RenderSnapshotRef::from_resolved(
+            RenderSnapshotMetadata::from(&self.projection.state),
+            &self.projection.composition,
+        )
     }
 
     pub fn sources(&self) -> &[MediaRef] {
         &self.sources
     }
 
-    pub fn into_parts(self) -> (EditorProjection, RenderSnapshot, Vec<MediaRef>) {
-        (self.projection, self.render_snapshot, self.sources)
-    }
-
     pub fn into_sheet(self, sheet_id: &str) -> Result<FrozenSheetRendering, CoreError> {
-        let output_unit = self.render_snapshot.output_unit(sheet_id)?;
+        let render_snapshot = RenderSnapshot::from_resolved(
+            RenderSnapshotMetadata::from(&self.projection.state),
+            self.projection.composition,
+        );
+        let output_unit = render_snapshot.output_unit(sheet_id)?;
         let referenced = output_unit
             .sheet
             .referenced_media_ids()
@@ -222,7 +224,7 @@ impl FrozenProjectRendering {
             ));
         }
         Ok(FrozenSheetRendering {
-            render_snapshot: self.render_snapshot,
+            render_snapshot,
             output_unit,
             sources,
         })
@@ -308,27 +310,17 @@ impl EditableProject {
 
     pub fn render_snapshot(&self) -> RenderSnapshot {
         let projection = self.projection();
-        build_render_snapshot(
-            &projection.state.project_id,
-            &projection.state.project_name,
-            projection.state.revision,
-            projection.state.document.dpi,
-            &projection.state.album,
+        RenderSnapshot::from_resolved(
+            RenderSnapshotMetadata::from(&projection.state),
+            projection.composition,
         )
     }
 
-    /// Freezes the public editor/render projections and only the exact linked
-    /// originals referenced by that same creative Revision.
+    /// Freezes one resolved editor projection and only the exact linked
+    /// originals referenced by its CompositionPlan at that creative Revision.
     pub fn freeze_rendering(&self) -> FrozenProjectRendering {
         let projection = self.projection();
-        let render_snapshot = build_render_snapshot(
-            &projection.state.project_id,
-            &projection.state.project_name,
-            projection.state.revision,
-            projection.state.document.dpi,
-            &projection.state.album,
-        );
-        let referenced = render_snapshot
+        let referenced = projection
             .composition
             .sheets
             .iter()
@@ -344,7 +336,6 @@ impl EditableProject {
 
         FrozenProjectRendering {
             projection,
-            render_snapshot,
             sources,
         }
     }

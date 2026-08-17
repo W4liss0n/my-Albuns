@@ -4,7 +4,7 @@ use std::fs;
 
 use myalbuns_core::{
     DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, SaveProjectOutcome,
+    ProjectIntent, ProjectLocation, RenderSnapshotRef, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -186,7 +186,7 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
 }
 
 #[test]
-fn a_frozen_sheet_owns_the_same_composition_and_only_its_exact_originals() {
+fn frozen_rendering_borrows_one_resolved_plan_for_canvas_and_export() {
     let root = tempfile::tempdir().expect("temporary frozen v2 Project");
     let project_path = root.path().join("Projeto congelado.myalbuns");
     fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
@@ -195,14 +195,27 @@ fn a_frozen_sheet_owns_the_same_composition_and_only_its_exact_originals() {
         .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
         .open_editable(OpenProjectRequest::new(location(&project_path)))
         .expect("the v2 Project is positively authorized");
-    let selected_sheet_id = project.projection().composition.sheets[1].sheet_id.clone();
+    let selected_sheet_id = "00000000-0000-4000-8000-000000000002".to_owned();
 
     let frozen = project.freeze_rendering();
-    assert_eq!(
-        frozen.projection().composition,
-        frozen.render_snapshot().composition,
-        "Canvas and Exportation must receive the same CompositionPlan",
+    let snapshot: RenderSnapshotRef<'_> = frozen.render_snapshot();
+    assert!(
+        std::ptr::eq(snapshot.composition, &frozen.projection().composition),
+        "Canvas and Export must borrow the same resolved CompositionPlan"
     );
+    assert_eq!(snapshot.project_id, "550e8400-e29b-41d4-a716-446655440000");
+    assert_eq!(snapshot.project_name, "Projeto congelado");
+    assert_eq!(snapshot.revision, 0);
+    assert_eq!(snapshot.dpi, 300);
+    assert_eq!(snapshot.composition.sheets.len(), 2);
+    assert_eq!(snapshot.composition.sheets[1].sheet_id, selected_sheet_id);
+    assert_eq!(snapshot.composition.sheets[1].width_um, 600_000);
+    assert_eq!(snapshot.composition.sheets[1].height_um, 300_000);
+    let canvas_sheet = &frozen.projection().composition.sheets[1];
+    assert_eq!(canvas_sheet.sheet_id, selected_sheet_id);
+    assert_eq!(canvas_sheet.number, 2);
+    assert_eq!(canvas_sheet.width_um, 600_000);
+    assert_eq!(canvas_sheet.height_um, 300_000);
     let frozen_sheet = frozen
         .into_sheet(&selected_sheet_id)
         .expect("the selected sheet owns its exact sources");
