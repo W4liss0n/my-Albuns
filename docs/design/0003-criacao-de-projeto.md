@@ -16,12 +16,15 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 1. `Configurações`, dedicada à base física e estrutural do Álbum;
 2. `Personalização`, dedicada aos padrões visuais iniciais.
 
+`Novo Projeto` aparece como contexto no título da janela e não se repete na
+área de conteúdo. A faixa superior compartilhada alinha as duas etapas à
+esquerda e mantém `Predefinição` à direita durante todo o fluxo.
+
 ### Configurações
 
 A primeira etapa mantém uma prévia proporcional da Lâmina aberta à esquerda e
 organiza os controles à direita nesta ordem:
 
-- Predefinição;
 - Unidade de medida;
 - Dimensão da Lâmina fechada;
 - Sangria e Área de segurança;
@@ -64,10 +67,9 @@ controles, sem repetir essas informações em um card de resumo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Configurações                                                   │
+│  1 Configurações ─ 2 Personalização          Predefinição [···]  │
 ├───────────────────────────────────────────┬──────────────────────┤
-│  Lâmina aberta · quantidade · guias       │  Predefinição        │
-│                                           │  Unidade              │
+│  Lâmina aberta · quantidade · guias       │  Unidade              │
 │          prévia proporcional              │  Dimensão fechada     │
 │                                           │  Sangria · Segurança │
 │                                           │  Lâminas              │
@@ -178,7 +180,7 @@ Os controles podem rolar dentro de sua região quando necessário, sem retirar a
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  Personalização                                                  │
+│  1 Configurações ─ 2 Personalização          Predefinição [···]  │
 ├───────────────────────────────────────────┬──────────────────────┤
 │                                           │  Background          │
 │                                           │  Overlay             │

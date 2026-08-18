@@ -271,7 +271,6 @@ export function NewProjectFlow({
       className="new-project-flow"
     >
       <header className="new-project-header">
-        <h1>Novo Projeto</h1>
         <h2 className="ui-visually-hidden" id="new-project-step-title">
           {step === "configuration" ? "Configurações" : "Personalização"}
         </h2>
@@ -287,6 +286,12 @@ export function NewProjectFlow({
             Personalização
           </li>
         </ol>
+        <PresetControl
+          onApply={applyProjectPreset}
+          onSave={saveProjectPreset}
+          presets={presets}
+          selectedPresetId={selectedPresetId}
+        />
       </header>
 
       {step === "configuration" ? (
@@ -295,11 +300,7 @@ export function NewProjectFlow({
           draft={draft}
           errors={validationErrors}
           fieldRefs={fieldRefs}
-          onApplyPreset={applyProjectPreset}
           onChange={updateDraft}
-          onSavePreset={saveProjectPreset}
-          presets={presets}
-          selectedPresetId={selectedPresetId}
           validationFailure={validationFailure}
         />
       ) : (
@@ -413,11 +414,7 @@ function ConfigurationStep({
   draft,
   errors,
   fieldRefs,
-  onApplyPreset,
   onChange,
-  onSavePreset,
-  presets,
-  selectedPresetId,
   validationFailure,
 }: {
   attempted: boolean;
@@ -426,14 +423,10 @@ function ConfigurationStep({
   fieldRefs: React.RefObject<
     Partial<Record<DimensionsFieldName, HTMLInputElement>>
   >;
-  onApplyPreset(presetId: string): void;
   onChange(
     draft: NewProjectDimensionsDraft,
     changedFields: readonly DimensionsFieldName[],
   ): void;
-  onSavePreset(name: string): void;
-  presets: readonly NewProjectPreset[];
-  selectedPresetId: string;
   validationFailure: ProjectLaunchFailure | null;
 }) {
   const updatePhysical = (field: PhysicalFieldName, text: string) => {
@@ -460,13 +453,6 @@ function ConfigurationStep({
     <div className="new-project-content new-project-dimensions">
       <DimensionsPreview draft={draft} />
       <div className="new-project-dimensions-controls">
-        <PresetControl
-          onApply={onApplyPreset}
-          onSave={onSavePreset}
-          presets={presets}
-          selectedPresetId={selectedPresetId}
-        />
-
         <ControlSection title="Unidade">
           <UnitSelector
             onChange={(displayUnit) =>
@@ -734,7 +720,6 @@ function PresetControl({
           </form>
         ) : null}
       </div>
-      <p>A predefinição guarda os dois passos: medidas e personalização.</p>
     </ControlSection>
   );
 }

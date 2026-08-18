@@ -10,19 +10,16 @@
 }
 
 .new-project-header {
+  position: relative;
+  z-index: 10;
   display: grid;
   min-width: 0;
   align-items: center;
   padding: 0 16px;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
-}
-
-.new-project-header h1 {
-  margin: 0;
-  font-size: 0.82rem;
-  font-weight: 650;
+  grid-template-columns: minmax(0, 1fr) 312px;
+  gap: 24px;
 }
 
 .new-project-steps {
@@ -33,7 +30,8 @@
   font-size: 0.7rem;
   list-style: none;
   gap: 34px;
-  grid-column: 2;
+  grid-column: 1;
+  justify-self: start;
 }
 
 .new-project-steps li {
@@ -159,6 +157,16 @@
   gap: 8px;
 }
 
+.new-project-preset-control {
+  display: grid;
+  width: 100%;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  grid-column: 2;
+  justify-self: end;
+}
+
 .new-project-preset-row > select,
 .new-project-save-preset > input,
 .new-project-field input,
@@ -194,13 +202,6 @@
   border-color: var(--ui-accent);
   outline: 2px solid #d9ebf7;
   outline-offset: 0;
-}
-
-.new-project-preset-control > p {
-  margin: -1px 0 0;
-  color: var(--ui-text-muted);
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 .new-project-save-preset {
@@ -667,11 +668,13 @@
   }
 
   .new-project-header {
-    grid-template-columns: 1fr auto;
+    padding: 0 10px;
+    grid-template-columns: auto minmax(170px, 1fr);
+    gap: 12px;
   }
 
   .new-project-steps {
-    grid-column: 2;
+    grid-column: 1;
   }
 
   .new-project-steps li {
@@ -679,6 +682,14 @@
   }
 
   .new-project-steps li + li::before {
+    display: none;
+  }
+
+  .new-project-preset-control {
+    grid-column: 2;
+  }
+
+  .new-project-preset-control > h2 {
     display: none;
   }
 

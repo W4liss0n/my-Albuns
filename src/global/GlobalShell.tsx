@@ -110,7 +110,7 @@ export function GlobalShell({
   if (surface === "newProject") {
     return (
       <div className="global-shell global-shell--new-project">
-        <ApplicationHeader status="Novo Projeto" />
+        <ApplicationHeader context="Novo Projeto" />
         <NewProjectFlow
           onCancel={() => setSurface("welcome")}
           onChooseDecorative={() =>

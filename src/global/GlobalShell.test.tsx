@@ -129,13 +129,20 @@ test("replaces welcome with New Project in the same window and restores welcome 
 
   await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
 
+  const windowTitlebar = screen.getByRole("banner", {
+    name: "Barra da janela",
+  });
+  expect(screen.getAllByText("Novo Projeto")).toHaveLength(1);
+  expect(windowTitlebar).toContainElement(screen.getByText("Novo Projeto"));
   expect(
-    screen.getByRole("heading", { level: 1, name: "Novo Projeto" }),
-  ).toBeInTheDocument();
+    screen.queryByRole("heading", { level: 1, name: "Novo Projeto" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("heading", { name: "Projetos recentes" }),
   ).not.toBeInTheDocument();
-  expect(screen.getAllByRole("banner", { name: "Barra da janela" })).toHaveLength(1);
+  expect(
+    screen.getAllByRole("banner", { name: "Barra da janela" }),
+  ).toHaveLength(1);
 
   await user.click(screen.getByRole("button", { name: "Cancelar" }));
 

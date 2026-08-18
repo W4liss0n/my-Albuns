@@ -94,6 +94,33 @@ test("keeps the preview panel shared while the sheet content changes", async () 
   ).not.toBeInTheDocument();
 });
 
+test("shares one header between the steps and the preset control", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const steps = screen.getByRole("list", { name: "Etapas da criação" });
+  const header = steps.closest("header");
+  expect(header).not.toBeNull();
+  expect(header).toContainElement(
+    screen.getByRole("combobox", { name: "Predefinição" }),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  expect(
+    await screen.findByRole("combobox", { name: "Predefinição" }),
+  ).toBeVisible();
+  expect(header).toContainElement(
+    screen.getByRole("combobox", { name: "Predefinição" }),
+  );
+});
+
 test("validates and creates with the complete neutral configuration", async () => {
   const user = userEvent.setup();
   const onValidate = vi.fn(validConfiguration);
