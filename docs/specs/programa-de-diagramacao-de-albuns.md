@@ -501,7 +501,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 - `Novo Projeto` abre um fluxo do próprio aplicativo composto por exatamente duas etapas: `Configurações` e `Personalização`.
 - `Novo Projeto` aparece como contexto no título da janela e não se repete na área de conteúdo.
-- A faixa superior compartilhada alinha `Configurações` e `Personalização` à esquerda e mantém `Predefinição` à direita durante as duas etapas.
+- A faixa superior compartilhada centraliza `Configurações` e `Personalização` no espaço disponível à esquerda de `Predefinição` e mantém esse controle alinhado à direita durante as duas etapas.
 - `Configurações` apresenta diretamente Unidade, Dimensão da Lâmina fechada, Sangria, Área de segurança, quantidade inicial de Lâminas, Resolução do Projeto e Configuração das extremidades; esses dois últimos grupos não ficam recolhidos.
 - A largura informada para a Dimensão da Lâmina fechada corresponde à largura da Página; a interface mostra e envia ao núcleo a Dimensão da Lâmina aberta com o dobro dessa largura e a mesma altura.
 - Medidas apresentadas em polegadas usam no máximo três casas decimais, sem alterar o valor físico interno em micrômetros.

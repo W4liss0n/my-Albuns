@@ -31,7 +31,7 @@
   list-style: none;
   gap: 34px;
   grid-column: 1;
-  justify-self: start;
+  justify-self: center;
 }
 
 .new-project-steps li {

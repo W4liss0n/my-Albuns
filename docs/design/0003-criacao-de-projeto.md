@@ -17,8 +17,9 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 2. `Personalização`, dedicada aos padrões visuais iniciais.
 
 `Novo Projeto` aparece como contexto no título da janela e não se repete na
-área de conteúdo. A faixa superior compartilhada alinha as duas etapas à
-esquerda e mantém `Predefinição` à direita durante todo o fluxo.
+área de conteúdo. A faixa superior compartilhada centraliza as duas etapas no
+espaço disponível à esquerda de `Predefinição` e mantém esse controle alinhado
+à direita durante todo o fluxo.
 
 ### Configurações
 
@@ -67,7 +68,7 @@ controles, sem repetir essas informações em um card de resumo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  1 Configurações ─ 2 Personalização          Predefinição [···]  │
+│    1 Configurações ─ 2 Personalização        Predefinição [···]  │
 ├───────────────────────────────────────────┬──────────────────────┤
 │  Lâmina aberta · quantidade · guias       │  Unidade              │
 │          prévia proporcional              │  Dimensão fechada     │
@@ -180,7 +181,7 @@ Os controles podem rolar dentro de sua região quando necessário, sem retirar a
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│  1 Configurações ─ 2 Personalização          Predefinição [···]  │
+│    1 Configurações ─ 2 Personalização        Predefinição [···]  │
 ├───────────────────────────────────────────┬──────────────────────┤
 │                                           │  Background          │
 │                                           │  Overlay             │
