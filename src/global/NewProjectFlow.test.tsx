@@ -495,9 +495,21 @@ test("shows a solid Frame border immediately and sends its canonical values", as
   );
   expect(frameBorders).toHaveLength(4);
   for (const frameBorder of frameBorders) {
-    expect(frameBorder).toHaveAttribute("stroke", "#C5A46D");
-    expect(frameBorder).toHaveAttribute("stroke-width", "2500");
+    const segments = frameBorder.querySelectorAll("rect");
+    expect(segments).toHaveLength(4);
+    for (const segment of segments) {
+      expect(segment).toHaveAttribute("fill", "#C5A46D");
+    }
   }
+  const firstFrameSegments = screen
+    .getByLabelText("Borda do Frame esquerdo 1")
+    .querySelectorAll("rect");
+  expect(firstFrameSegments[0]).toHaveAttribute("x", "12000");
+  expect(firstFrameSegments[0]).toHaveAttribute("y", "12000");
+  expect(firstFrameSegments[0]).toHaveAttribute("width", "135000");
+  expect(firstFrameSegments[0]).toHaveAttribute("height", "2500");
+  expect(firstFrameSegments[3]).toHaveAttribute("x", "144500");
+  expect(firstFrameSegments[3]).toHaveAttribute("width", "2500");
 
   await user.click(screen.getByRole("button", { name: "Criar" }));
   expect(onCreate).toHaveBeenCalledWith(

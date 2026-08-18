@@ -256,17 +256,22 @@ export function createSheetRenderNode(
         width: SHEET_VISUAL_STYLE.frame.outlineWidthPx,
         alpha: SHEET_VISUAL_STYLE.frame.outlineOpacity,
       });
-    const persistedBorder =
-      frameBorder.kind === "solid"
-        ? new Graphics()
-            .rect(0, 0, frameWidth, frameHeight)
-            .stroke({
-              color: hexToNumber(frameBorder.rgb),
-              width:
-                frameBorder.widthUm * MICROMETER_TO_CANVAS_PIXEL,
-              alpha: 1,
-            })
-        : null;
+    let persistedBorder: Graphics | null = null;
+    if (frameBorder.kind === "solid" && frame.borderFillRects.length > 0) {
+      persistedBorder = new Graphics();
+      for (const rect of frame.borderFillRects) {
+        persistedBorder.rect(
+          (rect.x - frame.clipRect.x) * MICROMETER_TO_CANVAS_PIXEL,
+          (rect.y - frame.clipRect.y) * MICROMETER_TO_CANVAS_PIXEL,
+          rect.width * MICROMETER_TO_CANVAS_PIXEL,
+          rect.height * MICROMETER_TO_CANVAS_PIXEL,
+        );
+      }
+      persistedBorder.fill({
+        color: hexToNumber(frameBorder.rgb),
+        alpha: 1,
+      });
+    }
     if (persistedBorder) {
       persistedBorder.label = `frame-persisted-border-${frame.frameId}`;
       persistedBorder.eventMode = "none";

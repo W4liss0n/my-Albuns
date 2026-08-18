@@ -255,13 +255,42 @@ test("materializes the persisted Frame border in the Canvas scene", async () => 
         rgb: "#A0B0C0",
         widthUm: 1_250,
       },
+      sheets: interactiveComposition.sheets.map((sheet) => ({
+        ...sheet,
+        frames: sheet.frames.map((frame) => ({
+          ...frame,
+          borderFillRects: [
+            { x: 0, y: 0, width: 300_000, height: 1_250 },
+            { x: 0, y: 198_750, width: 300_000, height: 1_250 },
+            { x: 0, y: 0, width: 1_250, height: 200_000 },
+            { x: 298_750, y: 0, width: 1_250, height: 200_000 },
+          ],
+        })),
+      })),
     },
   });
   await finishPixiInitialization();
 
-  expect(
-    displayWithLabel("frame-persisted-border-frame-001"),
-  ).toBeDefined();
+  const border = displayWithLabel(
+    "frame-persisted-border-frame-001",
+  ) as unknown as {
+    rectCommands: Array<{
+      height: number;
+      width: number;
+      x: number;
+      y: number;
+    }>;
+    fillStyles: unknown[];
+  };
+  expect(border.rectCommands).toEqual([
+    { height: 1.25, width: 300, x: 0, y: 0 },
+    { height: 1.25, width: 300, x: 0, y: 198.75 },
+    { height: 200, width: 1.25, x: 0, y: 0 },
+    { height: 200, width: 1.25, x: 298.75, y: 0 },
+  ]);
+  expect(border.fillStyles).toContainEqual(
+    expect.objectContaining({ color: 0xa0b0c0 }),
+  );
 });
 
 test("materializes and releases only the viewport margin while navigating a long Album", async () => {
@@ -453,6 +482,7 @@ test("reconciles only the composed sheet that changed", async () => {
                   width: 200_000,
                   height: 200_000,
                 },
+                borderFillRects: [],
                 zIndex: 0,
                 photo: null,
               },

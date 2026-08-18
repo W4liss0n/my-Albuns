@@ -458,7 +458,7 @@ fn render_snapshot_uses_the_composition_plan_and_excludes_canvas_navigation() {
     let session = horizon_project(12);
 
     let snapshot = session.render_snapshot();
-    assert_eq!(snapshot.schema_version, 5);
+    assert_eq!(snapshot.schema_version, 6);
     assert_eq!(snapshot.dpi, 300);
     let photo = snapshot.composition.sheets[0].frames[0]
         .photo

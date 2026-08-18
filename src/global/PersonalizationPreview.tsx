@@ -4,6 +4,7 @@ import type {
   OverlayDraftContent,
   PersonalizationScope,
 } from "./application/newProjectPersonalization";
+import { draftFrameBorderFillRects } from "./application/draftFrameBorderGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
 
 interface PersonalizationPreviewProps {
@@ -142,6 +143,18 @@ export function PersonalizationPreview({
                 pageX +
                 frameInsetX +
                 frameIndex * (frameWidth + frameGap);
+              const borderFillRects =
+                frameBorder.kind === "solid"
+                  ? draftFrameBorderFillRects(
+                      {
+                        height: frameHeight,
+                        width: frameWidth,
+                        x,
+                        y: frameInsetY,
+                      },
+                      frameBorder.widthUm,
+                    )
+                  : [];
 
               return (
                 <g key={frameNumber}>
@@ -158,18 +171,23 @@ export function PersonalizationPreview({
                     x={x}
                     y={frameInsetY}
                   />
-                  {frameBorder.kind === "solid" ? (
-                    <rect
+                  {frameBorder.kind === "solid" && borderFillRects.length > 0 ? (
+                    <g
                       aria-label={`Borda do Frame ${side} ${frameNumber}`}
-                      fill="none"
-                      height={frameHeight}
                       pointerEvents="none"
-                      stroke={frameBorder.rgb}
-                      strokeWidth={frameBorder.widthUm}
-                      width={frameWidth}
-                      x={x}
-                      y={frameInsetY}
-                    />
+                    >
+                      {borderFillRects.map((rect, index) => (
+                        <rect
+                          data-border-segment={index}
+                          fill={frameBorder.rgb}
+                          height={rect.height}
+                          key={index}
+                          width={rect.width}
+                          x={rect.x}
+                          y={rect.y}
+                        />
+                      ))}
+                    </g>
                   ) : null}
                 </g>
               );

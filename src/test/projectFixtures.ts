@@ -120,6 +120,7 @@ export const representativeProjection: EditorProjection = {
               width: 280_000,
               height: 260_000,
             },
+            borderFillRects: [],
             zIndex: 0,
             photo: {
               mediaId: "media-001",

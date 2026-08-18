@@ -5,7 +5,7 @@ use crate::model::{
     ComposedPhoto, ComposedSheet, CompositionPlan, Matrix2, MediaCatalogItem, MediaUsage,
     NormalizedPan, NumberRange, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN,
     PhotoPlacement, PhotoPlacementPlan, PhotoSnapshot, ProjectedActiveSides, ProjectedBackground,
-    ProjectedBackgroundContent, ProjectedOverlay, ProjectedOverlayContent,
+    ProjectedBackgroundContent, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
     RENDER_SNAPSHOT_SCHEMA_VERSION, RectUm, RenderSnapshot, SizeUm, VectorUm,
 };
 
@@ -32,6 +32,10 @@ impl CompositionCore {
                         .map(|frame| ComposedFrame {
                             frame_id: frame.id.clone(),
                             clip_rect: frame.rect.clone(),
+                            border_fill_rects: compose_frame_border_fill_rects(
+                                &frame.rect,
+                                &album.visual_defaults.frame_border,
+                            ),
                             z_index: frame.z_index,
                             photo: frame.photo.as_ref().map(|photo| {
                                 let media = media_by_id
@@ -77,6 +81,98 @@ impl CompositionCore {
                 })
                 .collect(),
         }
+    }
+}
+
+pub(crate) fn compose_frame_border_fill_rects(
+    frame: &RectUm,
+    border: &ProjectedFrameBorder,
+) -> Vec<RectUm> {
+    let ProjectedFrameBorder::Solid { width_um, .. } = border else {
+        return Vec::new();
+    };
+    let stroke = i64::try_from(*width_um)
+        .unwrap_or(i64::MAX)
+        .min(frame.width)
+        .min(frame.height);
+    if stroke <= 0 {
+        return Vec::new();
+    }
+
+    vec![
+        RectUm {
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: stroke,
+        },
+        RectUm {
+            x: frame.x,
+            y: frame.y + frame.height - stroke,
+            width: frame.width,
+            height: stroke,
+        },
+        RectUm {
+            x: frame.x,
+            y: frame.y,
+            width: stroke,
+            height: frame.height,
+        },
+        RectUm {
+            x: frame.x + frame.width - stroke,
+            y: frame.y,
+            width: stroke,
+            height: frame.height,
+        },
+    ]
+}
+
+#[cfg(test)]
+mod frame_border_tests {
+    use super::*;
+
+    #[test]
+    fn composes_an_inward_border_and_saturates_without_degenerate_rects() {
+        let frame = RectUm {
+            x: 10,
+            y: 20,
+            width: 100,
+            height: 60,
+        };
+        let border = ProjectedFrameBorder::Solid {
+            rgb: "#000000".into(),
+            width_um: 100,
+        };
+
+        assert_eq!(
+            compose_frame_border_fill_rects(&frame, &border),
+            vec![
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 100,
+                    height: 60,
+                },
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 100,
+                    height: 60,
+                },
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 60,
+                    height: 60,
+                },
+                RectUm {
+                    x: 50,
+                    y: 20,
+                    width: 60,
+                    height: 60,
+                },
+            ],
+        );
     }
 }
 

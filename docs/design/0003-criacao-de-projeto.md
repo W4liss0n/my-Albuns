@@ -112,6 +112,14 @@ espessura da Borda padrão em um controle deslizante, onde zero aparece como
 deslizante apresenta o `Espaço entre Frames` em pixels e atualiza imediatamente a
 reprodução.
 
+A reprodução desenha a Borda padrão integralmente para dentro de cada Frame. A
+dimensão externa do Frame permanece inalterada e somente sua área visível interna
+é ocupada pela espessura da Borda, conforme a regra geral da Borda do Frame.
+Após a criação, o `CompositionCore` materializa as quatro áreas internas de
+preenchimento que Editor e Exportação desenham sem recalcular essa regra. A
+reprodução transitória anterior à criação espelha o mesmo arranjo apenas para
+apresentar o rascunho ainda não submetido ao núcleo.
+
 `Espaço entre Frames` permanece um placeholder visual enquanto não existir no
 contrato do Padrão de Frame. Seu estado afeta somente a reprodução atual, não é
 enviado ao núcleo nem salvo em Predefinição ou Projeto, e deve permanecer marcado

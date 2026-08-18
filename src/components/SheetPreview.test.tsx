@@ -35,6 +35,12 @@ const photoSheet: ComposedSheet = {
         width: 280_000,
         height: 260_000,
       },
+      borderFillRects: [
+        { x: 20_000, y: 20_000, width: 280_000, height: 1_250 },
+        { x: 20_000, y: 278_750, width: 280_000, height: 1_250 },
+        { x: 20_000, y: 20_000, width: 1_250, height: 260_000 },
+        { x: 298_750, y: 20_000, width: 1_250, height: 260_000 },
+      ],
       zIndex: 0,
       photo: {
         mediaId: "media-001",
@@ -93,6 +99,7 @@ const placeholderSheet: ComposedSheet = {
         width: 250_000,
         height: 220_000,
       },
+      borderFillRects: [],
       zIndex: 0,
       photo: null,
     },
@@ -208,8 +215,15 @@ test("renders the persisted solid Frame border on top of Frame content", () => {
   const border = screen
     .getByRole("img", { name: /01/ })
     .querySelector('[data-preview-frame-border-id="frame-001"]');
-  expect(border).toHaveAttribute("stroke", "#A0B0C0");
-  expect(border).toHaveAttribute("stroke-width", "1250");
+  const segments = border?.querySelectorAll("rect") ?? [];
+  expect(segments).toHaveLength(4);
+  expect(segments[0]).toHaveAttribute("fill", "#A0B0C0");
+  expect(segments[0]).toHaveAttribute("x", "20000");
+  expect(segments[0]).toHaveAttribute("y", "20000");
+  expect(segments[0]).toHaveAttribute("width", "280000");
+  expect(segments[0]).toHaveAttribute("height", "1250");
+  expect(segments[3]).toHaveAttribute("x", "298750");
+  expect(segments[3]).toHaveAttribute("width", "1250");
 });
 
 test("keeps preview strokes aligned with Canvas units at other sheet heights", () => {

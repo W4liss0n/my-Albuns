@@ -95,12 +95,7 @@ pub(crate) fn render_request(
     progress(ImagingProgressStage::Composing, 0, composition_units)?;
     for (index, frame) in sheet.frames.iter().enumerate() {
         draw_frame(&mut image, frame, pixels_per_micrometer, &sources)?;
-        draw_frame_border(
-            &mut image,
-            &frame.clip_rect,
-            &request.unit.frame_border,
-            pixels_per_micrometer,
-        );
+        draw_frame_border(&mut image, frame, &request.unit.frame_border, raster)?;
         progress(
             ImagingProgressStage::Composing,
             u32::try_from(index + 1).map_err(|_| "a Lâmina contém Frames demais".to_string())?,
@@ -393,44 +388,62 @@ fn raster_rect(
 
 fn draw_frame_border(
     image: &mut RgbaImage,
-    frame: &RectUm,
+    frame: &ComposedFrame,
     border: &ProjectedFrameBorder,
-    pixels_per_micrometer: f64,
-) {
-    let ProjectedFrameBorder::Solid { rgb, width_um } = border else {
-        return;
+    raster: RasterPlan,
+) -> Result<(), RenderFailure> {
+    let ProjectedFrameBorder::Solid { rgb, .. } = border else {
+        return Ok(());
     };
-    let left = (to_pixels_signed(frame.x, pixels_per_micrometer).max(0) as u32).min(image.width());
-    let top = (to_pixels_signed(frame.y, pixels_per_micrometer).max(0) as u32).min(image.height());
-    let right = (to_pixels_signed(frame.x + frame.width, pixels_per_micrometer).max(0) as u32)
-        .min(image.width());
-    let bottom = (to_pixels_signed(frame.y + frame.height, pixels_per_micrometer).max(0) as u32)
-        .min(image.height());
-    if right <= left || bottom <= top {
-        return;
-    }
-    let stroke = ((*width_um as f64 * pixels_per_micrometer).round().max(1.0) as u32)
-        .min(right - left)
-        .min(bottom - top);
     let color = opaque_rgb(rgb);
-    fill_rect(image, left, top, right, (top + stroke).min(bottom), color);
-    fill_rect(
-        image,
-        left,
-        bottom.saturating_sub(stroke),
-        right,
-        bottom,
-        color,
-    );
-    fill_rect(image, left, top, (left + stroke).min(right), bottom, color);
-    fill_rect(
-        image,
-        right.saturating_sub(stroke),
-        top,
-        right,
-        bottom,
-        color,
-    );
+    let frame_bounds = raster_rect(image, &frame.clip_rect, raster)?;
+    let edges = [
+        FrameBorderEdge::Top,
+        FrameBorderEdge::Bottom,
+        FrameBorderEdge::Left,
+        FrameBorderEdge::Right,
+    ];
+    for (draw_rect, edge) in frame.border_fill_rects.iter().zip(edges) {
+        let mut bounds = raster_rect(image, draw_rect, raster)?;
+        preserve_positive_border_pixel(&mut bounds, frame_bounds, edge);
+        fill_rect(image, bounds.0, bounds.1, bounds.2, bounds.3, color);
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+enum FrameBorderEdge {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
+fn preserve_positive_border_pixel(
+    bounds: &mut (u32, u32, u32, u32),
+    frame: (u32, u32, u32, u32),
+    edge: FrameBorderEdge,
+) {
+    let (frame_left, frame_top, frame_right, frame_bottom) = frame;
+    match edge {
+        FrameBorderEdge::Top if bounds.3 <= bounds.1 && frame_bottom > frame_top => {
+            bounds.1 = frame_top;
+            bounds.3 = frame_top + 1;
+        }
+        FrameBorderEdge::Bottom if bounds.3 <= bounds.1 && frame_bottom > frame_top => {
+            bounds.1 = frame_bottom - 1;
+            bounds.3 = frame_bottom;
+        }
+        FrameBorderEdge::Left if bounds.2 <= bounds.0 && frame_right > frame_left => {
+            bounds.0 = frame_left;
+            bounds.2 = frame_left + 1;
+        }
+        FrameBorderEdge::Right if bounds.2 <= bounds.0 && frame_right > frame_left => {
+            bounds.0 = frame_right - 1;
+            bounds.2 = frame_right;
+        }
+        _ => {}
+    }
 }
 
 fn opaque_rgb(value: &str) -> Rgba<u8> {

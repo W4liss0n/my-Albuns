@@ -11,7 +11,7 @@ use myalbuns_core::{
     EndSheetFormat, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
     InitialOverlay, InitialOverlayContent, InitialProject, InitialProjectConfiguration,
     InitialProjectPersonalization, MediaKind, ProjectCore, ProjectIntent, ProjectLocation,
-    ProjectedFrameBorder, RenderSnapshot,
+    ProjectedFrameBorder, RectUm, RenderSnapshot,
 };
 use myalbuns_imaging_protocol::{
     CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheJob, CacheMediaSource,
@@ -770,6 +770,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
     frame.clip_rect.y = 0;
     frame.clip_rect.width = sheet.width_um;
     frame.clip_rect.height = sheet.height_um;
+    frame.border_fill_rects.clear();
     let photo = frame.photo.as_mut().expect("the fixture frame has a Photo");
     photo.draw_rect = frame.clip_rect.clone();
     photo.rotation_degrees = 0.0;
@@ -823,8 +824,34 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
 
     snapshot.composition.frame_border = ProjectedFrameBorder::Solid {
         rgb: "#00FF00".into(),
-        width_um: 1_270,
+        width_um: 1,
     };
+    snapshot.composition.sheets[0].frames[0].border_fill_rects = vec![
+        RectUm {
+            x: 0,
+            y: 0,
+            width: 25_400,
+            height: 1,
+        },
+        RectUm {
+            x: 0,
+            y: 12_699,
+            width: 25_400,
+            height: 1,
+        },
+        RectUm {
+            x: 0,
+            y: 0,
+            width: 1,
+            height: 12_700,
+        },
+        RectUm {
+            x: 25_399,
+            y: 0,
+            width: 1,
+            height: 12_700,
+        },
+    ];
     let bordered_output_path = output_dir.path().join("real-sheet-with-border.jpg");
     let bordered_result = invoke_real_processor(
         snapshot,
@@ -841,7 +868,7 @@ fn processor_renders_linked_original_pixels_and_only_the_configured_frame_border
     let bordered = image::open(&bordered_output_path)
         .expect("the bordered output decodes")
         .to_rgb8();
-    let border = bordered.get_pixel(1, 25);
+    let border = bordered.get_pixel(0, 25);
     assert!(
         u16::from(border[1]) > u16::from(border[0]) * 3
             && u16::from(border[1]) > u16::from(border[2]) * 3,

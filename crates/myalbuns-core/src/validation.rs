@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::composition::compose_frame_border_fill_rects;
 use crate::model::{
     AlbumSnapshot, ComposedBackground, ComposedOutputUnit, ComposedSheet, CoreError, MediaKind,
     PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, ProjectedBackground,
@@ -133,6 +134,14 @@ fn validate_composed_content(
                 &frame.frame_id,
                 CoreError::InvalidSnapshot,
             )?;
+            if frame.border_fill_rects
+                != compose_frame_border_fill_rects(&frame.clip_rect, frame_border)
+            {
+                return Err(CoreError::InvalidSnapshot(format!(
+                    "plano de Borda inválido para o Frame {}",
+                    frame.frame_id
+                )));
+            }
             let stack_key = (frame.z_index, frame.frame_id.as_str());
             if previous_stack_key.is_some_and(|previous| previous > stack_key) {
                 return Err(CoreError::InvalidSnapshot(format!(

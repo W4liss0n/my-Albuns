@@ -5,7 +5,7 @@ use ts_rs::TS;
 use crate::project_document::{DisplayUnit, DocumentSettings};
 
 pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 5;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 6;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -349,6 +349,7 @@ pub struct ComposedPhoto {
 pub struct ComposedFrame {
     pub frame_id: String,
     pub clip_rect: RectUm,
+    pub border_fill_rects: Vec<RectUm>,
     pub z_index: u32,
     pub photo: Option<ComposedPhoto>,
 }

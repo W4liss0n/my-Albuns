@@ -108,6 +108,7 @@ export const interactiveComposition: CompositionPlan = {
             width: 300_000,
             height: 200_000,
           },
+          borderFillRects: [],
           zIndex: 0,
           photo: {
             mediaId: "media-001",

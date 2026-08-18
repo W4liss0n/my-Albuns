@@ -270,18 +270,23 @@ function FramePreview({
         strokeOpacity={SHEET_VISUAL_STYLE.frame.outlineOpacity}
         strokeWidth={SHEET_VISUAL_STYLE.frame.outlineWidthPx * unit}
       />
-      {frameBorder.kind === "solid" ? (
-        <rect
+      {frameBorder.kind === "solid" && frame.borderFillRects.length > 0 ? (
+        <g
           data-preview-frame-border-id={frame.frameId}
-          fill="none"
-          height={clipRect.height}
           pointerEvents="none"
-          stroke={frameBorder.rgb}
-          strokeWidth={frameBorder.widthUm}
-          width={clipRect.width}
-          x={clipRect.x}
-          y={clipRect.y}
-        />
+        >
+          {frame.borderFillRects.map((rect, index) => (
+            <rect
+              data-preview-frame-border-segment={index}
+              fill={frameBorder.rgb}
+              height={rect.height}
+              key={index}
+              width={rect.width}
+              x={rect.x}
+              y={rect.y}
+            />
+          ))}
+        </g>
       ) : null}
     </g>
   );

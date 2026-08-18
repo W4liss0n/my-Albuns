@@ -193,11 +193,21 @@ vi.mock("pixi.js", () => {
   class Container extends DisplayObject {}
 
   class Graphics extends DisplayObject {
+    fillStyles: unknown[] = [];
+    rectCommands: Array<{
+      height: number;
+      width: number;
+      x: number;
+      y: number;
+    }> = [];
+    strokeStyles: unknown[] = [];
+
     circle() {
       return this;
     }
 
-    fill() {
+    fill(style?: unknown) {
+      this.fillStyles.push(style);
       return this;
     }
 
@@ -211,7 +221,8 @@ vi.mock("pixi.js", () => {
       return this;
     }
 
-    rect() {
+    rect(x: number, y: number, width: number, height: number) {
+      this.rectCommands.push({ height, width, x, y });
       return this;
     }
 
@@ -219,7 +230,8 @@ vi.mock("pixi.js", () => {
       return this;
     }
 
-    stroke() {
+    stroke(style?: unknown) {
+      this.strokeStyles.push(style);
       return this;
     }
   }

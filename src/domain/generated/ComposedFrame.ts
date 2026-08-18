@@ -2,4 +2,4 @@
 import type { ComposedPhoto } from "./ComposedPhoto";
 import type { RectUm } from "./RectUm";
 
-export type ComposedFrame = { frameId: string, clipRect: RectUm, zIndex: number, photo: ComposedPhoto | null, };
+export type ComposedFrame = { frameId: string, clipRect: RectUm, borderFillRects: Array<RectUm>, zIndex: number, photo: ComposedPhoto | null, };
