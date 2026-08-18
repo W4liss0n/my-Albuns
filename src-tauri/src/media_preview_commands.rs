@@ -7,21 +7,25 @@ use tauri::{AppHandle, Emitter, State, WebviewWindow};
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
     cache_engine::{
-        self, AuthorizedCacheNamespace, CacheEngine, CacheFailure, CacheFailureStage,
-        CacheFlightClaim, CacheWork,
+        self, AuthorizedCacheNamespace, CACHE_PROCESSOR_SUSPENDED_MESSAGE, CacheEngine,
+        CacheFailure, CacheFailureStage, CacheFlightClaim, CacheProcessorStatus, CacheWork,
     },
     cache_previews::{CachePreviewError, CachePreviewRegistry},
+    cache_service::CacheNamespaceOwner,
     imaging_processor::{
         ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
     },
     ipc_contract::{
-        LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewCommandErrorCode,
-        MediaPreviewDemand, MediaPreviewState,
+        CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged, MediaPreview,
+        MediaPreviewCommandError, MediaPreviewCommandErrorCode, MediaPreviewDemand,
+        MediaPreviewState,
     },
     logging::LoggingState,
     media_runtime::{MediaAvailability, MediaMonitor, MediaRuntime},
     path_io,
-    product_runtime::{LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL},
+    product_runtime::{
+        CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
+    },
     project_host::ProjectHost,
 };
 
@@ -63,6 +67,7 @@ pub(crate) async fn prepare_media_previews(
     processor: State<'_, ImagingProcessor>,
     logging: State<'_, LoggingState>,
     app_paths: State<'_, AppPaths>,
+    namespace_owner: State<'_, CacheNamespaceOwner>,
 ) -> Result<Option<Vec<MediaPreview>>, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
@@ -82,8 +87,7 @@ pub(crate) async fn prepare_media_previews(
     {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let namespace = AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority)
-        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let namespace = namespace_owner.namespace().clone();
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),
@@ -159,22 +163,15 @@ pub(crate) async fn prepare_media_previews(
                 MediaAvailability::Candidate => unreachable!(),
                 MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
             };
-            previews.push(if state == MediaPreviewState::Unavailable {
-                unavailable_preview(
-                    &engine,
-                    &registry,
-                    &app_paths,
-                    &namespace,
-                    &demand_revision,
-                    media_id,
-                )
-            } else {
-                MediaPreview {
-                    media_id,
-                    state,
-                    url: None,
-                }
-            });
+            previews.push(contextual_preview(
+                &engine,
+                &registry,
+                &app_paths,
+                &namespace,
+                &demand_revision,
+                media_id,
+                state,
+            ));
             continue;
         }
         let binding = catalog_by_id
@@ -194,13 +191,14 @@ pub(crate) async fn prepare_media_previews(
         {
             Ok(root_bindings) => root_bindings,
             Err(_) => {
-                previews.push(unavailable_preview(
+                previews.push(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,
                     &namespace,
                     &demand_revision,
                     media_id,
+                    MediaPreviewState::Unavailable,
                 ));
                 continue;
             }
@@ -252,6 +250,21 @@ pub(crate) async fn prepare_media_previews(
                 previews.push(preview.map_err(MediaPreviewCommandError::from)?);
             }
             Err(failure) => {
+                if engine.processor_status() == CacheProcessorStatus::Suspended
+                    && let Err(error) = window.emit(
+                        CACHE_PROCESSOR_WARNING_EVENT,
+                        CacheProcessorWarning {
+                            state: CacheProcessorState::Suspended,
+                            message: CACHE_PROCESSOR_SUSPENDED_MESSAGE.into(),
+                        },
+                    )
+                {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "cache_processor_warning_emit_failed",
+                    );
+                }
                 tracing::warn!(
                     target: "myalbuns.desktop",
                     stage = ?failure.stage,
@@ -260,13 +273,14 @@ pub(crate) async fn prepare_media_previews(
                     media_id,
                     event = "cache_media_unavailable",
                 );
-                previews.push(unavailable_preview(
+                previews.push(contextual_preview(
                     &engine,
                     &registry,
                     &app_paths,
                     &namespace,
                     &demand_revision,
                     media_id,
+                    MediaPreviewState::Unavailable,
                 ));
             }
         }
@@ -274,19 +288,27 @@ pub(crate) async fn prepare_media_previews(
     Ok(Some(previews))
 }
 
-fn unavailable_preview(
+fn contextual_preview(
     engine: &CacheEngine,
     registry: &CachePreviewRegistry,
     app_paths: &AppPaths,
     namespace: &AuthorizedCacheNamespace,
     demand: &cache_engine::CacheDemandRevision,
     media_id: String,
+    state: MediaPreviewState,
 ) -> MediaPreview {
     engine
-        .retain_last_known_preview(app_paths, namespace, registry, demand, media_id.as_str())
+        .retain_last_known_preview(
+            app_paths,
+            namespace,
+            registry,
+            demand,
+            media_id.as_str(),
+            state,
+        )
         .unwrap_or(MediaPreview {
             media_id,
-            state: MediaPreviewState::Unavailable,
+            state,
             url: None,
         })
 }

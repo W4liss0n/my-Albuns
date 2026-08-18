@@ -93,6 +93,7 @@ const projectCorePort: ProjectCorePort = {
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
   onMediaChanged: async () => () => undefined,
+  onCacheProcessorWarning: async () => () => undefined,
 };
 const exportPipelinePort: ExportPipelinePort = {
   startSheet: () => ({
@@ -137,6 +138,7 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{ ...projectCorePort, load }}
       logger={silentLogger}
@@ -246,6 +248,7 @@ test("prepares real media previews after opening without blocking the Workspace"
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={projectCorePort}
       logger={logger}
@@ -308,6 +311,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
           notifyMediaChanged = listener;
           return () => undefined;
         },
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{
         ...projectCorePort,
@@ -370,6 +374,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
           notifyMediaChanged = listener;
           return () => undefined;
         },
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{
         ...projectCorePort,
@@ -408,9 +413,14 @@ test("keeps the last known preview when linked media becomes unavailable", async
   ).toBeInTheDocument();
 });
 
-test("labels first-observation unavailability without claiming a previous preview", async () => {
+test("keeps the last representation only as visual context when the Original is absent", async () => {
+  const retainedUrl = "http://myalbuns-cache.localhost/generation-one";
   const prepareMediaPreviews = vi.fn().mockResolvedValue([
-    { mediaId: "media-001", state: "unavailable" as const, url: null },
+    {
+      mediaId: "media-001",
+      state: "absent" as const,
+      url: retainedUrl,
+    },
   ]);
 
   render(
@@ -421,6 +431,7 @@ test("labels first-observation unavailability without claiming a previous previe
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{
         ...projectCorePort,
@@ -442,7 +453,107 @@ test("labels first-observation unavailability without claiming a previous previe
   );
 
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
-  expect(screen.getByRole("status", { name: "Indisponível" })).toBeInTheDocument();
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-media-preview",
+    retainedUrl,
+  );
+  expect(
+    screen.getByRole("status", { name: "Arquivo ausente · prévia anterior" }),
+  ).toBeInTheDocument();
+});
+
+test("shows a non-blocking warning when repeated processor failures suspend Cache", async () => {
+  let warnCacheSuspended:
+    | ((warning: { state: "suspended"; message: string }) => void)
+    | undefined;
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews: async () => [],
+        onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async (listener) => {
+          warnCacheSuspended = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await screen.findByRole("button", { name: "Salvar" });
+  act(() =>
+    warnCacheSuspended?.({
+      state: "suspended",
+      message:
+        "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+    }),
+  );
+
+  expect(
+    screen.getByRole("status", { name: "Cache suspenso" }),
+  ).toHaveTextContent(
+    "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+  );
+  expect(screen.getByRole("button", { name: "Salvar" })).toBeEnabled();
+  expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+});
+
+test("labels first-observation unavailability without claiming a previous preview", async () => {
+  const prepareMediaPreviews = vi.fn().mockResolvedValue([
+    { mediaId: "media-001", state: "unavailable" as const, url: null },
+  ]);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(
+    await screen.findByRole("status", { name: "Indisponível" }),
+  ).toBeInTheDocument();
   expect(screen.queryByText("Indisponível · prévia anterior")).not.toBeInTheDocument();
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
@@ -452,6 +563,7 @@ test("labels first-observation unavailability without claiming a previous previe
 
 test("keeps one Monitor subscription while demand revisions change", async () => {
   const onMediaChanged = vi.fn(async () => () => undefined);
+  const onCacheProcessorWarning = vi.fn(async () => () => undefined);
   const prepareMediaPreviews = vi.fn(async () => []);
 
   render(
@@ -459,7 +571,11 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
       exportPipelinePort={exportPipelinePort}
       projectStartupPort={projectStartupPort}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={{ prepareMediaPreviews, onMediaChanged }}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged,
+        onCacheProcessorWarning,
+      }}
       projectCorePort={projectCorePort}
       logger={silentLogger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
@@ -483,6 +599,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
 
   expect(onMediaChanged).toHaveBeenCalledOnce();
+  expect(onCacheProcessorWarning).toHaveBeenCalledOnce();
   expect(prepareMediaPreviews).toHaveBeenNthCalledWith(2, {
     revision: 2,
     visibleMediaIds: [],
@@ -501,6 +618,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={projectCorePort}
       logger={silentLogger}
@@ -556,6 +674,7 @@ test("logs the typed media preview failure code without replacing it with unknow
       mediaPreviewPort={{
         prepareMediaPreviews,
         onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={projectCorePort}
       logger={logger}

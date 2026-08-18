@@ -20,6 +20,11 @@ export interface MediaPreviewRequest extends MediaPreviewDemand {
   revision: number;
 }
 
+export interface CacheProcessorWarning {
+  state: "suspended";
+  message: string;
+}
+
 export type MediaPreviewErrorCode =
   | "unavailable"
   | "unsupported_image"
@@ -183,6 +188,9 @@ export interface MediaPreviewPort {
   ): Promise<readonly MediaPreview[] | null>;
   onMediaChanged(
     listener: (mediaIds: readonly string[]) => void,
+  ): Promise<() => void>;
+  onCacheProcessorWarning(
+    listener: (warning: CacheProcessorWarning) => void,
   ): Promise<() => void>;
 }
 

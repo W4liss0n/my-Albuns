@@ -13,6 +13,7 @@ use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
+    cache_service::{CacheScheduledCleanupOutcome, CacheService},
     desktop_webview_policy,
     graphics_launch_gate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
@@ -993,6 +994,7 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
     let global_webview_data_directory =
         app_paths.webview_data_directory(GLOBAL_WEBVIEW_NAMESPACE)?;
     let state = GlobalRuntimeState::new(&app_paths, direct_project)?;
+    let cache_service = CacheService::new(app_paths.clone());
     let setup_state = state.clone();
     let provisional_decoratives =
         crate::provisional_decoratives::ProvisionalDecorativeRegistry::default();
@@ -1011,9 +1013,25 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         )
         .plugin(tauri_plugin_dialog::init())
         .manage(state)
+        .manage(cache_service)
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
+            let scheduled_cleanup = app
+                .state::<CacheService>()
+                .run_scheduled_cleanup()
+                .map_err(std::io::Error::other)?;
+            tracing::info!(
+                target: "myalbuns.desktop",
+                outcome = ?scheduled_cleanup,
+                event = "scheduled_cache_cleanup_checked",
+            );
+            if scheduled_cleanup == CacheScheduledCleanupOutcome::Deferred {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    event = "scheduled_cache_cleanup_deferred",
+                );
+            }
             let app_handle = app.handle().clone();
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
@@ -1036,6 +1054,9 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             recent_projects,
             open_recent_project,
             startup_open_failure,
+            crate::cache_service::cache_service_status,
+            crate::cache_service::free_closed_project_cache,
+            crate::cache_service::clear_all_cache,
             validate_project_configuration,
             crate::provisional_decoratives::choose_provisional_decorative,
             crate::provisional_decoratives::release_provisional_decorative,

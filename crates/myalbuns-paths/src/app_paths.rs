@@ -5,7 +5,10 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     AppPathsError, CachePathPlan, PreparedCacheStorage,
-    cache::{clear_project_cache, discard_project_cache_temporaries, prepare_cache_storage},
+    cache::{
+        CacheNamespaceUsage, clear_project_cache, discard_project_cache_temporaries,
+        inspect_cache_namespaces, prepare_cache_storage,
+    },
 };
 
 /// Temporary namespace that keeps this development version's data separate
@@ -111,6 +114,10 @@ impl AppPaths {
 
     pub fn clear_project_cache(&self, plan: &CachePathPlan) -> Result<bool, AppPathsError> {
         clear_project_cache(self, plan)
+    }
+
+    pub fn inspect_cache_namespaces(&self) -> Result<Vec<CacheNamespaceUsage>, AppPathsError> {
+        inspect_cache_namespaces(self)
     }
 
     pub fn discard_project_cache_temporaries(

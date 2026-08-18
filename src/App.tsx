@@ -11,6 +11,7 @@ import {
 } from "./application/logging";
 import type {
   ExportPipelinePort,
+  CacheProcessorWarning,
   MediaPreview,
   MediaPreviewDemand,
   MediaPreviewPort,
@@ -63,6 +64,8 @@ function App({
     preloadMediaIds: [],
   });
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
+  const [cacheProcessorWarning, setCacheProcessorWarning] =
+    useState<CacheProcessorWarning | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
 
@@ -181,6 +184,38 @@ function App({
   }, [logger, mediaPreviewPort, projectId]);
 
   useEffect(() => {
+    setCacheProcessorWarning(null);
+    if (!projectId) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void mediaPreviewPort
+      .onCacheProcessorWarning((warning) => {
+        if (active) setCacheProcessorWarning(warning);
+      })
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+        } else {
+          dispose();
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        logger.write({
+          level: "warn",
+          component: "media-preview",
+          event: "cache_processor_warning_subscription_failed",
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [logger, mediaPreviewPort, projectId]);
+
+  useEffect(() => {
     setMediaPreviews({});
   }, [projectId]);
 
@@ -284,6 +319,17 @@ function App({
       <CanvasGraphicsDiagnosticProbeProvider
         probe={canvasGraphicsDiagnosticProbe}
       >
+        {cacheProcessorWarning && (
+          <aside
+            className="cache-runtime-warning"
+            role="status"
+            aria-label="Cache suspenso"
+          >
+            <strong>Cache suspenso</strong>
+            <span>{cacheProcessorWarning.message}</span>
+            <small>A edição e o Salvamento continuam disponíveis.</small>
+          </aside>
+        )}
         <ProjectWorkspace
           projection={projection}
           exportPipelinePort={exportPipelinePort}

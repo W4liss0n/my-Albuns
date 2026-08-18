@@ -9,8 +9,9 @@ use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
-    cache_engine::{AuthorizedCacheNamespace, CacheEngine},
+    cache_engine::CacheEngine,
     cache_previews::CachePreviewRegistry,
+    cache_service::{CacheNamespaceOwner, CacheService},
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
@@ -32,6 +33,7 @@ use crate::{
 
 pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
 pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
+pub(crate) const CACHE_PROCESSOR_WARNING_EVENT: &str = "myalbuns://cache-processor-warning";
 
 pub(crate) fn run(
     opened: BootstrappedHostProject,
@@ -41,6 +43,10 @@ pub(crate) fn run(
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
+    let cache_service = CacheService::new(app_paths.clone());
+    let cache_namespace_owner = cache_service
+        .reserve_namespace(project.identity_authority())
+        .map_err(io::Error::other)?;
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
@@ -82,6 +88,8 @@ pub(crate) fn run(
         .manage(project_host)
         .manage(startup_handshake)
         .manage(cache_previews)
+        .manage(cache_service)
+        .manage(cache_namespace_owner)
         .manage(CacheEngine::default())
         .manage(MediaRuntime::default())
         .manage(MediaMonitor::default())
@@ -326,36 +334,27 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let invalidated = update.invalidated_media_ids();
             if !changed.is_empty() || !invalidated.is_empty() {
                 let app_paths = app.state::<AppPaths>();
-                match AuthorizedCacheNamespace::mount(&app_paths, &catalog.authority) {
-                    Ok(namespace) => match app.state::<CacheEngine>().apply_monitor_media_update(
-                        &app_paths,
-                        &namespace,
-                        app.state::<CachePreviewRegistry>().inner(),
-                        update,
-                    ) {
-                        Ok(removed_generation_count) => {
-                            tracing::info!(
-                                target: "myalbuns.desktop",
-                                invalidated_media_count = invalidated.len(),
-                                removed_generation_count,
-                                event = "linked_media_cache_invalidated",
-                            );
-                        }
-                        Err(error) => {
-                            tracing::warn!(
-                                target: "myalbuns.desktop",
-                                stage = ?error.stage,
-                                error = %error.message,
-                                event = "linked_media_cache_invalidation_failed",
-                            );
-                        }
-                    },
+                let namespace = app.state::<CacheNamespaceOwner>();
+                match app.state::<CacheEngine>().apply_monitor_media_update(
+                    &app_paths,
+                    namespace.namespace(),
+                    app.state::<CachePreviewRegistry>().inner(),
+                    update,
+                ) {
+                    Ok(removed_generation_count) => {
+                        tracing::info!(
+                            target: "myalbuns.desktop",
+                            invalidated_media_count = invalidated.len(),
+                            removed_generation_count,
+                            event = "linked_media_cache_invalidated",
+                        );
+                    }
                     Err(error) => {
                         tracing::warn!(
                             target: "myalbuns.desktop",
                             stage = ?error.stage,
                             error = %error.message,
-                            event = "linked_media_cache_namespace_unavailable",
+                            event = "linked_media_cache_invalidation_failed",
                         );
                     }
                 }

@@ -46,6 +46,22 @@ pub struct CachePathPlan {
     root: PathBuf,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CacheNamespaceUsage {
+    paths: CachePathPlan,
+    bytes: u64,
+}
+
+impl CacheNamespaceUsage {
+    pub fn paths(&self) -> &CachePathPlan {
+        &self.paths
+    }
+
+    pub fn bytes(&self) -> u64 {
+        self.bytes
+    }
+}
+
 /// Keeps the validated Cache directory chain open while artifacts are written.
 ///
 /// On Windows the handles deny directory replacement, so a reparse point
@@ -442,6 +458,104 @@ pub(crate) fn prepare_cache_storage(
         return Err(AppPathsError::CacheStorageOutsideRoot);
     }
     plan.prepare_storage()
+}
+
+pub(crate) fn inspect_cache_namespaces(
+    app_paths: &AppPaths,
+) -> Result<Vec<CacheNamespaceUsage>, AppPathsError> {
+    let local_data_root = app_paths
+        .local_root
+        .parent()
+        .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
+    let local_data = open_directory(local_data_root)?;
+    let Some(application) = open_existing_direct_child(&local_data, &app_paths.local_root)? else {
+        return Ok(Vec::new());
+    };
+    let Some(cache) = open_existing_direct_child(&application, &app_paths.cache_dir())? else {
+        return Ok(Vec::new());
+    };
+    let mut usages = Vec::new();
+    for entry in
+        fs::read_dir(&cache.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let path = entry.path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let Some(namespace) = entry.file_name().to_str().map(str::to_owned) else {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        };
+        if is_reparse_point(&metadata)
+            || !metadata.is_dir()
+            || !valid_namespace_component(&namespace)
+        {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let Some(project) = open_existing_direct_child(&cache, &path)? else {
+            continue;
+        };
+        let paths = CachePathPlan::from_root(path);
+        usages.push(CacheNamespaceUsage {
+            bytes: measure_project_cache(&project, &paths)?,
+            paths,
+        });
+    }
+    usages.sort_by(|left, right| left.paths.root.cmp(&right.paths.root));
+    Ok(usages)
+}
+
+fn measure_project_cache(
+    project: &DirectoryGuard,
+    paths: &CachePathPlan,
+) -> Result<u64, AppPathsError> {
+    let mut bytes = 0_u64;
+    for entry in
+        fs::read_dir(&project.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        let path = entry.path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if is_reparse_point(&metadata) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        if metadata.is_file() {
+            bytes = bytes
+                .checked_add(measure_open_file(project, &path)?)
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            continue;
+        }
+        if metadata.is_dir() && path == paths.media_directory() {
+            let media = open_existing_direct_child(project, &path)?
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            for media_entry in fs::read_dir(&media.logical_path)
+                .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+            {
+                let media_entry =
+                    media_entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+                let media_path = media_entry.path();
+                let media_metadata = fs::symlink_metadata(&media_path)
+                    .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+                if is_reparse_point(&media_metadata) || !media_metadata.is_file() {
+                    return Err(AppPathsError::CacheStorageOutsideRoot);
+                }
+                bytes = bytes
+                    .checked_add(measure_open_file(&media, &media_path)?)
+                    .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            }
+            continue;
+        }
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
+    Ok(bytes)
+}
+
+fn measure_open_file(parent: &DirectoryGuard, path: &Path) -> Result<u64, AppPathsError> {
+    let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+    validate_open_file(parent, path, &file)?;
+    file.metadata()
+        .map(|metadata| metadata.len())
+        .map_err(|_| AppPathsError::CacheStorageUnavailable)
 }
 
 pub(crate) fn clear_project_cache(

@@ -578,6 +578,45 @@ fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
 }
 
 #[test]
+fn inspects_only_direct_cache_namespaces_and_measures_their_files() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let first = paths
+        .project_cache("project-first")
+        .expect("the first Cache plan is valid");
+    let second = paths
+        .project_cache("project-second")
+        .expect("the second Cache plan is valid");
+    let first_storage = paths
+        .prepare_cache_storage(&first)
+        .expect("the first namespace is prepared");
+    let second_storage = paths
+        .prepare_cache_storage(&second)
+        .expect("the second namespace is prepared");
+    let first_preview = first
+        .preview_file("media-a", "generation-a", CacheArtifactFormat::Jpeg)
+        .expect("the first preview path is valid");
+    let second_preview = second
+        .preview_file("media-b", "generation-b", CacheArtifactFormat::Png)
+        .expect("the second preview path is valid");
+    std::fs::write(first.metadata_file(), b"meta").expect("the first metadata is writable");
+    std::fs::write(first_preview, b"preview-one").expect("the first preview is writable");
+    std::fs::write(second_preview, b"preview-two-two").expect("the second preview is writable");
+    drop(first_storage);
+    drop(second_storage);
+
+    let inspected = paths
+        .inspect_cache_namespaces()
+        .expect("the guarded Cache inspection succeeds");
+
+    assert_eq!(inspected.len(), 2);
+    assert_eq!(inspected[0].paths(), &first);
+    assert_eq!(inspected[0].bytes(), 15);
+    assert_eq!(inspected[1].paths(), &second);
+    assert_eq!(inspected[1].bytes(), 15);
+}
+
+#[test]
 fn rejects_a_cache_plan_from_another_local_data_root() {
     let authorized_root = tempfile::tempdir().expect("authorized LocalAppData root");
     let other_root = tempfile::tempdir().expect("different LocalAppData root");

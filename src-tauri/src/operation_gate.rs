@@ -1,38 +1,24 @@
-use std::{
-    fmt, io,
-    os::windows::ffi::OsStrExt,
-    sync::mpsc::{self, Sender},
-    thread::{self, JoinHandle},
-};
+use std::{fmt, os::windows::ffi::OsStrExt};
 
 use myalbuns_paths::AppPaths;
 use sha2::{Digest, Sha256};
-use windows_sys::Win32::{
-    Foundation::{CloseHandle, WAIT_ABANDONED, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
-    System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
-};
+
+use crate::named_mutex::{NamedMutex, NamedMutexError, NamedMutexGrant};
 
 #[derive(Debug)]
 pub(crate) struct OperationGate {
-    mutex_name: Vec<u16>,
+    mutex: NamedMutex,
 }
 
 #[derive(Debug)]
 pub(crate) struct OperationGrant {
-    release: Option<Sender<()>>,
-    worker: Option<JoinHandle<()>>,
+    _grant: NamedMutexGrant,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum OperationGateError {
     Conflict,
     Unavailable { reason: String },
-}
-
-enum WorkerAcquisition {
-    Acquired,
-    Conflict,
-    Unavailable(String),
 }
 
 impl OperationGate {
@@ -46,77 +32,20 @@ impl OperationGate {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
-        let mutex_name = format!(r"Local\MyAlbuns.OperationGate.v1.{suffix}")
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        Self { mutex_name }
+        let mutex_name = format!(r"Local\MyAlbuns.OperationGate.v1.{suffix}");
+        Self {
+            mutex: NamedMutex::new(mutex_name, "myalbuns-operation-gate"),
+        }
     }
 
     pub(crate) fn try_acquire(&self) -> Result<OperationGrant, OperationGateError> {
-        let mutex_name = self.mutex_name.clone();
-        let (acquisition_sender, acquisition_receiver) = mpsc::sync_channel(1);
-        let (release_sender, release_receiver) = mpsc::channel();
-        let worker = thread::Builder::new()
-            .name("myalbuns-operation-gate".into())
-            .spawn(move || {
-                let handle = unsafe { CreateMutexW(std::ptr::null(), 0, mutex_name.as_ptr()) };
-                if handle.is_null() {
-                    let _ = acquisition_sender.send(WorkerAcquisition::Unavailable(
-                        io::Error::last_os_error().to_string(),
-                    ));
-                    return;
-                }
-
-                let wait_result = unsafe { WaitForSingleObject(handle, 0) };
-                let acquisition = match wait_result {
-                    WAIT_OBJECT_0 | WAIT_ABANDONED => WorkerAcquisition::Acquired,
-                    WAIT_TIMEOUT => WorkerAcquisition::Conflict,
-                    WAIT_FAILED => {
-                        WorkerAcquisition::Unavailable(io::Error::last_os_error().to_string())
-                    }
-                    other => WorkerAcquisition::Unavailable(format!(
-                        "resultado inesperado do mutex: {other}"
-                    )),
-                };
-                let owns_mutex = matches!(acquisition, WorkerAcquisition::Acquired);
-                let acquisition_was_delivered = acquisition_sender.send(acquisition).is_ok();
-                if owns_mutex {
-                    if acquisition_was_delivered {
-                        let _ = release_receiver.recv();
-                    }
-                    unsafe {
-                        ReleaseMutex(handle);
-                    }
-                }
-                unsafe {
-                    CloseHandle(handle);
-                }
+        self.mutex
+            .try_acquire()
+            .map(|grant| OperationGrant { _grant: grant })
+            .map_err(|error| match error {
+                NamedMutexError::Conflict => OperationGateError::Conflict,
+                NamedMutexError::Unavailable(reason) => OperationGateError::Unavailable { reason },
             })
-            .map_err(|error| OperationGateError::Unavailable {
-                reason: error.to_string(),
-            })?;
-
-        match acquisition_receiver.recv() {
-            Ok(WorkerAcquisition::Acquired) => Ok(OperationGrant {
-                release: Some(release_sender),
-                worker: Some(worker),
-            }),
-            Ok(WorkerAcquisition::Conflict) => {
-                let _ = worker.join();
-                Err(OperationGateError::Conflict)
-            }
-            Ok(WorkerAcquisition::Unavailable(reason)) => {
-                let _ = worker.join();
-                Err(OperationGateError::Unavailable { reason })
-            }
-            Err(error) => {
-                let _ = worker.join();
-                Err(OperationGateError::Unavailable {
-                    reason: error.to_string(),
-                })
-            }
-        }
     }
 }
 
@@ -132,17 +61,6 @@ impl fmt::Display for OperationGateError {
 }
 
 impl std::error::Error for OperationGateError {}
-
-impl Drop for OperationGrant {
-    fn drop(&mut self) {
-        if let Some(release) = self.release.take() {
-            let _ = release.send(());
-        }
-        if let Some(worker) = self.worker.take() {
-            let _ = worker.join();
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {

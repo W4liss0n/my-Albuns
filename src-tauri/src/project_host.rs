@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIdentityAuthority,
-    ProjectIntent, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
+    SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -39,7 +39,6 @@ pub(crate) struct FrozenSheetExport {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AuthorizedMediaCatalog {
-    pub(crate) authority: ProjectIdentityAuthority,
     pub(crate) bindings: Vec<MediaBinding>,
 }
 
@@ -207,7 +206,6 @@ impl ProjectHost {
     pub(crate) fn authorized_media_catalog(&self) -> Result<AuthorizedMediaCatalog, String> {
         let project = self.project()?;
         Ok(AuthorizedMediaCatalog {
-            authority: project.identity_authority().clone(),
             bindings: project
                 .project()
                 .media()
@@ -940,10 +938,6 @@ mod tests {
             .expect("the Host can authorize its persisted media catalog");
         let projection = host.projection().expect("the Project remains available");
 
-        assert_eq!(
-            catalog.authority.project_id().hyphenated().to_string(),
-            projection.state.project_id
-        );
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,

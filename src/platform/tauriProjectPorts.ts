@@ -17,6 +17,7 @@ import {
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
+import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./generated/CacheProcessorWarning";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
@@ -178,6 +179,11 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
     listen<IpcLinkedMediaChanged>(
       "myalbuns://linked-media-changed",
       ({ payload }) => listener(payload.mediaIds),
+    ),
+  onCacheProcessorWarning: (listener) =>
+    listen<IpcCacheProcessorWarning>(
+      "myalbuns://cache-processor-warning",
+      ({ payload }) => listener(payload),
     ),
 };
 

@@ -1,6 +1,7 @@
 mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
+mod cache_service;
 mod desktop_webview_policy;
 #[cfg(debug_assertions)]
 mod dev_descendant_job;
@@ -22,6 +23,7 @@ pub mod ipc_contract;
 mod logging;
 mod media_preview_commands;
 mod media_runtime;
+mod named_mutex;
 mod native_project_dialog;
 mod opaque_image_protocol;
 mod operation_gate;

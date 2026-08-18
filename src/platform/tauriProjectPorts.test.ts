@@ -271,6 +271,28 @@ test("maps stable linked-media events to the reactive preview seam", async () =>
   expect(unlisten).toEqual(expect.any(Function));
 });
 
+test("maps the typed Cache processor warning without blocking Project commands", async () => {
+  const listener = vi.fn();
+
+  const unlisten = await tauriMediaPreviewPort.onCacheProcessorWarning(listener);
+  eventBoundary.listeners[0]({
+    payload: {
+      state: "suspended",
+      message: "O Cache foi suspenso após falhas repetidas.",
+    },
+  });
+
+  expect(listen).toHaveBeenCalledWith(
+    "myalbuns://cache-processor-warning",
+    expect.any(Function),
+  );
+  expect(listener).toHaveBeenCalledWith({
+    state: "suspended",
+    message: "O Cache foi suspenso após falhas repetidas.",
+  });
+  expect(unlisten).toEqual(expect.any(Function));
+});
+
 test("returns the authoritative projection from a confirmed Project save", async () => {
   const savedProjection = {
     ...representativeProjection,

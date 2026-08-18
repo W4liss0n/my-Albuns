@@ -26,6 +26,7 @@ pub(crate) enum MediaAvailability {
 pub(crate) struct MediaObservation {
     pub(crate) media_id: String,
     pub(crate) kind: MediaKind,
+    logical_path: PathBuf,
     pub(crate) availability: MediaAvailability,
     physical_identity: Option<PhysicalFileIdentity>,
     source_bytes: Option<u64>,
@@ -180,6 +181,7 @@ impl MediaResolver {
                 MediaObservation {
                     media_id: binding.media_id.clone(),
                     kind: binding.kind,
+                    logical_path: binding.logical_path.clone(),
                     availability,
                     physical_identity,
                     source_bytes,
@@ -249,11 +251,7 @@ impl MediaRuntime {
             .filter(|observation| {
                 previous
                     .get(observation.media_id.as_str())
-                    .is_none_or(|previous| *previous != **observation)
-                    && (observation.availability == MediaAvailability::Absent
-                        || previous
-                            .get(observation.media_id.as_str())
-                            .is_some_and(|previous| invalidates_cache(previous, observation)))
+                    .is_some_and(|previous| invalidates_cache(previous, observation))
             })
             .map(|observation| observation.media_id.clone())
             .collect();
@@ -335,6 +333,7 @@ fn invalidates_cache(previous: &MediaObservation, current: &MediaObservation) ->
     current.availability == MediaAvailability::Candidate
         && (previous.availability != MediaAvailability::Candidate
             || previous.kind != current.kind
+            || previous.logical_path != current.logical_path
             || previous.physical_identity != current.physical_identity
             || previous.source_bytes != current.source_bytes
             || previous.source_created_unix_ms != current.source_created_unix_ms
@@ -523,6 +522,14 @@ mod tests {
         );
         let absent = monitor.poll(&runtime, &bindings);
         assert!(absent.update().unwrap().invalidated_media_ids().is_empty());
+        assert!(
+            absent
+                .update()
+                .unwrap()
+                .revoked_preview_media_ids()
+                .is_empty(),
+            "a confirmed absence preserves the last representation as visual context"
+        );
         assert_eq!(
             absent.confirmed_observation().unwrap().observations()[0].availability,
             MediaAvailability::Absent
@@ -534,6 +541,56 @@ mod tests {
         assert_eq!(
             reappeared.update().unwrap().invalidated_media_ids(),
             ["photo-a"]
+        );
+    }
+
+    #[test]
+    fn relink_invalidates_only_the_changed_occurrence_even_for_the_same_physical_file() {
+        let root = tempfile::tempdir().expect("temporary relink fixture");
+        let original = root.path().join("photo.jpg");
+        let relinked = root.path().join("photo-relinked.jpg");
+        std::fs::write(&original, b"same Original bytes").expect("the Original is writable");
+        std::fs::hard_link(&original, &relinked)
+            .expect("the relink fixture aliases the same physical file");
+        let bindings = vec![
+            MediaBinding {
+                media_id: "photo-a".into(),
+                kind: MediaKind::Photo,
+                logical_path: original.clone(),
+            },
+            MediaBinding {
+                media_id: "photo-b".into(),
+                kind: MediaKind::Photo,
+                logical_path: original.clone(),
+            },
+        ];
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+
+        assert!(monitor.poll(&runtime, &bindings).update().is_none());
+        assert!(monitor.poll(&runtime, &bindings).update().is_some());
+
+        let relinked_bindings = vec![
+            MediaBinding {
+                media_id: "photo-a".into(),
+                kind: MediaKind::Photo,
+                logical_path: relinked,
+            },
+            bindings[1].clone(),
+        ];
+        assert!(
+            monitor
+                .poll(&runtime, &relinked_bindings)
+                .update()
+                .is_none(),
+            "one relink observation cannot invalidate Cache"
+        );
+        let stable = monitor.poll(&runtime, &relinked_bindings);
+        assert_eq!(stable.update().unwrap().changed_media_ids(), ["photo-a"]);
+        assert_eq!(
+            stable.update().unwrap().invalidated_media_ids(),
+            ["photo-a"],
+            "relink is scoped by media occurrence, not physical identity"
         );
     }
 }

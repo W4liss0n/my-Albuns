@@ -148,19 +148,28 @@ export function MediaPanel({
                     src={mediaPreviews[media.id].url ?? undefined}
                   />
                 )}
-                {mediaPreviews[media.id]?.state === "unavailable" && (
+                {mediaPreviews[media.id]?.state !== "ready" &&
+                  mediaPreviews[media.id] && (
                   <span
                     aria-label={
-                      mediaPreviews[media.id].url
-                        ? "Indisponível · prévia anterior"
-                        : "Indisponível"
+                      mediaPreviews[media.id].state === "absent"
+                        ? mediaPreviews[media.id].url
+                          ? "Arquivo ausente · prévia anterior"
+                          : "Arquivo ausente"
+                        : mediaPreviews[media.id].url
+                          ? "Indisponível · prévia anterior"
+                          : "Indisponível"
                     }
                     className="media-availability"
                     role="status"
                   >
-                    {mediaPreviews[media.id].url
-                      ? "Indisponível · prévia anterior"
-                      : "Indisponível"}
+                    {mediaPreviews[media.id].state === "absent"
+                      ? mediaPreviews[media.id].url
+                        ? "Arquivo ausente · prévia anterior"
+                        : "Arquivo ausente"
+                      : mediaPreviews[media.id].url
+                        ? "Indisponível · prévia anterior"
+                        : "Indisponível"}
                   </span>
                 )}
               </span>

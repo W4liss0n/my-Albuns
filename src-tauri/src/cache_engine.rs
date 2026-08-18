@@ -180,6 +180,7 @@ struct CacheFlightKey {
 pub(crate) enum CacheFailureStage {
     Plan,
     Processor(InvocationFailureStage),
+    ProcessorSuspended,
     RecoveryCleanup,
     ValidateResponse,
     VerifyArtifacts,
@@ -209,6 +210,16 @@ pub(crate) struct CacheRecovery {
 
 type FlightResult = Result<CacheExecution, CacheFailure>;
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum CacheProcessorStatus {
+    #[default]
+    Ready,
+    Suspended,
+}
+
+pub(crate) const CACHE_PROCESSOR_SUSPENDED_MESSAGE: &str =
+    "O Cache foi suspenso após falhas repetidas do Processador de Imagens.";
+
 #[derive(Debug, Default)]
 pub(crate) struct CacheEngine {
     flights: Arc<Mutex<HashMap<CacheFlightKey, Arc<CacheFlight>>>>,
@@ -216,6 +227,7 @@ pub(crate) struct CacheEngine {
     applied_observation_generations: Mutex<HashMap<(String, String), u64>>,
     active_owners: Arc<AtomicUsize>,
     activity: CacheActivityGate,
+    processor_status: Mutex<CacheProcessorStatus>,
     /// Serializes Cache state transitions that must be atomic with preview or
     /// on-disk metadata publication.
     ///
@@ -322,6 +334,20 @@ impl CacheFlightClaim {
 }
 
 impl CacheEngine {
+    pub(crate) fn processor_status(&self) -> CacheProcessorStatus {
+        *self
+            .processor_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn suspend_processor(&self) {
+        *self
+            .processor_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = CacheProcessorStatus::Suspended;
+    }
+
     pub(crate) async fn begin_cancellable_work(
         &self,
         cancellation: CacheCancellation,
@@ -524,7 +550,11 @@ impl CacheEngine {
         registry: &CachePreviewRegistry,
         demand: &CacheDemandRevision,
         media_id: &str,
+        state: MediaPreviewState,
     ) -> Option<MediaPreview> {
+        if state == MediaPreviewState::Ready {
+            return None;
+        }
         let _transition_and_publication_guard = self
             .transition_and_publication_gate
             .lock()
@@ -542,7 +572,7 @@ impl CacheEngine {
         {
             return None;
         }
-        if let Some(preview) = registry.retained_preview(media_id, MediaPreviewState::Unavailable) {
+        if let Some(preview) = registry.retained_preview(media_id, state) {
             return Some(preview);
         }
         let storage = app_paths.prepare_cache_storage(namespace.paths()).ok()?;
@@ -559,7 +589,7 @@ impl CacheEngine {
             return None;
         }
         registry.publish(app_paths, namespace, &artifact).ok()?;
-        registry.retained_preview(media_id, MediaPreviewState::Unavailable)
+        registry.retained_preview(media_id, state)
     }
 
     pub(crate) fn claim_demanded(
@@ -945,6 +975,12 @@ async fn execute_cache<T: ImagingTransport>(
     context: &InvocationContext,
     cancellation: &CacheCancellation,
 ) -> Result<CacheExecution, CacheFailure> {
+    if engine.processor_status() == CacheProcessorStatus::Suspended {
+        return Err(CacheFailure::new(
+            CacheFailureStage::ProcessorSuspended,
+            CACHE_PROCESSOR_SUSPENDED_MESSAGE,
+        ));
+    }
     if cancellation
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
@@ -960,6 +996,7 @@ async fn execute_cache<T: ImagingTransport>(
     };
     let command = ImagingCommand::build_cache(request.clone());
     let (response, recovery) = invoke_with_recovery(
+        engine,
         transport,
         app_paths,
         work.namespace.paths(),
@@ -998,7 +1035,10 @@ async fn execute_cache<T: ImagingTransport>(
         discard_candidate_generation(&storage, &request);
         return Err(cancelled_before_publication());
     }
-    verify_completion(&storage, &request, &completion)?;
+    if let Err(failure) = verify_completion(&storage, &request, &completion) {
+        discard_candidate_generation(&storage, &request);
+        return Err(failure);
+    }
     if cancellation
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
@@ -1050,7 +1090,7 @@ fn discard_candidate_generation(storage: &PreparedCacheStorage, request: &CacheR
                 media_id = job.source.media_id(),
                 generation_id = job.candidate_generation_id,
                 error = %error,
-                event = "cache_cancelled_generation_cleanup_failed",
+                event = "cache_candidate_generation_cleanup_failed",
             );
         }
     }
@@ -1105,6 +1145,7 @@ fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, 
 }
 
 async fn invoke_with_recovery<T: ImagingTransport>(
+    engine: &CacheEngine,
     transport: &mut T,
     app_paths: &AppPaths,
     cache_paths: &CachePathPlan,
@@ -1180,6 +1221,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                     });
                     attempt += 1;
                 } else {
+                    engine.suspend_processor();
                     return Err(cache_processor_failure(failure));
                 }
             }
@@ -2516,7 +2558,7 @@ mod tests {
     }
 
     #[test]
-    fn unavailable_media_preserves_the_last_known_preview_and_its_typed_state() {
+    fn absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
             let engine = CacheEngine::default();
@@ -2575,6 +2617,7 @@ mod tests {
                     &reopened_registry,
                     &demand,
                     fixture.work.source.media_id(),
+                    crate::ipc_contract::MediaPreviewState::Unavailable,
                 )
                 .expect("a new Host process can hydrate the last published generation");
             assert_eq!(
@@ -2612,6 +2655,7 @@ mod tests {
                         &CachePreviewRegistry::new("project"),
                         &demand,
                         fixture.work.source.media_id(),
+                        crate::ipc_contract::MediaPreviewState::Absent,
                     )
                     .is_none(),
                 "a malformed on-disk generation cannot be rehydrated after restart"
@@ -2643,6 +2687,7 @@ mod tests {
                         &registry,
                         &old_demand,
                         fixture.work.source.media_id(),
+                        crate::ipc_contract::MediaPreviewState::Unavailable,
                     )
                     .is_none(),
                 "a removed medium cannot regain resident bytes through unavailable fallback"
@@ -3111,6 +3156,126 @@ mod tests {
     }
 
     #[test]
+    fn corrupted_or_incompatible_index_is_discarded_and_rebuilt() {
+        tauri::async_runtime::block_on(async {
+            for incompatible_schema in [false, true] {
+                let fixture = fixture();
+                let engine = CacheEngine::default();
+                let previous = verified_preview_artifact(&fixture, &engine).await;
+                let previous_path = fixture
+                    .work
+                    .namespace
+                    .paths()
+                    .preview_file(&previous.media_id, &previous.generation_id, previous.format)
+                    .unwrap();
+                let metadata_path = fixture.work.namespace.paths().metadata_file();
+                if incompatible_schema {
+                    let mut metadata: serde_json::Value =
+                        serde_json::from_slice(&std::fs::read(&metadata_path).unwrap()).unwrap();
+                    metadata["schemaVersion"] = serde_json::json!(u32::MAX);
+                    std::fs::write(&metadata_path, serde_json::to_vec(&metadata).unwrap()).unwrap();
+                } else {
+                    std::fs::write(&metadata_path, b"{corrupted index").unwrap();
+                }
+
+                let mut transport = ScriptedTransport {
+                    app_paths: fixture.app_paths.clone(),
+                    scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                    attempts: Vec::new(),
+                };
+                let mut work = fixture.work.clone();
+                work.request_id = if incompatible_schema {
+                    "cache-incompatible-index"
+                } else {
+                    "cache-corrupted-index"
+                }
+                .into();
+                let rebuilt = engine
+                    .execute(
+                        &mut transport,
+                        &fixture.app_paths,
+                        work,
+                        &InvocationContext::new(
+                            "cache-index-rebuild",
+                            Some(fixture.work.namespace.project_id()),
+                        ),
+                        &CacheCancellation::default(),
+                    )
+                    .await
+                    .expect("a disposable invalid index is rebuilt");
+
+                assert_eq!(rebuilt.completion.generated_count, 1);
+                assert_ne!(rebuilt.artifact().generation_id, previous.generation_id);
+                assert!(
+                    !previous_path.exists(),
+                    "the unreferenced previous generation is collected only after rebuild"
+                );
+                let storage = fixture
+                    .app_paths
+                    .prepare_cache_storage(fixture.work.namespace.paths())
+                    .unwrap();
+                let metadata = super::load_metadata(&storage, fixture.work.namespace.paths())
+                    .expect("the rebuilt index is readable");
+                assert!(super::metadata_is_current(
+                    &metadata,
+                    fixture.work.namespace.project_id(),
+                    fixture.work.namespace.paths(),
+                ));
+            }
+        });
+    }
+
+    #[test]
+    fn repeated_processor_crashes_suspend_new_cache_work_after_one_restart() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([
+                    Script::Crash(5_001),
+                    Script::Crash(5_002),
+                    Script::Complete(CacheArtifactFormat::Jpeg),
+                ]),
+                attempts: Vec::new(),
+            };
+            let engine = CacheEngine::default();
+
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work.clone(),
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("a second crash is a repeated processor failure");
+            assert!(matches!(failure.stage, CacheFailureStage::Processor(_)));
+            assert_eq!(
+                engine.processor_status(),
+                super::CacheProcessorStatus::Suspended
+            );
+
+            let suspended = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work,
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("a suspended Cache cannot start a third processor attempt");
+            assert_eq!(suspended.stage, CacheFailureStage::ProcessorSuspended);
+            assert_eq!(
+                transport.attempts,
+                [1, 2],
+                "suspension does not consume another transport invocation"
+            );
+        });
+    }
+
+    #[test]
     fn cache_engine_does_not_restart_obsolete_work_after_a_processor_crash() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -3246,6 +3411,72 @@ mod tests {
                 assert_eq!(failure.stage, CacheFailureStage::ValidateResponse);
                 assert_eq!(transport.attempts, [1]);
             }
+        });
+    }
+
+    #[test]
+    fn failed_validation_discards_the_candidate_and_preserves_the_last_published_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let published = verified_preview_artifact(&fixture, &engine).await;
+            let published_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(
+                    &published.media_id,
+                    &published.generation_id,
+                    published.format,
+                )
+                .expect("the published generation path is valid");
+            std::fs::write(
+                fixture.work.source.source_path(),
+                b"changed Original requiring a candidate generation",
+            )
+            .expect("the Original changes before the invalid completion");
+            let mut work = fixture.work.clone();
+            work.request_id = "cache-invalid-completion".into();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::MalformedCounts]),
+                attempts: Vec::new(),
+            };
+
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    work,
+                    &InvocationContext::new(
+                        "cache-invalid-completion",
+                        Some(fixture.work.namespace.project_id()),
+                    ),
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("a malformed completion cannot publish its candidate");
+
+            assert_eq!(failure.stage, CacheFailureStage::ValidateResponse);
+            assert!(published_path.is_file());
+            let storage = fixture
+                .app_paths
+                .prepare_cache_storage(fixture.work.namespace.paths())
+                .expect("the last published Cache remains readable");
+            let metadata = super::load_metadata(&storage, fixture.work.namespace.paths())
+                .expect("the previous index remains published");
+            assert_eq!(metadata.entries.len(), 1);
+            assert_eq!(metadata.entries[0].generation_id, published.generation_id);
+            let generation_count =
+                std::fs::read_dir(fixture.work.namespace.paths().media_directory())
+                    .expect("the Cache media directory remains readable")
+                    .filter_map(Result::ok)
+                    .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+                    .count();
+            assert_eq!(
+                generation_count, 1,
+                "the rejected candidate cannot remain as an orphan generation"
+            );
         });
     }
 
