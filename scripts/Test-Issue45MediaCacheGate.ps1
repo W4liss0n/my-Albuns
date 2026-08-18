@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
+. (Join-Path $PSScriptRoot 'Gate-OwnedProcessJob.ps1')
 Initialize-MyAlbunsToolchain
 
 if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
@@ -33,6 +34,31 @@ if (-not [string]::Equals(
 }
 
 $fixedPoint = 'f6518d63b2c75656a58b6769e87abc318a913e23'
+$scratchRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path `
+        $workspaceRoot `
+        '.scratch\cargo-target-tests\issue-45-media-cache')
+)
+$scratchRootExisted = Test-Path -LiteralPath $scratchRoot
+$runRoot = $null
+$distPath = Join-Path $workspaceRoot 'dist'
+$preparedSidecarPath = Join-Path `
+    $workspaceRoot `
+    'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
+$windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
+function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
+    $existing = @(
+        $Paths | Where-Object { Test-Path -LiteralPath $_ }
+    )
+    if ($existing.Count -ne 0) {
+        throw "The issue 45 gate requires its output paths to be absent before the run: $($existing -join ', ')."
+    }
+}
+Assert-Issue45OwnedOutputsAbsent -Paths @(
+    $preparedSidecarPath
+    $windowsPathTarget
+    $distPath
+)
 $runnerMutex = [System.Threading.Mutex]::new(
     $false,
     'Local\MyAlbuns.Issue45MediaCacheGate.v1'
@@ -48,27 +74,11 @@ if (-not $runnerMutexHeld) {
     $runnerMutex.Dispose()
     throw 'Another issue 45 Media and Cache evidence runner is active.'
 }
-
-$scratchRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path `
-        $workspaceRoot `
-        '.scratch\cargo-target-tests\issue-45-media-cache')
-)
-$scratchRootExisted = Test-Path -LiteralPath $scratchRoot
-$runRoot = $null
-$distPath = Join-Path $workspaceRoot 'dist'
-$distExistedBefore = Test-Path -LiteralPath $distPath
-$preparedSidecarPath = Join-Path `
-    $workspaceRoot `
-    'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
-$preparedSidecarExistedBefore = Test-Path -LiteralPath $preparedSidecarPath
-$windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
-$windowsPathTargetExistedBefore = Test-Path -LiteralPath $windowsPathTarget
 $previousModulePath = $env:PSModulePath
 $previousTargetDirectory = $env:CARGO_TARGET_DIR
 $gateRunStartedUtc = [DateTime]::UtcNow
 $ownedProcessRecords = [System.Collections.Generic.Dictionary[string, object]]::new()
-$ownedParentProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+$ownedJobs = [System.Collections.Generic.List[object]]::new()
 $preexistingProcessIdentities = [System.Collections.Generic.HashSet[string]]::new()
 
 function Get-ProcessCreationUtc([object] $Process) {
@@ -121,62 +131,48 @@ function Get-WorkspaceProcesses {
     )
 }
 
-function Register-OwnedGateProcesses {
-    param(
-        [Parameter(Mandatory = $true)]
-        [uint32] $RootProcessId,
-
-        [Parameter(Mandatory = $true)]
-        [DateTime] $CommandStartedUtc
-    )
-
-    $processes = @(Get-CimInstance Win32_Process)
-    $knownParents = [System.Collections.Generic.HashSet[uint32]]::new()
-    [void] $knownParents.Add($RootProcessId)
-    foreach ($known in $ownedParentProcessIds) {
-        [void] $knownParents.Add($known)
+function Register-OwnedGateJobProcesses([object] $Job) {
+    $jobProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+    foreach ($processId in @($Job.ProcessIds())) {
+        [void] $jobProcessIds.Add([uint32] $processId)
     }
-    $changed = $true
-    while ($changed) {
-        $changed = $false
-        foreach ($process in $processes) {
-            $processId = [uint32] $process.ProcessId
-            if ($processId -eq $PID) {
-                continue
-            }
-            $createdUtc = Get-ProcessCreationUtc -Process $process
-            $isRoot = $processId -eq $RootProcessId
-            $isCurrentDescendant =
-                $knownParents.Contains([uint32] $process.ParentProcessId) -and
-                $createdUtc -ge $CommandStartedUtc
-            $isNewWorkspaceProcess = $createdUtc -ge $CommandStartedUtc -and
-                (Test-WorkspaceProcess -Process $process)
-            if (-not ($isRoot -or $isCurrentDescendant -or $isNewWorkspaceProcess)) {
-                continue
-            }
-            $identity = Get-GateProcessIdentity -Process $process
-            if ($preexistingProcessIdentities.Contains($identity)) {
-                continue
-            }
-            if (-not $ownedProcessRecords.ContainsKey($identity)) {
-                $ownedProcessRecords.Add($identity, [pscustomobject]@{
-                    processId = $processId
-                    parentProcessId = [uint32] $process.ParentProcessId
-                    creationUtc = $createdUtc
-                    executablePath = [string] $process.ExecutablePath
-                    commandLine = [string] $process.CommandLine
-                })
-                $changed = $true
-            }
-            [void] $knownParents.Add($processId)
-            [void] $ownedParentProcessIds.Add($processId)
+    if ($jobProcessIds.Count -eq 0) {
+        return
+    }
+    foreach ($process in @(Get-CimInstance Win32_Process)) {
+        $processId = [uint32] $process.ProcessId
+        if (-not $jobProcessIds.Contains($processId)) {
+            continue
+        }
+        $identity = Get-GateProcessIdentity -Process $process
+        if ($preexistingProcessIdentities.Contains($identity)) {
+            throw "A pre-existing process identity entered an issue 45 owned Job: $identity."
+        }
+        if (-not $ownedProcessRecords.ContainsKey($identity)) {
+            $ownedProcessRecords.Add($identity, [pscustomobject]@{
+                processId = $processId
+                parentProcessId = [uint32] $process.ParentProcessId
+                creationUtc = Get-ProcessCreationUtc -Process $process
+                executablePath = [string] $process.ExecutablePath
+                commandLine = [string] $process.CommandLine
+            })
         }
     }
 }
 
 function Get-ActiveOwnedGateProcesses {
+    $jobProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+    foreach ($job in @($ownedJobs.ToArray())) {
+        Register-OwnedGateJobProcesses -Job $job
+        foreach ($processId in @($job.ProcessIds())) {
+            [void] $jobProcessIds.Add([uint32] $processId)
+        }
+    }
     $active = [System.Collections.Generic.List[object]]::new()
     foreach ($process in @(Get-CimInstance Win32_Process)) {
+        if (-not $jobProcessIds.Contains([uint32] $process.ProcessId)) {
+            continue
+        }
         $identity = Get-GateProcessIdentity -Process $process
         if ($ownedProcessRecords.ContainsKey($identity)) {
             $active.Add($process)
@@ -215,24 +211,42 @@ function Get-OwnedGateListeners([object[]] $Processes) {
 }
 
 function Stop-OwnedGateProcesses {
+    $jobs = @($ownedJobs.ToArray())
     $before = @(Get-ActiveOwnedGateProcesses)
     $listenersBefore = @(Get-OwnedGateListeners -Processes $before)
-    foreach ($process in ($before | Sort-Object ProcessId -Descending)) {
-        Stop-Process -Id ([int] $process.ProcessId) -Force -ErrorAction SilentlyContinue
+    $activeProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+    foreach ($job in $jobs) {
+        foreach ($processId in @($job.ProcessIds())) {
+            [void] $activeProcessIds.Add([uint32] $processId)
+        }
+        if (@($job.ProcessIds()).Count -ne 0) {
+            $job.Terminate()
+        }
     }
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    $after = @(Get-ActiveOwnedGateProcesses)
-    while ($after.Count -ne 0 -and [DateTime]::UtcNow -lt $deadline) {
+    $remainingJobProcessCount = @(
+        $jobs | ForEach-Object { $_.ProcessIds() }
+    ).Count
+    while ($remainingJobProcessCount -ne 0 -and [DateTime]::UtcNow -lt $deadline) {
         Start-Sleep -Milliseconds 50
-        $after = @(Get-ActiveOwnedGateProcesses)
+        $remainingJobProcessCount = @(
+            $jobs | ForEach-Object { $_.ProcessIds() }
+        ).Count
     }
+    foreach ($job in $jobs) {
+        $job.Dispose()
+    }
+    $ownedJobs.Clear()
+    $after = @(Get-ActiveOwnedGateProcesses)
     $listenersAfter = @(Get-OwnedGateListeners -Processes $after)
-    if ($after.Count -ne 0 -or $listenersAfter.Count -ne 0) {
+    if ($remainingJobProcessCount -ne 0 -or
+            $after.Count -ne 0 -or
+            $listenersAfter.Count -ne 0) {
         $identifiers = @($after | ForEach-Object { $_.ProcessId }) -join ', '
         throw "The issue 45 gate could not terminate its owned process tree: $identifiers."
     }
     return [pscustomobject]@{
-        stoppedProcessCount = $before.Count
+        stoppedProcessCount = $activeProcessIds.Count
         listenersBefore = $listenersBefore.Count
         processesAfter = $after.Count
         listenersAfter = $listenersAfter.Count
@@ -243,8 +257,7 @@ function Clear-Issue45GateOutputs {
     $cleanupFailures = [System.Collections.Generic.List[string]]::new()
 
     try {
-        if (-not $preparedSidecarExistedBefore -and
-                (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf)) {
+        if (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf) {
             [System.IO.File]::Delete($preparedSidecarPath)
         }
     }
@@ -253,8 +266,7 @@ function Clear-Issue45GateOutputs {
     }
 
     try {
-        if (-not $windowsPathTargetExistedBefore -and
-                (Test-Path -LiteralPath $windowsPathTarget)) {
+        if (Test-Path -LiteralPath $windowsPathTarget) {
             Remove-GateScratchDirectory `
                 -Path $windowsPathTarget `
                 -AllowedParent (Join-Path $workspaceRoot 'target')
@@ -265,7 +277,7 @@ function Clear-Issue45GateOutputs {
     }
 
     try {
-        if (-not $distExistedBefore -and (Test-Path -LiteralPath $distPath)) {
+        if (Test-Path -LiteralPath $distPath) {
             Remove-GateScratchDirectory `
                 -Path $distPath `
                 -AllowedParent $workspaceRoot
@@ -360,6 +372,51 @@ function Get-NormalizedCommandOutput([object[]] $Lines) {
     return $text -replace "$([char]27)\[[0-9;?]*[ -/]*[@-~]", ''
 }
 
+function Start-OwnedGateProcess {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.ProcessStartInfo] $StartInfo,
+
+        [Parameter(Mandatory = $true)]
+        [string] $StartSignalPath
+    )
+
+    if (Test-Path -LiteralPath $StartSignalPath) {
+        throw "The owned process start signal already exists: $StartSignalPath."
+    }
+    $job = [Issue45OwnedProcessJob]::new()
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $StartInfo
+    $started = $false
+    try {
+        if (-not $process.Start()) {
+            throw 'The owned gate process could not be started.'
+        }
+        $started = $true
+        $job.Assign($process)
+        $ownedJobs.Add($job)
+        Register-OwnedGateJobProcesses -Job $job
+        [System.IO.File]::WriteAllText(
+            $StartSignalPath,
+            'assigned',
+            [System.Text.UTF8Encoding]::new($false)
+        )
+        return [pscustomobject]@{
+            process = $process
+            job = $job
+        }
+    }
+    catch {
+        if ($started -and -not $process.HasExited) {
+            try { $process.Kill() } catch {}
+            try { $process.WaitForExit() } catch {}
+        }
+        $process.Dispose()
+        $job.Dispose()
+        throw
+    }
+}
+
 function Invoke-RecordedCommand {
     [CmdletBinding()]
     param(
@@ -375,9 +432,9 @@ function Invoke-RecordedCommand {
 
     Write-Host "START $Name"
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $commandStartedUtc = [DateTime]::UtcNow
     $payloadPath = Join-Path $runRoot "$Name-command.json"
     $wrapperPath = Join-Path $runRoot "$Name-command.ps1"
+    $startSignalPath = Join-Path $runRoot "$Name-command.assigned"
     $payload = [ordered]@{
         filePath = $FilePath
         arguments = @($Arguments)
@@ -388,8 +445,14 @@ function Invoke-RecordedCommand {
         [System.Text.UTF8Encoding]::new($false)
     )
     $wrapper = @'
-param([Parameter(Mandatory = $true)][string] $PayloadPath)
+param(
+    [Parameter(Mandatory = $true)][string] $PayloadPath,
+    [Parameter(Mandatory = $true)][string] $StartSignalPath
+)
 $ErrorActionPreference = 'Stop'
+while (-not (Test-Path -LiteralPath $StartSignalPath -PathType Leaf)) {
+    Start-Sleep -Milliseconds 10
+}
 $payload = Get-Content -LiteralPath $PayloadPath -Raw -Encoding UTF8 | ConvertFrom-Json
 & ([string] $payload.filePath) @($payload.arguments)
 if ($null -eq $LASTEXITCODE) { exit 0 }
@@ -402,30 +465,27 @@ exit $LASTEXITCODE
     )
     $escapedWrapper = $wrapperPath.Replace('"', '\"')
     $escapedPayload = $payloadPath.Replace('"', '\"')
+    $escapedStartSignal = $startSignalPath.Replace('"', '\"')
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $windowsPowerShell
-    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$escapedWrapper`" `"$escapedPayload`""
+    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$escapedWrapper`" `"$escapedPayload`" `"$escapedStartSignal`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
-    $process = [System.Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    if (-not $process.Start()) {
-        throw "Gate command '$Name' could not be started."
-    }
+    $owned = Start-OwnedGateProcess `
+        -StartInfo $startInfo `
+        -StartSignalPath $startSignalPath
+    $process = $owned.process
+    $job = $owned.job
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     while (-not $process.HasExited) {
-        Register-OwnedGateProcesses `
-            -RootProcessId ([uint32] $process.Id) `
-            -CommandStartedUtc $commandStartedUtc
+        Register-OwnedGateJobProcesses -Job $job
         Start-Sleep -Milliseconds 50
     }
     $process.WaitForExit()
-    Register-OwnedGateProcesses `
-        -RootProcessId ([uint32] $process.Id) `
-        -CommandStartedUtc $commandStartedUtc
+    Register-OwnedGateJobProcesses -Job $job
     $exitCode = $process.ExitCode
     $rawOutput = @(
         $stdoutTask.GetAwaiter().GetResult()
@@ -463,6 +523,39 @@ function Get-Sha256([string] $Path) {
     }
 }
 
+function Test-OwnedOutputPreflightContracts {
+    $sentinelFile = Join-Path $runRoot 'preexisting-output.bin'
+    $sentinelDirectory = Join-Path $runRoot 'preexisting-output-directory'
+    $sentinelChild = Join-Path $sentinelDirectory 'sentinel.bin'
+    $missing = Join-Path $runRoot 'absent-output'
+    New-Item -ItemType Directory -Path $sentinelDirectory | Out-Null
+    [System.IO.File]::WriteAllBytes($sentinelFile, [byte[]] (1, 3, 5, 7))
+    [System.IO.File]::WriteAllBytes($sentinelChild, [byte[]] (2, 4, 6, 8))
+    $fileHash = Get-Sha256 -Path $sentinelFile
+    $childHash = Get-Sha256 -Path $sentinelChild
+    $rejected = $false
+    try {
+        Assert-Issue45OwnedOutputsAbsent -Paths @(
+            $sentinelFile
+            $sentinelDirectory
+            $missing
+        )
+    }
+    catch {
+        if ($_.Exception.Message -notlike 'The issue 45 gate requires its output paths to be absent*') {
+            throw
+        }
+        $rejected = $true
+    }
+    if (-not $rejected -or
+            (Get-Sha256 -Path $sentinelFile) -ne $fileHash -or
+            (Get-Sha256 -Path $sentinelChild) -ne $childHash) {
+        throw 'The output preflight did not reject and preserve its byte sentinels.'
+    }
+    Assert-Issue45OwnedOutputsAbsent -Paths @($missing)
+    return 4
+}
+
 function Get-ReleaseArtifact([string] $Name, [string] $Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "The release artifact '$Name' was not produced."
@@ -485,6 +578,57 @@ function Test-ExclusiveRead([string] $Path) {
     $stream.Dispose()
 }
 
+function Measure-VerifiedProof([object] $Requirement) {
+    $requiredText = [string] $Requirement.requiredText
+    switch ([string] $Requirement.proofKind) {
+        'rust-test' {
+            $resultPattern = '(?m)^test\s+(?:[A-Za-z0-9_]+::)*' +
+                [regex]::Escape($requiredText) +
+                '\s+\.\.\.\s+(?<status>ok|ignored|FAILED)\s*$'
+            $results = [regex]::Matches(
+                [string] $Requirement.sourceText,
+                $resultPattern
+            )
+            if ($results.Count -ne 1 -or
+                    $results[0].Groups['status'].Value -ne 'ok') {
+                return 0
+            }
+            return 1
+        }
+        'frontend-test' {
+            $results = @(
+                $Requirement.sourceData |
+                    Where-Object {
+                        [string]::Equals(
+                            [string] $_.title,
+                            $requiredText,
+                            [System.StringComparison]::Ordinal
+                        )
+                    }
+            )
+            if ($results.Count -ne 1 -or [string] $results[0].status -ne 'passed') {
+                return 0
+            }
+            return 1
+        }
+        'exact-line' {
+            return @(
+                ([string] $Requirement.sourceText) -split "`r?`n" |
+                    Where-Object {
+                        [string]::Equals(
+                            $_.Trim(),
+                            $requiredText,
+                            [System.StringComparison]::Ordinal
+                        )
+                    }
+            ).Count
+        }
+        default {
+            throw "Unknown issue 45 proof kind '$($Requirement.proofKind)'."
+        }
+    }
+}
+
 function New-VerifiedCriterion {
     param(
         [Parameter(Mandatory = $true)]
@@ -497,24 +641,21 @@ function New-VerifiedCriterion {
     $proofs = [System.Collections.Generic.List[object]]::new()
     $assertionCount = 0
     foreach ($requirement in @($Requirements)) {
-        $sourceText = [string] $requirement.sourceText
         $requiredText = [string] $requirement.requiredText
-        $matchCount = [regex]::Matches(
-            $sourceText,
-            [regex]::Escape($requiredText),
-            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
-        ).Count
-        if ($matchCount -lt 1) {
-            throw "Criterion '$Name' has no named proof '$requiredText' in '$($requirement.source)'."
+        $matchCount = Measure-VerifiedProof -Requirement $requirement
+        if ($matchCount -ne 1) {
+            throw "Criterion '$Name' has no single successful named proof '$requiredText' in '$($requirement.source)'."
         }
         $proofs.Add([ordered]@{
             source = [string] $requirement.source
             name = $requiredText
             matchCount = $matchCount
         })
-        $assertionCount += $matchCount
+        $assertionCount += 1
     }
-    $passed = $proofs.Count -eq @($Requirements).Count -and $assertionCount -ge $proofs.Count
+    $passed = $proofs.Count -eq @($Requirements).Count -and
+        $assertionCount -eq $proofs.Count -and
+        @($proofs | Where-Object { $_.matchCount -ne 1 }).Count -eq 0
     if (-not $passed) {
         throw "Criterion '$Name' did not retain every required named proof."
     }
@@ -526,11 +667,240 @@ function New-VerifiedCriterion {
     }
 }
 
+function Test-ProofParserContracts {
+    $passedFrontend = [pscustomobject]@{ title = 'frontend proof'; status = 'passed' }
+    $pendingFrontend = [pscustomobject]@{ title = 'frontend proof'; status = 'pending' }
+    $cases = @(
+        @{
+            expected = 1
+            requirement = @{
+                proofKind = 'rust-test'
+                sourceText = 'test module::rust_proof ... ok'
+                requiredText = 'rust_proof'
+            }
+        },
+        @{
+            expected = 0
+            requirement = @{
+                proofKind = 'rust-test'
+                sourceText = 'test module::rust_proof ... ignored'
+                requiredText = 'rust_proof'
+            }
+        },
+        @{
+            expected = 0
+            requirement = @{
+                proofKind = 'rust-test'
+                sourceText = "test a::rust_proof ... ok`ntest b::rust_proof ... ok"
+                requiredText = 'rust_proof'
+            }
+        },
+        @{
+            expected = 1
+            requirement = @{
+                proofKind = 'frontend-test'
+                sourceData = @($passedFrontend)
+                requiredText = 'frontend proof'
+            }
+        },
+        @{
+            expected = 0
+            requirement = @{
+                proofKind = 'frontend-test'
+                sourceData = @($pendingFrontend)
+                requiredText = 'frontend proof'
+            }
+        },
+        @{
+            expected = 0
+            requirement = @{
+                proofKind = 'frontend-test'
+                sourceData = @($passedFrontend, $passedFrontend)
+                requiredText = 'frontend proof'
+            }
+        },
+        @{
+            expected = 1
+            requirement = @{
+                proofKind = 'exact-line'
+                sourceText = "other`nexact proof"
+                requiredText = 'exact proof'
+            }
+        },
+        @{
+            expected = 0
+            requirement = @{
+                proofKind = 'exact-line'
+                sourceText = 'prefix exact proof suffix'
+                requiredText = 'exact proof'
+            }
+        }
+    )
+    foreach ($case in $cases) {
+        $actual = Measure-VerifiedProof -Requirement $case.requirement
+        if ($actual -ne $case.expected) {
+            throw "The fail-closed proof parser accepted or rejected the wrong fixture: expected=$($case.expected), actual=$actual."
+        }
+    }
+    return $cases.Count
+}
+
+function ConvertFrom-DesignMatrix([string] $Markdown) {
+    $section = [regex]::Match(
+        $Markdown,
+        '(?ms)^## Matriz do design 0010\s*\r?\n(?<body>.*?)(?=^##\s|\z)'
+    )
+    if (-not $section.Success) {
+        throw 'The issue 45 research has no design 0010 matrix section.'
+    }
+    $rows = [System.Collections.Generic.List[object]]::new()
+    foreach ($line in @($section.Groups['body'].Value -split "`r?`n")) {
+        $match = [regex]::Match(
+            $line,
+            '^\|(?<scenario>[^|]+)\|(?<producer>[^|]+)\|(?<effect>[^|]+)\|(?<proof>[^|]+)\|\s*$'
+        )
+        if (-not $match.Success) {
+            continue
+        }
+        $scenario = $match.Groups['scenario'].Value.Trim()
+        $rawProof = $match.Groups['proof'].Value.Trim()
+        $proofMatch = [regex]::Match(
+            $rawProof,
+            '^`(?<proof>[A-Za-z0-9_-]+)`$'
+        )
+        if (-not $proofMatch.Success) {
+            continue
+        }
+        $proof = $proofMatch.Groups['proof'].Value
+        $rows.Add([pscustomobject]@{
+            scenario = $scenario
+            producer = $match.Groups['producer'].Value.Trim()
+            consumerEffect = $match.Groups['effect'].Value.Trim()
+            proof = $proof
+            key = "$scenario => $proof"
+        })
+    }
+    return @($rows.ToArray())
+}
+
+function Get-NormativeDesignScenarios([string] $Markdown) {
+    $blocks = [System.Collections.Generic.List[object]]::new()
+    $collecting = $false
+    $current = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in @($Markdown -split "`r?`n")) {
+        $row = [regex]::Match(
+            $line,
+            '^\|(?<scenario>[^|]+)\|(?<result>[^|]+)\|\s*$'
+        )
+        if (-not $row.Success) {
+            if ($collecting -and $current.Count -ne 0) {
+                $blocks.Add(@($current.ToArray()))
+            }
+            $collecting = $false
+            $current.Clear()
+            continue
+        }
+        $scenario = $row.Groups['scenario'].Value.Trim()
+        $result = $row.Groups['result'].Value.Trim()
+        if ($scenario -match '^-+$' -and $result -match '^-+$') {
+            $collecting = $true
+            $current.Clear()
+            continue
+        }
+        if ($collecting) {
+            $current.Add($scenario)
+        }
+    }
+    if ($collecting -and $current.Count -ne 0) {
+        $blocks.Add(@($current.ToArray()))
+    }
+    $normative = @($blocks | Where-Object { @($_).Count -eq 14 })
+    if ($normative.Count -ne 1) {
+        throw 'The normative design 0010 must contain exactly one 14-row two-column scenario matrix.'
+    }
+    return @($normative[0])
+}
+
+function Test-DesignMatrixCoverage(
+    [object[]] $Rows,
+    [object[]] $Expected
+) {
+    if (@($Rows).Count -ne @($Expected).Count) {
+        return $false
+    }
+    $expectedByScenario = [System.Collections.Generic.Dictionary[string, string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($entry in @($Expected)) {
+        if ($expectedByScenario.ContainsKey([string] $entry.scenario)) {
+            throw "The expected design matrix duplicates '$($entry.scenario)'."
+        }
+        $expectedByScenario.Add(
+            [string] $entry.scenario,
+            [string] $entry.proof
+        )
+    }
+    $seen = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($row in @($Rows)) {
+        $scenario = [string] $row.scenario
+        if (-not $seen.Add($scenario) -or
+                [string]::IsNullOrWhiteSpace([string] $row.producer) -or
+                [string]::IsNullOrWhiteSpace([string] $row.consumerEffect) -or
+                [string]::Equals(
+                    [string] $row.producer,
+                    [string] $row.consumerEffect,
+                    [System.StringComparison]::Ordinal
+                ) -or
+                -not $expectedByScenario.ContainsKey($scenario) -or
+                -not [string]::Equals(
+                    [string] $row.proof,
+                    $expectedByScenario[$scenario],
+                    [System.StringComparison]::Ordinal
+                )) {
+            return $false
+        }
+    }
+    return $seen.Count -eq $expectedByScenario.Count
+}
+
+function Test-DesignMatrixContracts(
+    [object[]] $Rows,
+    [object[]] $Expected
+) {
+    if (-not (Test-DesignMatrixCoverage -Rows $Rows -Expected $Expected)) {
+        throw 'The design 0010 matrix is missing, duplicated, extra, or mapped to the wrong proof.'
+    }
+    $assertionCount = 1
+    for ($removed = 0; $removed -lt @($Rows).Count; $removed++) {
+        $fixture = @(
+            for ($index = 0; $index -lt @($Rows).Count; $index++) {
+                if ($index -ne $removed) { $Rows[$index] }
+            }
+        )
+        if (Test-DesignMatrixCoverage -Rows $fixture -Expected $Expected) {
+            throw 'The design matrix validator accepted a fixture with one normative row removed.'
+        }
+        $assertionCount += 1
+    }
+    return $assertionCount
+}
+
 function Invoke-OwnedCleanupProbe {
     $probeScript = Join-Path $runRoot 'owned-cleanup-probe.ps1'
     $probeReady = Join-Path $runRoot 'owned-cleanup-probe.ready'
+    $probeStartSignal = Join-Path $runRoot 'owned-cleanup-probe.assigned'
+    $sentinelScript = Join-Path $runRoot 'concurrent-independent-sentinel.ps1'
+    $sentinelReady = Join-Path $runRoot 'concurrent-independent-sentinel.ready'
     $probeSource = @'
-param([Parameter(Mandatory = $true)][string] $ReadyPath)
+param(
+    [Parameter(Mandatory = $true)][string] $ReadyPath,
+    [Parameter(Mandatory = $true)][string] $StartSignalPath
+)
+while (-not (Test-Path -LiteralPath $StartSignalPath -PathType Leaf)) {
+    Start-Sleep -Milliseconds 10
+}
 $listener = [System.Net.Sockets.TcpListener]::new(
     [System.Net.IPAddress]::Loopback,
     0
@@ -540,71 +910,152 @@ $port = ([System.Net.IPEndPoint] $listener.LocalEndpoint).Port
 [System.IO.File]::WriteAllText($ReadyPath, [string] $port)
 while ($true) { Start-Sleep -Seconds 1 }
 '@
+    $sentinelSource = @'
+param([Parameter(Mandatory = $true)][string] $ReadyPath)
+[System.IO.File]::WriteAllText($ReadyPath, 'alive')
+while ($true) { Start-Sleep -Seconds 1 }
+'@
     [System.IO.File]::WriteAllText(
         $probeScript,
         $probeSource + [System.Environment]::NewLine,
         [System.Text.UTF8Encoding]::new($false)
     )
+    [System.IO.File]::WriteAllText(
+        $sentinelScript,
+        $sentinelSource + [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $windowsPowerShell
-    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$probeScript`" `"$probeReady`""
+    $startInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$probeScript`" `"$probeReady`" `"$probeStartSignal`""
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
-    $process = [System.Diagnostics.Process]::new()
-    $process.StartInfo = $startInfo
-    if (-not $process.Start()) {
-        throw 'The owned-process cleanup probe could not start.'
-    }
-    $startedUtc = [DateTime]::UtcNow
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    while (-not (Test-Path -LiteralPath $probeReady -PathType Leaf)) {
-        if ($process.HasExited) {
-            throw 'The owned-process cleanup probe exited before listening.'
+    $owned = Start-OwnedGateProcess `
+        -StartInfo $startInfo `
+        -StartSignalPath $probeStartSignal
+    $process = $owned.process
+    $job = $owned.job
+    $sentinel = $null
+    $cleanup = $null
+    try {
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        while (-not (Test-Path -LiteralPath $probeReady -PathType Leaf)) {
+            if ($process.HasExited) {
+                throw 'The owned-process cleanup probe exited before listening.'
+            }
+            Register-OwnedGateJobProcesses -Job $job
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw 'The owned-process cleanup probe did not become ready.'
+            }
+            Start-Sleep -Milliseconds 50
         }
-        Register-OwnedGateProcesses `
-            -RootProcessId ([uint32] $process.Id) `
-            -CommandStartedUtc $startedUtc
-        if ([DateTime]::UtcNow -ge $deadline) {
-            throw 'The owned-process cleanup probe did not become ready.'
+        Register-OwnedGateJobProcesses -Job $job
+
+        $sentinelStartInfo = [System.Diagnostics.ProcessStartInfo]::new()
+        $sentinelStartInfo.FileName = $windowsPowerShell
+        $sentinelStartInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$sentinelScript`" `"$sentinelReady`""
+        $sentinelStartInfo.UseShellExecute = $false
+        $sentinelStartInfo.CreateNoWindow = $true
+        $sentinel = [System.Diagnostics.Process]::new()
+        $sentinel.StartInfo = $sentinelStartInfo
+        if (-not $sentinel.Start()) {
+            throw 'The concurrent independent sentinel could not start.'
         }
-        Start-Sleep -Milliseconds 50
-    }
-    Register-OwnedGateProcesses `
-        -RootProcessId ([uint32] $process.Id) `
-        -CommandStartedUtc $startedUtc
-    $active = @(Get-ActiveOwnedGateProcesses)
-    $listeners = @(Get-OwnedGateListeners -Processes $active)
-    while ($listeners.Count -eq 0 -and [DateTime]::UtcNow -lt $deadline) {
-        Start-Sleep -Milliseconds 50
+        $deadline = [DateTime]::UtcNow.AddSeconds(10)
+        while (-not (Test-Path -LiteralPath $sentinelReady -PathType Leaf)) {
+            if ($sentinel.HasExited) {
+                throw 'The concurrent independent sentinel exited before readiness.'
+            }
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw 'The concurrent independent sentinel did not become ready.'
+            }
+            Start-Sleep -Milliseconds 50
+        }
+        $sentinelCim = Get-CimInstance `
+            -ClassName Win32_Process `
+            -Filter "ProcessId = $($sentinel.Id)"
+        if ($null -eq $sentinelCim) {
+            throw 'The concurrent independent sentinel identity was not observable.'
+        }
+        $sentinelIdentity = Get-GateProcessIdentity -Process $sentinelCim
+
         $active = @(Get-ActiveOwnedGateProcesses)
         $listeners = @(Get-OwnedGateListeners -Processes $active)
+        while ($listeners.Count -eq 0 -and [DateTime]::UtcNow -lt $deadline) {
+            Start-Sleep -Milliseconds 50
+            $active = @(Get-ActiveOwnedGateProcesses)
+            $listeners = @(Get-OwnedGateListeners -Processes $active)
+        }
+        if ($active.Count -lt 1 -or $listeners.Count -lt 1) {
+            throw 'The cleanup probe did not causally observe its process and listener.'
+        }
+        $cleanup = Stop-OwnedGateProcesses
+        $process.WaitForExit()
+        if ($sentinel.HasExited) {
+            throw 'Owned Job cleanup terminated the concurrent independent sentinel.'
+        }
+        if ($ownedProcessRecords.ContainsKey($sentinelIdentity)) {
+            throw 'The concurrent independent sentinel was misclassified as owned.'
+        }
+        if ($cleanup.stoppedProcessCount -lt 1 `
+                -or $cleanup.listenersBefore -lt 1 `
+                -or $cleanup.processesAfter -ne 0 `
+                -or $cleanup.listenersAfter -ne 0) {
+            throw 'The cleanup probe did not terminate and verify its complete owned state.'
+        }
+        $cleanup | Add-Member `
+            -NotePropertyName independentSentinelSurvived `
+            -NotePropertyValue $true
+        return $cleanup
     }
-    if ($active.Count -lt 1 -or $listeners.Count -lt 1) {
-        throw 'The cleanup probe did not causally observe its process and listener.'
+    finally {
+        if ($null -eq $cleanup -and $ownedJobs.Count -ne 0) {
+            try { [void] (Stop-OwnedGateProcesses) } catch {}
+        }
+        if ($null -ne $process) {
+            if (-not $process.HasExited) {
+                try { $process.Kill() } catch {}
+                try { $process.WaitForExit() } catch {}
+            }
+            $process.Dispose()
+        }
+        if ($null -ne $sentinel) {
+            if (-not $sentinel.HasExited) {
+                try { $sentinel.Kill() } catch {}
+                try { $sentinel.WaitForExit() } catch {}
+            }
+            $sentinel.Dispose()
+        }
     }
-    $cleanup = Stop-OwnedGateProcesses
-    $process.WaitForExit()
-    $process.Dispose()
-    if ($cleanup.stoppedProcessCount -lt 1 `
-            -or $cleanup.listenersBefore -lt 1 `
-            -or $cleanup.processesAfter -ne 0 `
-            -or $cleanup.listenersAfter -ne 0) {
-        throw 'The cleanup probe did not terminate and verify its complete owned state.'
-    }
-    return $cleanup
 }
 
 try {
+    $outputPreflightAssertionCount = Test-OwnedOutputPreflightContracts
+    $checks.Add([ordered]@{
+        name = 'fail-closed-preexisting-output-preflight'
+        passed = ($outputPreflightAssertionCount -eq 4)
+        assertionCount = $outputPreflightAssertionCount
+    })
+
+    $proofParserAssertionCount = Test-ProofParserContracts
+    $checks.Add([ordered]@{
+        name = 'fail-closed-named-proof-parser'
+        passed = ($proofParserAssertionCount -eq 8)
+        assertionCount = $proofParserAssertionCount
+    })
+
     $cleanupProbe = Invoke-OwnedCleanupProbe
     $checks.Add([ordered]@{
         name = 'owned-process-listener-cleanup-probe'
         passed = ($cleanupProbe.stoppedProcessCount -ge 1 -and
             $cleanupProbe.listenersBefore -ge 1 -and
             $cleanupProbe.processesAfter -eq 0 -and
-            $cleanupProbe.listenersAfter -eq 0)
-        assertionCount = 4
+            $cleanupProbe.listenersAfter -eq 0 -and
+            $cleanupProbe.independentSentinelSurvived)
+        assertionCount = 6
         stoppedProcessCount = $cleanupProbe.stoppedProcessCount
         observedListenerCount = $cleanupProbe.listenersBefore
+        independentSentinelSurvived = $cleanupProbe.independentSentinelSurvived
     })
 
     $bootstrapTarget = Join-Path $runRoot 'bootstrap-target'
@@ -657,26 +1108,40 @@ try {
         elapsedMs = $contractRun.elapsedMs
     })
 
+    $frontendResultsPath = Join-Path $runRoot 'frontend-test-results.json'
     $frontendRun = Invoke-RecordedCommand `
         -Name 'frontend-tests' `
         -FilePath $npm `
-        -Arguments @('test', '--', '--reporter=verbose')
-    $frontendFilesMatch = [regex]::Match(
-        $frontendRun.output,
-        'Test Files\s+(\d+) passed'
-    )
-    $frontendTestsMatch = [regex]::Match(
-        $frontendRun.output,
-        'Tests\s+(\d+) passed'
-    )
-    if (-not $frontendFilesMatch.Success -or -not $frontendTestsMatch.Success) {
-        throw 'The frontend gate did not report non-empty passing counts.'
+        -Arguments @(
+            'test',
+            '--',
+            '--reporter=verbose',
+            '--reporter=json',
+            "--outputFile.json=$frontendResultsPath"
+        )
+    if (-not (Test-Path -LiteralPath $frontendResultsPath -PathType Leaf)) {
+        throw 'The frontend gate did not produce its machine-readable test report.'
     }
-    $frontendFileCount = [int] $frontendFilesMatch.Groups[1].Value
-    $frontendTestCount = [int] $frontendTestsMatch.Groups[1].Value
-    if ($frontendFileCount -lt 1 -or $frontendTestCount -lt 1) {
-        throw 'The frontend gate reported an empty passing count.'
+    $frontendResults = Get-Content `
+        -LiteralPath $frontendResultsPath `
+        -Raw `
+        -Encoding UTF8 |
+        ConvertFrom-Json
+    $frontendFileCount = [int] $frontendResults.numPassedTestSuites
+    $frontendTestCount = [int] $frontendResults.numPassedTests
+    if (-not $frontendResults.success `
+            -or $frontendFileCount -lt 1 `
+            -or $frontendTestCount -lt 1 `
+            -or [int] $frontendResults.numFailedTestSuites -ne 0 `
+            -or [int] $frontendResults.numFailedTests -ne 0 `
+            -or [int] $frontendResults.numPendingTests -ne 0 `
+            -or [int] $frontendResults.numTodoTests -ne 0) {
+        throw 'The frontend machine report is empty, failed, pending, or incomplete.'
     }
+    $frontendAssertions = @(
+        $frontendResults.testResults |
+            ForEach-Object { $_.assertionResults }
+    )
     $checks.Add([ordered]@{
         name = 'frontend-tests'
         passed = $true
@@ -934,75 +1399,202 @@ try {
         -LiteralPath (Join-Path $workspaceRoot 'docs\research\0036-integracao-final-de-midias-e-cache.md') `
         -Raw `
         -Encoding UTF8
+    $design0010Text = Get-Content `
+        -LiteralPath (Join-Path $workspaceRoot 'docs\design\0010-armazenamento-local-e-cache.md') `
+        -Raw `
+        -Encoding UTF8
+    $normativeScenarios = @(
+        Get-NormativeDesignScenarios -Markdown $design0010Text
+    )
+    $expectedMatrixProofs = @(
+        'cache_consumes_authoritative_identity_transitions_without_owning_them'
+        'a_new_authorized_identity_reserves_an_independent_empty_namespace'
+        'cache_consumes_authoritative_identity_transitions_without_owning_them'
+        'cache_consumes_authoritative_identity_transitions_without_owning_them'
+        'monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes'
+        'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state'
+        'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state'
+        'corrupted_or_incompatible_index_is_discarded_and_rebuilt'
+        'obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation'
+        'reopening_after_host_death_recovers_the_contained_processors_temporary'
+        'project_open_during_free_space_is_serialized_by_namespace_reservation'
+        'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup'
+        'export_plan_rejects_missing_originals_at_the_typed_plan_stage'
+        'real-mapped-unc'
+    )
+    if ($normativeScenarios.Count -ne $expectedMatrixProofs.Count) {
+        throw 'The normative design scenario and behavioral proof counts diverged.'
+    }
+    $expectedDesignMatrix = @(
+        for ($index = 0; $index -lt $normativeScenarios.Count; $index++) {
+            [pscustomobject]@{
+                scenario = $normativeScenarios[$index]
+                proof = $expectedMatrixProofs[$index]
+            }
+        }
+    )
+    $designMatrixRows = @(
+        ConvertFrom-DesignMatrix -Markdown $researchProofText
+    )
+    $designMatrixAssertionCount = Test-DesignMatrixContracts `
+        -Rows $designMatrixRows `
+        -Expected $expectedDesignMatrix
+    $checks.Add([ordered]@{
+        name = 'complete-fail-closed-design-0010-matrix'
+        passed = ($designMatrixAssertionCount -eq 15)
+        assertionCount = $designMatrixAssertionCount
+        normativeRowCount = $designMatrixRows.Count
+    })
+    $designMatrixProofText = @(
+        $designMatrixRows | ForEach-Object { $_.key }
+    ) -join "`n"
+
+    function New-RustProof([string] $Name) {
+        return @{
+            source = 'rust-tests'
+            proofKind = 'rust-test'
+            sourceText = $rustRun.output
+            requiredText = $Name
+        }
+    }
+
+    function New-FrontendProof([string] $Name) {
+        return @{
+            source = 'frontend-tests'
+            proofKind = 'frontend-test'
+            sourceData = $frontendAssertions
+            requiredText = $Name
+        }
+    }
+
+    function New-ExactProof(
+        [string] $Source,
+        [string] $Text,
+        [string] $Name
+    ) {
+        return @{
+            source = $Source
+            proofKind = 'exact-line'
+            sourceText = $Text
+            requiredText = $Name
+        }
+    }
+    $completeMatrixRequirements = [System.Collections.Generic.List[object]]::new()
+    foreach ($row in $designMatrixRows) {
+        $completeMatrixRequirements.Add(
+            (New-ExactProof `
+                -Source 'research-matrix' `
+                -Text $designMatrixProofText `
+                -Name $row.key)
+        )
+    }
+    foreach ($proofName in @(
+            'cache_consumes_authoritative_identity_transitions_without_owning_them'
+            'a_new_authorized_identity_reserves_an_independent_empty_namespace'
+            'monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes'
+            'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state'
+            'corrupted_or_incompatible_index_is_discarded_and_rebuilt'
+            'obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation'
+            'reopening_after_host_death_recovers_the_contained_processors_temporary'
+            'project_open_during_free_space_is_serialized_by_namespace_reservation'
+            'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup'
+            'export_plan_rejects_missing_originals_at_the_typed_plan_stage'
+        )) {
+        $completeMatrixRequirements.Add((New-RustProof -Name $proofName))
+    }
+    $completeMatrixRequirements.Add(
+        (New-ExactProof `
+            -Source 'windows-paths' `
+            -Text $windowsProofText `
+            -Name 'real-mapped-unc')
+    )
     $criteria = @(
         New-VerifiedCriterion `
             -Name 'authorized-independent-empty-namespace' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'a_new_authorized_identity_reserves_an_independent_empty_namespace' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'cache_consumes_authoritative_identity_transitions_without_owning_them' }
+                (New-RustProof -Name 'a_new_authorized_identity_reserves_an_independent_empty_namespace')
+                (New-RustProof -Name 'cache_consumes_authoritative_identity_transitions_without_owning_them')
             )
         New-VerifiedCriterion `
             -Name 'authoritative-absent-unavailable-and-visual-context' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'resolver_monitor_and_runtime_keep_observed_state_outside_media_refs' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state' },
-                @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'keeps the last known preview when linked media becomes unavailable' },
-                @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'keeps the last representation only as visual context when the Original is absent' }
+                (New-RustProof -Name 'resolver_monitor_and_runtime_keep_observed_state_outside_media_refs')
+                (New-RustProof -Name 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state')
+                (New-FrontendProof -Name 'keeps the last known preview when linked media becomes unavailable')
+                (New-FrontendProof -Name 'keeps the last representation only as visual context when the Original is absent')
+                (New-RustProof -Name 'export_plan_rejects_missing_originals_at_the_typed_plan_stage')
             )
         New-VerifiedCriterion `
             -Name 'relink-occurrence-stable-change-and-reappearance' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes' },
-                @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'offers public Relink only for an absent occurrence and applies the returned projection' }
+                (New-RustProof -Name 'public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history')
+                (New-RustProof -Name 'public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence')
+                (New-RustProof -Name 'monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes')
+                (New-FrontendProof -Name 'offers public Relink only for an absent occurrence and applies the returned projection')
             )
         New-VerifiedCriterion `
-            -Name 'incompatible-corrupt-invalid-cache-rebuild' `
+            -Name 'discardable-complete-index-and-candidate-validation' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'corrupted_or_incompatible_index_is_discarded_and_rebuilt' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'failed_validation_discards_the_candidate_and_preserves_the_last_published_generation' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'a_wrong_response_correlation_discards_the_unpublished_candidate_generation' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'repeated_crashes_after_candidate_publication_leave_no_orphan_generation' }
+                (New-RustProof -Name 'corrupted_or_incompatible_index_is_discarded_and_rebuilt')
+                (New-RustProof -Name 'duplicate_media_entries_make_the_discardable_cache_index_non_current')
+                (New-RustProof -Name 'cache_engine_publishes_index_last_reuses_and_invalidates_only_the_requested_media')
+                (New-RustProof -Name 'failed_validation_discards_the_candidate_and_preserves_the_last_published_generation')
+                (New-RustProof -Name 'a_wrong_response_correlation_discards_the_unpublished_candidate_generation')
+                (New-RustProof -Name 'repeated_crashes_after_candidate_publication_leave_no_orphan_generation')
+            )
+        New-VerifiedCriterion `
+            -Name 'request-fingerprint-variant-revalidation-and-obsolete-collection' `
+            -Requirements @(
+                (New-RustProof -Name 'terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement')
+                (New-RustProof -Name 'authoritative_demand_revision_rejects_queued_and_late_obsolete_work')
+                (New-RustProof -Name 'obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation')
+                (New-RustProof -Name 'failed_validation_discards_the_candidate_and_preserves_the_last_published_generation')
             )
         New-VerifiedCriterion `
             -Name 'processor-restart-once-then-nonblocking-suspension' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'repeated_processor_crashes_suspend_new_cache_work_after_one_restart' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'repeated_processor_failure_suspends_before_fallible_recovery_cleanup' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'terminating_the_host_closes_its_job_and_terminates_the_active_processor' },
-                @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'shows a non-blocking warning when repeated processor failures suspend Cache' },
-                @{ source = 'imaging-recovery'; sourceText = $imagingProofText; requiredText = 'production-recovery-integration' }
+                (New-RustProof -Name 'repeated_processor_crashes_suspend_new_cache_work_after_one_restart')
+                (New-RustProof -Name 'repeated_processor_failure_suspends_before_fallible_recovery_cleanup')
+                (New-FrontendProof -Name 'shows a non-blocking warning when repeated processor failures suspend Cache')
+            )
+        New-VerifiedCriterion `
+            -Name 'tracer-44-host-death-and-real-recovery' `
+            -Requirements @(
+                (New-RustProof -Name 'terminating_the_host_closes_its_job_and_terminates_the_active_processor')
+                (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'production-recovery-integration')
             )
         New-VerifiedCriterion `
             -Name 'local-unc-mapped-and-long-paths' `
             -Requirements @(
-                @{ source = 'windows-paths'; sourceText = $windowsProofText; requiredText = 'path-contract' },
-                @{ source = 'windows-paths'; sourceText = $windowsProofText; requiredText = 'path-policy' },
-                @{ source = 'windows-paths'; sourceText = $windowsProofText; requiredText = 'real-mapped-unc' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'prepares_the_cache_only_as_directories_below_the_authorized_root' }
+                (New-ExactProof -Source 'windows-paths' -Text $windowsProofText -Name 'path-contract')
+                (New-ExactProof -Source 'windows-paths' -Text $windowsProofText -Name 'path-policy')
+                (New-ExactProof -Source 'windows-paths' -Text $windowsProofText -Name 'real-mapped-unc')
+                (New-RustProof -Name 'prepares_the_cache_only_as_directories_below_the_authorized_root')
             )
         New-VerifiedCriterion `
             -Name 'measure-free-reserve-and-safe-total-cleanup' `
             -Requirements @(
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'measures_and_frees_only_namespaces_without_an_active_owner' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'namespace_reservation_survives_process_boundaries_and_owner_termination' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'reopening_after_host_death_recovers_the_contained_processors_temporary' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation' }
+                (New-RustProof -Name 'measures_and_frees_only_namespaces_without_an_active_owner')
+                (New-RustProof -Name 'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup')
+                (New-RustProof -Name 'project_open_during_free_space_is_serialized_by_namespace_reservation')
+                (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
+                (New-RustProof -Name 'reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation')
             )
         New-VerifiedCriterion `
-            -Name 'narrow-api-and-design-0010-ownership-matrix' `
+            -Name 'narrow-api-without-universal-coordinator' `
             -Requirements @(
-                @{ source = 'cache-service-source'; sourceText = $narrowApiProofText; requiredText = 'cache_service_status' },
-                @{ source = 'cache-service-source'; sourceText = $narrowApiProofText; requiredText = 'free_closed_project_cache' },
-                @{ source = 'cache-service-source'; sourceText = $narrowApiProofText; requiredText = 'clear_all_cache' },
-                @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'cache_consumes_authoritative_identity_transitions_without_owning_them' },
-                @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'maps the Project and media ports to the desktop commands' },
-                @{ source = 'research-matrix'; sourceText = $researchProofText; requiredText = 'ProjectSession::RelinkMedia' }
+                (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'cache_service_status')
+                (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'free_closed_project_cache')
+                (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'clear_all_cache')
+                (New-FrontendProof -Name 'maps the Project and media ports to the desktop commands')
+                (New-FrontendProof -Name 'initializes the native dialog used by the productive relink command')
             )
+        New-VerifiedCriterion `
+            -Name 'complete-design-0010-producer-consumer-matrix' `
+            -Requirements @($completeMatrixRequirements.ToArray())
     )
-    if ($criteria.Count -ne 8 -or @($criteria | Where-Object { -not $_.passed }).Count -ne 0) {
+    if ($criteria.Count -ne 11 -or @($criteria | Where-Object { -not $_.passed }).Count -ne 0) {
         throw 'The issue 45 criteria matrix is incomplete or contains an unproved criterion.'
     }
 
@@ -1056,8 +1648,9 @@ try {
         releaseArtifacts = $releaseArtifacts
         cleanup = [ordered]@{
             runScratchRemoved = $true
-            newlyCreatedWindowsPathTargetRemoved = -not $windowsPathTargetExistedBefore
-            newlyCreatedDistRemoved = -not $distExistedBefore
+            preparedSidecarRemoved = -not (Test-Path -LiteralPath $preparedSidecarPath)
+            windowsPathTargetRemoved = -not (Test-Path -LiteralPath $windowsPathTarget)
+            distRemoved = -not (Test-Path -LiteralPath $distPath)
             ownedProcesses = $ownedProcessCountAfter
             ownedListeners = $ownedListenerCountAfter
             claimedPreexistingProcessIdentities = $claimedPreexistingIdentities.Count

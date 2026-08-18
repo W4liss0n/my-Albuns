@@ -58,15 +58,18 @@ geração e ao processo que os criou; o sweep não remove temporários estrangei
 nem uma geração publicada por outro trabalho.
 
 Há uma única exceção deliberada para a recuperação após queda total do Host:
-o novo Host primeiro adquire com exclusividade a reserva nomeada do namespace e,
-antes de iniciar qualquer Processador, remove todos os nomes temporários
-bem-formados abandonados. A reserva prova que o Host anterior terminou; o Job
-Object prova que seu Processador não sobreviveu. Sob essa exclusão, não é
-necessário tratar PID reciclável como autoridade. Se o índice atual for válido,
-a recuperação preserva somente suas gerações referenciadas e coleta finais
-órfãos; se estiver ausente, incompatível ou corrompido, coleta todas as gerações
-finais e reconstrói o índice em trabalho novo. Erro de inspeção fecha a abertura
-do namespace, em vez de aceitar estado parcial.
+o novo Host primeiro adquire com exclusividade a reserva nomeada do namespace.
+Antes de cada dispatch de Cache, o Host anterior publica atomicamente uma claim
+com PID e instante de criação do Processador já contido. O fechamento do Job
+Object solicita a terminação, mas ela é assíncrona; por isso o novo Host reabre
+essa instância exata e aguarda seu estado sinalizado antes de inspecionar ou
+remover qualquer conteúdo. PID isolado e mutex abandonado não são tratados como
+prova de término. Sob essa exclusão confirmada, a recuperação remove os nomes
+temporários bem-formados abandonados. Se o índice atual for válido, preserva
+somente suas gerações referenciadas e coleta finais órfãos; se estiver ausente,
+incompatível ou corrompido, coleta todas as gerações finais e reconstrói o índice
+em trabalho novo. Claim incompatível, falha de consulta, timeout ou erro de
+inspeção fecham a abertura do namespace, em vez de aceitar estado parcial.
 
 Uma falha abrupta do Processador permite exatamente um restart para o trabalho
 ainda atual. Uma segunda falha suspende novos trabalhos de Cache e emite o
@@ -102,21 +105,27 @@ Mídia permanecem no contrato da issue 11.
 
 ## Matriz do design 0010
 
-| Transição | Produtor autoritativo | Efeito no consumidor Cache |
-| --- | --- | --- |
-| Projeto novo | `ProjectIdentityAuthority` / `ProjectCore` | reserva namespace novo, independente e vazio |
-| `Salvar como` | `ProjectCore`, na futura issue 18 | recebe a nova autoridade e reserva namespace novo e vazio |
-| Mesmo arquivo por alias | comparação física da issue 10 | `FocusExisting`; nenhum namespace novo |
-| Projeto movimentado | `ProjectCore` conserva o UUID | conserva namespace e dados derivados |
-| Cópia externa gravável | promoção técnica da issue 10 | recebe namespace novo e vazio |
-| Cópia externa somente leitura | resultado opaco da issue 10 | nenhuma Sessão e nenhum namespace |
-| Original ausente | inspeção autoritativa do `MediaResolver`, registrada pelo `MediaRuntime` | mantém só contexto visual; não valida o Original nem autoriza Exportação |
-| Original indisponível | inspeção inconclusiva do `MediaResolver`, registrada pelo `MediaRuntime` | mantém contexto e aguarda nova inspeção |
-| Religação de uma ocorrência | proposta validada do `MediaResolver`, seguida de `ProjectSession::RelinkMedia` e reinspeção | invalida somente o `mediaId` religado |
-| Mudança estável | duas inspeções autoritativas do `MediaResolver`, registradas pelo `MediaRuntime` | expira a época e deriva nova geração |
-| Cache corrompido/incompatível | validação do consumidor | descarta índice e reconstrói |
-| Falha repetida do Processador | supervisor preservado da issue 44 | suspende Cache sem bloquear edição/Salvamento |
-| Projeto fechado | término da reserva do Host | namespace passa a ser potencialmente liberável |
+Cada linha abaixo corresponde, sem omissões, à matriz normativa de cenários do
+design 0010. A última coluna nomeia uma prova comportamental executada pelo gate;
+o próprio runner rejeita linha ausente, extra, duplicada ou associada a outra
+prova.
+
+| Cenário normativo | Produtor autoritativo | Efeito no consumidor Cache | Prova comportamental |
+| --- | --- | --- | --- |
+| Projeto renomeado ou movido | `ProjectCore` da issue 10 conserva a Identidade | conserva o namespace e os dados derivados | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
+| `Salvar como` | `ProjectCore` da futura issue 18 produz nova Identidade | recebe a nova autoridade e reserva namespace independente e vazio | `a_new_authorized_identity_reserves_an_independent_empty_namespace` |
+| Cópia externa gravável | promoção autoritativa da issue 10 produz nova Identidade | recebe namespace independente e vazio | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
+| Cópia externa somente leitura | resultado opaco da issue 10 nega autoridade editável | não monta Sessão nem namespace duplicado | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
+| original alterado | duas inspeções autoritativas estáveis do `MediaResolver` | invalida somente a representação daquela ocorrência | `monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes` |
+| original ausente | inspeção autoritativa `Absent` do `MediaResolver` | mantém somente contexto visual; não valida o Original nem autoriza Exportação | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
+| origem de rede indisponível | inspeção inconclusiva `Unavailable` do `MediaResolver` | preserva vínculo e última representação sem confirmar ausência | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
+| índice corrompido | validação integral do `CacheEngine` | descarta o índice completo e reconstrói em trabalho novo | `corrupted_or_incompatible_index_is_discarded_and_rebuilt` |
+| job obsoleto termina | demanda autoritativa revalidada pelo `CacheEngine` | descarta a geração candidata sem publicá-la | `obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation` |
+| queda durante geração | Host e supervisor da issue 44 publicam a claim da instância contida | aguarda o Processador terminar, coleta temporário e preserva a geração publicada | `reopening_after_host_death_recovers_the_contained_processors_temporary` |
+| Projeto abre durante `Liberar espaço` | Host e serviço disputam a reserva atômica do namespace | quem reserva primeiro exclui o outro; nunca há remoção concorrente | `project_open_during_free_space_is_serialized_by_namespace_reservation` |
+| limpeza total com Projeto ativo | `OperationGate` e reservas registram atividade real | agenda limpeza para o próximo início seguro | `schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup` |
+| Exportação | `ExportPipeline` usa snapshot validado e Originais | Cache pausa e nunca se torna fonte final nem fallback | `export_plan_rejects_missing_originals_at_the_typed_plan_stage` |
+| Projeto ou mídia em UNC | autoridade de Identidade e `RootBindingPlan` preservam os paths | mantém Cache sob a raiz local do aplicativo | `real-mapped-unc` |
 
 O sufixo temporário de desenvolvimento `MyAlbuns2` permanece conforme o design
 0010. Migrá-lo para `MyAlbuns` é uma decisão de distribuição separada; esta
@@ -136,17 +145,26 @@ nenhum artefato anterior é aceito. Antes do primeiro contrato Tauri, o runner
 compila e prepara no próprio scratch o sidecar debug exigido pelo build script;
 o release usa outro `CARGO_TARGET_DIR` exclusivo sob esse scratch. Cada critério
 é derivado de provas nomeadas e não vazias nos resultados comportamentais da
-própria rodada. O runner inicia ainda um processo controlado com listener TCP,
-observa ambos, encerra a árvore pelo mesmo caminho usado no `finally` e exige
-contagens finais zero. Ele rastreia as identidades PID+instante de criação de
-todos os descendentes criados depois de cada comando e recusa qualquer
-identidade já presente no snapshot pré-gate; assim, reciclagem de PID parental
-não transforma um processo estrangeiro em alvo de cleanup. O runner calcula
-hashes antes de remover os outputs, mede listeners reais, exige locks exclusivos
-disponíveis, drena qualquer descendente registrado que ainda esteja encerrando,
-remove seus diretórios e só então captura novamente a árvore Git. O caminho de
-sucesso e o `finally` usam a mesma rotina medida de encerramento e verificação;
-qualquer falha também passa por ela antes da limpeza do scratch.
+própria rodada. O runner inicia ainda um processo controlado com listener TCP
+dentro de um Job Object privado, observa a árvore causal e encerra o Job pelo
+mesmo caminho usado no `finally`, exigindo contagens finais zero. Um
+processo-sentinela concorrente, criado depois do snapshot mas fora desse Job,
+precisa permanecer vivo; portanto proximidade temporal, pathname e PID parental
+nunca autorizam encerramento. Cada identidade observada combina PID e instante
+de criação e nenhuma identidade do snapshot pré-gate pode entrar num Job
+próprio. `dist`, sidecar preparado e o target fixo de caminhos precisam estar
+ausentes no preflight: o runner falha antes de escrever, em vez de sobrescrever
+um output ignorado preexistente. Ele calcula hashes dos artefatos, mede
+listeners reais, exige locks exclusivos, drena somente Jobs próprios, remove
+todos os outputs que criou e só então captura novamente a árvore Git. O caminho
+de sucesso e o `finally` usam a mesma rotina medida de encerramento e
+verificação; qualquer falha também passa por ela antes da limpeza do scratch.
+
+Resultados Rust são aceitos apenas por uma linha terminal exata `... ok`, e o
+frontend por uma asserção JSON exata com estado `passed`; `ignored`, pendente,
+duplicata ou simples substring fecham o gate. Fixtures negativas exercitam o
+parser. A matriz acima também é validada como conjunto exato e cada remoção
+unitária é usada como fixture negativa antes de aceitar as provas da rodada.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).
