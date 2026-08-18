@@ -137,11 +137,15 @@ Os controles podem rolar dentro de sua região quando necessário, sem retirar a
 │                                           │                      │
 │                                           │                      │
 ├───────────────────────────────────────────┴──────────────────────┤
-│  Voltar                         Cancelar              Criar      │
+│  Cancelar                              Voltar         Criar      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-O fluxo permite voltar à etapa anterior sem perder valores. `Cancelar` encerra a criação sem produzir arquivo. `Criar` existe na etapa final e, depois de validar as duas etapas, abre o diálogo nativo do Windows.
+O fluxo permite voltar à etapa anterior sem perder valores. `Cancelar` permanece
+isolado à esquerda do rodapé para reduzir encerramentos acidentais; `Voltar`
+fica agrupado à direita, imediatamente antes da ação principal `Criar`.
+`Cancelar` encerra a criação sem produzir arquivo. `Criar` existe na etapa final
+e, depois de validar as duas etapas, abre o diálogo nativo do Windows.
 
 ## Nome e Localização
 

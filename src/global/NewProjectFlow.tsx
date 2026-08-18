@@ -315,20 +315,23 @@ export function NewProjectFlow({
 
       <footer className="new-project-footer">
         <div>
+          <ActionButton
+            disabled={isCreating}
+            onClick={cancelFlow}
+            variant="quiet"
+          >
+            Cancelar
+          </ActionButton>
+        </div>
+        <div className="new-project-footer-actions">
           {step === "personalization" ? (
             <ActionButton
               disabled={isCreating}
               onClick={() => setStep("configuration")}
-              variant="quiet"
             >
               Voltar
             </ActionButton>
           ) : null}
-        </div>
-        <div className="new-project-footer-actions">
-          <ActionButton disabled={isCreating} onClick={cancelFlow}>
-            Cancelar
-          </ActionButton>
           {step === "configuration" ? (
             <ActionButton
               aria-label="Continuar"

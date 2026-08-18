@@ -517,7 +517,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O hover sem clique é apenas feedback temporário e não muda o escopo configurado.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.
-- `Voltar`, `Cancelar` e `Criar` permanecem em um rodapé fixo; se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.
+- `Cancelar` permanece isolado à esquerda do rodapé fixo; `Voltar` fica agrupado à direita, imediatamente antes de `Criar`. Se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.
 - O Nome e a Localização do arquivo não aparecem nessas etapas. Somente `Criar`, na etapa final, abre o diálogo nativo do Windows para escolhê-los.
 - Cancelar o diálogo nativo não cria arquivo e retorna ao fluxo do aplicativo preservando todos os valores preenchidos.
 

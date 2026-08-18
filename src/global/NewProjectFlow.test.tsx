@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
@@ -140,6 +141,39 @@ test("validates and creates with the complete neutral configuration", async () =
     ...expectedConfiguration,
     visualDefaults: neutralVisualDefaults,
   });
+});
+
+test("isolates cancellation and keeps backwards navigation beside the primary action", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const footerActionNames = () => {
+    const footer = screen
+      .getByRole("button", { name: "Cancelar" })
+      .closest("footer");
+    if (!footer) throw new Error("Rodapé da criação não encontrado.");
+
+    return within(footer)
+      .getAllByRole("button")
+      .map(
+        (button) =>
+          button.getAttribute("aria-label") ?? button.textContent?.trim(),
+      );
+  };
+
+  expect(footerActionNames()).toEqual(["Cancelar", "Continuar"]);
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  await screen.findByRole("button", { name: "Criar" });
+
+  expect(footerActionNames()).toEqual(["Cancelar", "Voltar", "Criar"]);
 });
 
 test("creates from the neutral visual defaults without copying the demonstrative Frames", async () => {
