@@ -19,7 +19,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  cursor: pointer;
+  cursor: default;
 }
 
 .new-project-proportional-preview-surface {
