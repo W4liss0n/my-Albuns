@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
+import { ActionButton } from "../ui";
+
 interface DocumentDpiControlProps {
   dpi: number;
   onApplyDpi(dpi: number): void | Promise<void>;
@@ -52,6 +54,7 @@ export function DocumentDpiControl({
       <label>
         <span>DPI</span>
         <input
+          className="ui-field-control"
           type="text"
           inputMode="numeric"
           value={draft}
@@ -60,12 +63,13 @@ export function DocumentDpiControl({
         />
       </label>
       {invalid && <span role="alert">{DPI_ERROR}</span>}
-      <button
+      <ActionButton
+        density="compact"
         type="submit"
         disabled={applying || candidate === null || candidate === dpi}
       >
         Aplicar DPI
-      </button>
+      </ActionButton>
     </form>
   );
 }

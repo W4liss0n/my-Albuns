@@ -349,6 +349,7 @@ export function ExportPreviewControl({
       {notification ? (
         <InlineNotice
           className="export-preview-notification"
+          floating
           role={notification.kind === "error" ? "alert" : "status"}
           tone={notification.kind}
         >

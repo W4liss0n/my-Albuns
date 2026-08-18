@@ -3,20 +3,16 @@
 }
 
 .export-preview-trigger.ui-action-button {
-  min-height: 30px;
-  padding: 0 18px;
+  height: 100%;
+  min-height: 0;
+  padding: 0 var(--ui-control-padding-inline);
   border-width: 0 0 0 1px;
   border-radius: 0;
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
 }
 
 .export-preview-notification.ui-inline-notice {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 40;
-  box-shadow: 0 14px 38px rgb(60 54 44 / 18%);
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
   font-weight: 600;
 }
 

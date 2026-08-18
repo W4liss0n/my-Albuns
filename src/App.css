@@ -4,14 +4,14 @@
 .startup-surface {
   display: grid;
   min-height: 100%;
-  padding: 32px;
+  padding: var(--ui-space-6);
   background: var(--ui-canvas);
   place-items: center;
 }
 
 .startup-card {
   width: min(600px, 100%);
-  padding: 34px;
+  padding: var(--ui-space-6);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ui-text);
@@ -20,7 +20,7 @@
 }
 
 .startup-card h1 {
-  margin: 9px 0 13px;
+  margin: var(--ui-space-2) 0 var(--ui-space-3);
   color: var(--ui-text);
   font-size: clamp(1.5rem, 4vw, 2.35rem);
   font-weight: 600;
@@ -30,7 +30,7 @@
 
 .startup-card p {
   color: var(--ui-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--ui-font-size-heading);
   line-height: 1.6;
 }
 
@@ -39,7 +39,7 @@
   margin: 0;
   color: var(--ui-accent) !important;
   font-family: var(--ui-font-mono);
-  font-size: 0.62rem !important;
+  font-size: var(--ui-font-size-micro) !important;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -47,37 +47,33 @@
 
 .diagnostic-list {
   display: grid;
-  margin: 26px 0 20px;
+  margin: var(--ui-space-5) 0 var(--ui-space-4);
   border-top: 1px solid var(--ui-border);
 }
 
 .diagnostic-list div {
   display: grid;
-  padding: 12px 0;
+  padding: var(--ui-space-3) 0;
   border-bottom: 1px solid var(--ui-border);
   grid-template-columns: 160px 1fr;
-  gap: 18px;
+  gap: var(--ui-space-4);
 }
 
 .diagnostic-list dt {
   color: var(--ui-text-muted);
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
 }
 
 .diagnostic-list dd {
   margin: 0;
   color: var(--ui-text);
   font-family: var(--ui-font-mono);
-  font-size: 0.68rem;
+  font-size: var(--ui-font-size-support);
   font-weight: 500;
 }
 
 .support-note {
-  padding: 11px 13px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-small);
-  background: var(--ui-surface-muted);
-  font-size: 0.7rem !important;
+  margin-top: var(--ui-space-3);
 }
 
 .safe-shell {
@@ -88,38 +84,22 @@
   display: grid;
   min-height: 100%;
   background: var(--ui-canvas);
-  grid-template-rows: 38px minmax(0, 1fr);
+  grid-template-rows: var(--ui-titlebar-height) minmax(0, 1fr);
 }
 
 .safe-application-shell__body {
   display: grid;
   min-height: 0;
   overflow: auto;
-  padding: 32px;
+  padding: var(--ui-space-6);
   place-items: center;
 }
 
 .safe-shell-navigation {
   display: flex;
-  padding-bottom: 18px;
+  padding-bottom: var(--ui-space-4);
   border-bottom: 1px solid var(--ui-border);
-  gap: 6px;
-}
-
-.safe-shell-navigation button {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface);
-  font-size: 0.7rem;
-}
-
-.safe-shell-navigation button[aria-pressed="true"] {
-  border-color: #a9cbe2;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  gap: var(--ui-space-2);
 }
 
 .safe-shell-content {
@@ -130,7 +110,7 @@
 .safe-settings-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: var(--ui-space-2);
 }
 
 .safe-settings-tabs {
@@ -139,12 +119,12 @@
 }
 
 .safe-settings-tabs button {
-  padding: 8px 11px;
+  padding: var(--ui-space-2) var(--ui-space-3);
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--ui-text-muted);
   background: transparent;
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
 }
 
 .safe-settings-tabs button[aria-selected="true"] {
@@ -157,14 +137,14 @@
 }
 
 .safe-settings-panel h2 {
-  margin: 0 0 10px;
-  font-size: 0.86rem;
+  margin: 0 0 var(--ui-space-2);
+  font-size: var(--ui-font-size-heading);
 }
 
 .safe-shell-scope-note {
   margin-top: 20px !important;
   color: var(--ui-text-muted) !important;
-  font-size: 0.66rem !important;
+  font-size: var(--ui-font-size-caption) !important;
 }
 
 .loading-mark {
@@ -192,7 +172,9 @@
   overflow: hidden;
   color: var(--ui-text);
   background: var(--ui-canvas);
-  grid-template-rows: 38px 31px minmax(0, 1fr);
+  grid-template-rows:
+    var(--ui-titlebar-height) var(--ui-commandbar-height)
+    minmax(0, 1fr);
 }
 
 .commandbar {
@@ -219,26 +201,26 @@
 }
 
 .app-menu button {
-  padding: 0 12px;
+  padding: 0 var(--ui-space-3);
   border: 0;
-  color: #3f3a34;
+  color: var(--ui-text-secondary);
   background: transparent;
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-control);
 }
 
 .app-menu button:hover {
   color: var(--ui-text);
-  background: #ece9e2;
+  background: var(--ui-surface-muted);
 }
 
 .app-menu-popup {
   position: absolute;
-  top: 31px;
+  top: var(--ui-commandbar-height);
   left: 0;
   z-index: 30;
   display: grid;
   min-width: 232px;
-  padding: 5px 0;
+  padding: var(--ui-space-1) 0;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   background: var(--ui-surface-raised);
@@ -248,12 +230,12 @@
 .app-menu-popup button {
   display: flex;
   width: 100%;
-  min-height: 29px;
+  min-height: var(--ui-compact-control-height);
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
+  padding: 0 var(--ui-space-3);
   border-radius: 0;
-  gap: 20px;
+  gap: var(--ui-space-5);
   text-align: left;
 }
 
@@ -269,14 +251,14 @@
 .app-menu-separator {
   display: block;
   height: 1px;
-  margin: 5px 0;
-  background: #edeae3;
+  margin: var(--ui-space-1) 0;
+  background: var(--ui-border);
 }
 
 .app-menu-shortcut {
-  color: #a8a29a;
+  color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 11px;
+  font-size: var(--ui-font-size-support);
   font-weight: 400;
 }
 
@@ -303,7 +285,7 @@
   min-height: 0;
   background:
     radial-gradient(circle at 50% 38%, rgb(255 255 255 / 46%), transparent 55%),
-    #e9e6df;
+    var(--ui-canvas);
   grid-area: canvas;
   grid-template-rows: minmax(0, 1fr);
 }
@@ -314,7 +296,7 @@
   min-height: 0;
   border: 0;
   outline: none;
-  background: #ddd9d0;
+  background: var(--ui-border);
   touch-action: none;
   user-select: none;
   z-index: 5;
@@ -323,7 +305,7 @@
 .workspace-splitter::after {
   position: absolute;
   border-radius: 2px;
-  background: #bcb6ab;
+  background: var(--ui-text-muted);
   content: "";
   transition: background 120ms ease;
 }
@@ -360,12 +342,12 @@
 kbd {
   padding: 2px 5px;
   border: 1px solid var(--ui-border-strong);
-  border-bottom-color: #b9b2a7;
+  border-bottom-color: var(--ui-border-strong);
   border-radius: 3px;
   color: var(--ui-text-secondary);
   background: var(--ui-surface);
   font-family: var(--ui-font-mono);
-  font-size: 0.58rem;
+  font-size: var(--ui-font-size-micro);
 }
 
 .canvas-host,
@@ -400,7 +382,7 @@ kbd {
   left: 50%;
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 0.68rem;
+  font-size: var(--ui-font-size-support);
   transform: translate(-50%, -50%);
 }
 
@@ -413,55 +395,41 @@ kbd {
   pointer-events: none;
 }
 
-.operation-toast {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 20;
-  display: grid;
+.operation-toast.ui-inline-notice {
   width: min(410px, calc(100vw - 36px));
   min-height: 58px;
+}
+
+.operation-toast > div {
+  display: grid;
   align-items: center;
-  padding: 10px 12px;
-  border: 1px solid var(--ui-success-border);
-  border-radius: var(--ui-radius);
-  color: var(--ui-success-text);
-  background: var(--ui-success-soft);
-  box-shadow: 0 14px 38px rgb(60 54 44 / 18%);
   grid-template-columns: auto 1fr auto;
-  gap: 10px;
+  gap: var(--ui-space-2);
 }
 
-.operation-toast.error {
-  border-color: var(--ui-danger-border);
-  color: var(--ui-danger-text);
-  background: var(--ui-danger-soft);
-}
-
-.operation-toast div {
+.operation-toast__message {
   display: grid;
   min-width: 0;
   gap: 2px;
 }
 
 .operation-toast strong {
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
 }
 
 .operation-toast span {
   overflow: hidden;
   color: inherit;
-  font-size: 0.62rem;
+  font-size: var(--ui-font-size-micro);
   text-overflow: ellipsis;
   white-space: nowrap;
   opacity: 0.78;
 }
 
-.operation-toast > button {
-  border: 0;
+.operation-toast__close.ui-action-button {
+  width: var(--ui-compact-control-height);
+  padding: 0;
   color: inherit;
-  background: transparent;
-  font-size: 1rem;
 }
 
 .toast-spinner {
@@ -475,7 +443,7 @@ kbd {
 
 @media (max-width: 1180px) {
   .app-menu button {
-    padding: 0 7px;
+    padding: 0 var(--ui-space-2);
   }
 
   .ui-application-header__identity small {

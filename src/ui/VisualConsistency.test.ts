@@ -10,8 +10,15 @@ const sharedStyles = readStyles("src/ui/ui.css");
 const welcomeStyles = readStyles("src/global/GlobalShell.css");
 const newProjectStyles = readStyles("src/global/NewProjectFlow.css");
 const previewStyles = readStyles("src/global/NewProjectPreviewPanel.css");
+const editorStyles = readStyles("src/App.css");
+const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
+const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
+const documentDpiSource = readStyles("src/components/DocumentDpiControl.tsx");
+const exportStyles = readStyles("src/components/ExportPreviewControl.css");
+const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
+const exportSource = readStyles("src/components/ExportPreviewControl.tsx");
 
-test("centralizes the shared type scale used by welcome and new Project", () => {
+test("centralizes the shared type scale used by every application surface", () => {
   expect(themeStyles).toContain("--ui-font-size-micro: 9.5px;");
   expect(themeStyles).toContain("--ui-font-size-caption: 10.5px;");
   expect(themeStyles).toContain("--ui-font-size-support: 11px;");
@@ -28,9 +35,32 @@ test("centralizes the shared type scale used by welcome and new Project", () => 
     welcomeStyles,
     newProjectStyles,
     previewStyles,
+    editorStyles,
+    mediaPanelStyles,
+    inspectorPanelStyles,
+    exportStyles,
   ]) {
     expect(styles).not.toMatch(duplicatedTypeLiteral);
   }
+});
+
+test("shares dense application chrome metrics", () => {
+  expect(themeStyles).toContain(
+    "--ui-commandbar-height: var(--ui-control-height);",
+  );
+  expect(themeStyles).toContain("--ui-toolbar-height: 34px;");
+  expect(themeStyles).toContain("--ui-compact-control-height: 28px;");
+  expect(editorStyles).toMatch(
+    /grid-template-rows:\s*var\(--ui-titlebar-height\) var\(--ui-commandbar-height\)\s*minmax\(0, 1fr\);/,
+  );
+  expect(mediaPanelStyles).toContain(
+    "grid-template-rows: var(--ui-toolbar-height) minmax(0, 1fr);",
+  );
+  expect(sharedStyles).toContain(
+    "height: var(--ui-compact-control-height);",
+  );
+  expect(documentDpiSource).toContain('className="ui-field-control"');
+  expect(documentDpiSource).toContain("<ActionButton");
 });
 
 test("shares regular action and footer metrics", () => {
@@ -51,4 +81,12 @@ test("provides one shared lined section heading", () => {
   expect(newProjectStyles).not.toMatch(
     /\.new-project-scope-label,\s*\n\.new-project-group-eyebrow/g,
   );
+});
+
+test("shares floating notification chrome", () => {
+  expect(sharedStyles).toMatch(/\.ui-inline-notice--floating\s*\{/);
+  expect(projectWorkspaceSource).toContain("<InlineNotice");
+  expect(projectWorkspaceSource).toContain("floating");
+  expect(exportSource).toContain("floating");
+  expect(exportStyles).not.toContain("position: fixed");
 });

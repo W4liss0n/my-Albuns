@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
 import type {
   ExportPort,
@@ -9,6 +10,12 @@ import type {
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
+import {
+  ActionButton,
+  AppIcon,
+  ApplicationHeader,
+  InlineNotice,
+} from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { ExportPreviewControl } from "./ExportPreviewControl";
 import { InspectorPanel } from "./InspectorPanel";
@@ -21,7 +28,6 @@ import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
 } from "./workspacePanelLayout";
-import { ApplicationHeader } from "../ui";
 
 type OpenApplicationMenu = "edit" | "file" | null;
 
@@ -352,12 +358,14 @@ export function ProjectWorkspace({
       </div>
 
       {(busy || message || closeMessage) && (
-        <div
-          className={`operation-toast ${message || closeMessage ? "error" : ""}`}
+        <InlineNotice
+          className="operation-toast"
+          floating
           role={message || closeMessage ? "alert" : "status"}
+          tone={message || closeMessage ? "error" : "success"}
         >
           {busy && <span className="toast-spinner" aria-hidden="true" />}
-          <div>
+          <div className="operation-toast__message">
             <strong>
               {message || closeMessage
                 ? "A operação não foi concluída"
@@ -366,18 +374,20 @@ export function ProjectWorkspace({
             <span>{closeMessage ?? message ?? "Aguarde…"}</span>
           </div>
           {!busy && (
-            <button
-              type="button"
+            <ActionButton
               aria-label="Fechar mensagem"
+              className="operation-toast__close"
+              density="compact"
+              variant="quiet"
               onClick={() => {
                 setCloseMessage(null);
                 controller.dismissFeedback();
               }}
             >
-              ×
-            </button>
+              <AppIcon icon={X} size={14} />
+            </ActionButton>
           )}
-        </div>
+        </InlineNotice>
       )}
 
     </div>
