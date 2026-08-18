@@ -567,49 +567,38 @@ function ConfigurationStep({
           />
         </ControlSection>
 
-        <details className="new-project-advanced">
-          <summary>Configurações avançadas</summary>
-          <div className="new-project-advanced-fields">
-            <ControlSection title="Resolução do Projeto">
-              <NumericField
-                attempted={attempted}
-                error={errors.dpi}
-                hideLabel
-                inputMode="numeric"
-                label="DPI"
-                onChange={(dpiText) =>
-                  onChange({ ...draft, dpiText }, ["dpi"])
-                }
-                ref={registerField("dpi")}
-                suffix="DPI"
-                value={draft.dpiText}
-              />
-            </ControlSection>
-            <ControlSection title="Configuração das extremidades">
-              <div className="new-project-paired-fields">
-                <SelectField
-                  label="Primeira Lâmina"
-                  onChange={(firstSheet) =>
-                    onChange({ ...draft, firstSheet }, [])
-                  }
-                  value={draft.firstSheet}
-                />
-                <SelectField
-                  label="Última Lâmina"
-                  onChange={(lastSheet) =>
-                    onChange({ ...draft, lastSheet }, [])
-                  }
-                  value={draft.lastSheet}
-                />
-              </div>
-            </ControlSection>
-          </div>
-        </details>
+        <ControlSection title="Resolução do Projeto">
+          <NumericField
+            attempted={attempted}
+            error={errors.dpi}
+            hideLabel
+            inputMode="numeric"
+            label="DPI"
+            onChange={(dpiText) =>
+              onChange({ ...draft, dpiText }, ["dpi"])
+            }
+            ref={registerField("dpi")}
+            suffix="DPI"
+            value={draft.dpiText}
+          />
+        </ControlSection>
 
-        <p className="new-project-dimensions-note">
-          Medidas, Sangria e Área de segurança valem para o Álbum inteiro e
-          podem ser alteradas depois nas Configurações do Projeto.
-        </p>
+        <ControlSection title="Configuração das extremidades">
+          <div className="new-project-paired-fields">
+            <SelectField
+              label="Primeira Lâmina"
+              onChange={(firstSheet) =>
+                onChange({ ...draft, firstSheet }, [])
+              }
+              value={draft.firstSheet}
+            />
+            <SelectField
+              label="Última Lâmina"
+              onChange={(lastSheet) => onChange({ ...draft, lastSheet }, [])}
+              value={draft.lastSheet}
+            />
+          </div>
+        </ControlSection>
 
         {validationFailure ? (
           <InlineNotice

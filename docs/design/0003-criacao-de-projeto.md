@@ -26,11 +26,8 @@ organiza os controles à direita nesta ordem:
 - Dimensão da Lâmina fechada;
 - Sangria e Área de segurança;
 - quantidade inicial de Lâminas;
-- Configurações avançadas, inicialmente recolhidas.
-
-`Configurações avançadas` contém a Resolução do Projeto e a Configuração das
-extremidades. Esses campos continuam fazendo parte da validação mesmo quando o
-grupo estiver recolhido.
+- Resolução do Projeto;
+- Configuração das extremidades.
 
 A largura informada em `Dimensão da Lâmina fechada` corresponde à largura da
 Página. A interface deriva a largura da Dimensão da Lâmina aberta multiplicando
@@ -40,11 +37,13 @@ e valida sempre a Dimensão da Lâmina aberta.
 A quantidade começa em 18 Lâminas e os botões do contador alteram o valor em
 passos de duas. A interface não inventa um máximo funcional: o núcleo continua
 dono da validade da quantidade, inclusive para Álbuns longos. A Unidade interna
-`in` é apresentada à pessoa como `pol` em botões, campos e prévias.
+`in` é apresentada à pessoa como `pol` em botões, campos e prévias. Medidas em
+polegadas usam no máximo três casas decimais, com arredondamento somente da
+apresentação; o valor físico interno permanece em micrômetros inteiros.
 
 As medidas, a Sangria do Projeto e a Área de segurança valem para o Álbum
-inteiro. Uma nota ao final dos controles informa que esses valores podem ser
-alterados posteriormente nas Configurações do Projeto.
+inteiro e podem ser alteradas posteriormente nas Configurações do Projeto. A
+etapa não repete essa informação em um card de aviso.
 
 #### Estado temporário das Predefinições
 
@@ -72,8 +71,8 @@ controles, sem repetir essas informações em um card de resumo.
 │          prévia proporcional              │  Dimensão fechada     │
 │                                           │  Sangria · Segurança │
 │                                           │  Lâminas              │
-│                                           │  ▸ Avançadas          │
-│                                           │  Nota                 │
+│                                           │  Resolução do Projeto │
+│                                           │  Extremidades         │
 ├──────────────────────────────────────────────────────────────────┤
 │  Cancelar                                           Continuar    │
 └──────────────────────────────────────────────────────────────────┘

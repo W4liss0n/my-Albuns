@@ -57,7 +57,11 @@ const MICROMETERS_PER_UNIT: Record<ProjectDisplayUnit, bigint> = {
 };
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-const MAX_PRESENTATION_DECIMALS = 15;
+const PRESENTATION_DECIMALS: Record<ProjectDisplayUnit, number> = {
+  mm: 3,
+  cm: 4,
+  in: 3,
+};
 
 const validationPresentation: Record<
   ProjectConfigurationValidationCode,
@@ -281,27 +285,19 @@ function formatMicrometerFraction(
   unit: ProjectDisplayUnit,
 ): string {
   const negative = numeratorUm < 0;
-  let remaining = BigInt(Math.abs(numeratorUm));
+  const magnitude = BigInt(Math.abs(numeratorUm));
   const denominator = MICROMETERS_PER_UNIT[unit] * BigInt(divisor);
-  const integer = remaining / denominator;
-  remaining %= denominator;
+  const decimalPlaces = PRESENTATION_DECIMALS[unit];
+  const scale = 10n ** BigInt(decimalPlaces);
+  const rounded = (magnitude * scale + denominator / 2n) / denominator;
+  const integer = rounded / scale;
+  const decimals = (rounded % scale)
+    .toString()
+    .padStart(decimalPlaces, "0")
+    .replace(/0+$/, "");
+  const sign = negative && rounded !== 0n ? "-" : "";
 
-  if (remaining === 0n) {
-    return `${negative ? "-" : ""}${integer}`;
-  }
-
-  let decimals = "";
-  for (
-    let index = 0;
-    remaining !== 0n && index < MAX_PRESENTATION_DECIMALS;
-    index += 1
-  ) {
-    remaining *= 10n;
-    decimals += (remaining / denominator).toString();
-    remaining %= denominator;
-  }
-
-  return `${negative ? "-" : ""}${integer}.${decimals}`;
+  return `${sign}${integer}${decimals ? `.${decimals}` : ""}`;
 }
 
 function parsePhysicalText(

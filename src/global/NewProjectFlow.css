@@ -466,42 +466,6 @@
   margin-top: 12px;
 }
 
-.new-project-advanced {
-  padding-top: 11px;
-  border-top: 1px solid var(--ui-border);
-}
-
-.new-project-advanced summary {
-  color: var(--ui-text-secondary);
-  cursor: pointer;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.new-project-advanced summary:focus-visible {
-  border-radius: 3px;
-  outline: 2px solid #d9ebf7;
-  outline-offset: 3px;
-}
-
-.new-project-advanced-fields {
-  display: flex;
-  flex-direction: column;
-  padding-top: 14px;
-  gap: 15px;
-}
-
-.new-project-dimensions-note {
-  margin: auto 0 0;
-  padding: 11px 13px;
-  border: 1px solid #e8e4dc;
-  border-radius: 6px;
-  color: #6b665e;
-  background: #fff;
-  font-size: 11.5px;
-  line-height: 1.45;
-}
-
 .new-project-preview {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }

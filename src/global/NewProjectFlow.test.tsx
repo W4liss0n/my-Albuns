@@ -97,14 +97,18 @@ test("validates and creates with the complete neutral configuration", async () =
       "Lâmina 600 × 300 mm · Página 300 × 300 mm · 300 DPI",
     ),
   ).not.toBeInTheDocument();
+  expect(screen.queryByText("Configurações avançadas")).not.toBeInTheDocument();
   expect(
-    screen.getByText("Configurações avançadas").closest("details"),
-  ).not.toHaveAttribute("open");
+    screen.getByRole("heading", { name: "Resolução do Projeto" }),
+  ).toBeVisible();
   expect(
-    screen.getByText(
+    screen.getByRole("heading", { name: "Configuração das extremidades" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(
       "Medidas, Sangria e Área de segurança valem para o Álbum inteiro e podem ser alteradas depois nas Configurações do Projeto.",
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByLabelText("Reprodução da Lâmina"),
   ).not.toBeInTheDocument();
@@ -624,8 +628,14 @@ test("converts periodic display values without changing physical values and keep
     name: "Altura da Lâmina fechada",
   });
   await user.click(screen.getByRole("button", { name: "pol" }));
-  expect(width).toHaveValue("11.811023622047244");
-  expect(height).toHaveValue("11.811023622047244");
+  expect(width).toHaveValue("11.811");
+  expect(height).toHaveValue("11.811");
+  expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue(
+    "0.118",
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("0.197");
   expect(width.closest(".new-project-input-shell")).toHaveTextContent("pol");
   expect(width.closest(".new-project-input-shell")).not.toHaveTextContent(
     "in",
