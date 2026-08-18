@@ -1,0 +1,299 @@
+{
+    "schemaVersion":  1,
+    "gate":  "issue-45-media-cache-final-integration",
+    "issue":  45,
+    "collectedAtUtc":  "2026-08-18T14:54:19.2122967Z",
+    "fixedPoint":  "f6518d63b2c75656a58b6769e87abc318a913e23",
+    "gitCommit":  "e3df82843a3f38e7fa7239067715b3513fdcc439",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64"
+                 },
+    "counts":  {
+                   "topLevelChecks":  9,
+                   "contractBindings":  65,
+                   "frontendFiles":  26,
+                   "frontendTests":  210,
+                   "rustTests":  412,
+                   "rustSuiteResults":  29,
+                   "rustQualityCommands":  3,
+                   "imagingRecoveryChecks":  9,
+                   "windowsPathChecks":  11,
+                   "releaseArtifacts":  4,
+                   "ownedProcessesAfter":  0,
+                   "ownedListenersAfter":  0
+               },
+    "checks":  [
+                   {
+                       "name":  "rust-typescript-contracts",
+                       "passed":  true,
+                       "assertionCount":  65,
+                       "elapsedMs":  32287
+                   },
+                   {
+                       "name":  "frontend-tests",
+                       "passed":  true,
+                       "assertionCount":  210,
+                       "fileCount":  26,
+                       "elapsedMs":  26043
+                   },
+                   {
+                       "name":  "frontend-typecheck",
+                       "passed":  true,
+                       "assertionCount":  1,
+                       "elapsedMs":  5252
+                   },
+                   {
+                       "name":  "rust-tests",
+                       "passed":  true,
+                       "assertionCount":  412,
+                       "suiteResultCount":  29,
+                       "elapsedMs":  118842
+                   },
+                   {
+                       "name":  "rust-fmt-clippy-deny-warnings",
+                       "passed":  true,
+                       "assertionCount":  3,
+                       "elapsedMs":  30965
+                   },
+                   {
+                       "name":  "real-processor-cache-canvas-recovery",
+                       "passed":  true,
+                       "assertionCount":  9,
+                       "elapsedMs":  185508
+                   },
+                   {
+                       "name":  "windows-local-unc-mapped-long-paths",
+                       "passed":  true,
+                       "assertionCount":  11,
+                       "elapsedMs":  267567
+                   },
+                   {
+                       "name":  "release-build-and-nsis-package",
+                       "passed":  true,
+                       "assertionCount":  4,
+                       "elapsedMs":  604542
+                   },
+                   {
+                       "name":  "owned-process-lock-listener-cleanup",
+                       "passed":  true,
+                       "assertionCount":  3,
+                       "ownedProcessCount":  0,
+                       "ownedListenerCount":  0,
+                       "exclusiveArtifactLockFailures":  0
+                   }
+               ],
+    "criteria":  [
+                     {
+                         "name":  "authorized-independent-empty-namespace",
+                         "passed":  true,
+                         "publicProof":  "CacheService + ProjectIdentityAuthority"
+                     },
+                     {
+                         "name":  "authoritative-missing-unavailable-and-visual-context",
+                         "passed":  true,
+                         "publicProof":  "MediaRuntime + CacheEngine + MediaPanel"
+                     },
+                     {
+                         "name":  "relink-occurrence-stable-change-and-reappearance",
+                         "passed":  true,
+                         "publicProof":  "MediaRuntime observations + CacheEngine epochs"
+                     },
+                     {
+                         "name":  "incompatible-corrupt-invalid-cache-rebuild",
+                         "passed":  true,
+                         "publicProof":  "discardable Cache index + validated candidate publication"
+                     },
+                     {
+                         "name":  "processor-restart-once-then-nonblocking-suspension",
+                         "passed":  true,
+                         "publicProof":  "real Processor recovery + typed frontend warning"
+                     },
+                     {
+                         "name":  "local-unc-mapped-and-long-paths",
+                         "passed":  true,
+                         "publicProof":  "Windows path gate + local AppPaths Cache root"
+                     },
+                     {
+                         "name":  "measure-free-reserve-and-safe-total-cleanup",
+                         "passed":  true,
+                         "publicProof":  "CacheService + named cross-process namespace mutexes"
+                     },
+                     {
+                         "name":  "narrow-api-and-design-0010-ownership-matrix",
+                         "passed":  true,
+                         "publicProof":  "three Cache commands; #10/#18 producers remain authoritative"
+                     }
+                 ],
+    "nestedEvidence":  {
+                           "imaging":  {
+                                           "schemaVersion":  1,
+                                           "checks":  9,
+                                           "cache":  {
+                                                         "failedProcessId":  30064,
+                                                         "foreignTemporarySurvivedCleanup":  true,
+                                                         "generatedCountAfterRestart":  1,
+                                                         "metadataExistedAfterFailure":  false,
+                                                         "metadataExistedAfterRestart":  true,
+                                                         "removedTemporaryCount":  1,
+                                                         "restartedProcessId":  27772,
+                                                         "temporaryExistedAfterCleanup":  false,
+                                                         "temporaryObservedAfterFailure":  true
+                                                     },
+                                           "canvas":  {
+                                                          "backgroundUrlOpaque":  true,
+                                                          "canvasReferencePixel":  [
+                                                                                       102,
+                                                                                       64,
+                                                                                       82
+                                                                                   ],
+                                                          "channelDelta":  [
+                                                                               0,
+                                                                               1,
+                                                                               0
+                                                                           ],
+                                                          "compositionMediaOrder":  [
+                                                                                        "78f9d260-2d4b-46cb-9748-85e1bbf2cbee",
+                                                                                        "4c128985-4ba0-4643-b966-ada7ff341c04"
+                                                                                    ],
+                                                          "equivalentBackgroundDemandCount":  2,
+                                                          "finalJpegPixel":  [
+                                                                                 102,
+                                                                                 63,
+                                                                                 82
+                                                                             ],
+                                                          "finalOutputSha256":  "9c337fd61b8c1e4362091722f2c75dedc08d020e543dfc88aa0d23e7573891dd",
+                                                          "finalSourceCount":  2,
+                                                          "originalBytesExposedToWebView":  false,
+                                                          "originalPathExposedToWebView":  false,
+                                                          "overlayUrlOpaque":  true,
+                                                          "processorIds":  [
+                                                                               4968,
+                                                                               21624,
+                                                                               32948
+                                                                           ],
+                                                          "singleFlightGenerationId":  "g-c6e240480a8a4362be73db8b94a87d7d",
+                                                          "singleFlightProcessorCount":  1,
+                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-15740-14bd5d\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                                          "actualTauriApp":  true,
+                                                          "actualAlbumCanvas":  true,
+                                                          "actualPixiRuntime":  true,
+                                                          "browserProcess":  "Tauri WebView2 via tauri-driver",
+                                                          "tauriDriverVersion":  "2.0.6",
+                                                          "nativeDriverVersion":  "151.0.4129.86",
+                                                          "webView2RuntimeVersion":  "151.0.4129.86",
+                                                          "opaqueResourceCount":  2,
+                                                          "canvasScreenshotScope":  "canvas-element",
+                                                          "actualCanvasSamplePoint":  [
+                                                                                          574,
+                                                                                          309
+                                                                                      ],
+                                                          "actualCanvasPixel":  [
+                                                                                    103,
+                                                                                    65,
+                                                                                    83
+                                                                                ],
+                                                          "actualCanvasDelta":  [
+                                                                                    1,
+                                                                                    1,
+                                                                                    1
+                                                                                ]
+                                                      },
+                                           "pause":  {
+                                                         "cacheBlockedWhileExportLease":  true,
+                                                         "cacheIndexAfterCancellation":  false,
+                                                         "cancelledProcessId":  15816,
+                                                         "cancelledProcessReaped":  true,
+                                                         "cancelledStage":  "cancelled",
+                                                         "pauseReason":  "paused",
+                                                         "processorExclusiveWhileExportLease":  true,
+                                                         "resumedAfterExportTerminal":  true,
+                                                         "resumedGenerationPublished":  true,
+                                                         "resumedProcessId":  25272
+                                                     },
+                                           "obsolete":  {
+                                                            "cacheIndexAfterCancellation":  false,
+                                                            "cancellationReason":  "obsolete",
+                                                            "cancelledProcessId":  12636,
+                                                            "cancelledProcessReaped":  true,
+                                                            "cancelledStage":  "cancelled",
+                                                            "resumableAfterCancellation":  false,
+                                                            "singleFlightDemandCount":  2,
+                                                            "singleFlightProcessorCount":  1,
+                                                            "waiterObservedCancellation":  true
+                                                        }
+                                       },
+                           "windowsPaths":  {
+                                                "schemaVersion":  2,
+                                                "checks":  11,
+                                                "paths":  {
+                                                              "bindingReusedAfterRemapWithinAttempt":  true,
+                                                              "cacheUnderLocalAppData":  true,
+                                                              "explicitRetryRecaptured":  true,
+                                                              "firstPlanSha256":  "35d326480434235a419a4dbf85697a465ee0e9d8bce4454d80e55de521669020",
+                                                              "identityFailure":  "indeterminate",
+                                                              "lockReleasedAfterOwnerDrop":  true,
+                                                              "mappedAndLocalIdentity":  "same",
+                                                              "mappedAndUncIdentity":  "same",
+                                                              "mappedRootKind":  "disk",
+                                                              "operationalRootKind":  "unc",
+                                                              "physicalAliasLockConflict":  true,
+                                                              "planRoundTripLossless":  true,
+                                                              "plansDistinct":  true,
+                                                              "readOnlyBatchAllowedWhileLocked":  true,
+                                                              "retryPlanSha256":  "12ca06c37e9f56f23a2ba4247c85ccbf04b105ac97ebf97817a7b7bf1318ffc1",
+                                                              "stagingInsideDestination":  true,
+                                                              "unavailableBinding":  "unavailable",
+                                                              "uncExportPublished":  true,
+                                                              "verbatimMappedBindingFrozenAsUnc":  true
+                                                          },
+                                                "sidecar":  {
+                                                                "explicitRetryPublished":  true,
+                                                                "mappingRemovedBeforeDispatch":  true,
+                                                                "outputPublishedOnUnc":  true,
+                                                                "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
+                                                                "processorPid":  30396,
+                                                                "processorUsedFrozenOperationalPath":  true,
+                                                                "rootBindingPlanSha256":  "b6e6ddf6cced9b5a0f2effc10e20f10c9a1adc162780047f424dbe2178755c3d",
+                                                                "stagingRemoved":  true,
+                                                                "unavailableAttemptStartedProcessor":  false,
+                                                                "unavailableBindingFailedAtPrepare":  true
+                                                            },
+                                                "longPathAware":  {
+                                                                      "desktop":  true,
+                                                                      "imagingSidecar":  true
+                                                                  }
+                                            }
+                       },
+    "releaseArtifacts":  [
+                             {
+                                 "name":  "desktop-release",
+                                 "bytes":  16948736,
+                                 "sha256":  "2b5701c29ffc9896c693d02c6e52ca2bc0bd2e8a170d762b53777d44a89fe23f"
+                             },
+                             {
+                                 "name":  "imaging-release",
+                                 "bytes":  3618304,
+                                 "sha256":  "0eb418328f196b21ae865e8e0afa4198499ef6f5239d15fe5b0324e1013eb245"
+                             },
+                             {
+                                 "name":  "prepared-sidecar",
+                                 "bytes":  3618304,
+                                 "sha256":  "0eb418328f196b21ae865e8e0afa4198499ef6f5239d15fe5b0324e1013eb245"
+                             },
+                             {
+                                 "name":  "nsis-installer",
+                                 "bytes":  4715784,
+                                 "sha256":  "bae3d60abff527c3af5f1f532c761f72309433138d6b34831b414f645270f141"
+                             }
+                         ],
+    "cleanup":  {
+                    "runScratchRemoved":  true,
+                    "newlyCreatedWindowsPathTargetRemoved":  true,
+                    "newlyCreatedDistRemoved":  false,
+                    "ownedProcesses":  0,
+                    "ownedListeners":  0,
+                    "artifactLocks":  0
+                }
+}
