@@ -594,6 +594,32 @@ try {
         observedListenerCount = $cleanupProbe.listenersBefore
     })
 
+    $bootstrapTarget = Join-Path $runRoot 'bootstrap-target'
+    $env:CARGO_TARGET_DIR = $bootstrapTarget
+    $sidecarPreparationRun = Invoke-RecordedCommand `
+        -Name 'debug-sidecar-preparation' `
+        -FilePath $windowsPowerShell `
+        -Arguments @(
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            (Join-Path $PSScriptRoot 'Prepare-Sidecar.ps1'),
+            '-Profile',
+            'debug'
+        )
+    $env:CARGO_TARGET_DIR = $previousTargetDirectory
+    if (-not (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf)) {
+        throw 'The clean evidence run did not prepare the required debug sidecar.'
+    }
+    Test-ExclusiveRead -Path $preparedSidecarPath
+    $checks.Add([ordered]@{
+        name = 'clean-debug-sidecar-preparation'
+        passed = $true
+        assertionCount = 2
+        elapsedMs = $sidecarPreparationRun.elapsedMs
+    })
+
     $contractRun = Invoke-RecordedCommand `
         -Name 'contracts' `
         -FilePath $windowsPowerShell `
