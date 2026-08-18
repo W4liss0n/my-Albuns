@@ -1,11 +1,11 @@
-use std::io::{Read, Write};
+use std::io::{BufRead, Write};
 
-use myalbuns_paths::{NativePathDto, RootBindingPlan};
+use myalbuns_paths::{NativePathDto, ProcessInstanceId, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
 use super::configuration::InitialProjectCreationConfiguration;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 4;
+pub(crate) const PROTOCOL_VERSION: u16 = 6;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -36,6 +36,13 @@ pub(crate) struct TargetAuthority {
     pub(crate) root_bindings: RootBindingPlan,
 }
 
+impl TargetAuthority {
+    pub(crate) fn validates_target_binding(&self) -> bool {
+        self.root_bindings.validate().is_ok()
+            && self.root_bindings.covers(self.logical_target.as_path())
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BootstrapRequest {
@@ -46,6 +53,16 @@ pub(crate) struct BootstrapRequest {
     pub(crate) authority: TargetAuthority,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SaveExternalCopyRequest {
+    pub(crate) protocol_version: u16,
+    pub(crate) attempt_id: String,
+    pub(crate) launch_nonce: String,
+    pub(crate) authority: TargetAuthority,
+    pub(crate) authorization: CreateWriteAuthorization,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum FailureStage {
@@ -53,6 +70,7 @@ pub(crate) enum FailureStage {
     Resolve,
     Open,
     Create,
+    SaveCopy,
     Initialize,
     Transport,
     Protocol,
@@ -76,10 +94,12 @@ pub(crate) enum FailureCode {
     InvalidProjectState,
     ProjectInUse,
     ExternalCopyRequiresInteractiveResolution,
+    ExternalCopyNotWritable,
     IdentityIndeterminate,
     InvalidInitialProject,
     DestinationConflict,
     CreateStateIndeterminate,
+    SaveCopyStateIndeterminate,
     HostExitedBeforeReady,
     CorrelationMismatch,
 }
@@ -97,6 +117,18 @@ pub(crate) enum HostTerminal {
         host_pid: u32,
         project_id: String,
         revision: u64,
+    },
+    FocusExisting {
+        attempt_id: String,
+        launch_nonce: String,
+        host_pid: u32,
+        project_id: String,
+        owner_process: ProcessInstanceId,
+    },
+    ExternalCopyNotWritable {
+        attempt_id: String,
+        launch_nonce: String,
+        host_pid: u32,
     },
     Failed {
         attempt_id: String,
@@ -132,6 +164,28 @@ impl HostTerminal {
         }
     }
 
+    pub(crate) fn focus_existing(
+        request: &BootstrapRequest,
+        project_id: String,
+        owner_process: ProcessInstanceId,
+    ) -> Self {
+        Self::FocusExisting {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: std::process::id(),
+            project_id,
+            owner_process,
+        }
+    }
+
+    pub(crate) fn external_copy_not_writable(request: &BootstrapRequest) -> Self {
+        Self::ExternalCopyNotWritable {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: std::process::id(),
+        }
+    }
+
     pub(crate) fn uncorrelated_failure(stage: FailureStage, code: FailureCode) -> Self {
         Self::Failed {
             attempt_id: String::new(),
@@ -149,6 +203,13 @@ pub(crate) enum ValidatedTerminal {
         host_pid: u32,
         project_id: String,
         revision: u64,
+    },
+    FocusExisting {
+        project_id: String,
+        owner_process: ProcessInstanceId,
+    },
+    ExternalCopyNotWritable {
+        host_pid: u32,
     },
     Failed {
         host_pid: u32,
@@ -173,6 +234,17 @@ pub(crate) fn validate_terminal(
             launch_nonce,
             host_pid,
             ..
+        }
+        | HostTerminal::FocusExisting {
+            attempt_id,
+            launch_nonce,
+            host_pid,
+            ..
+        }
+        | HostTerminal::ExternalCopyNotWritable {
+            attempt_id,
+            launch_nonce,
+            host_pid,
         }
         | HostTerminal::Failed {
             attempt_id,
@@ -199,6 +271,17 @@ pub(crate) fn validate_terminal(
             project_id,
             revision,
         },
+        HostTerminal::FocusExisting {
+            project_id,
+            owner_process,
+            ..
+        } => ValidatedTerminal::FocusExisting {
+            project_id,
+            owner_process,
+        },
+        HostTerminal::ExternalCopyNotWritable { host_pid, .. } => {
+            ValidatedTerminal::ExternalCopyNotWritable { host_pid }
+        }
         HostTerminal::Failed {
             host_pid,
             stage,
@@ -213,22 +296,41 @@ pub(crate) fn validate_terminal(
 }
 
 pub(crate) fn read_bootstrap_request(
-    reader: impl Read,
+    reader: impl BufRead,
 ) -> Result<BootstrapRequest, std::io::Error> {
+    read_request_line(reader, "bootstrap")
+}
+
+pub(crate) fn read_save_external_copy_request(
+    reader: impl BufRead,
+) -> Result<SaveExternalCopyRequest, std::io::Error> {
+    read_request_line(reader, "Salvar cópia como...")
+}
+
+fn read_request_line<T: serde::de::DeserializeOwned>(
+    reader: impl BufRead,
+    request_name: &str,
+) -> Result<T, std::io::Error> {
     let mut bytes = Vec::new();
     reader
         .take(MAX_BOOTSTRAP_REQUEST_BYTES + 1)
-        .read_to_end(&mut bytes)?;
+        .read_until(b'\n', &mut bytes)?;
     if bytes.len() as u64 > MAX_BOOTSTRAP_REQUEST_BYTES {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            "a requisição de bootstrap excede o limite",
+            format!("a requisição de {request_name} excede o limite"),
         ));
+    }
+    if bytes.last() == Some(&b'\n') {
+        bytes.pop();
+        if bytes.last() == Some(&b'\r') {
+            bytes.pop();
+        }
     }
     serde_json::from_slice(&bytes).map_err(|error| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("requisição de bootstrap inválida: {error}"),
+            format!("requisição de {request_name} inválida: {error}"),
         )
     })
 }
@@ -246,7 +348,7 @@ pub(crate) fn write_host_terminal(
 mod tests {
     use std::path::PathBuf;
 
-    use myalbuns_paths::OperationPathContext;
+    use myalbuns_paths::{OperationPathContext, RootBindingPlan};
 
     use super::super::configuration::{
         InitialBackground, InitialBackgroundContent, InitialDisplayUnit,
@@ -273,6 +375,26 @@ mod tests {
                 root_bindings: paths.freeze(),
             },
         }
+    }
+
+    #[test]
+    fn target_authority_owns_validation_of_its_frozen_target_binding() {
+        let valid = request().authority;
+        assert!(valid.validates_target_binding());
+
+        let invalid_plan = TargetAuthority {
+            logical_target: valid.logical_target.clone(),
+            root_bindings: RootBindingPlan::default(),
+        };
+        assert!(!invalid_plan.validates_target_binding());
+
+        let uncovered_target = TargetAuthority {
+            logical_target: NativePathDto::from(PathBuf::from(
+                r"\\servidor\acervo\Projeto.myalbuns",
+            )),
+            root_bindings: valid.root_bindings,
+        };
+        assert!(!uncovered_target.validates_target_binding());
     }
 
     #[test]
@@ -368,6 +490,36 @@ mod tests {
                 serde_json::from_value(encoded).expect("the request deserializes");
             assert_eq!(decoded, request);
         }
+    }
+
+    #[test]
+    fn save_copy_continuation_contains_only_the_destination_and_initial_correlation() {
+        let base = request();
+        let destination_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Copia.myalbuns");
+        let mut destination_paths = OperationPathContext::new();
+        destination_paths
+            .capture(&destination_path)
+            .expect("the destination root is captured");
+        let request = SaveExternalCopyRequest {
+            protocol_version: PROTOCOL_VERSION,
+            attempt_id: base.attempt_id,
+            launch_nonce: base.launch_nonce,
+            authority: TargetAuthority {
+                logical_target: NativePathDto::from(destination_path.clone()),
+                root_bindings: destination_paths.freeze(),
+            },
+            authorization: CreateWriteAuthorization::CreateOnly,
+        };
+
+        let encoded = serde_json::to_value(&request).expect("the request serializes");
+        assert!(encoded.get("source").is_none());
+        assert_eq!(encoded["authorization"], "createOnly");
+        assert!(encoded["authority"]["logicalTarget"].is_object());
+        assert_eq!(
+            serde_json::from_value::<SaveExternalCopyRequest>(encoded)
+                .expect("the request deserializes"),
+            request
+        );
     }
 
     #[test]
@@ -560,6 +712,53 @@ mod tests {
     }
 
     #[test]
+    fn a_focus_terminal_identifies_the_existing_owner_without_becoming_ready() {
+        let request = request();
+        let terminal = HostTerminal::FocusExisting {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: 4312,
+            project_id: "c4495826-fdf6-43ac-bbf9-92f068e6a704".into(),
+            owner_process: ProcessInstanceId::from_wire(9981, 123)
+                .expect("the owner process instance is valid"),
+        };
+        let encoded = serde_json::to_value(&terminal).expect("the focus terminal serializes");
+
+        assert_eq!(
+            encoded["ownerProcess"],
+            serde_json::json!({ "processId": 9981, "creationTime": 123 })
+        );
+        assert!(encoded.get("ownerProcessId").is_none());
+
+        assert_eq!(
+            validate_terminal(&request, 4312, terminal),
+            Ok(ValidatedTerminal::FocusExisting {
+                project_id: "c4495826-fdf6-43ac-bbf9-92f068e6a704".into(),
+                owner_process: ProcessInstanceId::from_wire(9981, 123)
+                    .expect("the owner process instance is valid"),
+            })
+        );
+    }
+
+    #[test]
+    fn an_external_copy_terminal_keeps_the_source_inside_the_correlated_host() {
+        let request = request();
+        let terminal = HostTerminal::ExternalCopyNotWritable {
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            host_pid: 4312,
+        };
+        let encoded = serde_json::to_value(&terminal).expect("the terminal serializes");
+
+        assert_eq!(encoded["state"], "externalCopyNotWritable");
+        assert!(encoded.get("source").is_none());
+        assert_eq!(
+            validate_terminal(&request, 4312, terminal),
+            Ok(ValidatedTerminal::ExternalCopyNotWritable { host_pid: 4312 })
+        );
+    }
+
+    #[test]
     fn terminal_validation_rejects_attempt_nonce_and_pid_mismatches() {
         let request = request();
         let terminals = [
@@ -616,13 +815,29 @@ mod tests {
     }
 
     #[test]
-    fn one_shot_transport_reads_one_bounded_request_and_writes_one_terminal_line() {
+    fn framed_transport_reads_bounded_requests_and_writes_one_terminal_line() {
         let request = request();
         let mut request_bytes = serde_json::to_vec(&request).expect("request serializes");
         request_bytes.push(b'\n');
         let decoded =
             read_bootstrap_request(request_bytes.as_slice()).expect("one request is accepted");
         assert_eq!(decoded, request);
+
+        let continuation = SaveExternalCopyRequest {
+            protocol_version: PROTOCOL_VERSION,
+            attempt_id: request.attempt_id.clone(),
+            launch_nonce: request.launch_nonce.clone(),
+            authority: request.authority.clone(),
+            authorization: CreateWriteAuthorization::CreateOnly,
+        };
+        let mut continuation_bytes =
+            serde_json::to_vec(&continuation).expect("continuation serializes");
+        continuation_bytes.push(b'\n');
+        assert_eq!(
+            read_save_external_copy_request(continuation_bytes.as_slice())
+                .expect("one continuation is accepted"),
+            continuation
+        );
 
         let terminal = HostTerminal::Ready {
             attempt_id: request.attempt_id,
@@ -642,10 +857,10 @@ mod tests {
     }
 
     #[test]
-    fn one_shot_request_transport_rejects_trailing_values_and_oversized_input() {
+    fn framed_request_transport_rejects_trailing_values_and_oversized_input() {
         let request = serde_json::to_vec(&request()).expect("request serializes");
         let mut trailing = request.clone();
-        trailing.extend_from_slice(b"\n{}");
+        trailing.extend_from_slice(b" {}\n");
         assert!(read_bootstrap_request(trailing.as_slice()).is_err());
 
         let oversized = vec![b' '; MAX_BOOTSTRAP_REQUEST_BYTES as usize + 1];

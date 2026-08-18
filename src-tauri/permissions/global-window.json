@@ -8,6 +8,7 @@
           "complete_graphics_gate",
           "create_project",
           "open_project",
+          "save_external_copy_as",
           "recent_projects",
           "open_recent_project",
           "startup_open_failure",

@@ -11,7 +11,9 @@ use myalbuns_core::{
     ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SaveProjectError,
     SaveProjectOutcome, SheetRole,
 };
-use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier, project_data_namespace};
+use myalbuns_paths::{
+    OperationPathContext, ProcessInstanceId, ProjectTransitionBarrier, project_data_namespace,
+};
 
 const NEUTRAL_PROJECT_V1: &str = r##"{
   "documentType": "myalbuns.project",
@@ -143,6 +145,28 @@ const PER_SIDE_PROJECT_V1: &str = r##"{
     ]
   }
 }"##;
+
+fn hold_transition_barrier(
+    transition_root: std::path::PathBuf,
+    project_id: String,
+) -> (std::sync::mpsc::Sender<()>, std::thread::JoinHandle<()>) {
+    let (ready_sender, ready_receiver) = std::sync::mpsc::channel();
+    let (release_sender, release_receiver) = std::sync::mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        let _barrier = ProjectTransitionBarrier::try_acquire(&transition_root, &project_id)
+            .expect("the competing transition owns the stable Identidade barrier");
+        ready_sender
+            .send(())
+            .expect("the competing transition reports readiness");
+        release_receiver
+            .recv()
+            .expect("the competing transition receives its causal release");
+    });
+    ready_receiver
+        .recv()
+        .expect("the competing transition reaches the barrier");
+    (release_sender, holder)
+}
 
 #[test]
 fn loads_the_neutral_v1_document_without_rewriting_it_or_creating_an_editable_session() {
@@ -717,12 +741,16 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
     assert!(!bytes.starts_with(&[0xEF, 0xBB, 0xBF]));
     assert!(std::str::from_utf8(&bytes).is_ok());
 
+    let created_id = created.project_id();
     assert_eq!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path)))
             .expect_err("the physical Project remains exclusively editable"),
-        OpenProjectError::ProjectInUse
+        OpenProjectError::FocusExisting {
+            project_id: created_id,
+            owner_process: ProcessInstanceId::current()
+                .expect("the owning process instance is captured"),
+        }
     );
-    let created_id = created.project_id();
     drop(created);
 
     let reopened = core
@@ -1963,14 +1991,19 @@ fn opening_an_editable_project_respects_its_stable_transition_barrier() {
         .expect("the productive Project is created");
     let project_id = project.project_id().hyphenated().to_string();
     drop(project);
-    let _barrier = ProjectTransitionBarrier::try_acquire(&project_path, &project_id)
-        .expect("the competing transition owns the stable sibling barrier");
+    let (release, holder) = hold_transition_barrier(directory.path().join("leases"), project_id);
 
     assert_eq!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path)))
             .expect_err("an opener cannot cross an active publication handoff"),
         OpenProjectError::ProjectInUse
     );
+    release
+        .send(())
+        .expect("the competing transition is explicitly released");
+    holder
+        .join()
+        .expect("the competing transition finishes without panic");
 }
 
 #[test]
@@ -1988,11 +2021,10 @@ fn a_conclusive_save_failure_preserves_the_editable_session_for_retry() {
     project
         .apply(ProjectIntent::SetDpi { dpi: 240 })
         .expect("the visible revision advances");
-    let barrier = ProjectTransitionBarrier::try_acquire(
-        &project_path,
-        &project.project_id().hyphenated().to_string(),
-    )
-    .expect("a competing transition acquires the stable sibling barrier");
+    let (release, holder) = hold_transition_barrier(
+        directory.path().join("leases"),
+        project.project_id().hyphenated().to_string(),
+    );
 
     assert_eq!(
         project
@@ -2007,7 +2039,12 @@ fn a_conclusive_save_failure_preserves_the_editable_session_for_retry() {
     assert!(unchanged.state.dirty);
     assert!(unchanged.state.can_undo);
 
-    drop(barrier);
+    release
+        .send(())
+        .expect("the competing transition is explicitly released");
+    holder
+        .join()
+        .expect("the competing transition finishes without panic");
     assert_eq!(
         project
             .save(1)
@@ -2548,7 +2585,7 @@ fn opening_invalid_content_leaves_no_editable_ownership_behind() {
 }
 
 #[test]
-fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_resolution() {
+fn a_second_physical_copy_with_the_same_project_identity_is_promoted_before_editing() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let original_path = directory.path().join("original.myalbuns");
     let copy_path = directory.path().join("copia.myalbuns");
@@ -2558,18 +2595,25 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
 
     let original = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
-        .expect("the original acquires its Identity");
-    assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-            .expect_err("a copied file cannot share an editable Identity"),
-        OpenProjectError::ExternalCopyRequiresInteractiveResolution
-    );
+        .expect("the original acquires its Identidade");
+    let promoted = core
+        .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
+        .expect("a writable copied file receives its own Identidade");
+    assert_ne!(promoted.project_id(), original.project_id());
+    assert_eq!(promoted.revision(), original.revision());
+    assert_eq!(promoted.saved_revision(), promoted.revision());
+    assert!(!promoted.can_undo());
+    drop(promoted);
     drop(original);
-    assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-            .expect_err("durable Identity evidence still protects the closed original"),
-        OpenProjectError::ExternalCopyRequiresInteractiveResolution
+
+    let reopened_copy = core
+        .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
+        .expect("the promoted copy reopens under its durable new Identidade");
+    assert_ne!(
+        reopened_copy.project_id().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
     );
+    drop(reopened_copy);
 
     let reopened = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
@@ -2581,7 +2625,7 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
 }
 
 #[test]
-fn a_possible_move_stays_fail_closed_until_the_identity_promotion_ticket() {
+fn a_confirmed_move_preserves_identity() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let original_path = directory.path().join("original.myalbuns");
     let moved_path = directory.path().join("movido.myalbuns");
@@ -2594,10 +2638,12 @@ fn a_possible_move_stays_fail_closed_until_the_identity_promotion_ticket() {
     drop(original);
     fs::rename(&original_path, &moved_path).expect("the Project is moved after closure");
 
+    let moved = core
+        .open_editable(OpenProjectRequest::new(project_location(&moved_path)))
+        .expect("NotFound under an accessible previous root confirms movement");
     assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&moved_path)))
-            .expect_err("issue #44 cannot classify or promote a possible movement"),
-        OpenProjectError::IdentityIndeterminate
+        moved.project_id().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
     );
 }
 

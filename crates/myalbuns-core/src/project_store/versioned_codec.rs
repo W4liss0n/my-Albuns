@@ -64,6 +64,33 @@ pub(super) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailur
     Ok(bytes)
 }
 
+pub(super) fn rewrite_project_id(
+    bytes: &[u8],
+    project_id: Uuid,
+) -> Result<(Vec<u8>, ProjectRevision), DecodeFailure> {
+    let source = decode(bytes)?;
+    let project_id = project_id.hyphenated().to_string();
+    let mut rewritten = match source.source_schema_version {
+        SCHEMA_VERSION_V1 => {
+            let mut document: ProjectDocumentV1 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
+        SCHEMA_VERSION_V2 => {
+            let mut document: ProjectDocumentV2 = serde_json::from_slice(bytes)
+                .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+            document.project_id = project_id;
+            serde_json::to_vec_pretty(&document)
+        }
+        _ => unreachable!("decode accepts only supported public schemas"),
+    }
+    .map_err(|_| document_failure(DocumentFailure::InvalidProjectDocument))?;
+    rewritten.push(b'\n');
+    let candidate = decode(&rewritten)?.revision;
+    Ok((rewritten, candidate))
+}
+
 fn classify_header(bytes: &[u8]) -> Result<u32, DecodeFailure> {
     let mut deserializer = serde_json::Deserializer::from_slice(bytes);
     let header = DocumentHeader::deserialize(&mut deserializer)

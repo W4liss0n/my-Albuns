@@ -221,8 +221,7 @@ impl ResolvedObject {
 
 pub(crate) fn compare_file_identity(left: &File, right: &File) -> PhysicalIdentityEvidence {
     match (file_identity(left), file_identity(right)) {
-        (Some(left), Some(right)) if left == right => PhysicalIdentityEvidence::Same,
-        (Some(_), Some(_)) => PhysicalIdentityEvidence::Different,
+        (Some(left), Some(right)) => left.compare(right),
         _ => PhysicalIdentityEvidence::Indeterminate,
     }
 }
@@ -480,64 +479,740 @@ fn validate_disk_handle(_file: &File, _expected: ExpectedObject) -> Result<(), R
 #[cfg(windows)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PhysicalFileIdentity {
-    volume: u64,
-    file_id: [u8; 16],
+    volume: WindowsVolumeIdentity,
+    file_id: WindowsFileId,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowsVolumeIdentity {
+    Extended {
+        serial: u64,
+        comparable_legacy_serial: Option<LegacyVolumeSerial>,
+    },
+    Legacy(LegacyVolumeSerial),
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyVolumeSerial(u32);
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowsFileId {
+    Extended(ExtendedFileId),
+    Legacy(LegacyFileId),
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct ExtendedFileId([u8; 16]);
+
+#[cfg(windows)]
+impl ExtendedFileId {
+    fn new(identifier: [u8; 16]) -> Option<Self> {
+        (identifier != [0; 16] && identifier != [u8::MAX; 16]).then_some(Self(identifier))
+    }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyFileId {
+    guarantee: LegacyFileIdGuarantee,
+    identifier: [u8; 8],
+}
+
+#[cfg(windows)]
+impl LegacyFileId {
+    fn new(guarantee: LegacyFileIdGuarantee, identifier: [u8; 8]) -> Option<Self> {
+        (identifier != [0; 8] && identifier != [u8::MAX; 8]).then_some(Self {
+            guarantee,
+            identifier,
+        })
+    }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LegacyFileIdGuarantee {
+    Ntfs,
+    Udfs,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowsFileSystem {
+    Ntfs,
+    Udfs,
+    Refs,
+    Cdfs,
+    Other,
+}
+
+#[cfg(windows)]
+impl WindowsFileSystem {
+    fn from_api_name(name: &[u16]) -> Self {
+        const NTFS: &[u16] = &[0x004e, 0x0054, 0x0046, 0x0053];
+        const UDFS: &[u16] = &[0x0055, 0x0044, 0x0046];
+        const REFS: &[u16] = &[0x0052, 0x0065, 0x0046, 0x0053];
+        const CDFS: &[u16] = &[0x0043, 0x0044, 0x0046, 0x0053];
+
+        if name == NTFS {
+            Self::Ntfs
+        } else if name == UDFS {
+            Self::Udfs
+        } else if name == REFS {
+            Self::Refs
+        } else if name == CDFS {
+            Self::Cdfs
+        } else {
+            Self::Other
+        }
+    }
+}
+
+#[cfg(windows)]
+fn legacy_identity_from_observation(
+    volume: LegacyVolumeSerial,
+    identifier: [u8; 8],
+    file_system: WindowsFileSystem,
+) -> Option<PhysicalFileIdentity> {
+    let guarantee = match file_system {
+        WindowsFileSystem::Ntfs => LegacyFileIdGuarantee::Ntfs,
+        WindowsFileSystem::Udfs => LegacyFileIdGuarantee::Udfs,
+        WindowsFileSystem::Refs | WindowsFileSystem::Cdfs | WindowsFileSystem::Other => {
+            return None;
+        }
+    };
+    Some(PhysicalFileIdentity {
+        volume: WindowsVolumeIdentity::Legacy(volume),
+        file_id: WindowsFileId::Legacy(LegacyFileId::new(guarantee, identifier)?),
+    })
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct WindowsVolumeObservation {
+    file_system: WindowsFileSystem,
+    legacy_serial: LegacyVolumeSerial,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExtendedFileIdQueryFailure {
+    Unsupported,
+    Unexpected,
+}
+
+#[cfg(windows)]
+impl ExtendedFileIdQueryFailure {
+    fn from_observation(error: u32, file_system: WindowsFileSystem) -> Self {
+        use windows_sys::Win32::Foundation::{
+            ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER, ERROR_NOT_SUPPORTED,
+        };
+
+        match error {
+            ERROR_INVALID_FUNCTION | ERROR_NOT_SUPPORTED => Self::Unsupported,
+            ERROR_INVALID_PARAMETER if file_system == WindowsFileSystem::Udfs => Self::Unsupported,
+            _ => Self::Unexpected,
+        }
+    }
 }
 
 #[cfg(windows)]
 impl PhysicalFileIdentity {
-    const TOKEN_PREFIX: &'static str = "windows-file-id-v1:";
+    const EXTENDED_TOKEN_PREFIX: &'static str = "windows-file-id-v1:";
+    const EXTENDED_TOKEN_WITH_COMPARABLE_VOLUME_PREFIX: &'static str = "windows-file-id-v2:";
+    const NTFS_LEGACY_TOKEN_PREFIX: &'static str = "windows-ntfs-file-index-v1:";
+    const UDFS_LEGACY_TOKEN_PREFIX: &'static str = "windows-udfs-file-index-v1:";
 
     /// Serializes this identity for local process-coordination metadata.
     pub fn to_local_token(self) -> String {
-        let mut token = format!("{}{:016x}:", Self::TOKEN_PREFIX, self.volume);
-        for byte in self.file_id {
-            use std::fmt::Write as _;
-            write!(&mut token, "{byte:02x}").expect("writing to a String cannot fail");
+        match (self.volume, self.file_id) {
+            (
+                WindowsVolumeIdentity::Extended {
+                    serial,
+                    comparable_legacy_serial: Some(comparable),
+                },
+                WindowsFileId::Extended(file_id),
+            ) => {
+                let mut token = format!(
+                    "{}{:016x}:{:08x}:",
+                    Self::EXTENDED_TOKEN_WITH_COMPARABLE_VOLUME_PREFIX,
+                    serial,
+                    comparable.0,
+                );
+                append_hex_bytes(&mut token, &file_id.0);
+                token
+            }
+            (
+                WindowsVolumeIdentity::Extended {
+                    serial,
+                    comparable_legacy_serial: None,
+                },
+                WindowsFileId::Extended(file_id),
+            ) => {
+                let mut token = format!("{}{:016x}:", Self::EXTENDED_TOKEN_PREFIX, serial);
+                append_hex_bytes(&mut token, &file_id.0);
+                token
+            }
+            (WindowsVolumeIdentity::Legacy(volume), WindowsFileId::Legacy(file_id)) => {
+                let prefix = match file_id.guarantee {
+                    LegacyFileIdGuarantee::Ntfs => Self::NTFS_LEGACY_TOKEN_PREFIX,
+                    LegacyFileIdGuarantee::Udfs => Self::UDFS_LEGACY_TOKEN_PREFIX,
+                };
+                let mut token = format!("{prefix}{:016x}:", volume.0);
+                append_hex_bytes(&mut token, &file_id.identifier);
+                token
+            }
+            _ => unreachable!("Windows file-ID and volume provenance are constructed together"),
         }
-        token
     }
 
     /// Restores local process-coordination evidence written by this platform.
     pub fn from_local_token(token: &str) -> Option<Self> {
-        let payload = token.strip_prefix(Self::TOKEN_PREFIX)?;
+        if let Some(payload) =
+            token.strip_prefix(Self::EXTENDED_TOKEN_WITH_COMPARABLE_VOLUME_PREFIX)
+        {
+            let mut fields = payload.split(':');
+            let volume = fields.next()?;
+            let comparable = fields.next()?;
+            let file_id = fields.next()?;
+            if fields.next().is_some()
+                || volume.len() != 16
+                || comparable.len() != 8
+                || file_id.len() != 32
+            {
+                return None;
+            }
+            let serial = u64::from_str_radix(volume, 16).ok()?;
+            let comparable_legacy_serial =
+                LegacyVolumeSerial(u32::from_str_radix(comparable, 16).ok()?);
+            let mut identifier = [0_u8; 16];
+            decode_hex_bytes(file_id, &mut identifier)?;
+            return Some(Self {
+                volume: WindowsVolumeIdentity::Extended {
+                    serial,
+                    comparable_legacy_serial: Some(comparable_legacy_serial),
+                },
+                file_id: WindowsFileId::Extended(ExtendedFileId::new(identifier)?),
+            });
+        }
+
+        let (payload, kind) = token
+            .strip_prefix(Self::EXTENDED_TOKEN_PREFIX)
+            .map(|payload| (payload, LocalTokenKind::Extended))
+            .or_else(|| {
+                token
+                    .strip_prefix(Self::NTFS_LEGACY_TOKEN_PREFIX)
+                    .map(|payload| (payload, LocalTokenKind::Legacy(LegacyFileIdGuarantee::Ntfs)))
+            })
+            .or_else(|| {
+                token
+                    .strip_prefix(Self::UDFS_LEGACY_TOKEN_PREFIX)
+                    .map(|payload| (payload, LocalTokenKind::Legacy(LegacyFileIdGuarantee::Udfs)))
+            })?;
         let (volume, file_id) = payload.split_once(':')?;
-        if volume.len() != 16 || file_id.len() != 32 {
+        let expected_file_id_length = match kind {
+            LocalTokenKind::Extended => 32,
+            LocalTokenKind::Legacy(_) => 16,
+        };
+        if volume.len() != 16 || file_id.len() != expected_file_id_length {
             return None;
         }
         let volume = u64::from_str_radix(volume, 16).ok()?;
-        let mut identifier = [0_u8; 16];
-        for (index, byte) in identifier.iter_mut().enumerate() {
-            *byte = u8::from_str_radix(&file_id[index * 2..index * 2 + 2], 16).ok()?;
-        }
-        Some(Self {
-            volume,
-            file_id: identifier,
-        })
+        let (volume, file_id) = match kind {
+            LocalTokenKind::Extended => {
+                let mut identifier = [0_u8; 16];
+                decode_hex_bytes(file_id, &mut identifier)?;
+                (
+                    WindowsVolumeIdentity::Extended {
+                        serial: volume,
+                        comparable_legacy_serial: None,
+                    },
+                    WindowsFileId::Extended(ExtendedFileId::new(identifier)?),
+                )
+            }
+            LocalTokenKind::Legacy(guarantee) => {
+                let mut identifier = [0_u8; 8];
+                decode_hex_bytes(file_id, &mut identifier)?;
+                (
+                    WindowsVolumeIdentity::Legacy(LegacyVolumeSerial(u32::try_from(volume).ok()?)),
+                    WindowsFileId::Legacy(LegacyFileId::new(guarantee, identifier)?),
+                )
+            }
+        };
+        Some(Self { volume, file_id })
     }
+
+    /// Compares file IDs only inside one format. Mixed formats use an
+    /// independently observed 32-bit volume serial solely to prove Different;
+    /// they can never prove Same.
+    pub fn compare(self, other: Self) -> PhysicalIdentityEvidence {
+        match (self.volume, self.file_id, other.volume, other.file_id) {
+            (
+                WindowsVolumeIdentity::Extended { serial: left, .. },
+                WindowsFileId::Extended(left_id),
+                WindowsVolumeIdentity::Extended { serial: right, .. },
+                WindowsFileId::Extended(right_id),
+            ) => compare_compatible_file_ids(left == right, left_id == right_id),
+            (
+                WindowsVolumeIdentity::Legacy(left),
+                WindowsFileId::Legacy(left_id),
+                WindowsVolumeIdentity::Legacy(right),
+                WindowsFileId::Legacy(right_id),
+            ) if left_id.guarantee == right_id.guarantee => compare_compatible_file_ids(
+                left == right,
+                left_id.identifier == right_id.identifier,
+            ),
+            (
+                WindowsVolumeIdentity::Legacy(left),
+                WindowsFileId::Legacy(_),
+                WindowsVolumeIdentity::Legacy(right),
+                WindowsFileId::Legacy(_),
+            ) => different_volume_or_indeterminate(Some(left), right),
+            (
+                WindowsVolumeIdentity::Extended {
+                    comparable_legacy_serial,
+                    ..
+                },
+                WindowsFileId::Extended(_),
+                WindowsVolumeIdentity::Legacy(legacy),
+                WindowsFileId::Legacy(_),
+            )
+            | (
+                WindowsVolumeIdentity::Legacy(legacy),
+                WindowsFileId::Legacy(_),
+                WindowsVolumeIdentity::Extended {
+                    comparable_legacy_serial,
+                    ..
+                },
+                WindowsFileId::Extended(_),
+            ) => different_volume_or_indeterminate(comparable_legacy_serial, legacy),
+            _ => PhysicalIdentityEvidence::Indeterminate,
+        }
+    }
+}
+
+#[cfg(windows)]
+fn compare_compatible_file_ids(same_volume: bool, same_file_id: bool) -> PhysicalIdentityEvidence {
+    if !same_volume || !same_file_id {
+        PhysicalIdentityEvidence::Different
+    } else {
+        PhysicalIdentityEvidence::Same
+    }
+}
+
+#[cfg(windows)]
+fn different_volume_or_indeterminate(
+    left: Option<LegacyVolumeSerial>,
+    right: LegacyVolumeSerial,
+) -> PhysicalIdentityEvidence {
+    match left {
+        Some(left) if left != right => PhysicalIdentityEvidence::Different,
+        _ => PhysicalIdentityEvidence::Indeterminate,
+    }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+enum LocalTokenKind {
+    Extended,
+    Legacy(LegacyFileIdGuarantee),
+}
+
+#[cfg(windows)]
+fn append_hex_bytes(destination: &mut String, source: &[u8]) {
+    for byte in source {
+        use std::fmt::Write as _;
+        write!(destination, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+}
+
+#[cfg(windows)]
+fn decode_hex_bytes(source: &str, destination: &mut [u8]) -> Option<()> {
+    for (index, byte) in destination.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&source[index * 2..index * 2 + 2], 16).ok()?;
+    }
+    Some(())
 }
 
 #[cfg(windows)]
 pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
     use std::{ffi::c_void, mem::size_of, os::windows::io::AsRawHandle};
     use windows_sys::Win32::{
-        Foundation::HANDLE,
+        Foundation::{GetLastError, HANDLE},
         Storage::FileSystem::{FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx},
     };
 
+    let handle = file.as_raw_handle() as HANDLE;
     let mut identity = FILE_ID_INFO::default();
     let succeeded = unsafe {
         GetFileInformationByHandleEx(
-            file.as_raw_handle() as HANDLE,
+            handle,
             FileIdInfo,
             (&mut identity as *mut FILE_ID_INFO).cast::<c_void>(),
             size_of::<FILE_ID_INFO>() as u32,
         )
     };
-    (succeeded != 0).then_some(PhysicalFileIdentity {
-        volume: identity.VolumeSerialNumber,
-        file_id: identity.FileId.Identifier,
+    if succeeded != 0 {
+        if let Some(file_id) = ExtendedFileId::new(identity.FileId.Identifier) {
+            let comparable_legacy_serial = query_windows_volume(handle)
+                .filter(|volume| {
+                    matches!(
+                        volume.file_system,
+                        WindowsFileSystem::Ntfs | WindowsFileSystem::Refs
+                    )
+                })
+                .map(|volume| volume.legacy_serial);
+            return Some(PhysicalFileIdentity {
+                volume: WindowsVolumeIdentity::Extended {
+                    serial: identity.VolumeSerialNumber,
+                    comparable_legacy_serial,
+                },
+                file_id: WindowsFileId::Extended(file_id),
+            });
+        }
+        if identity.FileId.Identifier != [0; 16] {
+            return None;
+        }
+        let volume = query_windows_volume(handle)?;
+        return (volume.file_system == WindowsFileSystem::Udfs)
+            .then(|| query_guaranteed_legacy_identity(handle, volume))
+            .flatten();
+    }
+    let extended_error = unsafe { GetLastError() };
+    let volume = query_windows_volume(handle)?;
+    if ExtendedFileIdQueryFailure::from_observation(extended_error, volume.file_system)
+        != ExtendedFileIdQueryFailure::Unsupported
+    {
+        return None;
+    }
+
+    query_guaranteed_legacy_identity(handle, volume)
+}
+
+#[cfg(windows)]
+fn query_guaranteed_legacy_identity(
+    handle: windows_sys::Win32::Foundation::HANDLE,
+    volume: WindowsVolumeObservation,
+) -> Option<PhysicalFileIdentity> {
+    let mut legacy = windows_sys::Win32::Storage::FileSystem::BY_HANDLE_FILE_INFORMATION::default();
+    let succeeded = unsafe {
+        windows_sys::Win32::Storage::FileSystem::GetFileInformationByHandle(handle, &mut legacy)
+    };
+    if succeeded == 0 {
+        return None;
+    }
+    if LegacyVolumeSerial(legacy.dwVolumeSerialNumber) != volume.legacy_serial {
+        return None;
+    }
+    let identifier =
+        (u64::from(legacy.nFileIndexHigh) << 32 | u64::from(legacy.nFileIndexLow)).to_be_bytes();
+    legacy_identity_from_observation(volume.legacy_serial, identifier, volume.file_system)
+}
+
+#[cfg(windows)]
+fn query_windows_volume(
+    handle: windows_sys::Win32::Foundation::HANDLE,
+) -> Option<WindowsVolumeObservation> {
+    use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationByHandleW;
+
+    let mut name = [0_u16; 32];
+    let mut legacy_serial = 0_u32;
+    let succeeded = unsafe {
+        GetVolumeInformationByHandleW(
+            handle,
+            std::ptr::null_mut(),
+            0,
+            &mut legacy_serial,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            name.as_mut_ptr(),
+            name.len() as u32,
+        )
+    };
+    if succeeded == 0 {
+        return None;
+    }
+    let length = name
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(name.len());
+    Some(WindowsVolumeObservation {
+        file_system: WindowsFileSystem::from_api_name(&name[..length]),
+        legacy_serial: LegacyVolumeSerial(legacy_serial),
     })
+}
+
+#[cfg(all(test, windows))]
+mod windows_identity_tests {
+    use std::os::windows::io::AsRawHandle;
+
+    use super::{
+        ExtendedFileId, ExtendedFileIdQueryFailure, LegacyFileId, LegacyFileIdGuarantee,
+        LegacyVolumeSerial, PhysicalFileIdentity, PhysicalIdentityEvidence, WindowsFileId,
+        WindowsFileSystem, WindowsVolumeIdentity, file_identity, legacy_identity_from_observation,
+        query_windows_volume,
+    };
+    use windows_sys::Win32::Foundation::{
+        ERROR_ACCESS_DENIED, ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER, ERROR_NOT_SUPPORTED,
+    };
+
+    fn extended_identity(
+        serial: u64,
+        comparable_legacy_serial: Option<u32>,
+        identifier: [u8; 16],
+    ) -> PhysicalFileIdentity {
+        PhysicalFileIdentity {
+            volume: WindowsVolumeIdentity::Extended {
+                serial,
+                comparable_legacy_serial: comparable_legacy_serial.map(LegacyVolumeSerial),
+            },
+            file_id: WindowsFileId::Extended(
+                ExtendedFileId::new(identifier).expect("authoritative fixture"),
+            ),
+        }
+    }
+
+    fn legacy_identity(serial: u32, identifier: [u8; 8]) -> PhysicalFileIdentity {
+        PhysicalFileIdentity {
+            volume: WindowsVolumeIdentity::Legacy(LegacyVolumeSerial(serial)),
+            file_id: WindowsFileId::Legacy(
+                LegacyFileId::new(LegacyFileIdGuarantee::Ntfs, identifier)
+                    .expect("authoritative fixture"),
+            ),
+        }
+    }
+
+    #[test]
+    fn extended_and_legacy_file_ids_round_trip_without_sharing_a_token_shape() {
+        let extended = extended_identity(7, Some(7), [3; 16]);
+        let extended_without_comparable_volume = extended_identity(7, None, [4; 16]);
+        let legacy = legacy_identity(7, [3; 8]);
+
+        for identity in [extended, extended_without_comparable_volume, legacy] {
+            let token = identity.to_local_token();
+            assert_eq!(
+                PhysicalFileIdentity::from_local_token(&token),
+                Some(identity)
+            );
+        }
+        assert_ne!(extended.to_local_token(), legacy.to_local_token());
+    }
+
+    #[test]
+    fn an_all_zero_extended_file_id_is_never_authoritative() {
+        assert_eq!(
+            PhysicalFileIdentity::from_local_token(
+                "windows-file-id-v1:0000000000000007:00000000000000000000000000000000",
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn an_all_ones_extended_file_id_is_never_authoritative() {
+        assert_eq!(
+            PhysicalFileIdentity::from_local_token(
+                "windows-file-id-v1:0000000000000007:ffffffffffffffffffffffffffffffff",
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn a_provenance_free_legacy_file_id_cannot_authorize_same() {
+        let token = "windows-file-index-v1:0000000000000007:0303030303030303";
+        let evidence = match (
+            PhysicalFileIdentity::from_local_token(token),
+            PhysicalFileIdentity::from_local_token(token),
+        ) {
+            (Some(left), Some(right)) => left.compare(right),
+            _ => PhysicalIdentityEvidence::Indeterminate,
+        };
+
+        assert_eq!(evidence, PhysicalIdentityEvidence::Indeterminate);
+    }
+
+    #[test]
+    fn equal_legacy_ids_on_refs_or_an_unknown_filesystem_are_indeterminate() {
+        for file_system in [WindowsFileSystem::Refs, WindowsFileSystem::Other] {
+            let left = legacy_identity_from_observation(LegacyVolumeSerial(7), [3; 8], file_system);
+            let right =
+                legacy_identity_from_observation(LegacyVolumeSerial(7), [3; 8], file_system);
+            let evidence = match (left, right) {
+                (Some(left), Some(right)) => left.compare(right),
+                _ => PhysicalIdentityEvidence::Indeterminate,
+            };
+
+            assert_eq!(evidence, PhysicalIdentityEvidence::Indeterminate);
+        }
+    }
+
+    #[test]
+    fn an_unexpected_extended_file_id_error_never_falls_back_to_legacy_identity() {
+        for (error, file_system) in [
+            (ERROR_ACCESS_DENIED, WindowsFileSystem::Ntfs),
+            (ERROR_INVALID_PARAMETER, WindowsFileSystem::Ntfs),
+            (ERROR_INVALID_PARAMETER, WindowsFileSystem::Refs),
+            (ERROR_INVALID_PARAMETER, WindowsFileSystem::Other),
+        ] {
+            assert_eq!(
+                ExtendedFileIdQueryFailure::from_observation(error, file_system),
+                ExtendedFileIdQueryFailure::Unexpected
+            );
+        }
+    }
+
+    #[test]
+    fn unsupported_extended_queries_can_use_a_guaranteed_ntfs_legacy_id() {
+        for error in [ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED] {
+            assert_eq!(
+                ExtendedFileIdQueryFailure::from_observation(error, WindowsFileSystem::Ntfs,),
+                ExtendedFileIdQueryFailure::Unsupported
+            );
+            let left = legacy_identity_from_observation(
+                LegacyVolumeSerial(7),
+                [3; 8],
+                WindowsFileSystem::Ntfs,
+            )
+            .expect("NTFS guarantees the non-sentinel legacy identifier");
+            let right = legacy_identity_from_observation(
+                LegacyVolumeSerial(7),
+                [3; 8],
+                WindowsFileSystem::Ntfs,
+            )
+            .expect("the same guaranteed observation remains authoritative");
+
+            assert_eq!(left.compare(right), PhysicalIdentityEvidence::Same);
+        }
+    }
+
+    #[test]
+    fn udfs_can_treat_invalid_parameter_as_an_unsupported_extended_query() {
+        assert_eq!(
+            ExtendedFileIdQueryFailure::from_observation(
+                ERROR_INVALID_PARAMETER,
+                WindowsFileSystem::Udfs,
+            ),
+            ExtendedFileIdQueryFailure::Unsupported
+        );
+        let left = legacy_identity_from_observation(
+            LegacyVolumeSerial(7),
+            [3; 8],
+            WindowsFileSystem::Udfs,
+        )
+        .expect("UDF has no extended IDs and guarantees its legacy ID");
+        let right = legacy_identity_from_observation(
+            LegacyVolumeSerial(7),
+            [3; 8],
+            WindowsFileSystem::Udfs,
+        )
+        .expect("the same UDF observation remains authoritative");
+
+        assert_eq!(left.compare(right), PhysicalIdentityEvidence::Same);
+    }
+
+    #[test]
+    fn filesystem_names_are_classified_exactly_before_granting_legacy_authority() {
+        assert_eq!(
+            WindowsFileSystem::from_api_name(&"NTFS".encode_utf16().collect::<Vec<_>>()),
+            WindowsFileSystem::Ntfs
+        );
+        assert_eq!(
+            WindowsFileSystem::from_api_name(&"ReFS".encode_utf16().collect::<Vec<_>>()),
+            WindowsFileSystem::Refs
+        );
+        assert_eq!(
+            WindowsFileSystem::from_api_name(&"NTFS-compatible".encode_utf16().collect::<Vec<_>>()),
+            WindowsFileSystem::Other
+        );
+    }
+
+    #[test]
+    fn physical_identity_comparison_is_closed_across_file_id_domains() {
+        let extended = extended_identity(7, Some(7), [3; 16]);
+        let other_extended = extended_identity(7, Some(7), [4; 16]);
+        let legacy = legacy_identity(7, [3; 8]);
+        let other_volume = legacy_identity(8, [3; 8]);
+
+        assert_eq!(extended.compare(extended), PhysicalIdentityEvidence::Same);
+        assert_eq!(
+            extended.compare(other_extended),
+            PhysicalIdentityEvidence::Different
+        );
+        assert_eq!(
+            legacy.compare(other_volume),
+            PhysicalIdentityEvidence::Different
+        );
+        assert_eq!(
+            extended.compare(legacy),
+            PhysicalIdentityEvidence::Indeterminate
+        );
+        assert_eq!(
+            legacy.compare(extended),
+            PhysicalIdentityEvidence::Indeterminate
+        );
+    }
+
+    #[test]
+    fn mixed_file_id_domains_normalize_native_volume_serial_widths_before_different() {
+        let native_extended_volume =
+            extended_identity(0xa8f2_cdd3_f2cd_a5c2, Some(0xf2cd_a5c2), [3; 16]);
+        let native_legacy_volume = legacy_identity(0xf2cd_a5c2, [3; 8]);
+        assert_eq!(
+            native_extended_volume.compare(native_legacy_volume),
+            PhysicalIdentityEvidence::Indeterminate,
+            "the same NTFS volume has different documented serial widths"
+        );
+        assert_eq!(
+            native_extended_volume.compare(legacy_identity(0xf2cd_a5c3, [3; 8])),
+            PhysicalIdentityEvidence::Different,
+            "independently observed volume serials can still prove a copy is Different"
+        );
+    }
+
+    #[test]
+    fn a_real_ntfs_handle_keeps_mixed_volume_serial_widths_indeterminate() {
+        let fixture = tempfile::NamedTempFile::new().expect("the native NTFS fixture is created");
+        let extended = file_identity(fixture.as_file())
+            .expect("the native handle exposes authoritative physical identity");
+        let handle = fixture.as_file().as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
+        let volume = query_windows_volume(handle).expect("the local volume is observed by handle");
+        assert_eq!(
+            volume.file_system,
+            WindowsFileSystem::Ntfs,
+            "the native evidence runner requires its temporary root on NTFS"
+        );
+
+        let mut legacy =
+            windows_sys::Win32::Storage::FileSystem::BY_HANDLE_FILE_INFORMATION::default();
+        let succeeded = unsafe {
+            windows_sys::Win32::Storage::FileSystem::GetFileInformationByHandle(handle, &mut legacy)
+        };
+        assert_ne!(succeeded, 0, "the same handle exposes its legacy fields");
+        assert_eq!(
+            LegacyVolumeSerial(legacy.dwVolumeSerialNumber),
+            volume.legacy_serial,
+            "both independent 32-bit volume observations agree"
+        );
+        let legacy_identifier = (u64::from(legacy.nFileIndexHigh) << 32
+            | u64::from(legacy.nFileIndexLow))
+        .to_be_bytes();
+        let legacy = legacy_identity_from_observation(
+            volume.legacy_serial,
+            legacy_identifier,
+            WindowsFileSystem::Ntfs,
+        )
+        .expect("NTFS guarantees the non-sentinel legacy fixture");
+
+        assert_eq!(
+            extended.compare(legacy),
+            PhysicalIdentityEvidence::Indeterminate,
+            "the same handle cannot compare its extended and legacy file-ID formats"
+        );
+    }
 }
 
 #[cfg(unix)]
@@ -570,6 +1245,15 @@ impl PhysicalFileIdentity {
             device: u64::from_str_radix(device, 16).ok()?,
             inode: u64::from_str_radix(inode, 16).ok()?,
         })
+    }
+
+    /// Compares the complete Unix device/inode identity pair.
+    pub fn compare(self, other: Self) -> PhysicalIdentityEvidence {
+        if self == other {
+            PhysicalIdentityEvidence::Same
+        } else {
+            PhysicalIdentityEvidence::Different
+        }
     }
 }
 

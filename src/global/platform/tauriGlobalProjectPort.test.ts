@@ -227,7 +227,12 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
   });
 });
 
-test.each(["opened", "cancelled"] as const)(
+test.each([
+  "opened",
+  "focused",
+  "externalCopyNotWritable",
+  "cancelled",
+] as const)(
   "opens through the native backend and returns the %s terminal without a pathname",
   async (status) => {
     vi.mocked(invoke).mockResolvedValueOnce({
@@ -241,6 +246,15 @@ test.each(["opened", "cancelled"] as const)(
     expect(invoke).toHaveBeenCalledWith("open_project");
   },
 );
+
+test("requests Salvar cópia como without exposing source or destination paths", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
+
+  await expect(
+    tauriGlobalProjectPort.saveExternalCopyAs(),
+  ).resolves.toEqual({ status: "cancelled" });
+  expect(invoke).toHaveBeenCalledWith("save_external_copy_as");
+});
 
 test("keeps an actionable structured backend failure inside the application port", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({

@@ -1,4 +1,4 @@
-use std::{fs::OpenOptions, path::Path};
+use std::{fs, fs::OpenOptions, path::Path};
 
 use std::os::windows::fs::OpenOptionsExt;
 use windows_sys::Win32::Storage::FileSystem::{
@@ -14,7 +14,7 @@ pub enum ProjectTransitionBarrierError {
 }
 
 /// Short-lived cross-process barrier covering the physical file-lock handoff
-/// during Project publication.
+/// during Project publication without requiring writes beside the Project.
 #[derive(Debug)]
 pub struct ProjectTransitionBarrier {
     _lock: ProjectFileLock,
@@ -22,14 +22,13 @@ pub struct ProjectTransitionBarrier {
 
 impl ProjectTransitionBarrier {
     pub fn try_acquire(
-        project_path: &Path,
+        local_state_root: &Path,
         project_id: &str,
     ) -> Result<Self, ProjectTransitionBarrierError> {
-        let parent = project_path
-            .parent()
-            .ok_or(ProjectTransitionBarrierError::Unavailable)?;
+        fs::create_dir_all(local_state_root)
+            .map_err(|_| ProjectTransitionBarrierError::Unavailable)?;
         let namespace = project_data_namespace(project_id);
-        let barrier_path = parent.join(format!(".myalbuns-{namespace}.lock"));
+        let barrier_path = local_state_root.join(format!("{namespace}.transition"));
         OpenOptions::new()
             .read(true)
             .write(true)

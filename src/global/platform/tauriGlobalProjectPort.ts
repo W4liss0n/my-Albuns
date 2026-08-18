@@ -23,6 +23,12 @@ const createFallbackFailure: ProjectLaunchFailure = {
   action: "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
 };
 
+const saveCopyFallbackFailure: ProjectLaunchFailure = {
+  code: "save_copy_unavailable",
+  message: "Não foi possível salvar a Cópia externa.",
+  action: "Tente novamente. Se o problema continuar, reabra a cópia.",
+};
+
 const validationFallbackFailure: ProjectLaunchFailure = {
   code: "project_configuration_validation_unavailable",
   message: "Não foi possível validar as Dimensões do Projeto.",
@@ -82,7 +88,12 @@ function toProjectLaunchOutcome(
   }
 
   const candidate = result as Record<string, unknown>;
-  if (candidate.status === "opened" || candidate.status === "cancelled") {
+  if (
+    candidate.status === "opened" ||
+    candidate.status === "focused" ||
+    candidate.status === "externalCopyNotWritable" ||
+    candidate.status === "cancelled"
+  ) {
     return { status: candidate.status };
   }
   if (candidate.status === "failed") {
@@ -260,6 +271,11 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
     settleProjectLaunch(
       () => invoke<unknown>("open_project"),
       openFallbackFailure,
+    ),
+  saveExternalCopyAs: () =>
+    settleProjectLaunch(
+      () => invoke<unknown>("save_external_copy_as"),
+      saveCopyFallbackFailure,
     ),
   listRecentProjects: async () => {
     try {

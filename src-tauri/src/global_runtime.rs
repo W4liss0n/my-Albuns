@@ -5,7 +5,9 @@ use std::{
 };
 
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto};
+#[cfg(windows)]
+use myalbuns_paths::ProcessInstanceHandle;
+use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto, ProcessInstanceId};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -17,8 +19,9 @@ use crate::{
     },
     logging, native_project_dialog, path_io,
     project_bootstrap::{
-        BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
-        FailureStage, InitialProjectConfiguration, InitialProjectCreationConfiguration,
+        BootstrapFailure, BootstrapFailureKind, BootstrapOutcome, CreateWriteAuthorization,
+        FailureCode, FailureStage, InitialProjectConfiguration,
+        InitialProjectCreationConfiguration, PendingExternalCopyProcess,
         ProjectConfigurationValidation, ProjectHostBootstrap, TargetAuthority,
         validate_configuration,
     },
@@ -44,6 +47,7 @@ struct GlobalRuntimeState {
     graphics_gate: GraphicsLaunchGate,
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
+    pending_external_copy: Arc<Mutex<Option<PendingExternalCopyProcess>>>,
 }
 
 impl GlobalRuntimeState {
@@ -53,6 +57,7 @@ impl GlobalRuntimeState {
             graphics_gate: GraphicsLaunchGate::new(direct_project),
             recent_projects: RecentProjectsStore::new(app_paths),
             startup_failure: Arc::new(Mutex::new(None)),
+            pending_external_copy: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -75,6 +80,27 @@ impl GlobalRuntimeState {
             error: graphics_gate_failure(),
         })
     }
+
+    fn take_external_copy(&self) -> Option<PendingExternalCopyProcess> {
+        self.pending_external_copy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+    }
+
+    fn remember_external_copy(&self, pending: PendingExternalCopyProcess) {
+        *self
+            .pending_external_copy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pending);
+    }
+
+    fn clear_external_copy(&self) {
+        self.pending_external_copy
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -92,6 +118,8 @@ pub(crate) struct ProjectLaunchFailure {
 #[serde(rename_all = "camelCase", tag = "status")]
 pub(crate) enum ProjectLaunchOutcome {
     Opened,
+    Focused,
+    ExternalCopyNotWritable,
     Cancelled,
     Failed { error: ProjectLaunchFailure },
 }
@@ -120,12 +148,16 @@ async fn complete_graphics_gate(
             )
             .await;
             match &outcome {
-                ProjectLaunchOutcome::Opened => exit_global_after_handoff(&app),
+                ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused => {
+                    exit_global_after_handoff(&app)
+                }
                 ProjectLaunchOutcome::Failed { error } => {
                     state.record_startup_failure(error.clone());
                     show_existing_global_window(&app);
                 }
-                ProjectLaunchOutcome::Cancelled => show_existing_global_window(&app),
+                ProjectLaunchOutcome::ExternalCopyNotWritable | ProjectLaunchOutcome::Cancelled => {
+                    show_existing_global_window(&app)
+                }
             }
             Some(outcome)
         }
@@ -182,10 +214,131 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     };
 
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
-    if outcome == ProjectLaunchOutcome::Opened {
+    if matches!(
+        outcome,
+        ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
+    ) {
         exit_global_after_handoff(&app);
     }
     outcome
+}
+
+#[tauri::command]
+async fn save_external_copy_as(app: AppHandle) -> ProjectLaunchOutcome {
+    let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(rejection) = state.project_host_gate_rejection() {
+        return rejection;
+    }
+    let Some(pending) = state.take_external_copy() else {
+        return ProjectLaunchOutcome::Failed {
+            error: simple_failure(
+                "external_copy_source_expired",
+                "A Cópia externa precisa ser validada novamente.",
+                "Abra novamente a cópia somente leitura.",
+            ),
+        };
+    };
+    let (destination_path, authorization) =
+        match native_project_dialog::choose_project_destination(&app).await {
+            Ok(native_project_dialog::ProjectSaveDialogOutcome::Cancelled) => {
+                return ProjectLaunchOutcome::Cancelled;
+            }
+            Ok(native_project_dialog::ProjectSaveDialogOutcome::Selected {
+                path,
+                authorization,
+            }) => (path, authorization),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    error = %error,
+                    event = "external_copy_destination_dialog_failed",
+                );
+                return ProjectLaunchOutcome::Failed {
+                    error: simple_failure(
+                        "dialog_unavailable",
+                        "Não foi possível concluir o diálogo para salvar a cópia.",
+                        "Tente novamente.",
+                    ),
+                };
+            }
+        };
+    let root_bindings = match path_io::capture_root_bindings(vec![destination_path.clone()]).await {
+        Ok(root_bindings) => root_bindings,
+        Err(error) => {
+            return ProjectLaunchOutcome::Failed {
+                error: binding_failure(error),
+            };
+        }
+    };
+    let destination_path = NativePathDto::from(destination_path);
+    let recent_path = destination_path.clone();
+    let destination = TargetAuthority {
+        logical_target: destination_path,
+        root_bindings,
+    };
+    let bootstrap = state.bootstrap.clone();
+    let recent_projects = state.recent_projects.clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let outcome = bootstrap.save_external_copy_as(pending, destination, authorization)?;
+        let recent_result = match &outcome {
+            BootstrapOutcome::Ready(ready) => {
+                Some(recent_projects.promote(&ready.project_id, recent_path))
+            }
+            BootstrapOutcome::FocusExisting { .. } => None,
+            BootstrapOutcome::ExternalCopyNotWritable(_) => None,
+        };
+        Ok::<_, BootstrapFailure>((outcome, recent_result))
+    })
+    .await
+    {
+        Ok(Ok((BootstrapOutcome::Ready(ready), recent_result))) => {
+            state.clear_external_copy();
+            if recent_result.is_some_and(|result| result.is_err()) {
+                tracing::warn!(
+                    target: "myalbuns.desktop",
+                    process_role = ProcessRole::Global.as_str(),
+                    project_id = ready.project_id,
+                    event = "recent_project_promotion_failed",
+                );
+            }
+            exit_global_after_handoff(&app);
+            ProjectLaunchOutcome::Opened
+        }
+        Ok(Ok((
+            BootstrapOutcome::FocusExisting {
+                project_id,
+                owner_process,
+            },
+            _,
+        ))) => {
+            let outcome = resolve_focus_existing(&state, project_id, owner_process);
+            if matches!(outcome, ProjectLaunchOutcome::Focused) {
+                exit_global_after_handoff(&app);
+            }
+            outcome
+        }
+        Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
+            drop(pending);
+            ProjectLaunchOutcome::Failed {
+                error: simple_failure(
+                    "invalid_host_terminal",
+                    "O Host não concluiu a criação da cópia.",
+                    "Abra novamente a cópia somente leitura.",
+                ),
+            }
+        }
+        Ok(Err(failure)) => ProjectLaunchOutcome::Failed {
+            error: bootstrap_failure(failure),
+        },
+        Err(_) => ProjectLaunchOutcome::Failed {
+            error: simple_failure(
+                "host_unavailable",
+                "Não foi possível iniciar a Janela da nova cópia.",
+                "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+            ),
+        },
+    }
 }
 
 #[tauri::command]
@@ -261,7 +414,10 @@ async fn create_project(
         },
     )
     .await;
-    if outcome == ProjectLaunchOutcome::Opened {
+    if matches!(
+        outcome,
+        ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
+    ) {
         provisional_decoratives.clear();
         exit_global_after_handoff(&app);
     }
@@ -306,7 +462,10 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
         }
     };
     let outcome = launch_confirmed_project(state, path, ConfirmedLaunch::OpenExisting).await;
-    if outcome == ProjectLaunchOutcome::Opened {
+    if matches!(
+        outcome,
+        ProjectLaunchOutcome::Opened | ProjectLaunchOutcome::Focused
+    ) {
         exit_global_after_handoff(&app);
     }
     outcome
@@ -341,25 +500,30 @@ async fn launch_confirmed_project(
         logical_target: native_path,
         root_bindings,
     };
-    let bootstrap = state.bootstrap;
-    let recent_projects = state.recent_projects;
+    let bootstrap = state.bootstrap.clone();
+    let recent_projects = state.recent_projects.clone();
     match tauri::async_runtime::spawn_blocking(move || {
-        let ready = match launch {
+        let outcome = match launch {
             ConfirmedLaunch::OpenExisting => bootstrap.open(authority),
             ConfirmedLaunch::CreateNew {
                 configuration,
                 authorization,
             } => bootstrap.create(authority, configuration, authorization),
         }?;
-        Ok::<_, BootstrapFailure>({
-            let recent_result = recent_projects.promote(&ready.project_id, recent_path);
-            (ready, recent_result)
-        })
+        let recent_result = match &outcome {
+            BootstrapOutcome::Ready(ready) => {
+                Some(recent_projects.promote(&ready.project_id, recent_path))
+            }
+            BootstrapOutcome::FocusExisting { .. } => None,
+            BootstrapOutcome::ExternalCopyNotWritable(_) => None,
+        };
+        Ok::<_, BootstrapFailure>((outcome, recent_result))
     })
     .await
     {
-        Ok(Ok((ready, recent_result))) => {
-            if recent_result.is_err() {
+        Ok(Ok((BootstrapOutcome::Ready(ready), recent_result))) => {
+            state.clear_external_copy();
+            if recent_result.is_some_and(|result| result.is_err()) {
                 tracing::warn!(
                     target: "myalbuns.desktop",
                     process_role = ProcessRole::Global.as_str(),
@@ -368,6 +532,17 @@ async fn launch_confirmed_project(
                 );
             }
             ProjectLaunchOutcome::Opened
+        }
+        Ok(Ok((
+            BootstrapOutcome::FocusExisting {
+                project_id,
+                owner_process,
+            },
+            _,
+        ))) => resolve_focus_existing(&state, project_id, owner_process),
+        Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
+            state.remember_external_copy(pending);
+            ProjectLaunchOutcome::ExternalCopyNotWritable
         }
         Ok(Err(failure)) => ProjectLaunchOutcome::Failed {
             error: bootstrap_failure(failure),
@@ -379,6 +554,32 @@ async fn launch_confirmed_project(
                 "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
             ),
         },
+    }
+}
+
+fn resolve_focus_existing(
+    state: &GlobalRuntimeState,
+    project_id: String,
+    owner_process: ProcessInstanceId,
+) -> ProjectLaunchOutcome {
+    if focus_existing_project_window(owner_process) {
+        state.clear_external_copy();
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::Global.as_str(),
+            project_id,
+            owner_process_id = owner_process.process_id(),
+            event = "existing_project_window_focused",
+        );
+        ProjectLaunchOutcome::Focused
+    } else {
+        ProjectLaunchOutcome::Failed {
+            error: simple_failure(
+                "project_in_use",
+                "Este Projeto já está aberto em outra janela.",
+                "Use a janela já aberta ou feche-a antes de tentar novamente.",
+            ),
+        }
     }
 }
 
@@ -408,6 +609,11 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
             "create_state_indeterminate",
             "Não foi possível confirmar se a criação do Projeto terminou.",
             "Não repita a criação agora. Verifique o arquivo escolhido e tente abri-lo antes de decidir o próximo passo.",
+        ),
+        (_, Some(FailureCode::SaveCopyStateIndeterminate)) => (
+            "save_copy_state_indeterminate",
+            "Não foi possível confirmar se a nova cópia terminou de ser salva.",
+            "Não repita agora. Verifique o destino escolhido antes de tentar novamente.",
         ),
         (_, Some(FailureCode::InvalidInitialProject)) => (
             "invalid_initial_project",
@@ -441,8 +647,13 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
         ),
         (_, Some(FailureCode::ExternalCopyRequiresInteractiveResolution)) => (
             "external_copy_requires_interactive_resolution",
-            "O arquivo parece ser uma cópia externa de outro Projeto.",
-            "A resolução interativa de cópias externas será disponibilizada em um fluxo próprio.",
+            "O arquivo parece ser uma Cópia externa de outro Projeto.",
+            "A resolução interativa de Cópias externas será disponibilizada em um fluxo próprio.",
+        ),
+        (_, Some(FailureCode::ExternalCopyNotWritable)) => (
+            "external_copy_not_writable",
+            "A Cópia externa não pode receber uma nova Identidade neste local.",
+            "Use Salvar cópia como... para criar uma versão editável em outro local.",
         ),
         (_, Some(FailureCode::IdentityIndeterminate)) => (
             "identity_indeterminate",
@@ -688,6 +899,75 @@ fn exit_global_after_handoff(app: &AppHandle) {
     app.exit(0);
 }
 
+#[cfg(windows)]
+fn focus_existing_project_window(owner_process: ProcessInstanceId) -> bool {
+    use windows::{
+        Win32::{
+            Foundation::{HWND, LPARAM},
+            UI::WindowsAndMessaging::{
+                EnumWindows, GetWindowThreadProcessId, IsWindowVisible, SW_RESTORE,
+                SetForegroundWindow, ShowWindow,
+            },
+        },
+        core::BOOL,
+    };
+
+    struct Search {
+        process_id: u32,
+        window: HWND,
+    }
+
+    unsafe extern "system" fn find_window(window: HWND, parameter: LPARAM) -> BOOL {
+        let search = unsafe { &mut *(parameter.0 as *mut Search) };
+        let mut process_id = 0_u32;
+        unsafe { GetWindowThreadProcessId(window, Some(&mut process_id)) };
+        if process_id == search.process_id && unsafe { IsWindowVisible(window) }.as_bool() {
+            search.window = window;
+            return BOOL(0);
+        }
+        BOOL(1)
+    }
+
+    if owner_process.process_id() == std::process::id() {
+        return false;
+    }
+    let Ok(process) = ProcessInstanceHandle::open(owner_process, 0) else {
+        return false;
+    };
+    let mut search = Search {
+        process_id: owner_process.process_id(),
+        window: HWND::default(),
+    };
+    let parameter = LPARAM((&raw mut search).cast::<()>() as isize);
+    let enumeration = unsafe { EnumWindows(Some(find_window), parameter) };
+    if enumeration.is_err() && search.window.0.is_null() {
+        return false;
+    }
+    if search.window.0.is_null() {
+        return false;
+    }
+    let belongs_to_owner = || {
+        let mut process_id = 0_u32;
+        unsafe { GetWindowThreadProcessId(search.window, Some(&mut process_id)) };
+        process_id == owner_process.process_id()
+    };
+    if !process.is_running().unwrap_or(false) || !belongs_to_owner() {
+        return false;
+    }
+    unsafe {
+        let _ = ShowWindow(search.window, SW_RESTORE);
+    }
+    if !process.is_running().unwrap_or(false) || !belongs_to_owner() {
+        return false;
+    }
+    unsafe { SetForegroundWindow(search.window).as_bool() }
+}
+
+#[cfg(not(windows))]
+fn focus_existing_project_window(_owner_process: ProcessInstanceId) -> bool {
+    false
+}
+
 #[cfg(debug_assertions)]
 fn webdriver_project_path(automation_enabled: bool, candidate: Option<PathBuf>) -> Option<PathBuf> {
     candidate.filter(|path| {
@@ -752,6 +1032,7 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
             complete_graphics_gate,
             create_project,
             open_project,
+            save_external_copy_as,
             recent_projects,
             open_recent_project,
             startup_open_failure,
@@ -767,6 +1048,117 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn a_reused_pid_never_focuses_the_visible_window_of_another_process_instance() {
+        use std::{
+            io::{BufRead, BufReader, Write},
+            os::windows::io::AsRawHandle,
+            process::{Command, Stdio},
+        };
+
+        let mut alien = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-STA",
+                "-Command",
+                r#"
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @'
+using System;
+using System.Threading;
+using System.Windows.Forms;
+
+public static class MyAlbunsFocusFixture
+{
+    private sealed class NonActivatingForm : Form
+    {
+        protected override bool ShowWithoutActivation { get { return true; } }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams parameters = base.CreateParams;
+                parameters.ExStyle |= 0x08000000;
+                return parameters;
+            }
+        }
+    }
+
+    public static void Run()
+    {
+        using (var window = new NonActivatingForm())
+        {
+            window.Text = "MyAlbuns foreign process instance";
+            window.Width = 320;
+            window.Height = 200;
+            window.Shown += delegate
+            {
+                Console.Out.WriteLine("ready");
+                Console.Out.Flush();
+            };
+            var input = new Thread(new ThreadStart(delegate
+            {
+                Console.In.ReadLine();
+                if (window.IsHandleCreated)
+                {
+                    window.BeginInvoke((Action)delegate { window.Close(); });
+                }
+            }));
+            input.IsBackground = true;
+            input.Start();
+            Application.Run(window);
+        }
+    }
+}
+'@ -ReferencedAssemblies System.Windows.Forms.dll,System.Drawing.dll
+[MyAlbunsFocusFixture]::Run()
+"#,
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("the foreign process instance starts");
+        let mut output = BufReader::new(
+            alien
+                .stdout
+                .take()
+                .expect("the foreign process exposes its readiness signal"),
+        );
+        let mut readiness = String::new();
+        output
+            .read_line(&mut readiness)
+            .expect("the visible foreign window reports readiness");
+        assert_eq!(readiness.trim(), "ready");
+
+        let observed =
+            ProcessInstanceId::from_process_handle(alien.id(), alien.as_raw_handle().cast())
+                .expect("the foreign process instance is observed exactly");
+        let reused_pid = ProcessInstanceId::from_wire(observed.process_id(), 1)
+            .expect("the previous process instance token is structurally valid");
+
+        let focused = focus_existing_project_window(reused_pid);
+
+        writeln!(
+            alien
+                .stdin
+                .as_mut()
+                .expect("the fixture stdin remains open"),
+            "close"
+        )
+        .expect("the foreign window receives its close signal");
+        alien.wait().expect("the foreign process is reaped");
+        assert_ne!(observed, reused_pid);
+        assert!(
+            !focused,
+            "a PID reused by another process instance must never receive focus"
+        );
+    }
 
     #[test]
     fn webdriver_adapter_accepts_only_an_automated_absolute_project_path() {
@@ -876,6 +1268,15 @@ mod tests {
         assert_eq!(
             serde_json::to_value(ProjectLaunchOutcome::Opened).expect("outcome serializes"),
             serde_json::json!({ "status": "opened" })
+        );
+        assert_eq!(
+            serde_json::to_value(ProjectLaunchOutcome::Focused).expect("outcome serializes"),
+            serde_json::json!({ "status": "focused" })
+        );
+        assert_eq!(
+            serde_json::to_value(ProjectLaunchOutcome::ExternalCopyNotWritable)
+                .expect("outcome serializes"),
+            serde_json::json!({ "status": "externalCopyNotWritable" })
         );
         assert_eq!(
             serde_json::to_value(ProjectLaunchOutcome::Cancelled).expect("outcome serializes"),
@@ -989,6 +1390,24 @@ mod tests {
         });
         assert!(
             indeterminate
+                .action
+                .as_deref()
+                .is_some_and(|action| action.contains("Não repita"))
+        );
+    }
+
+    #[test]
+    fn save_copy_failure_keeps_its_terminal_stage_and_safe_retry_instruction() {
+        let failure = bootstrap_failure(BootstrapFailure {
+            kind: BootstrapFailureKind::HostFailed,
+            stage: Some(FailureStage::SaveCopy),
+            code: Some(FailureCode::SaveCopyStateIndeterminate),
+        });
+
+        assert_eq!(failure.code, "save_copy_state_indeterminate");
+        assert_eq!(failure.stage, Some(FailureStage::SaveCopy));
+        assert!(
+            failure
                 .action
                 .as_deref()
                 .is_some_and(|action| action.contains("Não repita"))

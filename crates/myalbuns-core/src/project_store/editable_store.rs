@@ -1,16 +1,19 @@
-use std::{fs, io, path::PathBuf};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 #[cfg(windows)]
 use myalbuns_paths::{
     ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
     ProjectFileLock, ProjectFileLockError, ProjectTransitionBarrier, ProjectTransitionBarrierError,
-    ResolveError,
+    ResolveError, ResolvedObject,
 };
 use uuid::Uuid;
 
 use super::{
-    DecodeFailure, DocumentFailure, PathFailure, ProjectIdentityLease, ProjectLocation, decode,
-    decode_with_metadata, encode, map_path_failure,
+    DecodeFailure, DocumentFailure, PathFailure, PendingProjectIdentityLease, ProjectIdentityLease,
+    ProjectLocation, decode, decode_with_metadata, encode, map_path_failure,
     windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
@@ -19,17 +22,15 @@ mod save_protocol;
 
 use save_protocol::PersistedBaseline;
 pub(crate) use save_protocol::{SaveStoreError, SaveStoreResult};
-#[cfg(test)]
-pub(crate) use save_protocol::{
-    inject_post_publication_indeterminate_for_current_thread,
-    release_post_publication_indeterminate_for_current_thread,
-};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum OpenStoreError {
     Path(PathFailure),
     Document(DocumentFailure),
-    ProjectInUse,
+    ProjectInUse {
+        project_id: Uuid,
+        physical_identity: Option<PhysicalFileIdentity>,
+    },
     IdentityIndeterminate,
 }
 
@@ -46,6 +47,7 @@ pub(crate) enum CreateStoreError {
 #[derive(Debug)]
 pub(crate) struct ProjectStore {
     location: ProjectLocation,
+    transition_root: PathBuf,
     baseline: Option<PersistedBaseline>,
 }
 
@@ -57,6 +59,14 @@ impl ProjectStore {
     #[cfg(windows)]
     pub(crate) fn physical_identity(&self) -> Option<PhysicalFileIdentity> {
         self.baseline.as_ref()?.physical_identity()
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn compare_physical(&self, resolved: &ResolvedObject) -> PhysicalIdentityEvidence {
+        self.baseline
+            .as_ref()
+            .map(|baseline| baseline.compare_physical(resolved))
+            .unwrap_or(PhysicalIdentityEvidence::Indeterminate)
     }
 
     #[cfg(windows)]
@@ -81,9 +91,15 @@ impl ProjectStore {
     }
 
     #[cfg(windows)]
-    fn from_verified(location: ProjectLocation, lock: ProjectFileLock, bytes: Vec<u8>) -> Self {
+    fn from_verified(
+        location: ProjectLocation,
+        transition_root: &Path,
+        lock: ProjectFileLock,
+        bytes: Vec<u8>,
+    ) -> Self {
         Self {
             location,
+            transition_root: transition_root.to_path_buf(),
             baseline: Some(PersistedBaseline::new(lock, bytes)),
         }
     }
@@ -94,6 +110,14 @@ impl ProjectStore {
         identity_lease: &ProjectIdentityLease,
     ) -> SaveStoreResult {
         save_protocol::save(self, candidate, identity_lease)
+    }
+
+    pub(crate) fn rewrite_identity(
+        &mut self,
+        project_id: Uuid,
+        identity_lease: &PendingProjectIdentityLease,
+    ) -> SaveStoreResult {
+        save_protocol::rewrite_identity(self, project_id, identity_lease)
     }
 
     pub(crate) fn invalidate(&mut self) {
@@ -110,6 +134,7 @@ pub(crate) struct OpenedProject {
 #[derive(Debug)]
 pub(crate) struct PreparedReplacement {
     location: ProjectLocation,
+    transition_root: PathBuf,
     expected_revision: ProjectRevision,
     expected_bytes: Vec<u8>,
     temporary: TemporaryPublication,
@@ -135,6 +160,7 @@ impl PreparedReplacement {
         match publish_result {
             Ok(()) => verify_created(
                 &self.location,
+                &self.transition_root,
                 &self.destination,
                 &self.expected_bytes,
                 &self.expected_revision,
@@ -155,6 +181,7 @@ impl PreparedReplacement {
         }
         if let Ok(store) = verify_created(
             &self.location,
+            &self.transition_root,
             &self.destination,
             &self.expected_bytes,
             &self.expected_revision,
@@ -201,7 +228,10 @@ impl PreparedReplacement {
 }
 
 #[cfg(windows)]
-pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, OpenStoreError> {
+pub(crate) fn open_editable(
+    location: ProjectLocation,
+    transition_root: &Path,
+) -> Result<OpenedProject, OpenStoreError> {
     let initial = location
         .root_bindings()
         .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
@@ -210,27 +240,42 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
     let initial_revision = decode(&initial_bytes).map_err(map_open_decode_error)?;
-    let _barrier = ProjectTransitionBarrier::try_acquire(
-        initial.operational_path(),
+    let _barrier = match ProjectTransitionBarrier::try_acquire(
+        transition_root,
         &initial_revision.project_id.hyphenated().to_string(),
-    )
-    .map_err(|error| match error {
-        ProjectTransitionBarrierError::Conflict => OpenStoreError::ProjectInUse,
-        ProjectTransitionBarrierError::Unavailable => {
-            OpenStoreError::Path(PathFailure::Unavailable)
+    ) {
+        Ok(barrier) => barrier,
+        Err(ProjectTransitionBarrierError::Conflict) => {
+            return Err(classify_project_in_use_for_current_target(
+                &location,
+                &initial,
+                initial_revision.project_id,
+            ));
         }
-    })?;
+        Err(ProjectTransitionBarrierError::Unavailable) => {
+            return Err(OpenStoreError::Path(PathFailure::Unavailable));
+        }
+    };
     let resolved = location
         .root_bindings()
         .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
         .map_err(|error| OpenStoreError::Path(map_path_failure(error)))?;
-    let lock =
-        ProjectFileLock::try_acquire(resolved.operational_path()).map_err(|error| match error {
-            ProjectFileLockError::Conflict => OpenStoreError::ProjectInUse,
-            ProjectFileLockError::Unavailable { .. } => {
-                OpenStoreError::Path(PathFailure::IoFailure)
-            }
-        })?;
+    if initial.compare_physical(&resolved) != PhysicalIdentityEvidence::Same {
+        return Err(OpenStoreError::IdentityIndeterminate);
+    }
+    let lock = match ProjectFileLock::try_acquire(resolved.operational_path()) {
+        Ok(lock) => lock,
+        Err(ProjectFileLockError::Conflict) => {
+            return Err(classify_project_in_use_for_current_target(
+                &location,
+                &initial,
+                initial_revision.project_id,
+            ));
+        }
+        Err(ProjectFileLockError::Unavailable { .. }) => {
+            return Err(OpenStoreError::Path(PathFailure::IoFailure));
+        }
+    };
     if lock.compare_physical(&resolved) != PhysicalIdentityEvidence::Same {
         return Err(OpenStoreError::IdentityIndeterminate);
     }
@@ -244,18 +289,45 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
     Ok(OpenedProject {
         revision: decoded.revision,
         requires_schema_upgrade: decoded.requires_schema_upgrade,
-        store: ProjectStore::from_verified(location, lock, bytes),
+        store: ProjectStore::from_verified(location, transition_root, lock, bytes),
     })
 }
 
+#[cfg(windows)]
+fn classify_project_in_use_for_current_target(
+    location: &ProjectLocation,
+    expected: &ResolvedObject,
+    project_id: Uuid,
+) -> OpenStoreError {
+    let Ok(current) = location
+        .root_bindings()
+        .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
+    else {
+        return OpenStoreError::IdentityIndeterminate;
+    };
+    match expected.compare_physical(&current) {
+        PhysicalIdentityEvidence::Same => OpenStoreError::ProjectInUse {
+            project_id,
+            physical_identity: expected.physical_identity(),
+        },
+        PhysicalIdentityEvidence::Different | PhysicalIdentityEvidence::Indeterminate => {
+            OpenStoreError::IdentityIndeterminate
+        }
+    }
+}
+
 #[cfg(not(windows))]
-pub(crate) fn open_editable(_location: ProjectLocation) -> Result<OpenedProject, OpenStoreError> {
+pub(crate) fn open_editable(
+    _location: ProjectLocation,
+    _transition_root: &Path,
+) -> Result<OpenedProject, OpenStoreError> {
     Err(OpenStoreError::Path(PathFailure::IoFailure))
 }
 
 pub(crate) fn create_only(
     location: ProjectLocation,
     revision: &ProjectRevision,
+    transition_root: &Path,
 ) -> Result<ProjectStore, CreateStoreError> {
     let destination = location
         .prepare_file_destination()
@@ -263,9 +335,16 @@ pub(crate) fn create_only(
     let bytes = encode(revision).map_err(map_create_decode_error)?;
     let temporary = prepare_temporary(&destination, &bytes)?;
     match publish_new(temporary.path(), destination.operational_path()) {
-        Ok(()) => verify_created(&location, &destination, &bytes, revision)
+        Ok(()) => verify_created(&location, transition_root, &destination, &bytes, revision)
             .map_err(|_| CreateStoreError::StateIndeterminate),
-        Err(error) => reconcile_create_only_error(error, &location, &destination, &bytes, revision),
+        Err(error) => reconcile_create_only_error(
+            error,
+            &location,
+            transition_root,
+            &destination,
+            &bytes,
+            revision,
+        ),
     }
 }
 
@@ -273,6 +352,7 @@ pub(crate) fn create_only(
 fn reconcile_create_only_error(
     error: io::Error,
     location: &ProjectLocation,
+    transition_root: &Path,
     destination: &PreparedFileDestination,
     expected_bytes: &[u8],
     expected_revision: &ProjectRevision,
@@ -280,7 +360,13 @@ fn reconcile_create_only_error(
     if is_destination_conflict(&error) {
         return Err(CreateStoreError::DestinationConflict);
     }
-    if let Ok(store) = verify_created(location, destination, expected_bytes, expected_revision) {
+    if let Ok(store) = verify_created(
+        location,
+        transition_root,
+        destination,
+        expected_bytes,
+        expected_revision,
+    ) {
         return Ok(store);
     }
 
@@ -294,6 +380,7 @@ fn reconcile_create_only_error(
 fn reconcile_create_only_error(
     _error: io::Error,
     _location: &ProjectLocation,
+    _transition_root: &Path,
     _destination: &PreparedFileDestination,
     _expected_bytes: &[u8],
     _expected_revision: &ProjectRevision,
@@ -305,6 +392,7 @@ fn reconcile_create_only_error(
 pub(crate) fn prepare_replacement(
     location: ProjectLocation,
     revision: &ProjectRevision,
+    transition_root: &Path,
 ) -> Result<PreparedReplacement, CreateStoreError> {
     let destination = location
         .prepare_file_destination()
@@ -347,6 +435,7 @@ pub(crate) fn prepare_replacement(
 
     Ok(PreparedReplacement {
         location,
+        transition_root: transition_root.to_path_buf(),
         expected_revision: revision.clone(),
         expected_bytes,
         temporary,
@@ -360,6 +449,7 @@ pub(crate) fn prepare_replacement(
 pub(crate) fn prepare_replacement(
     _location: ProjectLocation,
     _revision: &ProjectRevision,
+    _transition_root: &Path,
 ) -> Result<PreparedReplacement, CreateStoreError> {
     Err(CreateStoreError::Path(PathFailure::IoFailure))
 }
@@ -378,6 +468,7 @@ fn prepare_temporary(
 #[cfg(windows)]
 fn verify_created(
     location: &ProjectLocation,
+    transition_root: &Path,
     destination: &PreparedFileDestination,
     expected_bytes: &[u8],
     expected_revision: &ProjectRevision,
@@ -395,12 +486,18 @@ fn verify_created(
     if revision != *expected_revision {
         return Err(());
     }
-    Ok(ProjectStore::from_verified(location.clone(), lock, bytes))
+    Ok(ProjectStore::from_verified(
+        location.clone(),
+        transition_root,
+        lock,
+        bytes,
+    ))
 }
 
 #[cfg(not(windows))]
 fn verify_created(
     _location: &ProjectLocation,
+    _transition_root: &Path,
     _destination: &PreparedFileDestination,
     _expected_bytes: &[u8],
     _expected_revision: &ProjectRevision,
@@ -425,7 +522,9 @@ fn map_create_decode_error(error: DecodeFailure) -> CreateStoreError {
 fn map_io_path(error: io::Error) -> PathFailure {
     match error.kind() {
         io::ErrorKind::NotFound => PathFailure::NotFound,
-        io::ErrorKind::PermissionDenied => PathFailure::AccessDenied,
+        io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem => {
+            PathFailure::AccessDenied
+        }
         io::ErrorKind::InvalidInput => PathFailure::InvalidPath,
         io::ErrorKind::AlreadyExists => PathFailure::Conflict,
         _ => PathFailure::IoFailure,
@@ -454,5 +553,73 @@ impl TemporaryPublication {
 impl Drop for TemporaryPublication {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use std::{io, path::Path};
+
+    use myalbuns_paths::{ExpectedObject, OperationPathContext};
+    use uuid::Uuid;
+    use windows_sys::Win32::Foundation::ERROR_WRITE_PROTECT;
+
+    use super::{
+        OpenStoreError, ProjectLocation, classify_project_in_use_for_current_target, map_io_path,
+    };
+    use crate::project_store::PathFailure;
+
+    fn project_location(path: &Path) -> ProjectLocation {
+        let mut paths = OperationPathContext::new();
+        paths
+            .capture(path)
+            .expect("the public path seam captures the Project root");
+        ProjectLocation::new(path.to_path_buf(), paths.freeze())
+    }
+
+    #[test]
+    fn write_protected_media_is_an_access_denied_path() {
+        let error = io::Error::from_raw_os_error(ERROR_WRITE_PROTECT as i32);
+
+        assert_eq!(error.kind(), io::ErrorKind::ReadOnlyFilesystem);
+        assert_eq!(map_io_path(error), PathFailure::AccessDenied);
+    }
+
+    #[test]
+    fn project_in_use_is_forwarded_only_while_the_path_still_names_the_same_file() {
+        let fixture = tempfile::tempdir().expect("temporary Project fixture");
+        let project_path = fixture.path().join("Projeto.myalbuns");
+        let retired_path = fixture.path().join("Projeto anterior.myalbuns");
+        let replacement_path = fixture.path().join("Outro Projeto.myalbuns");
+        std::fs::write(&project_path, b"first physical Project")
+            .expect("the first physical Project exists");
+        std::fs::write(&replacement_path, b"replacement physical Project")
+            .expect("the replacement physical Project exists");
+        let location = project_location(&project_path);
+        let expected = location
+            .root_bindings()
+            .resolve_existing(&project_path, ExpectedObject::RegularFile)
+            .expect("the first physical Project is retained by handle");
+        let project_id = Uuid::new_v4();
+
+        assert_eq!(
+            classify_project_in_use_for_current_target(&location, &expected, project_id),
+            OpenStoreError::ProjectInUse {
+                project_id,
+                physical_identity: expected.physical_identity(),
+            },
+            "Same is the only state that may be forwarded for focus"
+        );
+
+        std::fs::rename(&project_path, &retired_path)
+            .expect("the retained first Project leaves the pathname");
+        std::fs::rename(&replacement_path, &project_path)
+            .expect("another physical Project takes the pathname");
+
+        assert_eq!(
+            classify_project_in_use_for_current_target(&location, &expected, project_id),
+            OpenStoreError::IdentityIndeterminate,
+            "Different must fail closed instead of focusing the previous physical Project"
+        );
     }
 }
