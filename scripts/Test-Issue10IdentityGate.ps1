@@ -294,11 +294,27 @@ try {
             )
         },
         [ordered]@{
-            name = 'unusable-lease-identity-never-focuses'
+            name = 'native-volume-serial-widths-fail-closed-across-file-id-domains'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::mixed_file_id_domains_normalize_native_volume_serial_widths_before_different'
+            )
+        },
+        [ordered]@{
+            name = 'real-ntfs-handle-volume-serial-widths-fail-closed'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::a_real_ntfs_handle_keeps_mixed_volume_serial_widths_indeterminate'
+            )
+        },
+        [ordered]@{
+            name = 'incompatible-lease-identity-never-focuses'
             package = 'myalbuns-core'
             arguments = @(
                 '--lib',
-                'project_store::identity_lease::tests::an_active_lease_never_focuses_from_an_unusable_physical_identity_token'
+                'project_store::identity_lease::tests::active_lease_focus_requires_compatible_authoritative_physical_identity'
             )
         }
     )

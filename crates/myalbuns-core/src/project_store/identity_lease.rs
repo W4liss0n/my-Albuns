@@ -404,7 +404,9 @@ impl Drop for PendingProjectIdentityLease {
 mod tests {
     use std::sync::mpsc;
 
-    use myalbuns_paths::{ExpectedObject, OperationPathContext, ProcessInstanceId};
+    use myalbuns_paths::{
+        ExpectedObject, OperationPathContext, PhysicalFileIdentity, ProcessInstanceId,
+    };
 
     use super::{
         ActiveIdentityTarget, IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,
@@ -479,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    fn an_active_lease_never_focuses_from_an_unusable_physical_identity_token() {
+    fn active_lease_focus_requires_compatible_authoritative_physical_identity() {
         let fixture = tempfile::tempdir().expect("temporary identity lease fixture");
         let root = fixture.path().join("leases");
         let source_path = fixture.path().join("Project.myalbuns");
@@ -523,6 +525,32 @@ mod tests {
                 "unusable evidence must never become FocusExisting"
             );
         }
+
+        let legacy_candidate = PhysicalFileIdentity::from_local_token(
+            "windows-ntfs-file-index-v1:00000000f2cda5c2:0303030303030303",
+        )
+        .expect("the typed legacy candidate fixture is authoritative in its own domain");
+        publish_target_atomically(
+            &target,
+            &ActiveIdentityTarget {
+                version: 2,
+                physical_identity: concat!(
+                    "windows-file-id-v2:",
+                    "a8f2cdd3f2cda5c2:",
+                    "f2cda5c2:",
+                    "03030303030303030303030303030303"
+                )
+                .to_owned(),
+                owner_process,
+            },
+            || {},
+        )
+        .expect("the mixed-domain target fixture is published atomically");
+        assert_eq!(
+            ProjectIdentityLease::observe(&root, project_id, Some(legacy_candidate)),
+            Err(IdentityLeaseError::Unavailable),
+            "matching 32-bit volume evidence cannot turn mixed file-ID formats into FocusExisting"
+        );
         drop(lease);
     }
 }

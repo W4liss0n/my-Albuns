@@ -91,10 +91,18 @@ Windows e exige `ExternalCopyNotWritable` ao abrir a Cópia externa nela. Ambas
 usam eventos ou stdin para coordenação, sem `sleep`.
 
 O runner também fixa a comparação entre os dois domínios de identidade física
-do Windows: IDs estendidos ou legados só produzem `Same`/`Different` quando os
-dois lados usam o mesmo formato; formatos mistos no mesmo volume produzem
-`Indeterminate`, enquanto volumes distintos continuam conclusivamente
-`Different`. IDs estendidos compostos somente por `00` ou somente por `FF` são
+do Windows: somente IDs do mesmo formato podem produzir `Same`; uma diferença
+de ID só produz `Different` no mesmo formato, enquanto formatos mistos no mesmo
+volume produzem `Indeterminate`. Como `FILE_ID_INFO` fornece um serial de volume
+de 64 bits, enquanto `BY_HANDLE_FILE_INFORMATION` fornece 32 bits, igualdade ou
+desigualdade crua entre esses campos nunca decide a comparação. Em um handle
+local, uma segunda observação por `GetVolumeInformationByHandleW` fornece o
+serial comparável de 32 bits: sua divergência pode provar volumes distintos e
+`Different`, mas sua igualdade não torna formatos de ID mistos comparáveis. Em
+SMB, onde essa API de volume não é suportada, o domínio misto permanece
+`Indeterminate`.
+
+IDs estendidos compostos somente por `00` ou somente por `FF` são
 sentinelas sem autoridade e são ignorados. Um ID legado só é materializado com
 proveniência tipada de filesystem e garantia documental; igualdade legada em
 ReFS ou filesystem desconhecido, formato legado antigo sem proveniência e erro
@@ -110,7 +118,10 @@ ReFS, CDFS, filesystem desconhecido e qualquer erro inesperado permanecem sem
 evidência autoritativa. Em SMB, onde a consulta do nome do filesystem por
 handle não é suportada, somente um `FILE_ID_INFO` estendido válido autoriza a
 comparação. Isso conserva os aliases UNC positivos e fecha qualquer downgrade
-de evidência em falha transitória.
+de evidência em falha transitória. O token local estendido v2 transporta
+separadamente ambos os seriais quando a observação comparável existe; o token
+v1 anterior continua aceito sem inventar essa prova e, por isso, permanece
+inconclusivo contra um ID legado.
 
 O artefato canônico é
 [`artifacts/0035-issue-10-identity-gate.json`](artifacts/0035-issue-10-identity-gate.json).
@@ -133,7 +144,10 @@ aplicável; os formatos nunca compartilham o mesmo token local nem são
 comparados como se fossem o mesmo domínio de identidade. Testes da primitiva
 cobrem ambas as sentinelas de 128 bits, ReFS e filesystem desconhecido, erro
 inesperado sem fallback, NTFS/UDF positivos e propagação pela lease até impedir
-`FocusExisting`.
+`FocusExisting`. Uma regressão usa os valores nativos de um mesmo volume NTFS
+(`a8f2cdd3f2cda5c2` estendido e `f2cda5c2` legado) para provar que a diferença
+de largura não autoriza `Different` nem promoção; outra consulta os dois
+formatos no mesmo handle NTFS real usado pelo runner.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
@@ -168,6 +182,8 @@ pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
   matriz de garantias dos IDs de 64 e 128 bits por NTFS, ReFS, UDFS e CDFS;
 - [`BY_HANDLE_FILE_INFORMATION`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information):
   o índice de 64 bits não é garantidamente único em ReFS;
+- [`FILE_ID_INFO`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info):
+  o serial de volume do domínio estendido é um `ULONGLONG`;
 - [`GetFileInformationByHandleEx`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex):
   contrato de `FileIdInfo` e suporte SMB;
 - [`GetVolumeInformationByHandleW`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationbyhandlew):
