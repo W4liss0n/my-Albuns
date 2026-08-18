@@ -1,0 +1,77 @@
+{
+    "schemaVersion":  1,
+    "collectedAtUtc":  "2026-08-18T01:30:29.3041906Z",
+    "gitCommit":  "e61b6df138ca820e19099bf1097492dbd4c22194",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "uncProvider":  "loopback-administrative-share"
+                 },
+    "checks":  [
+                   {
+                       "name":  "public-project-core-gate-build",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-loopback-unc-and-mapped-drive",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "mapped-and-unc-aliases-focus-real-owner-process",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "writable-copy-persists-new-identity-before-session",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "pending-creative-change-not-in-technical-identity-write",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "simultaneous-original-and-copy-editing-isolated",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "rename-and-movement-preserve-identity-and-namespace",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "read-only-copy-blocked-with-save-copy-as-offer",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "save-copy-as-preserves-source-revision-and-publishes-current-schema",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "failed-save-copy-as-creates-no-editable-session",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unavailable-previous-root-fails-closed",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "originalProjectId":  "c7458c82-9d04-4b9a-aaa4-a94f476fde3d",
+                     "promotedCopyProjectId":  "294803cf-7c53-4738-ab8c-80189161558f",
+                     "saveCopyAsProjectId":  "4d07fed5-4355-4ac1-8cc1-7e1fe087ce56",
+                     "ownerProcessId":  13792,
+                     "mappedAliasOutcome":  "focusExisting",
+                     "uncAliasOutcome":  "focusExisting",
+                     "movedNamespaceReused":  true,
+                     "writableCopyNamespaceIsolated":  true,
+                     "persistedDpiExcludedPending240":  300,
+                     "isolatedCopyDpi":  600,
+                     "isolatedOriginalDpi":  300,
+                     "readOnlySourceSha256":  "9dd1a88dcf887a350b839db0d39a747fa23f53d072e999722a3e3b9e55215d8f",
+                     "readOnlySourcePreserved":  true,
+                     "saveCopyAsSourceSchema":  1,
+                     "saveCopyAsDestinationSchema":  2,
+                     "saveCopyAsRevision":  7,
+                     "unavailableOriginOutcome":  "identityIndeterminate",
+                     "unavailableCandidatePreserved":  true
+                 }
+}
