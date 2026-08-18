@@ -431,6 +431,30 @@
   grid-template-columns: 42% 16% 42%;
 }
 
+.new-project-fixed-selection {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  box-sizing: border-box;
+  outline: 2px solid var(--ui-accent);
+  pointer-events: none;
+}
+
+.new-project-fixed-selection--both {
+  right: 0;
+  left: 0;
+}
+
+.new-project-fixed-selection--left {
+  left: 0;
+  width: 50%;
+}
+
+.new-project-fixed-selection--right {
+  right: 0;
+  width: 50%;
+}
+
 .new-project-scope-controls button {
   min-width: 0;
   padding: 0;

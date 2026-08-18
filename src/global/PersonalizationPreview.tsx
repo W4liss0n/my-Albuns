@@ -10,7 +10,7 @@ import { SheetGuideLayer } from "./SheetGuideLayer";
 interface PersonalizationPreviewProps {
   bleedUm: number;
   focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
-  frameGapPx: number;
+  frameGapUm: number;
   heightUm: number;
   hoveredScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   personalization: NewProjectPersonalizationDraft;
@@ -21,7 +21,7 @@ interface PersonalizationPreviewProps {
 export function PersonalizationPreview({
   bleedUm,
   focusedScope,
-  frameGapPx,
+  frameGapUm,
   heightUm,
   hoveredScope,
   personalization,
@@ -35,18 +35,16 @@ export function PersonalizationPreview({
   ] as const;
   const frameInsetX = pageWidth * 0.04;
   const frameInsetY = heightUm * 0.04;
-  const frameGap = pageWidth * (frameGapPx / 300);
-  const frameWidth = (pageWidth - frameInsetX * 2 - frameGap) / 2;
+  const frameGap = Math.min(
+    frameGapUm,
+    Math.max(0, pageWidth - frameInsetX * 2),
+  );
+  const frameWidth = Math.max(
+    0,
+    (pageWidth - frameInsetX * 2 - frameGap) / 2,
+  );
   const frameHeight = heightUm - frameInsetY * 2;
   const frameBorder = personalization.frameBorder;
-  const selectionStrokeWidth = Math.max(1, heightUm * 0.006);
-  const selectionOutline = scopeOutline(
-    personalization.fixedScope,
-    heightUm,
-    pageWidth,
-    widthUm,
-    selectionStrokeWidth / 2,
-  );
   const focusStrokeWidth = Math.max(1, heightUm * 0.0035);
   const focusOutline = focusedScope
     ? scopeOutline(
@@ -54,7 +52,7 @@ export function PersonalizationPreview({
         heightUm,
         pageWidth,
         widthUm,
-        selectionStrokeWidth * 2,
+        heightUm * 0.012,
       )
     : null;
   const hoverArea = hoveredScope
@@ -234,7 +232,7 @@ export function PersonalizationPreview({
       {hoveredScope && hoverArea ? (
         <rect
           aria-label={scopeOutlineLabel("Pré-seleção", hoveredScope)}
-          fill="#2F7FBA"
+          fill="var(--ui-text-muted)"
           fillOpacity="0.08"
           pointerEvents="none"
           stroke="none"
@@ -253,17 +251,6 @@ export function PersonalizationPreview({
           {...focusOutline}
         />
       ) : null}
-      <rect
-        aria-label={scopeOutlineLabel(
-          "Seleção fixa",
-          personalization.fixedScope,
-        )}
-        fill="none"
-        pointerEvents="none"
-        stroke="#2F7FBA"
-        strokeWidth={selectionStrokeWidth}
-        {...selectionOutline}
-      />
       <SheetGuideLayer
         bleedUm={bleedUm}
         heightUm={heightUm}
@@ -307,7 +294,7 @@ function scopeOutline(
 }
 
 function scopeOutlineLabel(
-  prefix: "Foco de teclado" | "Pré-seleção" | "Seleção fixa",
+  prefix: "Foco de teclado" | "Pré-seleção",
   scope: PersonalizationScope,
 ) {
   return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;

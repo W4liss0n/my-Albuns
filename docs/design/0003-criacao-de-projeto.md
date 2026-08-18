@@ -109,8 +109,9 @@ antigo contorno tracejado, para continuar legível sobre o Background configurad
 O bloco `Frames` não usa checkbox ou campo numérico genérico. Ele apresenta a
 espessura da Borda padrão em um controle deslizante, onde zero aparece como
 `sem borda`, seguido pelas amostras branca, escura e dourada. Um segundo controle
-deslizante apresenta o `Espaço entre Frames` em pixels e atualiza imediatamente a
-reprodução.
+deslizante mantém o `Espaço entre Frames` como medida física transitória em
+micrômetros, apresenta sua conversão na Unidade escolhida em `Configurações` e
+atualiza imediatamente a reprodução.
 
 A reprodução desenha a Borda padrão integralmente para dentro de cada Frame. A
 dimensão externa do Frame permanece inalterada e somente sua área visível interna
@@ -141,14 +142,15 @@ A reprodução reutiliza as regiões clicáveis da seleção espacial de `Design
 Álbum`: clicar no lado esquerdo, no lado direito ou na região central fixa o
 escopo selecionado. Cada lado fora da seleção fixa recebe uma atenuação neutra
 translúcida sobre toda a superfície. O hover reduz essa atenuação no escopo
-candidato e o cobre com uma tonalidade azul translúcida, sem desenhar contorno
-nem alterar o contraste individual dos Frames. Mover o ponteiro nunca oculta,
-substitui ou modifica a seleção fixa.
+candidato e o cobre com uma tonalidade neutra compartilhada pelo tema, sem
+desenhar contorno nem alterar o contraste individual dos Frames. Mover o
+ponteiro nunca oculta, substitui ou modifica a seleção fixa.
 
-A seleção usa um contorno azul sólido na borda externa do escopo, mantém sua
-superfície com presença total e seus Frames com o contraste mais forte. O foco
-por teclado conserva um contorno azul-claro pontilhado, recuado da borda, e
-contraste intermediário nos Frames que não pertencem à seleção.
+A seleção usa um contorno azul sólido desenhado integralmente para fora da
+superfície do escopo, mantém sua superfície com presença total e seus Frames com
+o contraste mais forte. O foco por teclado conserva um contorno azul-claro
+pontilhado, recuado da borda, e contraste intermediário nos Frames que não
+pertencem à seleção.
 
 A tonalidade de hover fica sobre o conteúdo da Lâmina e abaixo dos indicadores
 de foco, da seleção fixa e das guias técnicas. Frames que não pertencem à

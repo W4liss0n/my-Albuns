@@ -273,7 +273,8 @@ test("creates from the neutral visual defaults without copying the demonstrative
   expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
   expect(
     screen.getByRole("slider", { name: "Espaço entre Frames" }),
-  ).toHaveValue("6");
+  ).toHaveValue("6000");
+  expect(screen.getByText("6 mm")).toBeVisible();
   expect(
     screen
       .getByRole("slider", { name: "Espaço entre Frames" })
@@ -283,11 +284,12 @@ test("creates from the neutral visual defaults without copying the demonstrative
   const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
   fireEvent.change(
     screen.getByRole("slider", { name: "Espaço entre Frames" }),
-    { target: { value: "18" } },
+    { target: { value: "18000" } },
   );
   expect(
     screen.getByRole("slider", { name: "Espaço entre Frames" }),
-  ).toHaveValue("18");
+  ).toHaveValue("18000");
+  expect(screen.getByText("18 mm")).toBeVisible();
   expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
     initialSecondFrameX,
   );
@@ -309,6 +311,26 @@ test("creates from the neutral visual defaults without copying the demonstrative
   expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
     '"frameGap"',
   );
+});
+
+test("formats the placeholder Frame spacing in the configured Unit", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "cm" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  expect(
+    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+  ).toHaveValue("6000");
+  expect(screen.getByText("0.6 cm")).toBeVisible();
 });
 
 test("hover fills the candidate sheet area without changing the fixed scope", async () => {
@@ -334,10 +356,10 @@ test("hover fills the candidate sheet area without changing the fixed scope", as
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
   expect(both).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "fill",
-    "#2F7FBA",
-  );
+  const hoverFill = screen
+    .getByLabelText("Pré-seleção do lado esquerdo")
+    .getAttribute("fill");
+  expect(hoverFill).toBe("var(--ui-text-muted)");
   expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
     "fill-opacity",
     "0.08",
@@ -349,9 +371,8 @@ test("hover fills the candidate sheet area without changing the fixed scope", as
   expect(
     screen.getByLabelText("Pré-seleção do lado esquerdo"),
   ).not.toHaveAttribute("stroke-dasharray");
-  expect(screen.getByLabelText("Seleção fixa de ambos os lados")).toHaveAttribute(
-    "stroke",
-    "#2F7FBA",
+  expect(document.querySelector(".new-project-fixed-selection")).toHaveClass(
+    "new-project-fixed-selection--both",
   );
   expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
     "fill-opacity",
@@ -439,13 +460,13 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
   fireEvent.pointerEnter(left);
 
   expect(right).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByLabelText("Seleção fixa do lado direito")).toHaveAttribute(
-    "stroke",
-    "#2F7FBA",
+  const fixedSelection = document.querySelector(
+    ".new-project-fixed-selection",
   );
-  expect(
-    screen.getByLabelText("Seleção fixa do lado direito"),
-  ).not.toHaveAttribute("stroke-dasharray");
+  expect(fixedSelection).toHaveAttribute("aria-hidden", "true");
+  expect(fixedSelection).toHaveClass(
+    "new-project-fixed-selection--right",
+  );
   expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
     "fill-opacity",
     "0.24",
@@ -502,9 +523,8 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
     "stroke",
     "#73A9CE",
   );
-  expect(screen.getByLabelText("Seleção fixa de ambos os lados")).toHaveAttribute(
-    "stroke",
-    "#2F7FBA",
+  expect(document.querySelector(".new-project-fixed-selection")).toHaveClass(
+    "new-project-fixed-selection--both",
   );
 });
 

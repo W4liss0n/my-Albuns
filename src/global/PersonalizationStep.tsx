@@ -51,8 +51,8 @@ export function PersonalizationStep({
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
-  // persistência; por enquanto ele controla somente a reprodução desta etapa.
-  const [frameGapPx, setFrameGapPx] = useState(6);
+  // persistência; a medida física controla somente a reprodução desta etapa.
+  const [frameGapUm, setFrameGapUm] = useState(6_000);
   const selectedBackground = backgroundForFixedScope(personalization);
   const backgroundColor =
     selectedBackground.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
@@ -117,13 +117,17 @@ export function PersonalizationStep({
           <>
             <PersonalizationPreview
               bleedUm={bleedUm}
-              frameGapPx={frameGapPx}
+              frameGapUm={frameGapUm}
               heightUm={heightUm}
               hoveredScope={hoveredScope}
               personalization={personalization}
               safetyUm={safetyUm}
               focusedScope={focusedScope}
               widthUm={widthUm}
+            />
+            <div
+              aria-hidden="true"
+              className={`new-project-fixed-selection new-project-fixed-selection--${personalization.fixedScope}`}
             />
             <div
               aria-label="Escopo da personalização"
@@ -282,12 +286,15 @@ export function PersonalizationStep({
           <FrameRangeControl
             dataPlaceholderFeature="new-project-frame-gap"
             label="Espaço entre Frames"
-            max={24}
+            max={24_000}
             min={0}
-            onChange={setFrameGapPx}
-            step={1}
-            value={frameGapPx}
-            valueText={`${frameGapPx} px`}
+            onChange={setFrameGapUm}
+            step={1_000}
+            value={frameGapUm}
+            valueText={`${formatMicrometers(
+              frameGapUm,
+              draft.displayUnit,
+            )} ${displayUnitLabel(draft.displayUnit)}`}
             visibleLabel="Espaço entre Frames"
           />
         </section>

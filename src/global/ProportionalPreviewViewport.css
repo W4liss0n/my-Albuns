@@ -4,7 +4,9 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
+  padding: 4px;
   overflow: hidden;
+  box-sizing: border-box;
   place-items: center;
 }
 
