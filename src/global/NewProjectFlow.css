@@ -195,6 +195,12 @@
   font-size: 12.5px;
 }
 
+.new-project-preset-select > select:focus,
+.new-project-preset-select > select:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .new-project-preset-select > .ui-app-icon {
   position: absolute;
   top: 50%;
@@ -237,12 +243,11 @@
 
 .new-project-preset-row:focus-within {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 2px #d9ebf7;
 }
 
 .new-project-preset-row > button:focus-visible {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: -3px;
+  outline: 0;
+  background: var(--ui-accent-soft);
 }
 
 .new-project-save-preset > input:focus-visible,

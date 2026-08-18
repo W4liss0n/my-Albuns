@@ -19,7 +19,9 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 `Novo Projeto` aparece como contexto no título da janela e não se repete na
 área de conteúdo. A faixa superior compartilhada centraliza as duas etapas no
 espaço disponível à esquerda do controle `Modelo inicial` e mantém esse controle
-alinhado à direita durante todo o fluxo.
+alinhado à direita durante todo o fluxo. Quando recebe foco, o controle composto
+usa somente um contorno externo compartilhado; o campo e a ação de salvar não
+desenham bordas de foco adicionais.
 
 ### Configurações
 
