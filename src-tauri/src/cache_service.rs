@@ -35,7 +35,7 @@ pub(crate) enum CacheServiceError {
     Reservation(String),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct CacheService {
     app_paths: AppPaths,
     maintenance: NamedMutex,
@@ -396,25 +396,48 @@ impl From<CacheServiceError> for CacheServiceCommandError {
     }
 }
 
+async fn run_cache_service_operation<T, F>(operation: F) -> Result<T, CacheServiceError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, CacheServiceError> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(operation)
+        .await
+        .map_err(|error| {
+            CacheServiceError::Storage(format!(
+                "a tarefa de manutenção do Cache não pôde ser concluída: {error}"
+            ))
+        })?
+}
+
 #[tauri::command]
-pub(crate) fn cache_service_status(
+pub(crate) async fn cache_service_status(
     service: tauri::State<'_, CacheService>,
 ) -> Result<CacheServiceStatus, CacheServiceCommandError> {
-    service.measure().map_err(Into::into)
+    let service = service.inner().clone();
+    run_cache_service_operation(move || service.measure())
+        .await
+        .map_err(Into::into)
 }
 
 #[tauri::command]
-pub(crate) fn free_closed_project_cache(
+pub(crate) async fn free_closed_project_cache(
     service: tauri::State<'_, CacheService>,
 ) -> Result<CacheFreeResult, CacheServiceCommandError> {
-    service.free_closed_projects().map_err(Into::into)
+    let service = service.inner().clone();
+    run_cache_service_operation(move || service.free_closed_projects())
+        .await
+        .map_err(Into::into)
 }
 
 #[tauri::command]
-pub(crate) fn clear_all_cache(
+pub(crate) async fn clear_all_cache(
     service: tauri::State<'_, CacheService>,
 ) -> Result<CacheClearAllOutcome, CacheServiceCommandError> {
-    service.clear_all_or_schedule().map_err(Into::into)
+    let service = service.inner().clone();
+    run_cache_service_operation(move || service.clear_all_or_schedule())
+        .await
+        .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -437,7 +460,10 @@ mod tests {
     use crate::ipc_contract::CacheClearAllOutcome;
     use crate::operation_gate::OperationGate;
 
-    use super::{CacheScheduledCleanupOutcome, CacheService, namespace_mutex};
+    use super::{
+        CacheScheduledCleanupOutcome, CacheService, CacheServiceError, namespace_mutex,
+        run_cache_service_operation,
+    };
 
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
     const NAMESPACE_OWNER_NAME_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_NAME";
@@ -449,6 +475,23 @@ mod tests {
         std::fs::create_dir_all(&roaming).expect("the roaming root exists");
         std::fs::create_dir_all(&local).expect("the local root exists");
         AppPaths::from_roots(&roaming, &local)
+    }
+
+    #[test]
+    fn cache_service_operations_leave_the_tauri_caller_thread() {
+        tauri::async_runtime::block_on(async {
+            let caller = thread::current().id();
+            let worker = run_cache_service_operation(move || {
+                Ok::<_, CacheServiceError>(thread::current().id())
+            })
+            .await
+            .expect("the blocking Cache operation completes");
+
+            assert_ne!(
+                worker, caller,
+                "filesystem traversal must not run on the Tauri caller thread"
+            );
+        });
     }
 
     fn project_location(path: &Path) -> ProjectLocation {

@@ -24,20 +24,24 @@ ao consumidor Cache com namespace independente e vazio; movimentar o mesmo
 Projeto conserva o namespace, enquanto focalizar um alias não cria outro Host
 nem outra reserva.
 
-O `MediaRuntime` é o produtor das observações de Mídia da issue 18. Ele separa
-`Missing`, obtido por inspeção autoritativa de ausência, de `Unavailable`, que
-não permite inferir ausência nem mudança. Duas amostras estáveis continuam
-necessárias para uma mudança de conteúdo. A Religação inclui o pathname lógico
-da ocorrência, de modo que duas ocorrências do mesmo arquivo físico não sejam
-invalidadas em conjunto.
+No escopo da issue 11, o `MediaResolver` produz inspeções autoritativas e
+propostas imutáveis. Ele separa `Absent`, obtido somente quando uma origem
+acessível confirma a ausência, de `Unavailable`, que não permite inferir
+ausência nem mudança. O `MediaRuntime` apenas registra as observações aceitas.
+Duas amostras estáveis continuam necessárias para uma mudança de conteúdo. Na
+Religação, `ProjectSession` possui o comando `RelinkMedia`; a ocorrência inclui
+seu pathname lógico, de modo que duas ocorrências do mesmo arquivo físico não
+sejam invalidadas em conjunto.
 
 O `CacheEngine` consome essas duas autoridades. A última representação válida
 pode permanecer visível como contexto quando o Original está ausente ou
 indisponível, mas não muda o estado do Original e não autoriza Exportação. Uma
 observação autoritativa posterior de reaparecimento ou mudança cria nova época;
 pedido, fingerprint, variante e época são revalidados antes da publicação.
-Falha de protocolo ou validação descarta apenas o candidato e preserva a última
-geração publicada.
+Falha de protocolo, correlação, transporte ou validação descarta o candidato
+ainda não referenciado pelo índice e preserva a última geração publicada. Isso
+também cobre a perda da resposta depois que o Processador promoveu o arquivo
+candidato.
 
 ## Ciclo de vida descartável
 
@@ -51,8 +55,11 @@ Uma falha abrupta do Processador permite exatamente um restart para o trabalho
 ainda atual. Uma segunda falha suspende novos trabalhos de Cache e emite o
 evento tipado `myalbuns://cache-processor-warning`. A Tela de Projeto mostra o
 aviso como status não modal; edição, Salvamento e a representação já disponível
-continuam funcionando. O estado externo é deliberadamente estreito: somente
-`suspended` atravessa IPC, sem expor o supervisor ou criar um coordenador geral.
+continuam funcionando. Cada sidecar é contido, antes do dispatch, em um Job
+Object privado com `KILL_ON_JOB_CLOSE`; ele não sobrevive à queda do Host que
+possui a reserva do namespace. O estado externo é deliberadamente estreito:
+somente `suspended` atravessa IPC, sem expor o supervisor ou criar um
+coordenador geral.
 
 ## Serviço de Cache
 
@@ -71,22 +78,25 @@ para o próximo início seguro. Chamadores concorrentes convergem para um único
 marcador idempotente.
 
 Esse recorte não cria store, registry ou coordenador universal. Ele também não
-reimplementa promoção, movimento, alias, `Salvar como…` ou `Salvar cópia
-como…`; essas decisões permanecem nas fronteiras das issues 10, 16, 11 e 18.
+reimplementa promoção, movimento, alias ou `Salvar cópia como…`, pertencentes à
+issue 10, nem `Salvar como…` e a nova Identidade da issue 18. A issue 16 consome
+somente as três operações estreitas de serviço; as referências e transições de
+Mídia permanecem no contrato da issue 11.
 
 ## Matriz do design 0010
 
 | Transição | Produtor autoritativo | Efeito no consumidor Cache |
 | --- | --- | --- |
 | Projeto novo | `ProjectIdentityAuthority` / `ProjectCore` | reserva namespace novo, independente e vazio |
+| `Salvar como` | `ProjectCore`, na futura issue 18 | recebe a nova autoridade e reserva namespace novo e vazio |
 | Mesmo arquivo por alias | comparação física da issue 10 | `FocusExisting`; nenhum namespace novo |
 | Projeto movimentado | `ProjectCore` conserva o UUID | conserva namespace e dados derivados |
 | Cópia externa gravável | promoção técnica da issue 10 | recebe namespace novo e vazio |
 | Cópia externa somente leitura | resultado opaco da issue 10 | nenhuma Sessão e nenhum namespace |
-| Original ausente | inspeção do `MediaRuntime` | mantém só contexto visual; não invalida |
-| Original indisponível | inspeção inconclusiva do `MediaRuntime` | mantém contexto e aguarda nova inspeção |
-| Religação de uma ocorrência | ação/observação da issue 18 | invalida somente a ocorrência religada |
-| Mudança estável | duas observações do `MediaRuntime` | expira a época e deriva nova geração |
+| Original ausente | inspeção autoritativa do `MediaResolver`, registrada pelo `MediaRuntime` | mantém só contexto visual; não valida o Original nem autoriza Exportação |
+| Original indisponível | inspeção inconclusiva do `MediaResolver`, registrada pelo `MediaRuntime` | mantém contexto e aguarda nova inspeção |
+| Religação de uma ocorrência | `ProjectSession::RelinkMedia`, seguida de inspeção do `MediaResolver` | invalida somente a ocorrência religada |
+| Mudança estável | duas inspeções autoritativas do `MediaResolver`, registradas pelo `MediaRuntime` | expira a época e deriva nova geração |
 | Cache corrompido/incompatível | validação do consumidor | descarta índice e reconstrói |
 | Falha repetida do Processador | supervisor preservado da issue 44 | suspende Cache sem bloquear edição/Salvamento |
 | Projeto fechado | término da reserva do Host | namespace passa a ser potencialmente liberável |

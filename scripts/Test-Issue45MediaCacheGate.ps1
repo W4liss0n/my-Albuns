@@ -12,15 +12,25 @@ if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
 }
 
 $workspaceRoot = $script:WorkspaceRoot
-if ([string]::IsNullOrWhiteSpace($OutputPath)) {
-    $OutputPath = Join-Path `
+$canonicalOutputPath = [System.IO.Path]::GetFullPath(
+    (Join-Path `
         $workspaceRoot `
-        'docs\research\artifacts\0036-issue-45-media-cache-integration.json'
+        'docs\research\artifacts\0036-issue-45-media-cache-integration.json')
+)
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = $canonicalOutputPath
 }
 elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
     $OutputPath = Join-Path $workspaceRoot $OutputPath
 }
 $OutputPath = [System.IO.Path]::GetFullPath($OutputPath)
+if (-not [string]::Equals(
+        $OutputPath,
+        $canonicalOutputPath,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The issue 45 gate writes only its canonical versioned evidence artifact.'
+}
 
 $fixedPoint = 'f6518d63b2c75656a58b6769e87abc318a913e23'
 $runnerMutex = [System.Threading.Mutex]::new(
@@ -45,6 +55,81 @@ $scratchRoot = [System.IO.Path]::GetFullPath(
         '.scratch\cargo-target-tests\issue-45-media-cache')
 )
 $scratchRootExisted = Test-Path -LiteralPath $scratchRoot
+$runRoot = $null
+$distPath = Join-Path $workspaceRoot 'dist'
+$distExistedBefore = Test-Path -LiteralPath $distPath
+$preparedSidecarPath = Join-Path `
+    $workspaceRoot `
+    'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
+$preparedSidecarExistedBefore = Test-Path -LiteralPath $preparedSidecarPath
+$windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
+$windowsPathTargetExistedBefore = Test-Path -LiteralPath $windowsPathTarget
+$previousModulePath = $env:PSModulePath
+$previousTargetDirectory = $env:CARGO_TARGET_DIR
+
+function Clear-Issue45GateOutputs {
+    $cleanupFailures = [System.Collections.Generic.List[string]]::new()
+
+    try {
+        if (-not $preparedSidecarExistedBefore -and
+                (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf)) {
+            [System.IO.File]::Delete($preparedSidecarPath)
+        }
+    }
+    catch {
+        $cleanupFailures.Add("prepared sidecar: $($_.Exception.Message)")
+    }
+
+    try {
+        if (-not $windowsPathTargetExistedBefore -and
+                (Test-Path -LiteralPath $windowsPathTarget)) {
+            Remove-GateScratchDirectory `
+                -Path $windowsPathTarget `
+                -AllowedParent (Join-Path $workspaceRoot 'target')
+        }
+    }
+    catch {
+        $cleanupFailures.Add("Windows path target: $($_.Exception.Message)")
+    }
+
+    try {
+        if (-not $distExistedBefore -and (Test-Path -LiteralPath $distPath)) {
+            Remove-GateScratchDirectory `
+                -Path $distPath `
+                -AllowedParent $workspaceRoot
+        }
+    }
+    catch {
+        $cleanupFailures.Add("frontend distribution: $($_.Exception.Message)")
+    }
+
+    try {
+        if (-not [string]::IsNullOrWhiteSpace($runRoot) -and
+                (Test-Path -LiteralPath $runRoot)) {
+            Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
+        }
+    }
+    catch {
+        $cleanupFailures.Add("run scratch: $($_.Exception.Message)")
+    }
+
+    try {
+        if (-not $scratchRootExisted -and
+                (Test-Path -LiteralPath $scratchRoot) -and
+                @(Get-ChildItem -LiteralPath $scratchRoot -Force).Count -eq 0) {
+            [System.IO.Directory]::Delete($scratchRoot)
+        }
+    }
+    catch {
+        $cleanupFailures.Add("scratch root: $($_.Exception.Message)")
+    }
+
+    if ($cleanupFailures.Count -ne 0) {
+        throw "The issue 45 gate could not clean all owned outputs: $($cleanupFailures -join '; ')"
+    }
+}
+
+try {
 New-Item -ItemType Directory -Force -Path $scratchRoot | Out-Null
 & git -C $workspaceRoot check-ignore --quiet -- $scratchRoot
 if ($LASTEXITCODE -ne 0) {
@@ -77,24 +162,12 @@ $windowsPowerShell = Join-Path `
     $env:SystemRoot `
     'System32\WindowsPowerShell\v1.0\powershell.exe'
 $npm = (Get-Command npm.cmd -ErrorAction Stop).Source
-$previousModulePath = $env:PSModulePath
-$previousTargetDirectory = $env:CARGO_TARGET_DIR
 $standardModulePath = Join-Path `
     $env:SystemRoot `
     'System32\WindowsPowerShell\v1.0\Modules'
 if ($standardModulePath -notin @($env:PSModulePath -split ';')) {
     $env:PSModulePath = "$standardModulePath;$env:PSModulePath"
 }
-
-$distPath = Join-Path $workspaceRoot 'dist'
-$distExistedBefore = Test-Path -LiteralPath $distPath
-$preparedSidecarPath = Join-Path `
-    $workspaceRoot `
-    'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
-$preparedSidecarExistedBefore = Test-Path -LiteralPath $preparedSidecarPath
-$windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
-$windowsPathTargetExistedBefore = Test-Path -LiteralPath $windowsPathTarget
-$runRootCleaned = $false
 $checks = [System.Collections.Generic.List[object]]::new()
 
 function Get-NormalizedCommandOutput([object[]] $Lines) {
@@ -448,28 +521,7 @@ try {
         exclusiveArtifactLockFailures = 0
     })
 
-    if (-not $preparedSidecarExistedBefore -and
-            (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf)) {
-        [System.IO.File]::Delete($preparedSidecarPath)
-    }
-    if (-not $windowsPathTargetExistedBefore -and
-            (Test-Path -LiteralPath $windowsPathTarget)) {
-        Remove-GateScratchDirectory `
-            -Path $windowsPathTarget `
-            -AllowedParent (Join-Path $workspaceRoot 'target')
-    }
-    if (-not $distExistedBefore -and (Test-Path -LiteralPath $distPath)) {
-        Remove-GateScratchDirectory `
-            -Path $distPath `
-            -AllowedParent $workspaceRoot
-    }
-    Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
-    $runRootCleaned = $true
-    if (-not $scratchRootExisted -and
-            (Test-Path -LiteralPath $scratchRoot) -and
-            @(Get-ChildItem -LiteralPath $scratchRoot -Force).Count -eq 0) {
-        [System.IO.Directory]::Delete($scratchRoot)
-    }
+    Clear-Issue45GateOutputs
 
     $sourceAfter = Get-GateSourceSnapshot `
         -WorkspaceRoot $workspaceRoot `
@@ -515,9 +567,9 @@ try {
                 publicProof = 'CacheService + ProjectIdentityAuthority'
             },
             [ordered]@{
-                name = 'authoritative-missing-unavailable-and-visual-context'
+                name = 'authoritative-absent-unavailable-and-visual-context'
                 passed = $true
-                publicProof = 'MediaRuntime + CacheEngine + MediaPanel'
+                publicProof = 'MediaResolver + MediaRuntime + CacheEngine + MediaPanel'
             },
             [ordered]@{
                 name = 'relink-occurrence-stable-change-and-reappearance'
@@ -547,7 +599,7 @@ try {
             [ordered]@{
                 name = 'narrow-api-and-design-0010-ownership-matrix'
                 passed = $true
-                publicProof = 'three Cache commands; #10/#18 producers remain authoritative'
+                publicProof = 'three Cache commands; ProjectCore and Media ownership remain authoritative'
             }
         )
         nestedEvidence = [ordered]@{
@@ -591,11 +643,16 @@ try {
 finally {
     $env:PSModulePath = $previousModulePath
     $env:CARGO_TARGET_DIR = $previousTargetDirectory
-    if (-not $runRootCleaned -and (Test-Path -LiteralPath $runRoot)) {
-        Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
+}
+}
+finally {
+    try {
+        Clear-Issue45GateOutputs
     }
-    if ($runnerMutexHeld) {
-        $runnerMutex.ReleaseMutex()
+    finally {
+        if ($runnerMutexHeld) {
+            $runnerMutex.ReleaseMutex()
+        }
+        $runnerMutex.Dispose()
     }
-    $runnerMutex.Dispose()
 }

@@ -29,6 +29,7 @@ mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
+mod processor_lifetime;
 mod product_runtime;
 mod project_bootstrap;
 mod project_close_commands;

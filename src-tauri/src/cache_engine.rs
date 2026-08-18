@@ -994,32 +994,6 @@ async fn execute_cache<T: ImagingTransport>(
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         plan_request(app_paths, &work)?
     };
-    let command = ImagingCommand::build_cache(request.clone());
-    let (response, recovery) = invoke_with_recovery(
-        engine,
-        transport,
-        app_paths,
-        work.namespace.paths(),
-        &command,
-        context,
-        cancellation,
-    )
-    .await?;
-    if let Some(failure) = response.failure_for(&work.request_id) {
-        return Err(CacheFailure::new(
-            CacheFailureStage::Processor(InvocationFailureStage::Processor(failure.code.stage())),
-            "O Processador recusou o trabalho de Cache.",
-        ));
-    }
-    let completion = response
-        .cache_completed_for(&work.request_id)
-        .cloned()
-        .ok_or_else(|| {
-            CacheFailure::new(
-                CacheFailureStage::ValidateResponse,
-                "O Processador devolveu uma resposta de Cache inesperada.",
-            )
-        })?;
     let storage = app_paths
         .prepare_cache_storage(work.namespace.paths())
         .map_err(|error| {
@@ -1028,22 +1002,46 @@ async fn execute_cache<T: ImagingTransport>(
                 format!("Não foi possível verificar o Cache: {error}"),
             )
         })?;
+    let (response, recovery) = invoke_with_recovery(
+        engine,
+        transport,
+        app_paths,
+        &storage,
+        &request,
+        context,
+        cancellation,
+    )
+    .await?;
+    if let Some(failure) = response.failure_for(&work.request_id) {
+        discard_candidate_generation(&storage, &request)?;
+        return Err(CacheFailure::new(
+            CacheFailureStage::Processor(InvocationFailureStage::Processor(failure.code.stage())),
+            "O Processador recusou o trabalho de Cache.",
+        ));
+    }
+    let Some(completion) = response.cache_completed_for(&work.request_id).cloned() else {
+        discard_candidate_generation(&storage, &request)?;
+        return Err(CacheFailure::new(
+            CacheFailureStage::ValidateResponse,
+            "O Processador devolveu uma resposta de Cache inesperada.",
+        ));
+    };
     if cancellation
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
     {
-        discard_candidate_generation(&storage, &request);
+        discard_candidate_generation(&storage, &request)?;
         return Err(cancelled_before_publication());
     }
     if let Err(failure) = verify_completion(&storage, &request, &completion) {
-        discard_candidate_generation(&storage, &request);
+        discard_candidate_generation(&storage, &request)?;
         return Err(failure);
     }
     if cancellation
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
     {
-        discard_candidate_generation(&storage, &request);
+        discard_candidate_generation(&storage, &request)?;
         return Err(cancelled_before_publication());
     }
     let _transition_and_publication_guard = engine
@@ -1054,7 +1052,7 @@ async fn execute_cache<T: ImagingTransport>(
         .flag()
         .load(std::sync::atomic::Ordering::Acquire)
     {
-        discard_candidate_generation(&storage, &request);
+        discard_candidate_generation(&storage, &request)?;
         return Err(cancelled_before_publication());
     }
     let metadata = publish_cache_metadata(&storage, &request, &completion.artifacts[0])?;
@@ -1074,8 +1072,12 @@ fn cancelled_before_publication() -> CacheFailure {
     )
 }
 
-fn discard_candidate_generation(storage: &PreparedCacheStorage, request: &CacheRequest) {
+fn discard_candidate_generation(
+    storage: &PreparedCacheStorage,
+    request: &CacheRequest,
+) -> Result<usize, CacheFailure> {
     let job = &request.jobs[0];
+    let mut removed = 0;
     for format in [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png] {
         let Ok(path) = request.cache_paths.preview_file(
             job.source.media_id(),
@@ -1084,16 +1086,14 @@ fn discard_candidate_generation(storage: &PreparedCacheStorage, request: &CacheR
         ) else {
             continue;
         };
-        if let Err(error) = storage.remove_existing_file(&path) {
-            tracing::warn!(
-                target: "myalbuns.desktop",
-                media_id = job.source.media_id(),
-                generation_id = job.candidate_generation_id,
-                error = %error,
-                event = "cache_candidate_generation_cleanup_failed",
-            );
-        }
+        removed += usize::from(storage.remove_existing_file(&path).map_err(|error| {
+            CacheFailure::new(
+                CacheFailureStage::RecoveryCleanup,
+                format!("Não foi possível descartar a geração candidata do Cache: {error}"),
+            )
+        })?);
     }
+    Ok(removed)
 }
 
 fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, CacheFailure> {
@@ -1148,18 +1148,19 @@ async fn invoke_with_recovery<T: ImagingTransport>(
     engine: &CacheEngine,
     transport: &mut T,
     app_paths: &AppPaths,
-    cache_paths: &CachePathPlan,
-    command: &ImagingCommand,
+    storage: &PreparedCacheStorage,
+    request: &CacheRequest,
     context: &InvocationContext,
     cancellation: &CacheCancellation,
 ) -> Result<(ImagingResponse, Option<CacheRecovery>), CacheFailure> {
+    let command = ImagingCommand::build_cache(request.clone());
     let mut attempt = 1_u8;
     let mut recovery = None;
     let progress = |_| {};
     loop {
         match transport
             .invoke(
-                command,
+                &command,
                 context,
                 ImagingOperation::Cache,
                 attempt,
@@ -1184,7 +1185,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
             Err(failure) if failure.is_cancelled() => {
                 if let Some(process_id) = failure.process_id {
                     app_paths
-                        .discard_project_cache_temporaries(cache_paths, process_id)
+                        .discard_project_cache_temporaries(&request.cache_paths, process_id)
                         .map_err(|error| CacheFailure {
                             stage: CacheFailureStage::RecoveryCleanup,
                             exit_code: failure.exit_code,
@@ -1193,14 +1194,16 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                             ),
                         })?;
                 }
+                discard_candidate_generation(storage, request)?;
                 return Err(cache_processor_failure(failure));
             }
             Err(failure) if failure.is_unexpected_termination() => {
                 let Some(failed_process_id) = failure.process_id else {
+                    discard_candidate_generation(storage, request)?;
                     return Err(cache_processor_failure(failure));
                 };
                 let removed_temporary_count = app_paths
-                    .discard_project_cache_temporaries(cache_paths, failed_process_id)
+                    .discard_project_cache_temporaries(&request.cache_paths, failed_process_id)
                     .map_err(|error| CacheFailure {
                         stage: CacheFailureStage::RecoveryCleanup,
                         exit_code: failure.exit_code,
@@ -1208,6 +1211,7 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                             "Não foi possível descartar o item incompleto do Cache: {error}"
                         ),
                     })?;
+                discard_candidate_generation(storage, request)?;
                 if cancellation
                     .flag()
                     .load(std::sync::atomic::Ordering::Acquire)
@@ -1225,7 +1229,10 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                     return Err(cache_processor_failure(failure));
                 }
             }
-            Err(failure) => return Err(cache_processor_failure(failure)),
+            Err(failure) => {
+                discard_candidate_generation(storage, request)?;
+                return Err(cache_processor_failure(failure));
+            }
         }
     }
 }
@@ -1641,7 +1648,9 @@ mod tests {
         MalformedCounts,
         MalformedOrientation,
         MalformedPageCount,
+        WrongRequestId,
         Crash(u32),
+        PublishThenCrash(u32),
         CrashAndObsolete(u32, CacheCancellation),
         Cancel(u32),
         Deterministic(u32),
@@ -1688,8 +1697,51 @@ mod tests {
                     CacheArtifactFormat::Jpeg,
                     |completion| completion.artifacts[0].source_page_count = Some(2),
                 ),
+                Script::WrongRequestId => {
+                    let response = complete(command, &self.app_paths, CacheArtifactFormat::Jpeg);
+                    response.map(|response| {
+                        let ImagingResponse::CacheCompleted { completion, .. } = response else {
+                            unreachable!("the scripted Cache completion has the expected kind")
+                        };
+                        ImagingResponse::cache_completed("another-request", completion)
+                    })
+                }
                 Script::Crash(process_id) => {
                     write_partial(command, &self.app_paths, process_id);
+                    Err(InvocationFailure::unexpected_termination(process_id))
+                }
+                Script::PublishThenCrash(process_id) => {
+                    let ImagingCommand::BuildCache(request) = command else {
+                        panic!("the scripted transport accepts Cache only");
+                    };
+                    let job = &request.jobs[0];
+                    let candidate = request
+                        .cache_paths
+                        .preview_file(
+                            job.source.media_id(),
+                            &job.candidate_generation_id,
+                            CacheArtifactFormat::Jpeg,
+                        )
+                        .expect("the candidate path is valid");
+                    if !candidate.exists() {
+                        let source = std::fs::read(job.source.source_path())
+                            .expect("the scripted adapter reads the Original");
+                        let metadata = std::fs::metadata(job.source.source_path())
+                            .expect("the scripted adapter inspects the Original");
+                        let fingerprint = CacheFingerprint::sha256_full_file_with_timestamps(
+                            source.len() as u64,
+                            metadata.created().ok().and_then(super::unix_millis),
+                            metadata.modified().ok().and_then(super::unix_millis),
+                            format!("{:x}", Sha256::digest(source)),
+                        )
+                        .expect("the scripted fingerprint is valid");
+                        publish_generated_artifact(
+                            &self.app_paths,
+                            request,
+                            CacheArtifactFormat::Jpeg,
+                            fingerprint,
+                        );
+                    }
                     Err(InvocationFailure::unexpected_termination(process_id))
                 }
                 Script::CrashAndObsolete(process_id, cancellation) => {
@@ -3476,6 +3528,79 @@ mod tests {
             assert_eq!(
                 generation_count, 1,
                 "the rejected candidate cannot remain as an orphan generation"
+            );
+        });
+    }
+
+    #[test]
+    fn a_wrong_response_correlation_discards_the_unpublished_candidate_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let media_directory = fixture.work.namespace.paths().media_directory();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::WrongRequestId]),
+                attempts: Vec::new(),
+            };
+
+            let failure = CacheEngine::default()
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work,
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("an uncorrelated completion cannot publish Cache metadata");
+
+            assert_eq!(failure.stage, CacheFailureStage::ValidateResponse);
+            assert_eq!(transport.attempts, [1]);
+            assert_eq!(
+                std::fs::read_dir(media_directory)
+                    .expect("the Media directory remains readable")
+                    .filter_map(Result::ok)
+                    .count(),
+                0,
+                "the sidecar candidate must not survive a terminal protocol failure"
+            );
+        });
+    }
+
+    #[test]
+    fn repeated_crashes_after_candidate_publication_leave_no_orphan_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let media_directory = fixture.work.namespace.paths().media_directory();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([
+                    Script::PublishThenCrash(7_001),
+                    Script::PublishThenCrash(7_002),
+                ]),
+                attempts: Vec::new(),
+            };
+
+            let failure = CacheEngine::default()
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work,
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("the second processor crash suspends Cache work");
+
+            assert_eq!(transport.attempts, [1, 2]);
+            assert!(matches!(failure.stage, CacheFailureStage::Processor(_)));
+            assert_eq!(
+                std::fs::read_dir(media_directory)
+                    .expect("the Media directory remains readable")
+                    .filter_map(Result::ok)
+                    .count(),
+                0,
+                "no final candidate may survive before metadata publication"
             );
         });
     }

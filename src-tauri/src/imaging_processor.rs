@@ -24,7 +24,7 @@ use tauri_plugin_shell::{
 };
 use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 
-use crate::logging::LoggingState;
+use crate::{logging::LoggingState, processor_lifetime::ProcessorChildLifetime};
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -410,6 +410,26 @@ async fn invoke_once(
         )
     })?;
     let imaging_process_id = child.pid();
+    let _processor_lifetime = match ProcessorChildLifetime::attach(imaging_process_id) {
+        Ok(lifetime) => lifetime,
+        Err(error) => {
+            let containment_message =
+                format!("Não foi possível conter o ciclo de vida do Processador: {error}");
+            match terminate_process(child, &mut events, imaging_process_id).await {
+                Ok(kill_error) => {
+                    let message = kill_error.map_or(containment_message.clone(), |kill_error| {
+                        format!("{containment_message}; o encerramento também falhou: {kill_error}")
+                    });
+                    return Err(InvocationFailure::at_stage(
+                        InvocationFailureStage::SpawnSidecar,
+                        Some(imaging_process_id),
+                        message,
+                    ));
+                }
+                Err(failure) => return Err(failure),
+            }
+        }
+    };
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),

@@ -10,7 +10,7 @@ use windows_sys::Win32::{
     System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct NamedMutex {
     name: Vec<u16>,
     worker_name: &'static str,
