@@ -25,7 +25,7 @@ const createFallbackFailure: ProjectLaunchFailure = {
 
 const saveCopyFallbackFailure: ProjectLaunchFailure = {
   code: "save_copy_unavailable",
-  message: "Não foi possível salvar a cópia externa.",
+  message: "Não foi possível salvar a Cópia externa.",
   action: "Tente novamente. Se o problema continuar, reabra a cópia.",
 };
 

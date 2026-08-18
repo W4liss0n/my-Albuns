@@ -36,6 +36,13 @@ pub(crate) struct TargetAuthority {
     pub(crate) root_bindings: RootBindingPlan,
 }
 
+impl TargetAuthority {
+    pub(crate) fn validates_target_binding(&self) -> bool {
+        self.root_bindings.validate().is_ok()
+            && self.root_bindings.covers(self.logical_target.as_path())
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BootstrapRequest {
@@ -341,7 +348,7 @@ pub(crate) fn write_host_terminal(
 mod tests {
     use std::path::PathBuf;
 
-    use myalbuns_paths::OperationPathContext;
+    use myalbuns_paths::{OperationPathContext, RootBindingPlan};
 
     use super::super::configuration::{
         InitialBackground, InitialBackgroundContent, InitialDisplayUnit,
@@ -368,6 +375,26 @@ mod tests {
                 root_bindings: paths.freeze(),
             },
         }
+    }
+
+    #[test]
+    fn target_authority_owns_validation_of_its_frozen_target_binding() {
+        let valid = request().authority;
+        assert!(valid.validates_target_binding());
+
+        let invalid_plan = TargetAuthority {
+            logical_target: valid.logical_target.clone(),
+            root_bindings: RootBindingPlan::default(),
+        };
+        assert!(!invalid_plan.validates_target_binding());
+
+        let uncovered_target = TargetAuthority {
+            logical_target: NativePathDto::from(PathBuf::from(
+                r"\\servidor\acervo\Projeto.myalbuns",
+            )),
+            root_bindings: valid.root_bindings,
+        };
+        assert!(!uncovered_target.validates_target_binding());
     }
 
     #[test]

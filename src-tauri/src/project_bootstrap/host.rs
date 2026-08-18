@@ -63,11 +63,7 @@ impl PendingExternalCopyHost {
         if continuation.protocol_version != super::protocol::PROTOCOL_VERSION
             || continuation.attempt_id != self.request.attempt_id
             || continuation.launch_nonce != self.request.launch_nonce
-            || continuation.authority.root_bindings.validate().is_err()
-            || !continuation
-                .authority
-                .root_bindings
-                .covers(continuation.authority.logical_target.as_path())
+            || !continuation.authority.validates_target_binding()
         {
             return Err(HostTerminal::failed(
                 &self.request,
@@ -148,11 +144,7 @@ fn bootstrap_host_project_with_thread(
     if request.protocol_version != super::protocol::PROTOCOL_VERSION
         || request.attempt_id.is_empty()
         || request.launch_nonce.is_empty()
-        || request.authority.root_bindings.validate().is_err()
-        || !request
-            .authority
-            .root_bindings
-            .covers(request.authority.logical_target.as_path())
+        || !request.authority.validates_target_binding()
     {
         return Err(HostTerminal::failed(
             &request,

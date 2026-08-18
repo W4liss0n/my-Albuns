@@ -126,11 +126,7 @@ fn new_request(
     authority: TargetAuthority,
     intent: BootstrapIntent,
 ) -> Result<BootstrapRequest, BootstrapFailure> {
-    if authority.root_bindings.validate().is_err()
-        || !authority
-            .root_bindings
-            .covers(authority.logical_target.as_path())
-    {
+    if !authority.validates_target_binding() {
         return Err(BootstrapFailure {
             kind: BootstrapFailureKind::InvalidAuthority,
             stage: None,
@@ -285,11 +281,7 @@ fn continue_external_copy(
     destination: TargetAuthority,
     authorization: CreateWriteAuthorization,
 ) -> Result<BootstrapOutcome, BootstrapFailure> {
-    if destination.root_bindings.validate().is_err()
-        || !destination
-            .root_bindings
-            .covers(destination.logical_target.as_path())
-    {
+    if !destination.validates_target_binding() {
         return Err(BootstrapFailure {
             kind: BootstrapFailureKind::InvalidAuthority,
             stage: None,

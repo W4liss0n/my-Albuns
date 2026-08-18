@@ -233,7 +233,7 @@ async fn save_external_copy_as(app: AppHandle) -> ProjectLaunchOutcome {
         return ProjectLaunchOutcome::Failed {
             error: simple_failure(
                 "external_copy_source_expired",
-                "A cópia externa precisa ser validada novamente.",
+                "A Cópia externa precisa ser validada novamente.",
                 "Abra novamente a cópia somente leitura.",
             ),
         };
@@ -647,12 +647,12 @@ fn bootstrap_failure(failure: BootstrapFailure) -> ProjectLaunchFailure {
         ),
         (_, Some(FailureCode::ExternalCopyRequiresInteractiveResolution)) => (
             "external_copy_requires_interactive_resolution",
-            "O arquivo parece ser uma cópia externa de outro Projeto.",
-            "A resolução interativa de cópias externas será disponibilizada em um fluxo próprio.",
+            "O arquivo parece ser uma Cópia externa de outro Projeto.",
+            "A resolução interativa de Cópias externas será disponibilizada em um fluxo próprio.",
         ),
         (_, Some(FailureCode::ExternalCopyNotWritable)) => (
             "external_copy_not_writable",
-            "A cópia externa não pode receber uma nova Identidade neste local.",
+            "A Cópia externa não pode receber uma nova Identidade neste local.",
             "Use Salvar cópia como... para criar uma versão editável em outro local.",
         ),
         (_, Some(FailureCode::IdentityIndeterminate)) => (
