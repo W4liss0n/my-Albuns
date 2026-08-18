@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-18T05:53:27.9747004Z",
-    "gitCommit":  "9bb838178a5788041a548e6cabd57c175f56c2f6",
+    "collectedAtUtc":  "2026-08-18T06:32:46.9213288Z",
+    "gitCommit":  "06c479a2bdd58b3a679e1c32727f84d89d05ff18",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -42,7 +42,15 @@
                        "passed":  true
                    },
                    {
-                       "name":  "unusable-lease-identity-never-focuses",
+                       "name":  "native-volume-serial-widths-fail-closed-across-file-id-domains",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-ntfs-handle-volume-serial-widths-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "incompatible-lease-identity-never-focuses",
                        "passed":  true
                    },
                    {
@@ -95,12 +103,12 @@
                    }
                ],
     "evidence":  {
-                     "originalProjectId":  "bf7d1135-fbb9-4969-98e0-55adf95fbe0a",
-                     "promotedCopyProjectId":  "07ed03eb-a5a4-41d3-b95d-c2a33c1055b3",
-                     "saveCopyAsProjectId":  "46f640e3-3db0-4cd8-aa7c-7474ed093bdb",
+                     "originalProjectId":  "00caeb15-0819-44c6-ae33-4f3fc880c551",
+                     "promotedCopyProjectId":  "172420dd-4e88-413b-961f-b966594b778b",
+                     "saveCopyAsProjectId":  "1ca1edfd-3f79-4138-a86b-9c49827650ca",
                      "ownerProcess":  {
-                                          "processId":  33728,
-                                          "creationTime":  134315060062917048
+                                          "processId":  17324,
+                                          "creationTime":  134315083659666426
                                       },
                      "mappedAliasOutcome":  "focusExisting",
                      "uncAliasOutcome":  "focusExisting",
