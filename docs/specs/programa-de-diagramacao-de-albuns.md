@@ -517,11 +517,11 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Espaço entre Frames` é um placeholder visual: atualiza somente a reprodução da etapa, não integra o Padrão de Frame, Predefinição ou Projeto e permanece marcado no código como `PLACEHOLDER UI`.
 - A reprodução respeita a proporção de largura e altura escolhida em `Configurações`, mas sempre representa uma Lâmina dupla, independentemente da Configuração das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
 - `Configurações` e `Personalização` reutilizam integralmente o mesmo painel de prévia — fundo, cabeçalho, metadados, legenda, espaçamento, encaixe proporcional, borda, sombra e guias técnicas — limitado simultaneamente pela largura e pela altura disponíveis; somente o conteúdo interno da Lâmina e as interações específicas da `Personalização` diferem.
-- Essa reprodução reutiliza o seletor espacial de `Design do Álbum`: hover realça esquerda, direita ou ambos pela região central; o clique fixa o escopo usado pelos controles de Background e Overlay.
-- A seleção fixa mostra um contorno azul sólido na borda externa e mantém seus Frames com contraste forte; hover ou foco por teclado mostra um contorno azul-claro pontilhado e recuado, com contraste intermediário nos Frames que não pertencem à seleção.
-- Hover e seleção são realces independentes e podem permanecer visíveis simultaneamente em escopos diferentes; mover o ponteiro nunca oculta nem substitui o escopo fixado.
-- Nenhum realce preenche ou tinge Background, Overlay ou guias técnicas; Frames fora da seleção e do hover permanecem discretos.
-- O hover sem clique é apenas feedback temporário e não muda o escopo configurado.
+- Essa reprodução reutiliza as regiões clicáveis do seletor espacial de `Design do Álbum`: o clique à esquerda, à direita ou na região central fixa o escopo usado pelos controles de Background e Overlay.
+- A seleção fixa mostra um contorno azul sólido na borda externa e mantém seus Frames com contraste forte; o foco por teclado mostra um contorno azul-claro pontilhado e recuado, com contraste intermediário nos Frames que não pertencem à seleção.
+- O hover não desenha contorno, não altera o contraste dos Frames e nunca oculta nem substitui o escopo fixado.
+- Nenhum realce preenche ou tinge Background, Overlay ou guias técnicas; Frames fora da seleção e do foco por teclado permanecem discretos.
+- Mover o ponteiro sem clicar não muda a reprodução nem o escopo configurado.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.
 - `Cancelar` permanece isolado à esquerda do rodapé fixo; `Voltar` fica agrupado à direita, imediatamente antes de `Criar`. Se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.

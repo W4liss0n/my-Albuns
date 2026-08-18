@@ -9,21 +9,21 @@ import { SheetGuideLayer } from "./SheetGuideLayer";
 
 interface PersonalizationPreviewProps {
   bleedUm: number;
+  focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   frameGapPx: number;
   heightUm: number;
   personalization: NewProjectPersonalizationDraft;
   safetyUm: number;
-  transientScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   widthUm: number;
 }
 
 export function PersonalizationPreview({
   bleedUm,
+  focusedScope,
   frameGapPx,
   heightUm,
   personalization,
   safetyUm,
-  transientScope,
   widthUm,
 }: PersonalizationPreviewProps) {
   const pageWidth = widthUm / 2;
@@ -41,10 +41,10 @@ export function PersonalizationPreview({
     widthUm,
     selectionStrokeWidth / 2,
   );
-  const transientStrokeWidth = Math.max(1, heightUm * 0.0035);
-  const transientOutline = transientScope
+  const focusStrokeWidth = Math.max(1, heightUm * 0.0035);
+  const focusOutline = focusedScope
     ? scopeOutline(
-        transientScope,
+        focusedScope,
         heightUm,
         pageWidth,
         widthUm,
@@ -131,8 +131,8 @@ export function PersonalizationPreview({
           personalization.fixedScope,
           pageIndex,
         );
-        const isTransient = transientScope
-          ? scopeContainsPage(transientScope, pageIndex)
+        const isFocused = focusedScope
+          ? scopeContainsPage(focusedScope, pageIndex)
           : false;
 
         return (
@@ -162,7 +162,7 @@ export function PersonalizationPreview({
                     aria-label={`Frame demonstrativo ${side} ${frameNumber}`}
                     fill="#7A684E"
                     fillOpacity={
-                      isSelected ? "0.24" : isTransient ? "0.15" : "0.08"
+                      isSelected ? "0.24" : isFocused ? "0.15" : "0.08"
                     }
                     height={frameHeight}
                     pointerEvents="none"
@@ -195,16 +195,16 @@ export function PersonalizationPreview({
           </g>
         );
       })}
-      {transientScope && transientOutline ? (
+      {focusedScope && focusOutline ? (
         <rect
-          aria-label={scopeOutlineLabel("Realce temporário", transientScope)}
+          aria-label={scopeOutlineLabel("Foco de teclado", focusedScope)}
           fill="none"
           pointerEvents="none"
           stroke="#73A9CE"
-          strokeDasharray={`${transientStrokeWidth * 0.1} ${heightUm * 0.018}`}
+          strokeDasharray={`${focusStrokeWidth * 0.1} ${heightUm * 0.018}`}
           strokeLinecap="round"
-          strokeWidth={transientStrokeWidth}
-          {...transientOutline}
+          strokeWidth={focusStrokeWidth}
+          {...focusOutline}
         />
       ) : null}
       <rect
@@ -261,7 +261,7 @@ function scopeOutline(
 }
 
 function scopeOutlineLabel(
-  prefix: "Realce temporário" | "Seleção fixa",
+  prefix: "Foco de teclado" | "Seleção fixa",
   scope: PersonalizationScope,
 ) {
   return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;

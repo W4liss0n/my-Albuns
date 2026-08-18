@@ -32,7 +32,6 @@ export type FrameBorderDraft =
 
 export interface NewProjectPersonalizationDraft {
   fixedScope: PersonalizationScope;
-  hoveredScope: PersonalizationScope | null;
   background: ScopedDraft<BackgroundDraftContent>;
   overlay: ScopedDraft<OverlayDraftContent>;
   frameBorder: FrameBorderDraft;
@@ -41,7 +40,6 @@ export interface NewProjectPersonalizationDraft {
 export function createDefaultPersonalizationDraft(): NewProjectPersonalizationDraft {
   return {
     fixedScope: "both",
-    hoveredScope: null,
     background: {
       scope: "bothSides",
       both: { kind: "color", rgb: "#FFFFFF" },
@@ -56,13 +54,6 @@ export function fixPersonalizationScope(
   fixedScope: PersonalizationScope,
 ): NewProjectPersonalizationDraft {
   return { ...draft, fixedScope };
-}
-
-export function hoverPersonalizationScope(
-  draft: NewProjectPersonalizationDraft,
-  hoveredScope: PersonalizationScope | null,
-): NewProjectPersonalizationDraft {
-  return { ...draft, hoveredScope };
 }
 
 export function backgroundForFixedScope(

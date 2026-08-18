@@ -227,7 +227,7 @@ export function NewProjectFlow({
       id: `custom-${nextCustomPreset.current}`,
       name,
       dimensions: draft,
-      personalization: { ...personalization, hoveredScope: null },
+      personalization,
     };
     nextCustomPreset.current += 1;
     setPresets((current) => [preset, ...current]);

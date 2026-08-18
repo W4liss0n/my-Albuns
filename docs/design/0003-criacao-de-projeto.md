@@ -137,25 +137,23 @@ uma segunda estrutura visual nem outra regra de dimensionamento.
 
 Qualquer alteração nesses controles atualiza a reprodução imediatamente. As imagens provisórias escolhidas para Background ou Overlay também são compostas na prévia antes da criação do Projeto.
 
-A reprodução reutiliza a seleção espacial de `Design do Álbum`:
+A reprodução reutiliza as regiões clicáveis da seleção espacial de `Design do
+Álbum`: clicar no lado esquerdo, no lado direito ou na região central fixa o
+escopo selecionado. O hover não desenha contorno nem altera o contraste dos
+Frames, portanto mover o ponteiro nunca oculta, substitui ou modifica a seleção
+fixa.
 
-- hover no lado esquerdo realça somente o lado esquerdo;
-- hover no lado direito realça somente o lado direito;
-- hover na região central realça os dois lados;
-- clicar fixa o escopo selecionado.
-
-Seleção fixa e hover são camadas independentes. A seleção usa um contorno azul
-sólido na borda externa do escopo e mantém seus Frames com o contraste mais
-forte. Hover ou foco por teclado usa um contorno azul-claro pontilhado, recuado da
-borda, e contraste intermediário nos Frames que não pertencem à seleção. Ao
-passar sobre outro escopo, o hover aparece sem ocultar ou substituir a seleção
-fixa; os dois realces permanecem visíveis simultaneamente.
+A seleção usa um contorno azul sólido na borda externa do escopo e mantém seus
+Frames com o contraste mais forte. O foco por teclado conserva um contorno
+azul-claro pontilhado, recuado da borda, e contraste intermediário nos Frames que
+não pertencem à seleção.
 
 Nenhuma das camadas aplica cor ou transparência sobre Background, Overlay ou
-guias técnicas. Frames que não pertencem à seleção nem ao hover permanecem mais
+guias técnicas. Frames que não pertencem à seleção nem ao foco permanecem mais
 discretos.
 
-Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro sem clicar produz somente o realce temporário e não troca a configuração selecionada.
+Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro
+sem clicar não altera a reprodução nem troca a configuração selecionada.
 
 A reprodução é somente visual: sua Lâmina, seus Frames e qualquer conteúdo demonstrativo não são copiados para o Projeto criado.
 
