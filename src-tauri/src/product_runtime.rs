@@ -84,6 +84,7 @@ pub(crate) fn run(
                 );
             },
         )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(project_host)
         .manage(startup_handshake)

@@ -3,6 +3,8 @@ import globalWindowCapability from "../../src-tauri/capabilities/global.json?raw
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
 import globalWindowPermission from "../../src-tauri/permissions/global-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
+import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
+import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   eager: true,
@@ -160,5 +162,13 @@ test("uses only the minimal Tauri core and event bridges", () => {
     "@tauri-apps/api/core",
     "@tauri-apps/api/event",
   ]);
+  expect(projectWindowCapability).not.toContain("dialog:");
+});
+
+test("initializes the native dialog used by the productive relink command", () => {
+  expect(projectCommandsSource).toContain("app.dialog()");
+  expect(productRuntimeSource).toContain(
+    ".plugin(tauri_plugin_dialog::init())",
+  );
   expect(projectWindowCapability).not.toContain("dialog:");
 });

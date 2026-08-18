@@ -17,6 +17,7 @@ use crate::{
     },
     named_mutex::{NamedMutex, NamedMutexError, NamedMutexGrant},
     operation_gate::{OperationGate, OperationGateError},
+    processor_lifetime::await_cache_writer_quiescence,
 };
 
 const CLEAR_SCHEDULE_CONTENT: &[u8] = b"MyAlbuns Cache clear schedule v1\n";
@@ -75,6 +76,7 @@ impl CacheService {
         let reservation = namespace_mutex(&self.app_paths, namespace.paths())
             .try_acquire()
             .map_err(map_reservation_error)?;
+        synchronize_cache_writer(namespace.paths())?;
         let recovery = CacheEngine::recover_reserved_namespace(&self.app_paths, &namespace)
             .map_err(|error| CacheServiceError::Storage(error.message))?;
         if recovery.removed_temporary_count > 0
@@ -103,6 +105,7 @@ impl CacheService {
         for usage in &usages {
             match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
                 Ok(_reservation) => {
+                    synchronize_cache_writer(usage.paths())?;
                     releasable_bytes =
                         releasable_bytes.checked_add(usage.bytes()).ok_or_else(|| {
                             CacheServiceError::Storage("volume de Cache excedeu u64".into())
@@ -130,7 +133,10 @@ impl CacheService {
         let mut skipped_active_namespace_count = 0_usize;
         for usage in usages {
             match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
-                Ok(reservation) => reserved.push((usage, reservation)),
+                Ok(reservation) => {
+                    synchronize_cache_writer(usage.paths())?;
+                    reserved.push((usage, reservation));
+                }
                 Err(NamedMutexError::Conflict) => skipped_active_namespace_count += 1,
                 Err(NamedMutexError::Unavailable(reason)) => {
                     return Err(CacheServiceError::Reservation(reason));
@@ -206,7 +212,10 @@ impl CacheService {
         let mut reservations = Vec::with_capacity(usages.len());
         for usage in &usages {
             match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
-                Ok(reservation) => reservations.push(reservation),
+                Ok(reservation) => {
+                    synchronize_cache_writer(usage.paths())?;
+                    reservations.push(reservation);
+                }
                 Err(NamedMutexError::Conflict) => return Ok(None),
                 Err(NamedMutexError::Unavailable(reason)) => {
                     return Err(CacheServiceError::Reservation(reason));
@@ -344,6 +353,11 @@ fn namespace_mutex(app_paths: &AppPaths, paths: &CachePathPlan) -> NamedMutex {
         mutex_name(app_paths, "CacheNamespace", namespace),
         "myalbuns-cache-namespace",
     )
+}
+
+fn synchronize_cache_writer(paths: &CachePathPlan) -> Result<(), CacheServiceError> {
+    await_cache_writer_quiescence(paths)
+        .map_err(|error| CacheServiceError::Reservation(error.to_string()))
 }
 
 fn mutex_name(app_paths: &AppPaths, kind: &str, scope: &str) -> String {
@@ -829,7 +843,7 @@ mod tests {
     }
 
     #[test]
-    fn namespace_reservation_survives_process_boundaries_and_owner_termination() {
+    fn project_open_during_free_space_is_serialized_by_namespace_reservation() {
         let root = tempfile::tempdir().expect("temporary namespace process fixture");
         let ready = root.path().join("namespace-owner.ready");
         let paths = app_paths(root.path());
@@ -926,6 +940,11 @@ mod tests {
             )
             .expect("the Processor temporary path is valid");
         assert!(abandoned.is_file());
+        let writer_claim = cache.root().join(".processor-writer.v1.json");
+        assert!(
+            writer_claim.is_file(),
+            "the Host publishes the exact contained writer before dispatch"
+        );
 
         // SAFETY: the PID was published by the live child and the handle is
         // closed after the Job-termination assertion below.
@@ -937,14 +956,6 @@ mod tests {
         host.kill()
             .expect("the Project Host is terminated abruptly");
         host.wait().expect("the terminated Host is reaped");
-        // SAFETY: closing the Host-owned Job signals the Processor object.
-        assert_eq!(
-            unsafe { WaitForSingleObject(processor, 10_000) },
-            WAIT_OBJECT_0,
-            "the contained Processor terminates with its Host"
-        );
-        // SAFETY: processor is owned by this test and no longer used.
-        unsafe { CloseHandle(processor) };
 
         let reopened = core
             .open_editable(OpenProjectRequest::new(project_location(&project_path)))
@@ -953,9 +964,18 @@ mod tests {
             .reserve_namespace(reopened.identity_authority())
             .expect("the new Host reserves and recovers the namespace");
         assert_eq!(owner.namespace().paths(), &cache);
+        // SAFETY: reserve_namespace must not return until the abandoned
+        // Processor instance has reached its signaled terminal state.
+        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_OBJECT_0);
+        // SAFETY: processor is owned by this test and no longer used.
+        unsafe { CloseHandle(processor) };
         assert!(
             !abandoned.exists(),
             "exclusive startup recovery removes the proved-abandoned temporary"
+        );
+        assert!(
+            !writer_claim.exists(),
+            "recovery removes the consumed exact writer claim"
         );
     }
 
@@ -1018,8 +1038,11 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .expect("the contained Processor starts");
-        let _lifetime = ProcessorChildLifetime::attach(worker.id())
+        let mut lifetime = ProcessorChildLifetime::attach(worker.id())
             .expect("the Host contains the Processor before dispatch");
+        lifetime
+            .publish_cache_writer_claim(owner.namespace().paths())
+            .expect("the Host publishes the contained Processor claim before dispatch");
         worker
             .stdin
             .as_mut()

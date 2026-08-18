@@ -410,7 +410,7 @@ async fn invoke_once(
         )
     })?;
     let imaging_process_id = child.pid();
-    let _processor_lifetime = match ProcessorChildLifetime::attach(imaging_process_id) {
+    let mut processor_lifetime = match ProcessorChildLifetime::attach(imaging_process_id) {
         Ok(lifetime) => lifetime,
         Err(error) => {
             let containment_message =
@@ -430,6 +430,25 @@ async fn invoke_once(
             }
         }
     };
+    if let ImagingCommand::BuildCache(request) = command
+        && let Err(error) = processor_lifetime.publish_cache_writer_claim(&request.cache_paths)
+    {
+        let claim_message =
+            format!("Não foi possível publicar a autoridade do Processador sobre o Cache: {error}");
+        match terminate_process(child, &mut events, imaging_process_id).await {
+            Ok(kill_error) => {
+                let message = kill_error.map_or(claim_message.clone(), |kill_error| {
+                    format!("{claim_message}; o encerramento também falhou: {kill_error}")
+                });
+                return Err(InvocationFailure::at_stage(
+                    InvocationFailureStage::WriteRequest,
+                    Some(imaging_process_id),
+                    message,
+                ));
+            }
+            Err(failure) => return Err(failure),
+        }
+    }
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
