@@ -4,6 +4,7 @@ export { ApplicationHeader } from "./ApplicationHeader";
 export { BrandWordmark } from "./BrandWordmark";
 export { ConfirmationDialog } from "./ConfirmationDialog";
 export { DialogWindowFrame } from "./DialogWindowFrame";
+export { FailureNotice } from "./FailureNotice";
 export { InlineNotice } from "./InlineNotice";
 export { MessageDialog } from "./MessageDialog";
 export { OwnedWindowShell } from "./OwnedWindowShell";

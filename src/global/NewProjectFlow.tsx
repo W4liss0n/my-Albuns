@@ -35,7 +35,7 @@ import {
   createBuiltInProjectPresets,
   type NewProjectPreset,
 } from "./application/newProjectPresets";
-import { ActionButton, AppIcon, InlineNotice } from "../ui";
+import { ActionButton, AppIcon, FailureNotice } from "../ui";
 import { DimensionsPreview } from "./DimensionsPreview";
 import { PersonalizationStep } from "./PersonalizationStep";
 import "./NewProjectFlow.css";
@@ -589,16 +589,10 @@ function ConfigurationStep({
         </ControlSection>
 
         {validationFailure ? (
-          <InlineNotice
-            role="alert"
+          <FailureNotice
+            failure={validationFailure}
             title="Não foi possível validar as Configurações"
-            tone="error"
-          >
-            <p>{validationFailure.message}</p>
-            {validationFailure.action ? (
-              <p>{validationFailure.action}</p>
-            ) : null}
-          </InlineNotice>
+          />
         ) : null}
       </div>
     </div>
@@ -707,7 +701,8 @@ function PresetControl({
               value={name}
             />
             <div>
-              <button
+              <ActionButton
+                density="compact"
                 onClick={() => {
                   setName("");
                   setIsSaving(false);
@@ -715,10 +710,15 @@ function PresetControl({
                 type="button"
               >
                 Cancelar
-              </button>
-              <button disabled={!name.trim()} type="submit">
+              </ActionButton>
+              <ActionButton
+                density="compact"
+                disabled={!name.trim()}
+                type="submit"
+                variant="primary"
+              >
                 Salvar
-              </button>
+              </ActionButton>
             </div>
           </form>
         ) : null}

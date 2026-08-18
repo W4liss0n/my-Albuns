@@ -15,6 +15,27 @@
   flex: none;
 }
 
+.ui-section-eyebrow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-micro);
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  gap: 10px;
+}
+
+.ui-section-eyebrow::after {
+  height: 1px;
+  background: var(--ui-border);
+  content: "";
+  flex: 1;
+}
+
 .ui-brand {
   display: inline-flex;
   color: var(--ui-text);
@@ -29,14 +50,14 @@
   margin-top: 7px;
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 0.66rem;
+  font-size: var(--ui-font-size-caption);
   font-weight: 400;
   letter-spacing: 0.02em;
 }
 
 .ui-brand--compact {
   color: var(--ui-accent);
-  font-size: 0.65rem;
+  font-size: var(--ui-font-size-caption);
   font-weight: 750;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -51,7 +72,7 @@
   padding: 0;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  gap: 12px;
+  gap: var(--ui-space-3);
   isolation: isolate;
   user-select: none;
 }
@@ -79,13 +100,13 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  color: #4b4640;
+  color: var(--ui-text-secondary);
   background: transparent;
   place-items: center;
 }
 
 .ui-window-control:hover {
-  background: #e8e5df;
+  background: var(--ui-surface-muted);
 }
 
 .ui-window-control--close:hover {
@@ -118,8 +139,8 @@
 
 .ui-application-header__identity strong {
   overflow: hidden;
-  color: #3a3630;
-  font-size: 12.5px;
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-control);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -129,7 +150,7 @@
 .ui-application-header__status {
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 11px;
+  font-size: var(--ui-font-size-support);
   font-weight: 400;
   white-space: nowrap;
 }
@@ -141,13 +162,13 @@
   max-width: calc(50% - 160px);
   flex: none;
   margin-left: auto;
-  padding: 0 12px;
+  padding: 0 var(--ui-space-3);
   pointer-events: none;
   text-overflow: ellipsis;
 }
 
 .ui-header-separator {
-  color: #c7c1b7;
+  color: var(--ui-border-strong);
 }
 
 .ui-action-button {
@@ -157,9 +178,9 @@
   justify-content: center;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-small);
-  font-size: 0.75rem;
+  font-size: var(--ui-font-size-action);
   font-weight: 550;
-  gap: 8px;
+  gap: var(--ui-space-2);
   transition:
     border-color 100ms ease,
     background 100ms ease,
@@ -167,14 +188,15 @@
 }
 
 .ui-action-button--regular {
-  min-height: 34px;
-  padding: 0 14px;
+  min-height: var(--ui-control-height);
+  padding: 0 var(--ui-control-padding-inline);
+  font-size: var(--ui-font-size-control);
 }
 
 .ui-action-button--compact {
   min-height: 28px;
   padding: 0 10px;
-  font-size: 0.7rem;
+  font-size: var(--ui-font-size-support);
 }
 
 .ui-action-button--primary {
@@ -196,7 +218,7 @@
 .ui-action-button--secondary:hover:not(:disabled),
 .ui-action-button--quiet:hover:not(:disabled) {
   border-color: #c9c3b8;
-  background: #f0eee9;
+  background: var(--ui-canvas);
 }
 
 .ui-action-button--quiet {
@@ -206,7 +228,7 @@
 }
 
 .ui-action-button--danger {
-  border-color: #dfb3ae;
+  border-color: var(--ui-danger-border);
   color: var(--ui-danger);
   background: var(--ui-danger-soft);
 }
@@ -222,7 +244,7 @@
   border-radius: var(--ui-radius);
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
-  font-size: 0.72rem;
+  font-size: var(--ui-font-size-label);
   line-height: 1.5;
 }
 
@@ -234,7 +256,7 @@
 .ui-inline-notice h2 {
   margin-bottom: 5px;
   color: var(--ui-text);
-  font-size: 0.76rem;
+  font-size: var(--ui-font-size-action);
 }
 
 .ui-inline-notice p + p {
@@ -293,14 +315,14 @@
 
 .ui-dialog-window__header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size-heading);
   font-weight: 600;
   line-height: 1.35;
 }
 
 .ui-dialog-window__body {
   color: var(--ui-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-control);
   line-height: 1.5;
 }
 
@@ -308,10 +330,10 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 11px 14px;
+  padding: var(--ui-footer-padding);
   border-top: 1px solid var(--ui-border);
   background: var(--ui-surface);
-  gap: 8px;
+  gap: var(--ui-space-2);
 }
 
 .ui-dialog-window--progress .ui-dialog-window__header {
@@ -328,13 +350,6 @@
 
 .ui-dialog-window--message .ui-dialog-window__body {
   padding: 18px;
-}
-
-.ui-dialog-window__footer .ui-action-button {
-  min-height: 31px;
-  padding: 0 15px;
-  border-radius: 5px;
-  font-size: 12.5px;
 }
 
 .ui-dialog-window__footer .ui-action-button--primary,
@@ -371,7 +386,7 @@
 
 .ui-progress-dialog__status {
   color: var(--ui-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-control);
 }
 
 .ui-progress-dialog__track {
@@ -402,7 +417,7 @@
 .ui-progress-dialog__note {
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 11px;
+  font-size: var(--ui-font-size-support);
   font-weight: 400;
 }
 
@@ -418,7 +433,7 @@
   min-width: 0;
   align-items: center;
   color: var(--ui-text);
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-control);
   gap: 9px;
 }
 
@@ -444,7 +459,7 @@
   flex: none;
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 10.5px;
+  font-size: var(--ui-font-size-caption);
 }
 
 .ui-standard-message {
@@ -489,7 +504,7 @@
 .ui-standard-message__title {
   margin: 0;
   color: var(--ui-text);
-  font-size: 13px;
+  font-size: var(--ui-font-size-heading);
   font-weight: 600;
   line-height: 1.4;
   text-wrap: pretty;
@@ -497,7 +512,7 @@
 
 .ui-standard-message__description {
   color: var(--ui-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--ui-font-size-control);
   line-height: 1.45;
   text-wrap: pretty;
 }
@@ -518,7 +533,7 @@
   overflow: hidden;
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 10.5px;
+  font-size: var(--ui-font-size-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

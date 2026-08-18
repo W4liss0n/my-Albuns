@@ -23,7 +23,7 @@ import {
   setOverlayImage,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
-import { ActionButton, AppIcon, InlineNotice } from "../ui";
+import { ActionButton, AppIcon, FailureNotice } from "../ui";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 import { PersonalizationPreview } from "./PersonalizationPreview";
 
@@ -182,7 +182,9 @@ export function PersonalizationStep({
         )}
       </NewProjectPreviewPanel>
       <div className="new-project-visual-values">
-        <p className="new-project-scope-label">{scopeLabel}</p>
+        <p className="ui-section-eyebrow new-project-scope-label">
+          {scopeLabel}
+        </p>
         <section className="new-project-value-group">
           <h2>Background</h2>
           <div
@@ -222,7 +224,6 @@ export function PersonalizationStep({
           <ActionButton
             aria-label="Escolher imagem de Background"
             className="new-project-image-action"
-            density="compact"
             onClick={() => void chooseBackground()}
           >
             <AppIcon icon={ImageIcon} size={14} />
@@ -239,7 +240,6 @@ export function PersonalizationStep({
           <ActionButton
             aria-label="Escolher imagem de Overlay"
             className="new-project-image-action new-project-image-action--dashed"
-            density="compact"
             onClick={() => void chooseOverlay()}
           >
             <AppIcon icon={ImageIcon} size={14} />
@@ -265,7 +265,9 @@ export function PersonalizationStep({
           )}
         </section>
         <section className="new-project-value-group">
-          <p className="new-project-group-eyebrow">Todas as Lâminas</p>
+          <p className="ui-section-eyebrow new-project-group-eyebrow">
+            Todas as Lâminas
+          </p>
           <h2>Frames</h2>
           <FrameRangeControl
             label="Espessura da Borda padrão"
@@ -279,7 +281,7 @@ export function PersonalizationStep({
           />
           <div
             aria-label="Cores da Borda"
-            className="new-project-frame-color-swatches"
+            className="new-project-color-swatches new-project-color-swatches--frames"
             role="group"
           >
             {FRAME_BORDER_SWATCHES.map((color) => (
@@ -314,24 +316,16 @@ export function PersonalizationStep({
           Nome e Localização serão escolhidos no diálogo do Windows ao criar.
         </p>
         {pickerFailure ? (
-          <InlineNotice
-            role="alert"
+          <FailureNotice
+            failure={pickerFailure}
             title="Não foi possível escolher a Imagem decorativa"
-            tone="error"
-          >
-            <p>{pickerFailure.message}</p>
-            {pickerFailure.action ? <p>{pickerFailure.action}</p> : null}
-          </InlineNotice>
+          />
         ) : null}
         {failure ? (
-          <InlineNotice
-            role="alert"
+          <FailureNotice
+            failure={failure}
             title="Não foi possível criar o Projeto"
-            tone="error"
-          >
-            <p>{failure.message}</p>
-            {failure.action ? <p>{failure.action}</p> : null}
-          </InlineNotice>
+          />
         ) : null}
       </div>
     </div>

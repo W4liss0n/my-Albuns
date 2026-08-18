@@ -148,7 +148,7 @@ test("replaces welcome with New Project in the same window and restores welcome 
 
   expect(
     screen.getByRole("heading", { name: "Projetos recentes" }),
-  ).toBeInTheDocument();
+  ).toHaveClass("ui-section-eyebrow");
 });
 
 test("keeps opening progress out of the welcome document", async () => {

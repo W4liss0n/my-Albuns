@@ -5,7 +5,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  padding: 4px;
+  padding: var(--ui-space-1);
   overflow: hidden;
   box-sizing: border-box;
   place-items: center;

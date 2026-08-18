@@ -92,6 +92,9 @@ test("keeps the preview panel shared while the sheet content changes", async () 
       name: "Prévia das Dimensões",
     }),
   ).not.toBeInTheDocument();
+  expect(
+    screen.getByText("Ambos os lados", { selector: ".ui-section-eyebrow" }),
+  ).toBeVisible();
 });
 
 test("shares one header between the steps and the preset control", async () => {
@@ -298,6 +301,9 @@ test("creates from the neutral visual defaults without copying the demonstrative
   const borderColors = within(
     screen.getByRole("group", { name: "Cores da Borda" }),
   ).getAllByRole("button");
+  expect(
+    screen.getByRole("group", { name: "Cores da Borda" }),
+  ).toHaveClass("new-project-color-swatches");
   expect(borderColors).toHaveLength(3);
   expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
   expect(
@@ -942,6 +948,13 @@ test("keeps a custom preset across both steps for the current placeholder sessio
       name: "Salvar configuração atual como modelo",
     }),
   );
+  const saveModelForm = screen.getByRole("form", { name: "Salvar modelo" });
+  expect(
+    within(saveModelForm).getByRole("button", { name: "Cancelar" }),
+  ).toHaveClass("ui-action-button");
+  expect(
+    within(saveModelForm).getByRole("button", { name: "Salvar" }),
+  ).toHaveClass("ui-action-button", "ui-action-button--primary");
   await user.type(
     screen.getByRole("textbox", { name: "Nome do modelo" }),
     "Estúdio 32 × 30",

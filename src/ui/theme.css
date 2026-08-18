@@ -38,7 +38,26 @@
   --ui-radius: 6px;
   --ui-radius-large: 10px;
   --ui-titlebar-height: 38px;
+  --ui-control-height: 31px;
+  --ui-control-padding-inline: 15px;
+  --ui-footer-padding: 11px 14px;
+  --ui-content-gutter: 16px;
+  --ui-panel-padding: 18px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 24px;
+  --ui-font-size-micro: 9.5px;
+  --ui-font-size-caption: 10.5px;
+  --ui-font-size-support: 11px;
+  --ui-font-size-label: 11.5px;
+  --ui-font-size-action: 12px;
+  --ui-font-size-control: 12.5px;
+  --ui-font-size-heading: 13px;
   --ui-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --ui-focus-ring-soft: #d9ebf7;
+  --ui-panel-surface: #f7f6f2;
 }
 
 * {

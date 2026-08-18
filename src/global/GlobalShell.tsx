@@ -135,9 +135,7 @@ export function GlobalShell({
       <ApplicationHeader status="diagramação de Álbuns" />
 
         <main className="global-recent-projects">
-          <div className="global-section-heading">
-            <h1>Projetos recentes</h1>
-          </div>
+          <h1 className="ui-section-eyebrow">Projetos recentes</h1>
           {recentProjects.length === 0 ? (
             <div className="global-empty-state">
               <strong>Nenhum Projeto recente</strong>
