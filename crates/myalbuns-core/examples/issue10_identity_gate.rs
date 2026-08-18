@@ -203,11 +203,11 @@ fn open_error(error: OpenProjectError) -> Value {
     match error {
         OpenProjectError::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         } => json!({
             "status": "focusExisting",
             "projectId": project_id.hyphenated().to_string(),
-            "ownerProcessId": owner_process_id,
+            "ownerProcess": owner_process,
         }),
         OpenProjectError::ExternalCopyNotWritable(_) => {
             json!({ "status": "externalCopyNotWritable" })

@@ -5,7 +5,7 @@ use myalbuns_core::{
     OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
     SaveProjectOutcome,
 };
-use myalbuns_paths::OperationPathContext;
+use myalbuns_paths::{OperationPathContext, ProcessInstanceId};
 
 fn project_location(path: &std::path::Path) -> ProjectLocation {
     let mut context = OperationPathContext::new();
@@ -32,12 +32,13 @@ fn productive_project_core_journey_rejects_stale_save_and_reopens_with_empty_his
     assert_eq!(project.revision(), 0);
     assert_eq!(project.saved_revision(), 0);
     let project_id = project.project_id();
+    let owner_process = ProcessInstanceId::current().expect("the owning process is identified");
     assert!(matches!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path))),
         Err(OpenProjectError::FocusExisting {
             project_id: focused_id,
-            owner_process_id,
-        }) if focused_id == project_id && owner_process_id == std::process::id()
+            owner_process: focused_owner,
+        }) if focused_id == project_id && focused_owner == owner_process
     ));
 
     let applied = project

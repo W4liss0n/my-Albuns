@@ -5,7 +5,7 @@ use std::{
 };
 
 use myalbuns_logging::ProcessRole;
-use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto};
+use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto, ProcessInstanceId};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, FilePath};
@@ -306,17 +306,17 @@ async fn save_external_copy_as(app: AppHandle) -> ProjectLaunchOutcome {
         Ok(Ok((
             BootstrapOutcome::FocusExisting {
                 project_id,
-                owner_process_id,
+                owner_process,
             },
             _,
         ))) => {
-            if focus_existing_project_window(owner_process_id) {
+            if focus_existing_project_window(owner_process) {
                 state.clear_external_copy();
                 tracing::info!(
                     target: "myalbuns.desktop",
                     process_role = ProcessRole::Global.as_str(),
                     project_id,
-                    owner_process_id,
+                    owner_process_id = owner_process.process_id(),
                     event = "existing_project_window_focused",
                 );
                 exit_global_after_handoff(&app);
@@ -549,17 +549,17 @@ async fn launch_confirmed_project(
         Ok(Ok((
             BootstrapOutcome::FocusExisting {
                 project_id,
-                owner_process_id,
+                owner_process,
             },
             _,
         ))) => {
-            if focus_existing_project_window(owner_process_id) {
+            if focus_existing_project_window(owner_process) {
                 state.clear_external_copy();
                 tracing::info!(
                     target: "myalbuns.desktop",
                     process_role = ProcessRole::Global.as_str(),
                     project_id,
-                    owner_process_id,
+                    owner_process_id = owner_process.process_id(),
                     event = "existing_project_window_focused",
                 );
                 ProjectLaunchOutcome::Focused
@@ -907,7 +907,52 @@ fn exit_global_after_handoff(app: &AppHandle) {
 }
 
 #[cfg(windows)]
-fn focus_existing_project_window(owner_process_id: u32) -> bool {
+struct ExactProcessHandle(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl ExactProcessHandle {
+    fn open(expected: ProcessInstanceId) -> Option<Self> {
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+
+        const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
+        let handle = unsafe {
+            OpenProcess(
+                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                0,
+                expected.process_id(),
+            )
+        };
+        if handle.is_null() {
+            return None;
+        }
+        let process = Self(handle);
+        let observed =
+            ProcessInstanceId::from_process_handle(expected.process_id(), process.0).ok()?;
+        (observed == expected && process.is_running()).then_some(process)
+    }
+
+    fn is_running(&self) -> bool {
+        use windows_sys::Win32::{
+            Foundation::WAIT_TIMEOUT, System::Threading::WaitForSingleObject,
+        };
+
+        (unsafe { WaitForSingleObject(self.0, 0) }) == WAIT_TIMEOUT
+    }
+}
+
+#[cfg(windows)]
+impl Drop for ExactProcessHandle {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn focus_existing_project_window(owner_process: ProcessInstanceId) -> bool {
     use windows::{
         Win32::{
             Foundation::{HWND, LPARAM},
@@ -935,11 +980,14 @@ fn focus_existing_project_window(owner_process_id: u32) -> bool {
         BOOL(1)
     }
 
-    if owner_process_id == 0 || owner_process_id == std::process::id() {
+    if owner_process.process_id() == std::process::id() {
         return false;
     }
+    let Some(process) = ExactProcessHandle::open(owner_process) else {
+        return false;
+    };
     let mut search = Search {
-        process_id: owner_process_id,
+        process_id: owner_process.process_id(),
         window: HWND::default(),
     };
     let parameter = LPARAM((&raw mut search).cast::<()>() as isize);
@@ -950,14 +998,25 @@ fn focus_existing_project_window(owner_process_id: u32) -> bool {
     if search.window.0.is_null() {
         return false;
     }
+    let belongs_to_owner = || {
+        let mut process_id = 0_u32;
+        unsafe { GetWindowThreadProcessId(search.window, Some(&mut process_id)) };
+        process_id == owner_process.process_id()
+    };
+    if !process.is_running() || !belongs_to_owner() {
+        return false;
+    }
     unsafe {
         let _ = ShowWindow(search.window, SW_RESTORE);
-        SetForegroundWindow(search.window).as_bool()
     }
+    if !process.is_running() || !belongs_to_owner() {
+        return false;
+    }
+    unsafe { SetForegroundWindow(search.window).as_bool() }
 }
 
 #[cfg(not(windows))]
-fn focus_existing_project_window(_owner_process_id: u32) -> bool {
+fn focus_existing_project_window(_owner_process: ProcessInstanceId) -> bool {
     false
 }
 
@@ -1041,6 +1100,117 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn a_reused_pid_never_focuses_the_visible_window_of_another_process_instance() {
+        use std::{
+            io::{BufRead, BufReader, Write},
+            os::windows::io::AsRawHandle,
+            process::{Command, Stdio},
+        };
+
+        let mut alien = Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-STA",
+                "-Command",
+                r#"
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type -TypeDefinition @'
+using System;
+using System.Threading;
+using System.Windows.Forms;
+
+public static class MyAlbunsFocusFixture
+{
+    private sealed class NonActivatingForm : Form
+    {
+        protected override bool ShowWithoutActivation { get { return true; } }
+
+        protected override CreateParams CreateParams
+        {
+            get
+            {
+                CreateParams parameters = base.CreateParams;
+                parameters.ExStyle |= 0x08000000;
+                return parameters;
+            }
+        }
+    }
+
+    public static void Run()
+    {
+        using (var window = new NonActivatingForm())
+        {
+            window.Text = "MyAlbuns foreign process instance";
+            window.Width = 320;
+            window.Height = 200;
+            window.Shown += delegate
+            {
+                Console.Out.WriteLine("ready");
+                Console.Out.Flush();
+            };
+            var input = new Thread(new ThreadStart(delegate
+            {
+                Console.In.ReadLine();
+                if (window.IsHandleCreated)
+                {
+                    window.BeginInvoke((Action)delegate { window.Close(); });
+                }
+            }));
+            input.IsBackground = true;
+            input.Start();
+            Application.Run(window);
+        }
+    }
+}
+'@ -ReferencedAssemblies System.Windows.Forms.dll,System.Drawing.dll
+[MyAlbunsFocusFixture]::Run()
+"#,
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .expect("the foreign process instance starts");
+        let mut output = BufReader::new(
+            alien
+                .stdout
+                .take()
+                .expect("the foreign process exposes its readiness signal"),
+        );
+        let mut readiness = String::new();
+        output
+            .read_line(&mut readiness)
+            .expect("the visible foreign window reports readiness");
+        assert_eq!(readiness.trim(), "ready");
+
+        let observed =
+            ProcessInstanceId::from_process_handle(alien.id(), alien.as_raw_handle().cast())
+                .expect("the foreign process instance is observed exactly");
+        let reused_pid = ProcessInstanceId::from_wire(observed.process_id(), 1)
+            .expect("the previous process instance token is structurally valid");
+
+        let focused = focus_existing_project_window(reused_pid);
+
+        writeln!(
+            alien
+                .stdin
+                .as_mut()
+                .expect("the fixture stdin remains open"),
+            "close"
+        )
+        .expect("the foreign window receives its close signal");
+        alien.wait().expect("the foreign process is reaped");
+        assert_ne!(observed, reused_pid);
+        assert!(
+            !focused,
+            "a PID reused by another process instance must never receive focus"
+        );
+    }
 
     #[test]
     fn webdriver_adapter_accepts_only_an_automated_absolute_project_path() {

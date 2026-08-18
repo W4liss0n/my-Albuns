@@ -11,7 +11,9 @@ use myalbuns_core::{
     ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SaveProjectError,
     SaveProjectOutcome, SheetRole,
 };
-use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier, project_data_namespace};
+use myalbuns_paths::{
+    OperationPathContext, ProcessInstanceId, ProjectTransitionBarrier, project_data_namespace,
+};
 
 const NEUTRAL_PROJECT_V1: &str = r##"{
   "documentType": "myalbuns.project",
@@ -723,7 +725,8 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
             .expect_err("the physical Project remains exclusively editable"),
         OpenProjectError::FocusExisting {
             project_id: created_id,
-            owner_process_id: std::process::id(),
+            owner_process: ProcessInstanceId::current()
+                .expect("the owning process instance is captured"),
         }
     );
     drop(created);

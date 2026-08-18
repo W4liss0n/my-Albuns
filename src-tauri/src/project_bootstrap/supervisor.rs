@@ -7,6 +7,8 @@ use std::{
     time::Duration,
 };
 
+use myalbuns_paths::ProcessInstanceId;
+
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, HostTerminal,
     InitialProjectCreationConfiguration, SaveExternalCopyRequest, TargetAuthority,
@@ -35,7 +37,7 @@ pub(crate) enum BootstrapOutcome {
     Ready(ReadyHost),
     FocusExisting {
         project_id: String,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable(PendingExternalCopyProcess),
 }
@@ -251,10 +253,10 @@ fn supervise_child(
         }
         Ok(ValidatedTerminal::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         }) => Ok(BootstrapOutcome::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         }),
         Ok(ValidatedTerminal::ExternalCopyNotWritable { .. }) => Ok(
             BootstrapOutcome::ExternalCopyNotWritable(PendingExternalCopyProcess {
@@ -324,10 +326,10 @@ fn continue_external_copy(
         }
         Ok(ValidatedTerminal::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         }) => Ok(BootstrapOutcome::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         }),
         Ok(ValidatedTerminal::ExternalCopyNotWritable { .. }) => Err(BootstrapFailure {
             kind: BootstrapFailureKind::InvalidTerminal,
@@ -698,7 +700,10 @@ mod tests {
               launchNonce = $request.launchNonce
               hostPid = $PID
               projectId = 'c4495826-fdf6-43ac-bbf9-92f068e6a704'
-              ownerProcessId = 4242
+              ownerProcess = @{
+                processId = 4242
+                creationTime = 123
+              }
             }
             [Console]::Out.WriteLine(($terminal | ConvertTo-Json -Compress))
             [Console]::Out.Flush()
@@ -712,13 +717,16 @@ mod tests {
 
         let BootstrapOutcome::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         } = outcome
         else {
             panic!("the fixture must return FocusExisting");
         };
         assert_eq!(project_id, "c4495826-fdf6-43ac-bbf9-92f068e6a704");
-        assert_eq!(owner_process_id, 4242);
+        assert_eq!(
+            owner_process,
+            ProcessInstanceId::from_wire(4242, 123).expect("the owner process instance is valid")
+        );
         assert!(
             !process_is_alive(spawned_pid),
             "the probing Host never survives as a duplicate Project process"
@@ -774,7 +782,7 @@ mod tests {
 
         assert!(
             !process_is_alive(spawned_pid),
-            "cancellation leaves no source Host or editable Session"
+            "cancellation leaves no source Host or editable Sessão"
         );
     }
 

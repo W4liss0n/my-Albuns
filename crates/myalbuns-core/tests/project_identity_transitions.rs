@@ -7,7 +7,7 @@ use myalbuns_core::{
     OpenProjectRequest, ProjectCore, ProjectIntent, ProjectLocation, SaveCopyAsError,
     SaveCopyAsRequest,
 };
-use myalbuns_paths::{OperationPathContext, project_data_namespace};
+use myalbuns_paths::{OperationPathContext, ProcessInstanceId, project_data_namespace};
 
 fn project_location(path: &Path) -> ProjectLocation {
     let mut paths = OperationPathContext::new();
@@ -88,10 +88,11 @@ fn a_second_physical_alias_focuses_the_existing_session() {
 
     assert_eq!(
         core.open_editable(OpenProjectRequest::new(project_location(&alias_path)))
-            .expect_err("an alias must not create a second editable session"),
+            .expect_err("an alias must not create a second editable Sessão"),
         OpenProjectError::FocusExisting {
             project_id,
-            owner_process_id: std::process::id(),
+            owner_process: ProcessInstanceId::current()
+                .expect("the owning process instance is captured"),
         }
     );
 }
@@ -243,7 +244,7 @@ fn save_copy_as_never_rewrites_a_source_that_became_writable() {
         .permissions();
     permissions.set_readonly(true);
     std::fs::set_permissions(&source_path, permissions)
-        .expect("the source first refuses in-place Identity correction");
+        .expect("the source first refuses in-place Identidade correction");
     let source = match core
         .open_editable(OpenProjectRequest::new(project_location(&source_path)))
         .expect_err("the opening returns the validated opaque source")
@@ -264,7 +265,7 @@ fn save_copy_as_never_rewrites_a_source_that_became_writable() {
     assert_eq!(
         std::fs::read(&source_path).expect("the source remains readable"),
         source_bytes,
-        "Save copy as never corrects Identity in the source pathname"
+        "Salvar cópia como... never corrects Identidade in the source pathname"
     );
 }
 
@@ -321,7 +322,7 @@ fn cancelling_or_failing_save_copy_as_leaves_no_source_session_or_path_mutation(
             project_location(&occupied_path),
             CreateAuthorization::CreateOnly,
         ))
-        .expect_err("an occupied destination fails before a Session exists"),
+        .expect_err("an occupied destination fails before a Sessão exists"),
         SaveCopyAsError::DestinationConflict
     );
     assert_eq!(
@@ -335,7 +336,7 @@ fn cancelling_or_failing_save_copy_as_leaves_no_source_session_or_path_mutation(
 
     let retry = match core
         .open_editable(OpenProjectRequest::new(project_location(&source_path)))
-        .expect_err("failure retained no editable ownership or duplicated source Session")
+        .expect_err("failure retained no editable ownership or duplicated source Sessão")
     {
         OpenProjectError::ExternalCopyNotWritable(source) => *source,
         other => panic!("unexpected open error: {other:?}"),
@@ -357,9 +358,9 @@ fn a_reused_previous_location_is_indeterminate_and_never_rewrites_the_candidate(
             InitialProject::neutral(),
             CreateAuthorization::CreateOnly,
         ))
-        .expect("the original Project establishes durable identity evidence");
+        .expect("the original Project establishes durable Identidade evidence");
     std::fs::copy(&previous_path, &candidate_path)
-        .expect("the candidate preserves the original persisted Identity");
+        .expect("the candidate preserves the original persisted Identidade");
     drop(original);
     let replacement = core
         .create_editable(CreateProjectRequest::new(
@@ -381,6 +382,6 @@ fn a_reused_previous_location_is_indeterminate_and_never_rewrites_the_candidate(
     assert_eq!(
         std::fs::read(&candidate_path).expect("the rejected candidate remains readable"),
         candidate_bytes,
-        "Indeterminate fails closed without rewriting Identity"
+        "Indeterminate fails closed without rewriting Identidade"
     );
 }

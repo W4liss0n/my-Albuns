@@ -5,7 +5,7 @@ use myalbuns_core::{
     EditableProject, InitialProject, OpenProjectError, OpenProjectRequest, PathFailure,
     ProjectCore, ProjectLocation, SaveCopyAsError, SaveCopyAsRequest,
 };
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, ProcessInstanceId};
 
 use super::{
     BootstrapIntent, BootstrapRequest, CreateWriteAuthorization, FailureCode, FailureStage,
@@ -34,7 +34,7 @@ enum BootstrapWorkerError {
     Failed(FailureStage, FailureCode),
     FocusExisting {
         project_id: String,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable {
         core: ProjectCore,
@@ -177,11 +177,11 @@ fn bootstrap_host_project_with_thread(
                     Ok(project) => project,
                     Err(OpenProjectError::FocusExisting {
                         project_id,
-                        owner_process_id,
+                        owner_process,
                     }) => {
                         return Err(BootstrapWorkerError::FocusExisting {
                             project_id: project_id.hyphenated().to_string(),
-                            owner_process_id,
+                            owner_process,
                         });
                     }
                     Err(OpenProjectError::ExternalCopyNotWritable(source)) => {
@@ -232,11 +232,11 @@ fn bootstrap_host_project_with_thread(
         }
         Ok(Err(BootstrapWorkerError::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         })) => Err(HostTerminal::focus_existing(
             &request,
             project_id,
-            owner_process_id,
+            owner_process,
         )),
         Ok(Err(BootstrapWorkerError::ExternalCopyNotWritable {
             core,
@@ -619,7 +619,8 @@ mod tests {
                 launch_nonce: "nonce-open".into(),
                 host_pid: std::process::id(),
                 project_id: owner.project().project_id().hyphenated().to_string(),
-                owner_process_id: std::process::id(),
+                owner_process: ProcessInstanceId::current()
+                    .expect("the owning process instance is captured"),
             }
         );
         assert_eq!(owner.project().revision(), 0);

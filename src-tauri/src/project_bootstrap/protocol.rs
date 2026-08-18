@@ -1,11 +1,11 @@
 use std::io::{BufRead, Write};
 
-use myalbuns_paths::{NativePathDto, RootBindingPlan};
+use myalbuns_paths::{NativePathDto, ProcessInstanceId, RootBindingPlan};
 use serde::{Deserialize, Serialize};
 
 use super::configuration::InitialProjectCreationConfiguration;
 
-pub(crate) const PROTOCOL_VERSION: u16 = 5;
+pub(crate) const PROTOCOL_VERSION: u16 = 6;
 const MAX_BOOTSTRAP_REQUEST_BYTES: u64 = 1024 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -116,7 +116,7 @@ pub(crate) enum HostTerminal {
         launch_nonce: String,
         host_pid: u32,
         project_id: String,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable {
         attempt_id: String,
@@ -160,14 +160,14 @@ impl HostTerminal {
     pub(crate) fn focus_existing(
         request: &BootstrapRequest,
         project_id: String,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     ) -> Self {
         Self::FocusExisting {
             attempt_id: request.attempt_id.clone(),
             launch_nonce: request.launch_nonce.clone(),
             host_pid: std::process::id(),
             project_id,
-            owner_process_id,
+            owner_process,
         }
     }
 
@@ -199,7 +199,7 @@ pub(crate) enum ValidatedTerminal {
     },
     FocusExisting {
         project_id: String,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     },
     ExternalCopyNotWritable {
         host_pid: u32,
@@ -266,11 +266,11 @@ pub(crate) fn validate_terminal(
         },
         HostTerminal::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
             ..
         } => ValidatedTerminal::FocusExisting {
             project_id,
-            owner_process_id,
+            owner_process,
         },
         HostTerminal::ExternalCopyNotWritable { host_pid, .. } => {
             ValidatedTerminal::ExternalCopyNotWritable { host_pid }
@@ -692,14 +692,23 @@ mod tests {
             launch_nonce: request.launch_nonce.clone(),
             host_pid: 4312,
             project_id: "c4495826-fdf6-43ac-bbf9-92f068e6a704".into(),
-            owner_process_id: 9981,
+            owner_process: ProcessInstanceId::from_wire(9981, 123)
+                .expect("the owner process instance is valid"),
         };
+        let encoded = serde_json::to_value(&terminal).expect("the focus terminal serializes");
+
+        assert_eq!(
+            encoded["ownerProcess"],
+            serde_json::json!({ "processId": 9981, "creationTime": 123 })
+        );
+        assert!(encoded.get("ownerProcessId").is_none());
 
         assert_eq!(
             validate_terminal(&request, 4312, terminal),
             Ok(ValidatedTerminal::FocusExisting {
                 project_id: "c4495826-fdf6-43ac-bbf9-92f068e6a704".into(),
-                owner_process_id: 9981,
+                owner_process: ProcessInstanceId::from_wire(9981, 123)
+                    .expect("the owner process instance is valid"),
             })
         );
     }

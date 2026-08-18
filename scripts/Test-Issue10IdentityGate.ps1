@@ -13,7 +13,7 @@ Import-Module Microsoft.PowerShell.Utility
 Initialize-MyAlbunsToolchain
 
 if (-not $IsWindows -and $env:OS -ne 'Windows_NT') {
-    throw 'The issue 10 Identity gate must run on Windows.'
+    throw 'The issue 10 Identidade gate must run on Windows.'
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
@@ -100,7 +100,7 @@ function Invoke-IdentityGate {
     ) + $AdditionalArguments
     $output = @(& $gateExecutable @arguments)
     if ($LASTEXITCODE -ne 0 -or $output.Count -lt 1) {
-        throw "Identity gate command '$Command' failed."
+        throw "Identidade gate command '$Command' failed."
     }
     return $output[-1] | ConvertFrom-Json
 }
@@ -171,7 +171,11 @@ function Start-IdentityHolder {
     if ($ready.status -ne 'holding' -or $ready.pid -ne $process.Id) {
         throw 'The holder readiness was not correlated to its real process.'
     }
-    return [pscustomobject]@{ process = $process; ready = $ready }
+    return [pscustomobject]@{
+        process = $process
+        creationTime = [uint64] $process.StartTime.ToFileTimeUtc()
+        ready = $ready
+    }
 }
 
 function Stop-IdentityHolder {
@@ -272,7 +276,8 @@ try {
     foreach ($alias in @($mappedAlias, $uncAlias)) {
         if ($alias.status -ne 'focusExisting' `
                 -or $alias.projectId -ne $created.projectId `
-                -or $alias.ownerProcessId -ne $holder.process.Id) {
+                -or $alias.ownerProcess.processId -ne $holder.process.Id `
+                -or $alias.ownerProcess.creationTime -ne $holder.creationTime) {
             throw 'A physical Windows alias did not focus the existing owner.'
         }
     }
@@ -292,7 +297,7 @@ try {
     $promotedCopyDocument = Get-Content -LiteralPath $writableCopyPath -Raw | ConvertFrom-Json
     if ($promotedCopyDocument.projectId -ne $writableCopy.projectId `
             -or $promotedCopyDocument.revision -ne $created.revision) {
-        throw 'The writable copy Identity was not persisted before the Session result.'
+        throw 'The writable copy Identidade was not persisted before the Sessão result.'
     }
     Add-Check 'writable-copy-persists-new-identity-before-session'
     Add-Check 'pending-creative-change-not-in-technical-identity-write'
@@ -325,7 +330,7 @@ try {
             -or $renamed.projectId -ne $created.projectId `
             -or $moved.projectId -ne $created.projectId `
             -or $moved.namespace -ne $created.namespace) {
-        throw 'Rename or movement duplicated the persisted Identity namespace.'
+        throw 'Rename or movement duplicated the persisted Identidade namespace.'
     }
     Add-Check 'rename-and-movement-preserve-identity-and-namespace'
 
@@ -336,7 +341,7 @@ try {
     Copy-Item -LiteralPath $legacyFixture -Destination $legacyOriginalPath
     $legacyOriginal = Invoke-IdentityGate -Command 'open' -Project $legacyOriginalPath
     if ($legacyOriginal.status -ne 'opened') {
-        throw 'The valid schema v1 source did not establish durable Identity evidence.'
+        throw 'The valid schema v1 source did not establish durable Identidade evidence.'
     }
     $readOnlySource = Join-Path $runRoot 'Copia somente leitura.myalbuns'
     Copy-Item -LiteralPath $legacyOriginalPath -Destination $readOnlySource
@@ -344,7 +349,7 @@ try {
     $readOnlyHash = Get-FileSha256 -Path $readOnlySource
     $readOnlyOpen = Invoke-IdentityGate -Command 'open' -Project $readOnlySource
     if ($readOnlyOpen.status -ne 'externalCopyNotWritable') {
-        throw 'The read-only external copy did not require Save copy as.'
+        throw 'The read-only external copy did not offer Salvar cópia como...'
     }
     Add-Check 'read-only-copy-blocked-with-save-copy-as-offer'
 
@@ -364,7 +369,7 @@ try {
             -or $savedDocument.schemaVersion -ne 2 `
             -or $savedDocument.projectId -ne $savedCopy.projectId `
             -or (Get-FileSha256 -Path $readOnlySource) -ne $readOnlyHash) {
-        throw 'Save copy as did not preserve source, Revision, current schema and isolation.'
+        throw 'Salvar cópia como... did not preserve source, Revision, current schema and isolation.'
     }
     Add-Check 'save-copy-as-preserves-source-revision-and-publishes-current-schema'
 
@@ -378,7 +383,7 @@ try {
     if ($failedCopy.status -ne 'destinationConflict' `
             -or (Get-FileSha256 -Path $occupiedPath) -ne $occupiedHash `
             -or (Get-FileSha256 -Path $readOnlySource) -ne $readOnlyHash) {
-        throw 'A failed Save copy as changed its source or occupied destination.'
+        throw 'A failed Salvar cópia como... operation changed its source or occupied destination.'
     }
     Add-Check 'failed-save-copy-as-creates-no-editable-session'
 
@@ -424,7 +429,10 @@ try {
             originalProjectId = $created.projectId
             promotedCopyProjectId = $writableCopy.projectId
             saveCopyAsProjectId = $savedCopy.projectId
-            ownerProcessId = $mappedAlias.ownerProcessId
+            ownerProcess = [ordered]@{
+                processId = $mappedAlias.ownerProcess.processId
+                creationTime = $mappedAlias.ownerProcess.creationTime
+            }
             mappedAliasOutcome = $mappedAlias.status
             uncAliasOutcome = $uncAlias.status
             movedNamespaceReused = $moved.namespace -eq $created.namespace
@@ -450,7 +458,7 @@ try {
         $json + [System.Environment]::NewLine,
         [System.Text.UTF8Encoding]::new($false)
     )
-    Write-Output "Issue 10 Identity gate report: $OutputPath"
+    Write-Output "Issue 10 Identidade gate report: $OutputPath"
     Write-Output $json
 }
 finally {

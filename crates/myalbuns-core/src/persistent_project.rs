@@ -3,7 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalIdentityEvidence};
+use myalbuns_paths::{
+    ExpectedObject, OperationPathContext, PhysicalIdentityEvidence, ProcessInstanceId,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -131,7 +133,7 @@ pub enum OpenProjectError {
     ProjectInUse,
     FocusExisting {
         project_id: Uuid,
-        owner_process_id: u32,
+        owner_process: ProcessInstanceId,
     },
     ExternalCopyRequiresInteractiveResolution,
     ExternalCopyNotWritable(Box<ExternalCopySource>),
@@ -153,11 +155,11 @@ impl PartialEq for OpenProjectError {
             (
                 Self::FocusExisting {
                     project_id: left_id,
-                    owner_process_id: left_process,
+                    owner_process: left_process,
                 },
                 Self::FocusExisting {
                     project_id: right_id,
-                    owner_process_id: right_process,
+                    owner_process: right_process,
                 },
             ) => left_id == right_id && left_process == right_process,
             _ => false,
@@ -585,10 +587,10 @@ impl ProjectCore {
                         opened.revision.project_id,
                         opened.store.physical_identity(),
                     ) {
-                        Ok(IdentityLeaseObservation::SamePhysicalTarget { owner_process_id }) => {
+                        Ok(IdentityLeaseObservation::SamePhysicalTarget { owner_process }) => {
                             Err(OpenProjectError::FocusExisting {
                                 project_id: opened.revision.project_id,
-                                owner_process_id,
+                                owner_process,
                             })
                         }
                         Ok(IdentityLeaseObservation::DifferentPhysicalTarget) => {
@@ -966,10 +968,10 @@ fn map_active_identity_observation(
     physical_identity: Option<myalbuns_paths::PhysicalFileIdentity>,
 ) -> OpenProjectError {
     match ProjectIdentityLease::observe(lease_root, project_id, physical_identity) {
-        Ok(IdentityLeaseObservation::SamePhysicalTarget { owner_process_id }) => {
+        Ok(IdentityLeaseObservation::SamePhysicalTarget { owner_process }) => {
             OpenProjectError::FocusExisting {
                 project_id,
-                owner_process_id,
+                owner_process,
             }
         }
         Ok(IdentityLeaseObservation::DifferentPhysicalTarget) => OpenProjectError::ProjectInUse,

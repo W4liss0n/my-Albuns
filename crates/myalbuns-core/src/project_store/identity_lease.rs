@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 use myalbuns_paths::{
-    PhysicalFileIdentity, ProjectFileLock, ProjectFileLockError, publish_new_file,
-    replace_existing_file,
+    PhysicalFileIdentity, ProcessInstanceId, ProjectFileLock, ProjectFileLockError,
+    publish_new_file, replace_existing_file,
 };
 
 #[cfg(windows)]
@@ -32,7 +32,7 @@ pub(crate) enum IdentityLeaseError {
 pub(crate) enum IdentityLeaseObservation {
     Inactive,
     Pending,
-    SamePhysicalTarget { owner_process_id: u32 },
+    SamePhysicalTarget { owner_process: ProcessInstanceId },
     DifferentPhysicalTarget,
 }
 
@@ -42,7 +42,7 @@ pub(crate) enum IdentityLeaseObservation {
 struct ActiveIdentityTarget {
     version: u32,
     physical_identity: String,
-    owner_process_id: u32,
+    owner_process: ProcessInstanceId,
 }
 
 #[cfg(windows)]
@@ -185,12 +185,14 @@ impl ProjectIdentityLease {
         &self,
         identity: PhysicalFileIdentity,
     ) -> Result<(), IdentityLeaseError> {
+        let owner_process =
+            ProcessInstanceId::current().map_err(|_| IdentityLeaseError::Unavailable)?;
         publish_target_atomically(
             &self.target_path,
             &ActiveIdentityTarget {
-                version: 1,
+                version: 2,
                 physical_identity: identity.to_local_token(),
-                owner_process_id: std::process::id(),
+                owner_process,
             },
             || {},
         )
@@ -228,7 +230,7 @@ impl ProjectIdentityLease {
                 };
                 let target: ActiveIdentityTarget =
                     serde_json::from_str(&source).map_err(|_| IdentityLeaseError::Unavailable)?;
-                if target.version != 1 || target.owner_process_id == 0 {
+                if target.version != 2 {
                     return Err(IdentityLeaseError::Unavailable);
                 }
                 let active = PhysicalFileIdentity::from_local_token(&target.physical_identity)
@@ -236,7 +238,7 @@ impl ProjectIdentityLease {
                     .ok_or(IdentityLeaseError::Unavailable)?;
                 if active == candidate {
                     Ok(IdentityLeaseObservation::SamePhysicalTarget {
-                        owner_process_id: target.owner_process_id,
+                        owner_process: target.owner_process,
                     })
                 } else {
                     Ok(IdentityLeaseObservation::DifferentPhysicalTarget)
@@ -398,7 +400,7 @@ impl Drop for PendingProjectIdentityLease {
 mod tests {
     use std::sync::mpsc;
 
-    use myalbuns_paths::{ExpectedObject, OperationPathContext};
+    use myalbuns_paths::{ExpectedObject, OperationPathContext, ProcessInstanceId};
 
     use super::{
         IdentityLeaseObservation, ProjectIdentityLease, publish_target_atomically, target_path,
@@ -427,9 +429,9 @@ mod tests {
         let target = target_path(&root, project_id);
         let publishing_target = target.clone();
         let active_target = super::ActiveIdentityTarget {
-            version: 1,
+            version: 2,
             physical_identity: identity.to_local_token(),
-            owner_process_id: std::process::id(),
+            owner_process: ProcessInstanceId::current().expect("the process instance is captured"),
         };
         let (reached_sender, reached_receiver) = mpsc::sync_channel(0);
         let (release_sender, release_receiver) = mpsc::sync_channel(0);
@@ -464,7 +466,8 @@ mod tests {
         assert_eq!(
             ProjectIdentityLease::observe(&root, project_id, Some(identity)),
             Ok(IdentityLeaseObservation::SamePhysicalTarget {
-                owner_process_id: std::process::id(),
+                owner_process: ProcessInstanceId::current()
+                    .expect("the observing process instance is captured"),
             })
         );
         drop(lease);

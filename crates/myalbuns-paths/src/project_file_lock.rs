@@ -41,10 +41,6 @@ impl ProjectFileLock {
     /// Attempts an immediate exclusive lock without changing Project bytes.
     /// The lock is released by `Drop` or by Windows when the process exits.
     pub fn try_acquire(path: &Path) -> Result<Self, ProjectFileLockError> {
-        Self::acquire_with_flags(path, LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY)
-    }
-
-    fn acquire_with_flags(path: &Path, flags: u32) -> Result<Self, ProjectFileLockError> {
         let file = OpenOptions::new()
             .read(true)
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
@@ -60,7 +56,7 @@ impl ProjectFileLock {
         let succeeded = unsafe {
             LockFileEx(
                 file.as_raw_handle() as HANDLE,
-                flags,
+                LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
                 0,
                 1,
                 0,

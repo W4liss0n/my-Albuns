@@ -8,11 +8,11 @@ use std::{
     time::Duration,
 };
 
-use crate::dev_process_identity::HostProcessInstanceId;
 use crate::dev_supervisor_protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
 };
+use myalbuns_paths::ProcessInstanceId as HostProcessInstanceId;
 use windows_sys::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB;
 
 const HOST_REGISTRATION_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);

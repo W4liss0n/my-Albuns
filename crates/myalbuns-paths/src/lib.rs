@@ -8,6 +8,7 @@ mod export;
 mod guarded_fs;
 mod native_path_serde;
 mod operation;
+mod process_instance;
 #[cfg(windows)]
 mod project_file_lock;
 #[cfg(windows)]
@@ -27,6 +28,7 @@ pub use native_path_serde::NativePathDto;
 pub use operation::{
     OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,
 };
+pub use process_instance::ProcessInstanceId;
 #[cfg(windows)]
 pub use project_file_lock::{ProjectFileLock, ProjectFileLockError};
 #[cfg(windows)]

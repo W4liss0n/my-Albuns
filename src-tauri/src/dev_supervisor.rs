@@ -31,13 +31,11 @@ use windows_sys::Win32::{
     },
 };
 
-#[path = "dev_process_identity.rs"]
-mod process_identity;
 #[path = "dev_supervisor_protocol.rs"]
 mod protocol;
 
 use crate::dev_job::create_job_with_limits;
-use process_identity::HostProcessInstanceId;
+use myalbuns_paths::ProcessInstanceId as HostProcessInstanceId;
 use protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
