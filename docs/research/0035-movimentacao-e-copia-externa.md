@@ -94,7 +94,23 @@ O runner também fixa a comparação entre os dois domínios de identidade físi
 do Windows: IDs estendidos ou legados só produzem `Same`/`Different` quando os
 dois lados usam o mesmo formato; formatos mistos no mesmo volume produzem
 `Indeterminate`, enquanto volumes distintos continuam conclusivamente
-`Different`.
+`Different`. IDs estendidos compostos somente por `00` ou somente por `FF` são
+sentinelas sem autoridade e são ignorados. Um ID legado só é materializado com
+proveniência tipada de filesystem e garantia documental; igualdade legada em
+ReFS ou filesystem desconhecido, formato legado antigo sem proveniência e erro
+inesperado na consulta estendida terminam em `Indeterminate`.
+
+O fallback não é uma segunda tentativa incondicional. O Core captura
+`GetLastError` imediatamente após `GetFileInformationByHandleEx(FileIdInfo)` e
+consulta o tipo do filesystem pelo mesmo handle. `ERROR_INVALID_FUNCTION` e
+`ERROR_NOT_SUPPORTED` indicam ausência real da classe estendida; o
+`ERROR_INVALID_PARAMETER` observado em mídia UDF só é aceito para UDF, cujo ID
+de 64 bits é garantido. NTFS e UDF podem então produzir um ID legado tipado;
+ReFS, CDFS, filesystem desconhecido e qualquer erro inesperado permanecem sem
+evidência autoritativa. Em SMB, onde a consulta do nome do filesystem por
+handle não é suportada, somente um `FILE_ID_INFO` estendido válido autoriza a
+comparação. Isso conserva os aliases UNC positivos e fecha qualquer downgrade
+de evidência em falha transitória.
 
 O artefato canônico é
 [`artifacts/0035-issue-10-identity-gate.json`](artifacts/0035-issue-10-identity-gate.json).
@@ -111,10 +127,13 @@ fonte que volta a ser gravável, `Salvar cópia como...`, Destino ocupado,
 cancelamento por descarte da fonte opaca, localização anterior reutilizada,
 troca A→B durante uma abertura bem-sucedida e volume ISO protegido contra
 escrita. A identidade física usa primeiro o ID de arquivo de 128 bits e mantém
-como fallback tipado o par `VolumeSerialNumber + FileIndex` documentado pelo
-Windows para filesystems que não oferecem `FileIdInfo`; os formatos nunca
-compartilham o mesmo token local nem são comparados como se fossem o mesmo
-domínio de identidade.
+como fallback tipado o par `VolumeSerialNumber + FileIndex` somente quando a
+consulta estendida falha como “não suportada” e o filesystem possui garantia
+aplicável; os formatos nunca compartilham o mesmo token local nem são
+comparados como se fossem o mesmo domínio de identidade. Testes da primitiva
+cobrem ambas as sentinelas de 128 bits, ReFS e filesystem desconhecido, erro
+inesperado sem fallback, NTFS/UDF positivos e propagação pela lease até impedir
+`FocusExisting`.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
@@ -140,6 +159,23 @@ pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
 - a prova de mídia somente leitura depende dos serviços nativos IMAPI2 e Disco
   Virtual disponíveis no Windows; ela valida a recusa de escrita antes de
   expor a unidade ao teste.
+
+## Fontes Win32 e SMB
+
+- [MS-FSCC 2.1.10 — FileId](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/98860416-1caf-4c80-a9ab-8d61e1ccf5a5):
+  os valores de 128 bits todo zero e todo `FF` devem ser ignorados;
+- [MS-FSCC 6 — Product Behavior](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/d4bc551b-7aaf-4b4f-ba0e-3a75e7c528f0):
+  matriz de garantias dos IDs de 64 e 128 bits por NTFS, ReFS, UDFS e CDFS;
+- [`BY_HANDLE_FILE_INFORMATION`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information):
+  o índice de 64 bits não é garantidamente único em ReFS;
+- [`GetFileInformationByHandleEx`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex):
+  contrato de `FileIdInfo` e suporte SMB;
+- [`GetVolumeInformationByHandleW`](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationbyhandlew):
+  identificação do filesystem pelo handle e ausência de suporte SMB;
+- [The Old New Thing — IDs sentinela](https://devblogs.microsoft.com/oldnewthing/20220127-00/?p=106199)
+  e [ordem segura de fallback](https://devblogs.microsoft.com/oldnewthing/20220128-00/?p=106201):
+  exemplos oficiais da Microsoft para descartar sentinelas, tentar primeiro o
+  ID de 128 bits e só então considerar um ID legado suportado.
 
 ## Repetição
 

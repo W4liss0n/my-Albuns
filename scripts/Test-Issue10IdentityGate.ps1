@@ -244,6 +244,82 @@ try {
     }
     Add-Check 'mixed-file-id-domains-fail-closed'
 
+    $physicalIdentityContracts = @(
+        [ordered]@{
+            name = 'zero-extended-file-id-sentinel-fails-closed'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::an_all_zero_extended_file_id_is_never_authoritative'
+            )
+        },
+        [ordered]@{
+            name = 'ones-extended-file-id-sentinel-fails-closed'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::an_all_ones_extended_file_id_is_never_authoritative'
+            )
+        },
+        [ordered]@{
+            name = 'legacy-file-id-provenance-fails-closed'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::a_provenance_free_legacy_file_id_cannot_authorize_same'
+            )
+        },
+        [ordered]@{
+            name = 'refs-and-unknown-legacy-ids-fail-closed'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::equal_legacy_ids_on_refs_or_an_unknown_filesystem_are_indeterminate'
+            )
+        },
+        [ordered]@{
+            name = 'unexpected-file-id-query-error-has-no-fallback'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::an_unexpected_extended_file_id_error_never_falls_back_to_legacy_identity'
+            )
+        },
+        [ordered]@{
+            name = 'documented-ntfs-legacy-fallback-remains-authoritative'
+            package = 'myalbuns-paths'
+            arguments = @(
+                '--lib',
+                'resolve::windows_identity_tests::unsupported_extended_queries_can_use_a_guaranteed_ntfs_legacy_id'
+            )
+        },
+        [ordered]@{
+            name = 'unusable-lease-identity-never-focuses'
+            package = 'myalbuns-core'
+            arguments = @(
+                '--lib',
+                'project_store::identity_lease::tests::an_active_lease_never_focuses_from_an_unusable_physical_identity_token'
+            )
+        }
+    )
+    foreach ($contract in $physicalIdentityContracts) {
+        Push-Location $script:WorkspaceRoot
+        try {
+            & $script:CargoExecutable test `
+                -p $contract.package `
+                @($contract.arguments) `
+                -- `
+                --exact
+            if ($LASTEXITCODE -ne 0) {
+                throw "The physical Identidade contract failed: $($contract.name)"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+        Add-Check $contract.name
+    }
+
     $causalTests = @(
         [ordered]@{
             name = 'a-to-b-success-race-fails-closed'

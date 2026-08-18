@@ -614,7 +614,7 @@ impl ProjectCore {
             self,
             opened.revision.project_id,
             opened.store.location().project_path(),
-            opened.store.physical_identity(),
+            IdentityCandidateTarget::Editable(&opened.store),
         ) {
             Ok(()) => {}
             Err(IdentityCandidateError::ExternalCopy) => {
@@ -699,7 +699,7 @@ fn authorize_loaded_identity(
         core,
         project_id,
         &loaded.project_path,
-        loaded.physical_identity,
+        IdentityCandidateTarget::Loaded(&loaded.resolved_object),
     ) {
         lease.discard_unpublished();
         return Err(map_load_identity_error(error));
@@ -731,7 +731,7 @@ fn authorize_identity_candidate(
     core: &ProjectCore,
     project_id: Uuid,
     candidate_location: &Path,
-    candidate_physical_identity: Option<myalbuns_paths::PhysicalFileIdentity>,
+    candidate_target: IdentityCandidateTarget<'_>,
 ) -> Result<(), IdentityCandidateError> {
     let registry = identity_registry(core).map_err(|()| IdentityCandidateError::Indeterminate)?;
     let previous_location = match registry
@@ -753,17 +753,12 @@ fn authorize_identity_candidate(
     let previous = project_store::read(&ProjectLocation::new(previous_location, context.freeze()));
     match previous {
         Ok(previous) if previous.revision.project_id == project_id => {
-            match (previous.physical_identity, candidate_physical_identity) {
-                (Some(previous), Some(candidate)) => match previous.compare(candidate) {
-                    PhysicalIdentityEvidence::Same => Ok(()),
-                    PhysicalIdentityEvidence::Different => {
-                        Err(IdentityCandidateError::ExternalCopy)
-                    }
-                    PhysicalIdentityEvidence::Indeterminate => {
-                        Err(IdentityCandidateError::Indeterminate)
-                    }
-                },
-                _ => Err(IdentityCandidateError::Indeterminate),
+            match candidate_target.compare(&previous.resolved_object) {
+                PhysicalIdentityEvidence::Same => Ok(()),
+                PhysicalIdentityEvidence::Different => Err(IdentityCandidateError::ExternalCopy),
+                PhysicalIdentityEvidence::Indeterminate => {
+                    Err(IdentityCandidateError::Indeterminate)
+                }
             }
         }
         Ok(_) => Err(IdentityCandidateError::Indeterminate),
@@ -771,6 +766,20 @@ fn authorize_identity_candidate(
             .publish(project_id, candidate_location)
             .map_err(|_| IdentityCandidateError::Indeterminate),
         Err(_) => Err(IdentityCandidateError::Indeterminate),
+    }
+}
+
+enum IdentityCandidateTarget<'a> {
+    Loaded(&'a myalbuns_paths::ResolvedObject),
+    Editable(&'a ProjectStore),
+}
+
+impl IdentityCandidateTarget<'_> {
+    fn compare(&self, previous: &myalbuns_paths::ResolvedObject) -> PhysicalIdentityEvidence {
+        match self {
+            Self::Loaded(candidate) => previous.compare_physical(candidate),
+            Self::Editable(candidate) => candidate.compare_physical(previous),
+        }
     }
 }
 

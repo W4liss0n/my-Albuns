@@ -58,7 +58,15 @@ impl PersistedBaseline {
 
     #[cfg(windows)]
     pub(super) fn matches(&self, resolved: &myalbuns_paths::ResolvedObject) -> bool {
-        self.lock.compare_physical(resolved) == myalbuns_paths::PhysicalIdentityEvidence::Same
+        self.compare_physical(resolved) == myalbuns_paths::PhysicalIdentityEvidence::Same
+    }
+
+    #[cfg(windows)]
+    pub(super) fn compare_physical(
+        &self,
+        resolved: &myalbuns_paths::ResolvedObject,
+    ) -> myalbuns_paths::PhysicalIdentityEvidence {
+        self.lock.compare_physical(resolved)
     }
 }
 

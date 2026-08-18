@@ -407,7 +407,8 @@ mod tests {
     use myalbuns_paths::{ExpectedObject, OperationPathContext, ProcessInstanceId};
 
     use super::{
-        IdentityLeaseObservation, ProjectIdentityLease, publish_target_atomically, target_path,
+        ActiveIdentityTarget, IdentityLeaseError, IdentityLeaseObservation, ProjectIdentityLease,
+        publish_target_atomically, target_path,
     };
 
     #[test]
@@ -474,6 +475,54 @@ mod tests {
                     .expect("the observing process instance is captured"),
             })
         );
+        drop(lease);
+    }
+
+    #[test]
+    fn an_active_lease_never_focuses_from_an_unusable_physical_identity_token() {
+        let fixture = tempfile::tempdir().expect("temporary identity lease fixture");
+        let root = fixture.path().join("leases");
+        let source_path = fixture.path().join("Project.myalbuns");
+        std::fs::write(&source_path, b"project bytes").expect("the candidate is writable");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&source_path)
+            .expect("the candidate root binding is captured");
+        let resolved = context
+            .freeze()
+            .resolve_existing(&source_path, ExpectedObject::RegularFile)
+            .expect("the candidate is resolved once");
+        let identity = resolved
+            .physical_identity()
+            .expect("the candidate has authoritative physical identity evidence");
+        let project_id = uuid::Uuid::new_v4();
+        let lease = ProjectIdentityLease::acquire(&root, project_id)
+            .expect("the fixture retains the active lease");
+        let target = target_path(&root, project_id);
+        let owner_process = ProcessInstanceId::current().expect("the process instance is captured");
+
+        for token in [
+            "windows-file-id-v1:0000000000000007:00000000000000000000000000000000",
+            "windows-file-id-v1:0000000000000007:ffffffffffffffffffffffffffffffff",
+            "windows-file-index-v1:0000000000000007:0303030303030303",
+        ] {
+            publish_target_atomically(
+                &target,
+                &ActiveIdentityTarget {
+                    version: 2,
+                    physical_identity: token.to_owned(),
+                    owner_process,
+                },
+                || {},
+            )
+            .expect("the malformed external target fixture is published atomically");
+
+            assert_eq!(
+                ProjectIdentityLease::observe(&root, project_id, Some(identity)),
+                Err(IdentityLeaseError::Unavailable),
+                "unusable evidence must never become FocusExisting"
+            );
+        }
         drop(lease);
     }
 }

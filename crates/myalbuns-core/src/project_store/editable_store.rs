@@ -62,6 +62,14 @@ impl ProjectStore {
     }
 
     #[cfg(windows)]
+    pub(crate) fn compare_physical(&self, resolved: &ResolvedObject) -> PhysicalIdentityEvidence {
+        self.baseline
+            .as_ref()
+            .map(|baseline| baseline.compare_physical(resolved))
+            .unwrap_or(PhysicalIdentityEvidence::Indeterminate)
+    }
+
+    #[cfg(windows)]
     pub(crate) fn location_still_matches_baseline(&self) -> bool {
         let Some(baseline) = self.baseline.as_ref() else {
             return false;
