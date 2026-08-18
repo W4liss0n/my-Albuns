@@ -12,6 +12,7 @@ interface PersonalizationPreviewProps {
   focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   frameGapPx: number;
   heightUm: number;
+  hoveredScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   personalization: NewProjectPersonalizationDraft;
   safetyUm: number;
   widthUm: number;
@@ -22,11 +23,16 @@ export function PersonalizationPreview({
   focusedScope,
   frameGapPx,
   heightUm,
+  hoveredScope,
   personalization,
   safetyUm,
   widthUm,
 }: PersonalizationPreviewProps) {
   const pageWidth = widthUm / 2;
+  const pageDescriptors = [
+    { pageIndex: 0, side: "esquerdo", x: 0 },
+    { pageIndex: 1, side: "direito", x: pageWidth },
+  ] as const;
   const frameInsetX = pageWidth * 0.04;
   const frameInsetY = heightUm * 0.04;
   const frameGap = pageWidth * (frameGapPx / 300);
@@ -50,6 +56,9 @@ export function PersonalizationPreview({
         widthUm,
         selectionStrokeWidth * 2,
       )
+    : null;
+  const hoverArea = hoveredScope
+    ? scopeOutline(hoveredScope, heightUm, pageWidth, widthUm, 0)
     : null;
 
   return (
@@ -125,8 +134,7 @@ export function PersonalizationPreview({
           />
         </>
       )}
-      {[0, pageWidth].map((pageX, pageIndex) => {
-        const side = pageIndex === 0 ? "esquerdo" : "direito";
+      {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
         const isSelected = scopeContainsPage(
           personalization.fixedScope,
           pageIndex,
@@ -195,6 +203,44 @@ export function PersonalizationPreview({
           </g>
         );
       })}
+      {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
+        const isSelected = scopeContainsPage(
+          personalization.fixedScope,
+          pageIndex,
+        );
+        const isCandidate =
+          (hoveredScope
+            ? scopeContainsPage(hoveredScope, pageIndex)
+            : false) ||
+          (focusedScope
+            ? scopeContainsPage(focusedScope, pageIndex)
+            : false);
+
+        return isSelected ? null : (
+          <rect
+            aria-label={`Atenuação do lado ${side}`}
+            fill="#E3E0DA"
+            fillOpacity={isCandidate ? "0.18" : "0.42"}
+            height={heightUm}
+            key={side}
+            pointerEvents="none"
+            stroke="none"
+            width={pageWidth}
+            x={pageX}
+            y="0"
+          />
+        );
+      })}
+      {hoveredScope && hoverArea ? (
+        <rect
+          aria-label={scopeOutlineLabel("Pré-seleção", hoveredScope)}
+          fill="#2F7FBA"
+          fillOpacity="0.08"
+          pointerEvents="none"
+          stroke="none"
+          {...hoverArea}
+        />
+      ) : null}
       {focusedScope && focusOutline ? (
         <rect
           aria-label={scopeOutlineLabel("Foco de teclado", focusedScope)}
@@ -261,7 +307,7 @@ function scopeOutline(
 }
 
 function scopeOutlineLabel(
-  prefix: "Foco de teclado" | "Seleção fixa",
+  prefix: "Foco de teclado" | "Pré-seleção" | "Seleção fixa",
   scope: PersonalizationScope,
 ) {
   return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;

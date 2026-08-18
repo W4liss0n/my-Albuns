@@ -47,6 +47,9 @@ export function PersonalizationStep({
   const [focusedScope, setFocusedScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
+  const [hoveredScope, setHoveredScope] = useState<
+    NewProjectPersonalizationDraft["fixedScope"] | null
+  >(null);
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
   // persistência; por enquanto ele controla somente a reprodução desta etapa.
   const [frameGapPx, setFrameGapPx] = useState(6);
@@ -116,6 +119,7 @@ export function PersonalizationStep({
               bleedUm={bleedUm}
               frameGapPx={frameGapPx}
               heightUm={heightUm}
+              hoveredScope={hoveredScope}
               personalization={personalization}
               safetyUm={safetyUm}
               focusedScope={focusedScope}
@@ -146,6 +150,12 @@ export function PersonalizationStep({
                       event.currentTarget.matches(":focus-visible")
                         ? scope
                         : null,
+                    )
+                  }
+                  onPointerEnter={() => setHoveredScope(scope)}
+                  onPointerLeave={() =>
+                    setHoveredScope((currentScope) =>
+                      currentScope === scope ? null : currentScope,
                     )
                   }
                   type="button"

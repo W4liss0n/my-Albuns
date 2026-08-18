@@ -139,21 +139,24 @@ Qualquer alteração nesses controles atualiza a reprodução imediatamente. As 
 
 A reprodução reutiliza as regiões clicáveis da seleção espacial de `Design do
 Álbum`: clicar no lado esquerdo, no lado direito ou na região central fixa o
-escopo selecionado. O hover não desenha contorno nem altera o contraste dos
-Frames, portanto mover o ponteiro nunca oculta, substitui ou modifica a seleção
-fixa.
+escopo selecionado. Cada lado fora da seleção fixa recebe uma atenuação neutra
+translúcida sobre toda a superfície. O hover reduz essa atenuação no escopo
+candidato e o cobre com uma tonalidade azul translúcida, sem desenhar contorno
+nem alterar o contraste individual dos Frames. Mover o ponteiro nunca oculta,
+substitui ou modifica a seleção fixa.
 
-A seleção usa um contorno azul sólido na borda externa do escopo e mantém seus
-Frames com o contraste mais forte. O foco por teclado conserva um contorno
-azul-claro pontilhado, recuado da borda, e contraste intermediário nos Frames que
-não pertencem à seleção.
+A seleção usa um contorno azul sólido na borda externa do escopo, mantém sua
+superfície com presença total e seus Frames com o contraste mais forte. O foco
+por teclado conserva um contorno azul-claro pontilhado, recuado da borda, e
+contraste intermediário nos Frames que não pertencem à seleção.
 
-Nenhuma das camadas aplica cor ou transparência sobre Background, Overlay ou
-guias técnicas. Frames que não pertencem à seleção nem ao foco permanecem mais
-discretos.
+A tonalidade de hover fica sobre o conteúdo da Lâmina e abaixo dos indicadores
+de foco, da seleção fixa e das guias técnicas. Frames que não pertencem à
+seleção nem ao foco permanecem mais discretos.
 
 Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro
-sem clicar não altera a reprodução nem troca a configuração selecionada.
+sem clicar altera somente a pré-seleção transitória da reprodução e não troca a
+configuração selecionada.
 
 A reprodução é somente visual: sua Lâmina, seus Frames e qualquer conteúdo demonstrativo não são copiados para o Projeto criado.
 

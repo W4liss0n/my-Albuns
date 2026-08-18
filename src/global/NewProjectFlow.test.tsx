@@ -311,7 +311,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
   );
 });
 
-test("hover does not decorate the preview while the fixed scope drives Background changes", async () => {
+test("hover fills the candidate sheet area without changing the fixed scope", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
 
@@ -329,13 +329,26 @@ test("hover does not decorate the preview while the fixed scope drives Backgroun
   });
   const left = screen.getByRole("button", { name: "Lado esquerdo" });
   expect(both).toHaveAttribute("aria-pressed", "true");
+  expect(screen.queryAllByLabelText(/Atenuação do lado/)).toHaveLength(0);
 
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
   expect(both).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "fill",
+    "#2F7FBA",
+  );
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "fill-opacity",
+    "0.08",
+  );
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "stroke",
+    "none",
+  );
   expect(
-    screen.queryByLabelText("Realce temporário do lado esquerdo"),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toHaveAttribute("stroke-dasharray");
   expect(screen.getByLabelText("Seleção fixa de ambos os lados")).toHaveAttribute(
     "stroke",
     "#2F7FBA",
@@ -356,6 +369,10 @@ test("hover does not decorate the preview while the fixed scope drives Backgroun
     "#123456",
   );
 
+  fireEvent.pointerLeave(left);
+  expect(
+    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toBeInTheDocument();
   await user.click(left);
   expect(left).toHaveAttribute("aria-pressed", "true");
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
@@ -384,7 +401,7 @@ test("hover does not decorate the preview while the fixed scope drives Backgroun
   );
 });
 
-test("hover does not change the fixed selection or inactive Frame appearance", async () => {
+test("hover tint keeps the fixed selection and Frame contrast independent", async () => {
   const user = userEvent.setup();
 
   render(
@@ -399,6 +416,26 @@ test("hover does not change the fixed selection or inactive Frame appearance", a
   const left = await screen.findByRole("button", { name: "Lado esquerdo" });
   const right = screen.getByRole("button", { name: "Lado direito" });
   await user.click(right);
+  expect(
+    screen.queryByLabelText("Foco de teclado do lado direito"),
+  ).not.toBeInTheDocument();
+
+  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+    "fill",
+    "#E3E0DA",
+  );
+  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+    "fill-opacity",
+    "0.42",
+  );
+  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+    "stroke",
+    "none",
+  );
+  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+    "width",
+    "300000",
+  );
   fireEvent.pointerEnter(left);
 
   expect(right).toHaveAttribute("aria-pressed", "true");
@@ -417,9 +454,18 @@ test("hover does not change the fixed selection or inactive Frame appearance", a
     "fill-opacity",
     "0.08",
   );
-  expect(
-    screen.queryByLabelText("Realce temporário do lado esquerdo"),
-  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "fill-opacity",
+    "0.08",
+  );
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "stroke",
+    "none",
+  );
+  expect(screen.getByLabelText("Atenuação do lado esquerdo")).toHaveAttribute(
+    "fill-opacity",
+    "0.18",
+  );
 });
 
 test("uses the sheet outline as the keyboard focus indicator", async () => {
@@ -445,9 +491,10 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   );
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
-  expect(
-    screen.queryByLabelText("Realce temporário do lado esquerdo"),
-  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
+    "stroke",
+    "none",
+  );
   expect(
     screen.getByLabelText("Foco de teclado do lado direito"),
   ).toHaveAttribute("fill", "none");

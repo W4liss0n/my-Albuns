@@ -518,10 +518,10 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A reprodução respeita a proporção de largura e altura escolhida em `Configurações`, mas sempre representa uma Lâmina dupla, independentemente da Configuração das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
 - `Configurações` e `Personalização` reutilizam integralmente o mesmo painel de prévia — fundo, cabeçalho, metadados, legenda, espaçamento, encaixe proporcional, borda, sombra e guias técnicas — limitado simultaneamente pela largura e pela altura disponíveis; somente o conteúdo interno da Lâmina e as interações específicas da `Personalização` diferem.
 - Essa reprodução reutiliza as regiões clicáveis do seletor espacial de `Design do Álbum`: o clique à esquerda, à direita ou na região central fixa o escopo usado pelos controles de Background e Overlay.
-- A seleção fixa mostra um contorno azul sólido na borda externa e mantém seus Frames com contraste forte; o foco por teclado mostra um contorno azul-claro pontilhado e recuado, com contraste intermediário nos Frames que não pertencem à seleção.
-- O hover não desenha contorno, não altera o contraste dos Frames e nunca oculta nem substitui o escopo fixado.
-- Nenhum realce preenche ou tinge Background, Overlay ou guias técnicas; Frames fora da seleção e do foco por teclado permanecem discretos.
-- Mover o ponteiro sem clicar não muda a reprodução nem o escopo configurado.
+- A seleção fixa mostra um contorno azul sólido na borda externa e mantém toda a superfície selecionada com presença total e seus Frames com contraste forte; cada lado não selecionado recebe uma atenuação neutra translúcida sobre toda a sua superfície. O foco por teclado mostra um contorno azul-claro pontilhado e recuado, com contraste intermediário nos Frames que não pertencem à seleção.
+- O hover reduz a atenuação do escopo candidato e o cobre com uma tonalidade azul translúcida, sem contorno e sem alterar o contraste individual dos Frames; o efeito nunca oculta nem substitui o escopo fixado.
+- A tonalidade de hover fica abaixo dos indicadores de foco, da seleção fixa e das guias técnicas. Frames fora da seleção e do foco por teclado permanecem discretos.
+- Mover o ponteiro sem clicar muda somente essa pré-seleção transitória da reprodução; não muda o escopo configurado nem o conteúdo de Background ou Overlay.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.
 - `Cancelar` permanece isolado à esquerda do rodapé fixo; `Voltar` fica agrupado à direita, imediatamente antes de `Criar`. Se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.
