@@ -12,12 +12,13 @@ use std::{
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEvent, ImagingFailureCode,
     ImagingFailureStage, ImagingPathCode, ImagingProgress, ImagingProgressStage, ImagingRequest,
-    ImagingResponse, decode_command, encode_event, root_binding_plan_sha256,
+    ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV, decode_command, encode_event,
+    encode_processor_handshake, root_binding_plan_sha256,
 };
 use myalbuns_logging::{
     ProcessRole, init_local_logging, safe_log_identifier, sidecar_log_directory,
 };
-use myalbuns_paths::AppPaths;
+use myalbuns_paths::{AppPaths, ProcessInstanceId};
 
 struct ProcessFailure {
     stage: Option<ImagingFailureStage>,
@@ -40,6 +41,10 @@ fn main() -> ExitCode {
     }
     if let Err(error) = process_tree::install_descendant_cleanup_on_exit() {
         eprintln!("ciclo de vida do Processador indisponível: {error}");
+        return ExitCode::FAILURE;
+    }
+    if let Err(error) = publish_processor_handshake() {
+        eprintln!("autoridade do ciclo de vida do Processador indisponível: {error}");
         return ExitCode::FAILURE;
     }
 
@@ -95,6 +100,23 @@ fn main() -> ExitCode {
     };
     drop(logging_guard);
     exit_code
+}
+
+fn publish_processor_handshake() -> Result<(), String> {
+    let Some(challenge) = std::env::var_os(PROCESSOR_HANDSHAKE_CHALLENGE_ENV) else {
+        return Ok(());
+    };
+    let challenge = challenge
+        .to_str()
+        .ok_or_else(|| "o desafio do Host não é texto válido".to_string())?;
+    let process = ProcessInstanceId::current()
+        .map_err(|error| format!("não foi possível observar a instância do processo: {error}"))?;
+    let encoded = encode_processor_handshake(challenge, process)?;
+    let mut stdout = std::io::stdout().lock();
+    stdout
+        .write_all(&encoded)
+        .and_then(|()| stdout.flush())
+        .map_err(|error| format!("não foi possível publicar o handshake: {error}"))
 }
 
 fn run(app_paths: &AppPaths) -> Result<(), ProcessFailure> {

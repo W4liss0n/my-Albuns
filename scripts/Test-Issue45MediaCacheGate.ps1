@@ -757,6 +757,20 @@ $expectedImagingRecoveryCheckNames = @(
     'actual-tauri-album-canvas-pixi-webview2'
 )
 
+$expectedWindowsPathCheckNames = @(
+    'path-contract'
+    'path-policy'
+    'real-mapped-unc'
+    'imaging-protocol'
+    'imaging-sidecar-build'
+    'sidecar-protocol-preflight'
+    'desktop-host-build'
+    'path-io-thread'
+    'real-sidecar-frozen-plan'
+    'desktop-long-path-manifest'
+    'sidecar-long-path-manifest'
+)
+
 function Test-ExactPassedCheckSet(
     [object[]] $Checks,
     [string[]] $ExpectedNames
@@ -770,15 +784,22 @@ function Test-ExactPassedCheckSet(
     )
     foreach ($name in @($ExpectedNames)) {
         if (-not $expected.Add([string] $name)) {
-            throw "The expected recovery check set duplicates '$name'."
+            throw "The expected check set duplicates '$name'."
         }
     }
     $seen = [System.Collections.Generic.HashSet[string]]::new(
         [System.StringComparer]::Ordinal
     )
     foreach ($check in $actual) {
-        $name = [string] $check.name
-        if (-not [bool] $check.passed `
+        if ($null -eq $check `
+                -or $null -eq $check.PSObject.Properties['name'] `
+                -or $null -eq $check.PSObject.Properties['passed'] `
+                -or $check.name -isnot [string] `
+                -or $check.passed -isnot [System.Boolean]) {
+            return $false
+        }
+        $name = $check.name
+        if ($check.passed -ne $true `
                 -or [string]::IsNullOrWhiteSpace($name) `
                 -or -not $expected.Contains($name) `
                 -or -not $seen.Add($name)) {
@@ -788,14 +809,14 @@ function Test-ExactPassedCheckSet(
     return $seen.Count -eq $expected.Count
 }
 
-function Test-ImagingRecoveryCheckSetContracts([string[]] $ExpectedNames) {
+function Test-ExactPassedCheckSetContracts([string[]] $ExpectedNames) {
     $valid = @(
         $ExpectedNames | ForEach-Object {
             [pscustomobject]@{ name = $_; passed = $true }
         }
     )
     if (-not (Test-ExactPassedCheckSet -Checks $valid -ExpectedNames $ExpectedNames)) {
-        throw 'The exact recovery check validator rejected its complete passing fixture.'
+        throw 'The exact check validator rejected its complete passing fixture.'
     }
     $assertionCount = 1
     for ($removed = 0; $removed -lt $valid.Count; $removed++) {
@@ -805,7 +826,7 @@ function Test-ImagingRecoveryCheckSetContracts([string[]] $ExpectedNames) {
             }
         )
         if (Test-ExactPassedCheckSet -Checks $fixture -ExpectedNames $ExpectedNames) {
-            throw "The recovery check validator accepted a fixture without '$($valid[$removed].name)'."
+            throw "The check validator accepted a fixture without '$($valid[$removed].name)'."
         }
         $assertionCount += 1
     }
@@ -815,21 +836,47 @@ function Test-ImagingRecoveryCheckSetContracts([string[]] $ExpectedNames) {
         }
     )
     if (Test-ExactPassedCheckSet -Checks $duplicate -ExpectedNames $ExpectedNames) {
-        throw 'The recovery check validator accepted a duplicate in place of a required check.'
+        throw 'The check validator accepted a duplicate in place of a required check.'
     }
     $assertionCount += 1
-    $failed = @(
+    foreach ($invalidPassed in @($false, 'false', 1, $null)) {
+        $invalid = @(
+            for ($index = 0; $index -lt $valid.Count; $index++) {
+                [pscustomobject]@{
+                    name = $valid[$index].name
+                    passed = if ($index -eq 0) { $invalidPassed } else { $true }
+                }
+            }
+        )
+        if (Test-ExactPassedCheckSet -Checks $invalid -ExpectedNames $ExpectedNames) {
+            $type = if ($null -eq $invalidPassed) {
+                'null'
+            }
+            else {
+                $invalidPassed.GetType().FullName
+            }
+            throw "The check validator accepted a non-true Boolean value of type '$type'."
+        }
+        $assertionCount += 1
+    }
+    $missingPassed = @(
         for ($index = 0; $index -lt $valid.Count; $index++) {
-            [pscustomobject]@{
-                name = $valid[$index].name
-                passed = ($index -ne 0)
+            if ($index -eq 0) {
+                [pscustomobject]@{ name = $valid[$index].name }
+            }
+            else {
+                $valid[$index]
             }
         }
     )
-    if (Test-ExactPassedCheckSet -Checks $failed -ExpectedNames $ExpectedNames) {
-        throw 'The recovery check validator accepted a required check that did not pass.'
+    if (Test-ExactPassedCheckSet -Checks $missingPassed -ExpectedNames $ExpectedNames) {
+        throw 'The check validator accepted a required check without a passed property.'
     }
     return $assertionCount + 1
+}
+
+function Test-ExactFalseBoolean([object] $Value) {
+    return $Value -is [System.Boolean] -and $Value -eq $false
 }
 
 function ConvertFrom-DesignMatrix([string] $Markdown) {
@@ -1131,12 +1178,20 @@ try {
         assertionCount = $proofParserAssertionCount
     })
 
-    $imagingCheckSetAssertionCount = Test-ImagingRecoveryCheckSetContracts `
+    $imagingCheckSetAssertionCount = Test-ExactPassedCheckSetContracts `
         -ExpectedNames $expectedImagingRecoveryCheckNames
     $checks.Add([ordered]@{
         name = 'fail-closed-imaging-recovery-check-set'
-        passed = ($imagingCheckSetAssertionCount -eq 12)
+        passed = ($imagingCheckSetAssertionCount -eq 16)
         assertionCount = $imagingCheckSetAssertionCount
+    })
+
+    $windowsCheckSetAssertionCount = Test-ExactPassedCheckSetContracts `
+        -ExpectedNames $expectedWindowsPathCheckNames
+    $checks.Add([ordered]@{
+        name = 'fail-closed-windows-path-check-set'
+        passed = ($windowsCheckSetAssertionCount -eq 18)
+        assertionCount = $windowsCheckSetAssertionCount
     })
 
     $cleanupProbe = Invoke-OwnedCleanupProbe
@@ -1319,10 +1374,10 @@ try {
         ConvertFrom-Json
     $imagingChecks = @($imagingEvidence.checks)
     $imagingCheckCount = $imagingChecks.Count
-    $imagingFailedCheckCount = @(
-        $imagingEvidence.checks | Where-Object { -not $_.passed }
-    ).Count
-    if ($imagingEvidence.sourceInputsDirty `
+    $imagingFailedCheckCount = @($imagingChecks | Where-Object {
+            $_.passed -isnot [System.Boolean] -or $_.passed -ne $true
+        }).Count
+    if (-not (Test-ExactFalseBoolean $imagingEvidence.sourceInputsDirty) `
             -or $imagingEvidence.gitCommit -ne $sourceBefore.gitCommit `
             -or $imagingFailedCheckCount -ne 0 `
             -or -not (Test-ExactPassedCheckSet `
@@ -1352,14 +1407,17 @@ try {
         )
     $windowsEvidence = Get-Content -LiteralPath $windowsEvidencePath -Raw |
         ConvertFrom-Json
-    $windowsCheckCount = @($windowsEvidence.checks).Count
-    $windowsFailedCheckCount = @(
-        $windowsEvidence.checks | Where-Object { -not $_.passed }
-    ).Count
-    if ($windowsEvidence.sourceInputsDirty `
+    $windowsChecks = @($windowsEvidence.checks)
+    $windowsCheckCount = $windowsChecks.Count
+    $windowsFailedCheckCount = @($windowsChecks | Where-Object {
+            $_.passed -isnot [System.Boolean] -or $_.passed -ne $true
+        }).Count
+    if (-not (Test-ExactFalseBoolean $windowsEvidence.sourceInputsDirty) `
             -or $windowsEvidence.gitCommit -ne $sourceBefore.gitCommit `
-            -or $windowsCheckCount -lt 1 `
-            -or $windowsFailedCheckCount -ne 0) {
+            -or $windowsFailedCheckCount -ne 0 `
+            -or -not (Test-ExactPassedCheckSet `
+                -Checks $windowsChecks `
+                -ExpectedNames $expectedWindowsPathCheckNames)) {
         throw "The Windows local/UNC/mapped/long-path evidence is not authoritative: sourceInputsDirty=$($windowsEvidence.sourceInputsDirty), gitCommit=$($windowsEvidence.gitCommit), expectedCommit=$($sourceBefore.gitCommit), checks=$windowsCheckCount, failed=$windowsFailedCheckCount."
     }
     $checks.Add([ordered]@{
@@ -1492,7 +1550,17 @@ try {
     if ($cacheCommandMatches.Count -ne 3 -or $cacheCommandNames.Count -ne 3) {
         throw 'The issue 16 Cache service surface is no longer exactly three narrow commands.'
     }
-    $narrowApiProofText = $cacheCommandNames -join "`n"
+    $cachePathApiSource = Get-Content `
+        -LiteralPath (Join-Path $workspaceRoot 'crates\myalbuns-paths\src\app_paths.rs') `
+        -Raw `
+        -Encoding UTF8
+    if ($cachePathApiSource -match '\binspect_cache_namespaces\b') {
+        throw 'The Cache path API reintroduced uncoordinated bulk namespace inspection.'
+    }
+    $narrowApiProofText = @(
+        $cacheCommandNames
+        'no-bulk-cache-namespace-inspection'
+    ) -join "`n"
     $researchProofText = Get-Content `
         -LiteralPath (Join-Path $workspaceRoot 'docs\research\0036-integracao-final-de-midias-e-cache.md') `
         -Raw `
@@ -1659,6 +1727,9 @@ try {
             -Name 'tracer-44-host-death-and-real-recovery' `
             -Requirements @(
                 (New-RustProof -Name 'terminating_the_host_closes_its_job_and_terminates_the_active_processor')
+                (New-RustProof -Name 'attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process')
+                (New-RustProof -Name 'fragmented_handshake_preserves_the_exact_process_instance')
+                (New-RustProof -Name 'processor_handshake_reports_the_exact_instance_seen_through_the_spawned_child_handle')
                 (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
                 (New-RustProof -Name 'free_closed_projects_after_host_death_waits_before_measuring_and_removing')
                 (New-RustProof -Name 'clear_all_after_host_death_waits_before_measuring_and_removing')
@@ -1686,6 +1757,8 @@ try {
                 (New-RustProof -Name 'measures_and_frees_only_namespaces_without_an_active_owner')
                 (New-RustProof -Name 'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup')
                 (New-RustProof -Name 'project_open_during_free_space_is_serialized_by_namespace_reservation')
+                (New-RustProof -Name 'active_namespace_measurement_tolerates_real_writer_promotion_and_exclusive_files')
+                (New-RustProof -Name 'scheduled_cleanup_keeps_the_runtime_responsive_until_the_exact_writer_exits')
                 (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
                 (New-RustProof -Name 'free_closed_projects_quiesces_writers_before_measuring_removed_bytes')
                 (New-RustProof -Name 'clear_all_quiesces_writers_before_measuring_removed_bytes')
@@ -1699,6 +1772,7 @@ try {
                 (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'cache_service_status')
                 (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'free_closed_project_cache')
                 (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'clear_all_cache')
+                (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'no-bulk-cache-namespace-inspection')
                 (New-FrontendProof -Name 'maps the Project and media ports to the desktop commands')
                 (New-FrontendProof -Name 'initializes the native dialog used by the productive relink command')
             )

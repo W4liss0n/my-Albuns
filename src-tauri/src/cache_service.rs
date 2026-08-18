@@ -119,7 +119,7 @@ impl CacheService {
                     // An active namespace cannot be quiesced without blocking its editor. Take a
                     // guarded snapshot, then retry the reservation: if the owner closed during
                     // inspection, discard that snapshot and measure again after quiescence.
-                    let active_snapshot = self.inspect_namespace(&paths)?;
+                    let active_snapshot = self.snapshot_active_namespace(&paths)?;
                     match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                         Ok(_reservation) => {
                             synchronize_cache_writer(&paths)?;
@@ -292,6 +292,15 @@ impl CacheService {
     ) -> Result<Option<CacheNamespaceUsage>, CacheServiceError> {
         self.app_paths
             .inspect_cache_namespace(paths)
+            .map_err(|error| CacheServiceError::Storage(error.to_string()))
+    }
+
+    fn snapshot_active_namespace(
+        &self,
+        paths: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, CacheServiceError> {
+        self.app_paths
+            .snapshot_active_cache_namespace(paths)
             .map_err(|error| CacheServiceError::Storage(error.to_string()))
     }
 
@@ -510,7 +519,10 @@ pub(crate) async fn clear_all_cache(
 mod tests {
     use std::{
         env,
+        ffi::c_void,
         io::{BufRead, BufReader, Write},
+        os::windows::fs::OpenOptionsExt,
+        os::windows::io::AsRawHandle,
         path::Path,
         process::{Command, Stdio},
         sync::{Arc, Barrier},
@@ -544,6 +556,7 @@ mod tests {
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
     const NAMESPACE_OWNER_NAME_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_NAME";
     const NAMESPACE_OWNER_READY_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_READY";
+    const NAMESPACE_OWNER_CHURN_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_CHURN";
     const HOST_DEATH_ROOT_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_ROOT";
     const HOST_DEATH_PROJECT_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_PROJECT";
     const HOST_DEATH_READY_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_READY";
@@ -1113,6 +1126,61 @@ mod tests {
     }
 
     #[test]
+    fn active_namespace_measurement_tolerates_real_writer_promotion_and_exclusive_files() {
+        let root = tempfile::tempdir().expect("temporary active-writer fixture");
+        let ready = root.path().join("active-writer.ready");
+        let paths = app_paths(root.path());
+        let namespace_name = "project-active-writer";
+        let cache = paths.project_cache(namespace_name).unwrap();
+        drop(paths.prepare_cache_storage(&cache).unwrap());
+        let mut owner = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("cache_service::tests::cache_namespace_owner_process")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(NAMESPACE_OWNER_ROOT_ENV, root.path())
+            .env(NAMESPACE_OWNER_NAME_ENV, namespace_name)
+            .env(NAMESPACE_OWNER_READY_ENV, &ready)
+            .env(NAMESPACE_OWNER_CHURN_ENV, "1")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the independent active writer starts");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready.is_file() {
+            assert!(owner.try_wait().unwrap().is_none());
+            assert!(Instant::now() < deadline, "the active writer timed out");
+            thread::sleep(Duration::from_millis(20));
+        }
+
+        let service = CacheService::new(paths);
+        for iteration in 0..40 {
+            let measured = service
+                .measure()
+                .expect("active promotion/removal cannot make measurement unavailable");
+            assert_eq!(measured.namespace_count, 1);
+            assert_eq!(measured.releasable_namespace_count, 0);
+            assert_eq!(measured.releasable_bytes, 0);
+            assert!(measured.occupied_bytes >= b"exclusive active Cache".len() as u64);
+            if iteration % 10 == 0 {
+                let freed = service
+                    .free_closed_projects()
+                    .expect("free-space skips the concurrently active namespace");
+                assert_eq!(freed.removed_namespace_count, 0);
+                assert_eq!(freed.skipped_active_namespace_count, 1);
+                assert_eq!(
+                    service
+                        .clear_all_or_schedule()
+                        .expect("total cleanup is scheduled while the writer is active"),
+                    CacheClearAllOutcome::Scheduled
+                );
+                assert!(cache.root().is_dir());
+            }
+        }
+
+        owner.kill().expect("the active writer is stopped");
+        owner.wait().expect("the active writer is reaped");
+    }
+
+    #[test]
     fn reopening_after_host_death_recovers_the_contained_processors_temporary() {
         let fixture = dead_host_cache_fixture();
         let measured = CacheService::new(fixture.paths.clone())
@@ -1203,8 +1271,36 @@ mod tests {
         let _reservation = namespace_mutex(&paths, &cache)
             .try_acquire()
             .expect("the child owns the namespace reservation");
+        let churn = env::var_os(NAMESPACE_OWNER_CHURN_ENV).is_some();
+        let _exclusive = churn.then(|| {
+            let path = cache.media_directory().join("exclusive.bin");
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .share_mode(0)
+                .open(path)
+                .expect("the active writer owns an exclusive Cache file");
+            file.write_all(b"exclusive active Cache")
+                .expect("the exclusive Cache payload is written");
+            file.sync_all()
+                .expect("the exclusive Cache payload is synchronized");
+            file
+        });
         std::fs::write(ready, b"owned").expect("the child signals reservation ownership");
-        thread::sleep(Duration::from_secs(120));
+        if churn {
+            let temporary = cache.media_directory().join("promotion.tmp");
+            let published = cache.media_directory().join("promotion.bin");
+            let deadline = Instant::now() + Duration::from_secs(120);
+            while Instant::now() < deadline {
+                std::fs::write(&temporary, b"candidate").expect("the candidate is written");
+                std::fs::rename(&temporary, &published).expect("the candidate is promoted");
+                std::fs::remove_file(&published).expect("the promoted generation becomes obsolete");
+                thread::yield_now();
+            }
+        } else {
+            thread::sleep(Duration::from_secs(120));
+        }
     }
 
     #[test]
@@ -1246,7 +1342,12 @@ mod tests {
             .stderr(Stdio::null())
             .spawn()
             .expect("the contained Processor starts");
-        let mut lifetime = ProcessorChildLifetime::attach(worker.id())
+        let worker_identity = ProcessInstanceId::from_process_handle(
+            worker.id(),
+            worker.as_raw_handle().cast::<c_void>(),
+        )
+        .expect("the exact contained Processor identity is observable");
+        let mut lifetime = ProcessorChildLifetime::attach(worker_identity)
             .expect("the Host contains the Processor before dispatch");
         lifetime
             .publish_cache_writer_claim(owner.namespace().paths())

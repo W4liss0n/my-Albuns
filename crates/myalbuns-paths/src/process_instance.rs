@@ -1,13 +1,16 @@
 #[cfg(windows)]
-use std::{io, time::Duration};
+use std::{
+    io,
+    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    time::Duration,
+};
 
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
 #[cfg(windows)]
 use windows_sys::Win32::{
     Foundation::{
-        CloseHandle, ERROR_INVALID_PARAMETER, FILETIME, HANDLE, WAIT_FAILED, WAIT_OBJECT_0,
-        WAIT_TIMEOUT,
+        ERROR_INVALID_PARAMETER, FILETIME, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
     },
     System::Threading::{
         GetCurrentProcess, GetProcessTimes, INFINITE, OpenProcess,
@@ -82,7 +85,7 @@ impl<'de> Deserialize<'de> for ProcessInstanceId {
 /// while callers inspect windows or coordinate lifecycle through this guard.
 #[cfg(windows)]
 #[derive(Debug)]
-pub struct ProcessInstanceHandle(HANDLE);
+pub struct ProcessInstanceHandle(OwnedHandle);
 
 #[cfg(windows)]
 impl ProcessInstanceHandle {
@@ -127,8 +130,12 @@ impl ProcessInstanceHandle {
                 Err(error)
             };
         }
-        let process = Self(handle);
-        let observed = ProcessInstanceId::from_process_handle(expected.process_id(), process.0)?;
+        // SAFETY: OpenProcess returned a new owned handle which is transferred
+        // exactly once to OwnedHandle. Windows kernel handles are process-wide,
+        // so this guard can safely move with async work between Host threads.
+        let process = Self(unsafe { OwnedHandle::from_raw_handle(handle) });
+        let observed =
+            ProcessInstanceId::from_process_handle(expected.process_id(), process.as_raw_handle())?;
         if observed != expected {
             return Ok(None);
         }
@@ -139,12 +146,12 @@ impl ProcessInstanceHandle {
     }
 
     pub fn as_raw_handle(&self) -> HANDLE {
-        self.0
+        self.0.as_raw_handle().cast()
     }
 
     pub fn is_running(&self) -> io::Result<bool> {
         // SAFETY: self owns a process handle with synchronization rights.
-        match unsafe { WaitForSingleObject(self.0, 0) } {
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), 0) } {
             WAIT_TIMEOUT => Ok(true),
             WAIT_OBJECT_0 => Ok(false),
             WAIT_FAILED => Err(io::Error::last_os_error()),
@@ -156,7 +163,7 @@ impl ProcessInstanceHandle {
 
     pub fn wait_for_exit(&self) -> io::Result<()> {
         // SAFETY: self owns a process handle with synchronization rights.
-        match unsafe { WaitForSingleObject(self.0, INFINITE) } {
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), INFINITE) } {
             WAIT_OBJECT_0 => Ok(()),
             WAIT_FAILED => Err(io::Error::last_os_error()),
             wait => Err(io::Error::other(format!(
@@ -170,24 +177,13 @@ impl ProcessInstanceHandle {
     pub fn wait_for_exit_timeout(&self, timeout: Duration) -> io::Result<bool> {
         let milliseconds = u32::try_from(timeout.as_millis()).unwrap_or(u32::MAX - 1);
         // SAFETY: self owns a process handle with synchronization rights.
-        match unsafe { WaitForSingleObject(self.0, milliseconds) } {
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), milliseconds) } {
             WAIT_OBJECT_0 => Ok(true),
             WAIT_TIMEOUT => Ok(false),
             WAIT_FAILED => Err(io::Error::last_os_error()),
             wait => Err(io::Error::other(format!(
                 "unexpected result while waiting for a process instance: {wait}"
             ))),
-        }
-    }
-}
-
-#[cfg(windows)]
-impl Drop for ProcessInstanceHandle {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            // SAFETY: this guard exclusively owns the process handle.
-            unsafe { CloseHandle(self.0) };
-            self.0 = std::ptr::null_mut();
         }
     }
 }

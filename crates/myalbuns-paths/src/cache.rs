@@ -460,18 +460,6 @@ pub(crate) fn prepare_cache_storage(
     plan.prepare_storage()
 }
 
-pub(crate) fn inspect_cache_namespaces(
-    app_paths: &AppPaths,
-) -> Result<Vec<CacheNamespaceUsage>, AppPathsError> {
-    let mut usages = Vec::new();
-    for paths in list_cache_namespaces(app_paths)? {
-        if let Some(usage) = inspect_cache_namespace(app_paths, &paths)? {
-            usages.push(usage);
-        }
-    }
-    Ok(usages)
-}
-
 pub(crate) fn list_cache_namespaces(
     app_paths: &AppPaths,
 ) -> Result<Vec<CachePathPlan>, AppPathsError> {
@@ -522,6 +510,19 @@ pub(crate) fn inspect_cache_namespace(
     };
     Ok(Some(CacheNamespaceUsage {
         bytes: measure_project_cache(project_cache.project(), paths)?,
+        paths: paths.clone(),
+    }))
+}
+
+pub(crate) fn snapshot_active_cache_namespace(
+    app_paths: &AppPaths,
+    paths: &CachePathPlan,
+) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
+    let Some(project_cache) = open_existing_project_cache(app_paths, paths)? else {
+        return Ok(None);
+    };
+    Ok(Some(CacheNamespaceUsage {
+        bytes: measure_active_project_cache(project_cache.project(), paths)?,
         paths: paths.clone(),
     }))
 }
@@ -578,6 +579,75 @@ fn measure_open_file(parent: &DirectoryGuard, path: &Path) -> Result<u64, AppPat
     file.metadata()
         .map(|metadata| metadata.len())
         .map_err(|_| AppPathsError::CacheStorageUnavailable)
+}
+
+/// Captures occupied bytes without opening files that the active Processor may
+/// hold exclusively. A file that disappears between enumeration and metadata
+/// capture is ordinary publication churn and is omitted from this snapshot.
+/// Reparse points and unexpected entry types still fail closed.
+fn measure_active_project_cache(
+    project: &DirectoryGuard,
+    paths: &CachePathPlan,
+) -> Result<u64, AppPathsError> {
+    let mut bytes = 0_u64;
+    for entry in
+        fs::read_dir(&project.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
+    {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
+        let path = entry.path();
+        let Some(metadata) = transient_entry_metadata(&entry)? else {
+            continue;
+        };
+        if is_reparse_point(&metadata) {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        if metadata.is_file() {
+            bytes = bytes
+                .checked_add(metadata.len())
+                .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            continue;
+        }
+        if metadata.is_dir() && path == paths.media_directory() {
+            let Some(media) = open_existing_direct_child(project, &path)? else {
+                continue;
+            };
+            for media_entry in fs::read_dir(&media.logical_path)
+                .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+            {
+                let media_entry = match media_entry {
+                    Ok(entry) => entry,
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+                    Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+                };
+                let Some(metadata) = transient_entry_metadata(&media_entry)? else {
+                    continue;
+                };
+                if is_reparse_point(&metadata) || !metadata.is_file() {
+                    return Err(AppPathsError::CacheStorageOutsideRoot);
+                }
+                bytes = bytes
+                    .checked_add(metadata.len())
+                    .ok_or(AppPathsError::CacheStorageUnavailable)?;
+            }
+            continue;
+        }
+        return Err(AppPathsError::CacheStorageOutsideRoot);
+    }
+    Ok(bytes)
+}
+
+fn transient_entry_metadata(entry: &fs::DirEntry) -> Result<Option<fs::Metadata>, AppPathsError> {
+    // On Windows DirEntry returns the WIN32_FIND_DATA captured by read_dir and
+    // performs no second open. That keeps active, share-denying files measurable.
+    match entry.metadata() {
+        Ok(metadata) => Ok(Some(metadata)),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(AppPathsError::CacheStorageUnavailable),
+    }
 }
 
 pub(crate) fn clear_project_cache(

@@ -37,6 +37,44 @@ pub(crate) const GLOBAL_WINDOW_LABEL: &str = "global";
 const GLOBAL_WEBVIEW_NAMESPACE: &str = "global";
 const HOST_TERMINAL_TIMEOUT: Duration = Duration::from_secs(30);
 
+type ScheduledCleanupResult = Result<CacheScheduledCleanupOutcome, String>;
+
+#[derive(Clone, Default)]
+struct ScheduledCleanupGate {
+    result: Arc<Mutex<Option<ScheduledCleanupResult>>>,
+    notification: Arc<tokio::sync::Notify>,
+}
+
+impl ScheduledCleanupGate {
+    fn complete(&self, result: ScheduledCleanupResult) {
+        let mut slot = self
+            .result
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if slot.is_some() {
+            return;
+        }
+        *slot = Some(result);
+        drop(slot);
+        self.notification.notify_waiters();
+    }
+
+    async fn wait(&self) -> ScheduledCleanupResult {
+        loop {
+            let notified = self.notification.notified();
+            if let Some(result) = self
+                .result
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone()
+            {
+                return result;
+            }
+            notified.await;
+        }
+    }
+}
+
 #[cfg(debug_assertions)]
 const WEBDRIVER_PROJECT_ENV: &str = "MYALBUNS_TAURI_WEBDRIVER_PROJECT";
 #[cfg(debug_assertions)]
@@ -49,6 +87,7 @@ struct GlobalRuntimeState {
     recent_projects: RecentProjectsStore,
     startup_failure: Arc<Mutex<Option<ProjectLaunchFailure>>>,
     pending_external_copy: Arc<Mutex<Option<PendingExternalCopyProcess>>>,
+    scheduled_cleanup: ScheduledCleanupGate,
 }
 
 impl GlobalRuntimeState {
@@ -59,6 +98,7 @@ impl GlobalRuntimeState {
             recent_projects: RecentProjectsStore::new(app_paths),
             startup_failure: Arc::new(Mutex::new(None)),
             pending_external_copy: Arc::new(Mutex::new(None)),
+            scheduled_cleanup: ScheduledCleanupGate::default(),
         })
     }
 
@@ -102,6 +142,14 @@ impl GlobalRuntimeState {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .take();
     }
+
+    async fn scheduled_cleanup_failure(&self) -> Option<ProjectLaunchFailure> {
+        self.scheduled_cleanup
+            .wait()
+            .await
+            .err()
+            .map(|reason| startup_cleanup_failure(&reason))
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -140,6 +188,9 @@ async fn complete_graphics_gate(
     report: GraphicsGateReport,
 ) -> Option<ProjectLaunchOutcome> {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return Some(ProjectLaunchOutcome::Failed { error });
+    }
     match state.graphics_gate.complete(report) {
         GraphicsGateCompletion::Ready(Some(project_path)) => {
             let outcome = launch_confirmed_project(
@@ -173,6 +224,9 @@ async fn complete_graphics_gate(
 #[tauri::command]
 async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return ProjectLaunchOutcome::Failed { error };
+    }
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
@@ -227,6 +281,9 @@ async fn open_project(app: AppHandle) -> ProjectLaunchOutcome {
 #[tauri::command]
 async fn save_external_copy_as(app: AppHandle) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return ProjectLaunchOutcome::Failed { error };
+    }
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
@@ -355,6 +412,9 @@ async fn create_project(
     configuration: ProvisionalProjectCreationConfiguration,
 ) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return ProjectLaunchOutcome::Failed { error };
+    }
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
@@ -429,6 +489,10 @@ async fn create_project(
 async fn recent_projects(
     state: tauri::State<'_, GlobalRuntimeState>,
 ) -> Result<Vec<RecentProjectSummary>, ProjectLaunchFailure> {
+    let state = state.inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return Err(error);
+    }
     let store = state.recent_projects.clone();
     tauri::async_runtime::spawn_blocking(move || store.list())
         .await
@@ -439,6 +503,9 @@ async fn recent_projects(
 #[tauri::command]
 async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunchOutcome {
     let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return ProjectLaunchOutcome::Failed { error };
+    }
     if let Some(rejection) = state.project_host_gate_rejection() {
         return rejection;
     }
@@ -473,9 +540,11 @@ async fn open_recent_project(app: AppHandle, project_id: String) -> ProjectLaunc
 }
 
 #[tauri::command]
-fn startup_open_failure(
-    state: tauri::State<'_, GlobalRuntimeState>,
-) -> Option<ProjectLaunchFailure> {
+async fn startup_open_failure(app: AppHandle) -> Option<ProjectLaunchFailure> {
+    let state = app.state::<GlobalRuntimeState>().inner().clone();
+    if let Some(error) = state.scheduled_cleanup_failure().await {
+        return Some(error);
+    }
     state.startup_failure()
 }
 
@@ -804,6 +873,14 @@ fn simple_failure(code: &str, message: &str, action: &str) -> ProjectLaunchFailu
     staged_failure(code, None, message, action)
 }
 
+fn startup_cleanup_failure(reason: &str) -> ProjectLaunchFailure {
+    simple_failure(
+        "startup_cache_cleanup_unavailable",
+        &format!("A limpeza segura do Cache na inicialização não foi concluída: {reason}"),
+        "Reinicie o MyAlbuns. Se o problema continuar, verifique o armazenamento local.",
+    )
+}
+
 fn staged_failure(
     code: &str,
     stage: Option<FailureStage>,
@@ -888,6 +965,60 @@ async fn initialize_global_window(
         state.record_startup_failure(graphics_gate_timeout_failure());
         let _ = window.show();
     }
+}
+
+async fn run_scheduled_cleanup_background(
+    service: CacheService,
+    readiness: ScheduledCleanupGate,
+) -> ScheduledCleanupResult {
+    let result =
+        match tauri::async_runtime::spawn_blocking(move || service.run_scheduled_cleanup()).await {
+            Ok(result) => result.map_err(|error| error.to_string()),
+            Err(error) => Err(format!(
+                "a tarefa de limpeza agendada não pôde ser concluída: {error}"
+            )),
+        };
+    readiness.complete(result.clone());
+    result
+}
+
+async fn initialize_global_runtime(
+    app: AppHandle,
+    state: GlobalRuntimeState,
+    window: WebviewWindow,
+    policy_readiness: desktop_webview_policy::WebviewPolicyReadiness,
+    cache_service: CacheService,
+) {
+    let scheduled_cleanup = match run_scheduled_cleanup_background(
+        cache_service,
+        state.scheduled_cleanup.clone(),
+    )
+    .await
+    {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            tracing::error!(
+                target: "myalbuns.desktop",
+                process_role = ProcessRole::Global.as_str(),
+                error,
+                event = "scheduled_cache_cleanup_failed",
+            );
+            app.exit(1);
+            return;
+        }
+    };
+    tracing::info!(
+        target: "myalbuns.desktop",
+        outcome = ?scheduled_cleanup,
+        event = "scheduled_cache_cleanup_checked",
+    );
+    if scheduled_cleanup == CacheScheduledCleanupOutcome::Deferred {
+        tracing::warn!(
+            target: "myalbuns.desktop",
+            event = "scheduled_cache_cleanup_deferred",
+        );
+    }
+    initialize_global_window(app, state, window, policy_readiness).await;
 }
 
 fn exit_global_after_handoff(app: &AppHandle) {
@@ -1017,32 +1148,19 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         .manage(provisional_decoratives)
         .setup(move |app| {
             logging::initialize(app, &app_paths, ProcessRole::Global);
-            let scheduled_cleanup = app
-                .state::<CacheService>()
-                .run_scheduled_cleanup()
-                .map_err(std::io::Error::other)?;
-            tracing::info!(
-                target: "myalbuns.desktop",
-                outcome = ?scheduled_cleanup,
-                event = "scheduled_cache_cleanup_checked",
-            );
-            if scheduled_cleanup == CacheScheduledCleanupOutcome::Deferred {
-                tracing::warn!(
-                    target: "myalbuns.desktop",
-                    event = "scheduled_cache_cleanup_deferred",
-                );
-            }
             let app_handle = app.handle().clone();
             // Both configured windows use `create: false`. Install the first
             // owned WebView before setup returns; the page-load terminal then
             // proves that Wry registered it before native policy is applied.
             let (window, policy_readiness) =
                 build_global_window(&app_handle, global_webview_data_directory.clone())?;
-            tauri::async_runtime::spawn(initialize_global_window(
+            let managed_cache_service = app.state::<CacheService>().inner().clone();
+            tauri::async_runtime::spawn(initialize_global_runtime(
                 app_handle,
                 setup_state.clone(),
                 window,
                 policy_readiness,
+                managed_cache_service,
             ));
             Ok(())
         })
@@ -1069,6 +1187,120 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn scheduled_cleanup_keeps_the_runtime_responsive_until_the_exact_writer_exits() {
+        use std::{
+            ffi::c_void,
+            os::windows::io::AsRawHandle,
+            process::{Command, Stdio},
+            time::Instant,
+        };
+
+        use crate::{
+            ipc_contract::CacheClearAllOutcome,
+            operation_gate::{OperationGate, OperationGateError},
+        };
+
+        tauri::async_runtime::block_on(async {
+            let root = tempfile::tempdir().expect("the startup cleanup fixture exists");
+            let app_paths =
+                AppPaths::from_roots(&root.path().join("roaming"), &root.path().join("local"));
+            std::fs::create_dir_all(root.path().join("roaming")).unwrap();
+            std::fs::create_dir_all(root.path().join("local")).unwrap();
+            let cache = app_paths
+                .project_cache("startup-delayed-writer")
+                .expect("the Cache namespace is valid");
+            drop(
+                app_paths
+                    .prepare_cache_storage(&cache)
+                    .expect("the Cache namespace is prepared"),
+            );
+            std::fs::write(cache.media_directory().join("payload.bin"), b"Cache")
+                .expect("the Cache payload is writable");
+            let service = CacheService::new(app_paths.clone());
+            let active_operation = OperationGate::new(&app_paths)
+                .try_acquire()
+                .expect("the scheduling fixture owns an active operation");
+            assert_eq!(
+                service
+                    .clear_all_or_schedule()
+                    .expect("cleanup is scheduled while an operation is active"),
+                CacheClearAllOutcome::Scheduled
+            );
+            drop(active_operation);
+
+            let mut writer =
+                Command::new(std::env::current_exe().expect("the test executable is known"))
+                    .arg("global_runtime::tests::delayed_cache_writer_process")
+                    .args(["--ignored", "--exact", "--nocapture"])
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                    .expect("the delayed Cache writer starts");
+            let writer_identity = ProcessInstanceId::from_process_handle(
+                writer.id(),
+                writer.as_raw_handle().cast::<c_void>(),
+            )
+            .expect("the delayed writer has an exact identity");
+            std::fs::write(
+                cache.root().join(".processor-writer.v1.json"),
+                serde_json::to_vec(&serde_json::json!({
+                    "schemaVersion": 1,
+                    "process": writer_identity,
+                }))
+                .expect("the exact writer claim serializes"),
+            )
+            .expect("the exact writer claim is published");
+
+            let readiness = ScheduledCleanupGate::default();
+            let cleanup = tauri::async_runtime::spawn(run_scheduled_cleanup_background(
+                service,
+                readiness.clone(),
+            ));
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                match OperationGate::new(&app_paths).try_acquire() {
+                    Err(OperationGateError::Conflict) => break,
+                    Ok(grant) => drop(grant),
+                    Err(error) => panic!("the operation marker is unavailable: {error}"),
+                }
+                assert!(Instant::now() < deadline, "cleanup did not start in time");
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            assert!(
+                tokio::time::timeout(Duration::from_millis(50), readiness.wait())
+                    .await
+                    .is_err(),
+                "runtime timers remain responsive while readiness stays withheld"
+            );
+
+            writer.kill().expect("the delayed writer is released");
+            writer.wait().expect("the delayed writer is reaped");
+            assert_eq!(
+                cleanup
+                    .await
+                    .expect("the cleanup task is joined")
+                    .expect("the scheduled cleanup succeeds"),
+                CacheScheduledCleanupOutcome::Cleared
+            );
+            assert_eq!(
+                readiness
+                    .wait()
+                    .await
+                    .expect("startup readiness observes the safe result"),
+                CacheScheduledCleanupOutcome::Cleared
+            );
+            assert!(!cache.root().exists());
+        });
+    }
+
+    #[test]
+    #[ignore = "spawned by the scheduled startup cleanup responsiveness test"]
+    fn delayed_cache_writer_process() {
+        std::thread::sleep(Duration::from_secs(120));
+    }
 
     #[cfg(windows)]
     #[test]

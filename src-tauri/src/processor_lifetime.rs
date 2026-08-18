@@ -17,13 +17,9 @@ use windows_sys::Win32::System::{
         JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
         SetInformationJobObject,
     },
-    Threading::{
-        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
-        WaitForSingleObject,
-    },
+    Threading::{PROCESS_SET_QUOTA, PROCESS_TERMINATE, WaitForSingleObject},
 };
 
-const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
 const CACHE_WRITER_CLAIM_SCHEMA_VERSION: u32 = 1;
 const CACHE_WRITER_CLAIM_FILE: &str = ".processor-writer.v1.json";
 const CACHE_WRITER_TEMPORARY_PREFIX: &str = ".processor-writer-";
@@ -46,13 +42,13 @@ struct CacheWriterClaim {
 #[derive(Debug)]
 pub(crate) struct ProcessorChildLifetime {
     job: Option<OwnedHandle>,
-    process: OwnedHandle,
+    process: ProcessInstanceHandle,
     process_instance: ProcessInstanceId,
     claim_path: Option<PathBuf>,
 }
 
 impl ProcessorChildLifetime {
-    pub(crate) fn attach(process_id: u32) -> io::Result<Self> {
+    pub(crate) fn attach(process_instance: ProcessInstanceId) -> io::Result<Self> {
         // SAFETY: null security/name creates a private non-inheritable Job. A
         // successful raw handle is immediately transferred to OwnedHandle.
         let job = unsafe {
@@ -78,32 +74,18 @@ impl ProcessorChildLifetime {
             return Err(io::Error::last_os_error());
         }
 
-        // SAFETY: process_id came from the freshly spawned CommandChild. The
-        // requested rights are exactly those required by AssignProcessToJobObject.
-        let process = unsafe {
-            let handle = OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION
-                    | PROCESS_SET_QUOTA
-                    | PROCESS_SYNCHRONIZE
-                    | PROCESS_TERMINATE,
-                0,
-                process_id,
-            );
-            if handle.is_null() {
-                return Err(io::Error::last_os_error());
-            }
-            OwnedHandle::from_raw_handle(handle)
-        };
-        let process_instance = ProcessInstanceId::from_process_handle(
-            process_id,
-            process.as_raw_handle().cast::<c_void>(),
-        )?;
+        // The expected PID + creation time came through the newly spawned
+        // child's stdout pipe. Reopening validates that exact instance before
+        // Job authority is acquired; a recycled PID therefore cannot assign
+        // or terminate the process that happens to occupy the numeric ID.
+        let process =
+            ProcessInstanceHandle::open(process_instance, PROCESS_SET_QUOTA | PROCESS_TERMINATE)?;
         // SAFETY: both handles are live, owned handles of the required kinds.
         // Windows 8+ forms a nested Job when an outer launcher Job is present.
         if unsafe {
             AssignProcessToJobObject(
                 job.as_raw_handle().cast::<c_void>(),
-                process.as_raw_handle().cast::<c_void>(),
+                process.as_raw_handle(),
             )
         } == 0
         {
@@ -175,9 +157,7 @@ impl Drop for ProcessorChildLifetime {
         // exact child reaching its signaled terminal state.
         drop(self.job.take());
         // SAFETY: self owns a process handle with synchronization rights.
-        if unsafe { WaitForSingleObject(self.process.as_raw_handle().cast::<c_void>(), 0) }
-            != WAIT_OBJECT_0
-        {
+        if unsafe { WaitForSingleObject(self.process.as_raw_handle(), 0) } != WAIT_OBJECT_0 {
             return;
         }
         let Some(claim_path) = self.claim_path.take() else {
@@ -284,7 +264,9 @@ fn remove_abandoned_claim_temporaries(paths: &CachePathPlan) -> io::Result<()> {
 mod tests {
     use std::{
         env,
+        ffi::c_void,
         io::{BufRead, BufReader, Write},
+        os::windows::io::AsRawHandle,
         process::{Command, Stdio},
         thread,
         time::{Duration, Instant},
@@ -337,6 +319,49 @@ mod tests {
                 .expect("the Cache storage is prepared"),
         );
         paths
+    }
+
+    fn child_identity(child: &std::process::Child) -> ProcessInstanceId {
+        ProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast::<c_void>())
+            .expect("the exact child identity is observable through its causal handle")
+    }
+
+    #[test]
+    fn attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process() {
+        let root = tempfile::tempdir().expect("the worker fixture exists");
+        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(WORKER_SPAWNED_ENV, root.path().join("spawned"))
+            .env(WORKER_ACTIVE_ENV, root.path().join("active"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the unrelated observed process starts");
+        let observed = child_identity(&worker);
+        let recycled = ProcessInstanceId::from_wire(
+            observed.process_id(),
+            observed
+                .creation_time_wire()
+                .checked_add(1)
+                .expect("the creation FILETIME is not maximal"),
+        )
+        .expect("the recycled-PID fixture is structurally valid");
+
+        ProcessorChildLifetime::attach(recycled)
+            .expect_err("a divergent creation time cannot acquire Job authority");
+        assert!(
+            worker
+                .try_wait()
+                .expect("the worker state is readable")
+                .is_none(),
+            "the process currently occupying the PID was neither contained nor killed"
+        );
+        worker
+            .kill()
+            .expect("the unrelated process is stopped by its test owner");
+        worker.wait().expect("the unrelated process is reaped");
     }
 
     #[test]
@@ -442,7 +467,7 @@ mod tests {
             .spawn()
             .expect("the Processor fixture starts");
         wait_for_file(&worker_spawned, &mut worker, "the Processor");
-        let _lifetime = ProcessorChildLifetime::attach(worker.id())
+        let _lifetime = ProcessorChildLifetime::attach(child_identity(&worker))
             .expect("the Host contains its Processor before dispatch");
         worker
             .stdin

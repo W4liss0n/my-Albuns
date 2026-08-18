@@ -7,8 +7,8 @@ use crate::{
     AppPathsError, CachePathPlan, PreparedCacheStorage,
     cache::{
         CacheNamespaceUsage, clear_project_cache, discard_abandoned_project_cache_temporaries,
-        discard_project_cache_temporaries, inspect_cache_namespace, inspect_cache_namespaces,
-        list_cache_namespaces, prepare_cache_storage,
+        discard_project_cache_temporaries, inspect_cache_namespace, list_cache_namespaces,
+        prepare_cache_storage, snapshot_active_cache_namespace,
     },
 };
 
@@ -117,10 +117,6 @@ impl AppPaths {
         clear_project_cache(self, plan)
     }
 
-    pub fn inspect_cache_namespaces(&self) -> Result<Vec<CacheNamespaceUsage>, AppPathsError> {
-        inspect_cache_namespaces(self)
-    }
-
     pub fn list_cache_namespaces(&self) -> Result<Vec<CachePathPlan>, AppPathsError> {
         list_cache_namespaces(self)
     }
@@ -130,6 +126,17 @@ impl AppPaths {
         plan: &CachePathPlan,
     ) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
         inspect_cache_namespace(self, plan)
+    }
+
+    /// Returns a non-authoritative occupied-byte snapshot for a namespace whose
+    /// external owner is still active. This value is display-only: callers must
+    /// acquire exclusive ownership and use `inspect_cache_namespace` before it
+    /// can authorize release or deletion.
+    pub fn snapshot_active_cache_namespace(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
+        snapshot_active_cache_namespace(self, plan)
     }
 
     pub fn discard_project_cache_temporaries(

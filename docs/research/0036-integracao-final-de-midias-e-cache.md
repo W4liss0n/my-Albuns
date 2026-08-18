@@ -60,10 +60,17 @@ nem uma geração publicada por outro trabalho.
 Há uma única exceção deliberada para a recuperação após queda total do Host:
 o novo Host primeiro adquire com exclusividade a reserva nomeada do namespace.
 Antes de cada dispatch de Cache, o Host anterior publica atomicamente uma claim
-com PID e instante de criação do Processador já contido. O fechamento do Job
-Object solicita a terminação, mas ela é assíncrona; por isso o novo Host reabre
-essa instância exata e aguarda seu estado sinalizado antes de inspecionar ou
-remover qualquer conteúdo. PID isolado e mutex abandonado não são tratados como
+com PID e instante de criação do Processador já contido. Essa autoridade não é
+inferida do PID retornado pelo launcher: o Host injeta um desafio único no
+sidecar recém-criado, recebe pelo pipe causal de `stdout` um handshake limitado
+a uma linha com o `ProcessInstanceId` e compara desafio, PID e instante de
+criação antes de adquirir o handle e associá-lo ao Job. Se o PID já foi
+reciclado, a associação falha sem conter ou encerrar o novo ocupante. Esse
+envelope condicional pertence ao ciclo de vida Host–Processador; ele não altera
+os comandos ou eventos do protocolo de imagens v17. O fechamento do Job Object
+solicita a terminação, mas ela é assíncrona; por isso o novo Host reabre essa
+instância exata e aguarda seu estado sinalizado antes de inspecionar ou remover
+qualquer conteúdo. PID isolado e mutex abandonado não são tratados como
 prova de término. Sob essa exclusão confirmada, a recuperação remove os nomes
 temporários bem-formados abandonados. Se o índice atual for válido, preserva
 somente suas gerações referenciadas e coleta finais órfãos; se estiver ausente,
@@ -91,6 +98,12 @@ fechado, adquire a reserva, aguarda a instância exata registrada na claim e só
 então inspeciona os bytes. Um namespace que permanece ativo é medido por um
 snapshot guardado, mas nunca entra no volume liberável. Se o proprietário fecha
 durante esse snapshot, o serviço repete a inspeção depois da quiescência. Uma
+medição ativa usa os metadados já capturados pela enumeração do diretório no
+Windows, sem reabrir arquivos que o Processador mantém sem compartilhamento;
+renomes e remoções concorrentes podem tornar a contagem momentaneamente
+aproximada, mas não indisponível. Reparse points e tipos inesperados continuam
+falhando fechados. Não há operação bulk pública que inspecione todos os
+namespaces sem antes classificá-los e coordená-los. Uma
 reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão;
 outro processo, portanto, não pode classificar aquele namespace como liberável.
 
@@ -100,6 +113,15 @@ Processador/Projeto ativo, a lease de manutenção e todas as reservas de
 namespace. Se isso não for possível, um marcador `create-only` agenda a ação
 para o próximo início seguro. Chamadores concorrentes convergem para um único
 marcador idempotente.
+
+No início do Global, a WebView é criada oculta dentro do `setup`, mas a limpeza
+agendada é executada no executor dedicado a operações bloqueantes. Um gate de
+prontidão retém os comandos automáticos e as ações de abertura/criação até o
+resultado seguro; a janela só segue sua inicialização depois desse resultado.
+Assim, aguardar uma claim de Processador e percorrer ou remover Cache não bloqueia
+o loop do Tauri. Falha de consulta ou limpeza mantém a janela oculta, devolve
+falha tipada aos comandos pendentes e encerra o processo em vez de liberar ações
+sobre estado não inspecionado.
 
 Esse recorte não cria store, registry ou coordenador universal. Ele também não
 reimplementa promoção, movimento, alias ou `Salvar cópia como…`, pertencentes à
@@ -170,7 +192,11 @@ duplicata ou simples substring fecham o gate. Fixtures negativas exercitam o
 parser. Os nove checks transitivos de recuperação, protocolo, sidecar,
 temporários, cancelamento, pausa causal e Canvas/WebView2 também formam um
 conjunto nominal exato: remover qualquer um, duplicar um nome ou marcar um deles
-como falho rejeita a evidência e o critério do tracer 44. A matriz acima também
+como falho rejeita a evidência e o critério do tracer 44. `passed` precisa ser o
+Booleano `true` exato — string, inteiro, `null` e propriedade ausente são
+rejeitados — e `sourceInputsDirty` precisa ser o Booleano `false` exato. O mesmo
+contrato cobre os onze checks do gate Windows. As fixtures somam 16 asserções
+para recuperação e 18 para paths Windows. A matriz acima também
 é validada como conjunto exato e cada remoção unitária é usada como fixture
 negativa antes de aceitar as provas da rodada.
 

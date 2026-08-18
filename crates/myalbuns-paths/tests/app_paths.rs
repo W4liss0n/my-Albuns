@@ -616,15 +616,12 @@ fn inspects_only_direct_cache_namespaces_and_measures_their_files() {
     assert_eq!(first_usage.paths(), &first);
     assert_eq!(first_usage.bytes(), 15);
 
-    let inspected = paths
-        .inspect_cache_namespaces()
-        .expect("the guarded Cache inspection succeeds");
-
-    assert_eq!(inspected.len(), 2);
-    assert_eq!(inspected[0].paths(), &first);
-    assert_eq!(inspected[0].bytes(), 15);
-    assert_eq!(inspected[1].paths(), &second);
-    assert_eq!(inspected[1].bytes(), 15);
+    let second_usage = paths
+        .inspect_cache_namespace(&second)
+        .expect("the second reserved namespace can be inspected separately")
+        .expect("the second namespace still exists");
+    assert_eq!(second_usage.paths(), &second);
+    assert_eq!(second_usage.bytes(), 15);
 }
 
 #[test]

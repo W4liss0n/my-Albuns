@@ -13,7 +13,8 @@ use std::{
 use myalbuns_imaging_protocol::decode_event_stream;
 use myalbuns_imaging_protocol::{
     IMAGING_PROTOCOL_VERSION, ImagingCommand, ImagingEventStreamDecoder, ImagingFailureStage,
-    ImagingProgress, ImagingResponse, encode_command,
+    ImagingProgress, ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV,
+    PROCESSOR_HANDSHAKE_MAX_BYTES, decode_processor_handshake, encode_command,
     root_binding_plan_sha256 as digest_root_binding_plan,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
@@ -27,6 +28,7 @@ use tokio::sync::{Mutex as AsyncMutex, OwnedMutexGuard};
 use crate::{logging::LoggingState, processor_lifetime::ProcessorChildLifetime};
 
 const PROCESS_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
+const PROCESS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Default)]
 pub(crate) struct ImagingProcessor {
@@ -390,6 +392,7 @@ async fn invoke_once(
                 format!("A correlação da solicitação é inválida: {error}"),
             )
         })?;
+    let handshake_challenge = uuid::Uuid::new_v4().simple().to_string();
     let sidecar = app
         .shell()
         .sidecar("myalbuns-imaging")
@@ -401,6 +404,7 @@ async fn invoke_once(
             )
         })?
         .env(LOG_DIRECTORY_ENV, logging.directory())
+        .env(PROCESSOR_HANDSHAKE_CHALLENGE_ENV, &handshake_challenge)
         .set_raw_out(true);
     let (mut events, mut child) = sidecar.spawn().map_err(|error| {
         InvocationFailure::at_stage(
@@ -410,7 +414,32 @@ async fn invoke_once(
         )
     })?;
     let imaging_process_id = child.pid();
-    let mut processor_lifetime = match ProcessorChildLifetime::attach(imaging_process_id) {
+    let process_instance =
+        match receive_processor_handshake(&mut events, &handshake_challenge, imaging_process_id)
+            .await
+        {
+            Ok(process_instance) => process_instance,
+            Err(failure) if failure.termination_observed => return Err(failure),
+            Err(failure) => {
+                let handshake_message = failure.message;
+                match terminate_process(child, &mut events, imaging_process_id).await {
+                    Ok(kill_error) => {
+                        let message = kill_error.map_or(handshake_message.clone(), |kill_error| {
+                            format!(
+                                "{handshake_message}; o encerramento também falhou: {kill_error}"
+                            )
+                        });
+                        return Err(InvocationFailure::at_stage(
+                            InvocationFailureStage::SpawnSidecar,
+                            Some(imaging_process_id),
+                            message,
+                        ));
+                    }
+                    Err(failure) => return Err(failure),
+                }
+            }
+        };
+    let mut processor_lifetime = match ProcessorChildLifetime::attach(process_instance) {
         Ok(lifetime) => lifetime,
         Err(error) => {
             let containment_message =
@@ -561,6 +590,82 @@ async fn invoke_once(
     })
 }
 
+async fn receive_processor_handshake(
+    events: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    expected_challenge: &str,
+    process_id: u32,
+) -> Result<myalbuns_paths::ProcessInstanceId, InvocationFailure> {
+    tokio::time::timeout(PROCESS_HANDSHAKE_TIMEOUT, async {
+        let mut source = Vec::new();
+        loop {
+            let Some(event) = events.recv().await else {
+                return Err(InvocationFailure::at_stage(
+                    InvocationFailureStage::SpawnSidecar,
+                    Some(process_id),
+                    "O canal do Processador fechou antes do handshake de ciclo de vida.",
+                ));
+            };
+            match event {
+                CommandEvent::Stdout(bytes) => {
+                    if source.len().saturating_add(bytes.len()) > PROCESSOR_HANDSHAKE_MAX_BYTES {
+                        return Err(InvocationFailure::at_stage(
+                            InvocationFailureStage::SpawnSidecar,
+                            Some(process_id),
+                            "O handshake de ciclo de vida do Processador excedeu o limite.",
+                        ));
+                    }
+                    source.extend_from_slice(&bytes);
+                    if source.contains(&b'\n') {
+                        return decode_processor_handshake(
+                            &source,
+                            expected_challenge,
+                            process_id,
+                        )
+                        .map_err(|error| {
+                            InvocationFailure::at_stage(
+                                InvocationFailureStage::SpawnSidecar,
+                                Some(process_id),
+                                format!(
+                                    "O handshake de ciclo de vida do Processador é inválido: {error}"
+                                ),
+                            )
+                        });
+                    }
+                }
+                CommandEvent::Stderr(bytes) => {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        process_role = ProcessRole::DesktopHost.as_str(),
+                        process_id = std::process::id(),
+                        imaging_process_id = process_id,
+                        byte_count = bytes.len(),
+                        event = "imaging_handshake_stderr_received",
+                    );
+                }
+                CommandEvent::Error(error) => {
+                    return Err(InvocationFailure::at_stage(
+                        InvocationFailureStage::SpawnSidecar,
+                        Some(process_id),
+                        format!("O canal do handshake do Processador falhou: {error}"),
+                    ));
+                }
+                CommandEvent::Terminated(payload) => {
+                    return Err(InvocationFailure::terminated(process_id, payload.code));
+                }
+                _ => {}
+            }
+        }
+    })
+    .await
+    .unwrap_or_else(|_| {
+        Err(InvocationFailure::at_stage(
+            InvocationFailureStage::SpawnSidecar,
+            Some(process_id),
+            "O Processador não publicou o handshake de ciclo de vida dentro do limite.",
+        ))
+    })
+}
+
 async fn terminate_process(
     child: CommandChild,
     events: &mut tauri::async_runtime::Receiver<CommandEvent>,
@@ -646,13 +751,15 @@ mod tests {
     use myalbuns_imaging_protocol::{
         ImagingEvent, ImagingEventStreamDecoder, ImagingFailureStage, ImagingProgress,
         ImagingProgressStage, ImagingResponse, RenderCompletion, encode_event,
+        encode_processor_handshake,
     };
+    use myalbuns_paths::ProcessInstanceId;
     use tauri_plugin_shell::process::{CommandEvent, TerminatedPayload};
 
     use super::{
         ImagingProcessor, InvocationControl, InvocationFailure, InvocationFailureStage,
         complete_invocation, decode_and_report_event_chunk, protect_processor_after_invocation,
-        wait_for_termination_for,
+        receive_processor_handshake, wait_for_termination_for,
     };
 
     #[test]
@@ -826,6 +933,51 @@ mod tests {
                 !wait_for_termination_for(&mut events, Duration::from_millis(1)).await,
                 "an open event channel cannot make process reaping wait indefinitely"
             );
+        });
+    }
+
+    #[test]
+    fn fragmented_handshake_preserves_the_exact_process_instance() {
+        tauri::async_runtime::block_on(async {
+            let process = ProcessInstanceId::from_wire(47, 99).expect("the identity is valid");
+            let encoded = encode_processor_handshake("launch_47", process)
+                .expect("the handshake is encodable");
+            let split = encoded.len() / 2;
+            let (sender, mut events) = tauri::async_runtime::channel(2);
+            sender
+                .send(CommandEvent::Stdout(encoded[..split].to_vec()))
+                .await
+                .expect("the first raw chunk is delivered");
+            sender
+                .send(CommandEvent::Stdout(encoded[split..].to_vec()))
+                .await
+                .expect("the second raw chunk is delivered");
+
+            assert_eq!(
+                receive_processor_handshake(&mut events, "launch_47", 47)
+                    .await
+                    .expect("the fragmented handshake is decoded"),
+                process
+            );
+        });
+    }
+
+    #[test]
+    fn mismatched_handshake_fails_before_job_authority_is_acquired() {
+        tauri::async_runtime::block_on(async {
+            let process = ProcessInstanceId::from_wire(47, 99).expect("the identity is valid");
+            let encoded = encode_processor_handshake("another_launch", process)
+                .expect("the handshake is encodable");
+            let (sender, mut events) = tauri::async_runtime::channel(1);
+            sender
+                .send(CommandEvent::Stdout(encoded))
+                .await
+                .expect("the raw handshake is delivered");
+
+            let failure = receive_processor_handshake(&mut events, "launch_47", 47)
+                .await
+                .expect_err("a handshake from another launch is rejected");
+            assert_eq!(failure.stage, InvocationFailureStage::SpawnSidecar);
         });
     }
 
