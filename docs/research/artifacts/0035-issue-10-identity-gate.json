@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-18T05:02:44.0671698Z",
-    "gitCommit":  "6d6085b66b7571c0cf1b0ec2705935580c751a8e",
+    "collectedAtUtc":  "2026-08-18T05:53:27.9747004Z",
+    "gitCommit":  "9bb838178a5788041a548e6cabd57c175f56c2f6",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -15,6 +15,34 @@
                    },
                    {
                        "name":  "mixed-file-id-domains-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "zero-extended-file-id-sentinel-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "ones-extended-file-id-sentinel-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "legacy-file-id-provenance-fails-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "refs-and-unknown-legacy-ids-fail-closed",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unexpected-file-id-query-error-has-no-fallback",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "documented-ntfs-legacy-fallback-remains-authoritative",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unusable-lease-identity-never-focuses",
                        "passed":  true
                    },
                    {
@@ -67,12 +95,12 @@
                    }
                ],
     "evidence":  {
-                     "originalProjectId":  "f02357cb-aa77-4302-aa7c-49073c8b96d8",
-                     "promotedCopyProjectId":  "41ccf4ae-f928-4fb6-85d0-4d200919ee5f",
-                     "saveCopyAsProjectId":  "d92155b5-8c6c-4fc1-9a10-fa55273befc4",
+                     "originalProjectId":  "bf7d1135-fbb9-4969-98e0-55adf95fbe0a",
+                     "promotedCopyProjectId":  "07ed03eb-a5a4-41d3-b95d-c2a33c1055b3",
+                     "saveCopyAsProjectId":  "46f640e3-3db0-4cd8-aa7c-7474ed093bdb",
                      "ownerProcess":  {
-                                          "processId":  29064,
-                                          "creationTime":  134315029631801593
+                                          "processId":  33728,
+                                          "creationTime":  134315060062917048
                                       },
                      "mappedAliasOutcome":  "focusExisting",
                      "uncAliasOutcome":  "focusExisting",
