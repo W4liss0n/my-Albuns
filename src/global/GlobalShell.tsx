@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   Download,
@@ -81,27 +81,71 @@ export function GlobalShell({
     };
   }, [projectPort]);
 
-  const runOpening = async (
-    attempt: () => Promise<OpenProjectOutcome>,
-  ) => {
-    openingAttempt.current += 1;
-    setIsOpening(true);
-    const outcome = await attempt();
-    if (outcome.status === "failed") {
-      await projectPort.showLaunchFailure(outcome.error);
-    }
-    setIsOpening(false);
-  };
+  const runOpening = useCallback(
+    async (attempt: () => Promise<OpenProjectOutcome>) => {
+      openingAttempt.current += 1;
+      setIsOpening(true);
+      const outcome = await attempt();
+      if (outcome.status === "failed") {
+        await projectPort.showLaunchFailure(outcome.error);
+      }
+      setIsOpening(false);
+    },
+    [projectPort],
+  );
 
-  const openProject = () => runOpening(() => projectPort.openProject());
+  const openProject = useCallback(
+    () => runOpening(() => projectPort.openProject()),
+    [projectPort, runOpening],
+  );
 
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
 
-  const startCreation = () => {
+  const startCreation = useCallback(() => {
     openingAttempt.current += 1;
     setSurface("newProject");
-  };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !graphicsDiagnostic.supported ||
+      isOpening ||
+      surface !== "welcome"
+    ) {
+      return;
+    }
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (
+        !event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        event.repeat
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "n") {
+        event.preventDefault();
+        startCreation();
+      } else if (key === "o") {
+        event.preventDefault();
+        void openProject();
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [
+    graphicsDiagnostic.supported,
+    isOpening,
+    openProject,
+    startCreation,
+    surface,
+  ]);
 
   if (!graphicsDiagnostic.supported) {
     return <SafeApplicationShell diagnostic={graphicsDiagnostic} />;
@@ -142,7 +186,13 @@ export function GlobalShell({
               <p>Os Projetos abertos recentemente aparecerão aqui.</p>
             </div>
           ) : (
-            <ul aria-label="Projetos recentes" className="global-recent-list">
+            <ul
+              aria-label="Projetos recentes"
+              className="global-recent-list"
+              data-placeholder-feature="recent-project-visual-metadata"
+            >
+              {/* PLACEHOLDER UI: capas, fixação e metadados secundários vêm da
+                  referência visual, mas ainda não existem no contrato de recentes. */}
               {recentProjects.map((project, index) => (
                 <li key={project.id}>
                   <button
@@ -212,14 +262,14 @@ export function GlobalShell({
           <div className="global-secondary-actions">
             {/* PLACEHOLDER UI: ainda não existe uma porta de Exportação em lote. */}
             <button
-              aria-label="Exportar vários Álbuns de uma vez"
+              aria-label="Exportação em lote"
               data-placeholder-feature="batch-export"
               disabled
               title="A Exportação em lote ainda não está disponível"
               type="button"
             >
               <AppIcon icon={Download} size={14} />
-              <span>Exportar vários Álbuns de uma vez</span>
+              <span>Exportação em lote</span>
             </button>
           </div>
         </aside>

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -73,7 +73,7 @@ test("shows the global welcome surface without a Project workspace", () => {
     screen.getByRole("button", { name: "Abrir Projeto" }),
   ).toBeEnabled();
   const batchExportPlaceholder = screen.getByRole("button", {
-    name: "Exportar vários Álbuns de uma vez",
+    name: "Exportação em lote",
   });
   expect(batchExportPlaceholder).toBeDisabled();
   expect(batchExportPlaceholder).toHaveAttribute(
@@ -81,6 +81,29 @@ test("shows the global welcome surface without a Project workspace", () => {
     "batch-export",
   );
   expect(screen.queryByTestId("album-canvas")).not.toBeInTheDocument();
+});
+
+test("activates the Windows shortcuts displayed on welcome", async () => {
+  const user = userEvent.setup();
+  const openProject = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      newProjectPort={createNewProjectPortStub()}
+      projectPort={createProjectPort({ openProject })}
+    />,
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+  expect(
+    screen.getByRole("banner", { name: "Barra da janela" }),
+  ).toHaveTextContent("Novo Projeto");
+
+  await user.click(screen.getByRole("button", { name: "Cancelar" }));
+  fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
+
+  await waitFor(() => expect(openProject).toHaveBeenCalledOnce());
 });
 
 test("blocks Project hosts at the global graphics boundary when hardware WebGL2 is unavailable", async () => {
@@ -228,6 +251,10 @@ test("loads and renders recent Projects by name", async () => {
   expect(
     screen.getByRole("button", { name: "Álbum da Bia" }),
   ).toBeEnabled();
+  expect(screen.getByRole("list", { name: "Projetos recentes" })).toHaveAttribute(
+    "data-placeholder-feature",
+    "recent-project-visual-metadata",
+  );
   expect(screen.getAllByText("Aberto recentemente")).toHaveLength(2);
   expect(listRecentProjects).toHaveBeenCalledOnce();
 });

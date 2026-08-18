@@ -9,15 +9,12 @@ import {
   ProportionalPreviewViewport,
   type PreviewOutsideSurfaceAction,
 } from "./ProportionalPreviewViewport";
+import {
+  createNewProjectPreviewGeometry,
+  type NewProjectPreviewGeometry,
+} from "./newProjectPreviewGeometry";
 
 import "./NewProjectPreviewPanel.css";
-
-interface NewProjectPreviewGeometry {
-  bleedUm: number;
-  heightUm: number;
-  safetyUm: number;
-  widthUm: number;
-}
 
 interface NewProjectPreviewPanelProps {
   children(geometry: NewProjectPreviewGeometry): ReactNode;
@@ -32,12 +29,7 @@ export function NewProjectPreviewPanel({
   outsideSurfaceAction,
   surfaceLabel,
 }: NewProjectPreviewPanelProps) {
-  const geometry = {
-    bleedUm: draft.bleed.valueUm,
-    heightUm: Math.max(1, draft.sheetHeight.valueUm),
-    safetyUm: draft.safety.valueUm,
-    widthUm: Math.max(1, draft.closedSheetWidth.valueUm * 2),
-  } satisfies NewProjectPreviewGeometry;
+  const geometry = createNewProjectPreviewGeometry(draft);
 
   return (
     <section

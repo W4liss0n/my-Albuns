@@ -15,19 +15,29 @@ Cada tentativa fornece seu próprio `ProgressSink` ao componente. A janela somen
 
 Quando a operação conhece um total confiável, a janela mostra:
 
+- uma linha curta com a etapa ou unidade atual;
 - uma única barra de progresso geral;
-- uma contagem no formato `X/Y`.
+- a porcentagem concluída;
+- uma estimativa de tempo somente quando a operação oferece esse dado confiável.
 
 ```text
 ┌──────────────────────────────────────────────┐
 │  Exportando                                  │
 │                                              │
 │  ███████████████░░░░░░░░░░░░                │
-│  18/42                                       │
+│  43%                         cerca de 2 min   │
 └──────────────────────────────────────────────┘
 ```
 
-`X/Y` representa unidades concluídas sobre unidades totais conforme o tipo de operação.
+A linha de estado pode usar `X/Y` para a unidade própria da operação, como
+`Lâmina 18 de 42`. A janela não inventa tempo restante quando o produtor de
+progresso não consegue estimá-lo.
+
+## Progresso em lote
+
+O lote reutiliza a mesma barra geral e acrescenta somente um resumo compacto do
+conjunto: item atual, estado desse item, posição `X/Y` e uma síntese da fila. Não
+exibe uma tabela nem os trabalhos simultâneos.
 
 ## Cancelamento
 
@@ -53,11 +63,13 @@ A janela não mostra:
 
 - tabela de Projetos ou arquivos;
 - múltiplas barras;
-- nomes de trabalhos executados em paralelo;
-- contagens separadas de concluídos, ignorados ou com falha;
+- nomes de trabalhos executados em paralelo além do único item atual;
+- histórico ou lista item a item de concluídos, ignorados ou com falha;
 - detalhes técnicos de processos ou threads.
 
-A Exportação em lote usa o modo determinado com seu progresso geral e processa um Projeto por vez no MVP. `X` avança somente quando o item alcança estado concluído, ignorado ou falho; o componente não expõe o Checkpoint do lote.
+A Exportação em lote usa o modo de lote com seu progresso geral e processa um
+Projeto por vez no MVP. `X` avança somente quando o item alcança estado
+concluído, ignorado ou falho; o componente não expõe o Checkpoint do lote.
 
 A Limpeza total do Cache pode reutilizar o mesmo componente quando executada sem Projeto ou Processador ativo, inclusive na inicialização agendada. Ela não pausa Janelas ativas nem remove Cache em uso no MVP.
 

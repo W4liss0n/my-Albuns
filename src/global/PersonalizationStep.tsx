@@ -126,17 +126,14 @@ export function PersonalizationStep({
         }}
         surfaceLabel="Prévia do formato da Lâmina"
       >
-        {({ bleedUm, heightUm, safetyUm, widthUm }) => (
+        {(geometry) => (
           <>
             <PersonalizationPreview
-              bleedUm={bleedUm}
               frameGapUm={frameGapUm}
-              heightUm={heightUm}
+              geometry={geometry}
               hoveredScope={previewedScope}
               personalization={personalization}
-              safetyUm={safetyUm}
               focusedScope={focusedScope}
-              widthUm={widthUm}
             />
             <div
               aria-hidden="true"

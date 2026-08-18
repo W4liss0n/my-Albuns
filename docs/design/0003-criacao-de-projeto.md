@@ -178,7 +178,7 @@ A reprodução é somente visual: sua Lâmina, seus Frames e qualquer conteúdo 
 
 - a coluna esquerda, maior, mantém a reprodução da Lâmina;
 - a coluna direita contém os controles de Background, Overlay e Padrão dos Frames;
-- o rodapé fixo contém `Voltar`, `Cancelar` e `Criar`.
+- o rodapé fixo contém `Voltar`, `Cancelar` e `Criar Projeto`.
 
 Os controles podem rolar dentro de sua região quando necessário, sem retirar a reprodução da área visível. O rodapé também permanece acessível independentemente da rolagem.
 
@@ -192,14 +192,14 @@ Os controles podem rolar dentro de sua região quando necessário, sem retirar a
 │                                           │                      │
 │                                           │                      │
 ├───────────────────────────────────────────┴──────────────────────┤
-│  Cancelar                              Voltar         Criar      │
+│  Cancelar                         Voltar         Criar Projeto   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 O fluxo permite voltar à etapa anterior sem perder valores. `Cancelar` permanece
 isolado à esquerda do rodapé para reduzir encerramentos acidentais; `Voltar`
-fica agrupado à direita, imediatamente antes da ação principal `Criar`.
-`Cancelar` encerra a criação sem produzir arquivo. `Criar` existe na etapa final
+fica agrupado à direita, imediatamente antes da ação principal `Criar Projeto`.
+`Cancelar` encerra a criação sem produzir arquivo. `Criar Projeto` existe na etapa final
 e, depois de validar as duas etapas, abre o diálogo nativo do Windows.
 
 ## Nome e Localização

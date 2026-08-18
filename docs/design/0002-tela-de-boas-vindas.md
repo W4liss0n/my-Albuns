@@ -16,47 +16,58 @@ A tela oferece:
 - `Novo Projeto`, que inicia o fluxo de criação;
 - `Abrir Projeto`, que abre o seletor de arquivo do Windows;
 - `Projetos recentes`, para localizar e reabrir trabalhos conhecidos;
-- `Exportação em lote`, para selecionar e processar uma pasta com Projetos persistidos;
-- `Configurações`, para preferências do aplicativo e opções globais;
-- `Ajuda`, para acesso ao suporte e às informações do programa.
+- `Exportação em lote`, como placeholder visual desabilitado até existir a porta
+  que seleciona e processa uma pasta com Projetos persistidos.
+
+`Configurações` e `Ajuda` não aparecem nessa superfície enquanto seus fluxos
+globais não estiverem ligados à nova UI. A ausência é intencional: a referência
+visual aceita não reserva ações inertes para esses dois destinos.
 
 ## Hierarquia visual
 
-`Projetos recentes` é a área dominante e utiliza a maior parte da janela. Ao lado dela, um grupo de ações principais dá acesso imediato a:
+`Projetos recentes` é a área dominante e utiliza a maior parte da janela. Ao lado
+dela, o painel de entrada dá acesso imediato a:
 
 - `Novo Projeto`;
-- `Abrir Projeto`;
-- `Exportação em lote`.
+- `Abrir Projeto`.
 
-`Configurações` e `Ajuda` são ações secundárias e ocupam uma região inferior discreta, sem competir visualmente com a criação, a abertura ou a lista de trabalhos. `Configurações` abre a janela global descrita em [Configurações do aplicativo](0009-configuracoes-do-aplicativo.md); se ela já estiver aberta, apenas a focaliza.
+Depois de um divisor, `Exportação em lote` aparece como ação visualmente
+secundária. Essa hierarquia reproduz a referência aceita sem alterar o conceito
+canônico da operação.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
 │                            MyAlbuns                               │
 ├──────────────────────────────────────────┬───────────────────────┤
-│                                          │  Novo Projeto         │
-│           Projetos recentes              │  Abrir Projeto        │
-│              área principal              │  Exportação em lote   │
-│                                          │                       │
-├──────────────────────────────────────────┴───────────────────────┤
-│                                      Configurações · Ajuda       │
+│                                          │  MyAlbuns              │
+│           Projetos recentes              │  Novo Projeto         │
+│              cartões                     │  Abrir Projeto        │
+│                                          │  ─────────────────    │
+│                                          │  Exportação em lote   │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-O protótipo definirá proporções, espaçamentos e dimensões finais sem alterar essa hierarquia.
+As proporções, os espaçamentos e as dimensões seguem a referência visual aceita.
 
 ## Projetos recentes
 
-Os Projetos recentes aparecem em uma lista textual. Cada item expõe ao frontend
-somente o Nome do Projeto e uma Identidade opaca usada para solicitar sua
-reabertura. O pathname nativo permanece no armazenamento do backend e nunca é
-transportado como string Unicode para a interface.
+Os Projetos recentes aparecem em uma grade de cartões. Cada cartão reserva uma
+capa visual, o Nome do Projeto, metadados secundários e a indicação de abertura.
+Clicar em qualquer ponto do cartão abre o Projeto correspondente.
 
-Não há miniatura ou data no item da primeira versão. Clicar em qualquer ponto da linha abre o Projeto correspondente.
+O contrato real ainda expõe ao frontend somente o Nome do Projeto e uma
+Identidade opaca usada para solicitar sua reabertura. O pathname nativo permanece
+no armazenamento do backend e nunca é transportado como string Unicode para a
+interface. Enquanto capa, fixação e metadados não existirem nesse contrato, esses
+trechos do cartão são placeholders de reprodução e permanecem marcados no código
+com `PLACEHOLDER UI` e `data-placeholder-feature`.
 
 A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
 para o topo somente depois que o Host independente confirma `Ready`; cancelamento
 ou falha anterior não cria nem reordena o item.
+
+Os atalhos Windows `Ctrl+N` e `Ctrl+O` aparecem junto às ações e acionam,
+respectivamente, `Novo Projeto` e `Abrir Projeto`; não são legendas decorativas.
 
 ## Relação com as Janelas de Projeto
 

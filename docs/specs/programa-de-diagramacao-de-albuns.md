@@ -459,13 +459,14 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 ### Tela de Boas-vindas
 
 - A janela visível do processo principal `MyAlbuns.exe` é uma Tela de Boas-vindas separada das Janelas de Projeto e não contém Canvas ou estado criativo.
-- A primeira versão oferece seis entradas principais: `Novo Projeto`, `Abrir Projeto`, `Projetos recentes`, `Exportação em lote`, `Configurações` e `Ajuda`.
+- A primeira versão da nova UI oferece `Novo Projeto`, `Abrir Projeto`, `Projetos recentes` e `Exportação em lote`. `Configurações` e `Ajuda` não aparecem nessa superfície até que seus fluxos globais sejam ligados sem introduzir ações inertes fora da referência aceita.
 - `Projetos recentes` ocupa a região principal e mais ampla da janela.
-- `Novo Projeto`, `Abrir Projeto` e `Exportação em lote` formam um grupo de ações principais ao lado dos recentes; `Configurações` e `Ajuda` aparecem como ações secundárias na região inferior.
-- Cada Projeto recente é uma linha textual com o Nome do Projeto em destaque e o caminho completo abaixo, em tamanho menor; a primeira versão não mostra miniatura ou data.
-- Clicar em qualquer ponto do item solicita a abertura do Projeto correspondente.
+- `Novo Projeto` e `Abrir Projeto` formam o grupo principal no painel lateral; `Exportação em lote` aparece depois de um divisor como ação visualmente secundária e permanece um placeholder desabilitado enquanto não existir sua porta de aplicação.
+- Cada Projeto recente é um cartão com capa visual, Nome do Projeto, metadados secundários e indicação de abertura. Somente Nome e Identidade opaca vêm do contrato real; capa, fixação e metadados permanecem placeholders explicitamente marcados no código até esse contrato existir. O pathname nativo não é enviado ao frontend.
+- Clicar em qualquer ponto do cartão solicita a abertura do Projeto correspondente.
 - A lista é ordenada pela abertura mais recente; abrir um Projeto por qualquer fluxo move sua entrada imediatamente para o topo.
 - `Novo Projeto` inicia o fluxo de criação; `Abrir Projeto` usa o diálogo do sistema operacional; `Projetos recentes` permite reabrir trabalhos conhecidos pelo aplicativo.
+- Os atalhos Windows visíveis `Ctrl+N` e `Ctrl+O` acionam `Novo Projeto` e `Abrir Projeto` enquanto a Tela de Boas-vindas está ativa.
 - `Exportação em lote` pode começar na Tela de Boas-vindas porque encontra Projetos persistidos em uma pasta e não depende do estado de uma sessão aberta.
 - A Geração de Projetos em lote permanece exclusivamente na Janela do Projeto usado como modelo e não aparece na Tela de Boas-vindas.
 - Abrir o primeiro Projeto oculta a Tela de Boas-vindas sem encerrar o `MyAlbuns.exe`; fechada a última Janela de Projeto, a Tela reaparece.
@@ -526,16 +527,17 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Mover o ponteiro sem clicar muda somente essa pré-seleção transitória da reprodução; não muda o escopo configurado nem o conteúdo de Background ou Overlay.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.
-- `Cancelar` permanece isolado à esquerda do rodapé fixo; `Voltar` fica agrupado à direita, imediatamente antes de `Criar`. Se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.
-- O Nome e a Localização do arquivo não aparecem nessas etapas. Somente `Criar`, na etapa final, abre o diálogo nativo do Windows para escolhê-los.
+- `Cancelar` permanece isolado à esquerda do rodapé fixo; `Voltar` fica agrupado à direita, imediatamente antes de `Criar Projeto`. Se os controles precisarem rolar, a reprodução e o rodapé continuam visíveis.
+- O Nome e a Localização do arquivo não aparecem nessas etapas. Somente `Criar Projeto`, na etapa final, abre o diálogo nativo do Windows para escolhê-los.
 - Cancelar o diálogo nativo não cria arquivo e retorna ao fluxo do aplicativo preservando todos os valores preenchidos.
 
 ### Estrutura da interface
 
 - Toda operação que precisa de uma janela de progresso usa a mesma representação minimalista.
-- Com total conhecido, ela mostra somente uma barra geral e `X/Y`; sem total confiável, usa barra animada indeterminada e omite a contagem.
+- Com total conhecido, ela mostra uma linha curta de estado, uma barra geral, porcentagem e uma estimativa de tempo somente quando confiável; a própria linha pode expressar a unidade como `X/Y`. Sem total confiável, usa barra animada indeterminada e omite porcentagem, contagem e estimativa.
+- O modo de lote reutiliza a barra geral e mostra somente item atual, estado desse item, posição `X/Y` e uma síntese compacta da fila; não exibe tabela nem trabalhos simultâneos.
 - `Cancelar` é a única ação opcional e só aparece quando a operação suporta interrupção segura; operações não canceláveis não mostram esse botão.
-- A janela não apresenta tabela por Projeto, múltiplas barras, lista de trabalhos simultâneos ou contagens separadas por status.
+- A janela não apresenta tabela por Projeto, múltiplas barras, lista de trabalhos simultâneos ou histórico item a item.
 - A janela de progresso nunca se transforma em resumo: sucesso integral a fecha e mostra uma confirmação curta; ignorados ou falhas abrem a Tela de Problemas com Projeto, Resultado e ações.
 - A Janela do Projeto possui uma barra de menus superior com os grupos iniciais `Arquivo`, `Editar`, `Lâmina`, `Exibir`, `Ferramentas` e `Ajuda`.
 - `Lâmina` oferece `Adicionar antes`, `Adicionar depois`, `Duplicar Lâmina`, `Excluir` e `Converter extremidade`, usando a Lâmina mais centralizada como alvo.
@@ -1056,7 +1058,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A Exportação em lote usa exclusivamente o estado persistido dos arquivos, mesmo quando um Projeto está aberto com mudanças não salvas. Correções criativas feitas por `Abrir Projeto` precisam ser salvas antes de uma nova verificação; o mapa temporário de Religação é a única exceção.
 - Imediatamente antes de criar o snapshot imutável de um item, o lote reabre o Projeto pelo núcleo compartilhado, confere sua revisão ou hash persistido contra a versão pré-validada e repete a validação se o arquivo mudou.
 - Durante toda a Exportação em lote, uma concessão global exclusiva permanece ativa e o Cache permanece pausado: todas as janelas de Projeto ficam indisponíveis, trabalhos de Cache são interrompidos em ponto seguro e somente a janela de progresso e cancelamento do lote permanece interativa.
-- O progresso do lote usa somente a barra geral e `X/Y`, sem expor a tabela de Projetos, quais estão simultaneamente ativos ou contadores separados de concluídos, ignorados e falhas durante o processamento.
+- O progresso do lote usa a barra geral, o Projeto atual, seu estado, a posição `X/Y` e uma síntese compacta da fila, sem expor a tabela de Projetos, trabalhos simultaneamente ativos ou histórico item a item durante o processamento.
 - Nenhuma Exportação normal, edição, Salvamento, abertura ou fechamento de Projeto pode começar enquanto o Modo de lote exclusivo estiver ativo.
 - Concluir, falhar ou cancelar o lote libera a concessão e a pausa, reabilita todas as janelas e permite retomar os trabalhos de Cache, sem salvar ou alterar automaticamente qualquer Projeto aberto.
 - O MVP processa exatamente um Projeto por vez, em ordem determinística, sem Perfil de desempenho, calibração ou paralelismo entre Álbuns. Paralelismo só pode ser reconsiderado depois de medições representativas.

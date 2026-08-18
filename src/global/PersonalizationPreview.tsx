@@ -5,29 +5,25 @@ import type {
   PersonalizationScope,
 } from "./application/newProjectPersonalization";
 import { draftFrameBorderFillRects } from "./application/draftFrameBorderGeometry";
+import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
 
 interface PersonalizationPreviewProps {
-  bleedUm: number;
   focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   frameGapUm: number;
-  heightUm: number;
+  geometry: NewProjectPreviewGeometry;
   hoveredScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   personalization: NewProjectPersonalizationDraft;
-  safetyUm: number;
-  widthUm: number;
 }
 
 export function PersonalizationPreview({
-  bleedUm,
   focusedScope,
   frameGapUm,
-  heightUm,
+  geometry,
   hoveredScope,
   personalization,
-  safetyUm,
-  widthUm,
 }: PersonalizationPreviewProps) {
+  const { heightUm, widthUm } = geometry;
   const pageWidth = widthUm / 2;
   const pageDescriptors = [
     { pageIndex: 0, side: "esquerdo", x: 0 },
@@ -251,12 +247,7 @@ export function PersonalizationPreview({
           {...focusOutline}
         />
       ) : null}
-      <SheetGuideLayer
-        bleedUm={bleedUm}
-        heightUm={heightUm}
-        safetyUm={safetyUm}
-        widthUm={widthUm}
-      />
+      <SheetGuideLayer geometry={geometry} />
     </svg>
   );
 }

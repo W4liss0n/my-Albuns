@@ -1,15 +1,11 @@
+import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
+
 interface SheetGuideLayerProps {
-  bleedUm: number;
-  heightUm: number;
-  safetyUm: number;
-  widthUm: number;
+  geometry: NewProjectPreviewGeometry;
 }
 
 export function SheetGuideLayer({
-  bleedUm,
-  heightUm,
-  safetyUm,
-  widthUm,
+  geometry: { bleedUm, heightUm, safetyUm, widthUm },
 }: SheetGuideLayerProps) {
   const smallestSide = Math.min(widthUm, heightUm);
   const bleed = Math.max(0, Math.min(bleedUm, smallestSide / 4));
