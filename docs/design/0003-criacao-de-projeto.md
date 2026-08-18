@@ -138,13 +138,16 @@ uma segunda estrutura visual nem outra regra de dimensionamento.
 
 Qualquer alteração nesses controles atualiza a reprodução imediatamente. As imagens provisórias escolhidas para Background ou Overlay também são compostas na prévia antes da criação do Projeto.
 
-A reprodução reutiliza as regiões clicáveis da seleção espacial de `Design do
-Álbum`: clicar no lado esquerdo, no lado direito ou na região central fixa o
-escopo selecionado. Cada lado fora da seleção fixa recebe uma atenuação neutra
+A reprodução divide a própria Lâmina em duas regiões clicáveis, uma para o lado
+esquerdo e outra para o lado direito. Clicar no espaço vazio da área de prévia,
+fora da Lâmina, fixa `Ambos os lados`; a região central da Lâmina não constitui
+um terceiro alvo. Cada lado fora da seleção fixa recebe uma atenuação neutra
 translúcida sobre toda a superfície. O hover reduz essa atenuação no escopo
 candidato e o cobre com uma tonalidade neutra compartilhada pelo tema, sem
-desenhar contorno nem alterar o contraste individual dos Frames. Mover o
-ponteiro nunca oculta, substitui ou modifica a seleção fixa.
+desenhar contorno nem alterar o contraste individual dos Frames. Um lado que já
+pertence à seleção fixa nunca recebe hover; quando `Ambos os lados` está fixado,
+nenhum lado apresenta pré-seleção. Mover o ponteiro nunca oculta, substitui ou
+modifica a seleção fixa.
 
 A seleção usa um contorno azul sólido desenhado integralmente para fora da
 superfície do escopo, mantém sua superfície com presença total e seus Frames com

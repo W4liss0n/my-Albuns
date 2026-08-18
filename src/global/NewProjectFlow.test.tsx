@@ -333,7 +333,91 @@ test("formats the placeholder Frame spacing in the configured Unit", async () =>
   expect(screen.getByText("0.6 cm")).toBeVisible();
 });
 
-test("hover fills the candidate sheet area without changing the fixed scope", async () => {
+test("does not hover a side that already belongs to the fixed scope", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
+  const right = screen.getByRole("button", { name: "Lado direito" });
+  fireEvent.pointerEnter(left);
+  expect(
+    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toBeInTheDocument();
+
+  await user.click(left);
+  fireEvent.pointerEnter(left);
+  expect(
+    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toBeInTheDocument();
+
+  fireEvent.pointerEnter(right);
+  expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
+    "fill",
+    "var(--ui-text-muted)",
+  );
+});
+
+test("selects both sides from the preview area outside the sheet", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const sheetSurface = await screen.findByLabelText(
+    "Prévia do formato da Lâmina",
+  );
+  const both = screen.getByRole("button", { name: "Ambos os lados" });
+  expect(
+    within(sheetSurface).queryByRole("button", { name: "Ambos os lados" }),
+  ).not.toBeInTheDocument();
+  const sideControls = within(sheetSurface).getByRole("group", {
+    name: "Escopo da personalização",
+  });
+  expect(within(sideControls).getAllByRole("button")).toHaveLength(2);
+  expect(
+    within(sideControls).getByRole("button", { name: "Lado esquerdo" }),
+  ).toBeVisible();
+  expect(
+    within(sideControls).getByRole("button", { name: "Lado direito" }),
+  ).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Lado esquerdo" }));
+  expect(both).toHaveAttribute("aria-pressed", "false");
+  both.focus();
+  await waitFor(() =>
+    expect(
+      screen.getByLabelText("Foco de teclado de ambos os lados"),
+    ).toHaveAttribute("stroke", "#73A9CE"),
+  );
+  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+    "fill-opacity",
+    "0.15",
+  );
+  both.blur();
+  await waitFor(() =>
+    expect(
+      screen.queryByLabelText("Foco de teclado de ambos os lados"),
+    ).not.toBeInTheDocument(),
+  );
+  await user.click(both);
+  expect(both).toHaveAttribute("aria-pressed", "true");
+});
+
+test("hover fills only an unselected candidate without changing the fixed scope", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
 
@@ -350,27 +434,16 @@ test("hover fills the candidate sheet area without changing the fixed scope", as
     name: "Ambos os lados",
   });
   const left = screen.getByRole("button", { name: "Lado esquerdo" });
+  const right = screen.getByRole("button", { name: "Lado direito" });
   expect(both).toHaveAttribute("aria-pressed", "true");
   expect(screen.queryAllByLabelText(/Atenuação do lado/)).toHaveLength(0);
 
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
   expect(both).toHaveAttribute("aria-pressed", "true");
-  const hoverFill = screen
-    .getByLabelText("Pré-seleção do lado esquerdo")
-    .getAttribute("fill");
-  expect(hoverFill).toBe("var(--ui-text-muted)");
-  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "fill-opacity",
-    "0.08",
-  );
-  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "stroke",
-    "none",
-  );
   expect(
-    screen.getByLabelText("Pré-seleção do lado esquerdo"),
-  ).not.toHaveAttribute("stroke-dasharray");
+    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toBeInTheDocument();
   expect(document.querySelector(".new-project-fixed-selection")).toHaveClass(
     "new-project-fixed-selection--both",
   );
@@ -396,6 +469,19 @@ test("hover fills the candidate sheet area without changing the fixed scope", as
   ).not.toBeInTheDocument();
   await user.click(left);
   expect(left).toHaveAttribute("aria-pressed", "true");
+  fireEvent.pointerEnter(right);
+  const hoverFill = screen
+    .getByLabelText("Pré-seleção do lado direito")
+    .getAttribute("fill");
+  expect(hoverFill).toBe("var(--ui-text-muted)");
+  expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
+    "fill-opacity",
+    "0.08",
+  );
+  expect(screen.getByLabelText("Pré-seleção do lado direito")).toHaveAttribute(
+    "stroke",
+    "none",
+  );
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
     target: { value: "#abcdef" },
   });
@@ -512,10 +598,9 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   );
   fireEvent.pointerEnter(left);
   expect(left).not.toHaveAttribute("data-highlighted");
-  expect(screen.getByLabelText("Pré-seleção do lado esquerdo")).toHaveAttribute(
-    "stroke",
-    "none",
-  );
+  expect(
+    screen.queryByLabelText("Pré-seleção do lado esquerdo"),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByLabelText("Foco de teclado do lado direito"),
   ).toHaveAttribute("fill", "none");

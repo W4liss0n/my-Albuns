@@ -5,7 +5,10 @@ import {
   formatMicrometers,
   type NewProjectDimensionsDraft,
 } from "./application/newProjectDimensions";
-import { ProportionalPreviewViewport } from "./ProportionalPreviewViewport";
+import {
+  ProportionalPreviewViewport,
+  type PreviewOutsideSurfaceAction,
+} from "./ProportionalPreviewViewport";
 
 import "./NewProjectPreviewPanel.css";
 
@@ -19,12 +22,14 @@ interface NewProjectPreviewGeometry {
 interface NewProjectPreviewPanelProps {
   children(geometry: NewProjectPreviewGeometry): ReactNode;
   draft: NewProjectDimensionsDraft;
+  outsideSurfaceAction?: PreviewOutsideSurfaceAction;
   surfaceLabel?: string;
 }
 
 export function NewProjectPreviewPanel({
   children,
   draft,
+  outsideSurfaceAction,
   surfaceLabel,
 }: NewProjectPreviewPanelProps) {
   const geometry = {
@@ -56,6 +61,7 @@ export function NewProjectPreviewPanel({
       <ProportionalPreviewViewport
         height={geometry.heightUm}
         label={surfaceLabel}
+        outsideSurfaceAction={outsideSurfaceAction}
         width={geometry.widthUm}
       >
         {children(geometry)}

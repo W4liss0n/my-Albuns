@@ -50,6 +50,11 @@ export function PersonalizationStep({
   const [hoveredScope, setHoveredScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
+  const previewedScope =
+    personalization.fixedScope === "both" ||
+    personalization.fixedScope === hoveredScope
+      ? null
+      : hoveredScope;
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
   // persistência; a medida física controla somente a reprodução desta etapa.
   const [frameGapUm, setFrameGapUm] = useState(6_000);
@@ -111,6 +116,14 @@ export function PersonalizationStep({
     <div className="new-project-content new-project-personalization">
       <NewProjectPreviewPanel
         draft={draft}
+        outsideSurfaceAction={{
+          label: "Ambos os lados",
+          onFocusChange: (focused) =>
+            setFocusedScope(focused ? "both" : null),
+          onPress: () =>
+            onChange(fixPersonalizationScope(personalization, "both")),
+          pressed: personalization.fixedScope === "both",
+        }}
         surfaceLabel="Prévia do formato da Lâmina"
       >
         {({ bleedUm, heightUm, safetyUm, widthUm }) => (
@@ -119,7 +132,7 @@ export function PersonalizationStep({
               bleedUm={bleedUm}
               frameGapUm={frameGapUm}
               heightUm={heightUm}
-              hoveredScope={hoveredScope}
+              hoveredScope={previewedScope}
               personalization={personalization}
               safetyUm={safetyUm}
               focusedScope={focusedScope}
@@ -137,7 +150,6 @@ export function PersonalizationStep({
               {(
                 [
                   ["left", "Lado esquerdo"],
-                  ["both", "Ambos os lados"],
                   ["right", "Lado direito"],
                 ] as const
               ).map(([scope, label]) => (
