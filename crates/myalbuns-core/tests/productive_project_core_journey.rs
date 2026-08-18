@@ -31,9 +31,13 @@ fn productive_project_core_journey_rejects_stale_save_and_reopens_with_empty_his
         .expect("CreateOnly publishes and owns one productive Project");
     assert_eq!(project.revision(), 0);
     assert_eq!(project.saved_revision(), 0);
+    let project_id = project.project_id();
     assert!(matches!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path))),
-        Err(OpenProjectError::ProjectInUse)
+        Err(OpenProjectError::FocusExisting {
+            project_id: focused_id,
+            owner_process_id,
+        }) if focused_id == project_id && owner_process_id == std::process::id()
     ));
 
     let applied = project

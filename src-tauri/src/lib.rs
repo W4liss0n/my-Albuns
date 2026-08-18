@@ -94,8 +94,8 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
     use std::io;
 
     use project_bootstrap::{
-        FailureCode, FailureStage, HostTerminal, bootstrap_host_project, read_bootstrap_request,
-        write_host_terminal,
+        FailureCode, FailureStage, HostBootstrap, HostTerminal, bootstrap_host_project_or_pending,
+        read_bootstrap_request, read_save_external_copy_request, write_host_terminal,
     };
 
     let request = match read_bootstrap_request(io::stdin().lock()) {
@@ -118,8 +118,28 @@ fn run_project_host() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    match bootstrap_host_project(request, &app_paths) {
-        Ok(opened) => product_runtime::run(opened, app_paths),
+    match bootstrap_host_project_or_pending(request, &app_paths) {
+        Ok(HostBootstrap::Ready(opened)) => product_runtime::run(opened, app_paths),
+        Ok(HostBootstrap::ExternalCopyNotWritable(pending)) => {
+            write_host_terminal(io::stdout().lock(), &pending.terminal())?;
+            let continuation = match read_save_external_copy_request(io::stdin().lock()) {
+                Ok(continuation) => continuation,
+                Err(_) => {
+                    write_host_terminal(
+                        io::stdout().lock(),
+                        &pending.invalid_continuation_terminal(),
+                    )?;
+                    return Ok(());
+                }
+            };
+            match pending.save_copy_as(continuation) {
+                Ok(opened) => product_runtime::run(opened, app_paths),
+                Err(terminal) => {
+                    write_host_terminal(io::stdout().lock(), &terminal)?;
+                    Ok(())
+                }
+            }
+        }
         Err(terminal) => {
             write_host_terminal(io::stdout().lock(), &terminal)?;
             Ok(())

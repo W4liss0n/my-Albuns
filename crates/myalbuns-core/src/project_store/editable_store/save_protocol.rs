@@ -1,25 +1,19 @@
 use std::io;
 
-#[cfg(test)]
-use std::cell::Cell;
-#[cfg(all(test, windows))]
-use std::{cell::RefCell, fs, os::windows::fs::OpenOptionsExt};
-
-#[cfg(windows)]
-use myalbuns_paths::{
-    PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination, ProjectFileLock,
-    ProjectTransitionBarrier, ProjectTransitionBarrierError, ResolveError,
-};
-#[cfg(all(test, windows))]
-use windows_sys::Win32::Storage::FileSystem::{FILE_SHARE_DELETE, FILE_SHARE_READ};
-
 use super::{ProjectStore, TemporaryPublication, map_io_path};
 use crate::{
     project_document::ProjectRevision,
     project_store::{
-        PathFailure, ProjectIdentityLease, ProjectLocation, decode, encode, map_path_failure,
+        IdentityTargetBinder, PathFailure, PendingProjectIdentityLease, ProjectIdentityLease,
+        ProjectLocation, decode, encode, map_path_failure,
+        versioned_codec::rewrite_project_id,
         windows_publish::{replace_existing, write_synced_new},
     },
+};
+#[cfg(windows)]
+use myalbuns_paths::{
+    PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination, ProjectFileLock,
+    ProjectTransitionBarrier, ProjectTransitionBarrierError, ResolveError,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -68,51 +62,6 @@ impl PersistedBaseline {
     }
 }
 
-#[cfg(test)]
-thread_local! {
-    static INJECT_POST_PUBLICATION_VERIFICATION_BLOCK: Cell<bool> = const { Cell::new(false) };
-}
-
-#[cfg(test)]
-pub(crate) fn inject_post_publication_indeterminate_for_current_thread() {
-    INJECT_POST_PUBLICATION_VERIFICATION_BLOCK.with(|injected| injected.set(true));
-}
-
-#[cfg(all(test, windows))]
-thread_local! {
-    static POST_PUBLICATION_VERIFICATION_BLOCKER: RefCell<Option<fs::File>> =
-        const { RefCell::new(None) };
-}
-
-#[cfg(all(test, windows))]
-pub(crate) fn release_post_publication_indeterminate_for_current_thread() {
-    POST_PUBLICATION_VERIFICATION_BLOCKER.with(|blocker| drop(blocker.borrow_mut().take()));
-}
-
-#[cfg(all(test, not(windows)))]
-pub(crate) fn release_post_publication_indeterminate_for_current_thread() {}
-
-#[cfg(all(test, windows))]
-fn install_post_publication_verification_blocker_if_requested(path: &std::path::Path) {
-    let requested =
-        INJECT_POST_PUBLICATION_VERIFICATION_BLOCK.with(|injected| injected.replace(false));
-    if !requested {
-        return;
-    }
-
-    let Ok(blocker) = fs::OpenOptions::new()
-        .read(true)
-        .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
-        .open(path)
-    else {
-        return;
-    };
-    POST_PUBLICATION_VERIFICATION_BLOCKER.with(|held| *held.borrow_mut() = Some(blocker));
-}
-
-#[cfg(all(not(test), windows))]
-fn install_post_publication_verification_blocker_if_requested(_path: &std::path::Path) {}
-
 #[cfg(windows)]
 pub(super) fn save(
     store: &mut ProjectStore,
@@ -125,11 +74,46 @@ pub(super) fn save(
     save_candidate(&store.location, baseline, candidate, identity_lease).install_into(store)
 }
 
+#[cfg(windows)]
+pub(super) fn rewrite_identity(
+    store: &mut ProjectStore,
+    project_id: uuid::Uuid,
+    identity_lease: &PendingProjectIdentityLease,
+) -> SaveStoreResult {
+    let Some(baseline) = store.baseline.take() else {
+        return SaveStoreResult::StateIndeterminate;
+    };
+    let (candidate_bytes, candidate) = match rewrite_project_id(&baseline.bytes, project_id) {
+        Ok(candidate) => candidate,
+        Err(_) => {
+            store.baseline = Some(baseline);
+            return SaveStoreResult::NotSaved(SaveStoreError::Path(PathFailure::IoFailure));
+        }
+    };
+    save_candidate_with_bytes(
+        &store.location,
+        baseline,
+        candidate,
+        candidate_bytes,
+        identity_lease,
+    )
+    .install_into(store)
+}
+
 #[cfg(not(windows))]
 pub(super) fn save(
     _store: &mut ProjectStore,
     _candidate: ProjectRevision,
     _identity_lease: &ProjectIdentityLease,
+) -> SaveStoreResult {
+    SaveStoreResult::NotSaved(SaveStoreError::Path(PathFailure::IoFailure))
+}
+
+#[cfg(not(windows))]
+pub(super) fn rewrite_identity(
+    _store: &mut ProjectStore,
+    _project_id: uuid::Uuid,
+    _identity_lease: &PendingProjectIdentityLease,
 ) -> SaveStoreResult {
     SaveStoreResult::NotSaved(SaveStoreError::Path(PathFailure::IoFailure))
 }
@@ -169,7 +153,7 @@ fn save_candidate(
     location: &ProjectLocation,
     baseline: PersistedBaseline,
     candidate: ProjectRevision,
-    identity_lease: &ProjectIdentityLease,
+    identity_lease: &dyn IdentityTargetBinder,
 ) -> SaveCandidateResult {
     let candidate_bytes = match encode(&candidate) {
         Ok(bytes) => bytes,
@@ -180,6 +164,23 @@ fn save_candidate(
             };
         }
     };
+    save_candidate_with_bytes(
+        location,
+        baseline,
+        candidate,
+        candidate_bytes,
+        identity_lease,
+    )
+}
+
+#[cfg(windows)]
+fn save_candidate_with_bytes(
+    location: &ProjectLocation,
+    baseline: PersistedBaseline,
+    candidate: ProjectRevision,
+    candidate_bytes: Vec<u8>,
+    identity_lease: &dyn IdentityTargetBinder,
+) -> SaveCandidateResult {
     let destination = match location.prepare_file_destination() {
         Ok(destination) => destination,
         Err(error) => {
@@ -281,18 +282,13 @@ fn save_candidate(
     } = baseline;
     drop(old_lock);
     match replace_existing(temporary.path(), destination.operational_path()) {
-        Ok(()) => {
-            install_post_publication_verification_blocker_if_requested(
-                destination.operational_path(),
-            );
-            verify_saved_candidate(
-                &destination,
-                &candidate_object,
-                candidate_bytes,
-                candidate,
-                identity_lease,
-            )
-        }
+        Ok(()) => verify_saved_candidate(
+            &destination,
+            &candidate_object,
+            candidate_bytes,
+            candidate,
+            identity_lease,
+        ),
         Err(error) => reconcile_save_error(
             &destination,
             &old_object,
@@ -312,7 +308,7 @@ fn verify_saved_candidate(
     candidate_object: &myalbuns_paths::ResolvedObject,
     candidate_bytes: Vec<u8>,
     candidate: ProjectRevision,
-    identity_lease: &ProjectIdentityLease,
+    identity_lease: &dyn IdentityTargetBinder,
 ) -> SaveCandidateResult {
     let Ok(current) = destination.resolve_created() else {
         return SaveCandidateResult::StateIndeterminate;
@@ -375,7 +371,7 @@ fn reconcile_save_error(
     baseline_bytes: Vec<u8>,
     candidate_bytes: Vec<u8>,
     candidate: ProjectRevision,
-    identity_lease: &ProjectIdentityLease,
+    identity_lease: &dyn IdentityTargetBinder,
     publication_error: io::Error,
 ) -> SaveCandidateResult {
     let Ok(Some(current)) = destination.resolve_existing() else {

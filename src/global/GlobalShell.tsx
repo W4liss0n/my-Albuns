@@ -21,6 +21,7 @@ export function GlobalShell({
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [externalCopyPending, setExternalCopyPending] = useState(false);
   const [failure, setFailure] = useState<OpenProjectFailure | null>(null);
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
@@ -68,9 +69,12 @@ export function GlobalShell({
     openingAttempt.current += 1;
     setIsOpening(true);
     setFailure(null);
+    setExternalCopyPending(false);
     const outcome = await attempt();
     if (outcome.status === "failed") {
       setFailure(outcome.error);
+    } else if (outcome.status === "externalCopyNotWritable") {
+      setExternalCopyPending(true);
     }
     setIsOpening(false);
   };
@@ -79,6 +83,17 @@ export function GlobalShell({
 
   const openRecentProject = (id: string) =>
     runOpening(() => projectPort.openRecentProject(id));
+
+  const saveExternalCopyAs = async () => {
+    setIsOpening(true);
+    setFailure(null);
+    const outcome = await projectPort.saveExternalCopyAs();
+    if (outcome.status === "failed") {
+      setFailure(outcome.error);
+    }
+    setExternalCopyPending(false);
+    setIsOpening(false);
+  };
 
   const startCreation = () => {
     openingAttempt.current += 1;
@@ -152,6 +167,22 @@ export function GlobalShell({
               <h2>Não foi possível abrir o Projeto</h2>
               <p>{failure.message}</p>
               {failure.action ? <p>{failure.action}</p> : null}
+            </section>
+          ) : null}
+          {externalCopyPending ? (
+            <section className="global-copy-resolution">
+              <h2>Cópia externa somente leitura</h2>
+              <p>
+                O arquivo original será preservado. Escolha outro local para
+                criar uma cópia editável com Identidade própria.
+              </p>
+              <button
+                disabled={isOpening || isCreating}
+                onClick={() => void saveExternalCopyAs()}
+                type="button"
+              >
+                {isOpening ? "Salvando cópia…" : "Salvar cópia como…"}
+              </button>
             </section>
           ) : null}
         </aside>

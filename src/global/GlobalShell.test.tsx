@@ -48,6 +48,7 @@ function createProjectPort(
     releaseProvisionalDecorative: async () => undefined,
     clearProvisionalDecoratives: async () => undefined,
     openProject: async () => ({ status: "cancelled" }),
+    saveExternalCopyAs: async () => ({ status: "cancelled" }),
     listRecentProjects: async () => [],
     openRecentProject: async () => ({ status: "cancelled" }),
     startupOpenFailure: async () => null,
@@ -267,6 +268,45 @@ test("shows an actionable structured failure without exposing a pathname", async
   expect(
     screen.getByRole("button", { name: "Tentar novamente" }),
   ).toBeEnabled();
+  expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
+});
+
+test("offers Salvar cópia como for a validated read-only external copy", async () => {
+  const user = userEvent.setup();
+  const openProject = vi.fn(async () => ({
+    status: "externalCopyNotWritable" as const,
+  }));
+  const saveExternalCopyAs = vi.fn(async () => ({
+    status: "cancelled" as const,
+  }));
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({
+        openProject,
+        saveExternalCopyAs,
+      })}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+
+  expect(
+    await screen.findByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).toBeInTheDocument();
+  const saveCopy = screen.getByRole("button", {
+    name: "Salvar cópia como…",
+  });
+  await user.click(saveCopy);
+
+  expect(saveExternalCopyAs).toHaveBeenCalledOnce();
+  expect(
+    screen.queryByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
 });
 

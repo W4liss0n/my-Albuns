@@ -717,12 +717,15 @@ fn creates_a_neutral_v1_project_and_reopens_it_as_a_clean_editable_session() {
     assert!(!bytes.starts_with(&[0xEF, 0xBB, 0xBF]));
     assert!(std::str::from_utf8(&bytes).is_ok());
 
+    let created_id = created.project_id();
     assert_eq!(
         core.open_editable(OpenProjectRequest::new(project_location(&project_path)))
             .expect_err("the physical Project remains exclusively editable"),
-        OpenProjectError::ProjectInUse
+        OpenProjectError::FocusExisting {
+            project_id: created_id,
+            owner_process_id: std::process::id(),
+        }
     );
-    let created_id = created.project_id();
     drop(created);
 
     let reopened = core
@@ -2548,7 +2551,7 @@ fn opening_invalid_content_leaves_no_editable_ownership_behind() {
 }
 
 #[test]
-fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_resolution() {
+fn a_second_physical_copy_with_the_same_project_identity_is_promoted_before_editing() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let original_path = directory.path().join("original.myalbuns");
     let copy_path = directory.path().join("copia.myalbuns");
@@ -2559,17 +2562,24 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
     let original = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
         .expect("the original acquires its Identity");
-    assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-            .expect_err("a copied file cannot share an editable Identity"),
-        OpenProjectError::ExternalCopyRequiresInteractiveResolution
-    );
+    let promoted = core
+        .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
+        .expect("a writable copied file receives its own Identity");
+    assert_ne!(promoted.project_id(), original.project_id());
+    assert_eq!(promoted.revision(), original.revision());
+    assert_eq!(promoted.saved_revision(), promoted.revision());
+    assert!(!promoted.can_undo());
+    drop(promoted);
     drop(original);
-    assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-            .expect_err("durable Identity evidence still protects the closed original"),
-        OpenProjectError::ExternalCopyRequiresInteractiveResolution
+
+    let reopened_copy = core
+        .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
+        .expect("the promoted copy reopens under its durable new Identity");
+    assert_ne!(
+        reopened_copy.project_id().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
     );
+    drop(reopened_copy);
 
     let reopened = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
@@ -2581,7 +2591,7 @@ fn a_second_physical_copy_with_the_same_project_identity_requires_interactive_re
 }
 
 #[test]
-fn a_possible_move_stays_fail_closed_until_the_identity_promotion_ticket() {
+fn a_confirmed_move_preserves_identity() {
     let directory = tempfile::tempdir().expect("temporary directory");
     let original_path = directory.path().join("original.myalbuns");
     let moved_path = directory.path().join("movido.myalbuns");
@@ -2594,10 +2604,12 @@ fn a_possible_move_stays_fail_closed_until_the_identity_promotion_ticket() {
     drop(original);
     fs::rename(&original_path, &moved_path).expect("the Project is moved after closure");
 
+    let moved = core
+        .open_editable(OpenProjectRequest::new(project_location(&moved_path)))
+        .expect("NotFound under an accessible previous root confirms movement");
     assert_eq!(
-        core.open_editable(OpenProjectRequest::new(project_location(&moved_path)))
-            .expect_err("issue #44 cannot classify or promote a possible movement"),
-        OpenProjectError::IdentityIndeterminate
+        moved.project_id().to_string(),
+        "550e8400-e29b-41d4-a716-446655440000"
     );
 }
 

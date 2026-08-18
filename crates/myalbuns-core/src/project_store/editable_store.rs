@@ -9,8 +9,8 @@ use myalbuns_paths::{
 use uuid::Uuid;
 
 use super::{
-    DecodeFailure, DocumentFailure, PathFailure, ProjectIdentityLease, ProjectLocation, decode,
-    decode_with_metadata, encode, map_path_failure,
+    DecodeFailure, DocumentFailure, PathFailure, PendingProjectIdentityLease, ProjectIdentityLease,
+    ProjectLocation, decode, decode_with_metadata, encode, map_path_failure,
     windows_publish::{publish_new, replace_existing, write_synced_new},
 };
 use crate::project_document::ProjectRevision;
@@ -19,17 +19,15 @@ mod save_protocol;
 
 use save_protocol::PersistedBaseline;
 pub(crate) use save_protocol::{SaveStoreError, SaveStoreResult};
-#[cfg(test)]
-pub(crate) use save_protocol::{
-    inject_post_publication_indeterminate_for_current_thread,
-    release_post_publication_indeterminate_for_current_thread,
-};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum OpenStoreError {
     Path(PathFailure),
     Document(DocumentFailure),
-    ProjectInUse,
+    ProjectInUse {
+        project_id: Uuid,
+        physical_identity: Option<PhysicalFileIdentity>,
+    },
     IdentityIndeterminate,
 }
 
@@ -94,6 +92,14 @@ impl ProjectStore {
         identity_lease: &ProjectIdentityLease,
     ) -> SaveStoreResult {
         save_protocol::save(self, candidate, identity_lease)
+    }
+
+    pub(crate) fn rewrite_identity(
+        &mut self,
+        project_id: Uuid,
+        identity_lease: &PendingProjectIdentityLease,
+    ) -> SaveStoreResult {
+        save_protocol::rewrite_identity(self, project_id, identity_lease)
     }
 
     pub(crate) fn invalidate(&mut self) {
@@ -210,12 +216,16 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
     let initial_revision = decode(&initial_bytes).map_err(map_open_decode_error)?;
+    let initial_physical_identity = initial.physical_identity();
     let _barrier = ProjectTransitionBarrier::try_acquire(
         initial.operational_path(),
         &initial_revision.project_id.hyphenated().to_string(),
     )
     .map_err(|error| match error {
-        ProjectTransitionBarrierError::Conflict => OpenStoreError::ProjectInUse,
+        ProjectTransitionBarrierError::Conflict => OpenStoreError::ProjectInUse {
+            project_id: initial_revision.project_id,
+            physical_identity: initial_physical_identity,
+        },
         ProjectTransitionBarrierError::Unavailable => {
             OpenStoreError::Path(PathFailure::Unavailable)
         }
@@ -226,7 +236,10 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
         .map_err(|error| OpenStoreError::Path(map_path_failure(error)))?;
     let lock =
         ProjectFileLock::try_acquire(resolved.operational_path()).map_err(|error| match error {
-            ProjectFileLockError::Conflict => OpenStoreError::ProjectInUse,
+            ProjectFileLockError::Conflict => OpenStoreError::ProjectInUse {
+                project_id: initial_revision.project_id,
+                physical_identity: initial_physical_identity,
+            },
             ProjectFileLockError::Unavailable { .. } => {
                 OpenStoreError::Path(PathFailure::IoFailure)
             }

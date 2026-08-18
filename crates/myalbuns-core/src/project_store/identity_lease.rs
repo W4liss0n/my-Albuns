@@ -1,4 +1,5 @@
 use std::{
+    cell::Cell,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
@@ -7,9 +8,18 @@ use std::{
 use uuid::Uuid;
 
 #[cfg(windows)]
+use serde::{Deserialize, Serialize};
+
+#[cfg(windows)]
 use myalbuns_paths::{
     PhysicalFileIdentity, ProjectFileLock, ProjectFileLockError, publish_new_file,
     replace_existing_file,
+};
+
+#[cfg(windows)]
+use windows_sys::Win32::{
+    Foundation::{CloseHandle, HANDLE, WAIT_ABANDONED, WAIT_OBJECT_0},
+    System::Threading::{CreateMutexW, INFINITE, ReleaseMutex, WaitForSingleObject},
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -22,8 +32,58 @@ pub(crate) enum IdentityLeaseError {
 pub(crate) enum IdentityLeaseObservation {
     Inactive,
     Pending,
-    SamePhysicalTarget,
+    SamePhysicalTarget { owner_process_id: u32 },
     DifferentPhysicalTarget,
+}
+
+#[cfg(windows)]
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ActiveIdentityTarget {
+    version: u32,
+    physical_identity: String,
+    owner_process_id: u32,
+}
+
+#[cfg(windows)]
+#[derive(Debug)]
+struct IdentityPublicationMutex {
+    handle: HANDLE,
+}
+
+#[cfg(windows)]
+impl IdentityPublicationMutex {
+    fn acquire(project_id: Uuid) -> Result<Self, IdentityLeaseError> {
+        let name = format!(
+            "Local\\MyAlbuns.ProjectIdentityPublication.{}",
+            project_id.hyphenated()
+        )
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+        let handle = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+        if handle.is_null() {
+            return Err(IdentityLeaseError::Unavailable);
+        }
+        let wait = unsafe { WaitForSingleObject(handle, INFINITE) };
+        if wait != WAIT_OBJECT_0 && wait != WAIT_ABANDONED {
+            unsafe {
+                CloseHandle(handle);
+            }
+            return Err(IdentityLeaseError::Unavailable);
+        }
+        Ok(Self { handle })
+    }
+}
+
+#[cfg(windows)]
+impl Drop for IdentityPublicationMutex {
+    fn drop(&mut self) {
+        unsafe {
+            ReleaseMutex(self.handle);
+            CloseHandle(self.handle);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -35,14 +95,35 @@ pub(crate) struct ProjectIdentityLease {
     lease_path: PathBuf,
     #[cfg(windows)]
     target_path: PathBuf,
+}
+
+#[derive(Debug)]
+pub(crate) struct PendingProjectIdentityLease {
+    #[cfg(windows)]
+    lease: Option<ProjectIdentityLease>,
     #[cfg(windows)]
     created_for_attempt: bool,
+    #[cfg(windows)]
+    target_bound: Cell<bool>,
+    #[cfg(windows)]
+    _publication_lock: IdentityPublicationMutex,
+}
+
+pub(crate) trait IdentityTargetBinder {
+    fn bind_target(
+        &self,
+        identity: myalbuns_paths::PhysicalFileIdentity,
+    ) -> Result<(), IdentityLeaseError>;
 }
 
 impl ProjectIdentityLease {
     #[cfg(windows)]
-    pub(crate) fn acquire(root: &Path, project_id: Uuid) -> Result<Self, IdentityLeaseError> {
+    pub(crate) fn acquire(
+        root: &Path,
+        project_id: Uuid,
+    ) -> Result<PendingProjectIdentityLease, IdentityLeaseError> {
         fs::create_dir_all(root).map_err(|_| IdentityLeaseError::Unavailable)?;
+        let publication_lock = IdentityPublicationMutex::acquire(project_id)?;
         let lease_path = lease_path(root, project_id);
         let created_for_attempt = match OpenOptions::new()
             .write(true)
@@ -86,25 +167,17 @@ impl ProjectIdentityLease {
             }
             return Err(IdentityLeaseError::Unavailable);
         }
-        Ok(Self {
-            project_id,
-            _lock: lock,
-            lease_path,
-            target_path,
+        Ok(PendingProjectIdentityLease {
+            lease: Some(Self {
+                project_id,
+                _lock: lock,
+                lease_path,
+                target_path,
+            }),
             created_for_attempt,
+            target_bound: Cell::new(false),
+            _publication_lock: publication_lock,
         })
-    }
-
-    #[cfg(windows)]
-    pub(crate) fn discard_unpublished(self) {
-        if !self.created_for_attempt {
-            return;
-        }
-        let lease_path = self.lease_path.clone();
-        let target_path = self.target_path.clone();
-        drop(self);
-        let _ = fs::remove_file(target_path);
-        let _ = fs::remove_file(lease_path);
     }
 
     #[cfg(windows)]
@@ -112,8 +185,15 @@ impl ProjectIdentityLease {
         &self,
         identity: PhysicalFileIdentity,
     ) -> Result<(), IdentityLeaseError> {
-        let token = identity.to_local_token();
-        publish_target_atomically(&self.target_path, &token, || {})
+        publish_target_atomically(
+            &self.target_path,
+            &ActiveIdentityTarget {
+                version: 1,
+                physical_identity: identity.to_local_token(),
+                owner_process_id: std::process::id(),
+            },
+            || {},
+        )
     }
 
     #[cfg(windows)]
@@ -146,15 +226,18 @@ impl ProjectIdentityLease {
                     }
                     Err(_) => return Err(IdentityLeaseError::Unavailable),
                 };
-                let token = source
-                    .strip_suffix('\n')
-                    .filter(|value| !value.contains(['\r', '\n']))
-                    .ok_or(IdentityLeaseError::Unavailable)?;
-                let active = PhysicalFileIdentity::from_local_token(token)
-                    .filter(|identity| identity.to_local_token() == token)
+                let target: ActiveIdentityTarget =
+                    serde_json::from_str(&source).map_err(|_| IdentityLeaseError::Unavailable)?;
+                if target.version != 1 || target.owner_process_id == 0 {
+                    return Err(IdentityLeaseError::Unavailable);
+                }
+                let active = PhysicalFileIdentity::from_local_token(&target.physical_identity)
+                    .filter(|identity| identity.to_local_token() == target.physical_identity)
                     .ok_or(IdentityLeaseError::Unavailable)?;
                 if active == candidate {
-                    Ok(IdentityLeaseObservation::SamePhysicalTarget)
+                    Ok(IdentityLeaseObservation::SamePhysicalTarget {
+                        owner_process_id: target.owner_process_id,
+                    })
                 } else {
                     Ok(IdentityLeaseObservation::DifferentPhysicalTarget)
                 }
@@ -169,15 +252,15 @@ impl ProjectIdentityLease {
     }
 
     #[cfg(not(windows))]
-    pub(crate) fn acquire(_root: &Path, _project_id: Uuid) -> Result<Self, IdentityLeaseError> {
+    pub(crate) fn acquire(
+        _root: &Path,
+        _project_id: Uuid,
+    ) -> Result<PendingProjectIdentityLease, IdentityLeaseError> {
         Err(IdentityLeaseError::Unavailable)
     }
     pub(crate) fn project_id(&self) -> Uuid {
         self.project_id
     }
-
-    #[cfg(not(windows))]
-    pub(crate) fn discard_unpublished(self) {}
 
     #[cfg(not(windows))]
     pub(crate) fn bind_target(
@@ -200,7 +283,7 @@ impl ProjectIdentityLease {
 #[cfg(windows)]
 fn publish_target_atomically(
     target_path: &Path,
-    token: &str,
+    target: &ActiveIdentityTarget,
     before_publish: impl FnOnce(),
 ) -> Result<(), IdentityLeaseError> {
     let file_name = target_path
@@ -215,7 +298,8 @@ fn publish_target_atomically(
             .create_new(true)
             .open(&temporary_path)
             .map_err(|_| IdentityLeaseError::Unavailable)?;
-        file.write_all(token.as_bytes())
+        let bytes = serde_json::to_vec(target).map_err(|_| IdentityLeaseError::Unavailable)?;
+        file.write_all(&bytes)
             .and_then(|_| file.write_all(b"\n"))
             .and_then(|_| file.sync_all())
             .map_err(|_| IdentityLeaseError::Unavailable)?;
@@ -240,6 +324,74 @@ fn lease_path(root: &Path, project_id: Uuid) -> PathBuf {
 
 fn target_path(root: &Path, project_id: Uuid) -> PathBuf {
     root.join(format!("{}.target", project_id.hyphenated()))
+}
+
+impl IdentityTargetBinder for ProjectIdentityLease {
+    fn bind_target(
+        &self,
+        identity: myalbuns_paths::PhysicalFileIdentity,
+    ) -> Result<(), IdentityLeaseError> {
+        ProjectIdentityLease::bind_target(self, identity)
+    }
+}
+
+impl PendingProjectIdentityLease {
+    #[cfg(windows)]
+    pub(crate) fn bind_target(
+        &self,
+        identity: PhysicalFileIdentity,
+    ) -> Result<(), IdentityLeaseError> {
+        let lease = self.lease.as_ref().ok_or(IdentityLeaseError::Unavailable)?;
+        lease.bind_target(identity)?;
+        self.target_bound.set(true);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn into_published(mut self) -> Result<ProjectIdentityLease, IdentityLeaseError> {
+        if !self.target_bound.get() {
+            return Err(IdentityLeaseError::Unavailable);
+        }
+        self.lease.take().ok_or(IdentityLeaseError::Unavailable)
+    }
+
+    pub(crate) fn discard_unpublished(self) {}
+
+    #[cfg(not(windows))]
+    pub(crate) fn bind_target(
+        &self,
+        _identity: myalbuns_paths::PhysicalFileIdentity,
+    ) -> Result<(), IdentityLeaseError> {
+        Err(IdentityLeaseError::Unavailable)
+    }
+
+    #[cfg(not(windows))]
+    pub(crate) fn into_published(self) -> Result<ProjectIdentityLease, IdentityLeaseError> {
+        Err(IdentityLeaseError::Unavailable)
+    }
+}
+
+impl IdentityTargetBinder for PendingProjectIdentityLease {
+    fn bind_target(
+        &self,
+        identity: myalbuns_paths::PhysicalFileIdentity,
+    ) -> Result<(), IdentityLeaseError> {
+        PendingProjectIdentityLease::bind_target(self, identity)
+    }
+}
+
+#[cfg(windows)]
+impl Drop for PendingProjectIdentityLease {
+    fn drop(&mut self) {
+        if !self.created_for_attempt {
+            return;
+        }
+        let Some(lease) = self.lease.as_ref() else {
+            return;
+        };
+        let _ = fs::remove_file(&lease.target_path);
+        let _ = fs::remove_file(&lease.lease_path);
+    }
 }
 
 #[cfg(all(test, windows))]
@@ -274,12 +426,16 @@ mod tests {
             .expect("the first observation owns the lease");
         let target = target_path(&root, project_id);
         let publishing_target = target.clone();
-        let token = identity.to_local_token();
+        let active_target = super::ActiveIdentityTarget {
+            version: 1,
+            physical_identity: identity.to_local_token(),
+            owner_process_id: std::process::id(),
+        };
         let (reached_sender, reached_receiver) = mpsc::sync_channel(0);
         let (release_sender, release_receiver) = mpsc::sync_channel(0);
 
         let publisher = std::thread::spawn(move || {
-            publish_target_atomically(&publishing_target, &token, || {
+            publish_target_atomically(&publishing_target, &active_target, || {
                 reached_sender
                     .send(())
                     .expect("the observer sees the pre-publication boundary");
@@ -307,7 +463,9 @@ mod tests {
             .expect("the target token is published atomically");
         assert_eq!(
             ProjectIdentityLease::observe(&root, project_id, Some(identity)),
-            Ok(IdentityLeaseObservation::SamePhysicalTarget)
+            Ok(IdentityLeaseObservation::SamePhysicalTarget {
+                owner_process_id: std::process::id(),
+            })
         );
         drop(lease);
     }
