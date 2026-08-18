@@ -417,6 +417,37 @@ test("selects both sides from the preview area outside the sheet", async () => {
   expect(both).toHaveAttribute("aria-pressed", "true");
 });
 
+test("selects both sides from the preview legends outside the sheet", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const both = await screen.findByRole("button", { name: "Ambos os lados" });
+  const left = screen.getByRole("button", { name: "Lado esquerdo" });
+
+  await user.click(left);
+  expect(both).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByText("Lâmina aberta"));
+  expect(both).toHaveAttribute("aria-pressed", "true");
+
+  await user.click(left);
+  expect(both).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByText("Proporção real da Lâmina aberta."));
+  expect(both).toHaveAttribute("aria-pressed", "true");
+
+  await user.click(left);
+  expect(both).toHaveAttribute("aria-pressed", "false");
+  await user.click(screen.getByLabelText("Prévia do formato da Lâmina"));
+  expect(both).toHaveAttribute("aria-pressed", "false");
+});
+
 test("hover fills only an unselected candidate without changing the fixed scope", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));

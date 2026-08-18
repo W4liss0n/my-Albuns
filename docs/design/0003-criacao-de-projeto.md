@@ -139,9 +139,10 @@ uma segunda estrutura visual nem outra regra de dimensionamento.
 Qualquer alteração nesses controles atualiza a reprodução imediatamente. As imagens provisórias escolhidas para Background ou Overlay também são compostas na prévia antes da criação do Projeto.
 
 A reprodução divide a própria Lâmina em duas regiões clicáveis, uma para o lado
-esquerdo e outra para o lado direito. Clicar no espaço vazio da área de prévia,
-fora da Lâmina, fixa `Ambos os lados`; a região central da Lâmina não constitui
-um terceiro alvo. Cada lado fora da seleção fixa recebe uma atenuação neutra
+esquerdo e outra para o lado direito. Clicar em qualquer ponto do painel de
+prévia fora da Lâmina, inclusive cabeçalho, metadados e legenda, fixa `Ambos os
+lados`; a região central da Lâmina não constitui um terceiro alvo. Cada lado fora
+da seleção fixa recebe uma atenuação neutra
 translúcida sobre toda a superfície. O hover reduz essa atenuação no escopo
 candidato e o cobre com uma tonalidade neutra compartilhada pelo tema, sem
 desenhar contorno nem alterar o contraste individual dos Frames. Um lado que já

@@ -105,7 +105,10 @@ export function ProportionalPreviewViewport({
           aria-pressed={outsideSurfaceAction.pressed}
           className="new-project-proportional-preview-outside-action"
           onBlur={() => outsideSurfaceAction.onFocusChange(false)}
-          onClick={outsideSurfaceAction.onPress}
+          onClick={(event) => {
+            event.stopPropagation();
+            outsideSurfaceAction.onPress();
+          }}
           onFocus={(event) =>
             outsideSurfaceAction.onFocusChange(
               event.currentTarget.matches(":focus-visible"),
@@ -117,6 +120,7 @@ export function ProportionalPreviewViewport({
       <div
         aria-label={label}
         className="new-project-proportional-preview-surface"
+        onClick={(event) => event.stopPropagation()}
         style={surfaceStyle}
       >
         {children}

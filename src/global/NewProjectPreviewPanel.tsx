@@ -43,6 +43,7 @@ export function NewProjectPreviewPanel({
     <section
       aria-label="Prévia da Lâmina aberta"
       className="new-project-preview-panel"
+      onClick={() => outsideSurfaceAction?.onPress()}
     >
       <p className="new-project-preview-metadata">
         <span>Lâmina aberta</span>
