@@ -118,9 +118,6 @@ export function ProgressDialog({
               <div className="ui-progress-dialog__meta">
                 <span>{percentage}%</span>
                 <span className="ui-progress-dialog__meta-spacer" />
-                <span>
-                  {completed}/{total}
-                </span>
                 {progress.remaining ? <span>{progress.remaining}</span> : null}
               </div>
             ) : (

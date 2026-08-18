@@ -31,6 +31,10 @@ interface GlobalShellProps {
 
 const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
+const welcomeShortcuts = {
+  newProject: { aria: "Control+N", key: "n", label: "Ctrl+N" },
+  openProject: { aria: "Control+O", key: "o", label: "Ctrl+O" },
+} as const;
 
 export function GlobalShell({
   graphicsDiagnostic,
@@ -128,10 +132,10 @@ export function GlobalShell({
       }
 
       const key = event.key.toLowerCase();
-      if (key === "n") {
+      if (key === welcomeShortcuts.newProject.key) {
         event.preventDefault();
         startCreation();
-      } else if (key === "o") {
+      } else if (key === welcomeShortcuts.openProject.key) {
         event.preventDefault();
         void openProject();
       }
@@ -238,16 +242,18 @@ export function GlobalShell({
           <div className="global-action-stack">
             <ActionButton
               aria-label="Novo Projeto"
+              aria-keyshortcuts={welcomeShortcuts.newProject.aria}
               disabled={isOpening}
               onClick={startCreation}
               variant="primary"
             >
               <AppIcon icon={Plus} size={16} />
               <span>Novo Projeto</span>
-              <kbd>Ctrl+N</kbd>
+              <kbd>{welcomeShortcuts.newProject.label}</kbd>
             </ActionButton>
             <ActionButton
               aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
+              aria-keyshortcuts={welcomeShortcuts.openProject.aria}
               disabled={isOpening}
               onClick={openProject}
             >
@@ -255,7 +261,7 @@ export function GlobalShell({
               <span>
                 {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
               </span>
-              <kbd>Ctrl+O</kbd>
+              <kbd>{welcomeShortcuts.openProject.label}</kbd>
             </ActionButton>
           </div>
           <div aria-hidden="true" className="global-action-divider" />

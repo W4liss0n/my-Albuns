@@ -83,6 +83,10 @@ Abrir diretamente um arquivo pelo Windows pode iniciar sua Janela de Projeto sem
 
 ## Operações em lote
 
-`Exportação em lote` pertence à Tela de Boas-vindas porque lê Projetos persistidos encontrados em uma pasta e não precisa de um Projeto modelo aberto. A ação abre a janela dedicada de [Configuração da Exportação em lote](0006-configuracao-da-exportacao-em-lote.md).
+`Exportação em lote` pertence à Tela de Boas-vindas porque lê Projetos
+persistidos encontrados em uma pasta e não precisa de um Projeto modelo aberto.
+Na nova UI, a ação permanece desabilitada e explicitamente marcada como
+placeholder. Quando sua porta de aplicação for implementada, ela abrirá a janela
+dedicada de [Configuração da Exportação em lote](0006-configuracao-da-exportacao-em-lote.md).
 
 `Geração de Projetos em lote` não aparece nessa tela. Ela é iniciada exclusivamente em uma Janela de Projeto, pois copia o estado visível daquele Projeto como modelo, inclusive alterações ainda não salvas, sem salvar ou modificar o original.

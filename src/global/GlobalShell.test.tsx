@@ -66,12 +66,16 @@ test("shows the global welcome surface without a Project workspace", () => {
   expect(
     screen.getByRole("heading", { name: "Projetos recentes" }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByRole("button", { name: "Novo Projeto" }),
-  ).toBeEnabled();
-  expect(
-    screen.getByRole("button", { name: "Abrir Projeto" }),
-  ).toBeEnabled();
+  const newProjectButton = screen.getByRole("button", {
+    name: "Novo Projeto",
+  });
+  const openProjectButton = screen.getByRole("button", {
+    name: "Abrir Projeto",
+  });
+  expect(newProjectButton).toBeEnabled();
+  expect(newProjectButton).toHaveAttribute("aria-keyshortcuts", "Control+N");
+  expect(openProjectButton).toBeEnabled();
+  expect(openProjectButton).toHaveAttribute("aria-keyshortcuts", "Control+O");
   const batchExportPlaceholder = screen.getByRole("button", {
     name: "Exportação em lote",
   });

@@ -49,7 +49,7 @@ test("presents determined and batch progress through the same interface", () => 
     "14",
   );
   expect(screen.getByText("35%")).toBeInTheDocument();
-  expect(screen.getByText("14/40")).toBeInTheDocument();
+  expect(screen.queryByText("14/40")).not.toBeInTheDocument();
 
   rerender(
     <ProgressDialog

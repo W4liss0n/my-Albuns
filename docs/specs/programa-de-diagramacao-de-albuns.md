@@ -474,7 +474,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 ### Configurações do aplicativo
 
 - `Configurações` abre uma janela global organizada nas abas iniciais `Desempenho` e `Photoshop`.
-- A janela pode ser aberta pela Tela de Boas-vindas ou por `Ferramentas > Configurações` em qualquer Janela de Projeto.
+- Nesta entrega, a janela pode ser aberta por `Ferramentas > Configurações` em qualquer Janela de Projeto; a entrada equivalente na Tela de Boas-vindas fica adiada até sua ligação com a nova UI.
 - Existe somente uma janela de Configurações por instância do MyAlbuns; solicitações posteriores focalizam a existente.
 - As preferências dessa janela pertencem ao usuário e não integram arquivos de Projeto, Salvamento ou Undo/Redo.
 - Escolhas simples são aplicadas e persistidas imediatamente, sem botão geral `Aplicar` ou `Salvar`. `Liberar espaço` e `Limpar todo o Cache` mantêm seus próprios feedbacks e confirmações.
