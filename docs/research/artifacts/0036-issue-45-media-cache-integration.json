@@ -2,85 +2,103 @@
     "schemaVersion":  1,
     "gate":  "issue-45-media-cache-final-integration",
     "issue":  45,
-    "collectedAtUtc":  "2026-08-18T16:08:03.7638663Z",
+    "collectedAtUtc":  "2026-08-18T19:46:01.0198947Z",
     "fixedPoint":  "f6518d63b2c75656a58b6769e87abc318a913e23",
-    "gitCommit":  "8403569b80f63e5e6abaa611d9fc5e5f67ff24fd",
+    "gitCommit":  "f6afc692692b6ec9e0fadea36c64d53ab7b549a8",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64"
                  },
     "counts":  {
-                   "topLevelChecks":  9,
+                   "topLevelChecks":  11,
                    "contractBindings":  65,
                    "frontendFiles":  26,
-                   "frontendTests":  210,
-                   "rustTests":  416,
+                   "frontendTests":  211,
+                   "rustTests":  422,
                    "rustSuiteResults":  29,
                    "rustQualityCommands":  3,
                    "imagingRecoveryChecks":  9,
                    "windowsPathChecks":  11,
                    "releaseArtifacts":  4,
                    "ownedProcessesAfter":  0,
-                   "ownedListenersAfter":  0
+                   "ownedListenersAfter":  0,
+                   "ownedProcessesStoppedAtFinalCleanup":  10,
+                   "ownedListenersObservedBeforeFinalCleanup":  0
                },
     "checks":  [
+                   {
+                       "name":  "owned-process-listener-cleanup-probe",
+                       "passed":  true,
+                       "assertionCount":  4,
+                       "stoppedProcessCount":  2,
+                       "observedListenerCount":  1
+                   },
+                   {
+                       "name":  "clean-debug-sidecar-preparation",
+                       "passed":  true,
+                       "assertionCount":  2,
+                       "elapsedMs":  43885
+                   },
                    {
                        "name":  "rust-typescript-contracts",
                        "passed":  true,
                        "assertionCount":  65,
-                       "elapsedMs":  154841
+                       "elapsedMs":  70971
                    },
                    {
                        "name":  "frontend-tests",
                        "passed":  true,
-                       "assertionCount":  210,
+                       "assertionCount":  211,
                        "fileCount":  26,
-                       "elapsedMs":  25026
+                       "elapsedMs":  35531
                    },
                    {
                        "name":  "frontend-typecheck",
                        "passed":  true,
                        "assertionCount":  1,
-                       "elapsedMs":  6776
+                       "elapsedMs":  8252
                    },
                    {
                        "name":  "rust-tests",
                        "passed":  true,
-                       "assertionCount":  416,
+                       "assertionCount":  422,
                        "suiteResultCount":  29,
-                       "elapsedMs":  218607
+                       "elapsedMs":  132293
                    },
                    {
                        "name":  "rust-fmt-clippy-deny-warnings",
                        "passed":  true,
                        "assertionCount":  3,
-                       "elapsedMs":  188861
+                       "elapsedMs":  46316
                    },
                    {
                        "name":  "real-processor-cache-canvas-recovery",
                        "passed":  true,
                        "assertionCount":  9,
-                       "elapsedMs":  390149
+                       "elapsedMs":  450292
                    },
                    {
                        "name":  "windows-local-unc-mapped-long-paths",
                        "passed":  true,
                        "assertionCount":  11,
-                       "elapsedMs":  308822
+                       "elapsedMs":  735251
                    },
                    {
                        "name":  "release-build-and-nsis-package",
                        "passed":  true,
                        "assertionCount":  4,
-                       "elapsedMs":  679073
+                       "elapsedMs":  1227023
                    },
                    {
                        "name":  "owned-process-lock-listener-cleanup",
                        "passed":  true,
-                       "assertionCount":  3,
+                       "assertionCount":  4,
                        "ownedProcessCount":  0,
                        "ownedListenerCount":  0,
+                       "claimedPreexistingProcessIdentityCount":  0,
+                       "stoppedOwnedProcessCount":  10,
+                       "observedOwnedListenerCountBeforeCleanup":  0,
                        "exclusiveArtifactLockFailures":  0
                    }
                ],
@@ -88,42 +106,228 @@
                      {
                          "name":  "authorized-independent-empty-namespace",
                          "passed":  true,
-                         "publicProof":  "CacheService + ProjectIdentityAuthority"
+                         "assertionCount":  2,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "authoritative-absent-unavailable-and-visual-context",
                          "passed":  true,
-                         "publicProof":  "MediaResolver + MediaRuntime + CacheEngine + MediaPanel"
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "resolver_monitor_and_runtime_keep_observed_state_outside_media_refs",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps the last known preview when linked media becomes unavailable",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps the last representation only as visual context when the Original is absent",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "relink-occurrence-stable-change-and-reappearance",
                          "passed":  true,
-                         "publicProof":  "MediaRuntime observations + CacheEngine epochs"
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "offers public Relink only for an absent occurrence and applies the returned projection",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "incompatible-corrupt-invalid-cache-rebuild",
                          "passed":  true,
-                         "publicProof":  "discardable Cache index + validated candidate publication"
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "failed_validation_discards_the_candidate_and_preserves_the_last_published_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_wrong_response_correlation_discards_the_unpublished_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_crashes_after_candidate_publication_leave_no_orphan_generation",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "processor-restart-once-then-nonblocking-suspension",
                          "passed":  true,
-                         "publicProof":  "real Processor recovery + typed frontend warning"
+                         "assertionCount":  5,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_processor_crashes_suspend_new_cache_work_after_one_restart",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_processor_failure_suspends_before_fallible_recovery_cleanup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "terminating_the_host_closes_its_job_and_terminates_the_active_processor",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "shows a non-blocking warning when repeated processor failures suspend Cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "production-recovery-integration",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "local-unc-mapped-and-long-paths",
                          "passed":  true,
-                         "publicProof":  "Windows path gate + local AppPaths Cache root"
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "path-contract",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "path-policy",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "real-mapped-unc",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "prepares_the_cache_only_as_directories_below_the_authorized_root",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "measure-free-reserve-and-safe-total-cleanup",
                          "passed":  true,
-                         "publicProof":  "CacheService + named cross-process namespace mutexes"
+                         "assertionCount":  5,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "measures_and_frees_only_namespaces_without_an_active_owner",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "namespace_reservation_survives_process_boundaries_and_owner_termination",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      },
                      {
                          "name":  "narrow-api-and-design-0010-ownership-matrix",
                          "passed":  true,
-                         "publicProof":  "three Cache commands; ProjectCore and Media ownership remain authoritative"
+                         "assertionCount":  6,
+                         "proofs":  [
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "cache_service_status",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "free_closed_project_cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "clear_all_cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "maps the Project and media ports to the desktop commands",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "ProjectSession::RelinkMedia",
+                                            "matchCount":  1
+                                        }
+                                    ]
                      }
                  ],
     "nestedEvidence":  {
@@ -131,13 +335,13 @@
                                            "schemaVersion":  1,
                                            "checks":  9,
                                            "cache":  {
-                                                         "failedProcessId":  9072,
+                                                         "failedProcessId":  27280,
                                                          "foreignTemporarySurvivedCleanup":  true,
                                                          "generatedCountAfterRestart":  1,
                                                          "metadataExistedAfterFailure":  false,
                                                          "metadataExistedAfterRestart":  true,
                                                          "removedTemporaryCount":  1,
-                                                         "restartedProcessId":  25884,
+                                                         "restartedProcessId":  2752,
                                                          "temporaryExistedAfterCleanup":  false,
                                                          "temporaryObservedAfterFailure":  true
                                                      },
@@ -154,8 +358,8 @@
                                                                                0
                                                                            ],
                                                           "compositionMediaOrder":  [
-                                                                                        "2b8ea592-120d-4032-a280-d1fc66bc34d4",
-                                                                                        "e654f7bc-be8d-40d9-b718-e3c924bfa269"
+                                                                                        "5327e9c2-49ed-4000-aa98-35223970adaa",
+                                                                                        "5b5a9fb6-7996-4420-99ea-0b7eacfbc0e1"
                                                                                     ],
                                                           "equivalentBackgroundDemandCount":  2,
                                                           "finalJpegPixel":  [
@@ -169,13 +373,13 @@
                                                           "originalPathExposedToWebView":  false,
                                                           "overlayUrlOpaque":  true,
                                                           "processorIds":  [
-                                                                               36708,
-                                                                               32780,
-                                                                               8512
+                                                                               38820,
+                                                                               34984,
+                                                                               15128
                                                                            ],
-                                                          "singleFlightGenerationId":  "g-f04fce5ec731461e9b3d8d6b349d8a04",
+                                                          "singleFlightGenerationId":  "g-b2761654cad142d8b9482df2b80d786c",
                                                           "singleFlightProcessorCount":  1,
-                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-15964-cae8fb\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-38840-7f5286\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
                                                           "actualTauriApp":  true,
                                                           "actualAlbumCanvas":  true,
                                                           "actualPixiRuntime":  true,
@@ -203,19 +407,19 @@
                                            "pause":  {
                                                          "cacheBlockedWhileExportLease":  true,
                                                          "cacheIndexAfterCancellation":  false,
-                                                         "cancelledProcessId":  12412,
+                                                         "cancelledProcessId":  37784,
                                                          "cancelledProcessReaped":  true,
                                                          "cancelledStage":  "cancelled",
                                                          "pauseReason":  "paused",
                                                          "processorExclusiveWhileExportLease":  true,
                                                          "resumedAfterExportTerminal":  true,
                                                          "resumedGenerationPublished":  true,
-                                                         "resumedProcessId":  19468
+                                                         "resumedProcessId":  2908
                                                      },
                                            "obsolete":  {
                                                             "cacheIndexAfterCancellation":  false,
                                                             "cancellationReason":  "obsolete",
-                                                            "cancelledProcessId":  34972,
+                                                            "cancelledProcessId":  22996,
                                                             "cancelledProcessReaped":  true,
                                                             "cancelledStage":  "cancelled",
                                                             "resumableAfterCancellation":  false,
@@ -231,7 +435,7 @@
                                                               "bindingReusedAfterRemapWithinAttempt":  true,
                                                               "cacheUnderLocalAppData":  true,
                                                               "explicitRetryRecaptured":  true,
-                                                              "firstPlanSha256":  "5ea9abdf3431632a8605927efd70dd67b564c8bab9c3da2feda3b13ebc296bc6",
+                                                              "firstPlanSha256":  "8d745ca830181c4e3ced359a80f505542cc4a892e076449aba1d11dc02363d18",
                                                               "identityFailure":  "indeterminate",
                                                               "lockReleasedAfterOwnerDrop":  true,
                                                               "mappedAndLocalIdentity":  "same",
@@ -242,7 +446,7 @@
                                                               "planRoundTripLossless":  true,
                                                               "plansDistinct":  true,
                                                               "readOnlyBatchAllowedWhileLocked":  true,
-                                                              "retryPlanSha256":  "989f83be4883446793dea99d2503690e08159f5a831001ba0d0bbcab091377a5",
+                                                              "retryPlanSha256":  "0ca9974540cb785dc820e30b553b094b908822ae3b6ce83d9eda164c9f0d2114",
                                                               "stagingInsideDestination":  true,
                                                               "unavailableBinding":  "unavailable",
                                                               "uncExportPublished":  true,
@@ -253,9 +457,9 @@
                                                                 "mappingRemovedBeforeDispatch":  true,
                                                                 "outputPublishedOnUnc":  true,
                                                                 "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
-                                                                "processorPid":  2908,
+                                                                "processorPid":  38728,
                                                                 "processorUsedFrozenOperationalPath":  true,
-                                                                "rootBindingPlanSha256":  "a313dd47217e6e990b58d7089b4269bdd667c978302a66a31270eeae4b10e208",
+                                                                "rootBindingPlanSha256":  "5c6b9cd74a51964ca70301785c8465c340e08b1a0ca4f25efcc656e744a887b7",
                                                                 "stagingRemoved":  true,
                                                                 "unavailableAttemptStartedProcessor":  false,
                                                                 "unavailableBindingFailedAtPrepare":  true
@@ -269,31 +473,34 @@
     "releaseArtifacts":  [
                              {
                                  "name":  "desktop-release",
-                                 "bytes":  17056768,
-                                 "sha256":  "2ad7c323557d0d19cdd4cd2a08a6ebcc7ab48b578ca891db233b3aff5b8df529"
+                                 "bytes":  17558528,
+                                 "sha256":  "a85784731012394eee49a8480ea12506967b518549a1ec0ad370f5e123e9ec35"
                              },
                              {
                                  "name":  "imaging-release",
                                  "bytes":  3618304,
-                                 "sha256":  "c3fa60d35e6537f8c52fcee07d658095979cfc53519a2766e841292392f073bd"
+                                 "sha256":  "f3cbe00ede8d49e012a52eaeed2b7b91fafed22e877b9608a9d3f3b571690862"
                              },
                              {
                                  "name":  "prepared-sidecar",
                                  "bytes":  3618304,
-                                 "sha256":  "c3fa60d35e6537f8c52fcee07d658095979cfc53519a2766e841292392f073bd"
+                                 "sha256":  "f3cbe00ede8d49e012a52eaeed2b7b91fafed22e877b9608a9d3f3b571690862"
                              },
                              {
                                  "name":  "nsis-installer",
-                                 "bytes":  4742399,
-                                 "sha256":  "258daf52b4424b612bef16c94d1a290b6a6a13c2414dc8b21bc0c9630cb9fb7b"
+                                 "bytes":  4963989,
+                                 "sha256":  "8464674df15b061199b2a5e95d0f12f4e9f90953fddfcb4054a79d70acbff29c"
                              }
                          ],
     "cleanup":  {
                     "runScratchRemoved":  true,
                     "newlyCreatedWindowsPathTargetRemoved":  true,
-                    "newlyCreatedDistRemoved":  false,
+                    "newlyCreatedDistRemoved":  true,
                     "ownedProcesses":  0,
                     "ownedListeners":  0,
+                    "claimedPreexistingProcessIdentities":  0,
+                    "stoppedOwnedProcesses":  10,
+                    "observedOwnedListenersBeforeCleanup":  0,
                     "artifactLocks":  0
                 }
 }
