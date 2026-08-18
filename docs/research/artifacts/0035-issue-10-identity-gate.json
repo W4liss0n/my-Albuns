@@ -1,7 +1,7 @@
 {
     "schemaVersion":  1,
-    "collectedAtUtc":  "2026-08-18T04:29:21.6626756Z",
-    "gitCommit":  "137289952a568f7f4cb4d258b3d1ac1d0a0c9429",
+    "collectedAtUtc":  "2026-08-18T05:02:44.0671698Z",
+    "gitCommit":  "6d6085b66b7571c0cf1b0ec2705935580c751a8e",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -11,6 +11,10 @@
     "checks":  [
                    {
                        "name":  "public-project-core-gate-build",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "mixed-file-id-domains-fail-closed",
                        "passed":  true
                    },
                    {
@@ -63,12 +67,12 @@
                    }
                ],
     "evidence":  {
-                     "originalProjectId":  "fa55bda6-db57-47f5-8bc8-727883465e37",
-                     "promotedCopyProjectId":  "3bd669ec-8481-473b-b9e2-0fb04781f760",
-                     "saveCopyAsProjectId":  "91071604-6055-4b97-840b-7de0797ebce1",
+                     "originalProjectId":  "f02357cb-aa77-4302-aa7c-49073c8b96d8",
+                     "promotedCopyProjectId":  "41ccf4ae-f928-4fb6-85d0-4d200919ee5f",
+                     "saveCopyAsProjectId":  "d92155b5-8c6c-4fc1-9a10-fa55273befc4",
                      "ownerProcess":  {
-                                          "processId":  19708,
-                                          "creationTime":  134315009607065457
+                                          "processId":  29064,
+                                          "creationTime":  134315029631801593
                                       },
                      "mappedAliasOutcome":  "focusExisting",
                      "uncAliasOutcome":  "focusExisting",
