@@ -139,11 +139,13 @@ o release usa outro `CARGO_TARGET_DIR` exclusivo sob esse scratch. Cada critéri
 própria rodada. O runner inicia ainda um processo controlado com listener TCP,
 observa ambos, encerra a árvore pelo mesmo caminho usado no `finally` e exige
 contagens finais zero. Ele rastreia as identidades PID+instante de criação de
-todos os descendentes dos comandos, calcula hashes antes de remover os outputs,
-mede listeners reais, exige locks exclusivos disponíveis, remove seus
-diretórios e só então captura novamente a árvore Git. Qualquer falha também
-passa pelo encerramento e pela verificação da árvore antes da limpeza do
-scratch.
+todos os descendentes criados depois de cada comando e recusa qualquer
+identidade já presente no snapshot pré-gate; assim, reciclagem de PID parental
+não transforma um processo estrangeiro em alvo de cleanup. O runner calcula
+hashes antes de remover os outputs, mede listeners reais, exige locks exclusivos
+disponíveis, remove seus diretórios e só então captura novamente a árvore Git.
+Qualquer falha também passa pelo encerramento e pela verificação da árvore antes
+da limpeza do scratch.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).

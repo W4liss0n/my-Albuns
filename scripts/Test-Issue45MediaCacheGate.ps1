@@ -69,6 +69,7 @@ $previousTargetDirectory = $env:CARGO_TARGET_DIR
 $gateRunStartedUtc = [DateTime]::UtcNow
 $ownedProcessRecords = [System.Collections.Generic.Dictionary[string, object]]::new()
 $ownedParentProcessIds = [System.Collections.Generic.HashSet[uint32]]::new()
+$preexistingProcessIdentities = [System.Collections.Generic.HashSet[string]]::new()
 
 function Get-ProcessCreationUtc([object] $Process) {
     if ($Process.CreationDate -is [DateTime]) {
@@ -145,13 +146,18 @@ function Register-OwnedGateProcesses {
             }
             $createdUtc = Get-ProcessCreationUtc -Process $process
             $isRoot = $processId -eq $RootProcessId
-            $hasOwnedParent = $knownParents.Contains([uint32] $process.ParentProcessId)
+            $isCurrentDescendant =
+                $knownParents.Contains([uint32] $process.ParentProcessId) -and
+                $createdUtc -ge $CommandStartedUtc
             $isNewWorkspaceProcess = $createdUtc -ge $CommandStartedUtc -and
                 (Test-WorkspaceProcess -Process $process)
-            if (-not ($isRoot -or $hasOwnedParent -or $isNewWorkspaceProcess)) {
+            if (-not ($isRoot -or $isCurrentDescendant -or $isNewWorkspaceProcess)) {
                 continue
             }
             $identity = Get-GateProcessIdentity -Process $process
+            if ($preexistingProcessIdentities.Contains($identity)) {
+                continue
+            }
             if (-not $ownedProcessRecords.ContainsKey($identity)) {
                 $ownedProcessRecords.Add($identity, [pscustomobject]@{
                     processId = $processId
@@ -296,6 +302,13 @@ function Clear-Issue45GateOutputs {
 }
 
 try {
+foreach ($process in @(Get-CimInstance Win32_Process)) {
+    if ([uint32] $process.ProcessId -ne $PID) {
+        [void] $preexistingProcessIdentities.Add(
+            (Get-GateProcessIdentity -Process $process)
+        )
+    }
+}
 New-Item -ItemType Directory -Force -Path $scratchRoot | Out-Null
 & git -C $workspaceRoot check-ignore --quiet -- $scratchRoot
 if ($LASTEXITCODE -ne 0) {
@@ -856,9 +869,14 @@ try {
     $remainingProcesses = @(Get-ActiveOwnedGateProcesses)
     $remainingListeners = @(Get-OwnedGateListeners -Processes $remainingProcesses)
     $untrackedWorkspaceProcesses = @(Get-WorkspaceProcesses)
+    $claimedPreexistingIdentities = @(
+        $ownedProcessRecords.Keys |
+            Where-Object { $preexistingProcessIdentities.Contains($_) }
+    )
     if ($remainingProcesses.Count -ne 0 `
             -or $remainingListeners.Count -ne 0 `
-            -or $untrackedWorkspaceProcesses.Count -ne 0) {
+            -or $untrackedWorkspaceProcesses.Count -ne 0 `
+            -or $claimedPreexistingIdentities.Count -ne 0) {
         $identifiers = @(
             $remainingProcesses
             $untrackedWorkspaceProcesses
@@ -871,10 +889,12 @@ try {
     $checks.Add([ordered]@{
         name = 'owned-process-lock-listener-cleanup'
         passed = ($ownedProcessCountAfter -eq 0 -and
-            $ownedListenerCountAfter -eq 0)
-        assertionCount = 3
+            $ownedListenerCountAfter -eq 0 -and
+            $claimedPreexistingIdentities.Count -eq 0)
+        assertionCount = 4
         ownedProcessCount = $ownedProcessCountAfter
         ownedListenerCount = $ownedListenerCountAfter
+        claimedPreexistingProcessIdentityCount = $claimedPreexistingIdentities.Count
         exclusiveArtifactLockFailures = 0
     })
 
@@ -1035,6 +1055,7 @@ try {
             newlyCreatedDistRemoved = -not $distExistedBefore
             ownedProcesses = $ownedProcessCountAfter
             ownedListeners = $ownedListenerCountAfter
+            claimedPreexistingProcessIdentities = $claimedPreexistingIdentities.Count
             artifactLocks = 0
         }
     }
