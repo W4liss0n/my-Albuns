@@ -41,10 +41,11 @@ export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
       <div className="new-project-dimensions-stage">
         <svg
           aria-label="Prévia das Dimensões"
+          height={height}
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          style={{ aspectRatio: `${width} / ${height}` }}
           viewBox={`0 0 ${width} ${height}`}
+          width={width}
           xmlns="http://www.w3.org/2000/svg"
         >
           <title>Prévia das Dimensões</title>

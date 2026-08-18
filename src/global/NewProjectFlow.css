@@ -133,14 +133,19 @@
 .new-project-dimensions-stage {
   display: grid;
   width: min(100%, 680px);
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   place-items: center;
 }
 
 .new-project-dimensions-stage svg {
   display: block;
-  width: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
   max-height: 100%;
+  box-sizing: border-box;
   border: 1px solid #ddd8ce;
   box-shadow: 0 10px 30px rgb(60 54 44 / 22%);
 }
