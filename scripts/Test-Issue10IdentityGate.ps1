@@ -6,6 +6,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Import-Module Microsoft.PowerShell.Utility
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
@@ -102,6 +103,40 @@ function Invoke-IdentityGate {
     return $output[-1] | ConvertFrom-Json
 }
 
+function ConvertTo-WindowsProcessArgument {
+    param([Parameter(Mandatory = $true)] [AllowEmptyString()] [string] $Argument)
+
+    if ($Argument.Length -gt 0 -and $Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    $quoted = [System.Text.StringBuilder]::new()
+    [void] $quoted.Append('"')
+    $backslashCount = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashCount += 1
+            continue
+        }
+        if ($character -eq '"') {
+            [void] $quoted.Append('\', (2 * $backslashCount) + 1)
+            [void] $quoted.Append('"')
+            $backslashCount = 0
+            continue
+        }
+        if ($backslashCount -gt 0) {
+            [void] $quoted.Append('\', $backslashCount)
+            $backslashCount = 0
+        }
+        [void] $quoted.Append($character)
+    }
+    if ($backslashCount -gt 0) {
+        [void] $quoted.Append('\', 2 * $backslashCount)
+    }
+    [void] $quoted.Append('"')
+    return $quoted.ToString()
+}
+
 function Start-IdentityHolder {
     param(
         [Parameter(Mandatory = $true)] [string] $Project,
@@ -113,13 +148,13 @@ function Start-IdentityHolder {
     $start.RedirectStandardInput = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
-    @(
+    $start.Arguments = (@(
         'hold',
         '--project', $Project,
         '--lease-root', $leaseRoot,
         '--registry-root', $registryRoot,
         '--pending-dpi', $PendingDpi.ToString([Globalization.CultureInfo]::InvariantCulture)
-    ) | ForEach-Object { [void]$start.ArgumentList.Add($_) }
+    ) | ForEach-Object { ConvertTo-WindowsProcessArgument $_ }) -join ' '
     $process = [System.Diagnostics.Process]::new()
     $process.StartInfo = $start
     if (-not $process.Start()) {
@@ -146,7 +181,7 @@ function Stop-IdentityHolder {
     $Holder.process.StandardInput.Flush()
     $Holder.process.StandardInput.Close()
     if (-not $Holder.process.WaitForExit(5000)) {
-        $Holder.process.Kill($true)
+        $Holder.process.Kill()
         $Holder.process.WaitForExit()
         throw 'The holder did not exit after its explicit release.'
     }
@@ -398,7 +433,7 @@ try {
 finally {
     if ($null -ne $holder) {
         if (-not $holder.process.HasExited) {
-            $holder.process.Kill($true)
+            $holder.process.Kill()
             $holder.process.WaitForExit()
         }
         $holder.process.Dispose()

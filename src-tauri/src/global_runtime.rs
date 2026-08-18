@@ -513,7 +513,6 @@ async fn launch_confirmed_project(
         logical_target: native_path,
         root_bindings,
     };
-    state.clear_external_copy();
     let bootstrap = state.bootstrap.clone();
     let recent_projects = state.recent_projects.clone();
     match tauri::async_runtime::spawn_blocking(move || {

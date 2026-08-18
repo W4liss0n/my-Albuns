@@ -88,7 +88,9 @@ Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
 oferece **Salvar cópia como…** apenas no resultado acionável e mantém a oferta
-quando o diálogo é cancelado.
+quando uma abertura posterior é cancelada ou falha antes de substituir o Host
+pendente. Cancelar o diálogo de **Salvar cópia como…** descarta e reap o Host
+pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
 
 ## Limites
 

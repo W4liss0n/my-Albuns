@@ -310,6 +310,64 @@ test("offers Salvar cópia como for a validated read-only external copy", async 
   expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
 });
 
+test("offers Salvar cópia como after a direct Windows opening", async () => {
+  const completeGraphicsGate = vi.fn(async () => ({
+    status: "externalCopyNotWritable" as const,
+  }));
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ completeGraphicsGate })}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).toBeInTheDocument();
+  expect(completeGraphicsGate).toHaveBeenCalledWith(true);
+});
+
+test.each([
+  ["cancelled", { status: "cancelled" as const }],
+  [
+    "failed",
+    {
+      status: "failed" as const,
+      error: {
+        code: "dialog_unavailable",
+        message: "Não foi possível concluir o diálogo de abertura.",
+        action: "Tente novamente.",
+      },
+    },
+  ],
+])("keeps the pending external copy visible after a later %s opening", async (_, laterOutcome) => {
+  const user = userEvent.setup();
+  const openProject = vi
+    .fn<() => Promise<OpenProjectOutcome>>()
+    .mockResolvedValueOnce({ status: "externalCopyNotWritable" })
+    .mockResolvedValueOnce(laterOutcome);
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ openProject })}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+  const pendingResolution = await screen.findByRole("heading", {
+    name: "Cópia externa somente leitura",
+  });
+
+  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+
+  expect(pendingResolution).toBeInTheDocument();
+  expect(openProject).toHaveBeenCalledTimes(2);
+});
+
 test("loads and renders recent Projects by name", async () => {
   const listRecentProjects = vi.fn(async () => [
     { id: "recent-ana", name: "Álbum da Ana" },

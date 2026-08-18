@@ -37,6 +37,8 @@ export function GlobalShell({
       .then((outcome) => {
         if (outcome?.status === "failed") {
           setFailure(outcome.error);
+        } else if (outcome?.status === "externalCopyNotWritable") {
+          setExternalCopyPending(true);
         }
       });
   }, [graphicsDiagnostic.supported, projectPort]);
@@ -69,12 +71,13 @@ export function GlobalShell({
     openingAttempt.current += 1;
     setIsOpening(true);
     setFailure(null);
-    setExternalCopyPending(false);
     const outcome = await attempt();
     if (outcome.status === "failed") {
       setFailure(outcome.error);
     } else if (outcome.status === "externalCopyNotWritable") {
       setExternalCopyPending(true);
+    } else if (outcome.status === "opened" || outcome.status === "focused") {
+      setExternalCopyPending(false);
     }
     setIsOpening(false);
   };
