@@ -605,6 +605,17 @@ fn inspects_only_direct_cache_namespaces_and_measures_their_files() {
     drop(first_storage);
     drop(second_storage);
 
+    let namespaces = paths
+        .list_cache_namespaces()
+        .expect("namespace enumeration succeeds without measuring their contents");
+    assert_eq!(namespaces, vec![first.clone(), second.clone()]);
+    let first_usage = paths
+        .inspect_cache_namespace(&first)
+        .expect("the reserved namespace can be inspected separately")
+        .expect("the first namespace still exists");
+    assert_eq!(first_usage.paths(), &first);
+    assert_eq!(first_usage.bytes(), 15);
+
     let inspected = paths
         .inspect_cache_namespaces()
         .expect("the guarded Cache inspection succeeds");

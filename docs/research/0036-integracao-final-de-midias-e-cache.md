@@ -86,9 +86,13 @@ coordenador geral.
 `CacheService` possui três operações públicas: consultar uso, liberar Cache de
 Projetos fechados e limpar tudo ou agendar a limpeza. O serviço mede bytes sob
 o `AppPaths` local e trata reparse points e tipos inesperados como erro, em vez
-de segui-los. Uma reserva por namespace usa mutex nomeado do Windows e vive por
-toda a Sessão; outro processo, portanto, não pode classificar aquele namespace
-como liberável.
+de segui-los. Primeiro ele enumera apenas os namespaces; para cada namespace
+fechado, adquire a reserva, aguarda a instância exata registrada na claim e só
+então inspeciona os bytes. Um namespace que permanece ativo é medido por um
+snapshot guardado, mas nunca entra no volume liberável. Se o proprietário fecha
+durante esse snapshot, o serviço repete a inspeção depois da quiescência. Uma
+reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão;
+outro processo, portanto, não pode classificar aquele namespace como liberável.
 
 A liberação parcial adquire apenas reservas disponíveis e remove somente esses
 Projetos. A limpeza total exige simultaneamente o gate de operação sem
@@ -163,8 +167,12 @@ verificação; qualquer falha também passa por ela antes da limpeza do scratch.
 Resultados Rust são aceitos apenas por uma linha terminal exata `... ok`, e o
 frontend por uma asserção JSON exata com estado `passed`; `ignored`, pendente,
 duplicata ou simples substring fecham o gate. Fixtures negativas exercitam o
-parser. A matriz acima também é validada como conjunto exato e cada remoção
-unitária é usada como fixture negativa antes de aceitar as provas da rodada.
+parser. Os nove checks transitivos de recuperação, protocolo, sidecar,
+temporários, cancelamento, pausa causal e Canvas/WebView2 também formam um
+conjunto nominal exato: remover qualquer um, duplicar um nome ou marcar um deles
+como falho rejeita a evidência e o critério do tracer 44. A matriz acima também
+é validada como conjunto exato e cada remoção unitária é usada como fixture
+negativa antes de aceitar as provas da rodada.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).

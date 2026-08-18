@@ -98,21 +98,50 @@ impl CacheService {
     }
 
     pub(crate) fn measure(&self) -> Result<CacheServiceStatus, CacheServiceError> {
-        let usages = self.inspect()?;
-        let occupied_bytes = sum_usage(&usages)?;
+        let namespaces = self.list_namespaces()?;
+        let mut occupied_bytes = 0_u64;
         let mut releasable_bytes = 0_u64;
+        let mut namespace_count = 0_usize;
         let mut releasable_namespace_count = 0_usize;
-        for usage in &usages {
-            match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
+        for paths in namespaces {
+            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(_reservation) => {
-                    synchronize_cache_writer(usage.paths())?;
-                    releasable_bytes =
-                        releasable_bytes.checked_add(usage.bytes()).ok_or_else(|| {
-                            CacheServiceError::Storage("volume de Cache excedeu u64".into())
-                        })?;
+                    synchronize_cache_writer(&paths)?;
+                    let Some(usage) = self.inspect_namespace(&paths)? else {
+                        continue;
+                    };
+                    occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
+                    releasable_bytes = checked_add_usage(releasable_bytes, usage.bytes())?;
+                    namespace_count += 1;
                     releasable_namespace_count += 1;
                 }
-                Err(NamedMutexError::Conflict) => {}
+                Err(NamedMutexError::Conflict) => {
+                    // An active namespace cannot be quiesced without blocking its editor. Take a
+                    // guarded snapshot, then retry the reservation: if the owner closed during
+                    // inspection, discard that snapshot and measure again after quiescence.
+                    let active_snapshot = self.inspect_namespace(&paths)?;
+                    match namespace_mutex(&self.app_paths, &paths).try_acquire() {
+                        Ok(_reservation) => {
+                            synchronize_cache_writer(&paths)?;
+                            let Some(usage) = self.inspect_namespace(&paths)? else {
+                                continue;
+                            };
+                            occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
+                            releasable_bytes = checked_add_usage(releasable_bytes, usage.bytes())?;
+                            namespace_count += 1;
+                            releasable_namespace_count += 1;
+                        }
+                        Err(NamedMutexError::Conflict) => {
+                            if let Some(usage) = active_snapshot {
+                                occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
+                                namespace_count += 1;
+                            }
+                        }
+                        Err(NamedMutexError::Unavailable(reason)) => {
+                            return Err(CacheServiceError::Reservation(reason));
+                        }
+                    }
+                }
                 Err(NamedMutexError::Unavailable(reason)) => {
                     return Err(CacheServiceError::Reservation(reason));
                 }
@@ -121,21 +150,23 @@ impl CacheService {
         Ok(CacheServiceStatus {
             occupied_bytes,
             releasable_bytes,
-            namespace_count: usages.len(),
+            namespace_count,
             releasable_namespace_count,
             clear_all_scheduled: self.clear_is_scheduled()?,
         })
     }
 
     pub(crate) fn free_closed_projects(&self) -> Result<CacheFreeResult, CacheServiceError> {
-        let usages = self.inspect()?;
+        let namespaces = self.list_namespaces()?;
         let mut reserved = Vec::new();
         let mut skipped_active_namespace_count = 0_usize;
-        for usage in usages {
-            match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
+        for paths in namespaces {
+            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(reservation) => {
-                    synchronize_cache_writer(usage.paths())?;
-                    reserved.push((usage, reservation));
+                    synchronize_cache_writer(&paths)?;
+                    if let Some(usage) = self.inspect_namespace(&paths)? {
+                        reserved.push((usage, reservation));
+                    }
                 }
                 Err(NamedMutexError::Conflict) => skipped_active_namespace_count += 1,
                 Err(NamedMutexError::Unavailable(reason)) => {
@@ -207,14 +238,15 @@ impl CacheService {
                 return Err(CacheServiceError::Reservation(reason));
             }
         };
-        let usages = self.inspect()?;
-        let measured_releasable_bytes = sum_usage(&usages)?;
-        let mut reservations = Vec::with_capacity(usages.len());
-        for usage in &usages {
-            match namespace_mutex(&self.app_paths, usage.paths()).try_acquire() {
+        let namespaces = self.list_namespaces()?;
+        let mut reserved = Vec::with_capacity(namespaces.len());
+        for paths in namespaces {
+            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(reservation) => {
-                    synchronize_cache_writer(usage.paths())?;
-                    reservations.push(reservation);
+                    synchronize_cache_writer(&paths)?;
+                    if let Some(usage) = self.inspect_namespace(&paths)? {
+                        reserved.push((usage, reservation));
+                    }
                 }
                 Err(NamedMutexError::Conflict) => return Ok(None),
                 Err(NamedMutexError::Unavailable(reason)) => {
@@ -222,9 +254,12 @@ impl CacheService {
                 }
             }
         }
+        let measured_releasable_bytes = reserved.iter().try_fold(0_u64, |total, (usage, _)| {
+            checked_add_usage(total, usage.bytes())
+        })?;
         let mut freed_bytes = 0_u64;
         let mut removed_namespace_count = 0_usize;
-        for usage in &usages {
+        for (usage, _reservation) in reserved {
             if self
                 .app_paths
                 .clear_project_cache(usage.paths())
@@ -236,7 +271,6 @@ impl CacheService {
                 removed_namespace_count += 1;
             }
         }
-        drop(reservations);
         self.clear_schedule_marker()?;
         Ok(Some(CacheFreeResult {
             measured_releasable_bytes,
@@ -246,9 +280,18 @@ impl CacheService {
         }))
     }
 
-    fn inspect(&self) -> Result<Vec<CacheNamespaceUsage>, CacheServiceError> {
+    fn list_namespaces(&self) -> Result<Vec<CachePathPlan>, CacheServiceError> {
         self.app_paths
-            .inspect_cache_namespaces()
+            .list_cache_namespaces()
+            .map_err(|error| CacheServiceError::Storage(error.to_string()))
+    }
+
+    fn inspect_namespace(
+        &self,
+        paths: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, CacheServiceError> {
+        self.app_paths
+            .inspect_cache_namespace(paths)
             .map_err(|error| CacheServiceError::Storage(error.to_string()))
     }
 
@@ -375,12 +418,10 @@ fn mutex_name(app_paths: &AppPaths, kind: &str, scope: &str) -> String {
     format!(r"Local\MyAlbuns.{kind}.v1.{suffix}")
 }
 
-fn sum_usage(usages: &[CacheNamespaceUsage]) -> Result<u64, CacheServiceError> {
-    usages.iter().try_fold(0_u64, |total, usage| {
-        total
-            .checked_add(usage.bytes())
-            .ok_or_else(|| CacheServiceError::Storage("volume de Cache excedeu u64".into()))
-    })
+fn checked_add_usage(total: u64, bytes: u64) -> Result<u64, CacheServiceError> {
+    total
+        .checked_add(bytes)
+        .ok_or_else(|| CacheServiceError::Storage("volume de Cache excedeu u64".into()))
 }
 
 fn map_reservation_error(error: NamedMutexError) -> CacheServiceError {
@@ -483,10 +524,11 @@ mod tests {
     };
     use myalbuns_imaging_protocol::{CACHE_REPRESENTATION_VERSION, CacheRepresentationPolicy};
     use myalbuns_paths::{
-        AppPaths, CacheArtifactFormat, OperationPathContext, project_data_namespace,
+        AppPaths, CacheArtifactFormat, CachePathPlan, OperationPathContext, ProcessInstanceId,
+        project_data_namespace,
     };
     use windows_sys::Win32::{
-        Foundation::{CloseHandle, WAIT_OBJECT_0, WAIT_TIMEOUT},
+        Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT},
         System::Threading::{OpenProcess, WaitForSingleObject},
     };
 
@@ -507,6 +549,7 @@ mod tests {
     const HOST_DEATH_READY_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_READY";
     const HOST_DEATH_NAMESPACE_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_NAMESPACE";
     const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
+    const ABANDONED_CACHE_PAYLOAD: &[u8] = b"partial Cache payload";
 
     fn app_paths(root: &Path) -> AppPaths {
         let roaming = root.join("roaming");
@@ -548,6 +591,152 @@ mod tests {
             CreateAuthorization::CreateOnly,
         ))
         .expect("the Project identity is authorized")
+    }
+
+    fn closed_cache_with_stale_writer_claim(
+        root: &Path,
+        namespace: &str,
+        payload: &[u8],
+    ) -> (AppPaths, CachePathPlan) {
+        let paths = app_paths(root);
+        let cache = paths
+            .project_cache(namespace)
+            .expect("the closed Cache namespace is valid");
+        drop(
+            paths
+                .prepare_cache_storage(&cache)
+                .expect("the closed Cache storage is prepared"),
+        );
+        std::fs::write(cache.media_directory().join("payload.bin"), payload)
+            .expect("the closed Cache payload is writable");
+        let current = ProcessInstanceId::current().expect("the test process has an identity");
+        let stale_creation_time = current
+            .creation_time_wire()
+            .checked_add(1)
+            .expect("the process FILETIME is not maximal");
+        let claim = serde_json::json!({
+            "schemaVersion": 1,
+            "process": {
+                "processId": current.process_id(),
+                "creationTime": stale_creation_time,
+            },
+        });
+        std::fs::write(
+            cache.root().join(".processor-writer.v1.json"),
+            serde_json::to_vec(&claim).expect("the stale writer claim serializes"),
+        )
+        .expect("the stale writer claim is writable");
+        (paths, cache)
+    }
+
+    struct DeadHostCacheFixture {
+        _root: tempfile::TempDir,
+        paths: AppPaths,
+        core: ProjectCore,
+        project_path: std::path::PathBuf,
+        cache: CachePathPlan,
+        abandoned: std::path::PathBuf,
+        writer_claim: std::path::PathBuf,
+        processor: HANDLE,
+    }
+
+    impl DeadHostCacheFixture {
+        fn assert_processor_signaled(&self) {
+            // SAFETY: the fixture keeps its exact Processor handle open until Drop.
+            assert_eq!(
+                unsafe { WaitForSingleObject(self.processor, 0) },
+                WAIT_OBJECT_0
+            );
+        }
+    }
+
+    impl Drop for DeadHostCacheFixture {
+        fn drop(&mut self) {
+            // SAFETY: the fixture owns this non-null handle and closes it exactly once.
+            unsafe { CloseHandle(self.processor) };
+        }
+    }
+
+    fn dead_host_cache_fixture() -> DeadHostCacheFixture {
+        let root = tempfile::tempdir().expect("temporary Host-death Cache fixture");
+        let ready = root.path().join("processor.ready");
+        let paths = app_paths(root.path());
+        let project_path = root.path().join("Projeto.myalbuns");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, project_path.clone());
+        let namespace_name = project_data_namespace(&project.project_id().hyphenated().to_string());
+        drop(project);
+        let mut host = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("cache_service::tests::cache_host_process_with_active_processor")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(HOST_DEATH_ROOT_ENV, root.path())
+            .env(HOST_DEATH_PROJECT_ENV, &project_path)
+            .env(HOST_DEATH_READY_ENV, &ready)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the independent Project Host starts");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !ready.is_file() {
+            assert!(
+                host.try_wait()
+                    .expect("the Host state is readable")
+                    .is_none(),
+                "the Host exited before its contained Processor became active"
+            );
+            assert!(
+                Instant::now() < deadline,
+                "the Processor readiness timed out"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+        let processor_id = std::fs::read_to_string(&ready)
+            .expect("the Processor readiness is readable")
+            .trim()
+            .parse::<u32>()
+            .expect("the Processor reports its PID");
+        let cache = paths
+            .project_cache(&namespace_name)
+            .expect("the authorized namespace plan is valid");
+        let abandoned = cache
+            .preview_temporary_file(
+                "host-death-media",
+                "abandoned-generation",
+                CacheArtifactFormat::Jpeg,
+                processor_id,
+            )
+            .expect("the Processor temporary path is valid");
+        assert!(abandoned.is_file());
+        let writer_claim = cache.root().join(".processor-writer.v1.json");
+        assert!(
+            writer_claim.is_file(),
+            "the Host publishes the exact contained writer before dispatch"
+        );
+
+        // SAFETY: the PID was published by the live child; the returned fixture
+        // owns and closes this exact synchronization handle.
+        let processor = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, processor_id) };
+        assert!(!processor.is_null(), "the active Processor can be observed");
+        // SAFETY: processor is a live synchronization handle.
+        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_TIMEOUT);
+
+        host.kill()
+            .expect("the Project Host is terminated abruptly");
+        host.wait().expect("the terminated Host is reaped");
+
+        DeadHostCacheFixture {
+            _root: root,
+            paths,
+            core,
+            project_path,
+            cache,
+            abandoned,
+            writer_claim,
+            processor,
+        }
     }
 
     #[test]
@@ -608,6 +797,43 @@ mod tests {
                 .freed_bytes,
             10
         );
+    }
+
+    #[test]
+    fn free_closed_projects_quiesces_writers_before_measuring_removed_bytes() {
+        let root = tempfile::tempdir().expect("temporary free-after-writer fixture");
+        let payload = b"closed Cache payload";
+        let (paths, cache) =
+            closed_cache_with_stale_writer_claim(root.path(), "closed-free", payload);
+
+        let freed = CacheService::new(paths)
+            .free_closed_projects()
+            .expect("the stale writer is quiesced before freeing its namespace");
+
+        assert_eq!(freed.measured_releasable_bytes, payload.len() as u64);
+        assert_eq!(freed.freed_bytes, payload.len() as u64);
+        assert_eq!(freed.removed_namespace_count, 1);
+        assert!(!cache.root().exists());
+    }
+
+    #[test]
+    fn clear_all_quiesces_writers_before_measuring_removed_bytes() {
+        let root = tempfile::tempdir().expect("temporary clear-after-writer fixture");
+        let payload = b"clearable Cache payload";
+        let (paths, cache) =
+            closed_cache_with_stale_writer_claim(root.path(), "closed-clear", payload);
+
+        let cleared = CacheService::new(paths)
+            .clear_all_or_schedule()
+            .expect("the stale writer is quiesced before total cleanup");
+
+        let CacheClearAllOutcome::Cleared { result } = cleared else {
+            panic!("a closed namespace can be cleared immediately");
+        };
+        assert_eq!(result.measured_releasable_bytes, payload.len() as u64);
+        assert_eq!(result.freed_bytes, payload.len() as u64);
+        assert_eq!(result.removed_namespace_count, 1);
+        assert!(!cache.root().exists());
     }
 
     #[test]
@@ -888,95 +1114,77 @@ mod tests {
 
     #[test]
     fn reopening_after_host_death_recovers_the_contained_processors_temporary() {
-        let root = tempfile::tempdir().expect("temporary Host-death Cache fixture");
-        let ready = root.path().join("processor.ready");
-        let paths = app_paths(root.path());
-        let project_path = root.path().join("Projeto.myalbuns");
-        let core = ProjectCore::new().with_identity_storage_roots(
-            root.path().join("leases"),
-            root.path().join("identities"),
+        let fixture = dead_host_cache_fixture();
+        let measured = CacheService::new(fixture.paths.clone())
+            .measure()
+            .expect("measurement quiesces the dead Host's contained writer");
+        assert_eq!(
+            measured.occupied_bytes,
+            ABANDONED_CACHE_PAYLOAD.len() as u64,
+            "the consumed writer claim is not reported as occupied Cache"
         );
-        let project = create_project(&core, project_path.clone());
-        let namespace_name = project_data_namespace(&project.project_id().hyphenated().to_string());
-        drop(project);
-        let mut host = Command::new(env::current_exe().expect("the test executable is known"))
-            .arg("cache_service::tests::cache_host_process_with_active_processor")
-            .args(["--ignored", "--exact", "--nocapture"])
-            .env(HOST_DEATH_ROOT_ENV, root.path())
-            .env(HOST_DEATH_PROJECT_ENV, &project_path)
-            .env(HOST_DEATH_READY_ENV, &ready)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .expect("the independent Project Host starts");
-        let deadline = Instant::now() + Duration::from_secs(15);
-        while !ready.is_file() {
-            assert!(
-                host.try_wait()
-                    .expect("the Host state is readable")
-                    .is_none(),
-                "the Host exited before its contained Processor became active"
-            );
-            assert!(
-                Instant::now() < deadline,
-                "the Processor readiness timed out"
-            );
-            thread::sleep(Duration::from_millis(20));
-        }
-        let processor_id = std::fs::read_to_string(&ready)
-            .expect("the Processor readiness is readable")
-            .trim()
-            .parse::<u32>()
-            .expect("the Processor reports its PID");
-        let cache = paths
-            .project_cache(&namespace_name)
-            .expect("the authorized namespace plan is valid");
-        let abandoned = cache
-            .preview_temporary_file(
-                "host-death-media",
-                "abandoned-generation",
-                CacheArtifactFormat::Jpeg,
-                processor_id,
-            )
-            .expect("the Processor temporary path is valid");
-        assert!(abandoned.is_file());
-        let writer_claim = cache.root().join(".processor-writer.v1.json");
-        assert!(
-            writer_claim.is_file(),
-            "the Host publishes the exact contained writer before dispatch"
-        );
+        assert_eq!(measured.releasable_bytes, measured.occupied_bytes);
+        fixture.assert_processor_signaled();
 
-        // SAFETY: the PID was published by the live child and the handle is
-        // closed after the Job-termination assertion below.
-        let processor = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, processor_id) };
-        assert!(!processor.is_null(), "the active Processor can be observed");
-        // SAFETY: processor is a live synchronization handle.
-        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_TIMEOUT);
-
-        host.kill()
-            .expect("the Project Host is terminated abruptly");
-        host.wait().expect("the terminated Host is reaped");
-
-        let reopened = core
-            .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        let reopened = fixture
+            .core
+            .open_editable(OpenProjectRequest::new(project_location(
+                &fixture.project_path,
+            )))
             .expect("the Project reopens after the dead Host releases its authority");
-        let owner = CacheService::new(paths)
+        let owner = CacheService::new(fixture.paths.clone())
             .reserve_namespace(reopened.identity_authority())
             .expect("the new Host reserves and recovers the namespace");
-        assert_eq!(owner.namespace().paths(), &cache);
-        // SAFETY: reserve_namespace must not return until the abandoned
-        // Processor instance has reached its signaled terminal state.
-        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_OBJECT_0);
-        // SAFETY: processor is owned by this test and no longer used.
-        unsafe { CloseHandle(processor) };
+        assert_eq!(owner.namespace().paths(), &fixture.cache);
+        fixture.assert_processor_signaled();
         assert!(
-            !abandoned.exists(),
+            !fixture.abandoned.exists(),
             "exclusive startup recovery removes the proved-abandoned temporary"
         );
         assert!(
-            !writer_claim.exists(),
+            !fixture.writer_claim.exists(),
             "recovery removes the consumed exact writer claim"
         );
+    }
+
+    #[test]
+    fn free_closed_projects_after_host_death_waits_before_measuring_and_removing() {
+        let fixture = dead_host_cache_fixture();
+
+        let freed = CacheService::new(fixture.paths.clone())
+            .free_closed_projects()
+            .expect("freeing waits for the dead Host's contained writer");
+
+        assert_eq!(
+            freed.measured_releasable_bytes,
+            ABANDONED_CACHE_PAYLOAD.len() as u64
+        );
+        assert_eq!(freed.freed_bytes, freed.measured_releasable_bytes);
+        assert_eq!(freed.removed_namespace_count, 1);
+        assert_eq!(freed.skipped_active_namespace_count, 0);
+        fixture.assert_processor_signaled();
+        assert!(!fixture.cache.root().exists());
+    }
+
+    #[test]
+    fn clear_all_after_host_death_waits_before_measuring_and_removing() {
+        let fixture = dead_host_cache_fixture();
+
+        let outcome = CacheService::new(fixture.paths.clone())
+            .clear_all_or_schedule()
+            .expect("total cleanup waits for the dead Host's contained writer");
+
+        let CacheClearAllOutcome::Cleared { result } = outcome else {
+            panic!("the abandoned Host no longer blocks immediate total cleanup");
+        };
+        assert_eq!(
+            result.measured_releasable_bytes,
+            ABANDONED_CACHE_PAYLOAD.len() as u64
+        );
+        assert_eq!(result.freed_bytes, result.measured_releasable_bytes);
+        assert_eq!(result.removed_namespace_count, 1);
+        fixture.assert_processor_signaled();
+        assert!(!fixture.cache.root().exists());
     }
 
     #[test]
@@ -1105,7 +1313,7 @@ mod tests {
             .begin_file_publication(&temporary, &final_path)
             .expect("the Processor owns an in-flight publication");
         publication
-            .write_all(b"partial Cache payload")
+            .write_all(ABANDONED_CACHE_PAYLOAD)
             .expect("the Processor writes a partial payload");
         publication.flush().expect("the partial payload is visible");
         std::fs::write(ready, std::process::id().to_string())

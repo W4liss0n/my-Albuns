@@ -745,6 +745,93 @@ function Test-ProofParserContracts {
     return $cases.Count
 }
 
+$expectedImagingRecoveryCheckNames = @(
+    'protocol'
+    'cache-temporary-cleanup'
+    'imaging-sidecar-build'
+    'production-recovery-integration'
+    'cache-webview-canvas-export-journey'
+    'obsolete-cache-cancellation-integration'
+    'causal-cache-pause-integration'
+    'actual-tauri-webview2-build'
+    'actual-tauri-album-canvas-pixi-webview2'
+)
+
+function Test-ExactPassedCheckSet(
+    [object[]] $Checks,
+    [string[]] $ExpectedNames
+) {
+    $actual = @($Checks)
+    if ($actual.Count -ne @($ExpectedNames).Count) {
+        return $false
+    }
+    $expected = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($name in @($ExpectedNames)) {
+        if (-not $expected.Add([string] $name)) {
+            throw "The expected recovery check set duplicates '$name'."
+        }
+    }
+    $seen = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::Ordinal
+    )
+    foreach ($check in $actual) {
+        $name = [string] $check.name
+        if (-not [bool] $check.passed `
+                -or [string]::IsNullOrWhiteSpace($name) `
+                -or -not $expected.Contains($name) `
+                -or -not $seen.Add($name)) {
+            return $false
+        }
+    }
+    return $seen.Count -eq $expected.Count
+}
+
+function Test-ImagingRecoveryCheckSetContracts([string[]] $ExpectedNames) {
+    $valid = @(
+        $ExpectedNames | ForEach-Object {
+            [pscustomobject]@{ name = $_; passed = $true }
+        }
+    )
+    if (-not (Test-ExactPassedCheckSet -Checks $valid -ExpectedNames $ExpectedNames)) {
+        throw 'The exact recovery check validator rejected its complete passing fixture.'
+    }
+    $assertionCount = 1
+    for ($removed = 0; $removed -lt $valid.Count; $removed++) {
+        $fixture = @(
+            for ($index = 0; $index -lt $valid.Count; $index++) {
+                if ($index -ne $removed) { $valid[$index] }
+            }
+        )
+        if (Test-ExactPassedCheckSet -Checks $fixture -ExpectedNames $ExpectedNames) {
+            throw "The recovery check validator accepted a fixture without '$($valid[$removed].name)'."
+        }
+        $assertionCount += 1
+    }
+    $duplicate = @(
+        for ($index = 0; $index -lt $valid.Count; $index++) {
+            if ($index -eq ($valid.Count - 1)) { $valid[0] } else { $valid[$index] }
+        }
+    )
+    if (Test-ExactPassedCheckSet -Checks $duplicate -ExpectedNames $ExpectedNames) {
+        throw 'The recovery check validator accepted a duplicate in place of a required check.'
+    }
+    $assertionCount += 1
+    $failed = @(
+        for ($index = 0; $index -lt $valid.Count; $index++) {
+            [pscustomobject]@{
+                name = $valid[$index].name
+                passed = ($index -ne 0)
+            }
+        }
+    )
+    if (Test-ExactPassedCheckSet -Checks $failed -ExpectedNames $ExpectedNames) {
+        throw 'The recovery check validator accepted a required check that did not pass.'
+    }
+    return $assertionCount + 1
+}
+
 function ConvertFrom-DesignMatrix([string] $Markdown) {
     $section = [regex]::Match(
         $Markdown,
@@ -1044,6 +1131,14 @@ try {
         assertionCount = $proofParserAssertionCount
     })
 
+    $imagingCheckSetAssertionCount = Test-ImagingRecoveryCheckSetContracts `
+        -ExpectedNames $expectedImagingRecoveryCheckNames
+    $checks.Add([ordered]@{
+        name = 'fail-closed-imaging-recovery-check-set'
+        passed = ($imagingCheckSetAssertionCount -eq 12)
+        assertionCount = $imagingCheckSetAssertionCount
+    })
+
     $cleanupProbe = Invoke-OwnedCleanupProbe
     $checks.Add([ordered]@{
         name = 'owned-process-listener-cleanup-probe'
@@ -1222,14 +1317,17 @@ try {
         )
     $imagingEvidence = Get-Content -LiteralPath $imagingEvidencePath -Raw |
         ConvertFrom-Json
-    $imagingCheckCount = @($imagingEvidence.checks).Count
+    $imagingChecks = @($imagingEvidence.checks)
+    $imagingCheckCount = $imagingChecks.Count
     $imagingFailedCheckCount = @(
         $imagingEvidence.checks | Where-Object { -not $_.passed }
     ).Count
     if ($imagingEvidence.sourceInputsDirty `
             -or $imagingEvidence.gitCommit -ne $sourceBefore.gitCommit `
-            -or $imagingCheckCount -lt 1 `
-            -or $imagingFailedCheckCount -ne 0) {
+            -or $imagingFailedCheckCount -ne 0 `
+            -or -not (Test-ExactPassedCheckSet `
+                -Checks $imagingChecks `
+                -ExpectedNames $expectedImagingRecoveryCheckNames)) {
         throw "The real Processor/Cache/Canvas recovery evidence is not authoritative: sourceInputsDirty=$($imagingEvidence.sourceInputsDirty), gitCommit=$($imagingEvidence.gitCommit), expectedCommit=$($sourceBefore.gitCommit), checks=$imagingCheckCount, failed=$imagingFailedCheckCount."
     }
     $checks.Add([ordered]@{
@@ -1562,7 +1660,17 @@ try {
             -Requirements @(
                 (New-RustProof -Name 'terminating_the_host_closes_its_job_and_terminates_the_active_processor')
                 (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
+                (New-RustProof -Name 'free_closed_projects_after_host_death_waits_before_measuring_and_removing')
+                (New-RustProof -Name 'clear_all_after_host_death_waits_before_measuring_and_removing')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'protocol')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'cache-temporary-cleanup')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'imaging-sidecar-build')
                 (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'production-recovery-integration')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'cache-webview-canvas-export-journey')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'obsolete-cache-cancellation-integration')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'causal-cache-pause-integration')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'actual-tauri-webview2-build')
+                (New-ExactProof -Source 'imaging-recovery' -Text $imagingProofText -Name 'actual-tauri-album-canvas-pixi-webview2')
             )
         New-VerifiedCriterion `
             -Name 'local-unc-mapped-and-long-paths' `
@@ -1579,6 +1687,10 @@ try {
                 (New-RustProof -Name 'schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup')
                 (New-RustProof -Name 'project_open_during_free_space_is_serialized_by_namespace_reservation')
                 (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
+                (New-RustProof -Name 'free_closed_projects_quiesces_writers_before_measuring_removed_bytes')
+                (New-RustProof -Name 'clear_all_quiesces_writers_before_measuring_removed_bytes')
+                (New-RustProof -Name 'free_closed_projects_after_host_death_waits_before_measuring_and_removing')
+                (New-RustProof -Name 'clear_all_after_host_death_waits_before_measuring_and_removing')
                 (New-RustProof -Name 'reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation')
             )
         New-VerifiedCriterion `
@@ -1632,6 +1744,7 @@ try {
             imaging = [ordered]@{
                 schemaVersion = $imagingEvidence.schemaVersion
                 checks = $imagingCheckCount
+                checkNames = @($imagingChecks | ForEach-Object { $_.name })
                 cache = $imagingEvidence.evidence.cache
                 canvas = $imagingEvidence.evidence.canvas
                 pause = $imagingEvidence.evidence.pause

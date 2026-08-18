@@ -463,6 +463,18 @@ pub(crate) fn prepare_cache_storage(
 pub(crate) fn inspect_cache_namespaces(
     app_paths: &AppPaths,
 ) -> Result<Vec<CacheNamespaceUsage>, AppPathsError> {
+    let mut usages = Vec::new();
+    for paths in list_cache_namespaces(app_paths)? {
+        if let Some(usage) = inspect_cache_namespace(app_paths, &paths)? {
+            usages.push(usage);
+        }
+    }
+    Ok(usages)
+}
+
+pub(crate) fn list_cache_namespaces(
+    app_paths: &AppPaths,
+) -> Result<Vec<CachePathPlan>, AppPathsError> {
     let local_data_root = app_paths
         .local_root
         .parent()
@@ -474,7 +486,7 @@ pub(crate) fn inspect_cache_namespaces(
     let Some(cache) = open_existing_direct_child(&application, &app_paths.cache_dir())? else {
         return Ok(Vec::new());
     };
-    let mut usages = Vec::new();
+    let mut namespaces = Vec::new();
     for entry in
         fs::read_dir(&cache.logical_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
     {
@@ -494,14 +506,24 @@ pub(crate) fn inspect_cache_namespaces(
         let Some(project) = open_existing_direct_child(&cache, &path)? else {
             continue;
         };
-        let paths = CachePathPlan::from_root(path);
-        usages.push(CacheNamespaceUsage {
-            bytes: measure_project_cache(&project, &paths)?,
-            paths,
-        });
+        drop(project);
+        namespaces.push(CachePathPlan::from_root(path));
     }
-    usages.sort_by(|left, right| left.paths.root.cmp(&right.paths.root));
-    Ok(usages)
+    namespaces.sort_by(|left, right| left.root.cmp(&right.root));
+    Ok(namespaces)
+}
+
+pub(crate) fn inspect_cache_namespace(
+    app_paths: &AppPaths,
+    paths: &CachePathPlan,
+) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
+    let Some(project_cache) = open_existing_project_cache(app_paths, paths)? else {
+        return Ok(None);
+    };
+    Ok(Some(CacheNamespaceUsage {
+        bytes: measure_project_cache(project_cache.project(), paths)?,
+        paths: paths.clone(),
+    }))
 }
 
 fn measure_project_cache(
