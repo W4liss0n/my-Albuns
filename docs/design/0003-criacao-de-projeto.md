@@ -18,8 +18,8 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 
 `Novo Projeto` aparece como contexto no título da janela e não se repete na
 área de conteúdo. A faixa superior compartilhada centraliza as duas etapas no
-espaço disponível à esquerda de `Predefinição` e mantém esse controle alinhado
-à direita durante todo o fluxo.
+espaço disponível à esquerda do controle `Modelo inicial` e mantém esse controle
+alinhado à direita durante todo o fluxo.
 
 ### Configurações
 
@@ -51,7 +51,8 @@ etapa não repete essa informação em um card de aviso.
 
 #### Estado temporário das Predefinições
 
-`Predefinição` é um **PLACEHOLDER UI** enquanto não existir contrato de
+`Predefinição`, apresentada na interface como `Modelo inicial`, é um
+**PLACEHOLDER UI** enquanto não existir contrato de
 aplicação e persistência no backend. As opções incorporadas e as opções salvas
 pelo usuário funcionam somente na sessão atual da tela e guardam, em memória, os
 valores de `Configurações` e `Personalização`. Reabrir o aplicativo descarta as
@@ -68,7 +69,7 @@ controles, sem repetir essas informações em um card de resumo.
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│    1 Configurações ─ 2 Personalização        Predefinição [···]  │
+│    1 Configurações ─ 2 Personalização        Modelo inicial [⌄]  │
 ├───────────────────────────────────────────┬──────────────────────┤
 │  Lâmina aberta · quantidade · guias       │  Unidade              │
 │          prévia proporcional              │  Dimensão fechada     │
@@ -181,7 +182,7 @@ Os controles podem rolar dentro de sua região quando necessário, sem retirar a
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│    1 Configurações ─ 2 Personalização        Predefinição [···]  │
+│    1 Configurações ─ 2 Personalização        Modelo inicial [⌄]  │
 ├───────────────────────────────────────────┬──────────────────────┤
 │                                           │  Background          │
 │                                           │  Overlay             │

@@ -1,5 +1,5 @@
 import { forwardRef, useId, useRef, useState } from "react";
-import { Minus, Plus, Save } from "lucide-react";
+import { ChevronDown, Minus, Plus, Save } from "lucide-react";
 
 import type {
   NewProjectConfiguration,
@@ -657,26 +657,29 @@ function PresetControl({
     <ControlSection
       className="new-project-preset-control"
       dataPlaceholderFeature="new-project-presets"
-      title="Predefinição"
+      title="Modelo inicial"
     >
       <div className="new-project-preset-row">
         <label className="ui-visually-hidden" htmlFor={presetId}>
-          Predefinição
+          Modelo inicial
         </label>
-        <select
-          id={presetId}
-          onChange={(event) => onApply(event.target.value)}
-          value={selectedPresetId}
-        >
-          <option value="">Nenhuma</option>
-          {presets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.name}
-            </option>
-          ))}
-        </select>
+        <span className="new-project-preset-select">
+          <select
+            id={presetId}
+            onChange={(event) => onApply(event.target.value)}
+            value={selectedPresetId}
+          >
+            <option value="">Nenhuma</option>
+            {presets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+              </option>
+            ))}
+          </select>
+          <AppIcon icon={ChevronDown} size={14} />
+        </span>
         <button
-          aria-label="Salvar configuração atual como predefinição"
+          aria-label="Salvar configuração atual como modelo"
           onClick={() => setIsSaving((current) => !current)}
           type="button"
         >
@@ -684,22 +687,22 @@ function PresetControl({
         </button>
         {isSaving ? (
           <form
-            aria-label="Salvar predefinição"
+            aria-label="Salvar modelo"
             className="new-project-save-preset"
             onSubmit={(event) => {
               event.preventDefault();
               confirmSave();
             }}
           >
-            <strong>Salvar predefinição</strong>
+            <strong>Salvar modelo</strong>
             <label className="ui-visually-hidden" htmlFor={presetNameId}>
-              Nome da predefinição
+              Nome do modelo
             </label>
             <input
               autoFocus
               id={presetNameId}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Nome da predefinição"
+              placeholder="Nome do modelo"
               type="text"
               value={name}
             />

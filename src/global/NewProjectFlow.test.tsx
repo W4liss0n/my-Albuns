@@ -109,15 +109,15 @@ test("shares one header between the steps and the preset control", async () => {
   const header = steps.closest("header");
   expect(header).not.toBeNull();
   expect(header).toContainElement(
-    screen.getByRole("combobox", { name: "Predefinição" }),
+    screen.getByRole("combobox", { name: "Modelo inicial" }),
   );
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(
-    await screen.findByRole("combobox", { name: "Predefinição" }),
+    await screen.findByRole("combobox", { name: "Modelo inicial" }),
   ).toBeVisible();
   expect(header).toContainElement(
-    screen.getByRole("combobox", { name: "Predefinição" }),
+    screen.getByRole("combobox", { name: "Modelo inicial" }),
   );
 });
 
@@ -149,7 +149,9 @@ test("validates and creates with the complete neutral configuration", async () =
     screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
   ).toHaveValue("18");
   expect(
-    screen.getByRole("combobox", { name: "Predefinição" }).closest("section"),
+    screen
+      .getByRole("combobox", { name: "Modelo inicial" })
+      .closest("section"),
   ).toHaveAttribute("data-placeholder-feature", "new-project-presets");
   await user.click(
     screen.getByRole("button", {
@@ -891,7 +893,7 @@ test("applies a reusable preset across both creation steps", async () => {
   );
 
   await user.selectOptions(
-    screen.getByRole("combobox", { name: "Predefinição" }),
+    screen.getByRole("combobox", { name: "Modelo inicial" }),
     "builtin-graphic-30",
   );
   expect(
@@ -937,16 +939,16 @@ test("keeps a custom preset across both steps for the current placeholder sessio
 
   await user.click(
     screen.getByRole("button", {
-      name: "Salvar configuração atual como predefinição",
+      name: "Salvar configuração atual como modelo",
     }),
   );
   await user.type(
-    screen.getByRole("textbox", { name: "Nome da predefinição" }),
+    screen.getByRole("textbox", { name: "Nome do modelo" }),
     "Estúdio 32 × 30",
   );
   await user.click(screen.getByRole("button", { name: "Salvar" }));
   expect(
-    screen.getByRole("combobox", { name: "Predefinição" }),
+    screen.getByRole("combobox", { name: "Modelo inicial" }),
   ).toHaveDisplayValue("Estúdio 32 × 30");
 
   fireEvent.change(
@@ -954,7 +956,7 @@ test("keeps a custom preset across both steps for the current placeholder sessio
     { target: { value: "300" } },
   );
   await user.selectOptions(
-    screen.getByRole("combobox", { name: "Predefinição" }),
+    screen.getByRole("combobox", { name: "Modelo inicial" }),
     "custom-1",
   );
   expect(

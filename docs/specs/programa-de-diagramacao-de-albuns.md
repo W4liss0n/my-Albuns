@@ -501,13 +501,13 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 - `Novo Projeto` abre um fluxo do próprio aplicativo composto por exatamente duas etapas: `Configurações` e `Personalização`.
 - `Novo Projeto` aparece como contexto no título da janela e não se repete na área de conteúdo.
-- A faixa superior compartilhada centraliza `Configurações` e `Personalização` no espaço disponível à esquerda de `Predefinição` e mantém esse controle alinhado à direita durante as duas etapas.
+- A faixa superior compartilhada centraliza `Configurações` e `Personalização` no espaço disponível à esquerda do controle `Modelo inicial` e mantém esse controle alinhado à direita durante as duas etapas.
 - `Configurações` apresenta diretamente Unidade, Dimensão da Lâmina fechada, Sangria, Área de segurança, quantidade inicial de Lâminas, Resolução do Projeto e Configuração das extremidades; esses dois últimos grupos não ficam recolhidos.
 - A largura informada para a Dimensão da Lâmina fechada corresponde à largura da Página; a interface mostra e envia ao núcleo a Dimensão da Lâmina aberta com o dobro dessa largura e a mesma altura.
 - Medidas apresentadas em polegadas usam no máximo três casas decimais, sem alterar o valor físico interno em micrômetros.
 - Uma prévia proporcional da Lâmina aberta ocupa a região principal. Medidas e DPI não são repetidos em um card de resumo.
 - A etapa não apresenta card de aviso sobre a abrangência ou a alteração posterior das medidas.
-- `Predefinição` é um placeholder de interface enquanto não possuir contrato de aplicação e persistência. As opções incorporadas ou salvas guardam `Configurações` e `Personalização` somente durante a sessão atual e permanecem marcadas no código como `PLACEHOLDER UI`.
+- A Predefinição é apresentada como `Modelo inicial` e continua sendo um placeholder de interface enquanto não possuir contrato de aplicação e persistência. As opções incorporadas ou salvas guardam `Configurações` e `Personalização` somente durante a sessão atual e permanecem marcadas no código como `PLACEHOLDER UI`.
 - `Continuar` valida todos os campos de `Configurações` e só avança quando o conjunto estiver válido.
 - Erros aparecem junto aos respectivos campos e o foco vai para o primeiro inválido; o fluxo não abre um modal genérico de validação.
 - `Personalização` contém Background padrão, Overlay padrão e Padrão dos Frames.

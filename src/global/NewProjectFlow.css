@@ -153,8 +153,10 @@
   position: relative;
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) 31px;
-  gap: 8px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  background: #fff;
+  grid-template-columns: minmax(0, 1fr) 33px;
 }
 
 .new-project-preset-control {
@@ -167,7 +169,41 @@
   justify-self: end;
 }
 
-.new-project-preset-row > select,
+.new-project-preset-control > h2 {
+  color: var(--ui-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.new-project-preset-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+  height: 31px;
+}
+
+.new-project-preset-select > select {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 34px 0 10px;
+  border: 0;
+  outline: 0;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 12.5px;
+}
+
+.new-project-preset-select > .ui-app-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--ui-text-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .new-project-save-preset > input,
 .new-project-field input,
 .new-project-field select {
@@ -184,18 +220,31 @@
 
 .new-project-preset-row > button {
   display: grid;
-  width: 31px;
+  width: 33px;
   height: 31px;
   padding: 0;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
+  border: 0;
+  border-left: 1px solid var(--ui-border);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: #fff;
+  background: transparent;
   place-items: center;
 }
 
-.new-project-preset-row > select:focus-visible,
-.new-project-preset-row > button:focus-visible,
+.new-project-preset-row > button:hover {
+  background: var(--ui-surface-muted);
+}
+
+.new-project-preset-row:focus-within {
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 2px #d9ebf7;
+}
+
+.new-project-preset-row > button:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -3px;
+}
+
 .new-project-save-preset > input:focus-visible,
 .new-project-field input:focus-visible,
 .new-project-field select:focus-visible {
