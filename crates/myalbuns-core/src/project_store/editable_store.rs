@@ -4,7 +4,7 @@ use std::{fs, io, path::PathBuf};
 use myalbuns_paths::{
     ExpectedObject, PhysicalFileIdentity, PhysicalIdentityEvidence, PreparedFileDestination,
     ProjectFileLock, ProjectFileLockError, ProjectTransitionBarrier, ProjectTransitionBarrierError,
-    ResolveError,
+    ResolveError, ResolvedObject,
 };
 use uuid::Uuid;
 
@@ -216,34 +216,39 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
         .read_bytes()
         .map_err(|error| OpenStoreError::Path(map_io_path(error)))?;
     let initial_revision = decode(&initial_bytes).map_err(map_open_decode_error)?;
-    let initial_physical_identity = initial.physical_identity();
-    let _barrier = ProjectTransitionBarrier::try_acquire(
+    let _barrier = match ProjectTransitionBarrier::try_acquire(
         initial.operational_path(),
         &initial_revision.project_id.hyphenated().to_string(),
-    )
-    .map_err(|error| match error {
-        ProjectTransitionBarrierError::Conflict => OpenStoreError::ProjectInUse {
-            project_id: initial_revision.project_id,
-            physical_identity: initial_physical_identity,
-        },
-        ProjectTransitionBarrierError::Unavailable => {
-            OpenStoreError::Path(PathFailure::Unavailable)
+    ) {
+        Ok(barrier) => barrier,
+        Err(ProjectTransitionBarrierError::Conflict) => {
+            return Err(classify_project_in_use_for_current_target(
+                &location,
+                &initial,
+                initial_revision.project_id,
+            ));
         }
-    })?;
+        Err(ProjectTransitionBarrierError::Unavailable) => {
+            return Err(OpenStoreError::Path(PathFailure::Unavailable));
+        }
+    };
     let resolved = location
         .root_bindings()
         .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
         .map_err(|error| OpenStoreError::Path(map_path_failure(error)))?;
-    let lock =
-        ProjectFileLock::try_acquire(resolved.operational_path()).map_err(|error| match error {
-            ProjectFileLockError::Conflict => OpenStoreError::ProjectInUse {
-                project_id: initial_revision.project_id,
-                physical_identity: initial_physical_identity,
-            },
-            ProjectFileLockError::Unavailable { .. } => {
-                OpenStoreError::Path(PathFailure::IoFailure)
-            }
-        })?;
+    let lock = match ProjectFileLock::try_acquire(resolved.operational_path()) {
+        Ok(lock) => lock,
+        Err(ProjectFileLockError::Conflict) => {
+            return Err(classify_project_in_use_for_current_target(
+                &location,
+                &initial,
+                initial_revision.project_id,
+            ));
+        }
+        Err(ProjectFileLockError::Unavailable { .. }) => {
+            return Err(OpenStoreError::Path(PathFailure::IoFailure));
+        }
+    };
     if lock.compare_physical(&resolved) != PhysicalIdentityEvidence::Same {
         return Err(OpenStoreError::IdentityIndeterminate);
     }
@@ -259,6 +264,29 @@ pub(crate) fn open_editable(location: ProjectLocation) -> Result<OpenedProject, 
         requires_schema_upgrade: decoded.requires_schema_upgrade,
         store: ProjectStore::from_verified(location, lock, bytes),
     })
+}
+
+#[cfg(windows)]
+fn classify_project_in_use_for_current_target(
+    location: &ProjectLocation,
+    expected: &ResolvedObject,
+    project_id: Uuid,
+) -> OpenStoreError {
+    let Ok(current) = location
+        .root_bindings()
+        .resolve_existing(location.project_path(), ExpectedObject::RegularFile)
+    else {
+        return OpenStoreError::IdentityIndeterminate;
+    };
+    match expected.compare_physical(&current) {
+        PhysicalIdentityEvidence::Same => OpenStoreError::ProjectInUse {
+            project_id,
+            physical_identity: expected.physical_identity(),
+        },
+        PhysicalIdentityEvidence::Different | PhysicalIdentityEvidence::Indeterminate => {
+            OpenStoreError::IdentityIndeterminate
+        }
+    }
 }
 
 #[cfg(not(windows))]
@@ -438,7 +466,9 @@ fn map_create_decode_error(error: DecodeFailure) -> CreateStoreError {
 fn map_io_path(error: io::Error) -> PathFailure {
     match error.kind() {
         io::ErrorKind::NotFound => PathFailure::NotFound,
-        io::ErrorKind::PermissionDenied => PathFailure::AccessDenied,
+        io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem => {
+            PathFailure::AccessDenied
+        }
         io::ErrorKind::InvalidInput => PathFailure::InvalidPath,
         io::ErrorKind::AlreadyExists => PathFailure::Conflict,
         _ => PathFailure::IoFailure,
@@ -467,5 +497,73 @@ impl TemporaryPublication {
 impl Drop for TemporaryPublication {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use std::{io, path::Path};
+
+    use myalbuns_paths::{ExpectedObject, OperationPathContext};
+    use uuid::Uuid;
+    use windows_sys::Win32::Foundation::ERROR_WRITE_PROTECT;
+
+    use super::{
+        OpenStoreError, ProjectLocation, classify_project_in_use_for_current_target, map_io_path,
+    };
+    use crate::project_store::PathFailure;
+
+    fn project_location(path: &Path) -> ProjectLocation {
+        let mut paths = OperationPathContext::new();
+        paths
+            .capture(path)
+            .expect("the public path seam captures the Project root");
+        ProjectLocation::new(path.to_path_buf(), paths.freeze())
+    }
+
+    #[test]
+    fn write_protected_media_is_an_access_denied_path() {
+        let error = io::Error::from_raw_os_error(ERROR_WRITE_PROTECT as i32);
+
+        assert_eq!(error.kind(), io::ErrorKind::ReadOnlyFilesystem);
+        assert_eq!(map_io_path(error), PathFailure::AccessDenied);
+    }
+
+    #[test]
+    fn project_in_use_is_forwarded_only_while_the_path_still_names_the_same_file() {
+        let fixture = tempfile::tempdir().expect("temporary Project fixture");
+        let project_path = fixture.path().join("Projeto.myalbuns");
+        let retired_path = fixture.path().join("Projeto anterior.myalbuns");
+        let replacement_path = fixture.path().join("Outro Projeto.myalbuns");
+        std::fs::write(&project_path, b"first physical Project")
+            .expect("the first physical Project exists");
+        std::fs::write(&replacement_path, b"replacement physical Project")
+            .expect("the replacement physical Project exists");
+        let location = project_location(&project_path);
+        let expected = location
+            .root_bindings()
+            .resolve_existing(&project_path, ExpectedObject::RegularFile)
+            .expect("the first physical Project is retained by handle");
+        let project_id = Uuid::new_v4();
+
+        assert_eq!(
+            classify_project_in_use_for_current_target(&location, &expected, project_id),
+            OpenStoreError::ProjectInUse {
+                project_id,
+                physical_identity: expected.physical_identity(),
+            },
+            "Same is the only state that may be forwarded for focus"
+        );
+
+        std::fs::rename(&project_path, &retired_path)
+            .expect("the retained first Project leaves the pathname");
+        std::fs::rename(&replacement_path, &project_path)
+            .expect("another physical Project takes the pathname");
+
+        assert_eq!(
+            classify_project_in_use_for_current_target(&location, &expected, project_id),
+            OpenStoreError::IdentityIndeterminate,
+            "Different must fail closed instead of focusing the previous physical Project"
+        );
     }
 }

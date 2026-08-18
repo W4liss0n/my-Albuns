@@ -20,7 +20,9 @@ Sessão ou namespace local?
 O gate de operação da issue 10 cobre três resultados fechados da comparação de
 identidade:
 
-- `Same` reutiliza a Sessão proprietária e fornece seu PID para focalização;
+- `Same` reutiliza a Sessão proprietária e fornece a Identidade exata da
+  instância proprietária, composta por PID e `FILETIME` de criação, para
+  focalização;
 - `Different` promove a Cópia externa gravável por uma escrita técnica que muda
   apenas a Identidade persistida;
 - evidência inconclusiva, inclusive uma raiz anterior indisponível, não é
@@ -29,9 +31,11 @@ identidade:
 Uma movimentação só é inferida quando a localização anterior está
 comprovadamente ausente. Nesse caso, o registro durável recebe a nova
 localização, mas o UUID e o namespace derivado permanecem iguais. Se o mesmo
-objeto físico estiver ativo por outro alias, o lease de Identidade contém o PID
-do Host proprietário e o Host efêmero devolve `FocusExisting` sem criar uma
-segunda Sessão.
+objeto físico estiver ativo por outro alias, o lease de Identidade contém a
+Identidade exata da instância do Host proprietário e o Host efêmero devolve
+`FocusExisting` sem criar uma segunda Sessão. O Global abre e revalida essa
+instância e conserva seu handle durante toda a enumeração e tentativa de foco;
+o PID isolado permanece apenas diagnóstico.
 
 Uma Cópia externa gravável recebe um UUID novo pelo protocolo de substituição
 atômica do `ProjectStore`. O candidato técnico é derivado dos bytes persistidos
@@ -73,17 +77,20 @@ stdin, sem `sleep` como sincronização. Outros processos então:
 
 O artefato canônico é
 [`artifacts/0035-issue-10-identity-gate.json`](artifacts/0035-issue-10-identity-gate.json).
-Ele é a única fonte dos UUIDs, PID, hashes, commit e sistema operacional da
-rodada registrada. `sourceInputsDirty=false` exige o mesmo `HEAD` e uma árvore
-inteira limpa antes e depois da jornada, excluindo apenas o próprio JSON de
-saída.
+Ele é a única fonte dos UUIDs, da Identidade de instância PID+`FILETIME`, dos
+hashes, do commit e do sistema operacional da rodada registrada.
+`sourceInputsDirty=false` exige o mesmo `HEAD` e uma árvore inteira limpa antes
+e depois da jornada, excluindo apenas o próprio JSON de saída.
 
 ## Cobertura complementar
 
 Os testes Rust de integração atravessam `ProjectCore` para movimento, alias
 físico, promoção automática, escrita técnica sem estado criativo pendente,
-fonte que volta a ser gravável, Save As somente leitura, Destino ocupado,
+fonte que volta a ser gravável, `Salvar cópia como...`, Destino ocupado,
 cancelamento por descarte da fonte opaca e localização anterior reutilizada.
+Uma regressão Windows complementar confirma que `ERROR_WRITE_PROTECT`, usado
+por mídia ou volume somente leitura, é classificado como fonte não gravável e
+chega ao mesmo terminal acionável de `AccessDenied`.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
@@ -96,9 +103,11 @@ pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
 
 - o SMB loopback exercita aliases e indisponibilidade reais, mas não representa
   latência WAN, DFS ou troca de credenciais;
-- o gate observa o PID retornado pelo Core e a ausência do Host duplicado; a
-  permissão do Windows para trazer uma janela de outro processo ao primeiro
-  plano ainda depende das regras normais de foreground do sistema;
+- o gate observa a Identidade exata da instância retornada pelo Core e a
+  ausência do Host duplicado; o Global retém o handle revalidado durante a
+  focalização, mas a permissão do Windows para trazer uma janela de outro
+  processo ao primeiro plano ainda depende das regras normais de foreground do
+  sistema;
 - o Core não monta Cache ou WebView. A ordem “Identidade antes de namespace” é
   completada pelos contratos públicos do Host, enquanto o gate confirma que o
   namespace derivado já é distinto no primeiro resultado editável;

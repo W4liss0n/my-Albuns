@@ -912,7 +912,7 @@ impl ProjectCore {
 fn promote_external_copy(
     core: &ProjectCore,
     mut opened: project_store::OpenedProject,
-    _repeated_identity_lease: Option<PendingProjectIdentityLease>,
+    source_identity_guard: Option<PendingProjectIdentityLease>,
 ) -> Result<EditableProject, OpenProjectError> {
     let lease_root = core
         .identity_lease_root()
@@ -946,6 +946,9 @@ fn promote_external_copy(
         .into_published()
         .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
     let identity_authority = ProjectIdentityAuthority::authorized(project_id);
+    // The source's repeated Identidade remains reserved until the promoted
+    // file, lease, registry and authority have all reached their terminal.
+    drop(source_identity_guard);
     Ok(EditableProject {
         session: PersistentProjectSession::from_persisted(revision, opened.requires_schema_upgrade),
         store: opened.store,

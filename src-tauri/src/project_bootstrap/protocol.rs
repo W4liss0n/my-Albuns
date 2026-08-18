@@ -297,7 +297,7 @@ pub(crate) fn read_bootstrap_request(
 pub(crate) fn read_save_external_copy_request(
     reader: impl BufRead,
 ) -> Result<SaveExternalCopyRequest, std::io::Error> {
-    read_request_line(reader, "Salvar cópia como")
+    read_request_line(reader, "Salvar cópia como...")
 }
 
 fn read_request_line<T: serde::de::DeserializeOwned>(

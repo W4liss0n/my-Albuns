@@ -28,6 +28,8 @@ pub use native_path_serde::NativePathDto;
 pub use operation::{
     OperationPathContext, PathRootKind, RootBinding, RootBindingPlan, validate_external_path,
 };
+#[cfg(windows)]
+pub use process_instance::ProcessInstanceHandle;
 pub use process_instance::ProcessInstanceId;
 #[cfg(windows)]
 pub use project_file_lock::{ProjectFileLock, ProjectFileLockError};

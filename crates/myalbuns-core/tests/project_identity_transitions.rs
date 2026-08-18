@@ -197,7 +197,7 @@ fn a_read_only_external_copy_can_be_saved_as_a_new_editable_project() {
             project_location(&destination_path),
             CreateAuthorization::CreateOnly,
         ))
-        .expect("Salvar copia como publishes a new editable Project");
+        .expect("Salvar cópia como... publishes a new editable Project");
 
     assert_ne!(copied.project_id(), original_id);
     assert_eq!(copied.revision(), original_revision);

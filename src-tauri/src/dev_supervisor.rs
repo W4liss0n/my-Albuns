@@ -7,7 +7,6 @@ use std::{
     os::windows::io::{AsRawHandle, OwnedHandle},
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
-    ptr,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -18,16 +17,13 @@ use std::{
 };
 
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
+    Foundation::HANDLE,
     System::{
         JobObjects::{
             AssignProcessToJobObject, IsProcessInJob, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
             TerminateJobObject,
         },
-        Threading::{
-            INFINITE, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA,
-            PROCESS_TERMINATE, WaitForSingleObject,
-        },
+        Threading::{PROCESS_SET_QUOTA, PROCESS_TERMINATE},
     },
 };
 
@@ -35,7 +31,7 @@ use windows_sys::Win32::{
 mod protocol;
 
 use crate::dev_job::create_job_with_limits;
-use myalbuns_paths::ProcessInstanceId as HostProcessInstanceId;
+use myalbuns_paths::{ProcessInstanceHandle, ProcessInstanceId as HostProcessInstanceId};
 use protocol::{
     AUTHORIZE_HOST_LEASE_REQUEST, HOST_LEASE_AUTHORITY_ENV, HOST_LEASE_AUTHORIZED_RESPONSE,
     HOST_LEASE_ENDPOINT_ENV, HOST_LEASE_REGISTERED_RESPONSE, REGISTER_HOST_LEASE_REQUEST,
@@ -56,7 +52,6 @@ const WORKER_GATE_TIMEOUT: Duration = Duration::from_secs(10);
 const FRONTEND_START_TIMEOUT: Duration = Duration::from_secs(120);
 const HOST_HANDOFF_TIMEOUT: Duration = Duration::from_secs(10);
 const JOB_TERMINATION_EXIT_CODE: u32 = 1;
-const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
 const HOST_LEASE_REJECTED_RESPONSE: &str = "REJECTED\n";
 
 pub(crate) fn run() -> io::Result<i32> {
@@ -764,80 +759,6 @@ fn handle_host_lease_connection(
     }
 }
 
-struct ValidatedHostProcess(HANDLE);
-
-impl ValidatedHostProcess {
-    fn open(expected: HostProcessInstanceId) -> io::Result<Self> {
-        // SAFETY: the typed instance guarantees a non-zero PID. The returned
-        // non-inheritable handle is wrapped immediately and closed once.
-        let process = unsafe {
-            OpenProcess(
-                PROCESS_SYNCHRONIZE
-                    | PROCESS_QUERY_LIMITED_INFORMATION
-                    | PROCESS_SET_QUOTA
-                    | PROCESS_TERMINATE,
-                0,
-                expected.process_id(),
-            )
-        };
-        if process.is_null() {
-            return Err(io::Error::last_os_error());
-        }
-        let process = Self(process);
-        let observed =
-            HostProcessInstanceId::from_process_handle(expected.process_id(), process.0)?;
-        if observed.process_id() != expected.process_id()
-            || observed.creation_time_wire() != expected.creation_time_wire()
-        {
-            return Err(io::Error::other(
-                "the Host PID was reused by another process instance",
-            ));
-        }
-        // GetProcessTimes remains valid after process termination. The lease's
-        // linearization point therefore also requires the exact handle to be
-        // unsignaled before Connected/REGISTERED can be published.
-        match unsafe { WaitForSingleObject(process.0, 0) } {
-            WAIT_TIMEOUT => {}
-            WAIT_OBJECT_0 => {
-                return Err(io::Error::other(
-                    "the Host process exited before acquiring the lease",
-                ));
-            }
-            WAIT_FAILED => return Err(io::Error::last_os_error()),
-            wait => {
-                return Err(io::Error::other(format!(
-                    "unexpected result while checking the Host process: {wait}"
-                )));
-            }
-        }
-        Ok(process)
-    }
-
-    fn as_raw_handle(&self) -> HANDLE {
-        self.0
-    }
-
-    fn wait_for_exit(&self) -> io::Result<()> {
-        // SAFETY: self owns a validated process handle with SYNCHRONIZE access.
-        let wait = unsafe { WaitForSingleObject(self.0, INFINITE) };
-        if wait == WAIT_OBJECT_0 {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error())
-        }
-    }
-}
-
-impl Drop for ValidatedHostProcess {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            // SAFETY: this wrapper exclusively owns the handle.
-            unsafe { CloseHandle(self.0) };
-            self.0 = ptr::null_mut();
-        }
-    }
-}
-
 fn track_host_lease(
     mut connection: TcpStream,
     job: &KillOnCloseJob,
@@ -849,7 +770,9 @@ fn track_host_lease(
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     }
-    let Ok(process) = ValidatedHostProcess::open(expected_process) else {
+    let Ok(process) =
+        ProcessInstanceHandle::open(expected_process, PROCESS_SET_QUOTA | PROCESS_TERMINATE)
+    else {
         let _ = write_host_lease_response(&mut connection, HOST_LEASE_REJECTED_RESPONSE);
         return;
     };

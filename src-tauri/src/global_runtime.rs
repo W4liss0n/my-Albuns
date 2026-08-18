@@ -5,6 +5,8 @@ use std::{
 };
 
 use myalbuns_logging::ProcessRole;
+#[cfg(windows)]
+use myalbuns_paths::ProcessInstanceHandle;
 use myalbuns_paths::{AppPaths, AppPathsError, NativePathDto, ProcessInstanceId};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder};
@@ -907,51 +909,6 @@ fn exit_global_after_handoff(app: &AppHandle) {
 }
 
 #[cfg(windows)]
-struct ExactProcessHandle(windows_sys::Win32::Foundation::HANDLE);
-
-#[cfg(windows)]
-impl ExactProcessHandle {
-    fn open(expected: ProcessInstanceId) -> Option<Self> {
-        use windows_sys::Win32::System::Threading::{
-            OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-        };
-
-        const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
-        let handle = unsafe {
-            OpenProcess(
-                PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
-                0,
-                expected.process_id(),
-            )
-        };
-        if handle.is_null() {
-            return None;
-        }
-        let process = Self(handle);
-        let observed =
-            ProcessInstanceId::from_process_handle(expected.process_id(), process.0).ok()?;
-        (observed == expected && process.is_running()).then_some(process)
-    }
-
-    fn is_running(&self) -> bool {
-        use windows_sys::Win32::{
-            Foundation::WAIT_TIMEOUT, System::Threading::WaitForSingleObject,
-        };
-
-        (unsafe { WaitForSingleObject(self.0, 0) }) == WAIT_TIMEOUT
-    }
-}
-
-#[cfg(windows)]
-impl Drop for ExactProcessHandle {
-    fn drop(&mut self) {
-        unsafe {
-            windows_sys::Win32::Foundation::CloseHandle(self.0);
-        }
-    }
-}
-
-#[cfg(windows)]
 fn focus_existing_project_window(owner_process: ProcessInstanceId) -> bool {
     use windows::{
         Win32::{
@@ -983,7 +940,7 @@ fn focus_existing_project_window(owner_process: ProcessInstanceId) -> bool {
     if owner_process.process_id() == std::process::id() {
         return false;
     }
-    let Some(process) = ExactProcessHandle::open(owner_process) else {
+    let Ok(process) = ProcessInstanceHandle::open(owner_process, 0) else {
         return false;
     };
     let mut search = Search {
@@ -1003,13 +960,13 @@ fn focus_existing_project_window(owner_process: ProcessInstanceId) -> bool {
         unsafe { GetWindowThreadProcessId(search.window, Some(&mut process_id)) };
         process_id == owner_process.process_id()
     };
-    if !process.is_running() || !belongs_to_owner() {
+    if !process.is_running().unwrap_or(false) || !belongs_to_owner() {
         return false;
     }
     unsafe {
         let _ = ShowWindow(search.window, SW_RESTORE);
     }
-    if !process.is_running() || !belongs_to_owner() {
+    if !process.is_running().unwrap_or(false) || !belongs_to_owner() {
         return false;
     }
     unsafe { SetForegroundWindow(search.window).as_bool() }

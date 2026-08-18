@@ -2564,10 +2564,10 @@ fn a_second_physical_copy_with_the_same_project_identity_is_promoted_before_edit
 
     let original = core
         .open_editable(OpenProjectRequest::new(project_location(&original_path)))
-        .expect("the original acquires its Identity");
+        .expect("the original acquires its Identidade");
     let promoted = core
         .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-        .expect("a writable copied file receives its own Identity");
+        .expect("a writable copied file receives its own Identidade");
     assert_ne!(promoted.project_id(), original.project_id());
     assert_eq!(promoted.revision(), original.revision());
     assert_eq!(promoted.saved_revision(), promoted.revision());
@@ -2577,7 +2577,7 @@ fn a_second_physical_copy_with_the_same_project_identity_is_promoted_before_edit
 
     let reopened_copy = core
         .open_editable(OpenProjectRequest::new(project_location(&copy_path)))
-        .expect("the promoted copy reopens under its durable new Identity");
+        .expect("the promoted copy reopens under its durable new Identidade");
     assert_ne!(
         reopened_copy.project_id().to_string(),
         "550e8400-e29b-41d4-a716-446655440000"
