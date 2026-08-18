@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 10-movimentacao-copia-externa
 date: 2026-08-17
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # Movimentação e Cópia externa
@@ -52,6 +52,13 @@ Host que recusou a abertura permanece vivo com essa mesma fonte opaca enquanto
 o Global abre o diálogo; somente a autoridade do Destino retorna ao processo.
 Assim, a segunda etapa não reabre nem tenta corrigir a fonte.
 
+A barreira curta de transição não cria mais um arquivo irmão no volume do
+Projeto. Ela é derivada da Identidade dentro do `identity_lease_root` local e
+autorizado do Core, onde continua serializando processos da mesma instalação.
+Isso permite abrir e validar uma fonte em mídia realmente protegida contra
+escrita; só a tentativa técnica de substituir sua Identidade toca o volume e
+produz o terminal acionável `ExternalCopyNotWritable`.
+
 ## Instrumento
 
 `scripts/Test-Issue10IdentityGate.ps1` compila o exemplo público
@@ -75,6 +82,14 @@ stdin, sem `sleep` como sincronização. Outros processos então:
 8. desmontam a unidade que continha uma localização anterior e confirmam
    `IdentityIndeterminate` sem reescrever o candidato.
 
+Antes da jornada SMB, o mesmo runner executa ainda duas provas causais pelo
+seam público do `ProjectCore`. A primeira usa um oplock real para interromper a
+leitura de A, troca o pathname por uma cópia física B com o mesmo UUID e só
+então libera a abertura; o resultado obrigatório é `IdentityIndeterminate`.
+A segunda cria uma imagem ISO por IMAPI2, monta-a como unidade óptica pelo
+Windows e exige `ExternalCopyNotWritable` ao abrir a Cópia externa nela. Ambas
+usam eventos ou stdin para coordenação, sem `sleep`.
+
 O artefato canônico é
 [`artifacts/0035-issue-10-identity-gate.json`](artifacts/0035-issue-10-identity-gate.json).
 Ele é a única fonte dos UUIDs, da Identidade de instância PID+`FILETIME`, dos
@@ -87,10 +102,12 @@ e depois da jornada, excluindo apenas o próprio JSON de saída.
 Os testes Rust de integração atravessam `ProjectCore` para movimento, alias
 físico, promoção automática, escrita técnica sem estado criativo pendente,
 fonte que volta a ser gravável, `Salvar cópia como...`, Destino ocupado,
-cancelamento por descarte da fonte opaca e localização anterior reutilizada.
-Uma regressão Windows complementar confirma que `ERROR_WRITE_PROTECT`, usado
-por mídia ou volume somente leitura, é classificado como fonte não gravável e
-chega ao mesmo terminal acionável de `AccessDenied`.
+cancelamento por descarte da fonte opaca, localização anterior reutilizada,
+troca A→B durante uma abertura bem-sucedida e volume ISO protegido contra
+escrita. A identidade física usa primeiro o ID de arquivo de 128 bits e mantém
+como fallback tipado o par `VolumeSerialNumber + FileIndex` documentado pelo
+Windows para filesystems que não oferecem `FileIdInfo`; os formatos nunca
+compartilham o mesmo token local.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,
@@ -113,6 +130,9 @@ pendente; a fonte precisa ser aberta novamente para uma nova tentativa.
   namespace derivado já é distinto no primeiro resultado editável;
 - o cancelamento do diálogo nativo é coberto na fronteira Global e no teste de
   aplicação; a jornada SMB não automatiza um diálogo modal do Windows.
+- a prova de mídia somente leitura depende dos serviços nativos IMAPI2 e Disco
+  Virtual disponíveis no Windows; ela valida a recusa de escrita antes de
+  expor a unidade ao teste.
 
 ## Repetição
 

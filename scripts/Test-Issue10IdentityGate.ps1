@@ -228,6 +228,35 @@ try {
     }
     Add-Check 'public-project-core-gate-build'
 
+    $causalTests = @(
+        [ordered]@{
+            name = 'a-to-b-success-race-fails-closed'
+            test = 'a_successful_open_never_authorizes_a_path_replacement_with_the_same_identity'
+        },
+        [ordered]@{
+            name = 'write-protected-volume-offers-save-copy-as'
+            test = 'an_external_copy_on_write_protected_media_offers_save_copy_as'
+        }
+    )
+    foreach ($causalTest in $causalTests) {
+        Push-Location $script:WorkspaceRoot
+        try {
+            & $script:CargoExecutable test `
+                -p myalbuns-core `
+                --test project_identity_transitions `
+                $causalTest.test `
+                -- `
+                --exact
+            if ($LASTEXITCODE -ne 0) {
+                throw "The causal public ProjectCore test failed: $($causalTest.test)"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+        Add-Check $causalTest.name
+    }
+
     $preflightName = '.myalbuns-issue10-preflight-{0}.tmp' -f `
         [System.Guid]::NewGuid().ToString('N')
     $preflightLocalPath = Join-Path $runRoot $preflightName

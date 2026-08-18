@@ -312,26 +312,11 @@ async fn save_external_copy_as(app: AppHandle) -> ProjectLaunchOutcome {
             },
             _,
         ))) => {
-            if focus_existing_project_window(owner_process) {
-                state.clear_external_copy();
-                tracing::info!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::Global.as_str(),
-                    project_id,
-                    owner_process_id = owner_process.process_id(),
-                    event = "existing_project_window_focused",
-                );
+            let outcome = resolve_focus_existing(&state, project_id, owner_process);
+            if matches!(outcome, ProjectLaunchOutcome::Focused) {
                 exit_global_after_handoff(&app);
-                ProjectLaunchOutcome::Focused
-            } else {
-                ProjectLaunchOutcome::Failed {
-                    error: simple_failure(
-                        "project_in_use",
-                        "Este Projeto já está aberto em outra janela.",
-                        "Use a janela já aberta ou feche-a antes de tentar novamente.",
-                    ),
-                }
             }
+            outcome
         }
         Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
             drop(pending);
@@ -554,27 +539,7 @@ async fn launch_confirmed_project(
                 owner_process,
             },
             _,
-        ))) => {
-            if focus_existing_project_window(owner_process) {
-                state.clear_external_copy();
-                tracing::info!(
-                    target: "myalbuns.desktop",
-                    process_role = ProcessRole::Global.as_str(),
-                    project_id,
-                    owner_process_id = owner_process.process_id(),
-                    event = "existing_project_window_focused",
-                );
-                ProjectLaunchOutcome::Focused
-            } else {
-                ProjectLaunchOutcome::Failed {
-                    error: simple_failure(
-                        "project_in_use",
-                        "Este Projeto já está aberto em outra janela.",
-                        "Use a janela já aberta ou feche-a antes de tentar novamente.",
-                    ),
-                }
-            }
-        }
+        ))) => resolve_focus_existing(&state, project_id, owner_process),
         Ok(Ok((BootstrapOutcome::ExternalCopyNotWritable(pending), _))) => {
             state.remember_external_copy(pending);
             ProjectLaunchOutcome::ExternalCopyNotWritable
@@ -589,6 +554,32 @@ async fn launch_confirmed_project(
                 "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
             ),
         },
+    }
+}
+
+fn resolve_focus_existing(
+    state: &GlobalRuntimeState,
+    project_id: String,
+    owner_process: ProcessInstanceId,
+) -> ProjectLaunchOutcome {
+    if focus_existing_project_window(owner_process) {
+        state.clear_external_copy();
+        tracing::info!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::Global.as_str(),
+            project_id,
+            owner_process_id = owner_process.process_id(),
+            event = "existing_project_window_focused",
+        );
+        ProjectLaunchOutcome::Focused
+    } else {
+        ProjectLaunchOutcome::Failed {
+            error: simple_failure(
+                "project_in_use",
+                "Este Projeto já está aberto em outra janela.",
+                "Use a janela já aberta ou feche-a antes de tentar novamente.",
+            ),
+        }
     }
 }
 

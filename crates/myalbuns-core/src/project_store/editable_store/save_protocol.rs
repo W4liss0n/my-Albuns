@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, path::Path};
 
 use super::{ProjectStore, TemporaryPublication, map_io_path};
 use crate::{
@@ -71,7 +71,14 @@ pub(super) fn save(
     let Some(baseline) = store.baseline.take() else {
         return SaveStoreResult::StateIndeterminate;
     };
-    save_candidate(&store.location, baseline, candidate, identity_lease).install_into(store)
+    save_candidate(
+        &store.location,
+        &store.transition_root,
+        baseline,
+        candidate,
+        identity_lease,
+    )
+    .install_into(store)
 }
 
 #[cfg(windows)]
@@ -92,6 +99,7 @@ pub(super) fn rewrite_identity(
     };
     save_candidate_with_bytes(
         &store.location,
+        &store.transition_root,
         baseline,
         candidate,
         candidate_bytes,
@@ -151,6 +159,7 @@ impl SaveCandidateResult {
 #[cfg(windows)]
 fn save_candidate(
     location: &ProjectLocation,
+    transition_root: &Path,
     baseline: PersistedBaseline,
     candidate: ProjectRevision,
     identity_lease: &dyn IdentityTargetBinder,
@@ -166,6 +175,7 @@ fn save_candidate(
     };
     save_candidate_with_bytes(
         location,
+        transition_root,
         baseline,
         candidate,
         candidate_bytes,
@@ -176,6 +186,7 @@ fn save_candidate(
 #[cfg(windows)]
 fn save_candidate_with_bytes(
     location: &ProjectLocation,
+    transition_root: &Path,
     baseline: PersistedBaseline,
     candidate: ProjectRevision,
     candidate_bytes: Vec<u8>,
@@ -197,10 +208,8 @@ fn save_candidate_with_bytes(
             error: SaveStoreError::Path(map_io_path(error)),
         };
     }
-    let _barrier = match ProjectTransitionBarrier::try_acquire(
-        destination.operational_path(),
-        &candidate.project_id.hyphenated().to_string(),
-    ) {
+    let project_id = candidate.project_id.hyphenated().to_string();
+    let _barrier = match ProjectTransitionBarrier::try_acquire(transition_root, &project_id) {
         Ok(barrier) => barrier,
         Err(error) => {
             return SaveCandidateResult::NotSaved {

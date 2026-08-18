@@ -514,10 +514,11 @@ impl ProjectCore {
 
         let store_result = match authorization {
             CreateAuthorization::CreateOnly => {
-                project_store::create_only(location, &revision).map_err(map_create_store_error)
+                project_store::create_only(location, &revision, lease_root)
+                    .map_err(map_create_store_error)
             }
             CreateAuthorization::ReplaceConfirmed => {
-                project_store::prepare_replacement(location, &revision)
+                project_store::prepare_replacement(location, &revision, lease_root)
                     .map_err(map_create_store_error)
                     .and_then(|prepared| {
                         let _replaced_identity_lease = prepared
@@ -564,7 +565,7 @@ impl ProjectCore {
         let lease_root = self
             .identity_lease_root()
             .ok_or(OpenProjectError::Path(PathFailure::IoFailure))?;
-        let opened = match project_store::open_editable(request.location) {
+        let opened = match project_store::open_editable(request.location, lease_root) {
             Ok(opened) => opened,
             Err(OpenStoreError::ProjectInUse {
                 project_id,
@@ -864,10 +865,12 @@ impl ProjectCore {
             source.revision.project.clone(),
         );
         let store_result = match authorization {
-            CreateAuthorization::CreateOnly => project_store::create_only(destination, &revision)
-                .map_err(map_save_copy_store_error),
+            CreateAuthorization::CreateOnly => {
+                project_store::create_only(destination, &revision, lease_root)
+                    .map_err(map_save_copy_store_error)
+            }
             CreateAuthorization::ReplaceConfirmed => {
-                project_store::prepare_replacement(destination, &revision)
+                project_store::prepare_replacement(destination, &revision, lease_root)
                     .map_err(map_save_copy_store_error)
                     .and_then(|prepared| {
                         let _replaced_identity_lease = prepared

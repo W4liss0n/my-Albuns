@@ -481,40 +481,78 @@ fn validate_disk_handle(_file: &File, _expected: ExpectedObject) -> Result<(), R
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PhysicalFileIdentity {
     volume: u64,
-    file_id: [u8; 16],
+    file_id: WindowsFileId,
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum WindowsFileId {
+    Extended([u8; 16]),
+    Legacy([u8; 8]),
 }
 
 #[cfg(windows)]
 impl PhysicalFileIdentity {
-    const TOKEN_PREFIX: &'static str = "windows-file-id-v1:";
+    const EXTENDED_TOKEN_PREFIX: &'static str = "windows-file-id-v1:";
+    const LEGACY_TOKEN_PREFIX: &'static str = "windows-file-index-v1:";
 
     /// Serializes this identity for local process-coordination metadata.
     pub fn to_local_token(self) -> String {
-        let mut token = format!("{}{:016x}:", Self::TOKEN_PREFIX, self.volume);
-        for byte in self.file_id {
-            use std::fmt::Write as _;
-            write!(&mut token, "{byte:02x}").expect("writing to a String cannot fail");
+        let prefix = match self.file_id {
+            WindowsFileId::Extended(_) => Self::EXTENDED_TOKEN_PREFIX,
+            WindowsFileId::Legacy(_) => Self::LEGACY_TOKEN_PREFIX,
+        };
+        let mut token = format!("{prefix}{:016x}:", self.volume);
+        match self.file_id {
+            WindowsFileId::Extended(file_id) => append_hex_bytes(&mut token, &file_id),
+            WindowsFileId::Legacy(file_id) => append_hex_bytes(&mut token, &file_id),
         }
         token
     }
 
     /// Restores local process-coordination evidence written by this platform.
     pub fn from_local_token(token: &str) -> Option<Self> {
-        let payload = token.strip_prefix(Self::TOKEN_PREFIX)?;
+        let (payload, extended) = token
+            .strip_prefix(Self::EXTENDED_TOKEN_PREFIX)
+            .map(|payload| (payload, true))
+            .or_else(|| {
+                token
+                    .strip_prefix(Self::LEGACY_TOKEN_PREFIX)
+                    .map(|payload| (payload, false))
+            })?;
         let (volume, file_id) = payload.split_once(':')?;
-        if volume.len() != 16 || file_id.len() != 32 {
+        let expected_file_id_length = if extended { 32 } else { 16 };
+        if volume.len() != 16 || file_id.len() != expected_file_id_length {
             return None;
         }
         let volume = u64::from_str_radix(volume, 16).ok()?;
-        let mut identifier = [0_u8; 16];
-        for (index, byte) in identifier.iter_mut().enumerate() {
-            *byte = u8::from_str_radix(&file_id[index * 2..index * 2 + 2], 16).ok()?;
-        }
-        Some(Self {
-            volume,
-            file_id: identifier,
-        })
+        let file_id = if extended {
+            let mut identifier = [0_u8; 16];
+            decode_hex_bytes(file_id, &mut identifier)?;
+            WindowsFileId::Extended(identifier)
+        } else {
+            let mut identifier = [0_u8; 8];
+            decode_hex_bytes(file_id, &mut identifier)?;
+            WindowsFileId::Legacy(identifier)
+        };
+        Some(Self { volume, file_id })
     }
+}
+
+#[cfg(windows)]
+fn append_hex_bytes(destination: &mut String, source: &[u8]) {
+    for byte in source {
+        use std::fmt::Write as _;
+        write!(destination, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+}
+
+#[cfg(windows)]
+fn decode_hex_bytes(source: &str, destination: &mut [u8]) -> Option<()> {
+    for (index, byte) in destination.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&source[index * 2..index * 2 + 2], 16).ok()?;
+    }
+    Some(())
 }
 
 #[cfg(windows)]
@@ -522,7 +560,10 @@ pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
     use std::{ffi::c_void, mem::size_of, os::windows::io::AsRawHandle};
     use windows_sys::Win32::{
         Foundation::HANDLE,
-        Storage::FileSystem::{FILE_ID_INFO, FileIdInfo, GetFileInformationByHandleEx},
+        Storage::FileSystem::{
+            BY_HANDLE_FILE_INFORMATION, FILE_ID_INFO, FileIdInfo, GetFileInformationByHandle,
+            GetFileInformationByHandleEx,
+        },
     };
 
     let mut identity = FILE_ID_INFO::default();
@@ -534,10 +575,49 @@ pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
             size_of::<FILE_ID_INFO>() as u32,
         )
     };
+    if succeeded != 0 {
+        return Some(PhysicalFileIdentity {
+            volume: identity.VolumeSerialNumber,
+            file_id: WindowsFileId::Extended(identity.FileId.Identifier),
+        });
+    }
+
+    let mut legacy = BY_HANDLE_FILE_INFORMATION::default();
+    let succeeded =
+        unsafe { GetFileInformationByHandle(file.as_raw_handle() as HANDLE, &mut legacy) };
     (succeeded != 0).then_some(PhysicalFileIdentity {
-        volume: identity.VolumeSerialNumber,
-        file_id: identity.FileId.Identifier,
+        volume: u64::from(legacy.dwVolumeSerialNumber),
+        file_id: WindowsFileId::Legacy(
+            (u64::from(legacy.nFileIndexHigh) << 32 | u64::from(legacy.nFileIndexLow))
+                .to_be_bytes(),
+        ),
     })
+}
+
+#[cfg(all(test, windows))]
+mod windows_identity_tests {
+    use super::{PhysicalFileIdentity, WindowsFileId};
+
+    #[test]
+    fn extended_and_legacy_file_ids_round_trip_without_sharing_a_token_shape() {
+        let extended = PhysicalFileIdentity {
+            volume: 7,
+            file_id: WindowsFileId::Extended([3; 16]),
+        };
+        let legacy = PhysicalFileIdentity {
+            volume: 7,
+            file_id: WindowsFileId::Legacy([3; 8]),
+        };
+
+        for identity in [extended, legacy] {
+            let token = identity.to_local_token();
+            assert_eq!(
+                PhysicalFileIdentity::from_local_token(&token),
+                Some(identity)
+            );
+        }
+        assert_ne!(extended.to_local_token(), legacy.to_local_token());
+    }
 }
 
 #[cfg(unix)]
