@@ -2,20 +2,20 @@
     "schemaVersion":  1,
     "gate":  "issue-45-media-cache-final-integration",
     "issue":  45,
-    "collectedAtUtc":  "2026-08-18T19:46:01.0198947Z",
+    "collectedAtUtc":  "2026-08-18T21:08:33.5907106Z",
     "fixedPoint":  "f6518d63b2c75656a58b6769e87abc318a913e23",
-    "gitCommit":  "f6afc692692b6ec9e0fadea36c64d53ab7b549a8",
+    "gitCommit":  "b50896e82824dc96647c84e3de77680bb31efca7",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64"
                  },
     "counts":  {
-                   "topLevelChecks":  11,
+                   "topLevelChecks":  14,
                    "contractBindings":  65,
-                   "frontendFiles":  26,
-                   "frontendTests":  211,
-                   "rustTests":  422,
+                   "frontendFiles":  27,
+                   "frontendTests":  212,
+                   "rustTests":  424,
                    "rustSuiteResults":  29,
                    "rustQualityCommands":  3,
                    "imagingRecoveryChecks":  9,
@@ -23,72 +23,83 @@
                    "releaseArtifacts":  4,
                    "ownedProcessesAfter":  0,
                    "ownedListenersAfter":  0,
-                   "ownedProcessesStoppedAtFinalCleanup":  10,
+                   "ownedProcessesStoppedAtFinalCleanup":  0,
                    "ownedListenersObservedBeforeFinalCleanup":  0
                },
     "checks":  [
                    {
+                       "name":  "fail-closed-preexisting-output-preflight",
+                       "passed":  true,
+                       "assertionCount":  4
+                   },
+                   {
+                       "name":  "fail-closed-named-proof-parser",
+                       "passed":  true,
+                       "assertionCount":  8
+                   },
+                   {
                        "name":  "owned-process-listener-cleanup-probe",
                        "passed":  true,
-                       "assertionCount":  4,
+                       "assertionCount":  6,
                        "stoppedProcessCount":  2,
-                       "observedListenerCount":  1
+                       "observedListenerCount":  1,
+                       "independentSentinelSurvived":  true
                    },
                    {
                        "name":  "clean-debug-sidecar-preparation",
                        "passed":  true,
                        "assertionCount":  2,
-                       "elapsedMs":  43885
+                       "elapsedMs":  24951
                    },
                    {
                        "name":  "rust-typescript-contracts",
                        "passed":  true,
                        "assertionCount":  65,
-                       "elapsedMs":  70971
+                       "elapsedMs":  48351
                    },
                    {
                        "name":  "frontend-tests",
                        "passed":  true,
-                       "assertionCount":  211,
-                       "fileCount":  26,
-                       "elapsedMs":  35531
+                       "assertionCount":  212,
+                       "fileCount":  27,
+                       "elapsedMs":  24752
                    },
                    {
                        "name":  "frontend-typecheck",
                        "passed":  true,
                        "assertionCount":  1,
-                       "elapsedMs":  8252
+                       "elapsedMs":  8510
                    },
                    {
                        "name":  "rust-tests",
                        "passed":  true,
-                       "assertionCount":  422,
+                       "assertionCount":  424,
                        "suiteResultCount":  29,
-                       "elapsedMs":  132293
+                       "elapsedMs":  137510
                    },
                    {
                        "name":  "rust-fmt-clippy-deny-warnings",
                        "passed":  true,
                        "assertionCount":  3,
-                       "elapsedMs":  46316
+                       "elapsedMs":  11341
                    },
                    {
                        "name":  "real-processor-cache-canvas-recovery",
                        "passed":  true,
                        "assertionCount":  9,
-                       "elapsedMs":  450292
+                       "elapsedMs":  177668
                    },
                    {
                        "name":  "windows-local-unc-mapped-long-paths",
                        "passed":  true,
                        "assertionCount":  11,
-                       "elapsedMs":  735251
+                       "elapsedMs":  182501
                    },
                    {
                        "name":  "release-build-and-nsis-package",
                        "passed":  true,
                        "assertionCount":  4,
-                       "elapsedMs":  1227023
+                       "elapsedMs":  316937
                    },
                    {
                        "name":  "owned-process-lock-listener-cleanup",
@@ -97,9 +108,15 @@
                        "ownedProcessCount":  0,
                        "ownedListenerCount":  0,
                        "claimedPreexistingProcessIdentityCount":  0,
-                       "stoppedOwnedProcessCount":  10,
+                       "stoppedOwnedProcessCount":  0,
                        "observedOwnedListenerCountBeforeCleanup":  0,
                        "exclusiveArtifactLockFailures":  0
+                   },
+                   {
+                       "name":  "complete-fail-closed-design-0010-matrix",
+                       "passed":  true,
+                       "assertionCount":  15,
+                       "normativeRowCount":  14
                    }
                ],
     "criteria":  [
@@ -123,7 +140,7 @@
                      {
                          "name":  "authoritative-absent-unavailable-and-visual-context",
                          "passed":  true,
-                         "assertionCount":  4,
+                         "assertionCount":  5,
                          "proofs":  [
                                         {
                                             "source":  "rust-tests",
@@ -143,6 +160,11 @@
                                         {
                                             "source":  "frontend-tests",
                                             "name":  "keeps the last representation only as visual context when the Original is absent",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "export_plan_rejects_missing_originals_at_the_typed_plan_stage",
                                             "matchCount":  1
                                         }
                                     ]
@@ -175,13 +197,23 @@
                                     ]
                      },
                      {
-                         "name":  "incompatible-corrupt-invalid-cache-rebuild",
+                         "name":  "discardable-complete-index-and-candidate-validation",
                          "passed":  true,
-                         "assertionCount":  4,
+                         "assertionCount":  6,
                          "proofs":  [
                                         {
                                             "source":  "rust-tests",
                                             "name":  "corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "duplicate_media_entries_make_the_discardable_cache_index_non_current",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_engine_publishes_index_last_reuses_and_invalidates_only_the_requested_media",
                                             "matchCount":  1
                                         },
                                         {
@@ -202,9 +234,36 @@
                                     ]
                      },
                      {
+                         "name":  "request-fingerprint-variant-revalidation-and-obsolete-collection",
+                         "passed":  true,
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "authoritative_demand_revision_rejects_queued_and_late_obsolete_work",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "failed_validation_discards_the_candidate_and_preserves_the_last_published_generation",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
                          "name":  "processor-restart-once-then-nonblocking-suspension",
                          "passed":  true,
-                         "assertionCount":  5,
+                         "assertionCount":  3,
                          "proofs":  [
                                         {
                                             "source":  "rust-tests",
@@ -217,13 +276,25 @@
                                             "matchCount":  1
                                         },
                                         {
+                                            "source":  "frontend-tests",
+                                            "name":  "shows a non-blocking warning when repeated processor failures suspend Cache",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "tracer-44-host-death-and-real-recovery",
+                         "passed":  true,
+                         "assertionCount":  3,
+                         "proofs":  [
+                                        {
                                             "source":  "rust-tests",
                                             "name":  "terminating_the_host_closes_its_job_and_terminates_the_active_processor",
                                             "matchCount":  1
                                         },
                                         {
-                                            "source":  "frontend-tests",
-                                            "name":  "shows a non-blocking warning when repeated processor failures suspend Cache",
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
                                             "matchCount":  1
                                         },
                                         {
@@ -277,7 +348,7 @@
                                         },
                                         {
                                             "source":  "rust-tests",
-                                            "name":  "namespace_reservation_survives_process_boundaries_and_owner_termination",
+                                            "name":  "project_open_during_free_space_is_serialized_by_namespace_reservation",
                                             "matchCount":  1
                                         },
                                         {
@@ -293,9 +364,9 @@
                                     ]
                      },
                      {
-                         "name":  "narrow-api-and-design-0010-ownership-matrix",
+                         "name":  "narrow-api-without-universal-coordinator",
                          "passed":  true,
-                         "assertionCount":  6,
+                         "assertionCount":  5,
                          "proofs":  [
                                         {
                                             "source":  "cache-service-source",
@@ -313,18 +384,145 @@
                                             "matchCount":  1
                                         },
                                         {
-                                            "source":  "rust-tests",
-                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
-                                            "matchCount":  1
-                                        },
-                                        {
                                             "source":  "frontend-tests",
                                             "name":  "maps the Project and media ports to the desktop commands",
                                             "matchCount":  1
                                         },
                                         {
+                                            "source":  "frontend-tests",
+                                            "name":  "initializes the native dialog used by the productive relink command",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "complete-design-0010-producer-consumer-matrix",
+                         "passed":  true,
+                         "assertionCount":  25,
+                         "proofs":  [
+                                        {
                                             "source":  "research-matrix",
-                                            "name":  "ProjectSession::RelinkMedia",
+                                            "name":  "Projeto renomeado ou movido =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "`Salvar como` =\u003e a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Cópia externa gravável =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Cópia externa somente leitura =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "original alterado =\u003e monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "original ausente =\u003e absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "origem de rede indisponível =\u003e absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "índice corrompido =\u003e corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "job obsoleto termina =\u003e obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "queda durante geração =\u003e reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Projeto abre durante `Liberar espaço` =\u003e project_open_during_free_space_is_serialized_by_namespace_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "limpeza total com Projeto ativo =\u003e schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Exportação =\u003e export_plan_rejects_missing_originals_at_the_typed_plan_stage",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Projeto ou mídia em UNC =\u003e real-mapped-unc",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "project_open_during_free_space_is_serialized_by_namespace_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "export_plan_rejects_missing_originals_at_the_typed_plan_stage",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "real-mapped-unc",
                                             "matchCount":  1
                                         }
                                     ]
@@ -335,13 +533,13 @@
                                            "schemaVersion":  1,
                                            "checks":  9,
                                            "cache":  {
-                                                         "failedProcessId":  27280,
+                                                         "failedProcessId":  4016,
                                                          "foreignTemporarySurvivedCleanup":  true,
                                                          "generatedCountAfterRestart":  1,
                                                          "metadataExistedAfterFailure":  false,
                                                          "metadataExistedAfterRestart":  true,
                                                          "removedTemporaryCount":  1,
-                                                         "restartedProcessId":  2752,
+                                                         "restartedProcessId":  22760,
                                                          "temporaryExistedAfterCleanup":  false,
                                                          "temporaryObservedAfterFailure":  true
                                                      },
@@ -358,8 +556,8 @@
                                                                                0
                                                                            ],
                                                           "compositionMediaOrder":  [
-                                                                                        "5327e9c2-49ed-4000-aa98-35223970adaa",
-                                                                                        "5b5a9fb6-7996-4420-99ea-0b7eacfbc0e1"
+                                                                                        "4f3885f7-eea0-467b-b668-4448ee0b50c3",
+                                                                                        "e6064728-3f19-410a-a950-8928ba0c7dc7"
                                                                                     ],
                                                           "equivalentBackgroundDemandCount":  2,
                                                           "finalJpegPixel":  [
@@ -373,13 +571,13 @@
                                                           "originalPathExposedToWebView":  false,
                                                           "overlayUrlOpaque":  true,
                                                           "processorIds":  [
-                                                                               38820,
-                                                                               34984,
-                                                                               15128
+                                                                               10348,
+                                                                               32900,
+                                                                               19960
                                                                            ],
-                                                          "singleFlightGenerationId":  "g-b2761654cad142d8b9482df2b80d786c",
+                                                          "singleFlightGenerationId":  "g-82551090ed184aa9b6ea80a0c20dcb55",
                                                           "singleFlightProcessorCount":  1,
-                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-38840-7f5286\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-25740-cf080c\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
                                                           "actualTauriApp":  true,
                                                           "actualAlbumCanvas":  true,
                                                           "actualPixiRuntime":  true,
@@ -407,19 +605,19 @@
                                            "pause":  {
                                                          "cacheBlockedWhileExportLease":  true,
                                                          "cacheIndexAfterCancellation":  false,
-                                                         "cancelledProcessId":  37784,
+                                                         "cancelledProcessId":  32208,
                                                          "cancelledProcessReaped":  true,
                                                          "cancelledStage":  "cancelled",
                                                          "pauseReason":  "paused",
                                                          "processorExclusiveWhileExportLease":  true,
                                                          "resumedAfterExportTerminal":  true,
                                                          "resumedGenerationPublished":  true,
-                                                         "resumedProcessId":  2908
+                                                         "resumedProcessId":  6580
                                                      },
                                            "obsolete":  {
                                                             "cacheIndexAfterCancellation":  false,
                                                             "cancellationReason":  "obsolete",
-                                                            "cancelledProcessId":  22996,
+                                                            "cancelledProcessId":  25780,
                                                             "cancelledProcessReaped":  true,
                                                             "cancelledStage":  "cancelled",
                                                             "resumableAfterCancellation":  false,
@@ -435,7 +633,7 @@
                                                               "bindingReusedAfterRemapWithinAttempt":  true,
                                                               "cacheUnderLocalAppData":  true,
                                                               "explicitRetryRecaptured":  true,
-                                                              "firstPlanSha256":  "8d745ca830181c4e3ced359a80f505542cc4a892e076449aba1d11dc02363d18",
+                                                              "firstPlanSha256":  "6a9634e678ddcde0529dbd895c2e4b7786b9e880ca8ceeed1e3d62e7170fae62",
                                                               "identityFailure":  "indeterminate",
                                                               "lockReleasedAfterOwnerDrop":  true,
                                                               "mappedAndLocalIdentity":  "same",
@@ -446,7 +644,7 @@
                                                               "planRoundTripLossless":  true,
                                                               "plansDistinct":  true,
                                                               "readOnlyBatchAllowedWhileLocked":  true,
-                                                              "retryPlanSha256":  "0ca9974540cb785dc820e30b553b094b908822ae3b6ce83d9eda164c9f0d2114",
+                                                              "retryPlanSha256":  "fc66f416a07beae83aa5809ec28e49fb5f01b29ab4e3408d2272244e731e4c3c",
                                                               "stagingInsideDestination":  true,
                                                               "unavailableBinding":  "unavailable",
                                                               "uncExportPublished":  true,
@@ -457,9 +655,9 @@
                                                                 "mappingRemovedBeforeDispatch":  true,
                                                                 "outputPublishedOnUnc":  true,
                                                                 "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
-                                                                "processorPid":  38728,
+                                                                "processorPid":  14896,
                                                                 "processorUsedFrozenOperationalPath":  true,
-                                                                "rootBindingPlanSha256":  "5c6b9cd74a51964ca70301785c8465c340e08b1a0ca4f25efcc656e744a887b7",
+                                                                "rootBindingPlanSha256":  "449e96eb8e48a0a4ae8bf740b9b8e119d203af24fc296be38e36e5c64c667e1d",
                                                                 "stagingRemoved":  true,
                                                                 "unavailableAttemptStartedProcessor":  false,
                                                                 "unavailableBindingFailedAtPrepare":  true
@@ -473,33 +671,34 @@
     "releaseArtifacts":  [
                              {
                                  "name":  "desktop-release",
-                                 "bytes":  17558528,
-                                 "sha256":  "a85784731012394eee49a8480ea12506967b518549a1ec0ad370f5e123e9ec35"
+                                 "bytes":  17624576,
+                                 "sha256":  "99e74632ee4a87baf6f5e2e9e59ae46332c219c3753e66fd735a120a063a00ea"
                              },
                              {
                                  "name":  "imaging-release",
-                                 "bytes":  3618304,
-                                 "sha256":  "f3cbe00ede8d49e012a52eaeed2b7b91fafed22e877b9608a9d3f3b571690862"
+                                 "bytes":  3619328,
+                                 "sha256":  "756d40f306ea6dfe168f83213c3326dd671a6ba7d0425f6a15ac886af325e3ad"
                              },
                              {
                                  "name":  "prepared-sidecar",
-                                 "bytes":  3618304,
-                                 "sha256":  "f3cbe00ede8d49e012a52eaeed2b7b91fafed22e877b9608a9d3f3b571690862"
+                                 "bytes":  3619328,
+                                 "sha256":  "756d40f306ea6dfe168f83213c3326dd671a6ba7d0425f6a15ac886af325e3ad"
                              },
                              {
                                  "name":  "nsis-installer",
-                                 "bytes":  4963989,
-                                 "sha256":  "8464674df15b061199b2a5e95d0f12f4e9f90953fddfcb4054a79d70acbff29c"
+                                 "bytes":  4981959,
+                                 "sha256":  "92cf14190aaf4557a5a2fcf38067dc900151eafa3f615423de922716b24a19c1"
                              }
                          ],
     "cleanup":  {
                     "runScratchRemoved":  true,
-                    "newlyCreatedWindowsPathTargetRemoved":  true,
-                    "newlyCreatedDistRemoved":  true,
+                    "preparedSidecarRemoved":  true,
+                    "windowsPathTargetRemoved":  true,
+                    "distRemoved":  true,
                     "ownedProcesses":  0,
                     "ownedListeners":  0,
                     "claimedPreexistingProcessIdentities":  0,
-                    "stoppedOwnedProcesses":  10,
+                    "stoppedOwnedProcesses":  0,
                     "observedOwnedListenersBeforeCleanup":  0,
                     "artifactLocks":  0
                 }
