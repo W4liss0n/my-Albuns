@@ -177,6 +177,7 @@ export interface ProjectStartupPort {
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
+  relink(mediaId: string): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;

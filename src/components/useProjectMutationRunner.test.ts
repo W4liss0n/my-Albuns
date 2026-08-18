@@ -31,6 +31,7 @@ function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
     apply: async () => representativeProjection,
+    relink: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,
     save: async () => {

@@ -593,6 +593,31 @@ pub(crate) fn discard_project_cache_temporaries(
     Ok(removed)
 }
 
+/// Discards every well-formed Cache temporary in a namespace whose caller has
+/// already acquired the exclusive Project-namespace reservation.
+///
+/// The reservation is the authority: the Host acquires it before starting any
+/// new Processor, and Processor lifetime is contained by that Host. Therefore
+/// no matching temporary can still belong to a live writer at this point.
+pub(crate) fn discard_abandoned_project_cache_temporaries(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+) -> Result<usize, AppPathsError> {
+    let Some(project_cache) = open_existing_project_cache(app_paths, plan)? else {
+        return Ok(0);
+    };
+
+    let project = project_cache.project();
+    let mut removed = discard_matching_files(project, |name| {
+        metadata_temporary_process_id(name).is_some()
+    })?;
+    if let Some(media) = open_existing_direct_child(project, &plan.media_directory())? {
+        removed +=
+            discard_matching_files(&media, |name| preview_temporary_process_id(name).is_some())?;
+    }
+    Ok(removed)
+}
+
 fn open_existing_project_cache(
     app_paths: &AppPaths,
     plan: &CachePathPlan,
@@ -692,29 +717,31 @@ where
 }
 
 fn is_metadata_temporary_name_for(name: &std::ffi::OsStr, process_id: u32) -> bool {
+    metadata_temporary_process_id(name) == Some(process_id)
+}
+
+fn metadata_temporary_process_id(name: &std::ffi::OsStr) -> Option<u32> {
     name.to_str()
         .and_then(|name| name.strip_prefix("metadata.json.tmp-"))
         .and_then(|value| value.parse::<u32>().ok())
-        == Some(process_id)
 }
 
 fn is_preview_temporary_name_for(name: &std::ffi::OsStr, expected_process_id: u32) -> bool {
-    let Some((artifact, process_id)) = name.to_str().and_then(|name| name.rsplit_once(".tmp-"))
-    else {
-        return false;
-    };
-    let Some(components) = [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png]
+    preview_temporary_process_id(name) == Some(expected_process_id)
+}
+
+fn preview_temporary_process_id(name: &std::ffi::OsStr) -> Option<u32> {
+    let (artifact, process_id) = name.to_str().and_then(|name| name.rsplit_once(".tmp-"))?;
+    let components = [CacheArtifactFormat::Jpeg, CacheArtifactFormat::Png]
         .into_iter()
-        .find_map(|format| artifact.strip_suffix(&format!(".{}", format.extension())))
-    else {
-        return false;
-    };
+        .find_map(|format| artifact.strip_suffix(&format!(".{}", format.extension())))?;
     let mut components = components.split('.');
     matches!(
         (components.next(), components.next(), components.next()),
         (Some(media_id), Some(generation_id), None)
             if valid_cache_component(media_id)
                 && valid_cache_component(generation_id)
-                && process_id.parse::<u32>().ok() == Some(expected_process_id)
     )
+    .then(|| process_id.parse::<u32>().ok())
+    .flatten()
 }

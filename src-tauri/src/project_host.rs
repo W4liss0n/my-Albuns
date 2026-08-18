@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
-    SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIntent, RelinkMedia,
+    RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
-use crate::media_runtime::MediaBinding;
+use crate::media_runtime::{MediaBinding, MediaRelinkProposal};
 
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
@@ -77,6 +77,32 @@ impl ProjectHost {
     pub(crate) fn apply(&self, intent: ProjectIntent) -> Result<EditorProjection, String> {
         self.project()?
             .apply(intent)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn relink_media(
+        &self,
+        proposal: MediaRelinkProposal,
+    ) -> Result<EditorProjection, String> {
+        let media_id: MediaId = proposal
+            .media_id()
+            .parse()
+            .map_err(|error| format!("A ocorrência de mídia é inválida: {error}"))?;
+        let mut project = self.project()?;
+        let current = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.id() == media_id.into_uuid())
+            .ok_or_else(|| format!("A ocorrência de mídia não existe: {media_id}"))?;
+        if current.kind() != proposal.kind() || current.path() != proposal.expected_logical_path() {
+            return Err("A referência de mídia mudou durante a Religação; tente novamente.".into());
+        }
+        project
+            .relink_media(RelinkMedia::new(
+                media_id,
+                proposal.replacement_path().to_path_buf(),
+            ))
             .map_err(|error| error.to_string())
     }
 
@@ -299,8 +325,11 @@ mod tests {
 
     use super::{ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError};
     use crate::{
-        export_pipeline, imaging_processor::InvocationContext,
-        imaging_recovery_integration::RealProcessTransport, path_io,
+        export_pipeline,
+        imaging_processor::InvocationContext,
+        imaging_recovery_integration::RealProcessTransport,
+        media_runtime::{MediaMonitor, MediaResolver, MediaRuntime},
+        path_io,
     };
 
     const TEST_PROCESSOR_ENV: &str = "MYALBUNS_TEST_IMAGING_PROCESSOR";
@@ -947,5 +976,100 @@ mod tests {
         let frontend_projection =
             serde_json::to_string(&projection).expect("the editor projection serializes");
         assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence() {
+        let media_root = tempfile::tempdir().expect("temporary relink media fixture");
+        let original_left = media_root.path().join("left.png");
+        let original_right = media_root.path().join("right.png");
+        let replacement = media_root.path().join("replacement.png");
+        RgbaImage::from_pixel(32, 24, Rgba([40, 80, 120, 255]))
+            .save_with_format(&original_left, ImageFormat::Png)
+            .expect("the first occurrence is writable");
+        std::fs::hard_link(&original_left, &original_right)
+            .expect("the second occurrence aliases the same physical file");
+        std::fs::hard_link(&original_left, &replacement)
+            .expect("the relink candidate aliases the same physical file");
+        let initial =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Media {
+                        path: original_left.clone(),
+                    },
+                    right: InitialBackgroundContent::Media {
+                        path: original_right.clone(),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ));
+        let fixture = fixture_with_initial(initial);
+        let before = fixture
+            .host
+            .authorized_media_catalog()
+            .expect("the persisted occurrences are authorized");
+        let selected = before
+            .bindings
+            .iter()
+            .find(|binding| binding.logical_path == original_left)
+            .expect("the selected occurrence is present")
+            .clone();
+        let untouched = before
+            .bindings
+            .iter()
+            .find(|binding| binding.logical_path == original_right)
+            .expect("the other occurrence is present")
+            .clone();
+        let resolver = MediaResolver;
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+        assert!(monitor.poll(&runtime, &before.bindings).update().is_none());
+        assert!(monitor.poll(&runtime, &before.bindings).update().is_some());
+
+        let proposal = resolver
+            .propose_relink(&selected, replacement.clone())
+            .expect("MediaResolver authoritatively validates the selected candidate");
+        let projection = fixture
+            .host
+            .relink_media(proposal)
+            .expect("ProjectSession owns the RelinkMedia command");
+
+        assert_eq!(projection.state.revision, 1);
+        assert!(projection.state.dirty);
+        assert!(projection.state.can_undo);
+        let after = fixture
+            .host
+            .authorized_media_catalog()
+            .expect("the relinked catalog remains authorized");
+        assert_eq!(
+            after
+                .bindings
+                .iter()
+                .find(|binding| binding.media_id == selected.media_id)
+                .expect("the selected occurrence remains present")
+                .logical_path,
+            replacement
+        );
+        assert_eq!(
+            after
+                .bindings
+                .iter()
+                .find(|binding| binding.media_id == untouched.media_id)
+                .expect("the other occurrence remains present")
+                .logical_path,
+            original_right
+        );
+        assert!(monitor.poll(&runtime, &after.bindings).update().is_none());
+        let stable = monitor.poll(&runtime, &after.bindings);
+        assert_eq!(
+            stable.update().unwrap().changed_media_ids(),
+            std::slice::from_ref(&selected.media_id)
+        );
+        assert_eq!(
+            stable.update().unwrap().invalidated_media_ids(),
+            std::slice::from_ref(&selected.media_id),
+            "Cache reacts by occurrence even when every path aliases one physical file"
+        );
     }
 }

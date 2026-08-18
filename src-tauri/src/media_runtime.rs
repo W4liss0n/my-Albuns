@@ -1,10 +1,12 @@
 use std::{
     collections::HashMap,
+    io::BufReader,
     path::PathBuf,
     sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use image::{ImageDecoder, ImageFormat, ImageReader};
 use myalbuns_core::MediaKind;
 use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError};
 
@@ -38,6 +40,32 @@ pub(crate) struct MediaObservation {
 pub(crate) struct MediaResolutionProposal {
     generation: u64,
     observations: Vec<MediaObservation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MediaRelinkProposal {
+    media_id: String,
+    kind: MediaKind,
+    expected_logical_path: PathBuf,
+    replacement_path: PathBuf,
+}
+
+impl MediaRelinkProposal {
+    pub(crate) fn media_id(&self) -> &str {
+        &self.media_id
+    }
+
+    pub(crate) fn kind(&self) -> MediaKind {
+        self.kind
+    }
+
+    pub(crate) fn expected_logical_path(&self) -> &std::path::Path {
+        &self.expected_logical_path
+    }
+
+    pub(crate) fn replacement_path(&self) -> &std::path::Path {
+        &self.replacement_path
+    }
 }
 
 impl MediaResolutionProposal {
@@ -125,6 +153,49 @@ impl MediaMonitorPoll {
 pub(crate) struct MediaResolver;
 
 impl MediaResolver {
+    pub(crate) fn propose_relink(
+        &self,
+        binding: &MediaBinding,
+        replacement_path: PathBuf,
+    ) -> Result<MediaRelinkProposal, String> {
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&replacement_path)
+            .map_err(|error| format!("O caminho escolhido para Religação é inválido: {error}"))?;
+        let plan = context.freeze();
+        let resolved = plan
+            .resolve_existing(&replacement_path, ExpectedObject::RegularFile)
+            .map_err(|error| {
+                format!("O Arquivo escolhido para Religação não está disponível: {error}")
+            })?;
+        let file = resolved.reopen_for_read().map_err(|error| {
+            format!("Não foi possível inspecionar o Arquivo escolhido: {error}")
+        })?;
+        let reader = ImageReader::new(BufReader::new(file))
+            .with_guessed_format()
+            .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+        if !matches!(
+            reader.format(),
+            Some(ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::Tiff)
+        ) {
+            return Err("O Arquivo escolhido não usa um formato de mídia compatível.".into());
+        }
+        let decoder = reader
+            .into_decoder()
+            .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+        let (width, height) = decoder.dimensions();
+        if width == 0 || height == 0 {
+            return Err("A mídia escolhida não possui dimensões válidas.".into());
+        }
+
+        Ok(MediaRelinkProposal {
+            media_id: binding.media_id.clone(),
+            kind: binding.kind,
+            expected_logical_path: binding.logical_path.clone(),
+            replacement_path,
+        })
+    }
+
     pub(crate) fn observe(
         &self,
         generation: u64,

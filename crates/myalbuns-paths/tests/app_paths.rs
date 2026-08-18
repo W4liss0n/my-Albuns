@@ -872,6 +872,51 @@ fn discards_only_cache_temporaries_left_by_a_terminated_processor() {
 }
 
 #[test]
+fn exclusive_owner_recovery_discards_all_well_formed_abandoned_temporaries() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-owner-recovery")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the Cache directory chain is held");
+    let published = cache
+        .preview_file("media-01", "generation-live", CacheArtifactFormat::Jpeg)
+        .expect("the published path is valid");
+    let first_preview = cache
+        .preview_temporary_file("media-01", "generation-a", CacheArtifactFormat::Png, 4_242)
+        .expect("the first temporary path is valid");
+    let second_preview = cache
+        .preview_temporary_file("media-02", "generation-b", CacheArtifactFormat::Jpeg, 4_343)
+        .expect("the second temporary path is valid");
+    let metadata_temporary = cache.metadata_temporary_file(4_444);
+    let unrelated = cache.media_directory().join("notes.tmp-4242");
+    for path in [
+        &published,
+        &first_preview,
+        &second_preview,
+        &metadata_temporary,
+        &unrelated,
+    ] {
+        std::fs::write(path, b"fixture").expect("the recovery fixture is writable");
+    }
+    drop(storage);
+
+    assert_eq!(
+        paths
+            .discard_abandoned_project_cache_temporaries(&cache)
+            .expect("the exclusive owner discards abandoned temporaries"),
+        3
+    );
+    assert!(published.is_file());
+    assert!(unrelated.is_file());
+    assert!(!first_preview.exists());
+    assert!(!second_preview.exists());
+    assert!(!metadata_temporary.exists());
+}
+
+#[test]
 fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let external = tempfile::tempdir().expect("external directory");

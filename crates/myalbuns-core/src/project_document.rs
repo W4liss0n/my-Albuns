@@ -274,6 +274,18 @@ impl ProjectDocument {
         validate_project_state(&candidate)?;
         Ok(candidate)
     }
+
+    pub(crate) fn with_relinked_media(&self, media_id: Uuid, path: PathBuf) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        let media = candidate
+            .media
+            .iter_mut()
+            .find(|media| media.id == media_id)
+            .ok_or(())?;
+        media.path = path;
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -196,6 +196,7 @@ function projectCorePortWithApply(
   return {
     load: async () => projection,
     apply,
+    relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
     save: async () => {
@@ -898,6 +899,56 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test("offers public Relink only for an absent occurrence and applies the returned projection", async () => {
+  const relinkedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: projection.state.revision + 1,
+      dirty: true,
+      canUndo: true,
+    },
+  };
+  const relink = vi.fn<ProjectCorePort["relink"]>(async () =>
+    relinkedProjection
+  );
+  const projectCorePort: ProjectCorePort = {
+    ...projectCorePortWithApply(async () => projection),
+    relink,
+  };
+  const onProjectionChange = vi.fn();
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      mediaPreviews={{
+        "media-001": {
+          mediaId: "media-001",
+          state: "absent",
+          url: "asset://localhost/cache/media-001-last.jpg",
+        },
+        "media-002": {
+          mediaId: "media-002",
+          state: "unavailable",
+          url: null,
+        },
+      }}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(
+    screen.getAllByRole("button", { name: /Religar arquivo de/i }),
+  ).toHaveLength(1);
+  fireEvent.click(
+    screen.getByRole("button", { name: /Religar arquivo de/i }),
+  );
+
+  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001"));
+  expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });
 
 test("merges only Panel viewport and one-row preload margin with Canvas demand", async () => {

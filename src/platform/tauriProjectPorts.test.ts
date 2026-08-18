@@ -225,6 +225,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
 
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.apply(intent);
+  await tauriProjectCorePort.relink("media-a-001");
   await tauriProjectCorePort.undo();
   await tauriProjectCorePort.redo();
   vi.mocked(invoke).mockResolvedValueOnce([
@@ -247,9 +248,12 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(invoke).toHaveBeenNthCalledWith(2, "apply_project_intent", {
     intent,
   });
-  expect(invoke).toHaveBeenNthCalledWith(3, "undo_project");
-  expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
-  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews", {
+  expect(invoke).toHaveBeenNthCalledWith(3, "relink_media", {
+    mediaId: "media-a-001",
+  });
+  expect(invoke).toHaveBeenNthCalledWith(4, "undo_project");
+  expect(invoke).toHaveBeenNthCalledWith(5, "redo_project");
+  expect(invoke).toHaveBeenNthCalledWith(6, "prepare_media_previews", {
     demand,
   });
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");

@@ -276,6 +276,10 @@ export function ProjectWorkspace({
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
+          onRelinkMedia={controller.relinkMedia}
+          relinkDisabled={
+            Boolean(busy) || exportActive || projectClose.interactionBlocked
+          }
         />
       </div>
 

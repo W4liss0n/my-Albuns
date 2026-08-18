@@ -149,6 +149,8 @@ export const tauriProjectCorePort: ProjectCorePort = {
     invoke<EditorProjection>("project_state", { operationId }),
   apply: (intent: ProjectIntent) =>
     invoke<EditorProjection>("apply_project_intent", { intent }),
+  relink: (mediaId) =>
+    invoke<EditorProjection>("relink_media", { mediaId }),
   undo: () => invoke<EditorProjection>("undo_project"),
   redo: () => invoke<EditorProjection>("redo_project"),
   save: async (expectedRevision) => {

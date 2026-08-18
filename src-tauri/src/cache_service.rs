@@ -10,7 +10,7 @@ use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan, publish_new_f
 use sha2::{Digest, Sha256};
 
 use crate::{
-    cache_engine::AuthorizedCacheNamespace,
+    cache_engine::{AuthorizedCacheNamespace, CacheEngine},
     ipc_contract::{
         CacheClearAllOutcome, CacheFreeResult, CacheServiceCommandError,
         CacheServiceCommandErrorCode, CacheServiceStatus,
@@ -75,9 +75,20 @@ impl CacheService {
         let reservation = namespace_mutex(&self.app_paths, namespace.paths())
             .try_acquire()
             .map_err(map_reservation_error)?;
-        self.app_paths
-            .prepare_cache_storage(namespace.paths())
-            .map_err(|error| CacheServiceError::Storage(error.to_string()))?;
+        let recovery = CacheEngine::recover_reserved_namespace(&self.app_paths, &namespace)
+            .map_err(|error| CacheServiceError::Storage(error.message))?;
+        if recovery.removed_temporary_count > 0
+            || recovery.removed_generation_count > 0
+            || recovery.discarded_index
+        {
+            tracing::info!(
+                target: "myalbuns.desktop",
+                removed_temporary_count = recovery.removed_temporary_count,
+                removed_generation_count = recovery.removed_generation_count,
+                discarded_index = recovery.discarded_index,
+                event = "cache_namespace_recovered",
+            );
+        }
         Ok(CacheNamespaceOwner {
             namespace,
             _reservation: reservation,
@@ -444,6 +455,7 @@ pub(crate) async fn clear_all_cache(
 mod tests {
     use std::{
         env,
+        io::{BufRead, BufReader, Write},
         path::Path,
         process::{Command, Stdio},
         sync::{Arc, Barrier},
@@ -455,10 +467,18 @@ mod tests {
         CreateAuthorization, CreateProjectRequest, EditableProject, InitialProject,
         OpenProjectError, OpenProjectRequest, ProjectCore, ProjectLocation,
     };
-    use myalbuns_paths::{AppPaths, OperationPathContext};
+    use myalbuns_imaging_protocol::{CACHE_REPRESENTATION_VERSION, CacheRepresentationPolicy};
+    use myalbuns_paths::{
+        AppPaths, CacheArtifactFormat, OperationPathContext, project_data_namespace,
+    };
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, WAIT_OBJECT_0, WAIT_TIMEOUT},
+        System::Threading::{OpenProcess, WaitForSingleObject},
+    };
 
     use crate::ipc_contract::CacheClearAllOutcome;
     use crate::operation_gate::OperationGate;
+    use crate::processor_lifetime::ProcessorChildLifetime;
 
     use super::{
         CacheScheduledCleanupOutcome, CacheService, CacheServiceError, namespace_mutex,
@@ -468,6 +488,11 @@ mod tests {
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
     const NAMESPACE_OWNER_NAME_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_NAME";
     const NAMESPACE_OWNER_READY_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_READY";
+    const HOST_DEATH_ROOT_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_ROOT";
+    const HOST_DEATH_PROJECT_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_PROJECT";
+    const HOST_DEATH_READY_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_READY";
+    const HOST_DEATH_NAMESPACE_ENV: &str = "MYALBUNS_CACHE_HOST_DEATH_NAMESPACE";
+    const PROCESS_SYNCHRONIZE: u32 = 0x0010_0000;
 
     fn app_paths(root: &Path) -> AppPaths {
         let roaming = root.join("roaming");
@@ -679,7 +704,16 @@ mod tests {
             .reserve_namespace(original.identity_authority())
             .expect("the original authority reserves Cache");
         let original_cache = original_owner.namespace().paths().clone();
-        std::fs::write(original_cache.metadata_file(), b"identity-owned Cache")
+        let valid_cache_metadata = serde_json::to_vec_pretty(&serde_json::json!({
+            "schemaVersion": 5,
+            "representationVersion": CACHE_REPRESENTATION_VERSION,
+            "projectId": original_id.hyphenated().to_string(),
+            "lastUsedUnixMs": 1,
+            "policy": CacheRepresentationPolicy::measured_v1(),
+            "entries": [],
+        }))
+        .expect("the current empty Cache index serializes");
+        std::fs::write(original_cache.metadata_file(), &valid_cache_metadata)
             .expect("the original namespace has observable state");
         drop(original_owner);
         drop(original);
@@ -696,7 +730,7 @@ mod tests {
         assert_eq!(moved_owner.namespace().paths(), &original_cache);
         assert_eq!(
             std::fs::read(original_cache.metadata_file()).unwrap(),
-            b"identity-owned Cache"
+            valid_cache_metadata
         );
 
         std::fs::hard_link(&moved_path, &alias_path)
@@ -839,6 +873,93 @@ mod tests {
     }
 
     #[test]
+    fn reopening_after_host_death_recovers_the_contained_processors_temporary() {
+        let root = tempfile::tempdir().expect("temporary Host-death Cache fixture");
+        let ready = root.path().join("processor.ready");
+        let paths = app_paths(root.path());
+        let project_path = root.path().join("Projeto.myalbuns");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, project_path.clone());
+        let namespace_name = project_data_namespace(&project.project_id().hyphenated().to_string());
+        drop(project);
+        let mut host = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("cache_service::tests::cache_host_process_with_active_processor")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(HOST_DEATH_ROOT_ENV, root.path())
+            .env(HOST_DEATH_PROJECT_ENV, &project_path)
+            .env(HOST_DEATH_READY_ENV, &ready)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the independent Project Host starts");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !ready.is_file() {
+            assert!(
+                host.try_wait()
+                    .expect("the Host state is readable")
+                    .is_none(),
+                "the Host exited before its contained Processor became active"
+            );
+            assert!(
+                Instant::now() < deadline,
+                "the Processor readiness timed out"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+        let processor_id = std::fs::read_to_string(&ready)
+            .expect("the Processor readiness is readable")
+            .trim()
+            .parse::<u32>()
+            .expect("the Processor reports its PID");
+        let cache = paths
+            .project_cache(&namespace_name)
+            .expect("the authorized namespace plan is valid");
+        let abandoned = cache
+            .preview_temporary_file(
+                "host-death-media",
+                "abandoned-generation",
+                CacheArtifactFormat::Jpeg,
+                processor_id,
+            )
+            .expect("the Processor temporary path is valid");
+        assert!(abandoned.is_file());
+
+        // SAFETY: the PID was published by the live child and the handle is
+        // closed after the Job-termination assertion below.
+        let processor = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, processor_id) };
+        assert!(!processor.is_null(), "the active Processor can be observed");
+        // SAFETY: processor is a live synchronization handle.
+        assert_eq!(unsafe { WaitForSingleObject(processor, 0) }, WAIT_TIMEOUT);
+
+        host.kill()
+            .expect("the Project Host is terminated abruptly");
+        host.wait().expect("the terminated Host is reaped");
+        // SAFETY: closing the Host-owned Job signals the Processor object.
+        assert_eq!(
+            unsafe { WaitForSingleObject(processor, 10_000) },
+            WAIT_OBJECT_0,
+            "the contained Processor terminates with its Host"
+        );
+        // SAFETY: processor is owned by this test and no longer used.
+        unsafe { CloseHandle(processor) };
+
+        let reopened = core
+            .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+            .expect("the Project reopens after the dead Host releases its authority");
+        let owner = CacheService::new(paths)
+            .reserve_namespace(reopened.identity_authority())
+            .expect("the new Host reserves and recovers the namespace");
+        assert_eq!(owner.namespace().paths(), &cache);
+        assert!(
+            !abandoned.exists(),
+            "exclusive startup recovery removes the proved-abandoned temporary"
+        );
+    }
+
+    #[test]
     #[ignore = "spawned by the real Cache namespace process test"]
     fn cache_namespace_owner_process() {
         let root = std::path::PathBuf::from(
@@ -855,6 +976,117 @@ mod tests {
             .try_acquire()
             .expect("the child owns the namespace reservation");
         std::fs::write(ready, b"owned").expect("the child signals reservation ownership");
+        thread::sleep(Duration::from_secs(120));
+    }
+
+    #[test]
+    #[ignore = "spawned by the real Host-death Cache recovery test"]
+    fn cache_host_process_with_active_processor() {
+        let root = std::path::PathBuf::from(
+            env::var_os(HOST_DEATH_ROOT_ENV).expect("the Host-death root is configured"),
+        );
+        let project_path = std::path::PathBuf::from(
+            env::var_os(HOST_DEATH_PROJECT_ENV).expect("the Project path is configured"),
+        );
+        let ready =
+            env::var_os(HOST_DEATH_READY_ENV).expect("the Processor ready path is configured");
+        let paths = app_paths(&root);
+        let core = ProjectCore::new()
+            .with_identity_storage_roots(root.join("leases"), root.join("identities"));
+        let project = core
+            .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+            .expect("the child Host opens the authorized Project");
+        let service = CacheService::new(paths);
+        let owner = service
+            .reserve_namespace(project.identity_authority())
+            .expect("the child Host reserves its Cache namespace");
+        let namespace = owner
+            .namespace()
+            .paths()
+            .root()
+            .file_name()
+            .expect("the namespace has a filename")
+            .to_owned();
+        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("cache_service::tests::cache_abandoned_temporary_processor")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(HOST_DEATH_ROOT_ENV, &root)
+            .env(HOST_DEATH_NAMESPACE_ENV, namespace)
+            .env(HOST_DEATH_READY_ENV, &ready)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the contained Processor starts");
+        let _lifetime = ProcessorChildLifetime::attach(worker.id())
+            .expect("the Host contains the Processor before dispatch");
+        worker
+            .stdin
+            .as_mut()
+            .expect("the Processor stdin is available")
+            .write_all(b"dispatch\n")
+            .expect("the Host dispatches the Cache write");
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !std::path::Path::new(&ready).is_file() {
+            assert!(worker.try_wait().unwrap().is_none());
+            assert!(
+                Instant::now() < deadline,
+                "the Processor did not write in time"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+        thread::sleep(Duration::from_secs(120));
+        worker
+            .wait()
+            .expect("the contained Processor is reaped if the Host is not terminated");
+    }
+
+    #[test]
+    #[ignore = "spawned by the real Host-death Cache recovery test"]
+    fn cache_abandoned_temporary_processor() {
+        let root = std::path::PathBuf::from(
+            env::var_os(HOST_DEATH_ROOT_ENV).expect("the Host-death root is configured"),
+        );
+        let namespace =
+            env::var(HOST_DEATH_NAMESPACE_ENV).expect("the Cache namespace is configured");
+        let ready =
+            env::var_os(HOST_DEATH_READY_ENV).expect("the Processor ready path is configured");
+        let mut dispatch = String::new();
+        BufReader::new(std::io::stdin())
+            .read_line(&mut dispatch)
+            .expect("the Processor receives dispatch");
+        assert_eq!(dispatch, "dispatch\n");
+        let paths = app_paths(&root);
+        let cache = paths
+            .project_cache(&namespace)
+            .expect("the Cache plan is valid");
+        let storage = paths
+            .prepare_cache_storage(&cache)
+            .expect("the held namespace is prepared");
+        let temporary = cache
+            .preview_temporary_file(
+                "host-death-media",
+                "abandoned-generation",
+                CacheArtifactFormat::Jpeg,
+                std::process::id(),
+            )
+            .expect("the temporary path is valid");
+        let final_path = cache
+            .preview_file(
+                "host-death-media",
+                "abandoned-generation",
+                CacheArtifactFormat::Jpeg,
+            )
+            .expect("the candidate path is valid");
+        let mut publication = storage
+            .begin_file_publication(&temporary, &final_path)
+            .expect("the Processor owns an in-flight publication");
+        publication
+            .write_all(b"partial Cache payload")
+            .expect("the Processor writes a partial payload");
+        publication.flush().expect("the partial payload is visible");
+        std::fs::write(ready, std::process::id().to_string())
+            .expect("the Processor publishes readiness");
         thread::sleep(Duration::from_secs(120));
     }
 }

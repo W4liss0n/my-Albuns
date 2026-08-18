@@ -29,9 +29,15 @@ propostas imutáveis. Ele separa `Absent`, obtido somente quando uma origem
 acessível confirma a ausência, de `Unavailable`, que não permite inferir
 ausência nem mudança. O `MediaRuntime` apenas registra as observações aceitas.
 Duas amostras estáveis continuam necessárias para uma mudança de conteúdo. Na
-Religação, `ProjectSession` possui o comando `RelinkMedia`; a ocorrência inclui
-seu pathname lógico, de modo que duas ocorrências do mesmo arquivo físico não
-sejam invalidadas em conjunto.
+Religação pública, a WebView envia somente o `mediaId` e o Host oferece o seletor
+nativo apenas para uma ocorrência cuja ausência foi confirmada. O pathname
+escolhido não atravessa IPC: `MediaResolver` reabre o candidato pela fronteira
+central de caminhos, valida JPEG, PNG ou TIFF e produz uma proposta imutável;
+`ProjectSession` possui e aplica `RelinkMedia` com Histórico e mudanças
+pendentes. Antes de aplicar, o Host confirma novamente que a mesma ocorrência e
+o mesmo vínculo continuam atuais. O monitor reinspeciona a nova referência, e
+o Cache invalida somente esse `mediaId`, mesmo quando duas ocorrências apontavam
+para o mesmo arquivo físico.
 
 O `CacheEngine` consome essas duas autoridades. A última representação válida
 pode permanecer visível como contexto quando o Original está ausente ou
@@ -50,6 +56,17 @@ JSON corrompido, entrada duplicada ou artefato inválido provocam reconstrução
 partir de trabalho novo, nunca aceitação parcial. Temporários pertencem à
 geração e ao processo que os criou; o sweep não remove temporários estrangeiros
 nem uma geração publicada por outro trabalho.
+
+Há uma única exceção deliberada para a recuperação após queda total do Host:
+o novo Host primeiro adquire com exclusividade a reserva nomeada do namespace e,
+antes de iniciar qualquer Processador, remove todos os nomes temporários
+bem-formados abandonados. A reserva prova que o Host anterior terminou; o Job
+Object prova que seu Processador não sobreviveu. Sob essa exclusão, não é
+necessário tratar PID reciclável como autoridade. Se o índice atual for válido,
+a recuperação preserva somente suas gerações referenciadas e coleta finais
+órfãos; se estiver ausente, incompatível ou corrompido, coleta todas as gerações
+finais e reconstrói o índice em trabalho novo. Erro de inspeção fecha a abertura
+do namespace, em vez de aceitar estado parcial.
 
 Uma falha abrupta do Processador permite exatamente um restart para o trabalho
 ainda atual. Uma segunda falha suspende novos trabalhos de Cache e emite o
@@ -95,7 +112,7 @@ Mídia permanecem no contrato da issue 11.
 | Cópia externa somente leitura | resultado opaco da issue 10 | nenhuma Sessão e nenhum namespace |
 | Original ausente | inspeção autoritativa do `MediaResolver`, registrada pelo `MediaRuntime` | mantém só contexto visual; não valida o Original nem autoriza Exportação |
 | Original indisponível | inspeção inconclusiva do `MediaResolver`, registrada pelo `MediaRuntime` | mantém contexto e aguarda nova inspeção |
-| Religação de uma ocorrência | `ProjectSession::RelinkMedia`, seguida de inspeção do `MediaResolver` | invalida somente a ocorrência religada |
+| Religação de uma ocorrência | proposta validada do `MediaResolver`, seguida de `ProjectSession::RelinkMedia` e reinspeção | invalida somente o `mediaId` religado |
 | Mudança estável | duas inspeções autoritativas do `MediaResolver`, registradas pelo `MediaRuntime` | expira a época e deriva nova geração |
 | Cache corrompido/incompatível | validação do consumidor | descarta índice e reconstrói |
 | Falha repetida do Processador | supervisor preservado da issue 44 | suspende Cache sem bloquear edição/Salvamento |
@@ -116,9 +133,15 @@ com bundle NSIS. Contagens vazias fecham o gate.
 
 Os relatórios transitivos são produzidos novamente dentro do scratch da rodada;
 nenhum artefato anterior é aceito. O release usa um `CARGO_TARGET_DIR` exclusivo
-sob esse scratch. O runner calcula hashes antes de remover os outputs, exige
-zero processo próprio, zero listener próprio e locks exclusivos disponíveis,
-remove seus diretórios e só então captura novamente a árvore Git.
+sob esse scratch. Cada critério é derivado de provas nomeadas e não vazias nos
+resultados comportamentais da própria rodada. O runner inicia ainda um processo
+controlado com listener TCP, observa ambos, encerra a árvore pelo mesmo caminho
+usado no `finally` e exige contagens finais zero. Ele rastreia as identidades
+PID+instante de criação de todos os descendentes dos comandos, calcula hashes
+antes de remover os outputs, mede listeners reais, exige locks exclusivos
+disponíveis, remove seus diretórios e só então captura novamente a árvore Git.
+Qualquer falha também passa pelo encerramento e pela verificação da árvore antes
+da limpeza do scratch.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).

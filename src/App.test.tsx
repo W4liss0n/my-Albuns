@@ -84,6 +84,7 @@ const projection = createEmptyProjection();
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   apply: async () => projection,
+  relink: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
   save: async () => {

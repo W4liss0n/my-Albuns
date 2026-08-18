@@ -101,6 +101,25 @@
   text-align: left;
 }
 
+.media-card-shell {
+  display: grid;
+  width: 188px;
+  gap: 5px;
+}
+
+.media-relink {
+  min-height: 24px;
+  border: 1px solid rgb(201 154 93 / 38%);
+  border-radius: 6px;
+  color: #f0d4ad;
+  background: rgb(74 52 31 / 76%);
+  font-size: 0.58rem;
+}
+
+.media-relink:disabled {
+  opacity: 0.5;
+}
+
 .media-card:hover {
   border-color: rgb(201 154 93 / 40%);
   transform: translateY(-1px);

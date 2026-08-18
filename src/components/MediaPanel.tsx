@@ -18,6 +18,8 @@ export interface MediaPanelProps {
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
+  onRelinkMedia(mediaId: string): void;
+  relinkDisabled?: boolean;
 }
 
 export function MediaPanel({
@@ -26,6 +28,8 @@ export function MediaPanel({
   mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
+  onRelinkMedia,
+  relinkDisabled = false,
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
     useState<MediaKind>("photo");
@@ -118,10 +122,10 @@ export function MediaPanel({
       </div>
       <div className="media-strip" ref={stripRef}>
         {activeMediaItems.map((media) => (
+          <div className="media-card-shell" key={media.id}>
             <button
               className="media-card"
               type="button"
-              key={media.id}
               data-media-id={media.id}
               onDoubleClick={
                 media.kind === "photo"
@@ -178,6 +182,18 @@ export function MediaPanel({
                 <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
               </span>
             </button>
+            {mediaPreviews[media.id]?.state === "absent" && (
+              <button
+                aria-label={`Religar arquivo de ${media.name}`}
+                className="media-relink"
+                disabled={relinkDisabled}
+                type="button"
+                onClick={() => onRelinkMedia(media.id)}
+              >
+                Religar arquivo
+              </button>
+            )}
+          </div>
           ))}
         {activeMediaKind === "photo" && (
           <div className="media-tip">

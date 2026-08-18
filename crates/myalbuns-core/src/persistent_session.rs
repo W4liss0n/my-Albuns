@@ -1,5 +1,5 @@
 use crate::{
-    model::{CoreError, ProjectIntent},
+    model::{CoreError, ProjectIntent, RelinkMedia},
     project_document::{MAX_SAFE_INTEGER, ProjectDocument, ProjectRevision},
 };
 use uuid::Uuid;
@@ -81,6 +81,36 @@ impl PersistentProjectSession {
                 return Err(CoreError::UnsupportedProjectIntent);
             }
         };
+
+        self.undo.push(self.current.clone());
+        self.redo.clear();
+        self.current = ProjectRevision::new(self.current.project_id, next_revision, project);
+        self.latest_revision = next_revision;
+        Ok(())
+    }
+
+    pub(crate) fn relink_media(&mut self, command: RelinkMedia) -> Result<(), CoreError> {
+        let next_revision = self
+            .latest_revision
+            .checked_add(1)
+            .filter(|revision| *revision <= MAX_SAFE_INTEGER)
+            .ok_or(CoreError::RevisionSpaceExhausted)?;
+        if !self
+            .current
+            .project
+            .media()
+            .iter()
+            .any(|media| media.id() == command.media_id.into_uuid())
+        {
+            return Err(CoreError::MediaNotFound(command.media_id.to_string()));
+        }
+        let project = self
+            .current
+            .project
+            .with_relinked_media(command.media_id.into_uuid(), command.replacement_path)
+            .map_err(|()| {
+                CoreError::InvalidProject("a nova referência de mídia não é válida".into())
+            })?;
 
         self.undo.push(self.current.clone());
         self.redo.clear();

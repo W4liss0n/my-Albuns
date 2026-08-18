@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RenderSnapshot,
-        RenderSnapshotMetadata, RenderSnapshotRef,
+        ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RelinkMedia,
+        RenderSnapshot, RenderSnapshotMetadata, RenderSnapshotRef,
     },
     persistent_projection,
     persistent_session::PersistentProjectSession,
@@ -418,6 +418,14 @@ impl EditableProject {
             return Err(CoreError::EditableSessionInvalidated);
         }
         self.session.apply(intent)?;
+        Ok(self.projection())
+    }
+
+    pub fn relink_media(&mut self, command: RelinkMedia) -> Result<EditorProjection, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        self.session.relink_media(command)?;
         Ok(self.projection())
     }
 

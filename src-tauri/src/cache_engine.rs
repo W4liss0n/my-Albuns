@@ -208,6 +208,13 @@ pub(crate) struct CacheRecovery {
     pub(crate) removed_temporary_count: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct CacheNamespaceRecovery {
+    pub(crate) removed_temporary_count: usize,
+    pub(crate) removed_generation_count: usize,
+    pub(crate) discarded_index: bool,
+}
+
 type FlightResult = Result<CacheExecution, CacheFailure>;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -334,6 +341,72 @@ impl CacheFlightClaim {
 }
 
 impl CacheEngine {
+    /// Recovers a namespace after its new Host acquired the exclusive
+    /// reservation and before that Host can start a Processor.
+    pub(crate) fn recover_reserved_namespace(
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+    ) -> Result<CacheNamespaceRecovery, CacheFailure> {
+        let storage = app_paths
+            .prepare_cache_storage(namespace.paths())
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::RecoveryCleanup,
+                    format!("Não foi possível preparar a recuperação do Cache: {error}"),
+                )
+            })?;
+        let removed_temporary_count = app_paths
+            .discard_abandoned_project_cache_temporaries(namespace.paths())
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::RecoveryCleanup,
+                    format!("Não foi possível remover temporários abandonados: {error}"),
+                )
+            })?;
+        let metadata_path = namespace.paths().metadata_file();
+        let metadata_present = storage
+            .open_existing_file(&metadata_path)
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::RecoveryCleanup,
+                    format!("Não foi possível inspecionar o índice descartável: {error}"),
+                )
+            })?
+            .is_some();
+        let metadata = load_metadata(&storage, namespace.paths()).filter(|metadata| {
+            metadata_is_current(metadata, namespace.project_id(), namespace.paths())
+        });
+        let removed_generation_count = match metadata.as_ref() {
+            Some(metadata) => {
+                sweep_unreferenced_generations(&storage, namespace.paths(), metadata)?
+            }
+            None => storage
+                .remove_unreferenced_generations(&HashSet::new())
+                .map_err(|error| {
+                    CacheFailure::new(
+                        CacheFailureStage::RecoveryCleanup,
+                        format!("Não foi possível descartar gerações sem índice: {error}"),
+                    )
+                })?,
+        };
+        let discarded_index = metadata.is_none() && metadata_present;
+        if discarded_index {
+            storage
+                .remove_existing_file(&metadata_path)
+                .map_err(|error| {
+                    CacheFailure::new(
+                        CacheFailureStage::RecoveryCleanup,
+                        format!("Não foi possível descartar o índice incompatível: {error}"),
+                    )
+                })?;
+        }
+        Ok(CacheNamespaceRecovery {
+            removed_temporary_count,
+            removed_generation_count,
+            discarded_index,
+        })
+    }
+
     pub(crate) fn processor_status(&self) -> CacheProcessorStatus {
         *self
             .processor_status
@@ -1198,6 +1271,10 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                 return Err(cache_processor_failure(failure));
             }
             Err(failure) if failure.is_unexpected_termination() => {
+                let repeated_failure = attempt > 1;
+                if repeated_failure {
+                    engine.suspend_processor();
+                }
                 let Some(failed_process_id) = failure.process_id else {
                     discard_candidate_generation(storage, request)?;
                     return Err(cache_processor_failure(failure));
@@ -1218,14 +1295,13 @@ async fn invoke_with_recovery<T: ImagingTransport>(
                 {
                     return Err(cancelled_before_publication());
                 }
-                if attempt == 1 {
+                if !repeated_failure {
                     recovery = Some(CacheRecovery {
                         failed_process_id,
                         removed_temporary_count,
                     });
                     attempt += 1;
                 } else {
-                    engine.suspend_processor();
                     return Err(cache_processor_failure(failure));
                 }
             }
@@ -1650,6 +1726,7 @@ mod tests {
         MalformedPageCount,
         WrongRequestId,
         Crash(u32),
+        CrashWithInvalidCandidate(u32),
         PublishThenCrash(u32),
         CrashAndObsolete(u32, CacheCancellation),
         Cancel(u32),
@@ -1708,6 +1785,23 @@ mod tests {
                 }
                 Script::Crash(process_id) => {
                     write_partial(command, &self.app_paths, process_id);
+                    Err(InvocationFailure::unexpected_termination(process_id))
+                }
+                Script::CrashWithInvalidCandidate(process_id) => {
+                    let ImagingCommand::BuildCache(request) = command else {
+                        panic!("the scripted transport accepts Cache only");
+                    };
+                    let job = &request.jobs[0];
+                    let candidate = request
+                        .cache_paths
+                        .preview_file(
+                            job.source.media_id(),
+                            &job.candidate_generation_id,
+                            CacheArtifactFormat::Jpeg,
+                        )
+                        .expect("the invalid candidate path is valid");
+                    std::fs::create_dir(&candidate)
+                        .expect("the invalid candidate fixture is created");
                     Err(InvocationFailure::unexpected_termination(process_id))
                 }
                 Script::PublishThenCrash(process_id) => {
@@ -3172,6 +3266,78 @@ mod tests {
     }
 
     #[test]
+    fn reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let published = verified_preview_artifact(&fixture, &engine).await;
+            let published_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(
+                    &published.media_id,
+                    &published.generation_id,
+                    published.format,
+                )
+                .expect("the indexed generation path is valid");
+            let orphan = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(
+                    "photo-orphan",
+                    "orphan-generation",
+                    CacheArtifactFormat::Png,
+                )
+                .expect("the orphan generation path is valid");
+            let preview_temporary = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_temporary_file(
+                    "photo-partial",
+                    "partial-generation",
+                    CacheArtifactFormat::Jpeg,
+                    4_242,
+                )
+                .expect("the abandoned preview path is valid");
+            let metadata_temporary = fixture
+                .work
+                .namespace
+                .paths()
+                .metadata_temporary_file(4_343);
+            std::fs::write(&orphan, b"orphan generation")
+                .expect("the orphan generation is materialized");
+            std::fs::write(&preview_temporary, b"abandoned preview")
+                .expect("the preview temporary is materialized");
+            std::fs::write(&metadata_temporary, b"abandoned metadata")
+                .expect("the metadata temporary is materialized");
+            let metadata_before = std::fs::read(fixture.work.namespace.paths().metadata_file())
+                .expect("the published index is readable");
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("exclusive namespace recovery succeeds");
+
+            assert_eq!(recovered.removed_temporary_count, 2);
+            assert_eq!(recovered.removed_generation_count, 1);
+            assert!(!recovered.discarded_index);
+            assert!(published_path.is_file());
+            assert!(!orphan.exists());
+            assert!(!preview_temporary.exists());
+            assert!(!metadata_temporary.exists());
+            assert_eq!(
+                std::fs::read(fixture.work.namespace.paths().metadata_file())
+                    .expect("the published index remains readable"),
+                metadata_before
+            );
+        });
+    }
+
+    #[test]
     fn cache_engine_recovers_one_crash_and_discards_only_that_process_temporary() {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
@@ -3324,6 +3490,48 @@ mod tests {
                 [1, 2],
                 "suspension does not consume another transport invocation"
             );
+        });
+    }
+
+    #[test]
+    fn repeated_processor_failure_suspends_before_fallible_recovery_cleanup() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let mut transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([
+                    Script::Crash(5_101),
+                    Script::CrashWithInvalidCandidate(5_102),
+                    Script::Complete(CacheArtifactFormat::Jpeg),
+                ]),
+                attempts: Vec::new(),
+            };
+            let engine = CacheEngine::default();
+
+            let failure = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work.clone(),
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("the invalid repeated-crash candidate cannot be cleaned");
+            assert_eq!(failure.stage, CacheFailureStage::RecoveryCleanup);
+
+            let suspended = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fixture.work,
+                    &fixture.context,
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect_err("cleanup failure cannot reopen the repeated-crash loop");
+            assert_eq!(suspended.stage, CacheFailureStage::ProcessorSuspended);
+            assert_eq!(transport.attempts, [1, 2]);
         });
     }
 

@@ -3,11 +3,14 @@ use myalbuns_core::{
     SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use tauri::{State, WebviewWindow};
+use tauri::{AppHandle, State, WebviewWindow};
+use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
     ipc_contract::{SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult},
     logging::validate_optional_identifier,
+    media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
+    product_runtime::PROJECT_WINDOW_LABEL,
     project_host::{ProjectHost, ProjectHostSaveError},
 };
 
@@ -61,6 +64,88 @@ pub(crate) fn apply_project_intent(
         event = "project_intent_applied",
     );
     Ok(projection)
+}
+
+#[tauri::command]
+pub(crate) async fn relink_media(
+    media_id: String,
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<EditorProjection, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A Religação só está disponível na Janela do Projeto.".into());
+    }
+    let host = state.inner().clone();
+    let binding = host
+        .authorized_media_catalog()?
+        .bindings
+        .into_iter()
+        .find(|binding| binding.media_id == media_id)
+        .ok_or_else(|| "A ocorrência de mídia não pertence a este Projeto.".to_string())?;
+    let inspected_binding = binding.clone();
+    let absent = tauri::async_runtime::spawn_blocking(move || {
+        occurrence_is_authoritatively_absent(&inspected_binding)
+    })
+    .await
+    .map_err(|_| "Não foi possível reinspecionar o Arquivo vinculado.".to_string())?;
+    if !absent {
+        return Err(
+            "Somente um Arquivo comprovadamente ausente pode ser religado; tente novamente se a origem estiver indisponível."
+                .into(),
+        );
+    }
+
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .add_filter(
+            "Imagens JPEG, PNG e TIFF",
+            &["jpg", "jpeg", "png", "tif", "tiff"],
+        )
+        .pick_file(move |selection| {
+            let _ = sender.send(selection);
+        });
+    let selection = receiver
+        .await
+        .map_err(|_| "Não foi possível concluir o diálogo de Religação.".to_string())?;
+    let Some(selection) = selection else {
+        return host.projection();
+    };
+    let FilePath::Path(path) = selection else {
+        return Err("O local escolhido não é um Arquivo do Windows válido.".into());
+    };
+
+    let selected_media_id = binding.media_id.clone();
+    let relinked = tauri::async_runtime::spawn_blocking(move || {
+        if !occurrence_is_authoritatively_absent(&binding) {
+            return Err(
+                "O Arquivo original reapareceu durante a Religação; nenhuma referência foi alterada."
+                    .to_string(),
+            );
+        }
+        let proposal = MediaResolver.propose_relink(&binding, path)?;
+        host.relink_media(proposal)
+    })
+    .await
+    .map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        window_label = window.label(),
+        media_id = safe_log_identifier(&selected_media_id),
+        revision = relinked.state.revision,
+        event = "linked_media_relinked",
+    );
+    Ok(relinked)
+}
+
+fn occurrence_is_authoritatively_absent(binding: &MediaBinding) -> bool {
+    MediaResolver
+        .observe(0, std::slice::from_ref(binding))
+        .observations()
+        .first()
+        .is_some_and(|observation| observation.availability == MediaAvailability::Absent)
 }
 
 #[tauri::command]

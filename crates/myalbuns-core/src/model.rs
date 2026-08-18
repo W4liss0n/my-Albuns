@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use thiserror::Error;
 use ts_rs::TS;
@@ -61,6 +63,26 @@ impl std::str::FromStr for MediaId {
 impl From<MediaId> for String {
     fn from(value: MediaId) -> Self {
         value.to_string()
+    }
+}
+
+/// A creative command that changes one persisted media occurrence.
+///
+/// The native path deliberately has no serde or TypeScript representation, so
+/// only the trusted Host can construct this command after `MediaResolver`
+/// validates a user-selected file.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RelinkMedia {
+    pub(crate) media_id: MediaId,
+    pub(crate) replacement_path: PathBuf,
+}
+
+impl RelinkMedia {
+    pub fn new(media_id: MediaId, replacement_path: PathBuf) -> Self {
+        Self {
+            media_id,
+            replacement_path,
+        }
     }
 }
 

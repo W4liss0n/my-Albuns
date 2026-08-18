@@ -6,8 +6,8 @@ use sha2::{Digest, Sha256};
 use crate::{
     AppPathsError, CachePathPlan, PreparedCacheStorage,
     cache::{
-        CacheNamespaceUsage, clear_project_cache, discard_project_cache_temporaries,
-        inspect_cache_namespaces, prepare_cache_storage,
+        CacheNamespaceUsage, clear_project_cache, discard_abandoned_project_cache_temporaries,
+        discard_project_cache_temporaries, inspect_cache_namespaces, prepare_cache_storage,
     },
 };
 
@@ -126,6 +126,13 @@ impl AppPaths {
         process_id: u32,
     ) -> Result<usize, AppPathsError> {
         discard_project_cache_temporaries(self, plan, process_id)
+    }
+
+    pub fn discard_abandoned_project_cache_temporaries(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<usize, AppPathsError> {
+        discard_abandoned_project_cache_temporaries(self, plan)
     }
 
     pub fn recovery_dir(&self) -> PathBuf {

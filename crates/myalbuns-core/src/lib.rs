@@ -14,8 +14,8 @@ pub use model::{
     MediaTransform, MediaUsage, NormalizedPan, NumberRange, ParseMediaIdError, PhotoPlacement,
     PhotoPlacementPlan, PhotoSnapshot, ProjectIntent, ProjectedActiveSides, ProjectedBackground,
     ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay,
-    ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RenderSnapshot, RenderSnapshotRef,
-    SheetRole, SheetSnapshot, SizeUm, VectorUm,
+    ProjectedOverlayContent, ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot,
+    RenderSnapshotRef, SheetRole, SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
