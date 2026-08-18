@@ -136,10 +136,16 @@ A reprodução reutiliza a seleção espacial de `Design do Álbum`:
 - hover na região central realça os dois lados;
 - clicar fixa o escopo selecionado.
 
-O realce usa somente um contorno azul na borda externa do escopo. Ele não aplica
-cor ou transparência sobre Background, Overlay ou guias técnicas. Para reforçar
-o foco sem tingir a Página inteira, somente os Frames demonstrativos do escopo
-realçado recebem maior contraste; os Frames do outro Lado ficam mais discretos.
+Seleção fixa e hover são camadas independentes. A seleção usa um contorno azul
+sólido na borda externa do escopo e mantém seus Frames com o contraste mais
+forte. Hover ou foco por teclado usa um contorno azul-claro pontilhado, recuado da
+borda, e contraste intermediário nos Frames que não pertencem à seleção. Ao
+passar sobre outro escopo, o hover aparece sem ocultar ou substituir a seleção
+fixa; os dois realces permanecem visíveis simultaneamente.
+
+Nenhuma das camadas aplica cor ou transparência sobre Background, Overlay ou
+guias técnicas. Frames que não pertencem à seleção nem ao hover permanecem mais
+discretos.
 
 Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro sem clicar produz somente o realce temporário e não troca a configuração selecionada.
 

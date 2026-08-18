@@ -518,8 +518,9 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A reprodução respeita a proporção de largura e altura escolhida em `Configurações`, mas sempre representa uma Lâmina dupla, independentemente da Configuração das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
 - `Configurações` e `Personalização` reutilizam integralmente o mesmo painel de prévia — fundo, cabeçalho, metadados, legenda, espaçamento, encaixe proporcional, borda, sombra e guias técnicas — limitado simultaneamente pela largura e pela altura disponíveis; somente o conteúdo interno da Lâmina e as interações específicas da `Personalização` diferem.
 - Essa reprodução reutiliza o seletor espacial de `Design do Álbum`: hover realça esquerda, direita ou ambos pela região central; o clique fixa o escopo usado pelos controles de Background e Overlay.
-- O escopo realçado mostra somente um contorno azul em sua borda externa, sem preencher, tingir ou reduzir a legibilidade do conteúdo da Lâmina.
-- Os Frames demonstrativos do escopo realçado recebem contraste maior, enquanto os Frames do outro Lado ficam discretos; esse destaque não altera Background, Overlay ou guias técnicas.
+- A seleção fixa mostra um contorno azul sólido na borda externa e mantém seus Frames com contraste forte; hover ou foco por teclado mostra um contorno azul-claro pontilhado e recuado, com contraste intermediário nos Frames que não pertencem à seleção.
+- Hover e seleção são realces independentes e podem permanecer visíveis simultaneamente em escopos diferentes; mover o ponteiro nunca oculta nem substitui o escopo fixado.
+- Nenhum realce preenche ou tinge Background, Overlay ou guias técnicas; Frames fora da seleção e do hover permanecem discretos.
 - O hover sem clique é apenas feedback temporário e não muda o escopo configurado.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.

@@ -333,11 +333,13 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   fireEvent.pointerEnter(left);
   expect(left).toHaveAttribute("data-highlighted", "true");
   expect(both).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByLabelText("Realce do lado esquerdo")).toHaveAttribute(
-    "fill",
-    "none",
-  );
-  expect(screen.getByLabelText("Realce do lado esquerdo")).toHaveAttribute(
+  expect(
+    screen.getByLabelText("Realce temporário do lado esquerdo"),
+  ).toHaveAttribute("fill", "none");
+  expect(
+    screen.getByLabelText("Realce temporário do lado esquerdo"),
+  ).toHaveAttribute("stroke", "#73A9CE");
+  expect(screen.getByLabelText("Seleção fixa de ambos os lados")).toHaveAttribute(
     "stroke",
     "#2F7FBA",
   );
@@ -347,7 +349,7 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   );
   expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
     "fill-opacity",
-    "0.08",
+    "0.24",
   );
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
     target: { value: "#123456" },
@@ -385,6 +387,47 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   );
 });
 
+test("keeps the fixed selection visible while another scope is hovered", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
+  const right = screen.getByRole("button", { name: "Lado direito" });
+  await user.click(right);
+  fireEvent.pointerEnter(left);
+
+  expect(right).toHaveAttribute("aria-pressed", "true");
+  expect(screen.getByLabelText("Seleção fixa do lado direito")).toHaveAttribute(
+    "stroke",
+    "#2F7FBA",
+  );
+  expect(
+    screen.getByLabelText("Seleção fixa do lado direito"),
+  ).not.toHaveAttribute("stroke-dasharray");
+  expect(
+    screen.getByLabelText("Realce temporário do lado esquerdo"),
+  ).toHaveAttribute("stroke", "#73A9CE");
+  expect(
+    screen.getByLabelText("Realce temporário do lado esquerdo"),
+  ).toHaveAttribute("stroke-dasharray");
+  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+    "fill-opacity",
+    "0.24",
+  );
+  expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
+    "fill-opacity",
+    "0.15",
+  );
+});
+
 test("uses the sheet outline as the keyboard focus indicator", async () => {
   const user = userEvent.setup();
 
@@ -406,11 +449,13 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
   fireEvent.pointerLeave(left);
 
   expect(right).toHaveAttribute("data-highlighted", "true");
-  expect(screen.getByLabelText("Realce do lado direito")).toHaveAttribute(
-    "fill",
-    "none",
-  );
-  expect(screen.getByLabelText("Realce do lado direito")).toHaveAttribute(
+  expect(
+    screen.getByLabelText("Realce temporário do lado direito"),
+  ).toHaveAttribute("fill", "none");
+  expect(
+    screen.getByLabelText("Realce temporário do lado direito"),
+  ).toHaveAttribute("stroke", "#73A9CE");
+  expect(screen.getByLabelText("Seleção fixa de ambos os lados")).toHaveAttribute(
     "stroke",
     "#2F7FBA",
   );

@@ -2,6 +2,7 @@ import type {
   BackgroundDraftContent,
   NewProjectPersonalizationDraft,
   OverlayDraftContent,
+  PersonalizationScope,
 } from "./application/newProjectPersonalization";
 import { SheetGuideLayer } from "./SheetGuideLayer";
 
@@ -9,9 +10,9 @@ interface PersonalizationPreviewProps {
   bleedUm: number;
   frameGapPx: number;
   heightUm: number;
-  highlightedScope: NewProjectPersonalizationDraft["fixedScope"];
   personalization: NewProjectPersonalizationDraft;
   safetyUm: number;
+  transientScope: NewProjectPersonalizationDraft["fixedScope"] | null;
   widthUm: number;
 }
 
@@ -19,9 +20,9 @@ export function PersonalizationPreview({
   bleedUm,
   frameGapPx,
   heightUm,
-  highlightedScope,
   personalization,
   safetyUm,
+  transientScope,
   widthUm,
 }: PersonalizationPreviewProps) {
   const pageWidth = widthUm / 2;
@@ -31,11 +32,24 @@ export function PersonalizationPreview({
   const frameWidth = (pageWidth - frameInsetX * 2 - frameGap) / 2;
   const frameHeight = heightUm - frameInsetY * 2;
   const frameBorder = personalization.frameBorder;
-  const highlightWidth =
-    highlightedScope === "both" ? widthUm : pageWidth;
-  const highlightX = highlightedScope === "right" ? pageWidth : 0;
-  const highlightStrokeWidth = Math.max(1, heightUm * 0.006);
-  const highlightInset = highlightStrokeWidth / 2;
+  const selectionStrokeWidth = Math.max(1, heightUm * 0.006);
+  const selectionOutline = scopeOutline(
+    personalization.fixedScope,
+    heightUm,
+    pageWidth,
+    widthUm,
+    selectionStrokeWidth / 2,
+  );
+  const transientStrokeWidth = Math.max(1, heightUm * 0.0035);
+  const transientOutline = transientScope
+    ? scopeOutline(
+        transientScope,
+        heightUm,
+        pageWidth,
+        widthUm,
+        selectionStrokeWidth * 2,
+      )
+    : null;
 
   return (
     <svg
@@ -112,10 +126,13 @@ export function PersonalizationPreview({
       )}
       {[0, pageWidth].map((pageX, pageIndex) => {
         const side = pageIndex === 0 ? "esquerdo" : "direito";
-        const isHighlighted =
-          highlightedScope === "both" ||
-          (highlightedScope === "left" && pageIndex === 0) ||
-          (highlightedScope === "right" && pageIndex === 1);
+        const isSelected = scopeContainsPage(
+          personalization.fixedScope,
+          pageIndex,
+        );
+        const isTransient = transientScope
+          ? scopeContainsPage(transientScope, pageIndex)
+          : false;
 
         return (
           <g key={side}>
@@ -131,7 +148,9 @@ export function PersonalizationPreview({
                   <rect
                     aria-label={`Frame demonstrativo ${side} ${frameNumber}`}
                     fill="#7A684E"
-                    fillOpacity={isHighlighted ? "0.24" : "0.08"}
+                    fillOpacity={
+                      isSelected ? "0.24" : isTransient ? "0.15" : "0.08"
+                    }
                     height={frameHeight}
                     pointerEvents="none"
                     stroke="none"
@@ -158,22 +177,28 @@ export function PersonalizationPreview({
           </g>
         );
       })}
+      {transientScope && transientOutline ? (
+        <rect
+          aria-label={scopeOutlineLabel("Realce temporário", transientScope)}
+          fill="none"
+          pointerEvents="none"
+          stroke="#73A9CE"
+          strokeDasharray={`${transientStrokeWidth * 0.1} ${heightUm * 0.018}`}
+          strokeLinecap="round"
+          strokeWidth={transientStrokeWidth}
+          {...transientOutline}
+        />
+      ) : null}
       <rect
-        aria-label={
-          highlightedScope === "both"
-            ? "Realce de ambos os lados"
-            : highlightedScope === "left"
-              ? "Realce do lado esquerdo"
-              : "Realce do lado direito"
-        }
+        aria-label={scopeOutlineLabel(
+          "Seleção fixa",
+          personalization.fixedScope,
+        )}
         fill="none"
-        height={Math.max(1, heightUm - highlightStrokeWidth)}
         pointerEvents="none"
         stroke="#2F7FBA"
-        strokeWidth={highlightStrokeWidth}
-        width={Math.max(1, highlightWidth - highlightStrokeWidth)}
-        x={highlightX + highlightInset}
-        y={highlightInset}
+        strokeWidth={selectionStrokeWidth}
+        {...selectionOutline}
       />
       <SheetGuideLayer
         bleedUm={bleedUm}
@@ -184,6 +209,66 @@ export function PersonalizationPreview({
     </svg>
   );
 }
+
+function scopeContainsPage(
+  scope: PersonalizationScope,
+  pageIndex: number,
+) {
+  const descriptor = SCOPE_DESCRIPTORS[scope];
+  return (
+    pageIndex >= descriptor.firstPageIndex &&
+    pageIndex < descriptor.firstPageIndex + descriptor.pageCount
+  );
+}
+
+function scopeOutline(
+  scope: PersonalizationScope,
+  heightUm: number,
+  pageWidth: number,
+  widthUm: number,
+  inset: number,
+) {
+  const descriptor = SCOPE_DESCRIPTORS[scope];
+  const scopeWidth = Math.min(
+    widthUm,
+    pageWidth * descriptor.pageCount,
+  );
+  const scopeX = pageWidth * descriptor.firstPageIndex;
+  return {
+    height: Math.max(1, heightUm - inset * 2),
+    width: Math.max(1, scopeWidth - inset * 2),
+    x: scopeX + inset,
+    y: inset,
+  };
+}
+
+function scopeOutlineLabel(
+  prefix: "Realce temporário" | "Seleção fixa",
+  scope: PersonalizationScope,
+) {
+  return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;
+}
+
+const SCOPE_DESCRIPTORS = {
+  both: {
+    firstPageIndex: 0,
+    labelSuffix: "de ambos os lados",
+    pageCount: 2,
+  },
+  left: {
+    firstPageIndex: 0,
+    labelSuffix: "do lado esquerdo",
+    pageCount: 1,
+  },
+  right: {
+    firstPageIndex: 1,
+    labelSuffix: "do lado direito",
+    pageCount: 1,
+  },
+} as const satisfies Record<
+  PersonalizationScope,
+  { firstPageIndex: number; labelSuffix: string; pageCount: number }
+>;
 
 function OverlayContent({
   content,

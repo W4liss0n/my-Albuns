@@ -54,10 +54,7 @@ export function PersonalizationStep({
   const selectedBackground = backgroundForFixedScope(personalization);
   const backgroundColor =
     selectedBackground.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
-  const highlightedScope =
-    personalization.hoveredScope ??
-    focusedScope ??
-    personalization.fixedScope;
+  const transientScope = personalization.hoveredScope ?? focusedScope;
   const selectedOverlay = overlayForFixedScope(personalization);
   const activeFrameBorder =
     personalization.frameBorder.kind === "solid"
@@ -121,9 +118,9 @@ export function PersonalizationStep({
               bleedUm={bleedUm}
               frameGapPx={frameGapPx}
               heightUm={heightUm}
-              highlightedScope={highlightedScope}
               personalization={personalization}
               safetyUm={safetyUm}
+              transientScope={transientScope}
               widthUm={widthUm}
             />
             <div
@@ -142,14 +139,20 @@ export function PersonalizationStep({
                   aria-label={label}
                   aria-pressed={personalization.fixedScope === scope}
                   data-highlighted={
-                    highlightedScope === scope ? "true" : undefined
+                    transientScope === scope ? "true" : undefined
                   }
                   key={scope}
                   onBlur={() => setFocusedScope(null)}
                   onClick={() =>
                     onChange(fixPersonalizationScope(personalization, scope))
                   }
-                  onFocus={() => setFocusedScope(scope)}
+                  onFocus={(event) =>
+                    setFocusedScope(
+                      event.currentTarget.matches(":focus-visible")
+                        ? scope
+                        : null,
+                    )
+                  }
                   onPointerEnter={() =>
                     onChange(hoverPersonalizationScope(personalization, scope))
                   }
