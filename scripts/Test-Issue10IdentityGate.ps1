@@ -228,6 +228,22 @@ try {
     }
     Add-Check 'public-project-core-gate-build'
 
+    Push-Location $script:WorkspaceRoot
+    try {
+        & $script:CargoExecutable test `
+            -p myalbuns-paths `
+            'resolve::windows_identity_tests::physical_identity_comparison_is_closed_across_file_id_domains' `
+            -- `
+            --exact
+        if ($LASTEXITCODE -ne 0) {
+            throw 'The mixed Windows file-ID comparison contract failed.'
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Add-Check 'mixed-file-id-domains-fail-closed'
+
     $causalTests = @(
         [ordered]@{
             name = 'a-to-b-success-race-fails-closed'

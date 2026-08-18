@@ -90,6 +90,12 @@ A segunda cria uma imagem ISO por IMAPI2, monta-a como unidade óptica pelo
 Windows e exige `ExternalCopyNotWritable` ao abrir a Cópia externa nela. Ambas
 usam eventos ou stdin para coordenação, sem `sleep`.
 
+O runner também fixa a comparação entre os dois domínios de identidade física
+do Windows: IDs estendidos ou legados só produzem `Same`/`Different` quando os
+dois lados usam o mesmo formato; formatos mistos no mesmo volume produzem
+`Indeterminate`, enquanto volumes distintos continuam conclusivamente
+`Different`.
+
 O artefato canônico é
 [`artifacts/0035-issue-10-identity-gate.json`](artifacts/0035-issue-10-identity-gate.json).
 Ele é a única fonte dos UUIDs, da Identidade de instância PID+`FILETIME`, dos
@@ -107,7 +113,8 @@ troca A→B durante uma abertura bem-sucedida e volume ISO protegido contra
 escrita. A identidade física usa primeiro o ID de arquivo de 128 bits e mantém
 como fallback tipado o par `VolumeSerialNumber + FileIndex` documentado pelo
 Windows para filesystems que não oferecem `FileIdInfo`; os formatos nunca
-compartilham o mesmo token local.
+compartilham o mesmo token local nem são comparados como se fossem o mesmo
+domínio de identidade.
 Os testes de Host e protocolo comprovam a correlação de `FocusExisting`, a
 eliminação do Host efêmero e o transporte separado das autoridades de fonte e
 Destino. Os testes da Tela Global verificam que o frontend não recebe pathname,

@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(windows)]
 use myalbuns_paths::{
-    PhysicalFileIdentity, ProcessInstanceId, ProjectFileLock, ProjectFileLockError,
-    publish_new_file, replace_existing_file,
+    PhysicalFileIdentity, PhysicalIdentityEvidence, ProcessInstanceId, ProjectFileLock,
+    ProjectFileLockError, publish_new_file, replace_existing_file,
 };
 
 #[cfg(windows)]
@@ -236,12 +236,16 @@ impl ProjectIdentityLease {
                 let active = PhysicalFileIdentity::from_local_token(&target.physical_identity)
                     .filter(|identity| identity.to_local_token() == target.physical_identity)
                     .ok_or(IdentityLeaseError::Unavailable)?;
-                if active == candidate {
-                    Ok(IdentityLeaseObservation::SamePhysicalTarget {
-                        owner_process: target.owner_process,
-                    })
-                } else {
-                    Ok(IdentityLeaseObservation::DifferentPhysicalTarget)
+                match active.compare(candidate) {
+                    PhysicalIdentityEvidence::Same => {
+                        Ok(IdentityLeaseObservation::SamePhysicalTarget {
+                            owner_process: target.owner_process,
+                        })
+                    }
+                    PhysicalIdentityEvidence::Different => {
+                        Ok(IdentityLeaseObservation::DifferentPhysicalTarget)
+                    }
+                    PhysicalIdentityEvidence::Indeterminate => Err(IdentityLeaseError::Unavailable),
                 }
             }
             Err(ProjectFileLockError::Unavailable { .. }) => match fs::metadata(&lease_path) {

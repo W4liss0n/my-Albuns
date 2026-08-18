@@ -754,13 +754,15 @@ fn authorize_identity_candidate(
     match previous {
         Ok(previous) if previous.revision.project_id == project_id => {
             match (previous.physical_identity, candidate_physical_identity) {
-                (Some(previous), Some(candidate)) => {
-                    if previous == candidate {
-                        Ok(())
-                    } else {
+                (Some(previous), Some(candidate)) => match previous.compare(candidate) {
+                    PhysicalIdentityEvidence::Same => Ok(()),
+                    PhysicalIdentityEvidence::Different => {
                         Err(IdentityCandidateError::ExternalCopy)
                     }
-                }
+                    PhysicalIdentityEvidence::Indeterminate => {
+                        Err(IdentityCandidateError::Indeterminate)
+                    }
+                },
                 _ => Err(IdentityCandidateError::Indeterminate),
             }
         }

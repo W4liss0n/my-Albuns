@@ -221,8 +221,7 @@ impl ResolvedObject {
 
 pub(crate) fn compare_file_identity(left: &File, right: &File) -> PhysicalIdentityEvidence {
     match (file_identity(left), file_identity(right)) {
-        (Some(left), Some(right)) if left == right => PhysicalIdentityEvidence::Same,
-        (Some(_), Some(_)) => PhysicalIdentityEvidence::Different,
+        (Some(left), Some(right)) => left.compare(right),
         _ => PhysicalIdentityEvidence::Indeterminate,
     }
 }
@@ -537,6 +536,25 @@ impl PhysicalFileIdentity {
         };
         Some(Self { volume, file_id })
     }
+
+    /// Compares only compatible Windows file-ID domains. Mixed extended and
+    /// legacy identifiers on one volume remain inconclusive.
+    pub fn compare(self, other: Self) -> PhysicalIdentityEvidence {
+        if self.volume != other.volume {
+            return PhysicalIdentityEvidence::Different;
+        }
+        let same_file_id = match (self.file_id, other.file_id) {
+            (WindowsFileId::Extended(left), WindowsFileId::Extended(right)) => Some(left == right),
+            (WindowsFileId::Legacy(left), WindowsFileId::Legacy(right)) => Some(left == right),
+            (WindowsFileId::Extended(_), WindowsFileId::Legacy(_))
+            | (WindowsFileId::Legacy(_), WindowsFileId::Extended(_)) => None,
+        };
+        match same_file_id {
+            Some(true) => PhysicalIdentityEvidence::Same,
+            Some(false) => PhysicalIdentityEvidence::Different,
+            None => PhysicalIdentityEvidence::Indeterminate,
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -596,7 +614,7 @@ pub(crate) fn file_identity(file: &File) -> Option<PhysicalFileIdentity> {
 
 #[cfg(all(test, windows))]
 mod windows_identity_tests {
-    use super::{PhysicalFileIdentity, WindowsFileId};
+    use super::{PhysicalFileIdentity, PhysicalIdentityEvidence, WindowsFileId};
 
     #[test]
     fn extended_and_legacy_file_ids_round_trip_without_sharing_a_token_shape() {
@@ -617,6 +635,44 @@ mod windows_identity_tests {
             );
         }
         assert_ne!(extended.to_local_token(), legacy.to_local_token());
+    }
+
+    #[test]
+    fn physical_identity_comparison_is_closed_across_file_id_domains() {
+        let extended = PhysicalFileIdentity {
+            volume: 7,
+            file_id: WindowsFileId::Extended([3; 16]),
+        };
+        let other_extended = PhysicalFileIdentity {
+            volume: 7,
+            file_id: WindowsFileId::Extended([4; 16]),
+        };
+        let legacy = PhysicalFileIdentity {
+            volume: 7,
+            file_id: WindowsFileId::Legacy([3; 8]),
+        };
+        let other_volume = PhysicalFileIdentity {
+            volume: 8,
+            file_id: WindowsFileId::Legacy([3; 8]),
+        };
+
+        assert_eq!(extended.compare(extended), PhysicalIdentityEvidence::Same);
+        assert_eq!(
+            extended.compare(other_extended),
+            PhysicalIdentityEvidence::Different
+        );
+        assert_eq!(
+            legacy.compare(other_volume),
+            PhysicalIdentityEvidence::Different
+        );
+        assert_eq!(
+            extended.compare(legacy),
+            PhysicalIdentityEvidence::Indeterminate
+        );
+        assert_eq!(
+            legacy.compare(extended),
+            PhysicalIdentityEvidence::Indeterminate
+        );
     }
 }
 
@@ -650,6 +706,15 @@ impl PhysicalFileIdentity {
             device: u64::from_str_radix(device, 16).ok()?,
             inode: u64::from_str_radix(inode, 16).ok()?,
         })
+    }
+
+    /// Compares the complete Unix device/inode identity pair.
+    pub fn compare(self, other: Self) -> PhysicalIdentityEvidence {
+        if self == other {
+            PhysicalIdentityEvidence::Same
+        } else {
+            PhysicalIdentityEvidence::Different
+        }
     }
 }
 
