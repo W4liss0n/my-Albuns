@@ -77,6 +77,8 @@ $registryRoot = Join-Path $runRoot 'state\identities'
 $holder = $null
 $mappingCreated = $false
 $readOnlySource = $null
+$preflightLocalPath = $null
+$preflightCreated = $false
 $checks = [System.Collections.Generic.List[object]]::new()
 
 function Add-Check {
@@ -222,9 +224,30 @@ try {
     }
     Add-Check 'public-project-core-gate-build'
 
-    $preflight = Join-Path $UncRoot 'preflight.tmp'
-    [System.IO.File]::WriteAllBytes($preflight, [byte[]](1, 2, 3))
-    [System.IO.File]::Delete($preflight)
+    $preflightName = '.myalbuns-issue10-preflight-{0}.tmp' -f `
+        [System.Guid]::NewGuid().ToString('N')
+    $preflightLocalPath = Join-Path $runRoot $preflightName
+    $preflightUncPath = Join-Path $UncRoot $preflightName
+    $preflightBytes = [byte[]](1, 2, 3)
+    $preflightStream = [System.IO.FileStream]::new(
+        $preflightLocalPath,
+        [System.IO.FileMode]::CreateNew,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::None
+    )
+    $preflightCreated = $true
+    try {
+        $preflightStream.Write($preflightBytes, 0, $preflightBytes.Length)
+        $preflightStream.Flush($true)
+    }
+    finally {
+        $preflightStream.Dispose()
+    }
+    $observedPreflight = [System.IO.File]::ReadAllBytes($preflightUncPath)
+    if ([Convert]::ToBase64String($observedPreflight) -ne `
+            [Convert]::ToBase64String($preflightBytes)) {
+        throw 'The supplied UNC root does not resolve to the isolated gate scratch root.'
+    }
     $mappingOutput = @(& net.exe use $mappedDrive $UncRoot /persistent:no 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw "The real mapped drive could not be created: $($mappingOutput -join ' ')"
@@ -443,6 +466,12 @@ finally {
     }
     if ($mappingCreated) {
         & net.exe use $mappedDrive /delete /y | Out-Null
+    }
+    if ($preflightCreated `
+            -and $null -ne $preflightLocalPath `
+            -and [System.IO.File]::Exists($preflightLocalPath)) {
+        [System.IO.File]::Delete($preflightLocalPath)
+        $preflightCreated = $false
     }
     Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
 }
