@@ -999,7 +999,7 @@ try {
                 @{ source = 'cache-service-source'; sourceText = $narrowApiProofText; requiredText = 'clear_all_cache' },
                 @{ source = 'rust-tests'; sourceText = $rustRun.output; requiredText = 'cache_consumes_authoritative_identity_transitions_without_owning_them' },
                 @{ source = 'frontend-tests'; sourceText = $frontendRun.output; requiredText = 'maps the Project and media ports to the desktop commands' },
-                @{ source = 'research-matrix'; sourceText = $researchProofText; requiredText = 'Religação de uma ocorrência' }
+                @{ source = 'research-matrix'; sourceText = $researchProofText; requiredText = 'ProjectSession::RelinkMedia' }
             )
     )
     if ($criteria.Count -ne 8 -or @($criteria | Where-Object { -not $_.passed }).Count -ne 0) {
