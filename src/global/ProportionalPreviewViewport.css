@@ -1,0 +1,15 @@
+.new-project-proportional-preview-viewport {
+  display: grid;
+  width: min(100%, 680px);
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  place-items: center;
+}
+
+.new-project-proportional-preview-surface {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}

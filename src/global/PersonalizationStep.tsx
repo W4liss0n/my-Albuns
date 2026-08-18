@@ -5,6 +5,9 @@ import type {
   ProjectLaunchFailure,
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
+import type {
+  NewProjectDimensionsDraft,
+} from "./application/newProjectDimensions";
 import {
   backgroundForFixedScope,
   clearOverlay,
@@ -20,24 +23,23 @@ import {
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
 import { ActionButton, AppIcon, InlineNotice } from "../ui";
+import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 import { PersonalizationPreview } from "./PersonalizationPreview";
 
 interface PersonalizationStepProps {
+  draft: NewProjectDimensionsDraft;
   failure: ProjectLaunchFailure | null;
-  heightUm: number;
   onChange(personalization: NewProjectPersonalizationDraft): void;
   onChooseDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
   personalization: NewProjectPersonalizationDraft;
-  widthUm: number;
 }
 
 export function PersonalizationStep({
+  draft,
   failure,
-  heightUm,
   onChange,
   onChooseDecorative,
   personalization,
-  widthUm,
 }: PersonalizationStepProps) {
   const [pickerFailure, setPickerFailure] =
     useState<ProjectLaunchFailure | null>(null);
@@ -69,62 +71,54 @@ export function PersonalizationStep({
 
   return (
     <div className="new-project-content new-project-personalization">
-      <div className="new-project-preview">
-        <div className="new-project-personalization-heading">
-          <strong>{scopeLabel}</strong>
-          <span>
-            Lâmina aberta {formatPreviewMeasurement(widthUm)} ×{" "}
-            {formatPreviewMeasurement(heightUm)} mm
-          </span>
-        </div>
-        <div
-          aria-label="Prévia do formato da Lâmina"
-          className="new-project-preview-stage"
-          style={{ aspectRatio: `${widthUm} / ${heightUm}` }}
-        >
-          <PersonalizationPreview
-            heightUm={heightUm}
-            personalization={personalization}
-            widthUm={widthUm}
-          />
-          <div
-            aria-label="Escopo da personalização"
-            className="new-project-scope-controls"
-            role="group"
-          >
-            {(
-              [
-                ["left", "Lado esquerdo"],
-                ["both", "Ambos os lados"],
-                ["right", "Lado direito"],
-              ] as const
-            ).map(([scope, label]) => (
-              <button
-                aria-label={label}
-                aria-pressed={personalization.fixedScope === scope}
-                data-highlighted={
-                  highlightedScope === scope ? "true" : undefined
-                }
-                key={scope}
-                onClick={() =>
-                  onChange(fixPersonalizationScope(personalization, scope))
-                }
-                onPointerEnter={() =>
-                  onChange(hoverPersonalizationScope(personalization, scope))
-                }
-                onPointerLeave={() =>
-                  onChange(hoverPersonalizationScope(personalization, null))
-                }
-                type="button"
-              />
-            ))}
-          </div>
-        </div>
-        <p className="new-project-preview-caption">
-          Background e Overlay acompanham o escopo selecionado. Clique em uma
-          Página para editar somente aquele Lado.
-        </p>
-      </div>
+      <NewProjectPreviewPanel
+        draft={draft}
+        surfaceLabel="Prévia do formato da Lâmina"
+      >
+        {({ bleedUm, heightUm, safetyUm, widthUm }) => (
+          <>
+            <PersonalizationPreview
+              bleedUm={bleedUm}
+              heightUm={heightUm}
+              personalization={personalization}
+              safetyUm={safetyUm}
+              widthUm={widthUm}
+            />
+            <div
+              aria-label="Escopo da personalização"
+              className="new-project-scope-controls"
+              role="group"
+            >
+              {(
+                [
+                  ["left", "Lado esquerdo"],
+                  ["both", "Ambos os lados"],
+                  ["right", "Lado direito"],
+                ] as const
+              ).map(([scope, label]) => (
+                <button
+                  aria-label={label}
+                  aria-pressed={personalization.fixedScope === scope}
+                  data-highlighted={
+                    highlightedScope === scope ? "true" : undefined
+                  }
+                  key={scope}
+                  onClick={() =>
+                    onChange(fixPersonalizationScope(personalization, scope))
+                  }
+                  onPointerEnter={() =>
+                    onChange(hoverPersonalizationScope(personalization, scope))
+                  }
+                  onPointerLeave={() =>
+                    onChange(hoverPersonalizationScope(personalization, null))
+                  }
+                  type="button"
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </NewProjectPreviewPanel>
       <div className="new-project-visual-values">
         <p className="new-project-scope-label">{scopeLabel}</p>
         <section className="new-project-value-group">
@@ -302,19 +296,10 @@ const BACKGROUND_SWATCHES = [
   "#1d2a3a",
 ] as const;
 
-const previewMeasurementFormatter = new Intl.NumberFormat("pt-BR", {
-  maximumFractionDigits: 2,
-  useGrouping: false,
-});
-
 function personalizationScopeLabel(
   scope: NewProjectPersonalizationDraft["fixedScope"],
 ) {
   if (scope === "left") return "Página esquerda";
   if (scope === "right") return "Página direita";
   return "Ambos os lados";
-}
-
-function formatPreviewMeasurement(micrometers: number) {
-  return previewMeasurementFormatter.format(micrometers / 1_000);
 }

@@ -102,7 +102,18 @@ A etapa `Personalização` contém uma reprodução de Lâmina com Frames de dem
 - o Overlay atual;
 - a presença, a cor e a espessura da Borda padrão dos Frames.
 
+A demonstração distribui quatro Frames em duas colunas por Página, com margens e
+intervalos uniformes. Cada Frame usa um preenchimento neutro translúcido, sem o
+antigo contorno tracejado, para continuar legível sobre o Background configurado.
+
 A reprodução mostra sempre uma Lâmina dupla e mantém a proporção de largura e altura definida na etapa `Configurações`. O formato escolhido para a primeira ou a última Lâmina não desativa lados nessa demonstração, pois sua finalidade é permitir a configuração conjunta dos escopos esquerdo, direito e de Ambos os lados.
+
+As duas etapas reutilizam o mesmo painel de prévia: fundo, cabeçalho, metadados,
+legenda, espaçamento, encaixe proporcional, borda, sombra e guias técnicas. Ele limita
+a superfície simultaneamente pela largura e pela altura disponíveis e reserva
+as faixas externas de cabeçalho e legenda. Somente o conteúdo interno da Lâmina
+e os controles espaciais da `Personalização` variam entre as etapas; não existe
+uma segunda estrutura visual nem outra regra de dimensionamento.
 
 Qualquer alteração nesses controles atualiza a reprodução imediatamente. As imagens provisórias escolhidas para Background ou Overlay também são compostas na prévia antes da criação do Projeto.
 
@@ -112,6 +123,9 @@ A reprodução reutiliza a seleção espacial de `Design do Álbum`:
 - hover no lado direito realça somente o lado direito;
 - hover na região central realça os dois lados;
 - clicar fixa o escopo selecionado.
+
+O realce usa somente um contorno azul na borda externa do escopo. Ele não aplica
+cor ou transparência sobre Background, Overlay, Frames ou guias técnicas.
 
 Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro sem clicar produz somente o realce temporário e não troca a configuração selecionada.
 

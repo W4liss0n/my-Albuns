@@ -512,8 +512,11 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Background e Overlay permitem `Escolher imagem...` pelo seletor nativo do Windows. A seleção permanece provisória e só é vinculada à aba `Decorativos` depois que a criação for concluída com sucesso.
 - Cancelar o fluxo não importa ou copia imagens provisórias nem altera seus arquivos originais.
 - `Personalização` apresenta uma reprodução viva de uma Lâmina com Frames de demonstração, atualizada imediatamente para mostrar Background, Overlay e presença, cor e espessura da Borda padrão.
+- A reprodução distribui quatro Frames demonstrativos, dois por Página, como áreas neutras translúcidas com margens e intervalos uniformes, sem contorno tracejado.
 - A reprodução respeita a proporção de largura e altura escolhida em `Configurações`, mas sempre representa uma Lâmina dupla, independentemente da Configuração das extremidades, para expor esquerda, direita e Ambos os lados na mesma superfície.
+- `Configurações` e `Personalização` reutilizam integralmente o mesmo painel de prévia — fundo, cabeçalho, metadados, legenda, espaçamento, encaixe proporcional, borda, sombra e guias técnicas — limitado simultaneamente pela largura e pela altura disponíveis; somente o conteúdo interno da Lâmina e as interações específicas da `Personalização` diferem.
 - Essa reprodução reutiliza o seletor espacial de `Design do Álbum`: hover realça esquerda, direita ou ambos pela região central; o clique fixa o escopo usado pelos controles de Background e Overlay.
+- O escopo realçado mostra somente um contorno azul em sua borda externa, sem preencher, tingir ou reduzir a legibilidade do conteúdo da Lâmina.
 - O hover sem clique é apenas feedback temporário e não muda o escopo configurado.
 - A reprodução aceita as imagens provisórias escolhidas, mas permanece somente visual e não cria Lâmina, Frame ou Foto no Projeto resultante.
 - `Personalização` usa duas colunas: reprodução ampla à esquerda e controles de Background, Overlay e Padrão dos Frames à direita.

@@ -3,35 +3,47 @@ import type {
   NewProjectPersonalizationDraft,
   OverlayDraftContent,
 } from "./application/newProjectPersonalization";
+import { SheetGuideLayer } from "./SheetGuideLayer";
 
 interface PersonalizationPreviewProps {
+  bleedUm: number;
   heightUm: number;
   personalization: NewProjectPersonalizationDraft;
+  safetyUm: number;
   widthUm: number;
 }
 
 export function PersonalizationPreview({
+  bleedUm,
   heightUm,
   personalization,
+  safetyUm,
   widthUm,
 }: PersonalizationPreviewProps) {
   const pageWidth = widthUm / 2;
-  const frameInsetX = widthUm * 0.06;
-  const frameInsetY = heightUm * 0.12;
-  const frameWidth = pageWidth - frameInsetX * 2;
+  const frameInsetX = pageWidth * 0.04;
+  const frameInsetY = heightUm * 0.04;
+  const frameGap = pageWidth * 0.02;
+  const frameWidth = (pageWidth - frameInsetX * 2 - frameGap) / 2;
   const frameHeight = heightUm - frameInsetY * 2;
   const frameBorder = personalization.frameBorder;
   const highlightedScope =
     personalization.hoveredScope ?? personalization.fixedScope;
+  const highlightWidth =
+    highlightedScope === "both" ? widthUm : pageWidth;
+  const highlightX = highlightedScope === "right" ? pageWidth : 0;
+  const highlightStrokeWidth = Math.max(1, heightUm * 0.006);
+  const highlightInset = highlightStrokeWidth / 2;
 
   return (
     <svg
       aria-label="Reprodução da Lâmina"
-      className="new-project-preview-sheet"
+      className="new-project-sheet new-project-personalization-sheet"
+      height={heightUm}
       preserveAspectRatio="xMidYMid meet"
       role="img"
-      style={{ aspectRatio: `${widthUm} / ${heightUm}` }}
       viewBox={`0 0 ${widthUm} ${heightUm}`}
+      width={widthUm}
       xmlns="http://www.w3.org/2000/svg"
     >
       <title>Reprodução da Lâmina</title>
@@ -70,14 +82,6 @@ export function PersonalizationPreview({
           />
         </>
       )}
-      <line
-        stroke="#D6D0C4"
-        strokeWidth={Math.max(1, heightUm * 0.002)}
-        x1={pageWidth}
-        x2={pageWidth}
-        y1="0"
-        y2={heightUm}
-      />
       {personalization.overlay.scope === "bothSides" ? (
         <OverlayContent
           content={personalization.overlay.both}
@@ -104,36 +108,47 @@ export function PersonalizationPreview({
           />
         </>
       )}
-      {[0, pageWidth].map((pageX, index) => {
-        const side = index === 0 ? "esquerdo" : "direito";
-        const x = pageX + frameInsetX;
+      {[0, pageWidth].map((pageX, pageIndex) => {
+        const side = pageIndex === 0 ? "esquerdo" : "direito";
 
         return (
-          <g key={pageX}>
-            <rect
-              aria-label={`Frame demonstrativo ${side}`}
-              fill="none"
-              height={frameHeight}
-              stroke="#81796D"
-              strokeDasharray={`${heightUm * 0.012} ${heightUm * 0.008}`}
-              strokeOpacity="0.72"
-              strokeWidth={Math.max(1, heightUm * 0.002)}
-              width={frameWidth}
-              x={x}
-              y={frameInsetY}
-            />
-            {frameBorder.kind === "solid" ? (
-              <rect
-                aria-label={`Borda do Frame ${side}`}
-                fill="none"
-                height={frameHeight}
-                stroke={frameBorder.rgb}
-                strokeWidth={frameBorder.widthUm}
-                width={frameWidth}
-                x={x}
-                y={frameInsetY}
-              />
-            ) : null}
+          <g key={side}>
+            {[0, 1].map((frameIndex) => {
+              const frameNumber = frameIndex + 1;
+              const x =
+                pageX +
+                frameInsetX +
+                frameIndex * (frameWidth + frameGap);
+
+              return (
+                <g key={frameNumber}>
+                  <rect
+                    aria-label={`Frame demonstrativo ${side} ${frameNumber}`}
+                    fill="#5B554C"
+                    fillOpacity="0.08"
+                    height={frameHeight}
+                    pointerEvents="none"
+                    stroke="none"
+                    width={frameWidth}
+                    x={x}
+                    y={frameInsetY}
+                  />
+                  {frameBorder.kind === "solid" ? (
+                    <rect
+                      aria-label={`Borda do Frame ${side} ${frameNumber}`}
+                      fill="none"
+                      height={frameHeight}
+                      pointerEvents="none"
+                      stroke={frameBorder.rgb}
+                      strokeWidth={frameBorder.widthUm}
+                      width={frameWidth}
+                      x={x}
+                      y={frameInsetY}
+                    />
+                  ) : null}
+                </g>
+              );
+            })}
           </g>
         );
       })}
@@ -145,13 +160,20 @@ export function PersonalizationPreview({
               ? "Realce do lado esquerdo"
               : "Realce do lado direito"
         }
-        fill="#2F7FBA"
-        fillOpacity="0.16"
-        height={heightUm}
+        fill="none"
+        height={Math.max(1, heightUm - highlightStrokeWidth)}
         pointerEvents="none"
-        width={highlightedScope === "both" ? widthUm : pageWidth}
-        x={highlightedScope === "right" ? pageWidth : 0}
-        y="0"
+        stroke="#2F7FBA"
+        strokeWidth={highlightStrokeWidth}
+        width={Math.max(1, highlightWidth - highlightStrokeWidth)}
+        x={highlightX + highlightInset}
+        y={highlightInset}
+      />
+      <SheetGuideLayer
+        bleedUm={bleedUm}
+        heightUm={heightUm}
+        safetyUm={safetyUm}
+        widthUm={widthUm}
       />
     </svg>
   );

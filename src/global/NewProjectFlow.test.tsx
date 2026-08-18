@@ -46,6 +46,54 @@ const neutralVisualDefaults = {
   frameBorder: { kind: "none" as const },
 };
 
+test("keeps the preview panel shared while the sheet content changes", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const previewPanel = () =>
+    screen.getByRole("region", { name: "Prévia da Lâmina aberta" });
+
+  expect(within(previewPanel()).getByText("Lâmina aberta")).toBeVisible();
+  expect(within(previewPanel()).getByText(/18 Lâminas/)).toBeVisible();
+  expect(
+    within(previewPanel()).getByText("Proporção real da Lâmina aberta."),
+  ).toBeVisible();
+  expect(
+    within(previewPanel()).getByLabelText("Guias técnicas da Lâmina"),
+  ).toBeInTheDocument();
+  expect(
+    within(previewPanel()).getByRole("img", { name: "Prévia das Dimensões" }),
+  ).toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  expect(within(previewPanel()).getByText("Lâmina aberta")).toBeVisible();
+  expect(within(previewPanel()).getByText(/18 Lâminas/)).toBeVisible();
+  expect(
+    within(previewPanel()).getByText("Proporção real da Lâmina aberta."),
+  ).toBeVisible();
+  expect(
+    within(previewPanel()).getByLabelText("Guias técnicas da Lâmina"),
+  ).toBeInTheDocument();
+  expect(
+    within(previewPanel()).getByRole("img", {
+      name: "Reprodução da Lâmina",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(previewPanel()).queryByRole("img", {
+      name: "Prévia das Dimensões",
+    }),
+  ).not.toBeInTheDocument();
+});
+
 test("validates and creates with the complete neutral configuration", async () => {
   const user = userEvent.setup();
   const onValidate = vi.fn(validConfiguration);
@@ -201,14 +249,15 @@ test("creates from the neutral visual defaults without copying the demonstrative
     "fill",
     "#FFFFFF",
   );
-  expect(screen.getByLabelText("Frame demonstrativo esquerdo")).not.toHaveAttribute(
-    "stroke",
-    "transparent",
+  const demonstrativeFrames = screen.getAllByLabelText(
+    /Frame demonstrativo (esquerdo|direito) [12]/,
   );
-  expect(screen.getByLabelText("Frame demonstrativo esquerdo")).not.toHaveAttribute(
-    "stroke-width",
-    "0",
-  );
+  expect(demonstrativeFrames).toHaveLength(4);
+  for (const frame of demonstrativeFrames) {
+    expect(frame).toHaveAttribute("fill", "#5B554C");
+    expect(frame).toHaveAttribute("fill-opacity", "0.08");
+    expect(frame).toHaveAttribute("stroke", "none");
+  }
   expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff");
   expect(
     screen.getByRole("checkbox", { name: "Borda dos Frames" }),
@@ -252,7 +301,14 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   fireEvent.pointerEnter(left);
   expect(left).toHaveAttribute("data-highlighted", "true");
   expect(both).toHaveAttribute("aria-pressed", "true");
-  expect(screen.getByLabelText("Realce do lado esquerdo")).toBeInTheDocument();
+  expect(screen.getByLabelText("Realce do lado esquerdo")).toHaveAttribute(
+    "fill",
+    "none",
+  );
+  expect(screen.getByLabelText("Realce do lado esquerdo")).toHaveAttribute(
+    "stroke",
+    "#2F7FBA",
+  );
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
     target: { value: "#123456" },
   });
@@ -312,14 +368,14 @@ test("shows a solid Frame border immediately and sends its canonical values", as
     target: { value: "2500" },
   });
 
-  expect(screen.getByLabelText("Borda do Frame esquerdo")).toHaveAttribute(
-    "stroke",
-    "#FEDCBA",
+  const frameBorders = screen.getAllByLabelText(
+    /Borda do Frame (esquerdo|direito) [12]/,
   );
-  expect(screen.getByLabelText("Borda do Frame esquerdo")).toHaveAttribute(
-    "stroke-width",
-    "2500",
-  );
+  expect(frameBorders).toHaveLength(4);
+  for (const frameBorder of frameBorders) {
+    expect(frameBorder).toHaveAttribute("stroke", "#FEDCBA");
+    expect(frameBorder).toHaveAttribute("stroke-width", "2500");
+  }
 
   await user.click(screen.getByRole("button", { name: "Criar" }));
   expect(onCreate).toHaveBeenCalledWith(

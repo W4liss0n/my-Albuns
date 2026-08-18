@@ -304,12 +304,11 @@ export function NewProjectFlow({
         />
       ) : (
         <PersonalizationStep
+          draft={draft}
           failure={failure}
-          heightUm={draft.sheetHeight.valueUm}
           onChange={updatePersonalization}
           onChooseDecorative={onChooseDecorative}
           personalization={personalization}
-          widthUm={draft.closedSheetWidth.valueUm * 2}
         />
       )}
 
