@@ -254,14 +254,43 @@ test("creates from the neutral visual defaults without copying the demonstrative
   );
   expect(demonstrativeFrames).toHaveLength(4);
   for (const frame of demonstrativeFrames) {
-    expect(frame).toHaveAttribute("fill", "#5B554C");
-    expect(frame).toHaveAttribute("fill-opacity", "0.08");
+    expect(frame).toHaveAttribute("fill", "#7A684E");
+    expect(frame).toHaveAttribute("fill-opacity", "0.24");
     expect(frame).toHaveAttribute("stroke", "none");
   }
   expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff");
   expect(
-    screen.getByRole("checkbox", { name: "Borda dos Frames" }),
-  ).not.toBeChecked();
+    screen.queryByRole("checkbox", { name: "Borda dos Frames" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("slider", { name: "Espessura da Borda padrão" }),
+  ).toHaveValue("0");
+  expect(screen.getByText("sem borda")).toBeVisible();
+  const borderColors = within(
+    screen.getByRole("group", { name: "Cores da Borda" }),
+  ).getAllByRole("button");
+  expect(borderColors).toHaveLength(3);
+  expect(borderColors[0]).toHaveAttribute("aria-pressed", "true");
+  expect(
+    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+  ).toHaveValue("6");
+  expect(
+    screen
+      .getByRole("slider", { name: "Espaço entre Frames" })
+      .closest("div"),
+  ).toHaveAttribute("data-placeholder-feature", "new-project-frame-gap");
+  const secondFrame = screen.getByLabelText("Frame demonstrativo esquerdo 2");
+  const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
+  fireEvent.change(
+    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+    { target: { value: "18" } },
+  );
+  expect(
+    screen.getByRole("slider", { name: "Espaço entre Frames" }),
+  ).toHaveValue("18");
+  expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
+    initialSecondFrameX,
+  );
   expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
     "fill",
     "#FFFFFF",
@@ -276,6 +305,9 @@ test("creates from the neutral visual defaults without copying the demonstrative
   );
   expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
     '"frames"',
+  );
+  expect(JSON.stringify(onCreate.mock.calls[0]?.[0])).not.toContain(
+    '"frameGap"',
   );
 });
 
@@ -308,6 +340,14 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   expect(screen.getByLabelText("Realce do lado esquerdo")).toHaveAttribute(
     "stroke",
     "#2F7FBA",
+  );
+  expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
+    "fill-opacity",
+    "0.24",
+  );
+  expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
+    "fill-opacity",
+    "0.08",
   );
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
     target: { value: "#123456" },
@@ -345,6 +385,37 @@ test("hover only highlights while the fixed scope drives immediate Background ch
   );
 });
 
+test("uses the sheet outline as the keyboard focus indicator", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const left = await screen.findByRole("button", { name: "Lado esquerdo" });
+  const right = await screen.findByRole("button", { name: "Lado direito" });
+  right.focus();
+  expect(right).toHaveFocus();
+  fireEvent.pointerEnter(left);
+  expect(left).toHaveAttribute("data-highlighted", "true");
+  fireEvent.pointerLeave(left);
+
+  expect(right).toHaveAttribute("data-highlighted", "true");
+  expect(screen.getByLabelText("Realce do lado direito")).toHaveAttribute(
+    "fill",
+    "none",
+  );
+  expect(screen.getByLabelText("Realce do lado direito")).toHaveAttribute(
+    "stroke",
+    "#2F7FBA",
+  );
+});
+
 test("shows a solid Frame border immediately and sends its canonical values", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
@@ -357,23 +428,29 @@ test("shows a solid Frame border immediately and sends its canonical values", as
     />,
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
+  fireEvent.change(
+    await screen.findByRole("slider", {
+      name: "Espessura da Borda padrão",
+    }),
+    {
+      target: { value: "2500" },
+    },
+  );
   await user.click(
-    await screen.findByRole("checkbox", { name: "Borda dos Frames" }),
+    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
   );
 
-  fireEvent.change(screen.getByLabelText("Cor da Borda"), {
-    target: { value: "#fedcba" },
-  });
-  fireEvent.change(screen.getByLabelText("Espessura da Borda (µm)"), {
-    target: { value: "2500" },
-  });
+  expect(screen.getByText("2.5 mm")).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+  ).toHaveAttribute("aria-pressed", "true");
 
   const frameBorders = screen.getAllByLabelText(
     /Borda do Frame (esquerdo|direito) [12]/,
   );
   expect(frameBorders).toHaveLength(4);
   for (const frameBorder of frameBorders) {
-    expect(frameBorder).toHaveAttribute("stroke", "#FEDCBA");
+    expect(frameBorder).toHaveAttribute("stroke", "#C5A46D");
     expect(frameBorder).toHaveAttribute("stroke-width", "2500");
   }
 
@@ -383,7 +460,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
       visualDefaults: expect.objectContaining({
         frameBorder: {
           kind: "solid",
-          rgb: "#FEDCBA",
+          rgb: "#C5A46D",
           widthUm: 2500,
         },
       }),

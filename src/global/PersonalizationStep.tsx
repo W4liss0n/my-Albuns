@@ -5,8 +5,10 @@ import type {
   ProjectLaunchFailure,
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
-import type {
-  NewProjectDimensionsDraft,
+import {
+  displayUnitLabel,
+  formatMicrometers,
+  type NewProjectDimensionsDraft,
 } from "./application/newProjectDimensions";
 import {
   backgroundForFixedScope,
@@ -43,13 +45,51 @@ export function PersonalizationStep({
 }: PersonalizationStepProps) {
   const [pickerFailure, setPickerFailure] =
     useState<ProjectLaunchFailure | null>(null);
+  const [focusedScope, setFocusedScope] = useState<
+    NewProjectPersonalizationDraft["fixedScope"] | null
+  >(null);
+  // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
+  // persistência; por enquanto ele controla somente a reprodução desta etapa.
+  const [frameGapPx, setFrameGapPx] = useState(6);
   const selectedBackground = backgroundForFixedScope(personalization);
   const backgroundColor =
     selectedBackground.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
   const highlightedScope =
-    personalization.hoveredScope ?? personalization.fixedScope;
+    personalization.hoveredScope ??
+    focusedScope ??
+    personalization.fixedScope;
   const selectedOverlay = overlayForFixedScope(personalization);
+  const activeFrameBorder =
+    personalization.frameBorder.kind === "solid"
+      ? personalization.frameBorder
+      : null;
+  const frameBorderColor = activeFrameBorder?.rgb ?? "#FFFFFF";
+  const frameBorderWidthUm = activeFrameBorder?.widthUm ?? 0;
+  const frameBorderValue = activeFrameBorder
+    ? `${formatMicrometers(
+        activeFrameBorder.widthUm,
+        draft.displayUnit,
+      )} ${displayUnitLabel(draft.displayUnit)}`
+    : "sem borda";
   const scopeLabel = personalizationScopeLabel(personalization.fixedScope);
+  const withSolidFrameBorder = () =>
+    activeFrameBorder
+      ? personalization
+      : setFrameBorderColor(
+          setFrameBorderEnabled(personalization, true),
+          frameBorderColor,
+        );
+  const changeFrameBorderWidth = (widthUm: number) => {
+    if (widthUm <= 0) {
+      onChange(setFrameBorderEnabled(personalization, false));
+      return;
+    }
+
+    onChange(setFrameBorderWidth(withSolidFrameBorder(), widthUm));
+  };
+  const changeFrameBorderColor = (rgb: string) => {
+    onChange(setFrameBorderColor(withSolidFrameBorder(), rgb));
+  };
   const chooseBackground = async () => {
     setPickerFailure(null);
     const outcome = await onChooseDecorative();
@@ -79,7 +119,9 @@ export function PersonalizationStep({
           <>
             <PersonalizationPreview
               bleedUm={bleedUm}
+              frameGapPx={frameGapPx}
               heightUm={heightUm}
+              highlightedScope={highlightedScope}
               personalization={personalization}
               safetyUm={safetyUm}
               widthUm={widthUm}
@@ -103,9 +145,11 @@ export function PersonalizationStep({
                     highlightedScope === scope ? "true" : undefined
                   }
                   key={scope}
+                  onBlur={() => setFocusedScope(null)}
                   onClick={() =>
                     onChange(fixPersonalizationScope(personalization, scope))
                   }
+                  onFocus={() => setFocusedScope(scope)}
                   onPointerEnter={() =>
                     onChange(hoverPersonalizationScope(personalization, scope))
                   }
@@ -205,59 +249,45 @@ export function PersonalizationStep({
         <section className="new-project-value-group">
           <p className="new-project-group-eyebrow">Todas as Lâminas</p>
           <h2>Frames</h2>
-          <label className="new-project-toggle">
-            <input
-              aria-label="Borda dos Frames"
-              checked={personalization.frameBorder.kind === "solid"}
-              onChange={(event) =>
-                onChange(
-                  setFrameBorderEnabled(
-                    personalization,
-                    event.target.checked,
-                  ),
-                )
-              }
-              type="checkbox"
-            />
-            <span>Borda padrão</span>
-          </label>
-          {personalization.frameBorder.kind === "solid" ? (
-            <div className="new-project-frame-border-fields">
-              <label className="new-project-field">
-                <span>Cor da Borda</span>
-                <input
-                  onChange={(event) =>
-                    onChange(
-                      setFrameBorderColor(
-                        personalization,
-                        event.target.value,
-                      ),
-                    )
-                  }
-                  type="color"
-                  value={personalization.frameBorder.rgb}
-                />
-              </label>
-              <label className="new-project-field">
-                <span>Espessura da Borda (µm)</span>
-                <input
-                  inputMode="numeric"
-                  min="1"
-                  onChange={(event) =>
-                    onChange(
-                      setFrameBorderWidth(
-                        personalization,
-                        Number(event.target.value),
-                      ),
-                    )
-                  }
-                  step="1"
-                  type="number"
-                  value={personalization.frameBorder.widthUm}
-                />
-              </label>
-            </div>
-          ) : null}
+          <FrameRangeControl
+            label="Espessura da Borda padrão"
+            max={5_000}
+            min={0}
+            onChange={changeFrameBorderWidth}
+            step={250}
+            value={frameBorderWidthUm}
+            valueText={frameBorderValue}
+            visibleLabel="Borda padrão"
+          />
+          <div
+            aria-label="Cores da Borda"
+            className="new-project-frame-color-swatches"
+            role="group"
+          >
+            {FRAME_BORDER_SWATCHES.map((color) => (
+              <button
+                aria-label={`Usar cor da Borda ${color}`}
+                aria-pressed={
+                  frameBorderColor.toLowerCase() === color.toLowerCase()
+                }
+                key={color}
+                onClick={() => changeFrameBorderColor(color)}
+                style={{ background: color }}
+                type="button"
+              />
+            ))}
+          </div>
+          <FrameRangeControl
+            dataPlaceholderFeature="new-project-frame-gap"
+            label="Espaço entre Frames"
+            max={24}
+            min={0}
+            onChange={setFrameGapPx}
+            step={1}
+            value={frameGapPx}
+            valueText={`${frameGapPx} px`}
+            visibleLabel="Espaço entre Frames"
+          />
         </section>
         <p className="new-project-native-note">
           Nome e Localização serão escolhidos no diálogo do Windows ao criar.
@@ -295,6 +325,51 @@ const BACKGROUND_SWATCHES = [
   "#2c2924",
   "#1d2a3a",
 ] as const;
+
+const FRAME_BORDER_SWATCHES = ["#FFFFFF", "#2C2924", "#C5A46D"] as const;
+
+function FrameRangeControl({
+  dataPlaceholderFeature,
+  label,
+  max,
+  min,
+  onChange,
+  step,
+  value,
+  valueText,
+  visibleLabel,
+}: {
+  dataPlaceholderFeature?: string;
+  label: string;
+  max: number;
+  min: number;
+  onChange(value: number): void;
+  step: number;
+  value: number;
+  valueText: string;
+  visibleLabel: string;
+}) {
+  return (
+    <div
+      className="new-project-frame-range-control"
+      data-placeholder-feature={dataPlaceholderFeature}
+    >
+      <div className="new-project-frame-range-heading">
+        <span>{visibleLabel}</span>
+        <output>{valueText}</output>
+      </div>
+      <input
+        aria-label={label}
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.target.value))}
+        step={step}
+        type="range"
+        value={value}
+      />
+    </div>
+  );
+}
 
 function personalizationScopeLabel(
   scope: NewProjectPersonalizationDraft["fixedScope"],

@@ -106,6 +106,18 @@ A demonstração distribui quatro Frames em duas colunas por Página, com margen
 intervalos uniformes. Cada Frame usa um preenchimento neutro translúcido, sem o
 antigo contorno tracejado, para continuar legível sobre o Background configurado.
 
+O bloco `Frames` não usa checkbox ou campo numérico genérico. Ele apresenta a
+espessura da Borda padrão em um controle deslizante, onde zero aparece como
+`sem borda`, seguido pelas amostras branca, escura e dourada. Um segundo controle
+deslizante apresenta o `Espaço entre Frames` em pixels e atualiza imediatamente a
+reprodução.
+
+`Espaço entre Frames` permanece um placeholder visual enquanto não existir no
+contrato do Padrão de Frame. Seu estado afeta somente a reprodução atual, não é
+enviado ao núcleo nem salvo em Predefinição ou Projeto, e deve permanecer marcado
+no código com `PLACEHOLDER UI` e
+`data-placeholder-feature="new-project-frame-gap"`.
+
 A reprodução mostra sempre uma Lâmina dupla e mantém a proporção de largura e altura definida na etapa `Configurações`. O formato escolhido para a primeira ou a última Lâmina não desativa lados nessa demonstração, pois sua finalidade é permitir a configuração conjunta dos escopos esquerdo, direito e de Ambos os lados.
 
 As duas etapas reutilizam o mesmo painel de prévia: fundo, cabeçalho, metadados,
@@ -125,7 +137,9 @@ A reprodução reutiliza a seleção espacial de `Design do Álbum`:
 - clicar fixa o escopo selecionado.
 
 O realce usa somente um contorno azul na borda externa do escopo. Ele não aplica
-cor ou transparência sobre Background, Overlay, Frames ou guias técnicas.
+cor ou transparência sobre Background, Overlay ou guias técnicas. Para reforçar
+o foco sem tingir a Página inteira, somente os Frames demonstrativos do escopo
+realçado recebem maior contraste; os Frames do outro Lado ficam mais discretos.
 
 Os controles de Background e Overlay atuam no escopo fixado. Mover o ponteiro sem clicar produz somente o realce temporário e não troca a configuração selecionada.
 

@@ -7,7 +7,9 @@ import { SheetGuideLayer } from "./SheetGuideLayer";
 
 interface PersonalizationPreviewProps {
   bleedUm: number;
+  frameGapPx: number;
   heightUm: number;
+  highlightedScope: NewProjectPersonalizationDraft["fixedScope"];
   personalization: NewProjectPersonalizationDraft;
   safetyUm: number;
   widthUm: number;
@@ -15,7 +17,9 @@ interface PersonalizationPreviewProps {
 
 export function PersonalizationPreview({
   bleedUm,
+  frameGapPx,
   heightUm,
+  highlightedScope,
   personalization,
   safetyUm,
   widthUm,
@@ -23,12 +27,10 @@ export function PersonalizationPreview({
   const pageWidth = widthUm / 2;
   const frameInsetX = pageWidth * 0.04;
   const frameInsetY = heightUm * 0.04;
-  const frameGap = pageWidth * 0.02;
+  const frameGap = pageWidth * (frameGapPx / 300);
   const frameWidth = (pageWidth - frameInsetX * 2 - frameGap) / 2;
   const frameHeight = heightUm - frameInsetY * 2;
   const frameBorder = personalization.frameBorder;
-  const highlightedScope =
-    personalization.hoveredScope ?? personalization.fixedScope;
   const highlightWidth =
     highlightedScope === "both" ? widthUm : pageWidth;
   const highlightX = highlightedScope === "right" ? pageWidth : 0;
@@ -110,6 +112,10 @@ export function PersonalizationPreview({
       )}
       {[0, pageWidth].map((pageX, pageIndex) => {
         const side = pageIndex === 0 ? "esquerdo" : "direito";
+        const isHighlighted =
+          highlightedScope === "both" ||
+          (highlightedScope === "left" && pageIndex === 0) ||
+          (highlightedScope === "right" && pageIndex === 1);
 
         return (
           <g key={side}>
@@ -124,8 +130,8 @@ export function PersonalizationPreview({
                 <g key={frameNumber}>
                   <rect
                     aria-label={`Frame demonstrativo ${side} ${frameNumber}`}
-                    fill="#5B554C"
-                    fillOpacity="0.08"
+                    fill="#7A684E"
+                    fillOpacity={isHighlighted ? "0.24" : "0.08"}
                     height={frameHeight}
                     pointerEvents="none"
                     stroke="none"
