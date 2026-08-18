@@ -40,10 +40,16 @@ if (-not $runnerMutexHeld) {
 }
 
 $scratchRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $workspaceRoot '.scratch\issue-45-media-cache')
+    (Join-Path `
+        $workspaceRoot `
+        '.scratch\cargo-target-tests\issue-45-media-cache')
 )
 $scratchRootExisted = Test-Path -LiteralPath $scratchRoot
 New-Item -ItemType Directory -Force -Path $scratchRoot | Out-Null
+& git -C $workspaceRoot check-ignore --quiet -- $scratchRoot
+if ($LASTEXITCODE -ne 0) {
+    throw 'The issue 45 gate scratch root must be excluded from source provenance.'
+}
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $scratchRoot "run-$PID-$([guid]::NewGuid().ToString('N').Substring(0, 8))")
 )
@@ -320,11 +326,14 @@ try {
     $imagingEvidence = Get-Content -LiteralPath $imagingEvidencePath -Raw |
         ConvertFrom-Json
     $imagingCheckCount = @($imagingEvidence.checks).Count
+    $imagingFailedCheckCount = @(
+        $imagingEvidence.checks | Where-Object { -not $_.passed }
+    ).Count
     if ($imagingEvidence.sourceInputsDirty `
             -or $imagingEvidence.gitCommit -ne $sourceBefore.gitCommit `
             -or $imagingCheckCount -lt 1 `
-            -or @($imagingEvidence.checks | Where-Object { -not $_.passed }).Count -ne 0) {
-        throw 'The real Processor/Cache/Canvas recovery evidence is not authoritative.'
+            -or $imagingFailedCheckCount -ne 0) {
+        throw "The real Processor/Cache/Canvas recovery evidence is not authoritative: sourceInputsDirty=$($imagingEvidence.sourceInputsDirty), gitCommit=$($imagingEvidence.gitCommit), expectedCommit=$($sourceBefore.gitCommit), checks=$imagingCheckCount, failed=$imagingFailedCheckCount."
     }
     $checks.Add([ordered]@{
         name = 'real-processor-cache-canvas-recovery'
@@ -349,11 +358,14 @@ try {
     $windowsEvidence = Get-Content -LiteralPath $windowsEvidencePath -Raw |
         ConvertFrom-Json
     $windowsCheckCount = @($windowsEvidence.checks).Count
+    $windowsFailedCheckCount = @(
+        $windowsEvidence.checks | Where-Object { -not $_.passed }
+    ).Count
     if ($windowsEvidence.sourceInputsDirty `
             -or $windowsEvidence.gitCommit -ne $sourceBefore.gitCommit `
             -or $windowsCheckCount -lt 1 `
-            -or @($windowsEvidence.checks | Where-Object { -not $_.passed }).Count -ne 0) {
-        throw 'The Windows local/UNC/mapped/long-path evidence is not authoritative.'
+            -or $windowsFailedCheckCount -ne 0) {
+        throw "The Windows local/UNC/mapped/long-path evidence is not authoritative: sourceInputsDirty=$($windowsEvidence.sourceInputsDirty), gitCommit=$($windowsEvidence.gitCommit), expectedCommit=$($sourceBefore.gitCommit), checks=$windowsCheckCount, failed=$windowsFailedCheckCount."
     }
     $checks.Add([ordered]@{
         name = 'windows-local-unc-mapped-long-paths'
