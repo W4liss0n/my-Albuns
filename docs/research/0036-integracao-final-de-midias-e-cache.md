@@ -143,9 +143,10 @@ todos os descendentes criados depois de cada comando e recusa qualquer
 identidade já presente no snapshot pré-gate; assim, reciclagem de PID parental
 não transforma um processo estrangeiro em alvo de cleanup. O runner calcula
 hashes antes de remover os outputs, mede listeners reais, exige locks exclusivos
-disponíveis, remove seus diretórios e só então captura novamente a árvore Git.
-Qualquer falha também passa pelo encerramento e pela verificação da árvore antes
-da limpeza do scratch.
+disponíveis, drena qualquer descendente registrado que ainda esteja encerrando,
+remove seus diretórios e só então captura novamente a árvore Git. O caminho de
+sucesso e o `finally` usam a mesma rotina medida de encerramento e verificação;
+qualquer falha também passa por ela antes da limpeza do scratch.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).

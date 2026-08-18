@@ -866,6 +866,7 @@ try {
         elapsedMs = $releaseRun.elapsedMs
     })
 
+    $finalOwnedCleanup = Stop-OwnedGateProcesses
     $remainingProcesses = @(Get-ActiveOwnedGateProcesses)
     $remainingListeners = @(Get-OwnedGateListeners -Processes $remainingProcesses)
     $untrackedWorkspaceProcesses = @(Get-WorkspaceProcesses)
@@ -895,6 +896,8 @@ try {
         ownedProcessCount = $ownedProcessCountAfter
         ownedListenerCount = $ownedListenerCountAfter
         claimedPreexistingProcessIdentityCount = $claimedPreexistingIdentities.Count
+        stoppedOwnedProcessCount = $finalOwnedCleanup.stoppedProcessCount
+        observedOwnedListenerCountBeforeCleanup = $finalOwnedCleanup.listenersBefore
         exclusiveArtifactLockFailures = 0
     })
 
@@ -1028,6 +1031,8 @@ try {
             releaseArtifacts = $releaseArtifacts.Count
             ownedProcessesAfter = $ownedProcessCountAfter
             ownedListenersAfter = $ownedListenerCountAfter
+            ownedProcessesStoppedAtFinalCleanup = $finalOwnedCleanup.stoppedProcessCount
+            ownedListenersObservedBeforeFinalCleanup = $finalOwnedCleanup.listenersBefore
         }
         checks = @($checks)
         criteria = $criteria
@@ -1056,6 +1061,8 @@ try {
             ownedProcesses = $ownedProcessCountAfter
             ownedListeners = $ownedListenerCountAfter
             claimedPreexistingProcessIdentities = $claimedPreexistingIdentities.Count
+            stoppedOwnedProcesses = $finalOwnedCleanup.stoppedProcessCount
+            observedOwnedListenersBeforeCleanup = $finalOwnedCleanup.listenersBefore
             artifactLocks = 0
         }
     }
