@@ -9,6 +9,7 @@ import {
   type CanvasMetrics,
   type PhotoTransformDelta,
   type PhotoTransformPreview,
+  type SheetBarMetadata,
 } from "./AlbumCanvas";
 import type { Logger } from "../application/logging";
 import { silentLogger } from "../application/logging";
@@ -25,6 +26,7 @@ const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
     alpha: number;
     children: unknown[];
+    eventMode: string;
     handlers: Map<string, (event: unknown) => void>;
     label: string;
     mask: unknown;
@@ -35,6 +37,8 @@ const pixiLifecycle = vi.hoisted(() => ({
     }>;
     position: { x: number; y: number };
     scale: { x: number; y: number };
+    style?: Record<string, unknown>;
+    text?: string;
     visible: boolean;
     emit(name: string, event: unknown): void;
   }>,
@@ -236,7 +240,20 @@ vi.mock("pixi.js", () => {
     }
   }
 
-  class Text extends DisplayObject {}
+  class Text extends DisplayObject {
+    anchor = new Point();
+    style: Record<string, unknown>;
+    text: string;
+
+    constructor(options: {
+      style?: Record<string, unknown>;
+      text?: string;
+    } = {}) {
+      super();
+      this.style = options.style ?? {};
+      this.text = options.text ?? "";
+    }
+  }
 
   class Sprite extends DisplayObject {
     height = 0;
@@ -332,6 +349,9 @@ vi.mock("pixi.js", () => {
 export function renderCanvas({
   projectId = "project-spike-001",
   compositionPlan = composition,
+  sheetBarMetadata = [
+    { sheetId: "sheet-001", pageNumbers: [1, 2] },
+  ],
   mediaPreviewUrls,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
@@ -350,6 +370,7 @@ export function renderCanvas({
 }: {
   projectId?: string;
   compositionPlan?: CompositionPlan;
+  sheetBarMetadata?: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
@@ -374,6 +395,7 @@ export function renderCanvas({
         }
         projectId={projectId}
         composition={compositionPlan}
+        sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
         continuousCanvasLayout={createContinuousCanvasLayout(
           compositionPlan.sheets,

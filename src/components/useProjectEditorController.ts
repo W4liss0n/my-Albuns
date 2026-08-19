@@ -54,6 +54,10 @@ export function useProjectEditorController({
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
     composition: projection.composition,
+    sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
+      sheetId: sheet.id,
+      pageNumbers: sheet.pageNumbers,
+    })),
     continuousCanvasLayout: navigation.canvasLayout,
     selectedFrameId: navigation.selectedFrameId,
     focusedSheetId: navigation.focusedSheetId,

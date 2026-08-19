@@ -7,7 +7,7 @@ document: design
 
 **Referência visual:** [imagem fornecida pelo autor](../assets/referencia-layout-editor.png)
 
-**Referências complementares:** [barra da Lâmina](../assets/referencia-barra-da-lamina.png) · [Painel de Layouts horizontal](../assets/referencia-painel-de-layouts-horizontal.png)
+**Referência complementar:** [Painel de Layouts horizontal](../assets/referencia-painel-de-layouts-horizontal.png)
 
 ![Referência de disposição da Janela do Projeto](../assets/referencia-layout-editor.png)
 
@@ -142,15 +142,15 @@ recalibrados por medições posteriores sem alterar o comportamento documental.
 
 ### Barra da Lâmina e Painel de Layouts
 
-![Referência da barra acima da Lâmina](../assets/referencia-barra-da-lamina.png)
+Cada Lâmina possui uma barra própria sobreposta aos 40 px superiores de sua superfície, sem reservar espaço adicional nem alterar a escala automática do Canvas. Ela acompanha a largura visual da Lâmina, mantém altura e tipografia constantes na tela independentemente da escala e nunca aparece na Exportação.
 
-Cada Lâmina possui uma barra própria imediatamente acima de sua superfície. A barra é parte exclusiva da interface, acompanha visualmente a largura da Lâmina e nunca aparece na Exportação.
+Fora do hover, a Barra permanece visualmente oculta. Ao entrar na Lâmina, ela aparece como uma superfície clara translúcida com opacidade de `0,55`, separador inferior discreto, Numeração de Página centralizada em cada lado ativo, ações compactas e o número da Lâmina alinhado à direita. Sair da Lâmina volta a ocultá-la sem alterar foco ou seleção.
 
 A Barra e o Painel de Layouts pertencem exclusivamente ao Canvas contínuo do modo normal. Ambos ficam ausentes e indisponíveis no Modo de edição da Lâmina.
 
 Quando o Painel estava aberto antes da entrada no Modo de edição, ele é apenas ocultado: seu alvo e estado aberto ficam suspensos. Ao sair com `Esc`, a faixa reaparece para a mesma Lâmina, mas sua lista é recalculada antes da exibição para refletir quantidade e geometria atuais. Se o Painel estava fechado, não é aberto automaticamente.
 
-Na Lâmina dupla, `P2`, `P3` e rótulos equivalentes mostram a Numeração de Página de cada lado ativo. O número alinhado à direita identifica a posição da Lâmina no Álbum.
+Na Lâmina dupla, a Numeração de Página aparece sem prefixo sobre cada lado ativo. O número alinhado à direita identifica a posição da Lâmina no Álbum no formato `L02`.
 
 O controle de duas setas troca de lado os Frames: os pertencentes à Página esquerda passam para a direita e os pertencentes à direita passam para a esquerda. A ação afeta Frames e as Fotos contidas neles, não troca a Numeração de Página.
 

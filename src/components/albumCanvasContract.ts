@@ -28,9 +28,15 @@ export interface CanvasMetrics {
   scale: number;
 }
 
+export interface SheetBarMetadata {
+  sheetId: string;
+  pageNumbers: readonly number[];
+}
+
 export interface AlbumCanvasProps {
   projectId: string;
   composition: CompositionPlan;
+  sheetBarMetadata: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   continuousCanvasLayout: ContinuousCanvasLayout;
   selectedFrameId: string | null;

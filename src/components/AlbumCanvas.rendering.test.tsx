@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import type { LogEvent, Logger } from "../application/logging";
@@ -29,15 +29,109 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
     position: { y: number };
     scale: { x: number; y: number };
   };
-  const expectedScale = (500 - 2 * 24) / (300 + 24);
+  const expectedScale = (500 - 2 * 28) / 300;
 
   expect(world.scale.x).toBeCloseTo(expectedScale, 4);
   expect(world.scale.y).toBeCloseTo(expectedScale, 4);
-  expect(world.position.y - 24 * world.scale.y).toBeCloseTo(24, 4);
+  expect(world.position.y).toBeCloseTo(28, 4);
   expect(pixiLifecycle.initOptions[0]).toMatchObject({
     autoDensity: true,
     resolution: window.devicePixelRatio,
   });
+});
+
+test("materializes the integrated Sheet Bar instead of a loose sheet label", async () => {
+  vi.useFakeTimers();
+  renderCanvas();
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-bar-surface-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 40, width: 600, x: 0, y: 0 }],
+  });
+  expect(displayWithLabel("sheet-bar-page-left-sheet-001")).toMatchObject({
+    text: "1",
+  });
+  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
+    text: "2",
+  });
+  expect(displayWithLabel("placeholder-sheet-bar-swap-sheet-001")).toMatchObject({
+    alpha: 0.45,
+    eventMode: "none",
+  });
+  expect(displayWithLabel("placeholder-sheet-bar-layout-sheet-001")).toMatchObject({
+    alpha: 0.45,
+    eventMode: "none",
+  });
+  expect(
+    screen.getByRole("button", {
+      name: "Trocar Frames — indisponível nesta versão",
+    }),
+  ).toBeDisabled();
+  expect(
+    screen.getByRole("button", {
+      name: "Abrir Painel de Layouts — indisponível nesta versão",
+    }),
+  ).toBeDisabled();
+  expect(displayWithLabel("sheet-bar-number-sheet-001")).toMatchObject({
+    text: "L01",
+  });
+
+  const sheetBar = displayWithLabel("sheet-bar-sheet-001");
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
+  expect(sheetBar.alpha).toBe(0);
+  expect(sheetBar.scale.y).toBeCloseTo(1 / ((500 - 2 * 28) / 300));
+
+  sheet.emit("pointerenter", {});
+  expect(sheetBar.alpha).toBe(0);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(sheetBar.alpha).toBe(0.55);
+
+  sheet.emit("pointerleave", {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(sheetBar.alpha).toBe(0);
+});
+
+test("centers the canonical page number on a single-page sheet bar", async () => {
+  const singlePageComposition: CompositionPlan = {
+    ...composition,
+    sheets: [
+      {
+        ...composition.sheets[0],
+        activeSides: "right",
+        widthUm: 300_000,
+        base: {
+          ...composition.sheets[0].base,
+          drawRect: {
+            ...composition.sheets[0].base.drawRect,
+            width: 300_000,
+          },
+        },
+        backgrounds: composition.sheets[0].backgrounds.map((background) => ({
+          ...background,
+          drawRect: { ...background.drawRect, width: 300_000 },
+        })),
+      },
+    ],
+  };
+  renderCanvas({
+    compositionPlan: singlePageComposition,
+    sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
+    position: { x: 150, y: 20 },
+    text: "1",
+  });
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "sheet-bar-page-left-sheet-001",
+    ),
+  ).toBe(false);
 });
 
 test("keeps the materialized Pixi scene stable across view-only updates", async () => {
@@ -59,6 +153,7 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
     <AlbumCanvas
       projectId="project-spike-001"
       composition={interactiveComposition}
+      sheetBarMetadata={[]}
       continuousCanvasLayout={layout}
       selectedFrameId={selectedFrameId}
       focusedSheetId="sheet-001"
@@ -352,11 +447,12 @@ test("materializes and releases only the viewport margin while navigating a long
     onTransformCommit: vi.fn(async () => true),
   };
   const layout = createContinuousCanvasLayout(longComposition.sheets);
-  const canvasScale = (500 - 2 * 24) / (300 + 24);
+  const canvasScale = (500 - 2 * 28) / 300;
   const canvasAt = (focusedSheetId: string) => (
     <AlbumCanvas
       projectId="project-spike-001"
       composition={longComposition}
+      sheetBarMetadata={[]}
       mediaPreviewUrls={mediaPreviewUrls}
       continuousCanvasLayout={layout}
       selectedFrameId={null}
@@ -439,6 +535,7 @@ test("materializes and releases only the viewport margin while navigating a long
 test("reconciles only the composed sheet that changed", async () => {
   const canvasProps = {
     projectId: "project-spike-001",
+    sheetBarMetadata: [],
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",

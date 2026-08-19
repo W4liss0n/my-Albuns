@@ -463,6 +463,7 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
   );
   const commonProps = {
     composition: interactiveComposition,
+    sheetBarMetadata: [],
     continuousCanvasLayout: createContinuousCanvasLayout(
       interactiveComposition.sheets,
     ),

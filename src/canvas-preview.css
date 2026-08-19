@@ -1,0 +1,10 @@
+.canvas-preview {
+  width: 100%;
+  height: min(420px, 100%);
+}
+
+.canvas-preview .canvas-host,
+.canvas-preview .canvas-empty {
+  width: 100%;
+  height: 100%;
+}

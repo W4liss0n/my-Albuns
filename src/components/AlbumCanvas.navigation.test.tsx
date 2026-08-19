@@ -3,6 +3,10 @@ import { expect, test, vi } from "vitest";
 
 import { threeSheetComposition } from "./albumCanvasTestFixtures";
 import {
+  continuousCanvasScale,
+  createContinuousCanvasLayout,
+} from "./canvasGeometry";
+import {
   finishPixiInitialization,
   getPixiLifecycle,
   renderCanvas,
@@ -40,7 +44,11 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
   await finishPixiInitialization();
 
   const app = pixiLifecycle.instances[0];
-  const scale = (500 - 2 * 24) / (300 + 24);
+  const scale = continuousCanvasScale(500, 300);
+  const layout = createContinuousCanvasLayout(
+    threeSheetComposition.sheets,
+  );
+  const entries = layout.entriesAtScale(scale);
 
   app.canvas.dispatchEvent(
     new WheelEvent("wheel", {
@@ -53,7 +61,7 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
     onViewportChange.mock.calls[
       onViewportChange.mock.calls.length - 1
     ]?.[0].offsetX;
-  expect(lastOffset + 1_604 * scale).toBeCloseTo(600, 4);
+  expect(lastOffset + entries[2].center * scale).toBeCloseTo(600, 4);
   expect(onCenteredSheetChange).toHaveBeenLastCalledWith("sheet-003");
   onCenteredSheetChange.mockClear();
 
@@ -68,7 +76,7 @@ test("keeps edge sheets centered and tracks the centered sheet while scrolling",
     onViewportChange.mock.calls[
       onViewportChange.mock.calls.length - 1
     ]?.[0].offsetX;
-  expect(firstOffset + 300 * scale).toBeCloseTo(600, 4);
+  expect(firstOffset + entries[0].center * scale).toBeCloseTo(600, 4);
   expect(onCenteredSheetChange).not.toHaveBeenCalled();
 });
 
@@ -101,9 +109,10 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
   expect(pixiLifecycle.instances[0].resizeCount).toBe(1);
   expect(pixiLifecycle.instances[0].screen.width).toBe(900);
   expect(pixiLifecycle.instances[0].screen.height).toBe(700);
-  expect(world.scale.x).toBeCloseTo((700 - 2 * 24) / (300 + 24), 4);
+  const expectedScale = continuousCanvasScale(700, 300);
+  expect(world.scale.x).toBeCloseTo(expectedScale, 4);
   expect(onCanvasMetricsChange).toHaveBeenLastCalledWith({
     width: 900,
-    scale: (700 - 2 * 24) / (300 + 24),
+    scale: expectedScale,
   });
 });

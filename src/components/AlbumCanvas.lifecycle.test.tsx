@@ -150,6 +150,7 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
         <AlbumCanvas
           projectId="project-spike-001"
           composition={composition}
+          sheetBarMetadata={[]}
           continuousCanvasLayout={createContinuousCanvasLayout(
             composition.sheets,
           )}

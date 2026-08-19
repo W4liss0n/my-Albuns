@@ -3,9 +3,8 @@ import type { ComposedSheet } from "../domain/project";
 export const CANVAS_MICROMETERS_PER_PIXEL = 1_000;
 export const MICROMETER_TO_CANVAS_PIXEL =
   1 / CANVAS_MICROMETERS_PER_PIXEL;
-export const SHEET_GAP_PX = 52;
-export const SHEET_LABEL_HEIGHT_PX = 24;
-export const CANVAS_VERTICAL_MARGIN_PX = 24;
+export const SHEET_GAP_PX = 46;
+export const CANVAS_VERTICAL_MARGIN_PX = 28;
 
 export function continuousCanvasScale(
   canvasHeight: number,
@@ -15,7 +14,7 @@ export function continuousCanvasScale(
     1,
     canvasHeight - CANVAS_VERTICAL_MARGIN_PX * 2,
   );
-  return availableHeight / (sheetHeight + SHEET_LABEL_HEIGHT_PX);
+  return availableHeight / sheetHeight;
 }
 
 export interface ContinuousCanvasEntry {
@@ -28,7 +27,7 @@ export interface ContinuousCanvasEntry {
 }
 
 export interface ContinuousCanvasLayout {
-  readonly entries: readonly ContinuousCanvasEntry[];
+  entriesAtScale(scale: number): readonly ContinuousCanvasEntry[];
   centeredOffset(
     sheetId: string,
     scale: number,
@@ -49,34 +48,41 @@ export interface ContinuousCanvasLayout {
 export function createContinuousCanvasLayout(
   sheets: readonly ComposedSheet[],
 ): ContinuousCanvasLayout {
-  let nextLeft = 0;
-  const entries = sheets.map((sheet, index) => {
-    const width =
-      sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
-    const entry: ContinuousCanvasEntry = {
-      sheetId: sheet.sheetId,
-      index,
-      left: nextLeft,
-      width,
-      center: nextLeft + width / 2,
-      right: nextLeft + width,
-    };
-    nextLeft += width + SHEET_GAP_PX;
-    return entry;
-  });
-  const entriesBySheetId = new Map(
-    entries.map((entry) => [entry.sheetId, entry]),
-  );
+  const measuredSheets = sheets.map((sheet, index) => ({
+    sheetId: sheet.sheetId,
+    index,
+    width: sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL,
+  }));
+  const entriesAtScale = (scale: number) => {
+    const safeScale = Math.max(scale, Number.EPSILON);
+    const gap = SHEET_GAP_PX / safeScale;
+    let nextLeft = 0;
+    return measuredSheets.map((sheet) => {
+      const entry: ContinuousCanvasEntry = {
+        ...sheet,
+        left: nextLeft,
+        center: nextLeft + sheet.width / 2,
+        right: nextLeft + sheet.width,
+      };
+      nextLeft += sheet.width + gap;
+      return entry;
+    });
+  };
 
   return {
-    entries,
+    entriesAtScale,
     centeredOffset(sheetId, scale, canvasWidth) {
+      const entries = entriesAtScale(scale);
+      const entriesBySheetId = new Map(
+        entries.map((entry) => [entry.sheetId, entry]),
+      );
       const entry = entriesBySheetId.get(sheetId);
       return entry
         ? canvasWidth / 2 - entry.center * scale
         : null;
     },
     clampOffset(offsetX, scale, canvasWidth) {
+      const entries = entriesAtScale(scale);
       const first = entries[0];
       const last = entries[entries.length - 1];
       if (!first || !last || scale <= 0) return offsetX;
@@ -86,6 +92,7 @@ export function createContinuousCanvasLayout(
       return Math.min(maximum, Math.max(minimum, offsetX));
     },
     centeredSheetId(offsetX, scale, canvasWidth) {
+      const entries = entriesAtScale(scale);
       if (entries.length === 0 || scale <= 0) return null;
 
       const visibleCenter = (canvasWidth / 2 - offsetX) / scale;

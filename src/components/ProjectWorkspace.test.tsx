@@ -1317,7 +1317,7 @@ test("centers a Grade navigation target in the visible Canvas", () => {
   fireEvent.click(screen.getByText("02").closest("button")!);
 
   const targetCenter =
-    canvasHarness.props!.continuousCanvasLayout.entries[1].center;
+    canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[1].center;
   expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
     1_000 / 2 - targetCenter * 0.5,
   );
@@ -1343,7 +1343,7 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
     });
   });
 
-  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(24);
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(4);
   expect(useEditorView.getState().focusedSheetId).toBe("sheet-002");
   expect(useEditorView.getState().centeredSheetId).toBe("sheet-002");
 });

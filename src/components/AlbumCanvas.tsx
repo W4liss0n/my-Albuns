@@ -26,6 +26,7 @@ export type {
   PhotoTransformDelta,
   PhotoTransformPreview,
   PhotoZoomPreview,
+  SheetBarMetadata,
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
@@ -331,6 +332,22 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
   return (
     <div className="canvas-host" ref={hostRef}>
+      <div
+        aria-label="Ações da Barra da Lâmina"
+        className="ui-visually-hidden"
+        role="group"
+      >
+        <button
+          aria-label="Trocar Frames — indisponível nesta versão"
+          disabled
+          type="button"
+        />
+        <button
+          aria-label="Abrir Painel de Layouts — indisponível nesta versão"
+          disabled
+          type="button"
+        />
+      </div>
       {graphicsState === "initializing" && (
         <span className="canvas-loading">Iniciando WebGL2…</span>
       )}

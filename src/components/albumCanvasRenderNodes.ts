@@ -5,7 +5,6 @@ import {
   Graphics,
   Rectangle,
   Sprite,
-  Text,
   type Texture,
 } from "pixi.js";
 
@@ -14,10 +13,9 @@ import type {
   NormalizedPan,
   ProjectedFrameBorder,
 } from "../domain/project";
-import {
-  MICROMETER_TO_CANVAS_PIXEL,
-  SHEET_LABEL_HEIGHT_PX,
-} from "./canvasGeometry";
+import type { SheetBarMetadata } from "./albumCanvasContract";
+import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
+import { pixiColor } from "./pixiColor";
 import {
   createPhotoGeometry,
   type CanvasPhotoPlacement,
@@ -28,6 +26,12 @@ import {
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
+import {
+  createSheetBarRenderNode,
+  setSheetBarHovered,
+  stopSheetBarTransition,
+  type SheetBarRenderNode,
+} from "./sheetBarRenderNode";
 
 const PAN_OUTSIDE_OPACITY = 0.24;
 
@@ -50,6 +54,7 @@ export interface SheetRenderNode {
   photoNodes: PhotoRenderNode[];
   selectionOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
+  sheetBar: SheetBarRenderNode;
 }
 
 interface SheetRenderNodeCallbacks {
@@ -80,6 +85,7 @@ interface PhotoPreviewLayerOptions {
 
 export function createSheetRenderNode(
   sheet: ComposedSheet,
+  sheetBarMetadata: SheetBarMetadata | undefined,
   frameBorder: ProjectedFrameBorder,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
@@ -87,6 +93,7 @@ export function createSheetRenderNode(
   const sheetContainer = new Container();
   const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
   const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
+  sheetContainer.label = `canvas-sheet-${sheet.sheetId}`;
   sheetContainer.eventMode = "static";
   sheetContainer.hitArea = new Rectangle(0, 0, width, height);
   sheetContainer.cursor = "default";
@@ -97,8 +104,8 @@ export function createSheetRenderNode(
   });
 
   const shadow = new Graphics()
-    .roundRect(8, 12, width, height, 4)
-    .fill({ color: 0x121820, alpha: 0.2 });
+    .roundRect(0, 6, width, height, 3)
+    .fill({ color: 0x3c362c, alpha: 0.12 });
   const surface = new Graphics()
     .roundRect(
       0,
@@ -107,9 +114,9 @@ export function createSheetRenderNode(
       height,
       SHEET_VISUAL_STYLE.surface.cornerRadiusPx,
     )
-    .fill({ color: hexToNumber(sheet.base.rgb) })
+    .fill({ color: pixiColor(sheet.base.rgb) })
     .stroke({
-      color: hexToNumber(SHEET_VISUAL_STYLE.surface.outline),
+      color: pixiColor(SHEET_VISUAL_STYLE.surface.outline),
       width: SHEET_VISUAL_STYLE.surface.outlineWidthPx,
       alpha: SHEET_VISUAL_STYLE.surface.outlineOpacity,
     });
@@ -125,7 +132,7 @@ export function createSheetRenderNode(
     if (background.kind === "color") {
       const color = new Graphics()
         .rect(x, y, backgroundWidth, backgroundHeight)
-        .fill({ color: hexToNumber(background.rgb) });
+        .fill({ color: pixiColor(background.rgb) });
       color.label = `background-color-${background.rgb}`;
       color.eventMode = "none";
       sheetContainer.addChild(color);
@@ -150,25 +157,12 @@ export function createSheetRenderNode(
     }
   }
 
-  const label = new Text({
-    text: `LÂMINA ${String(sheet.number).padStart(2, "0")}`,
-    style: {
-      fontFamily: "Segoe UI",
-      fontSize: 10,
-      fontWeight: "600",
-      fill: 0x77808a,
-      letterSpacing: 1.4,
-    },
-  });
-  label.position.set(2, -SHEET_LABEL_HEIGHT_PX);
-  sheetContainer.addChild(label);
-
   if (sheet.activeSides === "both") {
     const centerLine = new Graphics()
       .moveTo(width / 2, 0)
       .lineTo(width / 2, height)
       .stroke({
-        color: hexToNumber(SHEET_VISUAL_STYLE.centerLine.color),
+        color: pixiColor(SHEET_VISUAL_STYLE.centerLine.color),
         width: SHEET_VISUAL_STYLE.centerLine.widthPx,
         alpha: SHEET_VISUAL_STYLE.centerLine.opacity,
       });
@@ -252,7 +246,7 @@ export function createSheetRenderNode(
     const outline = new Graphics()
       .rect(0, 0, frameWidth, frameHeight)
       .stroke({
-        color: hexToNumber(SHEET_VISUAL_STYLE.frame.outline),
+        color: pixiColor(SHEET_VISUAL_STYLE.frame.outline),
         width: SHEET_VISUAL_STYLE.frame.outlineWidthPx,
         alpha: SHEET_VISUAL_STYLE.frame.outlineOpacity,
       });
@@ -268,7 +262,7 @@ export function createSheetRenderNode(
         );
       }
       persistedBorder.fill({
-        color: hexToNumber(frameBorder.rgb),
+        color: pixiColor(frameBorder.rgb),
         alpha: 1,
       });
     }
@@ -335,7 +329,7 @@ export function createSheetRenderNode(
           overlayStyle.cornerRadiusPx,
         )
         .stroke({
-          color: hexToNumber(overlayStyle.outline),
+          color: pixiColor(overlayStyle.outline),
           width: overlayStyle.outlineWidthPx,
           alpha: overlayStyle.outlineOpacity,
         });
@@ -345,8 +339,21 @@ export function createSheetRenderNode(
     }
   }
 
+  const sheetBar = createSheetBarRenderNode(
+    sheet,
+    sheetBarMetadata,
+    width,
+  );
+  sheetContainer.on("pointerenter", () => {
+    setSheetBarHovered(sheetBar, true);
+  });
+  sheetContainer.on("pointerleave", () => {
+    setSheetBarHovered(sheetBar, false);
+  });
+  sheetContainer.addChild(sheetBar.container);
+
   const focusOutline = new Graphics()
-    .roundRect(-5, -5, width + 10, height + 10, 7)
+    .rect(-2, -2, width + 4, height + 4)
     .stroke({ color: 0x2f7fba, width: 2, alpha: 0.9 });
   focusOutline.label = `sheet-focus-${sheet.sheetId}`;
   focusOutline.eventMode = "none";
@@ -359,10 +366,12 @@ export function createSheetRenderNode(
     photoNodes,
     selectionOutlines,
     focusOutline,
+    sheetBar,
   };
 }
 
 export function destroySheetRenderNode(node: SheetRenderNode) {
+  stopSheetBarTransition(node.sheetBar);
   node.container.destroy({ children: true });
 }
 
@@ -444,7 +453,7 @@ function createPhotoPreviewLayer({
           drawWidth / photoStyle.stripeCount + photoStyle.stripeOverlapPx,
           drawHeight,
         )
-        .fill({ color: hexToNumber(palette[paletteIndex]) }),
+        .fill({ color: pixiColor(palette[paletteIndex]) }),
     );
   }
   photoLayer.addChild(
@@ -455,7 +464,7 @@ function createPhotoPreviewLayer({
         drawHeight * photoStyle.lightRadiusToHeightRatio,
       )
       .fill({
-        color: hexToNumber(photoStyle.lightColor),
+        color: pixiColor(photoStyle.lightColor),
         alpha: photoStyle.lightOpacity,
       }),
   );
@@ -465,9 +474,9 @@ function createPhotoPreviewLayer({
 function createPlaceholder(frameWidth: number, frameHeight: number) {
   return new Graphics()
     .rect(0, 0, frameWidth, frameHeight)
-    .fill({ color: hexToNumber(SHEET_VISUAL_STYLE.placeholder.fill) })
+    .fill({ color: pixiColor(SHEET_VISUAL_STYLE.placeholder.fill) })
     .stroke({
-      color: hexToNumber(SHEET_VISUAL_STYLE.placeholder.outline),
+      color: pixiColor(SHEET_VISUAL_STYLE.placeholder.outline),
       width: SHEET_VISUAL_STYLE.placeholder.outlineWidthPx,
       alpha: SHEET_VISUAL_STYLE.placeholder.outlineOpacity,
     });
@@ -484,7 +493,7 @@ function createPlaceholderCross(
     .moveTo(frameWidth / 2, frameHeight / 2 - style.crossHalfLengthPx)
     .lineTo(frameWidth / 2, frameHeight / 2 + style.crossHalfLengthPx)
     .stroke({
-      color: hexToNumber(style.crossColor),
+      color: pixiColor(style.crossColor),
       width: style.crossWidthPx,
       alpha: style.crossOpacity,
     });
@@ -514,8 +523,4 @@ function setPhotoLayersScale(
 ) {
   node.layer.scale.set(x, y);
   node.outsideLayer.scale.set(x, y);
-}
-
-function hexToNumber(value: string): number {
-  return Number.parseInt(value.replace("#", ""), 16);
 }

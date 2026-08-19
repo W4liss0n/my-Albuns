@@ -1,7 +1,10 @@
 import { expect, test } from "vitest";
 
 import type { CompositionPlan } from "../domain/project";
-import { createContinuousCanvasLayout } from "./canvasGeometry";
+import {
+  createContinuousCanvasLayout,
+  SHEET_GAP_PX,
+} from "./canvasGeometry";
 
 function neutralLayers() {
   return {
@@ -54,8 +57,8 @@ test("limits continuous Canvas movement at the edge sheet centers", () => {
   const layout = createContinuousCanvasLayout(threeSheets);
 
   expect(layout.clampOffset(999, 0.5, 1_000)).toBe(350);
-  expect(layout.clampOffset(-999, 0.5, 1_000)).toBe(-302);
-  expect(layout.clampOffset(24, 0.5, 1_000)).toBe(24);
+  expect(layout.clampOffset(-999, 0.5, 1_000)).toBe(-342);
+  expect(layout.clampOffset(4, 0.5, 1_000)).toBe(4);
 });
 
 test("identifies the sheet nearest the visible Canvas center", () => {
@@ -64,10 +67,10 @@ test("identifies the sheet nearest the visible Canvas center", () => {
   expect(layout.centeredSheetId(350, 0.5, 1_000)).toBe(
     "sheet-001",
   );
-  expect(layout.centeredSheetId(24, 0.5, 1_000)).toBe(
+  expect(layout.centeredSheetId(4, 0.5, 1_000)).toBe(
     "sheet-002",
   );
-  expect(layout.centeredSheetId(-302, 0.5, 1_000)).toBe(
+  expect(layout.centeredSheetId(-342, 0.5, 1_000)).toBe(
     "sheet-003",
   );
 });
@@ -76,11 +79,22 @@ test("calculates the offset that centers any navigation target", () => {
   const layout = createContinuousCanvasLayout(threeSheets);
 
   expect(layout.centeredOffset("sheet-001", 0.5, 1_000)).toBe(350);
-  expect(layout.centeredOffset("sheet-002", 0.5, 1_000)).toBe(24);
+  expect(layout.centeredOffset("sheet-002", 0.5, 1_000)).toBe(4);
   expect(layout.centeredOffset("sheet-003", 0.5, 1_000)).toBe(
-    -302,
+    -342,
   );
   expect(layout.centeredOffset("missing", 0.5, 1_000)).toBeNull();
+});
+
+test("keeps the visible gap between sheets fixed while Canvas scale changes", () => {
+  const layout = createContinuousCanvasLayout(threeSheets);
+
+  for (const scale of [0.5, 1, 1.75]) {
+    const [first, second] = layout.entriesAtScale(scale);
+    const visibleGap = (second.left - first.right) * scale;
+
+    expect(visibleGap).toBeCloseTo(SHEET_GAP_PX);
+  }
 });
 
 test("measures sheet geometry once and reuses it", () => {
@@ -99,7 +113,7 @@ test("measures sheet geometry once and reuses it", () => {
   expect(widthReads).toBe(threeSheets.length);
 
   layout.clampOffset(999, 0.5, 1_000);
-  layout.centeredSheetId(24, 0.5, 1_000);
+  layout.centeredSheetId(4, 0.5, 1_000);
   layout.centeredOffset("sheet-003", 0.5, 1_000);
   expect(widthReads).toBe(threeSheets.length);
 });

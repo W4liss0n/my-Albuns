@@ -1,13 +1,16 @@
 import { Application, Container, Rectangle } from "pixi.js";
 
 import type { ComposedSheet } from "../domain/project";
-import type { AlbumCanvasProps, CanvasMetrics } from "./albumCanvasContract";
+import type {
+  AlbumCanvasProps,
+  CanvasMetrics,
+  SheetBarMetadata,
+} from "./albumCanvasContract";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
   type ContinuousCanvasLayout,
   MICROMETER_TO_CANVAS_PIXEL,
-  SHEET_LABEL_HEIGHT_PX,
 } from "./canvasGeometry";
 import {
   createSheetRenderNode,
@@ -15,6 +18,7 @@ import {
   type PhotoRenderNode,
   type SheetRenderNode,
 } from "./albumCanvasRenderNodes";
+import { applySheetBarScale } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { ViewportTexturePool } from "./viewportTexturePool";
 
@@ -106,7 +110,7 @@ export class AlbumCanvasScene {
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
-      CANVAS_VERTICAL_MARGIN_PX + SHEET_LABEL_HEIGHT_PX * scale,
+      CANVAS_VERTICAL_MARGIN_PX,
     );
     this.world.scale.set(scale);
     this.app.stage.hitArea = new Rectangle(
@@ -191,15 +195,16 @@ export class AlbumCanvasScene {
   ) {
     if (!this.input) return;
     const sheets = this.input.composition.sheets;
+    const entries = layout.entriesAtScale(scale);
     const viewportLeft = -boundedOffsetX / scale;
     const viewportRight = viewportLeft + this.app.screen.width / scale;
-    const visibleIndexes = layout.entries
+    const visibleIndexes = entries
       .filter(
         ({ left, right }) =>
           right >= viewportLeft && left <= viewportRight,
       )
       .map(({ index }) => index);
-    const residentIndexes = layout.entries
+    const residentIndexes = entries
       .filter(
         ({ left, right }) =>
           right >= viewportLeft - VIEWPORT_PRELOAD_PX &&
@@ -219,6 +224,12 @@ export class AlbumCanvasScene {
     const desiredIds = new Set(desiredSheets.map((sheet) => sheet.sheetId));
     const desiredPreviewUrls = new Set<string>();
     const signatures = new Map<string, string>();
+    const sheetBarMetadata = new Map(
+      this.input.sheetBarMetadata.map((metadata) => [
+        metadata.sheetId,
+        metadata,
+      ]),
+    );
 
     for (const sheet of desiredSheets) {
       const previewStates = sheet.frames.map((frame) => {
@@ -252,6 +263,7 @@ export class AlbumCanvasScene {
         sheet.sheetId,
         JSON.stringify([
           sheet,
+          sheetBarMetadata.get(sheet.sheetId) ?? null,
           this.input.composition.frameBorder,
           previewStates,
           backgroundPreviewStates,
@@ -275,11 +287,16 @@ export class AlbumCanvasScene {
       const signature = signatures.get(sheet.sheetId) ?? "";
       let node = this.sheetNodes.get(sheet.sheetId);
       if (!node) {
-        node = this.createSheetNode(sheet, signature);
+        node = this.createSheetNode(
+          sheet,
+          sheetBarMetadata.get(sheet.sheetId),
+          signature,
+        );
         this.sheetNodes.set(sheet.sheetId, node);
         this.world.addChild(node.container);
       }
-      node.container.position.set(layout.entries[index].left, 0);
+      applySheetBarScale(node.sheetBar, scale);
+      node.container.position.set(entries[index].left, 0);
     }
   }
 
@@ -319,10 +336,12 @@ export class AlbumCanvasScene {
 
   private createSheetNode(
     sheet: ComposedSheet,
+    sheetBarMetadata: SheetBarMetadata | undefined,
     signature: string,
   ): SheetRenderNode {
     const node = createSheetRenderNode(
       sheet,
+      sheetBarMetadata,
       this.input?.composition.frameBorder ?? { kind: "none" },
       signature,
       {
