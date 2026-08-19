@@ -266,7 +266,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Painel contextual e Painel de imagens continuam disponíveis.
 - O Painel de imagens assume automaticamente uma altura compacta para priorizar o Canvas, sem ser completamente ocultado.
 - A altura normal anterior não é sobrescrita; ao sair, ela é restaurada.
-- Encerrar o modo retorna ao Canvas contínuo na mesma posição de navegação anterior.
+- Encerrar o modo retorna ao Canvas contínuo com a Lâmina que estava sendo editada centralizada.
 - Dois cliques em uma Lâmina entram no modo para aquela Lâmina.
 - Com o foco no Canvas, `Enter` entra no modo para a Lâmina centralizada.
 - `Esc` encerra o modo e retorna ao Canvas contínuo.

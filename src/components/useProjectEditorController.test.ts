@@ -3,7 +3,10 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectSessionPort } from "../application/projectPorts";
 import { useEditorView } from "../state/editorView";
-import { representativeProjection } from "../test/projectFixtures";
+import {
+  createTwoSheetProjection,
+  representativeProjection,
+} from "../test/projectFixtures";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 
@@ -99,4 +102,59 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
   outsideButton.remove();
   canvasHost.remove();
   input.remove();
+});
+
+test("centers the edited Sheet when leaving Sheet Edit Mode", () => {
+  const projection = createTwoSheetProjection();
+  const view = renderHook(() =>
+    useProjectEditorController({
+      projection,
+      runProjectMutation: vi.fn(),
+      onProjectionChange: vi.fn(),
+    }),
+  );
+
+  act(() => {
+    view.result.current.canvasProps.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+    view.result.current.canvasProps.onEditSheet("sheet-002");
+  });
+  expect(view.result.current.canvasProps.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-002",
+  });
+  act(() => {
+    view.result.current.canvasProps.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.8,
+    });
+  });
+
+  fireEvent.keyDown(window, { key: "Escape" });
+
+  expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
+  expect(useEditorView.getState()).toMatchObject({
+    focusedSheetId: "sheet-002",
+    viewport: { offsetX: 0 },
+  });
+
+  act(() => {
+    view.result.current.canvasProps.onCanvasMetricsChange?.({
+      width: 1_000,
+      scale: 0.5,
+    });
+  });
+  const expectedOffset =
+    view.result.current.canvasProps.continuousCanvasLayout.centeredOffset(
+      "sheet-002",
+      0.5,
+      1_000,
+    );
+  expect(useEditorView.getState()).toMatchObject({
+    centeredSheetId: "sheet-002",
+    focusedSheetId: "sheet-002",
+    viewport: { offsetX: expectedOffset },
+  });
 });

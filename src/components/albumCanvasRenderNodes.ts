@@ -36,6 +36,10 @@ import {
   type PhotoGeometry,
 } from "./photoGeometry";
 import {
+  createFrameSelectionRenderNode,
+  type FrameSelectionRenderNode,
+} from "./frameSelectionRenderNode";
+import {
   frameOutlineStyle,
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
@@ -76,7 +80,7 @@ export interface SheetRenderNode {
   photoNodes: PhotoRenderNode[];
   placeholderLabels: Text[];
   inactiveSideGradient: FillGradient | null;
-  selectionOutlines: Map<string, Graphics>;
+  frameSelections: Map<string, FrameSelectionRenderNode>;
   focusOutline: Graphics;
   sheetBar: SheetBarRenderNode;
   viewBounds: CanvasBounds;
@@ -207,7 +211,10 @@ export function createSheetRenderNode(
   );
   if (centerLine) sheetContainer.addChild(centerLine);
 
-  const selectionOutlines = new Map<string, Graphics>();
+  const frameSelections = new Map<string, FrameSelectionRenderNode>();
+  const frameSelectionLayer = new Container();
+  frameSelectionLayer.label = `frame-selection-layer-${sheet.sheetId}`;
+  frameSelectionLayer.eventMode = "none";
   const photoNodes: PhotoRenderNode[] = [];
   const placeholderLabels: Text[] = [];
   for (const frame of sheet.frames) {
@@ -320,18 +327,21 @@ export function createSheetRenderNode(
       persistedBorder.label = `frame-persisted-border-${frame.frameId}`;
       persistedBorder.eventMode = "none";
     }
-    const selectionOutline = new Graphics()
-      .rect(0, 0, frameWidth, frameHeight)
-      .stroke({ color: 0x2f7fba, width: 3, alpha: 1 });
-    selectionOutline.label = `frame-selection-${frame.frameId}`;
-    selectionOutline.eventMode = "none";
-    selectionOutline.visible = false;
-    selectionOutlines.set(frame.frameId, selectionOutline);
     frameContainer.addChild(
       outline,
       ...(persistedBorder ? [persistedBorder] : []),
-      selectionOutline,
     );
+
+    const frameSelection = createFrameSelectionRenderNode(
+      frame.frameId,
+      frameWidth,
+      frameHeight,
+      modePolicy.showsFrameResizeHandles &&
+        sheetBarMetadata?.layoutLocked === false,
+    );
+    frameSelection.container.position.set(frameX, frameY);
+    frameSelections.set(frame.frameId, frameSelection);
+    frameSelectionLayer.addChild(frameSelection.container);
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
@@ -413,6 +423,7 @@ export function createSheetRenderNode(
       activeContent.addChild(guide);
     }
   }
+  activeContent.addChild(frameSelectionLayer);
 
   const sheetBar = createSheetBarRenderNode(
     sheet,
@@ -463,7 +474,7 @@ export function createSheetRenderNode(
     photoNodes,
     placeholderLabels,
     inactiveSideGradient: inactiveSide?.gradient ?? null,
-    selectionOutlines,
+    frameSelections,
     focusOutline,
     sheetBar,
     viewBounds: viewGeometry.visibleOuterBounds,

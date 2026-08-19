@@ -36,6 +36,7 @@ export interface CanvasTechnicalGuides {
 export interface SheetBarMetadata {
   sheetId: string;
   pageNumbers: readonly number[];
+  layoutLocked: boolean;
 }
 
 export type AlbumCanvasMode =

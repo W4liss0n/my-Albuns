@@ -10,6 +10,7 @@ import "./App.css";
 import { AlbumCanvas } from "./components/AlbumCanvas";
 import type {
   AlbumCanvasMode,
+  CanvasMetrics,
   SheetBarMetadata,
 } from "./components/albumCanvasContract";
 import { createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
@@ -97,11 +98,31 @@ const previewTechnicalGuides = {
 } as const;
 
 const sheetBarMetadata: readonly SheetBarMetadata[] = [
-  { sheetId: "sheet-001", pageNumbers: [1] },
-  { sheetId: "sheet-002", pageNumbers: [2, 3] },
-  { sheetId: "sheet-003", pageNumbers: [4, 5] },
-  { sheetId: "sheet-004", pageNumbers: [6, 7] },
-  { sheetId: "sheet-005", pageNumbers: [8] },
+  {
+    sheetId: "sheet-001",
+    pageNumbers: [1],
+    layoutLocked: false,
+  },
+  {
+    sheetId: "sheet-002",
+    pageNumbers: [2, 3],
+    layoutLocked: false,
+  },
+  {
+    sheetId: "sheet-003",
+    pageNumbers: [4, 5],
+    layoutLocked: false,
+  },
+  {
+    sheetId: "sheet-004",
+    pageNumbers: [6, 7],
+    layoutLocked: false,
+  },
+  {
+    sheetId: "sheet-005",
+    pageNumbers: [8],
+    layoutLocked: false,
+  },
 ];
 
 export function CanvasPreview() {
@@ -114,6 +135,8 @@ export function CanvasPreview() {
     [],
   );
   const centeredOnce = useRef(false);
+  const pendingCenteredSheetId = useRef<string | null>(null);
+  const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
   const [viewport, setViewport] = useState({ offsetX: 0 });
@@ -130,9 +153,28 @@ export function CanvasPreview() {
     setFocusedSheetId(sheetId);
     setMode({ kind: "sheet-editing", sheetId });
   }, []);
+  const centerPreviewOnSheet = useCallback(
+    (sheetId: string, metrics: CanvasMetrics) => {
+      setFocusedSheetId(sheetId);
+      setCenteredSheetId(sheetId);
+      const offsetX = layout.centeredOffset(
+        sheetId,
+        metrics.scale,
+        metrics.width,
+      );
+      if (offsetX === null) return;
+      setViewport((current) => ({ ...current, offsetX }));
+    },
+    [layout],
+  );
   const exitSheetEditing = useCallback(() => {
+    if (mode.kind === "sheet-editing") {
+      pendingCenteredSheetId.current = mode.sheetId;
+      setFocusedSheetId(mode.sheetId);
+    }
+    setSelectedFrameId(null);
     setMode({ kind: "normal" });
-  }, []);
+  }, [centerPreviewOnSheet, mode]);
   useCanvasModeKeyboardShortcuts({
     implicitSheetId: centeredSheetId,
     mode,
@@ -149,24 +191,28 @@ export function CanvasPreview() {
         sheetBarMetadata={sheetBarMetadata}
         technicalGuides={previewTechnicalGuides}
         continuousCanvasLayout={layout}
-        selectedFrameId={null}
+        selectedFrameId={selectedFrameId}
         focusedSheetId={focusedSheetId}
         centeredSheetId={centeredSheetId}
         viewport={viewport}
-        onSelectFrame={() => undefined}
+        onSelectFrame={setSelectedFrameId}
         onEditSheet={enterSheetEditing}
         onFocusSheet={setFocusedSheetId}
         onCenteredSheetChange={setCenteredSheetId}
         onViewportChange={setViewport}
         onTransformPreview={() => undefined}
         onTransformCommit={async () => true}
-        onCanvasMetricsChange={({ width, scale }) => {
+        onCanvasMetricsChange={(metrics) => {
+          const pendingSheetId = pendingCenteredSheetId.current;
+          if (pendingSheetId) {
+            pendingCenteredSheetId.current = null;
+            centeredOnce.current = true;
+            centerPreviewOnSheet(pendingSheetId, metrics);
+            return;
+          }
           if (centeredOnce.current) return;
           centeredOnce.current = true;
-          setViewport({
-            offsetX:
-              layout.centeredOffset("sheet-002", scale, width) ?? 0,
-          });
+          centerPreviewOnSheet("sheet-002", metrics);
         }}
       />
     </main>

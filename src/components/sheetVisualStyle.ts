@@ -74,6 +74,15 @@ export const SHEET_VISUAL_STYLE = {
     outlineOpacity: 0.72,
     outlineWidthPx: 1,
   },
+  frameSelection: {
+    outline: "#2f7fba",
+    outlineOpacity: 1,
+    outlineWidthPx: 2,
+    handleFill: "#ffffff",
+    handleOutline: "#2f7fba",
+    handleOutlineWidthPx: 1,
+    handleSizePx: 8,
+  },
   overlay: {
     outline: "#2f7fba",
     outlineOpacity: 0.52,

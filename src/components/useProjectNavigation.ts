@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -59,51 +60,77 @@ export function useProjectNavigation(projection: EditorProjection) {
     ],
   );
 
-  function centerCanvasOnSheet(
-    sheetId: string,
-    metrics: CanvasMetrics,
-  ) {
-    const offsetX = canvasLayout.centeredOffset(
-      sheetId,
-      metrics.scale,
-      metrics.width,
-    );
-    if (offsetX === null) return false;
+  const centerCanvasOnSheet = useCallback(
+    (sheetId: string, metrics: CanvasMetrics) => {
+      const offsetX = canvasLayout.centeredOffset(
+        sheetId,
+        metrics.scale,
+        metrics.width,
+      );
+      if (offsetX === null) return false;
 
-    setViewport({
-      ...useEditorView.getState().viewport,
-      offsetX,
-    });
-    return true;
-  }
+      setViewport({
+        ...useEditorView.getState().viewport,
+        offsetX,
+      });
+      return true;
+    },
+    [canvasLayout, setViewport],
+  );
 
-  function handleCanvasMetricsChange(metrics: CanvasMetrics) {
-    setCanvasMetrics(metrics);
-    const pendingSheetId = pendingSheetNavigationRef.current;
-    if (
-      pendingSheetId &&
-      centerCanvasOnSheet(pendingSheetId, metrics)
-    ) {
-      pendingSheetNavigationRef.current = null;
-    }
-  }
+  const handleCanvasMetricsChange = useCallback(
+    (metrics: CanvasMetrics) => {
+      setCanvasMetrics(metrics);
+      const pendingSheetId = pendingSheetNavigationRef.current;
+      if (
+        pendingSheetId &&
+        centerCanvasOnSheet(pendingSheetId, metrics)
+      ) {
+        pendingSheetNavigationRef.current = null;
+        centerSheet(pendingSheetId);
+      }
+    },
+    [centerCanvasOnSheet, centerSheet],
+  );
 
-  function navigateToSheet(sheetId: string) {
-    const sheetExists = projection.composition.sheets.some(
-      (sheet) => sheet.sheetId === sheetId,
-    );
-    if (!sheetExists) return;
+  const centerSheetOnNextCanvasMetrics = useCallback(
+    (sheetId: string) => {
+      const sheetExists = projection.composition.sheets.some(
+        (sheet) => sheet.sheetId === sheetId,
+      );
+      if (!sheetExists) return;
 
-    focusSheet(sheetId);
-    centerSheet(sheetId);
-    if (!canvasMetrics) {
       pendingSheetNavigationRef.current = sheetId;
-      return;
-    }
+      focusSheet(sheetId);
+    },
+    [focusSheet, projection.composition.sheets],
+  );
 
-    pendingSheetNavigationRef.current = null;
-    centerCanvasOnSheet(sheetId, canvasMetrics);
-  }
+  const navigateToSheet = useCallback(
+    (sheetId: string) => {
+      const sheetExists = projection.composition.sheets.some(
+        (sheet) => sheet.sheetId === sheetId,
+      );
+      if (!sheetExists) return;
+
+      focusSheet(sheetId);
+      centerSheet(sheetId);
+      if (!canvasMetrics) {
+        pendingSheetNavigationRef.current = sheetId;
+        return;
+      }
+
+      pendingSheetNavigationRef.current = null;
+      centerCanvasOnSheet(sheetId, canvasMetrics);
+    },
+    [
+      canvasMetrics,
+      centerCanvasOnSheet,
+      centerSheet,
+      focusSheet,
+      projection.composition.sheets,
+    ],
+  );
 
   const implicitSheetId = projection.state.album.sheets.some(
     (sheet) => sheet.id === centeredSheetId,
@@ -124,5 +151,6 @@ export function useProjectNavigation(projection: EditorProjection) {
     setViewport,
     handleCanvasMetricsChange,
     navigateToSheet,
+    centerSheetOnNextCanvasMetrics,
   };
 }

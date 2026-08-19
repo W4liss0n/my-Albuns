@@ -7,6 +7,7 @@ export type AlbumCanvasModePolicy =
       enablesContinuousNavigation: true;
       enablesPhotoTransform: true;
       masksBleed: true;
+      showsFrameResizeHandles: false;
       showsSheetBar: true;
       showsTechnicalGuides: false;
     }
@@ -15,6 +16,7 @@ export type AlbumCanvasModePolicy =
       enablesContinuousNavigation: false;
       enablesPhotoTransform: false;
       masksBleed: false;
+      showsFrameResizeHandles: true;
       showsSheetBar: false;
       showsTechnicalGuides: true;
     };
@@ -24,6 +26,7 @@ const NORMAL_MODE_POLICY: AlbumCanvasModePolicy = {
   enablesContinuousNavigation: true,
   enablesPhotoTransform: true,
   masksBleed: true,
+  showsFrameResizeHandles: false,
   showsSheetBar: true,
   showsTechnicalGuides: false,
 };
@@ -37,6 +40,7 @@ export function albumCanvasModePolicy(
     enablesContinuousNavigation: false,
     enablesPhotoTransform: false,
     masksBleed: false,
+    showsFrameResizeHandles: true,
     showsSheetBar: false,
     showsTechnicalGuides: true,
   };

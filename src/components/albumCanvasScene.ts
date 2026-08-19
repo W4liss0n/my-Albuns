@@ -20,6 +20,7 @@ import {
   type PhotoRenderNode,
   type SheetRenderNode,
 } from "./albumCanvasRenderNodes";
+import { applyFrameSelectionScale } from "./frameSelectionRenderNode";
 import {
   albumCanvasModePolicy,
   sheetsForCanvasMode,
@@ -91,6 +92,7 @@ export class AlbumCanvasScene {
       this.modeSignature !== modeSignature
     ) {
       this.resetTransientInteractions();
+      this.lastCanvasMetrics = null;
     }
     this.modeSignature = modeSignature;
     this.input = input;
@@ -339,6 +341,9 @@ export class AlbumCanvasScene {
       }
       applySheetBarScale(node.sheetBar, scale);
       applyPlaceholderLabelScale(node, scale);
+      for (const selection of node.frameSelections.values()) {
+        applyFrameSelectionScale(selection, scale);
+      }
       node.container.position.set(
         entries[index].left - node.viewBounds.x,
         0,
@@ -439,8 +444,8 @@ export class AlbumCanvasScene {
     if (!this.input) return;
     for (const [sheetId, node] of this.sheetNodes) {
       node.focusOutline.visible = sheetId === this.input.focusedSheetId;
-      for (const [frameId, outline] of node.selectionOutlines) {
-        outline.visible = frameId === this.input.selectedFrameId;
+      for (const [frameId, selection] of node.frameSelections) {
+        selection.container.visible = frameId === this.input.selectedFrameId;
       }
     }
   }

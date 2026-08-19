@@ -235,6 +235,113 @@ test("shows the complete active surface and technical guides only in Sheet Edit 
   expect(displayWithLabel("sheet-bar-sheet-001").visible).toBe(false);
 });
 
+test("shows the selected Frame boundary and eight visual-only resize handles in Sheet Edit Mode", async () => {
+  renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: interactiveComposition,
+    selectedFrameId: "frame-001",
+    sheetBarMetadata: [
+      {
+        sheetId: "sheet-001",
+        pageNumbers: [1, 2],
+        layoutLocked: false,
+      },
+    ],
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("frame-selection-frame-001")).toMatchObject({
+    rectCommands: [{ height: 200, width: 300, x: 0, y: 0 }],
+    strokeStyles: [
+      expect.objectContaining({
+        alignment: 0,
+        color: 0x2f7fba,
+        width: 2,
+      }),
+    ],
+    visible: true,
+  });
+
+  const handleLabels = [
+    "top-left",
+    "top",
+    "top-right",
+    "right",
+    "bottom-right",
+    "bottom",
+    "bottom-left",
+    "left",
+  ].map(
+    (position) =>
+      `frame-resize-handle-placeholder-${position}-frame-001`,
+  );
+  const expectedPositions = [
+    { x: 0, y: 0 },
+    { x: 150, y: 0 },
+    { x: 300, y: 0 },
+    { x: 300, y: 100 },
+    { x: 300, y: 200 },
+    { x: 150, y: 200 },
+    { x: 0, y: 200 },
+    { x: 0, y: 100 },
+  ];
+  const expectedInverseScale = 1 / ((500 - 2 * 28) / 300);
+
+  for (const [index, label] of handleLabels.entries()) {
+    const handle = displayWithLabel(label) as unknown as {
+      fillStyles: Array<{ color: number }>;
+      position: { x: number; y: number };
+      rectCommands: Array<{
+        height: number;
+        width: number;
+        x: number;
+        y: number;
+      }>;
+      scale: { x: number; y: number };
+      strokeStyles: Array<{ color: number }>;
+      visible: boolean;
+    };
+    expect(handle).toMatchObject({
+      position: expectedPositions[index],
+      rectCommands: [{ height: 8, width: 8, x: -4, y: -4 }],
+      visible: true,
+    });
+    expect(handle.fillStyles).toContainEqual(
+      expect.objectContaining({ color: 0xffffff }),
+    );
+    expect(handle.strokeStyles).toContainEqual(
+      expect.objectContaining({ color: 0x2f7fba }),
+    );
+    expect(handle.scale.x).toBeCloseTo(expectedInverseScale);
+    expect(handle.scale.y).toBeCloseTo(expectedInverseScale);
+  }
+});
+
+test("keeps the selected Frame boundary but omits resize handles for a locked Layout", async () => {
+  renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    compositionPlan: interactiveComposition,
+    selectedFrameId: "frame-001",
+    sheetBarMetadata: [
+      {
+        sheetId: "sheet-001",
+        pageNumbers: [1, 2],
+        layoutLocked: true,
+      },
+    ],
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("frame-selection-frame-001")).toMatchObject({
+    visible: true,
+  });
+  expect(
+    pixiLifecycle.displays.some(({ label }) =>
+      label.startsWith("frame-resize-handle-placeholder-"),
+    ),
+  ).toBe(false);
+});
+
 test.each([
   {
     guides: { bleedUm: 0, safetyUm: 5_000 },
@@ -326,7 +433,13 @@ test.each(singlePageEdgeCases)(
     renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
       mode: { kind: "sheet-editing", sheetId: "sheet-001" },
-      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      sheetBarMetadata: [
+        {
+          sheetId: "sheet-001",
+          pageNumbers: [1],
+          layoutLocked: false,
+        },
+      ],
       technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
     });
     await finishPixiInitialization();
@@ -363,7 +476,13 @@ test.each(singlePageEdgeCases)(
   async ({ activeSides, activeMask, inactivePosition }) => {
     renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
-      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      sheetBarMetadata: [
+        {
+          sheetId: "sheet-001",
+          pageNumbers: [1],
+          layoutLocked: false,
+        },
+      ],
       technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
     });
     await finishPixiInitialization();
@@ -518,7 +637,13 @@ test.each([
     const onFocusSheet = vi.fn();
     const view = renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
-      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      sheetBarMetadata: [
+        {
+          sheetId: "sheet-001",
+          pageNumbers: [1],
+          layoutLocked: false,
+        },
+      ],
       onFocusSheet,
     });
     await finishPixiInitialization();

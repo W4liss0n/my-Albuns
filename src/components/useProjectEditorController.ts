@@ -61,9 +61,18 @@ export function useProjectEditorController({
   });
 
   const exitSheetEditing = useCallback(() => {
+    const editedSheetId =
+      canvasMode.kind === "sheet-editing" ? canvasMode.sheetId : null;
     navigation.selectFrame(null);
     setCanvasMode({ kind: "normal" });
-  }, [navigation.selectFrame]);
+    if (editedSheetId) {
+      navigation.centerSheetOnNextCanvasMetrics(editedSheetId);
+    }
+  }, [
+    canvasMode,
+    navigation.centerSheetOnNextCanvasMetrics,
+    navigation.selectFrame,
+  ]);
 
   const enterSheetEditing = useCallback(
     (sheetId: string) => {
@@ -134,6 +143,9 @@ export function useProjectEditorController({
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
       pageNumbers: sheet.pageNumbers,
+      // UI placeholder: the current projection does not expose per-Sheet
+      // Layout locking to the renderer yet.
+      layoutLocked: false,
     })),
     continuousCanvasLayout: navigation.canvasLayout,
     selectedFrameId: navigation.selectedFrameId,

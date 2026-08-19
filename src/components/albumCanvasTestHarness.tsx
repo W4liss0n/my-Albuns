@@ -388,8 +388,13 @@ export function renderCanvas({
   mode = { kind: "normal" },
   compositionPlan = composition,
   sheetBarMetadata = [
-    { sheetId: "sheet-001", pageNumbers: [1, 2] },
+    {
+      sheetId: "sheet-001",
+      pageNumbers: [1, 2],
+      layoutLocked: false,
+    },
   ],
+  selectedFrameId = null,
   mediaPreviewUrls,
   technicalGuides,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
@@ -412,6 +417,7 @@ export function renderCanvas({
   mode?: AlbumCanvasMode;
   compositionPlan?: CompositionPlan;
   sheetBarMetadata?: readonly SheetBarMetadata[];
+  selectedFrameId?: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   technicalGuides?: CanvasTechnicalGuides;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
@@ -450,7 +456,7 @@ export function renderCanvas({
               )
             : createContinuousCanvasLayout(compositionPlan.sheets)
         }
-        selectedFrameId={null}
+        selectedFrameId={selectedFrameId}
         focusedSheetId="sheet-001"
         centeredSheetId="sheet-001"
         viewport={{ offsetX: 42 }}

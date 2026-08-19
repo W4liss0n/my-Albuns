@@ -1,4 +1,4 @@
-import { act } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import { threeSheetComposition } from "./albumCanvasTestFixtures";
@@ -7,6 +7,7 @@ import {
   createContinuousCanvasLayout,
 } from "./canvasGeometry";
 import {
+  AlbumCanvas,
   displayWithLabel,
   finishPixiInitialization,
   getPixiLifecycle,
@@ -116,6 +117,51 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
     width: 900,
     scale: expectedScale,
   });
+});
+
+test("reports fresh Canvas metrics after leaving Sheet Edit Mode", async () => {
+  const onCanvasMetricsChange = vi.fn();
+  const layout = createContinuousCanvasLayout(
+    threeSheetComposition.sheets,
+  );
+  const callbacks = {
+    onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
+    onFocusSheet: vi.fn(),
+    onCenteredSheetChange: vi.fn(),
+    onViewportChange: vi.fn(),
+    onTransformPreview: vi.fn(),
+    onTransformCommit: vi.fn(async () => true),
+  };
+  const canvas = (
+    mode:
+      | { kind: "normal" }
+      | { kind: "sheet-editing"; sheetId: string },
+  ) => (
+    <AlbumCanvas
+      projectId="project-spike-001"
+      mode={mode}
+      composition={threeSheetComposition}
+      sheetBarMetadata={[]}
+      continuousCanvasLayout={layout}
+      selectedFrameId={null}
+      focusedSheetId="sheet-002"
+      centeredSheetId="sheet-002"
+      viewport={{ offsetX: 42 }}
+      onCanvasMetricsChange={onCanvasMetricsChange}
+      {...callbacks}
+    />
+  );
+
+  const view = render(
+    canvas({ kind: "sheet-editing", sheetId: "sheet-002" }),
+  );
+  await finishPixiInitialization();
+  onCanvasMetricsChange.mockClear();
+
+  view.rerender(canvas({ kind: "normal" }));
+
+  expect(onCanvasMetricsChange).toHaveBeenCalledOnce();
 });
 
 test("isolates the target sheet and suppresses continuous navigation in Sheet Edit Mode", async () => {

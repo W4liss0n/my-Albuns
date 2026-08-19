@@ -591,7 +591,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Acima do ajuste inicial, `Espaço` + arraste com o botão esquerdo ou arraste com o botão do meio fazem Pan do Canvas, com cursor de mão e sem modificar conteúdo.
 - `Ajustar Lâmina` é o limite mínimo do Zoom; o limite máximo é calibrado no protótipo conforme nitidez e responsividade.
 - No Modo de edição, gestos diretos selecionam um ou vários Frames e permitem suas operações geométricas; os atalhos diretos de Pan e Zoom da Foto não atuam nesse modo.
-- Nesse modo, o Painel de imagens assume uma altura compacta sem desaparecer. Ao sair, o Canvas contínuo retorna à posição anterior e restaura a altura normal do Painel.
+- Nesse modo, o Painel de imagens assume uma altura compacta sem desaparecer. Ao sair, o Canvas contínuo centraliza a Lâmina que estava sendo editada e restaura a altura normal do Painel.
 - As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
 - Painel de imagens e Painel contextual reservam permanentemente a largura potencial de suas barras de rolagem vertical, evitando deslocamento horizontal do conteúdo quando elas aparecem ou desaparecem.
 - Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada e `Esc` retorna ao Canvas contínuo.
