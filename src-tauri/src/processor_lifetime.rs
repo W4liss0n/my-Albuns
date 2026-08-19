@@ -53,6 +53,49 @@ pub(crate) struct ProcessorChildLifetime {
     claim_storage: Option<CacheWriterClaimStorage>,
 }
 
+/// Pins the validated Cache namespace and the exact claimed Process instance
+/// before any potentially blocking wait begins.
+///
+/// Keeping both handles in one value makes the synchronization boundary
+/// explicit: a successor can only wait and clean through the physical
+/// namespace that it prepared before a pathname replacement.
+struct PreparedCacheWriterQuiescence {
+    storage: CacheWriterClaimStorage,
+    encoded_claim: Vec<u8>,
+    process: Option<ProcessInstanceHandle>,
+}
+
+impl PreparedCacheWriterQuiescence {
+    fn finish(self) -> io::Result<()> {
+        let Self {
+            storage,
+            encoded_claim,
+            process,
+        } = self;
+        if let Some(process) = process
+            && !process.wait_for_exit_timeout(CACHE_WRITER_WAIT_TIMEOUT)?
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "the previous Cache writer did not terminate in time",
+            ));
+        }
+        if !storage
+            .remove_claim_if_matches(&encoded_claim)
+            .map_err(cache_storage_error)?
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "the Cache writer claim changed during synchronization",
+            ));
+        }
+        storage
+            .discard_claim_temporaries()
+            .map_err(cache_storage_error)?;
+        Ok(())
+    }
+}
+
 impl ProcessorChildLifetime {
     pub(crate) fn attach(process_instance: ProcessInstanceId) -> io::Result<Self> {
         // SAFETY: null security/name creates a private non-inheritable Job. A
@@ -171,11 +214,21 @@ pub(crate) fn await_cache_writer_quiescence(
     app_paths: &AppPaths,
     paths: &CachePathPlan,
 ) -> io::Result<()> {
+    let Some(prepared) = prepare_cache_writer_quiescence(app_paths, paths)? else {
+        return Ok(());
+    };
+    prepared.finish()
+}
+
+fn prepare_cache_writer_quiescence(
+    app_paths: &AppPaths,
+    paths: &CachePathPlan,
+) -> io::Result<Option<PreparedCacheWriterQuiescence>> {
     let Some(storage) = app_paths
         .open_cache_writer_claim_storage(paths)
         .map_err(cache_storage_error)?
     else {
-        return Ok(());
+        return Ok(None);
     };
     let encoded = match storage.read_claim().map_err(cache_storage_error)? {
         Some(encoded) => encoded,
@@ -183,7 +236,7 @@ pub(crate) fn await_cache_writer_quiescence(
             storage
                 .discard_claim_temporaries()
                 .map_err(cache_storage_error)?;
-            return Ok(());
+            return Ok(None);
         }
     };
     let claim: CacheWriterClaim = serde_json::from_slice(&encoded)
@@ -194,27 +247,12 @@ pub(crate) fn await_cache_writer_quiescence(
             "the Cache writer claim schema is incompatible",
         ));
     }
-    if let Some(process) = ProcessInstanceHandle::open_if_running(claim.process, 0)?
-        && !process.wait_for_exit_timeout(CACHE_WRITER_WAIT_TIMEOUT)?
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::TimedOut,
-            "the previous Cache writer did not terminate in time",
-        ));
-    }
-    if !storage
-        .remove_claim_if_matches(&encoded)
-        .map_err(cache_storage_error)?
-    {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "the Cache writer claim changed during synchronization",
-        ));
-    }
-    storage
-        .discard_claim_temporaries()
-        .map_err(cache_storage_error)?;
-    Ok(())
+    let process = ProcessInstanceHandle::open_if_running(claim.process, 0)?;
+    Ok(Some(PreparedCacheWriterQuiescence {
+        storage,
+        encoded_claim: encoded,
+        process,
+    }))
 }
 
 #[cfg(test)]
@@ -248,7 +286,7 @@ mod tests {
     use super::{
         CACHE_WRITER_CLAIM_FILE, CACHE_WRITER_CLAIM_SCHEMA_VERSION, CACHE_WRITER_TEMPORARY_PREFIX,
         CacheWriterClaim, ProcessorChildLifetime, await_cache_writer_quiescence,
-        cache_writer_claim_path,
+        cache_writer_claim_path, prepare_cache_writer_quiescence,
     };
 
     const HOST_READY_ENV: &str = "MYALBUNS_PROCESSOR_LIFETIME_HOST_READY";
@@ -426,19 +464,30 @@ mod tests {
         std::fs::write(&external_temporary, b"external temporary sentinel")
             .expect("the external temporary sentinel exists");
 
-        let synchronized_paths = paths.clone();
-        let synchronized_app_paths = app_paths.clone();
+        let prepared = prepare_cache_writer_quiescence(&app_paths, &paths)
+            .expect("the guarded writer wait is prepared")
+            .expect("the live exact writer requires synchronization");
         let (started_sender, started_receiver) = std::sync::mpsc::channel();
         let synchronization = thread::spawn(move || {
             started_sender
                 .send(())
-                .expect("the waiter start is observed");
-            await_cache_writer_quiescence(&synchronized_app_paths, &synchronized_paths)
+                .expect("the prepared waiter start is observed");
+            prepared.finish()
         });
         started_receiver
             .recv()
-            .expect("the writer waiter has started");
-        thread::sleep(Duration::from_millis(250));
+            .expect("the prepared writer waiter has started");
+        assert!(
+            worker
+                .try_wait()
+                .expect("the exact writer state is readable")
+                .is_none(),
+            "the exact writer remains alive before the namespace replacement"
+        );
+        assert!(
+            !synchronization.is_finished(),
+            "the prepared waiter remains blocked on the exact live writer"
+        );
 
         let displaced = paths.root().with_file_name("processor-claim-displaced");
         std::fs::rename(paths.root(), &displaced)

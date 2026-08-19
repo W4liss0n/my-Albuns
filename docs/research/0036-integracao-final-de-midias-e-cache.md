@@ -80,7 +80,11 @@ inspeção fecham a abertura do namespace, em vez de aceitar estado parcial.
 Toda leitura, publicação e remoção da claim passa por
 `CacheWriterClaimStorage`, da biblioteca central `myalbuns-paths`. Essa guarda
 mantém aberta a cadeia física validada de diretórios durante a espera da
-instância exata e revalida cada arquivo aberto contra ela. Publicação create-only
+instância exata e revalida cada arquivo aberto contra ela. A preparação da
+espera adquire essa guarda e o handle da instância exata como uma única
+fronteira produtiva antes de qualquer readiness; a prova concorrente confirma
+que o Processador continua vivo e o waiter bloqueado antes de substituir o
+pathname. Publicação create-only
 usa `NtSetInformationFile`, a entrada indicada pela documentação Win32 para
 user mode, com o diretório físico como raiz relativa; remoção condicional usa
 `SetFileInformationByHandle` no mesmo handle aberto com `DELETE`. Se o pathname do
