@@ -1075,11 +1075,11 @@ test("presents the Grade with reference metadata and navigation state", () => {
   expect(tiles[0].querySelector(".sheet-tile__number")).toHaveTextContent(
     "01",
   );
-  expect(tiles[0].querySelector(".sheet-tile__pages")).toHaveTextContent(
-    "pág 7–8",
+  expect(tiles[0].querySelector(".sheet-tile__pages")?.textContent).toBe(
+    "7–8",
   );
-  expect(tiles[1].querySelector(".sheet-tile__pages")).toHaveTextContent(
-    "pág 12–13",
+  expect(tiles[1].querySelector(".sheet-tile__pages")?.textContent).toBe(
+    "12–13",
   );
 });
 

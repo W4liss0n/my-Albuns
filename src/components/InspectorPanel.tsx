@@ -391,11 +391,11 @@ function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
   return firstPage === lastPage
     ? {
         accessibleLabel: `Página ${firstPage}`,
-        visualLabel: `pág ${firstPage}`,
+        visualLabel: String(firstPage),
       }
     : {
         accessibleLabel: `Páginas ${firstPage}–${lastPage}`,
-        visualLabel: `pág ${firstPage}–${lastPage}`,
+        visualLabel: `${firstPage}–${lastPage}`,
       };
 }
 
