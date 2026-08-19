@@ -9,6 +9,7 @@ import type {
 } from "../domain/project";
 import { CANVAS_MICROMETERS_PER_PIXEL } from "./canvasGeometry";
 import {
+  frameOutlineStyle,
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
@@ -199,7 +200,8 @@ function FramePreview({
   unit,
 }: FramePreviewProps) {
   const { clipRect, photo } = frame;
-  const placeholderStyle = SHEET_VISUAL_STYLE.placeholder;
+  const placeholderStyle = SHEET_VISUAL_STYLE.framePlaceholder;
+  const outlineStyle = frameOutlineStyle(photo !== null);
 
   return (
     <g>
@@ -219,43 +221,6 @@ function FramePreview({
             width={clipRect.width}
             height={clipRect.height}
             fill={placeholderStyle.fill}
-            stroke={placeholderStyle.outline}
-            strokeOpacity={placeholderStyle.outlineOpacity}
-            strokeWidth={placeholderStyle.outlineWidthPx * unit}
-          />
-          <line
-            x1={
-              clipRect.x +
-              clipRect.width / 2 -
-              placeholderStyle.crossHalfLengthPx * unit
-            }
-            y1={clipRect.y + clipRect.height / 2}
-            x2={
-              clipRect.x +
-              clipRect.width / 2 +
-              placeholderStyle.crossHalfLengthPx * unit
-            }
-            y2={clipRect.y + clipRect.height / 2}
-            stroke={placeholderStyle.crossColor}
-            strokeOpacity={placeholderStyle.crossOpacity}
-            strokeWidth={placeholderStyle.crossWidthPx * unit}
-          />
-          <line
-            x1={clipRect.x + clipRect.width / 2}
-            y1={
-              clipRect.y +
-              clipRect.height / 2 -
-              placeholderStyle.crossHalfLengthPx * unit
-            }
-            x2={clipRect.x + clipRect.width / 2}
-            y2={
-              clipRect.y +
-              clipRect.height / 2 +
-              placeholderStyle.crossHalfLengthPx * unit
-            }
-            stroke={placeholderStyle.crossColor}
-            strokeOpacity={placeholderStyle.crossOpacity}
-            strokeWidth={placeholderStyle.crossWidthPx * unit}
           />
         </g>
       )}
@@ -266,9 +231,9 @@ function FramePreview({
         width={clipRect.width}
         height={clipRect.height}
         fill="none"
-        stroke={SHEET_VISUAL_STYLE.frame.outline}
-        strokeOpacity={SHEET_VISUAL_STYLE.frame.outlineOpacity}
-        strokeWidth={SHEET_VISUAL_STYLE.frame.outlineWidthPx * unit}
+        stroke={outlineStyle.outline}
+        strokeOpacity={outlineStyle.outlineOpacity}
+        strokeWidth={outlineStyle.outlineWidthPx * unit}
       />
       {frameBorder.kind === "solid" && frame.borderFillRects.length > 0 ? (
         <g

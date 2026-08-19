@@ -1162,6 +1162,16 @@ test("shows Page numbers instead of cover and final aliases", () => {
   expect(tiles[1]).toHaveAccessibleName(
     "Ir para Lâmina 02, Lâmina final, Página 2",
   );
+  expect(
+    tiles[0].style.getPropertyValue("--sheet-inactive-side-gradient"),
+  ).toBe(
+    "linear-gradient(to right, #faf9f6 0%, #f4f1eb 58%, #ece7df 100%)",
+  );
+  expect(
+    tiles[1].style.getPropertyValue("--sheet-inactive-side-gradient"),
+  ).toBe(
+    "linear-gradient(to left, #faf9f6 0%, #f4f1eb 58%, #ece7df 100%)",
+  );
 });
 
 test("uses reduced Cache previews in the media panel and Canvas", () => {

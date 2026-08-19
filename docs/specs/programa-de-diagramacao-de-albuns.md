@@ -553,7 +553,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - O Canvas começa diretamente abaixo da barra de menus e comandos, sem uma faixa permanente de título, contagem ou ajuda sobre os gestos.
 - A área útil do Canvas usa o neutro compartilhado da aplicação. A escala automática preserva `28 px` de margem superior e inferior, e superfícies consecutivas mantêm `46 px` de separação horizontal na tela.
 - A Lâmina possui cantos retos, contorno neutro de `1 px`, sombra curta e sombra ampla. Em Lâmina dupla, a divisão central usa um separador claro e discreto.
-- Frames vazios usam faixas diagonais neutras, sem ícone central ou card interno; a aparência transitória não substitui a Borda persistida do Frame.
+- Frames vazios usam preenchimento neutro liso e contorno fino, sem ícone. No Canvas, `Adicionar Foto` permanece centralizado e visível, enquanto miniaturas da Grade omitem o rótulo. O cursor permanece o padrão do sistema sobre qualquer Frame; essa aparência transitória não substitui a Borda persistida do Frame.
 - Sangria e Área de segurança são desenhadas a partir das medidas do Documento como guias tracejadas vermelha e azul, acima da composição e abaixo da Barra da Lâmina. Essas guias pertencem somente à interface e nunca participam da Exportação.
 - O modelo lógico mantém todas as Lâminas do Álbum e não impõe um máximo arbitrário. A cena detalhada e suas texturas são materializadas somente para a área visível e uma margem de pré-carga adjacente.
 - Ao sair dessa faixa, uma Lâmina conserva seu estado lógico, mas pode liberar recursos gráficos pesados; retornar à faixa reconstrói sua representação sem alterar o Projeto. A política concreta de residência e descarte será calibrada por testes de estresse com Álbuns longos.

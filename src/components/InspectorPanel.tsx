@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
@@ -18,6 +18,7 @@ import { AppIcon, EmptyState } from "../ui";
 import { DocumentDpiControl } from "./DocumentDpiControl";
 import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { SheetPreview } from "./SheetPreview";
+import { inactiveSideCssGradient } from "./sheetVisualStyle";
 import "./InspectorPanel.css";
 
 const PHOTO_ZOOM_KEYS = new Set([
@@ -255,6 +256,14 @@ export function InspectorPanel({
                         key={sheet.sheetId}
                         className={active ? "sheet-tile active" : "sheet-tile"}
                         data-active-sides={sheet.activeSides}
+                        style={
+                          sheet.activeSides === "both"
+                            ? undefined
+                            : ({
+                                "--sheet-inactive-side-gradient":
+                                  inactiveSideCssGradient(sheet.activeSides),
+                              } as CSSProperties)
+                        }
                         onPress={() => onNavigateToSheet(sheet.sheetId)}
                       >
                         <SheetPreview

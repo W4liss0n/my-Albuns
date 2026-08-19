@@ -1,4 +1,4 @@
-import { Container, FederatedPointerEvent, FederatedWheelEvent } from "pixi.js";
+import { FederatedPointerEvent, FederatedWheelEvent } from "pixi.js";
 
 import type { NormalizedPan } from "../domain/project";
 import type {
@@ -93,7 +93,6 @@ export class PhotoInteractionSession {
   }
 
   startPan(
-    frameContainer: Container,
     photoNode: PhotoRenderNode,
     event: FederatedPointerEvent,
   ) {
@@ -122,7 +121,6 @@ export class PhotoInteractionSession {
         : photoNode.baseZoom,
     };
     setPhotoPanAids(photoNode, true);
-    frameContainer.cursor = "grabbing";
   }
 
   handleWheel(photoNode: PhotoRenderNode, event: FederatedWheelEvent) {

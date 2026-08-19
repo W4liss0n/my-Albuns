@@ -224,11 +224,17 @@
 
 .sheet-tile[data-active-sides="left"],
 .sheet-tile[data-active-sides="right"] {
-  background: repeating-linear-gradient(
-    135deg,
-    #e4e0d7 0 4px,
-    #dcd8ce 4px 8px
-  );
+  background-image: var(--sheet-inactive-side-gradient);
+  background-repeat: no-repeat;
+  background-size: 50% 100%;
+}
+
+.sheet-tile[data-active-sides="left"] {
+  background-position: right;
+}
+
+.sheet-tile[data-active-sides="right"] {
+  background-position: left;
 }
 
 .sheet-tile[data-active-sides="left"] .sheet-preview,

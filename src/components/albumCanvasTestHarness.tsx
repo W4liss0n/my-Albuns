@@ -27,6 +27,7 @@ const pixiLifecycle = vi.hoisted(() => ({
   displays: [] as Array<{
     alpha: number;
     children: unknown[];
+    cursor: string;
     eventMode: string;
     filters: unknown[];
     handlers: Map<string, (event: unknown) => void>;
@@ -64,6 +65,7 @@ const pixiLifecycle = vi.hoisted(() => ({
   resolveAssetLoads: [] as Array<(texture: object) => void>,
   rejectAssetLoads: [] as Array<(reason?: unknown) => void>,
   spriteTextures: [] as unknown[],
+  fillGradients: [] as Array<{ destroyCount: number }>,
 }));
 
 export function getPixiLifecycle() {
@@ -200,6 +202,26 @@ vi.mock("pixi.js", () => {
   }
 
   class Container extends DisplayObject {}
+
+  class FillGradient {
+    colorStops: unknown;
+    destroyCount = 0;
+    end: unknown;
+    start: unknown;
+    type: unknown;
+
+    constructor(options: Record<string, unknown>) {
+      this.colorStops = options.colorStops;
+      this.end = options.end;
+      this.start = options.start;
+      this.type = options.type;
+      pixiLifecycle.fillGradients.push(this);
+    }
+
+    destroy() {
+      this.destroyCount += 1;
+    }
+  }
 
   class Graphics extends DisplayObject {
     fillStyles: unknown[] = [];
@@ -343,6 +365,7 @@ vi.mock("pixi.js", () => {
     Container,
     FederatedPointerEvent: class {},
     FederatedWheelEvent: class {},
+    FillGradient,
     Graphics,
     Rectangle: class {
       constructor(
@@ -492,6 +515,7 @@ export function setupAlbumCanvasTestHarness() {
     pixiLifecycle.resolveAssetLoads.length = 0;
     pixiLifecycle.rejectAssetLoads.length = 0;
     pixiLifecycle.spriteTextures.length = 0;
+    pixiLifecycle.fillGradients.length = 0;
     vi.stubGlobal(
       "ResizeObserver",
       class {

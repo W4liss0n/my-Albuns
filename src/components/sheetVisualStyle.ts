@@ -51,11 +51,10 @@ export const SHEET_VISUAL_STYLE = {
     numberFontSizePx: 12.5,
   },
   inactiveSide: {
-    fill: "#f4f1eb",
-    foldShadow: "#8a847a",
-    foldShadowOpacity: 0.09,
-    foldShadowWidthPx: 12,
-    foldShadowSteps: 6,
+    outerEdge: "#faf9f6",
+    body: "#f4f1eb",
+    bodyStopOffset: 0.58,
+    fold: "#ece7df",
   },
   photo: {
     stripeCount: 12,
@@ -66,21 +65,13 @@ export const SHEET_VISUAL_STYLE = {
     lightCenterYRatio: 0.28,
     lightRadiusToHeightRatio: 0.18,
   },
-  placeholder: {
-    fill: "#ded8cc",
-    outline: "#b9b1a4",
-    outlineOpacity: 0.8,
+  framePlaceholder: {
+    fill: "#ece8e1",
+    outline: "#c9c2b7",
+    outlineOpacity: 0.88,
     outlineWidthPx: 1,
-    crossColor: "#948b7e",
-    crossOpacity: 0.75,
-    crossWidthPx: 1.4,
-    crossHalfLengthPx: 12,
-  },
-  canvasPlaceholder: {
-    light: "#e6e1d7",
-    dark: "#dcd6ca",
-    stripeWidthPx: 4,
-    stripeGapPx: 4,
+    labelText: "#655f56",
+    labelFontSizePx: 10.5,
   },
   frame: {
     outline: "#ffffff",
@@ -95,6 +86,34 @@ export const SHEET_VISUAL_STYLE = {
     cornerRadiusPx: 2,
   },
 } as const;
+
+export function frameOutlineStyle(hasPhoto: boolean) {
+  return hasPhoto
+    ? SHEET_VISUAL_STYLE.frame
+    : SHEET_VISUAL_STYLE.framePlaceholder;
+}
+
+const INACTIVE_SIDE_GRADIENT_ORIENTATION = {
+  left: { cssDirection: "to left", startX: 1, endX: 0 },
+  right: { cssDirection: "to right", startX: 0, endX: 1 },
+} as const;
+
+export function inactiveSideGradientOrientation(
+  activeSides: "left" | "right",
+) {
+  return INACTIVE_SIDE_GRADIENT_ORIENTATION[activeSides];
+}
+
+export function inactiveSideCssGradient(
+  activeSides: "left" | "right",
+) {
+  const style = SHEET_VISUAL_STYLE.inactiveSide;
+  const { cssDirection } = inactiveSideGradientOrientation(activeSides);
+  const bodyStopPercent = Number(
+    (style.bodyStopOffset * 100).toFixed(4),
+  );
+  return `linear-gradient(${cssDirection}, ${style.outerEdge} 0%, ${style.body} ${bodyStopPercent}%, ${style.fold} 100%)`;
+}
 
 export function photoPaletteIndexForStripe(stripe: number) {
   return Math.min(

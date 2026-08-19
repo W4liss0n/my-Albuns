@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, FillGradient, Graphics, Text } from "pixi.js";
 
 import type { ComposedSheet } from "../domain/project";
 import {
@@ -11,7 +11,10 @@ import {
   MICROMETER_TO_CANVAS_PIXEL,
 } from "./canvasGeometry";
 import { pixiColor } from "./pixiColor";
-import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
+import {
+  inactiveSideGradientOrientation,
+  SHEET_VISUAL_STYLE,
+} from "./sheetVisualStyle";
 
 export function createSheetSurfaceRenderNodes(
   sheet: ComposedSheet,
@@ -104,35 +107,36 @@ export function createSheetInactiveSide(
   presentation: CanvasSheetPresentation,
   height: number,
 ) {
-  if (presentation.inactiveOffsetXPx === null) return null;
+  if (
+    sheet.activeSides === "both" ||
+    presentation.inactiveOffsetXPx === null
+  ) {
+    return null;
+  }
   const style = SHEET_VISUAL_STYLE.inactiveSide;
   const inactiveSide = new Container();
   inactiveSide.label = `sheet-inactive-side-${sheet.sheetId}`;
   inactiveSide.eventMode = "none";
   inactiveSide.position.set(presentation.inactiveOffsetXPx, 0);
 
-  const base = new Graphics()
+  const orientation = inactiveSideGradientOrientation(sheet.activeSides);
+  const gradient = new FillGradient({
+    type: "linear",
+    start: { x: orientation.startX, y: 0 },
+    end: { x: orientation.endX, y: 0 },
+    colorStops: [
+      { offset: 0, color: style.outerEdge },
+      { offset: style.bodyStopOffset, color: style.body },
+      { offset: 1, color: style.fold },
+    ],
+  });
+  const gradientSurface = new Graphics()
     .rect(0, 0, presentation.activeWidthPx, height)
-    .fill({ color: pixiColor(style.fill) });
-  base.label = `sheet-inactive-side-base-${sheet.sheetId}`;
-  base.eventMode = "none";
-
-  const foldShadow = new Graphics();
-  for (let step = style.foldShadowSteps; step >= 1; step -= 1) {
-    const width =
-      (style.foldShadowWidthPx * step) / style.foldShadowSteps;
-    const x = sheet.activeSides === "right"
-      ? presentation.activeWidthPx - width
-      : 0;
-    foldShadow.rect(x, 0, width, height).fill({
-      color: pixiColor(style.foldShadow),
-      alpha: style.foldShadowOpacity / style.foldShadowSteps,
-    });
-  }
-  foldShadow.label = `sheet-inactive-side-fold-shadow-${sheet.sheetId}`;
-  foldShadow.eventMode = "none";
-  inactiveSide.addChild(base, foldShadow);
-  return inactiveSide;
+    .fill(gradient);
+  gradientSurface.label = `sheet-inactive-side-gradient-${sheet.sheetId}`;
+  gradientSurface.eventMode = "none";
+  inactiveSide.addChild(gradientSurface);
+  return { container: inactiveSide, gradient };
 }
 
 export function createCanvasFramePlaceholder(
@@ -140,41 +144,32 @@ export function createCanvasFramePlaceholder(
   frameWidth: number,
   frameHeight: number,
 ) {
-  const style = SHEET_VISUAL_STYLE.canvasPlaceholder;
+  const style = SHEET_VISUAL_STYLE.framePlaceholder;
   const placeholder = new Container();
   placeholder.label = `frame-placeholder-${frameId}`;
   placeholder.eventMode = "none";
   const base = new Graphics()
     .rect(0, 0, frameWidth, frameHeight)
-    .fill({ color: pixiColor(style.light) });
+    .fill({ color: pixiColor(style.fill) });
   base.label = `frame-placeholder-base-${frameId}`;
   base.eventMode = "none";
 
-  const stripes = new Graphics();
-  const period = style.stripeWidthPx + style.stripeGapPx;
-  for (
-    let offset = -frameHeight;
-    offset < frameWidth;
-    offset += period
-  ) {
-    stripes
-      .moveTo(offset, 0)
-      .lineTo(offset + style.stripeWidthPx, 0)
-      .lineTo(offset + style.stripeWidthPx + frameHeight, frameHeight)
-      .lineTo(offset + frameHeight, frameHeight)
-      .lineTo(offset, 0);
-  }
-  stripes.fill({ color: pixiColor(style.dark) });
-  stripes.label = `frame-placeholder-stripes-${frameId}`;
-  stripes.eventMode = "none";
-  const clip = new Graphics()
-    .rect(0, 0, frameWidth, frameHeight)
-    .fill(0xffffff);
-  clip.label = `frame-placeholder-mask-${frameId}`;
-  clip.eventMode = "none";
-  stripes.mask = clip;
-  placeholder.addChild(base, stripes, clip);
-  return placeholder;
+  const label = new Text({
+    text: "Adicionar Foto",
+    style: {
+      fontFamily:
+        '"Helvetica Neue", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
+      fontSize: style.labelFontSizePx,
+      fontWeight: "500",
+      fill: pixiColor(style.labelText),
+    },
+  });
+  label.label = `frame-placeholder-label-${frameId}`;
+  label.anchor.set(0.5);
+  label.position.set(frameWidth / 2, frameHeight / 2);
+  label.eventMode = "none";
+  placeholder.addChild(base, label);
+  return { container: placeholder, label };
 }
 
 export function createSheetTechnicalGuideNodes(

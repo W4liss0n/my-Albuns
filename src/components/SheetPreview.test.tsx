@@ -140,12 +140,21 @@ test("renders the composed geometry and visual layers of each sheet", () => {
   expect(
     secondPreview.querySelector("[data-preview-photo-id]"),
   ).not.toBeInTheDocument();
-  expect(
-    secondPreview.querySelector('[data-preview-placeholder-id="frame-002"]'),
-  ).toBeInTheDocument();
-  expect(
-    secondPreview.querySelector('[data-preview-frame-id="frame-002"]'),
-  ).toHaveAttribute("x", "320000");
+  const previewPlaceholder = secondPreview.querySelector(
+    '[data-preview-placeholder-id="frame-002"]',
+  );
+  expect(previewPlaceholder).toBeInTheDocument();
+  expect(previewPlaceholder?.querySelector("rect")).toHaveAttribute(
+    "fill",
+    "#ece8e1",
+  );
+  expect(previewPlaceholder?.querySelector("line")).not.toBeInTheDocument();
+  const previewFrame = secondPreview.querySelector(
+    '[data-preview-frame-id="frame-002"]',
+  );
+  expect(previewFrame).toHaveAttribute("x", "320000");
+  expect(previewFrame).toHaveAttribute("stroke", "#c9c2b7");
+  expect(previewFrame).toHaveAttribute("stroke-opacity", "0.88");
   expect(
     secondPreview.querySelector(
       '[data-preview-overlay-id="decorative-overlay"]',

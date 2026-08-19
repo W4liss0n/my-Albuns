@@ -35,6 +35,7 @@ test("reveals the dimmed Photo overflow and thirds guides only during Pan", asyn
   await finishPixiInitialization();
 
   const frame = displayWithHandler("pointerdown");
+  expect(frame.cursor).toBe("default");
   const outsidePreview = displayWithLabel(
     "photo-pan-outside-preview",
   );
@@ -144,6 +145,8 @@ test("keeps the photo inside a stationary frame mask throughout pan", async () =
   pixiLifecycle.instances[0].stage.emit("pointerup", {
     global: { x: 1_000, y: 0 },
   });
+
+  expect(frame.cursor).toBe("default");
 
   expect(onTransformCommit).toHaveBeenCalledOnce();
   expect(onTransformCommit).toHaveBeenCalledWith({

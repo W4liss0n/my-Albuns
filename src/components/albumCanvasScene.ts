@@ -13,6 +13,7 @@ import {
   MICROMETER_TO_CANVAS_PIXEL,
 } from "./canvasGeometry";
 import {
+  applyPlaceholderLabelScale,
   createSheetRenderNode,
   destroySheetRenderNode,
   type PhotoRenderNode,
@@ -297,6 +298,7 @@ export class AlbumCanvasScene {
         this.world.addChild(node.container);
       }
       applySheetBarScale(node.sheetBar, scale);
+      applyPlaceholderLabelScale(node, scale);
       node.container.position.set(entries[index].left, 0);
     }
   }
@@ -358,8 +360,8 @@ export class AlbumCanvasScene {
           this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
-        onPhotoPanStart: (frameContainer, photoNode, event) => {
-          this.photoInteractions.startPan(frameContainer, photoNode, event);
+        onPhotoPanStart: (photoNode, event) => {
+          this.photoInteractions.startPan(photoNode, event);
         },
         onPhotoWheel: (photoNode, event) => {
           this.photoInteractions.handleWheel(photoNode, event);

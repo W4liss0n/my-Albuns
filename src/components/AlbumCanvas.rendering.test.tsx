@@ -123,24 +123,39 @@ test("matches the reference Canvas surface, technical guides and empty Frame tre
   const placeholderBase = displayWithLabel(
     "frame-placeholder-base-frame-placeholder",
   ) as unknown as { fillStyles: Array<{ color: number }> };
-  const placeholderStripes = displayWithLabel(
-    "frame-placeholder-stripes-frame-placeholder",
-  ) as unknown as {
-    fillStyles: Array<{ color: number }>;
-    pathCommands: unknown[];
-  };
   expect(placeholderBase.fillStyles).toContainEqual(
-    expect.objectContaining({ color: 0xe6e1d7 }),
+    expect.objectContaining({ color: 0xece8e1 }),
   );
-  expect(placeholderStripes.fillStyles).toContainEqual(
-    expect.objectContaining({ color: 0xdcd6ca }),
+  expect(displayWithLabel("frame-outline-frame-placeholder")).toMatchObject({
+    strokeStyles: [
+      expect.objectContaining({
+        alpha: 0.88,
+        color: 0xc9c2b7,
+        pixelLine: true,
+        width: 1,
+      }),
+    ],
+  });
+  const placeholderLabel = displayWithLabel(
+    "frame-placeholder-label-frame-placeholder",
   );
-  expect(placeholderStripes.pathCommands.length).toBeGreaterThan(0);
+  expect(placeholderLabel).toMatchObject({
+    text: "Adicionar Foto",
+    visible: true,
+  });
+  const expectedUiScale = 1 / ((500 - 2 * 28) / 300);
+  expect(placeholderLabel.scale.x).toBeCloseTo(expectedUiScale);
+  expect(placeholderLabel.scale.y).toBeCloseTo(expectedUiScale);
   expect(
     getPixiLifecycle().displays.some(
-      ({ label }) => label === "frame-placeholder-cross-frame-placeholder",
+      ({ label }) => label === "frame-placeholder-stripes-frame-placeholder",
     ),
   ).toBe(false);
+
+  const placeholderFrame = displayWithLabel(
+    "canvas-frame-frame-placeholder",
+  );
+  expect(placeholderFrame.cursor).toBe("default");
 
   expect(displayWithLabel("sheet-bleed-guide-sheet-001")).toBeDefined();
   expect(displayWithLabel("sheet-safety-guide-sheet-001")).toBeDefined();
@@ -350,16 +365,18 @@ test.each([
   {
     activeSides: "right" as const,
     activeOffsetXPx: 300,
+    gradientEndX: 1,
+    gradientStartX: 0,
     inactiveOffsetXPx: 0,
-    shadingX: 288,
     pageX: 450,
     missingPageLabel: "sheet-bar-page-left-sheet-001",
   },
   {
     activeSides: "left" as const,
     activeOffsetXPx: 0,
+    gradientEndX: 0,
+    gradientStartX: 1,
     inactiveOffsetXPx: 300,
-    shadingX: 0,
     pageX: 150,
     missingPageLabel: "sheet-bar-page-right-sheet-001",
   },
@@ -368,13 +385,14 @@ test.each([
   async ({
     activeSides,
     activeOffsetXPx,
+    gradientEndX,
+    gradientStartX,
     inactiveOffsetXPx,
     missingPageLabel,
     pageX,
-    shadingX,
   }) => {
     const onFocusSheet = vi.fn();
-    renderCanvas({
+    const view = renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
       sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
       onFocusSheet,
@@ -388,21 +406,26 @@ test.each([
       eventMode: "none",
       position: { x: inactiveOffsetXPx, y: 0 },
     });
-    expect(displayWithLabel("sheet-inactive-side-base-sheet-001")).toMatchObject({
-      fillStyles: [expect.objectContaining({ color: 0xf4f1eb })],
+    expect(displayWithLabel("sheet-inactive-side-gradient-sheet-001")).toMatchObject({
+      fillStyles: [
+        expect.objectContaining({
+          colorStops: [
+            { color: "#faf9f6", offset: 0 },
+            { color: "#f4f1eb", offset: 0.58 },
+            { color: "#ece7df", offset: 1 },
+          ],
+          end: { x: gradientEndX, y: 0 },
+          start: { x: gradientStartX, y: 0 },
+          type: "linear",
+        }),
+      ],
       rectCommands: [{ height: 300, width: 300, x: 0, y: 0 }],
-    });
-    expect(displayWithLabel("sheet-inactive-side-fold-shadow-sheet-001")).toMatchObject({
-      fillStyles: expect.arrayContaining([
-        expect.objectContaining({ alpha: 0.015, color: 0x8a847a }),
-      ]),
-      rectCommands: expect.arrayContaining([
-        { height: 300, width: 12, x: shadingX, y: 0 },
-      ]),
     });
     expect(
       pixiLifecycle.displays.some(
-        ({ label }) => label === "sheet-inactive-side-stripes-sheet-001",
+        ({ label }) =>
+          label === "sheet-inactive-side-fold-shadow-sheet-001" ||
+          label === "sheet-inactive-side-stripes-sheet-001",
       ),
     ).toBe(false);
     expect(displayWithLabel("sheet-active-content-sheet-001")).toMatchObject({
@@ -433,6 +456,11 @@ test.each([
     expect(
       pixiLifecycle.displays.some(({ label }) => label === missingPageLabel),
     ).toBe(false);
+    const gradient =
+      pixiLifecycle.fillGradients[pixiLifecycle.fillGradients.length - 1];
+    expect(gradient?.destroyCount).toBe(0);
+    view.unmount();
+    expect(gradient?.destroyCount).toBe(1);
   },
 );
 

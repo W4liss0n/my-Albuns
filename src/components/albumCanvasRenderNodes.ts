@@ -5,6 +5,8 @@ import {
   Graphics,
   Rectangle,
   Sprite,
+  type FillGradient,
+  type Text,
   type Texture,
 } from "pixi.js";
 
@@ -29,6 +31,7 @@ import {
   type PhotoGeometry,
 } from "./photoGeometry";
 import {
+  frameOutlineStyle,
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
@@ -66,6 +69,8 @@ export interface SheetRenderNode {
   container: Container;
   signature: string;
   photoNodes: PhotoRenderNode[];
+  placeholderLabels: Text[];
+  inactiveSideGradient: FillGradient | null;
   selectionOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
   sheetBar: SheetBarRenderNode;
@@ -76,7 +81,6 @@ interface SheetRenderNodeCallbacks {
   onSheetTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string) => void;
   onPhotoPanStart: (
-    frameContainer: Container,
     photoNode: PhotoRenderNode,
     event: FederatedPointerEvent,
   ) => void;
@@ -127,7 +131,7 @@ export function createSheetRenderNode(
     presentation,
     height,
   );
-  if (inactiveSide) sheetContainer.addChild(inactiveSide);
+  if (inactiveSide) sheetContainer.addChild(inactiveSide.container);
 
   const activeContent = new Container();
   activeContent.label = `sheet-active-content-${sheet.sheetId}`;
@@ -175,18 +179,23 @@ export function createSheetRenderNode(
 
   const selectionOutlines = new Map<string, Graphics>();
   const photoNodes: PhotoRenderNode[] = [];
+  const placeholderLabels: Text[] = [];
   for (const frame of sheet.frames) {
     const frameContainer = new Container();
     const frameX = frame.clipRect.x * MICROMETER_TO_CANVAS_PIXEL;
     const frameY = frame.clipRect.y * MICROMETER_TO_CANVAS_PIXEL;
     const frameWidth = frame.clipRect.width * MICROMETER_TO_CANVAS_PIXEL;
     const frameHeight = frame.clipRect.height * MICROMETER_TO_CANVAS_PIXEL;
+    frameContainer.label = `canvas-frame-${frame.frameId}`;
     frameContainer.position.set(frameX, frameY);
     frameContainer.eventMode = "static";
     frameContainer.hitArea = new Rectangle(0, 0, frameWidth, frameHeight);
-    frameContainer.cursor = frame.photo ? "grab" : "pointer";
+    frameContainer.cursor = "default";
 
     let photoNode: PhotoRenderNode | null = null;
+    let emptyPlaceholder: ReturnType<
+      typeof createCanvasFramePlaceholder
+    > | null = null;
     if (frame.photo) {
       const geometry = createPhotoGeometry(
         frame.photo.placement,
@@ -241,22 +250,26 @@ export function createSheetRenderNode(
       };
       photoNodes.push(photoNode);
     } else {
-      frameContainer.addChild(
-        createCanvasFramePlaceholder(
-          frame.frameId,
-          frameWidth,
-          frameHeight,
-        ),
+      emptyPlaceholder = createCanvasFramePlaceholder(
+        frame.frameId,
+        frameWidth,
+        frameHeight,
       );
+      frameContainer.addChild(emptyPlaceholder.container);
+      placeholderLabels.push(emptyPlaceholder.label);
     }
 
+    const outlineStyle = frameOutlineStyle(frame.photo !== null);
     const outline = new Graphics()
       .rect(0, 0, frameWidth, frameHeight)
       .stroke({
-        color: pixiColor(SHEET_VISUAL_STYLE.frame.outline),
-        width: SHEET_VISUAL_STYLE.frame.outlineWidthPx,
-        alpha: SHEET_VISUAL_STYLE.frame.outlineOpacity,
+        color: pixiColor(outlineStyle.outline),
+        width: outlineStyle.outlineWidthPx,
+        alpha: outlineStyle.outlineOpacity,
+        pixelLine: !frame.photo,
       });
+    outline.label = `frame-outline-${frame.frameId}`;
+    outline.eventMode = "none";
     let persistedBorder: Graphics | null = null;
     if (frameBorder.kind === "solid" && frame.borderFillRects.length > 0) {
       persistedBorder = new Graphics();
@@ -299,7 +312,7 @@ export function createSheetRenderNode(
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
       if (!event.altKey || !photoNode) return;
       event.stopPropagation();
-      callbacks.onPhotoPanStart(frameContainer, photoNode, event);
+      callbacks.onPhotoPanStart(photoNode, event);
     });
     frameContainer.on("wheel", (event: FederatedWheelEvent) => {
       if (!event.altKey || !photoNode) return;
@@ -394,15 +407,28 @@ export function createSheetRenderNode(
     container: sheetContainer,
     signature,
     photoNodes,
+    placeholderLabels,
+    inactiveSideGradient: inactiveSide?.gradient ?? null,
     selectionOutlines,
     focusOutline,
     sheetBar,
   };
 }
 
+export function applyPlaceholderLabelScale(
+  node: SheetRenderNode,
+  canvasScale: number,
+) {
+  const inverseScale = 1 / Math.max(canvasScale, Number.EPSILON);
+  for (const label of node.placeholderLabels) {
+    label.scale.set(inverseScale);
+  }
+}
+
 export function destroySheetRenderNode(node: SheetRenderNode) {
   stopSheetBarTransition(node.sheetBar);
   node.container.destroy({ children: true });
+  node.inactiveSideGradient?.destroy();
 }
 
 export function setPhotoPanAids(
