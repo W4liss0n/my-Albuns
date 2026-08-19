@@ -242,6 +242,24 @@
   font-size: var(--ui-font-size-support);
 }
 
+.ui-embedded-input,
+.ui-embedded-input:focus,
+.ui-embedded-input:focus-visible {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  caret-color: var(--ui-accent);
+}
+
+.ui-embedded-field {
+  transition: background 100ms ease;
+}
+
+.ui-embedded-field:focus-within {
+  background: var(--ui-surface-muted);
+}
+
 .ui-field-control {
   width: 100%;
   min-width: 0;

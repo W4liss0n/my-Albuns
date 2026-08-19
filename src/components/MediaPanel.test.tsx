@@ -31,7 +31,12 @@ test("matches the reference toolbar and exposes unavailable import actions as pl
     "aria-pressed",
     "false",
   );
-  expect(screen.getByRole("searchbox", { name: "Buscar Fotos" })).toBeVisible();
+  const photoSearch = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  expect(photoSearch).toBeVisible();
+  expect(photoSearch).toHaveClass("ui-embedded-input");
+  expect(photoSearch.closest(".media-search")).toHaveClass(
+    "ui-embedded-field",
+  );
   expect(screen.getByRole("button", { name: "Todas 3" })).toHaveAttribute(
     "aria-pressed",
     "true",

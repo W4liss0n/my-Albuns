@@ -167,10 +167,7 @@
   width: 100%;
   min-width: 0;
   padding: 0;
-  border: 0;
-  outline: 0;
   color: var(--ui-text);
-  background: transparent;
   font-size: var(--ui-font-size-support);
 }
 

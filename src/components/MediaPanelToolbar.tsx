@@ -177,11 +177,12 @@ export function MediaPanelToolbar({
       <div className="media-toolbar-actions">
         <div
           aria-label={`Busca em ${activeKindLabel}`}
-          className="media-search"
+          className="media-search ui-embedded-field"
           role="search"
         >
           <input
             aria-label={`Buscar ${activeKindLabel}`}
+            className="ui-embedded-input"
             placeholder="Buscar…"
             role="searchbox"
             value={search}
