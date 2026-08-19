@@ -83,6 +83,12 @@ export function MediaPanel({
           direction * naturalNameCollator.compare(left.name, right.name),
       );
   }, [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+  const emptyStateReason =
+    activeMediaItems.length === 0
+      ? "catalog"
+      : visibleMediaItems.length === 0
+        ? "filtered"
+        : null;
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,6 +179,7 @@ export function MediaPanel({
             : "Grade de Decorativos"
         }
         className="media-grid"
+        data-empty={emptyStateReason ?? undefined}
         ref={gridRef}
         role="group"
         style={
@@ -181,10 +188,11 @@ export function MediaPanel({
           } as CSSProperties
         }
       >
-        {activeMediaItems.length === 0 ? (
-          <MediaPanelEmptyState kind={activeMediaKind} reason="catalog" />
-        ) : visibleMediaItems.length === 0 ? (
-          <MediaPanelEmptyState kind={activeMediaKind} reason="filtered" />
+        {emptyStateReason ? (
+          <MediaPanelEmptyState
+            kind={activeMediaKind}
+            reason={emptyStateReason}
+          />
         ) : (
           visibleMediaItems.map((media) => {
             const usageCount = mediaUsageById.get(media.id) ?? 0;

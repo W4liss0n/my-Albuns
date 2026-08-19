@@ -63,7 +63,7 @@ test("matches the reference toolbar and exposes unavailable import actions as pl
   }
 });
 
-test("renders an empty catalog as an integrated media thumbnail motif", () => {
+test("renders only centered copy when the media catalog is empty", () => {
   render(
     <MediaPanel
       mediaItems={[]}
@@ -77,13 +77,18 @@ test("renders an empty catalog as an integrated media thumbnail motif", () => {
   });
   expect(emptyState).toHaveClass("ui-empty-state");
   expect(emptyState).toHaveClass("media-empty-state--catalog");
-  expect(
-    within(emptyState).getByText("Fotos"),
-  ).toHaveClass("ui-empty-state__eyebrow");
-  expect(emptyState.querySelector(".ui-empty-state__icon")).not.toBeNull();
+  expect(screen.getByRole("group", { name: "Grade de Fotos" })).toHaveAttribute(
+    "data-empty",
+    "catalog",
+  );
+  expect(emptyState).toHaveTextContent(
+    "As Fotos importadas para este Projeto aparecerão aqui.",
+  );
+  expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
+  expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
 });
 
-test("reuses the media motif when filters have no results", async () => {
+test("keeps only centered copy when filters have no results", async () => {
   const user = userEvent.setup();
   renderPanel();
 
@@ -96,9 +101,15 @@ test("reuses the media motif when filters have no results", async () => {
     name: "Nenhum item encontrado",
   });
   expect(emptyState).toHaveClass("media-empty-state--filtered");
-  expect(within(emptyState).getByText("Resultados")).toHaveClass(
-    "ui-empty-state__eyebrow",
+  expect(screen.getByRole("group", { name: "Grade de Fotos" })).toHaveAttribute(
+    "data-empty",
+    "filtered",
   );
+  expect(emptyState).toHaveTextContent(
+    "Ajuste a Busca ou o Filtro de uso para ver outros itens.",
+  );
+  expect(emptyState.querySelector(".ui-empty-state__eyebrow")).toBeNull();
+  expect(emptyState.querySelector(".ui-empty-state__icon")).toBeNull();
 });
 
 test("combines accent-insensitive search with the usage filter and natural name order", async () => {
