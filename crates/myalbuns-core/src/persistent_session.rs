@@ -65,52 +65,44 @@ impl PersistentProjectSession {
     }
 
     pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<(), CoreError> {
-        let next_revision = self
-            .latest_revision
-            .checked_add(1)
-            .filter(|revision| *revision <= MAX_SAFE_INTEGER)
-            .ok_or(CoreError::RevisionSpaceExhausted)?;
-        let project = match intent {
-            ProjectIntent::SetDpi { dpi } => self
-                .current
-                .project
+        self.commit_edit(move |project| match intent {
+            ProjectIntent::SetDpi { dpi } => project
                 .with_dpi(dpi)
-                .map_err(|()| CoreError::InvalidDpi(dpi))?,
+                .map_err(|()| CoreError::InvalidDpi(dpi)),
             ProjectIntent::TransformPhoto { .. }
             | ProjectIntent::FillLeftmostPlaceholder { .. } => {
-                return Err(CoreError::UnsupportedProjectIntent);
+                Err(CoreError::UnsupportedProjectIntent)
             }
-        };
-
-        self.undo.push(self.current.clone());
-        self.redo.clear();
-        self.current = ProjectRevision::new(self.current.project_id, next_revision, project);
-        self.latest_revision = next_revision;
-        Ok(())
+        })
     }
 
     pub(crate) fn relink_media(&mut self, command: RelinkMedia) -> Result<(), CoreError> {
+        self.commit_edit(move |project| {
+            if !project
+                .media()
+                .iter()
+                .any(|media| media.id() == command.media_id.into_uuid())
+            {
+                return Err(CoreError::MediaNotFound(command.media_id.to_string()));
+            }
+            project
+                .with_relinked_media(command.media_id.into_uuid(), command.replacement_path)
+                .map_err(|()| {
+                    CoreError::InvalidProject("a nova referência de mídia não é válida".into())
+                })
+        })
+    }
+
+    fn commit_edit(
+        &mut self,
+        edit: impl FnOnce(&ProjectDocument) -> Result<ProjectDocument, CoreError>,
+    ) -> Result<(), CoreError> {
         let next_revision = self
             .latest_revision
             .checked_add(1)
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
-        if !self
-            .current
-            .project
-            .media()
-            .iter()
-            .any(|media| media.id() == command.media_id.into_uuid())
-        {
-            return Err(CoreError::MediaNotFound(command.media_id.to_string()));
-        }
-        let project = self
-            .current
-            .project
-            .with_relinked_media(command.media_id.into_uuid(), command.replacement_path)
-            .map_err(|()| {
-                CoreError::InvalidProject("a nova referência de mídia não é válida".into())
-            })?;
+        let project = edit(&self.current.project)?;
 
         self.undo.push(self.current.clone());
         self.redo.clear();

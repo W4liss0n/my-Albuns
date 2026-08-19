@@ -1,4 +1,4 @@
-if (-not ('Issue45OwnedProcessJob' -as [type])) {
+if (-not ('GateOwnedProcessJob' -as [type])) {
     Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -6,7 +6,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-public sealed class Issue45OwnedProcessJob : IDisposable
+public sealed class GateOwnedProcessJob : IDisposable
 {
     private const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
     private const int JobObjectBasicProcessIdList = 3;
@@ -78,7 +78,7 @@ public sealed class Issue45OwnedProcessJob : IDisposable
 
     private IntPtr handle;
 
-    public Issue45OwnedProcessJob()
+    public GateOwnedProcessJob()
     {
         handle = CreateJobObject(IntPtr.Zero, null);
         if (handle == IntPtr.Zero)
@@ -165,7 +165,7 @@ public sealed class Issue45OwnedProcessJob : IDisposable
     {
         if (handle == IntPtr.Zero)
         {
-            throw new ObjectDisposedException("Issue45OwnedProcessJob");
+            throw new ObjectDisposedException("GateOwnedProcessJob");
         }
     }
 
@@ -179,7 +179,7 @@ public sealed class Issue45OwnedProcessJob : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    ~Issue45OwnedProcessJob()
+    ~GateOwnedProcessJob()
     {
         Dispose();
     }

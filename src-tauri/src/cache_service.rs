@@ -48,6 +48,19 @@ pub(crate) struct CacheNamespaceOwner {
     _reservation: NamedMutexGrant,
 }
 
+#[derive(Debug)]
+struct ReservedCacheNamespace {
+    usage: CacheNamespaceUsage,
+    _reservation: NamedMutexGrant,
+}
+
+#[derive(Debug)]
+enum CacheNamespaceRemovalReservation {
+    Active,
+    Vacant,
+    Reserved(ReservedCacheNamespace),
+}
+
 impl CacheNamespaceOwner {
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
@@ -161,44 +174,17 @@ impl CacheService {
         let mut reserved = Vec::new();
         let mut skipped_active_namespace_count = 0_usize;
         for paths in namespaces {
-            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
-                Ok(reservation) => {
-                    synchronize_cache_writer(&self.app_paths, &paths)?;
-                    if let Some(usage) = self.inspect_namespace(&paths)? {
-                        reserved.push((usage, reservation));
-                    }
+            match self.reserve_namespace_for_removal(&paths)? {
+                CacheNamespaceRemovalReservation::Active => {
+                    skipped_active_namespace_count += 1;
                 }
-                Err(NamedMutexError::Conflict) => skipped_active_namespace_count += 1,
-                Err(NamedMutexError::Unavailable(reason)) => {
-                    return Err(CacheServiceError::Reservation(reason));
+                CacheNamespaceRemovalReservation::Vacant => {}
+                CacheNamespaceRemovalReservation::Reserved(namespace) => {
+                    reserved.push(namespace);
                 }
             }
         }
-        let measured_releasable_bytes = reserved.iter().try_fold(0_u64, |total, (usage, _)| {
-            total
-                .checked_add(usage.bytes())
-                .ok_or_else(|| CacheServiceError::Storage("volume de Cache excedeu u64".into()))
-        })?;
-        let mut freed_bytes = 0_u64;
-        let mut removed_namespace_count = 0_usize;
-        for (usage, _reservation) in reserved {
-            if self
-                .app_paths
-                .clear_project_cache(usage.paths())
-                .map_err(|error| CacheServiceError::Storage(error.to_string()))?
-            {
-                freed_bytes = freed_bytes.checked_add(usage.bytes()).ok_or_else(|| {
-                    CacheServiceError::Storage("volume de Cache excedeu u64".into())
-                })?;
-                removed_namespace_count += 1;
-            }
-        }
-        Ok(CacheFreeResult {
-            measured_releasable_bytes,
-            freed_bytes,
-            removed_namespace_count,
-            skipped_active_namespace_count,
-        })
+        self.clear_reserved_namespaces(reserved, skipped_active_namespace_count)
     }
 
     pub(crate) fn clear_all_or_schedule(&self) -> Result<CacheClearAllOutcome, CacheServiceError> {
@@ -241,25 +227,54 @@ impl CacheService {
         let namespaces = self.list_namespaces()?;
         let mut reserved = Vec::with_capacity(namespaces.len());
         for paths in namespaces {
-            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
-                Ok(reservation) => {
-                    synchronize_cache_writer(&self.app_paths, &paths)?;
-                    if let Some(usage) = self.inspect_namespace(&paths)? {
-                        reserved.push((usage, reservation));
-                    }
-                }
-                Err(NamedMutexError::Conflict) => return Ok(None),
-                Err(NamedMutexError::Unavailable(reason)) => {
-                    return Err(CacheServiceError::Reservation(reason));
+            match self.reserve_namespace_for_removal(&paths)? {
+                CacheNamespaceRemovalReservation::Active => return Ok(None),
+                CacheNamespaceRemovalReservation::Vacant => {}
+                CacheNamespaceRemovalReservation::Reserved(namespace) => {
+                    reserved.push(namespace);
                 }
             }
         }
-        let measured_releasable_bytes = reserved.iter().try_fold(0_u64, |total, (usage, _)| {
-            checked_add_usage(total, usage.bytes())
+        let result = self.clear_reserved_namespaces(reserved, 0)?;
+        self.clear_schedule_marker()?;
+        Ok(Some(result))
+    }
+
+    fn reserve_namespace_for_removal(
+        &self,
+        paths: &CachePathPlan,
+    ) -> Result<CacheNamespaceRemovalReservation, CacheServiceError> {
+        let reservation = match namespace_mutex(&self.app_paths, paths).try_acquire() {
+            Ok(reservation) => reservation,
+            Err(NamedMutexError::Conflict) => {
+                return Ok(CacheNamespaceRemovalReservation::Active);
+            }
+            Err(NamedMutexError::Unavailable(reason)) => {
+                return Err(CacheServiceError::Reservation(reason));
+            }
+        };
+        synchronize_cache_writer(&self.app_paths, paths)?;
+        Ok(match self.inspect_namespace(paths)? {
+            Some(usage) => CacheNamespaceRemovalReservation::Reserved(ReservedCacheNamespace {
+                usage,
+                _reservation: reservation,
+            }),
+            None => CacheNamespaceRemovalReservation::Vacant,
+        })
+    }
+
+    fn clear_reserved_namespaces(
+        &self,
+        reserved: Vec<ReservedCacheNamespace>,
+        skipped_active_namespace_count: usize,
+    ) -> Result<CacheFreeResult, CacheServiceError> {
+        let measured_releasable_bytes = reserved.iter().try_fold(0_u64, |total, namespace| {
+            checked_add_usage(total, namespace.usage.bytes())
         })?;
         let mut freed_bytes = 0_u64;
         let mut removed_namespace_count = 0_usize;
-        for (usage, _reservation) in reserved {
+        for namespace in reserved {
+            let usage = &namespace.usage;
             if self
                 .app_paths
                 .clear_project_cache(usage.paths())
@@ -271,13 +286,12 @@ impl CacheService {
                 removed_namespace_count += 1;
             }
         }
-        self.clear_schedule_marker()?;
-        Ok(Some(CacheFreeResult {
+        Ok(CacheFreeResult {
             measured_releasable_bytes,
             freed_bytes,
             removed_namespace_count,
-            skipped_active_namespace_count: 0,
-        }))
+            skipped_active_namespace_count,
+        })
     }
 
     fn list_namespaces(&self) -> Result<Vec<CachePathPlan>, CacheServiceError> {

@@ -188,6 +188,16 @@ Rust→TypeScript, frontend, Rust, `fmt`, `clippy -D warnings`, recuperação re
 de Processador/Cache/Canvas, caminhos locais/UNC/mapeados/longos e build release
 com bundle NSIS. Contagens vazias fecham o gate.
 
+O script da issue conserva apenas a ordem dos checks, os comandos de build e a
+composição da matriz. Mecanismos com razões de mudança próprias ficam em módulos
+concretos: `Gate-ProcessScope.ps1` contém Job, processos e listeners;
+`Issue45-MediaCacheGateScratch.ps1` contém preflight, limpeza causal e a
+sentinela independente; `Issue45-MediaCacheGateProof.ps1` contém parsers,
+conjuntos exatos e validação da matriz; `Gate-EvidenceReport.ps1` contém hashes,
+locks, snapshots terminais e publicação restaurável. Eles reutilizam os helpers
+menores de Job, scratch e proveniência já compartilhados, sem introduzir um
+registro ou framework universal de gates.
+
 Os relatórios transitivos são produzidos novamente dentro do scratch da rodada;
 nenhum artefato anterior é aceito. Antes do primeiro contrato Tauri, o runner
 fixa um `CARGO_TARGET_DIR` absoluto e exclusivo sob o `runRoot`; contratos,

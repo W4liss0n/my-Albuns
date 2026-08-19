@@ -316,16 +316,7 @@ impl MediaRuntime {
             })
             .map(|observation| observation.media_id.clone())
             .collect::<Vec<_>>();
-        let revoked_preview_media_ids = proposal
-            .observations
-            .iter()
-            .filter(|observation| {
-                previous
-                    .get(observation.media_id.as_str())
-                    .is_some_and(|previous| invalidates_cache(previous, observation))
-            })
-            .map(|observation| observation.media_id.clone())
-            .collect();
+        let revoked_preview_media_ids = invalidated_media_ids.clone();
         *current = Some(proposal);
         MediaRuntimeUpdate {
             observation_generation,
