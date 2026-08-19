@@ -5,6 +5,9 @@ import type {
   AlbumCanvasMode,
   AlbumCanvasProps,
 } from "./albumCanvasContract";
+import {
+  useCanvasModeKeyboardShortcuts,
+} from "./useCanvasModeKeyboardShortcuts";
 import { usePhotoGestures } from "./usePhotoGestures";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -116,36 +119,13 @@ export function useProjectEditorController({
     projection.state.album.sheets,
   ]);
 
-  useEffect(() => {
-    const changeCanvasMode = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) return;
-      if (event.key === "Escape" && canvasMode.kind === "sheet-editing") {
-        exitSheetEditing();
-        event.preventDefault();
-        return;
-      }
-      if (
-        event.key === "Enter" &&
-        canvasMode.kind === "normal" &&
-        !interactionBlocked &&
-        !isTextEntryTarget(event.target) &&
-        isCanvasFocusTarget(event.target)
-      ) {
-        const sheetId = navigation.implicitSheetId;
-        if (!sheetId) return;
-        enterSheetEditing(sheetId);
-        event.preventDefault();
-      }
-    };
-    window.addEventListener("keydown", changeCanvasMode);
-    return () => window.removeEventListener("keydown", changeCanvasMode);
-  }, [
-    canvasMode,
-    enterSheetEditing,
-    exitSheetEditing,
+  useCanvasModeKeyboardShortcuts({
+    implicitSheetId: navigation.implicitSheetId,
     interactionBlocked,
-    navigation.implicitSheetId,
-  ]);
+    mode: canvasMode,
+    onEnterSheetEditing: enterSheetEditing,
+    onExitSheetEditing: exitSheetEditing,
+  });
 
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
@@ -205,19 +185,4 @@ export function useProjectEditorController({
     },
     dismissFeedback: mutations.dismissFeedback,
   };
-}
-
-function isTextEntryTarget(target: EventTarget | null) {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
-function isCanvasFocusTarget(target: EventTarget | null) {
-  return (
-    target instanceof Element && target.closest(".canvas-host") !== null
-  );
 }

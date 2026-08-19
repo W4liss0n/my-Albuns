@@ -1,4 +1,9 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactDOM from "react-dom/client";
 
 import "./App.css";
@@ -12,6 +17,9 @@ import {
   type CanvasGraphicsDiagnosticProbe,
   CanvasGraphicsDiagnosticProbeProvider,
 } from "./components/canvasGraphicsDiagnosticProbeContext";
+import {
+  useCanvasModeKeyboardShortcuts,
+} from "./components/useCanvasModeKeyboardShortcuts";
 import type {
   ComposedFrame,
   ComposedSheet,
@@ -96,7 +104,7 @@ const sheetBarMetadata: readonly SheetBarMetadata[] = [
   { sheetId: "sheet-005", pageNumbers: [8] },
 ];
 
-function CanvasPreview() {
+export function CanvasPreview() {
   const layout = useMemo(
     () =>
       createNormalCanvasLayout(
@@ -118,6 +126,19 @@ function CanvasPreview() {
         }
       : { kind: "normal" };
   });
+  const enterSheetEditing = useCallback((sheetId: string) => {
+    setFocusedSheetId(sheetId);
+    setMode({ kind: "sheet-editing", sheetId });
+  }, []);
+  const exitSheetEditing = useCallback(() => {
+    setMode({ kind: "normal" });
+  }, []);
+  useCanvasModeKeyboardShortcuts({
+    implicitSheetId: centeredSheetId,
+    mode,
+    onEnterSheetEditing: enterSheetEditing,
+    onExitSheetEditing: exitSheetEditing,
+  });
 
   return (
     <main className="canvas-preview canvas-section" data-development-preview="canvas">
@@ -133,9 +154,7 @@ function CanvasPreview() {
         centeredSheetId={centeredSheetId}
         viewport={viewport}
         onSelectFrame={() => undefined}
-        onEditSheet={(sheetId) =>
-          setMode({ kind: "sheet-editing", sheetId })
-        }
+        onEditSheet={enterSheetEditing}
         onFocusSheet={setFocusedSheetId}
         onCenteredSheetChange={setCenteredSheetId}
         onViewportChange={setViewport}
@@ -197,12 +216,15 @@ function placeholder(
   };
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <CanvasGraphicsDiagnosticProbeProvider
-      probe={previewGraphicsDiagnosticProbe}
-    >
-      <CanvasPreview />
-    </CanvasGraphicsDiagnosticProbeProvider>
-  </React.StrictMode>,
-);
+const root = document.getElementById("root");
+if (root) {
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <CanvasGraphicsDiagnosticProbeProvider
+        probe={previewGraphicsDiagnosticProbe}
+      >
+        <CanvasPreview />
+      </CanvasGraphicsDiagnosticProbeProvider>
+    </React.StrictMode>,
+  );
+}
