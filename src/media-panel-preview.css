@@ -1,0 +1,9 @@
+.media-panel-preview {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+}
+
+.media-panel-preview > .media-panel {
+  grid-area: auto;
+}

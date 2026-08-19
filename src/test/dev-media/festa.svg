@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="room" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#161828"/>
+      <stop offset=".52" stop-color="#53314f"/>
+      <stop offset="1" stop-color="#ad694d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#room)"/>
+  <g opacity=".8">
+    <circle cx="136" cy="122" r="31" fill="#f4c06d"/><circle cx="303" cy="77" r="18" fill="#ce7a80"/><circle cx="476" cy="151" r="27" fill="#ebcd8d"/>
+    <circle cx="746" cy="88" r="24" fill="#d38198"/><circle cx="982" cy="143" r="36" fill="#f1bc69"/><circle cx="1105" cy="67" r="18" fill="#dca47d"/>
+  </g>
+  <path d="M0 701c176-164 348-178 527-39 178-168 438-207 673 18v120H0Z" fill="#161820"/>
+  <g fill="#382737">
+    <circle cx="257" cy="436" r="78"/><path d="M117 800c18-184 48-285 142-293 104 11 139 121 149 293Z"/>
+    <circle cx="716" cy="399" r="86"/><path d="M563 800c18-202 57-311 155-324 111 19 142 143 157 324Z"/>
+    <circle cx="992" cy="456" r="69"/><path d="M873 800c12-164 47-258 120-274 86 13 123 112 132 274Z"/>
+  </g>
+  <path d="M331 527c87-119 186-141 297-68" fill="none" stroke="#d19871" stroke-width="31" stroke-linecap="round"/>
+</svg>

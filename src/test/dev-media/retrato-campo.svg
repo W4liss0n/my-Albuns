@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#bdd0ca"/>
+      <stop offset="1" stop-color="#f0dbc2"/>
+    </linearGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#aeb686"/>
+      <stop offset="1" stop-color="#50624d"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="700" fill="url(#sky)"/>
+  <rect y="700" width="800" height="500" fill="url(#field)"/>
+  <circle cx="615" cy="275" r="86" fill="#f8e5b2" opacity=".8"/>
+  <path d="M0 760c165-69 322-82 484-30 113 36 218 38 316 4v466H0Z" fill="#788761"/>
+  <g fill="#e6d49c" opacity=".9">
+    <circle cx="92" cy="850" r="12"/><circle cx="170" cy="1000" r="9"/><circle cx="650" cy="914" r="13"/><circle cx="725" cy="1050" r="8"/>
+  </g>
+  <circle cx="397" cy="510" r="76" fill="#8e5e46"/>
+  <path d="M280 1130c0-252 25-448 117-492 95 47 128 244 122 492Z" fill="#e7d7bd"/>
+  <path d="M330 499c22-91 112-128 175-45-10 92-49 164-113 167-47-3-75-42-62-122Z" fill="#c98d6a"/>
+</svg>
