@@ -327,6 +327,28 @@ test("preserves a selected group on right click and replaces it for an unselecte
   expect(portrait).toHaveAttribute("aria-pressed", "false");
 });
 
+test("clears selection and keeps Ctrl+A in the grid after a background click", () => {
+  renderPanel();
+
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  fireEvent.click(album2);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(grid);
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  expect(grid).toHaveFocus();
+
+  expect(fireEvent.keyDown(grid, { ctrlKey: true, key: "a" })).toBe(false);
+  const selectedMediaCards = within(grid).getAllByRole("button", {
+    pressed: true,
+  });
+  for (const mediaCard of selectedMediaCards) {
+    expect(mediaCard).toHaveAttribute("data-selected", "true");
+  }
+  expect(selectedMediaCards).toHaveLength(3);
+});
+
 test("removes hidden items from the transient media selection", async () => {
   const user = userEvent.setup();
   renderPanel();

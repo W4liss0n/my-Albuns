@@ -300,6 +300,10 @@
   justify-content: stretch;
 }
 
+.media-grid:focus {
+  outline: 0;
+}
+
 .ui-empty-state.media-empty-state {
   min-height: 0;
   grid-column: 1;

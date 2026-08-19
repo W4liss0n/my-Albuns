@@ -241,6 +241,15 @@ export function MediaPanel({
     setSelectionAnchorId(mediaId);
   }
 
+  function clearSelectionFromGridBackground(
+    event: MouseEvent<HTMLDivElement>,
+  ) {
+    if ((event.target as HTMLElement).closest("[data-media-id]")) return;
+    setSelectedMediaIds(new Set());
+    setSelectionAnchorId(null);
+    event.currentTarget.focus({ preventScroll: true });
+  }
+
   function captureIntrinsicPreviewSize(
     mediaId: string,
     previewUrl: string,
@@ -297,6 +306,7 @@ export function MediaPanel({
         }
         className="media-grid"
         data-empty={emptyStateReason ?? undefined}
+        onClick={clearSelectionFromGridBackground}
         ref={gridRef}
         role="group"
         style={
@@ -304,6 +314,7 @@ export function MediaPanel({
             "--media-thumbnail-size": `${thumbnailSize}px`,
           } as CSSProperties
         }
+        tabIndex={-1}
       >
         {emptyStateReason ? (
           <MediaPanelEmptyState
