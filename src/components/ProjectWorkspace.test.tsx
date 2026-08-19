@@ -1030,6 +1030,59 @@ test("renders each Grade item from its own composed sheet", () => {
   expect(screen.getAllByRole("img")).toHaveLength(2);
 });
 
+test("presents the Grade with reference metadata and navigation state", () => {
+  const projectionWithProjectedPageNumbers: EditorProjection = {
+    ...twoSheetProjection,
+    state: {
+      ...twoSheetProjection.state,
+      album: {
+        ...twoSheetProjection.state.album,
+        sheets: twoSheetProjection.state.album.sheets.map((sheet, index) => ({
+          ...sheet,
+          pageNumbers: index === 0 ? [7, 8] : [12, 13],
+        })),
+      },
+    },
+  };
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithProjectedPageNumbers}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => projectionWithProjectedPageNumbers,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const gradeTrigger = screen.getByRole("button", {
+    name: "Grade de Lâminas",
+  });
+  expect(
+    gradeTrigger.querySelector(".inspector-section-meta"),
+  ).toHaveTextContent("2");
+
+  const tiles = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-tile"),
+  );
+  expect(tiles).toHaveLength(2);
+  expect(tiles[0]).toHaveAttribute("aria-current", "true");
+  expect(tiles[1]).not.toHaveAttribute("aria-current");
+  expect(tiles[0]).toHaveAttribute("data-active-sides", "both");
+  expect(tiles[0]).toHaveAccessibleName(
+    "Ir para Lâmina 01, Páginas 7–8",
+  );
+  expect(tiles[0].querySelector(".sheet-tile__number")).toHaveTextContent(
+    "01",
+  );
+  expect(tiles[0].querySelector(".sheet-tile__pages")).toHaveTextContent(
+    "pág 7–8",
+  );
+  expect(tiles[1].querySelector(".sheet-tile__pages")).toHaveTextContent(
+    "pág 12–13",
+  );
+});
+
 test("uses reduced Cache previews in the media panel and Canvas", () => {
   const mediaPreviewUrls = {
     "media-001": "asset://localhost/cache/media-001.jpg",

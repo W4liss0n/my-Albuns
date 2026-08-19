@@ -266,6 +266,7 @@ pub struct SheetSnapshot {
     pub number: usize,
     pub role: SheetRole,
     pub active_sides: ProjectedActiveSides,
+    pub page_numbers: Vec<usize>,
     pub width_um: i64,
     pub height_um: i64,
     pub frames: Vec<FrameSnapshot>,

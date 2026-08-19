@@ -842,6 +842,21 @@ fn configured_project_round_trips_physical_settings_and_album_structure() {
         projected_json["state"]["album"]["sheets"][0]["activeSides"],
         "right"
     );
+    assert_eq!(
+        projected_json["state"]["album"]["sheets"]
+            .as_array()
+            .expect("the projected Album has an ordered sheet list")
+            .iter()
+            .map(|sheet| sheet["pageNumbers"].clone())
+            .collect::<Vec<_>>(),
+        vec![
+            serde_json::json!([1]),
+            serde_json::json!([2, 3]),
+            serde_json::json!([4, 5]),
+            serde_json::json!([6, 7]),
+            serde_json::json!([8, 9]),
+        ]
+    );
     drop(created);
 
     let reopened = core

@@ -70,6 +70,10 @@ export function InspectorPanel({
   onApplyDpi,
   onNavigateToSheet,
 }: InspectorPanelProps) {
+  const sheetStateById = new Map(
+    sheetStates.map((sheet) => [sheet.id, sheet] as const),
+  );
+
   return (
     <aside
       id="contextual-panel"
@@ -219,6 +223,7 @@ export function InspectorPanel({
               key="album-sheet-grid"
               title="Grade de Lâminas"
               preferenceKey="album.sheet-grid"
+              meta={sheets.length}
               defaultOpen
             >
               {sheets.length === 0 ? (
@@ -229,25 +234,43 @@ export function InspectorPanel({
                   title="Nenhuma Lâmina na Grade"
                 />
               ) : (
-                <div className="sheet-grid">
-                  {sheets.map((sheet) => (
-                    <Button
-                      key={sheet.sheetId}
-                      className={
-                        sheet.sheetId === focusedSheetId
-                          ? "sheet-tile active"
-                          : "sheet-tile"
-                      }
-                      onPress={() => onNavigateToSheet(sheet.sheetId)}
-                    >
-                      <SheetPreview
-                        frameBorder={frameBorder}
-                        sheet={sheet}
-                        mediaPreviewUrls={mediaPreviewUrls}
-                      />
-                      <span>{String(sheet.number).padStart(2, "0")}</span>
-                    </Button>
-                  ))}
+                <div
+                  className="sheet-grid"
+                  data-placeholder-feature="reorder-sheets-from-grid"
+                >
+                  {sheets.map((sheet) => {
+                    const number = String(sheet.number).padStart(2, "0");
+                    const pageMetadata = formatSheetPageMetadata(
+                      sheetStateById.get(sheet.sheetId),
+                    );
+                    const visualPageLabel =
+                      pageMetadata?.visualLabel ?? `Lâmina ${number}`;
+                    const accessiblePageLabel =
+                      pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
+                    const active = sheet.sheetId === focusedSheetId;
+                    return (
+                      <Button
+                        aria-current={active ? "true" : undefined}
+                        aria-label={`Ir para Lâmina ${number}, ${accessiblePageLabel}`}
+                        key={sheet.sheetId}
+                        className={active ? "sheet-tile active" : "sheet-tile"}
+                        data-active-sides={sheet.activeSides}
+                        onPress={() => onNavigateToSheet(sheet.sheetId)}
+                      >
+                        <SheetPreview
+                          frameBorder={frameBorder}
+                          sheet={sheet}
+                          mediaPreviewUrls={mediaPreviewUrls}
+                        />
+                        <span aria-hidden="true" className="sheet-tile__number">
+                          {number}
+                        </span>
+                        <span aria-hidden="true" className="sheet-tile__pages">
+                          {visualPageLabel}
+                        </span>
+                      </Button>
+                    );
+                  })}
                 </div>
               )}
             </InspectorSection>
@@ -262,12 +285,14 @@ function InspectorSection({
   accessibleTitle,
   title,
   preferenceKey,
+  meta,
   defaultOpen = false,
   children,
 }: {
   accessibleTitle?: string;
   title: string;
   preferenceKey: string;
+  meta?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
@@ -293,7 +318,12 @@ function InspectorSection({
         onClick={toggle}
       >
         <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
-        <span>{title}</span>
+        <span className="inspector-section-title">{title}</span>
+        {meta !== undefined && (
+          <span aria-hidden="true" className="inspector-section-meta">
+            {meta}
+          </span>
+        )}
       </button>
       {open && <div className="inspector-section-content">{children}</div>}
     </section>
@@ -338,10 +368,35 @@ function formatDimensions(
 }
 
 function pageCount(sheets: readonly SheetSnapshot[]) {
-  return sheets.reduce(
-    (total, sheet) => total + (sheet.activeSides === "both" ? 2 : 1),
-    0,
-  );
+  return sheets.reduce((total, sheet) => total + sheet.pageNumbers.length, 0);
+}
+
+function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
+  if (!sheet || sheet.pageNumbers.length === 0) return null;
+
+  const firstPage = sheet.pageNumbers[0];
+  const lastPage = sheet.pageNumbers[sheet.pageNumbers.length - 1];
+  if (sheet.role === "initial" && sheet.pageNumbers.length === 1) {
+    return {
+      accessibleLabel: `Lâmina inicial, Página ${firstPage}`,
+      visualLabel: "capa",
+    };
+  }
+  if (sheet.role === "final" && sheet.pageNumbers.length === 1) {
+    return {
+      accessibleLabel: `Lâmina final, Página ${firstPage}`,
+      visualLabel: "final",
+    };
+  }
+  return firstPage === lastPage
+    ? {
+        accessibleLabel: `Página ${firstPage}`,
+        visualLabel: `pág ${firstPage}`,
+      }
+    : {
+        accessibleLabel: `Páginas ${firstPage}–${lastPage}`,
+        visualLabel: `pág ${firstPage}–${lastPage}`,
+      };
 }
 
 function sheetFormat(sheet: SheetSnapshot | undefined) {

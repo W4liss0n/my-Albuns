@@ -28,6 +28,7 @@ export const representativeProjection: EditorProjection = {
           number: 1,
           role: "initial",
           activeSides: "both",
+          pageNumbers: [1, 2],
           widthUm: 600_000,
           heightUm: 300_000,
           frames: [
@@ -185,6 +186,7 @@ export function createTwoSheetProjection(): EditorProjection {
             id: "sheet-002",
             number: 2,
             role: "final",
+            pageNumbers: [3, 4],
             frames: [],
           },
         ],

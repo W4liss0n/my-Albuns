@@ -1,0 +1,11 @@
+.sheet-grid-preview {
+  display: grid;
+  height: 100%;
+  min-height: 0;
+  padding-left: calc(100% - 306px);
+  background: var(--ui-canvas);
+}
+
+.sheet-grid-preview > .inspector {
+  grid-area: auto;
+}

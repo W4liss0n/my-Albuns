@@ -568,6 +568,7 @@ fn compose_through_public_contract(frame: &RectUm, photo: &PlacementPhoto) -> Co
             number: 1,
             role: SheetRole::Internal,
             active_sides: ProjectedActiveSides::Both,
+            page_numbers: vec![1, 2],
             width_um: frame.x + frame.width,
             height_um: frame.y + frame.height,
             frames: vec![FrameSnapshot {

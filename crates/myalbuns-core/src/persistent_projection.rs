@@ -25,25 +25,37 @@ pub(crate) fn editor_projection(
 ) -> EditorProjection {
     let settings = project.document();
     let last_sheet = project.sheets().len().saturating_sub(1);
+    let mut next_page_number = 1;
     let album = AlbumSnapshot {
         sheets: project
             .sheets()
             .iter()
             .enumerate()
-            .map(|(index, sheet)| SheetSnapshot {
-                id: sheet.id().hyphenated().to_string(),
-                number: index + 1,
-                role: if index == 0 {
-                    SheetRole::Initial
-                } else if index == last_sheet {
-                    SheetRole::Final
-                } else {
-                    SheetRole::Internal
-                },
-                active_sides: projected_active_sides(sheet.active_sides()),
-                width_um: settings.sheet_width_um() as i64,
-                height_um: settings.sheet_height_um() as i64,
-                frames: Vec::new(),
+            .map(|(index, sheet)| {
+                let active_sides = projected_active_sides(sheet.active_sides());
+                let page_count = match active_sides {
+                    ProjectedActiveSides::Both => 2,
+                    ProjectedActiveSides::Left | ProjectedActiveSides::Right => 1,
+                };
+                let page_numbers = (next_page_number..next_page_number + page_count).collect();
+                next_page_number += page_count;
+
+                SheetSnapshot {
+                    id: sheet.id().hyphenated().to_string(),
+                    number: index + 1,
+                    role: if index == 0 {
+                        SheetRole::Initial
+                    } else if index == last_sheet {
+                        SheetRole::Final
+                    } else {
+                        SheetRole::Internal
+                    },
+                    active_sides,
+                    page_numbers,
+                    width_um: settings.sheet_width_um() as i64,
+                    height_um: settings.sheet_height_um() as i64,
+                    frames: Vec::new(),
+                }
             })
             .collect(),
         media: project

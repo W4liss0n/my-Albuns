@@ -104,6 +104,7 @@ fn sample_sheet(number: usize, sheet_count: usize) -> SheetSnapshot {
         number,
         role,
         active_sides: ProjectedActiveSides::Both,
+        page_numbers: vec![(number * 2) - 1, number * 2],
         width_um: SHEET_WIDTH_UM,
         height_um: SHEET_HEIGHT_UM,
         frames: vec![
