@@ -574,6 +574,8 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'explicit_retry_changes_unavailable_to_absent_after_authoritative_inspection')
                     (New-RustProof -Name 'explicit_retry_can_establish_the_first_observation_for_provisional_unavailability')
                     (New-RustProof -Name 'explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root')
+                    (New-RustProof -Name 'explicit_retry_keeps_unavailable_when_cache_adoption_fails_and_can_be_retried')
+                    (New-RustProof -Name 'authoritative_media_availability_maps_exhaustively_without_cache_failures')
                     (New-RustProof -Name 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state')
                     (New-FrontendProof -Name 'offers retry only for an unavailable occurrence and keeps Relink exclusive to absent')
                     (New-FrontendProof -Name 'retries an unavailable occurrence explicitly and refreshes it without Relink')

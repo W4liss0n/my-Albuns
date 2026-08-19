@@ -771,7 +771,7 @@ impl CacheEngine {
 
     fn apply_media_update(
         &self,
-        app_paths: &AppPaths,
+        _app_paths: &AppPaths,
         namespace: &AuthorizedCacheNamespace,
         registry: &CachePreviewRegistry,
         update: &MediaRuntimeUpdate,
@@ -855,15 +855,13 @@ impl CacheEngine {
             .cloned()
             .collect::<HashSet<_>>();
         registry.invalidate_media(applied_revoked_previews.iter().map(String::as_str));
-        let applied_invalidated = invalidated
-            .intersection(&applied_media_ids)
-            .cloned()
-            .collect::<HashSet<_>>();
-        let removed_generation_count = if applied_invalidated.is_empty() {
-            0
-        } else {
-            self.invalidate_artifacts_locked(app_paths, namespace, &applied_invalidated)?
-        };
+        // A stable source change invalidates reuse and resident publication now,
+        // but the indexed generation remains the last atomic Cache publication
+        // until a verified successor replaces it. Planning revalidates its
+        // fingerprint, so retaining it cannot make the stale bytes reusable.
+        // `publish_cache_metadata` swaps the entry first and only then collects
+        // the superseded file.
+        let removed_generation_count = 0;
         {
             let mut generations = self
                 .applied_observation_generations
@@ -883,32 +881,6 @@ impl CacheEngine {
         })
     }
 
-    #[cfg(test)]
-    pub(crate) fn invalidate_media<I, S>(
-        &self,
-        app_paths: &AppPaths,
-        namespace: &AuthorizedCacheNamespace,
-        media_ids: I,
-    ) -> Result<usize, CacheFailure>
-    where
-        I: IntoIterator<Item = S>,
-        S: AsRef<str>,
-    {
-        let media_ids = media_ids
-            .into_iter()
-            .map(|media_id| media_id.as_ref().to_owned())
-            .collect::<HashSet<_>>();
-        if media_ids.is_empty() {
-            return Ok(0);
-        }
-        let _transition_and_publication_guard = self
-            .transition_and_publication_gate
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        self.cancel_flights(namespace.project_id(), &media_ids);
-        self.invalidate_artifacts_locked(app_paths, namespace, &media_ids)
-    }
-
     fn cancel_flights(&self, project_id: &str, media_ids: &HashSet<String>) {
         let mut flights = self
             .flights
@@ -921,48 +893,6 @@ impl CacheEngine {
             }
             true
         });
-    }
-
-    fn invalidate_artifacts_locked(
-        &self,
-        app_paths: &AppPaths,
-        namespace: &AuthorizedCacheNamespace,
-        media_ids: &HashSet<String>,
-    ) -> Result<usize, CacheFailure> {
-        let storage = app_paths
-            .prepare_cache_storage(namespace.paths())
-            .map_err(|error| {
-                CacheFailure::new(
-                    CacheFailureStage::PublishIndex,
-                    format!("Não foi possível preparar a invalidação do Cache: {error}"),
-                )
-            })?;
-        let mut entries = current_entries(&storage, namespace.project_id(), namespace.paths());
-        let invalidated_paths = entries
-            .iter()
-            .filter(|entry| media_ids.contains(&entry.media_id))
-            .filter_map(|entry| entry_path(namespace.paths(), entry).ok())
-            .collect::<Vec<_>>();
-        entries.retain(|entry| !media_ids.contains(&entry.media_id));
-        let metadata = current_metadata(namespace.project_id(), entries)?;
-        publish_metadata(&storage, namespace.paths(), &metadata)?;
-        let mut removed = 0;
-        for path in invalidated_paths {
-            removed += usize::from(storage.remove_existing_file(&path).map_err(|error| {
-                CacheFailure::new(
-                    CacheFailureStage::PublishIndex,
-                    format!("Não foi possível remover a geração invalidada: {error}"),
-                )
-            })?);
-        }
-        if self.can_sweep_while_idle() {
-            removed += sweep_unreferenced_generations(&storage, namespace.paths(), &metadata)?;
-        }
-        Ok(removed)
-    }
-
-    fn can_sweep_while_idle(&self) -> bool {
-        self.active_owners.load(Ordering::Acquire) == 0
     }
 
     fn can_sweep_after_publication(&self) -> bool {
@@ -1514,17 +1444,6 @@ fn publish_cache_metadata(
         );
     }
     Ok(metadata)
-}
-
-fn current_entries(
-    storage: &PreparedCacheStorage,
-    project_id: &str,
-    cache_paths: &CachePathPlan,
-) -> Vec<CacheMetadataEntry> {
-    load_metadata(storage, cache_paths)
-        .filter(|metadata| metadata_is_current(metadata, project_id, cache_paths))
-        .map(|metadata| metadata.entries)
-        .unwrap_or_default()
 }
 
 fn current_metadata(
@@ -2782,6 +2701,22 @@ mod tests {
                 StatusCode::OK
             );
 
+            let cache_failure = engine
+                .retain_last_known_preview(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &CachePreviewRegistry::new("project"),
+                    &demand,
+                    fixture.work.source.media_id(),
+                    crate::ipc_contract::MediaPreviewState::CacheUnavailable,
+                )
+                .expect("a Cache failure can retain G1 without classifying the Original");
+            assert_eq!(
+                cache_failure.state,
+                crate::ipc_contract::MediaPreviewState::CacheUnavailable
+            );
+            assert!(cache_failure.url.is_some());
+
             let artifact_path = fixture
                 .work
                 .namespace
@@ -2977,6 +2912,7 @@ mod tests {
     fn invalidated_flight_is_detached_before_revalidation_claims_a_replacement() {
         let fixture = fixture();
         let engine = CacheEngine::default();
+        let registry = CachePreviewRegistry::new("project");
         let demand = engine.reconcile_demand(
             fixture.work.namespace.project_id(),
             1,
@@ -2990,18 +2926,28 @@ mod tests {
         };
 
         engine
-            .invalidate_media(
+            .apply_monitor_media_update(
                 &fixture.app_paths,
                 &fixture.work.namespace,
-                [fixture.work.source.media_id()],
+                &registry,
+                &MediaRuntimeUpdate::for_test(
+                    1,
+                    vec![fixture.work.source.media_id().to_owned()],
+                    vec![fixture.work.source.media_id().to_owned()],
+                ),
             )
-            .expect("reactive invalidation succeeds");
+            .expect("the stable Monitor update cancels the obsolete flight");
         assert_eq!(
             invalidated_owner.cancellation().reason(),
             Some(crate::cache_activity_gate::CacheCancellationReason::Obsolete)
         );
+        let revalidated_demand = engine.reconcile_demand(
+            fixture.work.namespace.project_id(),
+            2,
+            [fixture.work.source.media_id()],
+        );
         let CacheFlightClaim::Owner(revalidated_owner) = engine
-            .claim_demanded(&demand, &fixture.work)
+            .claim_demanded(&revalidated_demand, &fixture.work)
             .expect("the current demand can revalidate its flight")
         else {
             panic!("revalidation owns a fresh flight instead of waiting on the cancelled one");
@@ -3010,7 +2956,7 @@ mod tests {
         drop(invalidated_owner);
         assert!(
             matches!(
-                engine.claim_demanded(&demand, &fixture.work),
+                engine.claim_demanded(&revalidated_demand, &fixture.work),
                 Some(CacheFlightClaim::Waiter(_))
             ),
             "completion of the detached flight cannot remove its replacement"
@@ -3022,6 +2968,7 @@ mod tests {
     fn invalidation_preserves_an_unpublished_generation_owned_by_an_unrelated_flight() {
         let fixture = fixture();
         let engine = CacheEngine::default();
+        let registry = CachePreviewRegistry::new("project");
         let demand = engine.reconcile_demand(
             fixture.work.namespace.project_id(),
             1,
@@ -3047,12 +2994,17 @@ mod tests {
             .expect("the active candidate exists before publication");
 
         engine
-            .invalidate_media(
+            .apply_monitor_media_update(
                 &fixture.app_paths,
                 &fixture.work.namespace,
-                ["unrelated-media"],
+                &registry,
+                &MediaRuntimeUpdate::for_test(
+                    1,
+                    vec!["unrelated-media".into()],
+                    vec!["unrelated-media".into()],
+                ),
             )
-            .expect("targeted invalidation succeeds");
+            .expect("the unrelated stable update is accepted");
 
         assert!(
             candidate.exists(),
@@ -3073,11 +3025,13 @@ mod tests {
                     Script::Complete(CacheArtifactFormat::Jpeg),
                     Script::Complete(CacheArtifactFormat::Jpeg),
                     Script::Complete(CacheArtifactFormat::Jpeg),
+                    Script::Complete(CacheArtifactFormat::Jpeg),
                 ]),
                 attempts: Vec::new(),
             };
             let cancellation = CacheCancellation::default();
             let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
 
             let first = engine
                 .execute(
@@ -3208,8 +3162,41 @@ mod tests {
                 )
                 .expect("the current Photo B path is central");
             engine
-                .invalidate_media(&fixture.app_paths, &fixture.work.namespace, ["photo-a"])
-                .expect("targeted invalidation publishes a rebuilt index");
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(
+                        10,
+                        vec!["photo-a".into()],
+                        vec!["photo-a".into()],
+                    ),
+                )
+                .expect("targeted invalidation revokes reuse without deleting G1");
+            assert!(third_path.is_file());
+            assert!(fourth_path.is_file());
+
+            std::fs::write(fixture.work.source.source_path(), b"original-photo-v3")
+                .expect("the Original changes before its verified replacement");
+            let mut fifth_work = fixture.work.clone();
+            fifth_work.request_id = "cache-fifth".into();
+            let fifth = engine
+                .execute(
+                    &mut transport,
+                    &fixture.app_paths,
+                    fifth_work,
+                    &InvocationContext::new(
+                        "cache-fifth",
+                        Some(fixture.work.namespace.project_id()),
+                    ),
+                    &cancellation,
+                )
+                .await
+                .expect("the verified replacement atomically supersedes Photo A");
+            assert_ne!(
+                fifth.artifact().generation_id,
+                third.artifact().generation_id
+            );
             assert!(!third_path.exists());
             assert!(fourth_path.is_file());
 
@@ -3220,8 +3207,9 @@ mod tests {
             assert_eq!(metadata["schemaVersion"], 5);
             assert_eq!(metadata["representationVersion"], 1);
             assert_eq!(metadata["policy"]["maxEdgePx"], 1_600);
-            assert_eq!(metadata["entries"].as_array().map(Vec::len), Some(1));
-            assert_eq!(metadata["entries"][0]["mediaId"], "photo-b");
+            assert_eq!(metadata["entries"].as_array().map(Vec::len), Some(2));
+            assert_eq!(metadata["entries"][0]["mediaId"], "photo-a");
+            assert_eq!(metadata["entries"][1]["mediaId"], "photo-b");
             assert!(metadata["entries"][0].get("kind").is_none());
             assert!(metadata["entries"][0]["fingerprint"]["sourceCreatedUnixMs"].is_u64());
             assert!(metadata["entries"][0]["fingerprint"]["sourceModifiedUnixMs"].is_u64());
@@ -3239,7 +3227,7 @@ mod tests {
                     "the disposable index cannot persist path observation {forbidden}"
                 );
             }
-            assert_eq!(transport.attempts, [1, 1, 1, 1]);
+            assert_eq!(transport.attempts, [1, 1, 1, 1, 1]);
         });
     }
 
@@ -3679,6 +3667,7 @@ mod tests {
         tauri::async_runtime::block_on(async {
             let fixture = fixture();
             let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
             let published = verified_preview_artifact(&fixture, &engine).await;
             let published_path = fixture
                 .work
@@ -3695,6 +3684,22 @@ mod tests {
                 b"changed Original requiring a candidate generation",
             )
             .expect("the Original changes before the invalid completion");
+            engine
+                .apply_monitor_media_update(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &registry,
+                    &MediaRuntimeUpdate::for_test(
+                        10,
+                        vec![published.media_id.clone()],
+                        vec![published.media_id.clone()],
+                    ),
+                )
+                .expect("the stable change invalidates logical reuse");
+            assert!(
+                published_path.is_file(),
+                "logical invalidation retains G1 until a verified replacement is published"
+            );
             let mut work = fixture.work.clone();
             work.request_id = "cache-invalid-completion".into();
             let mut transport = ScriptedTransport {
@@ -3736,6 +3741,43 @@ mod tests {
             assert_eq!(
                 generation_count, 1,
                 "the rejected candidate cannot remain as an orphan generation"
+            );
+
+            let mut replacement_work = fixture.work.clone();
+            replacement_work.request_id = "cache-valid-replacement".into();
+            let mut replacement_transport = ScriptedTransport {
+                app_paths: fixture.app_paths.clone(),
+                scripts: VecDeque::from([Script::Complete(CacheArtifactFormat::Jpeg)]),
+                attempts: Vec::new(),
+            };
+            let replacement = engine
+                .execute(
+                    &mut replacement_transport,
+                    &fixture.app_paths,
+                    replacement_work,
+                    &InvocationContext::new(
+                        "cache-valid-replacement",
+                        Some(fixture.work.namespace.project_id()),
+                    ),
+                    &CacheCancellation::default(),
+                )
+                .await
+                .expect("a verified replacement can supersede G1");
+
+            assert_ne!(
+                replacement.artifact().generation_id,
+                published.generation_id
+            );
+            assert!(
+                !published_path.exists(),
+                "G1 is collected only after G2 is atomically published"
+            );
+            let metadata = super::load_metadata(&storage, fixture.work.namespace.paths())
+                .expect("the replacement index is published");
+            assert_eq!(metadata.entries.len(), 1);
+            assert_eq!(
+                metadata.entries[0].generation_id,
+                replacement.artifact().generation_id
             );
         });
     }

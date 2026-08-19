@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use myalbuns_imaging_protocol::CacheMediaSource;
 use myalbuns_paths::AppPaths;
-use tauri::{AppHandle, Emitter, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 use crate::{
     cache_activity_gate::{CacheCancellation, CacheCancellationReason},
@@ -65,8 +65,8 @@ impl MediaPreviewCommandError {
 pub(crate) async fn retry_unavailable_media(
     media_id: String,
     window: WebviewWindow,
+    app: AppHandle,
     project_host: State<'_, ProjectHost>,
-    engine: State<'_, CacheEngine>,
     registry: State<'_, CachePreviewRegistry>,
     media_runtime: State<'_, MediaRuntime>,
     media_monitor: State<'_, MediaMonitor>,
@@ -81,20 +81,35 @@ pub(crate) async fn retry_unavailable_media(
         .map_err(MediaPreviewCommandError::retry_failed)?;
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
-    let inspection =
-        tauri::async_runtime::spawn_blocking(move || monitor.retry_unavailable(&runtime, &binding))
-            .await
-            .map_err(MediaPreviewCommandError::retry_failed)?
-            .map_err(MediaPreviewCommandError::retry_failed)?;
-    let namespace = namespace_owner.namespace();
-    engine
-        .apply_monitor_media_update(&app_paths, namespace, registry.inner(), inspection.update())
-        .map_err(|failure| MediaPreviewCommandError::retry_failed(failure.message))?;
-    let state = match inspection.availability() {
-        MediaAvailability::Candidate => MediaPreviewState::Ready,
-        MediaAvailability::Absent => MediaPreviewState::Absent,
-        MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
-    };
+    let retry_app = app.clone();
+    let retry_app_paths = app_paths.inner().clone();
+    let retry_namespace = namespace_owner.namespace().clone();
+    let retry_registry = registry.inner().clone();
+    let inspection = tauri::async_runtime::spawn_blocking(move || {
+        monitor.retry_unavailable(&runtime, &binding, |update| {
+            retry_app
+                .state::<CacheEngine>()
+                .apply_monitor_media_update(
+                    &retry_app_paths,
+                    &retry_namespace,
+                    &retry_registry,
+                    update,
+                )
+                .map(|_| ())
+                .map_err(|failure| failure.message)
+        })
+    })
+    .await
+    .map_err(MediaPreviewCommandError::retry_failed)?
+    .map_err(MediaPreviewCommandError::retry_failed)?;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        media_id,
+        changed = !inspection.update().changed_media_ids().is_empty(),
+        invalidated = !inspection.update().invalidated_media_ids().is_empty(),
+        event = "linked_media_retry_adopted",
+    );
+    let state = preview_state(inspection.availability());
     let retained = (state != MediaPreviewState::Ready)
         .then(|| registry.retained_preview(&media_id, state))
         .flatten();
@@ -209,12 +224,8 @@ pub(crate) async fn prepare_media_previews(
             .get(media_id.as_str())
             .copied()
             .unwrap_or(MediaAvailability::Unavailable);
-        if availability != MediaAvailability::Candidate {
-            let state = match availability {
-                MediaAvailability::Absent => MediaPreviewState::Absent,
-                MediaAvailability::Candidate => unreachable!(),
-                MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
-            };
+        let state = preview_state(availability);
+        if state != MediaPreviewState::Ready {
             previews.push(contextual_preview(
                 &engine,
                 &registry,
@@ -250,7 +261,7 @@ pub(crate) async fn prepare_media_previews(
                     &namespace,
                     &demand_revision,
                     media_id,
-                    MediaPreviewState::Unavailable,
+                    cache_failure_state(),
                 ));
                 continue;
             }
@@ -332,12 +343,24 @@ pub(crate) async fn prepare_media_previews(
                     &namespace,
                     &demand_revision,
                     media_id,
-                    MediaPreviewState::Unavailable,
+                    cache_failure_state(),
                 ));
             }
         }
     }
     Ok(Some(previews))
+}
+
+fn preview_state(availability: MediaAvailability) -> MediaPreviewState {
+    match availability {
+        MediaAvailability::Candidate => MediaPreviewState::Ready,
+        MediaAvailability::Absent => MediaPreviewState::Absent,
+        MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
+    }
+}
+
+fn cache_failure_state() -> MediaPreviewState {
+    MediaPreviewState::CacheUnavailable
 }
 
 fn contextual_preview(
@@ -459,9 +482,12 @@ async fn execute_owned_cache(
 
 #[cfg(test)]
 mod tests {
-    use crate::ipc_contract::MediaPreviewDemand;
+    use crate::{
+        ipc_contract::{MediaPreviewDemand, MediaPreviewState},
+        media_runtime::MediaAvailability,
+    };
 
-    use super::ordered_demand;
+    use super::{cache_failure_state, ordered_demand, preview_state};
 
     #[test]
     fn visible_media_precedes_preload_and_equivalent_demands_are_grouped() {
@@ -474,6 +500,33 @@ mod tests {
         assert_eq!(
             ordered_demand(&demand),
             ["photo-visible", "shared", "photo-preload"]
+        );
+    }
+
+    #[test]
+    fn authoritative_media_availability_maps_exhaustively_without_cache_failures() {
+        assert_eq!(
+            preview_state(MediaAvailability::Candidate),
+            MediaPreviewState::Ready
+        );
+        assert_eq!(
+            preview_state(MediaAvailability::Absent),
+            MediaPreviewState::Absent
+        );
+        assert_eq!(
+            preview_state(MediaAvailability::Unavailable),
+            MediaPreviewState::Unavailable
+        );
+        assert_ne!(
+            preview_state(MediaAvailability::Unavailable),
+            MediaPreviewState::CacheUnavailable,
+            "a Cache failure is not an authoritative statement about the Original"
+        );
+        assert_eq!(cache_failure_state(), MediaPreviewState::CacheUnavailable);
+        assert_ne!(
+            cache_failure_state(),
+            MediaPreviewState::Unavailable,
+            "Processor, validation and Cache storage failures do not classify the Original"
         );
     }
 }

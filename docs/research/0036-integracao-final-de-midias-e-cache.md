@@ -43,18 +43,31 @@ Uma ocorrência confirmada como `Unavailable` oferece `Tentar novamente`, nunca
 Religação. A WebView envia somente o `mediaId`; o Host relê o binding atual da
 ocorrência e o `MediaResolver` cria outro `OperationPathContext` para uma nova
 inspeção autoritativa. `MediaRuntime` substitui somente essa observação e o
-`CacheEngine` reage à nova geração antes de outra demanda de prévia. Se a raiz
+`CacheEngine` reage à nova geração antes de outra demanda de prévia. A adoção é
+uma transição única: se essa reação falhar, `MediaRuntime` conserva
+`Unavailable` e a próxima tentativa continua autorizada. Se a raiz
 continuar inacessível, o estado e a ação permanecem; se ela voltar e o arquivo
 não existir, o resultado passa a `Absent` e somente então oferece Religação; se
 o Original reaparecer, a demanda normal reconstrói ou revalida a representação.
 O fluxo não chama `ProjectSession`, não cria Histórico e não altera caminho,
 `MediaRef`, revisão, dirty, Undo/Redo ou conteúdo salvo.
 
+Falha do Processador, de validação do protocolo, do armazenamento do Cache ou
+da captura técnica usada para preparar um job não confirma indisponibilidade do
+Original. Nesses terminais a prévia usa o estado distinto
+`CacheUnavailable`, pode manter a última representação apenas como contexto e
+não oferece `Tentar novamente` nem Religação. Somente a inspeção autoritativa do
+`MediaResolver` produz `Unavailable` e sua ação explícita.
+
 O `CacheEngine` consome essas duas autoridades. A última representação válida
 pode permanecer visível como contexto quando o Original está ausente ou
 indisponível, mas não muda o estado do Original e não autoriza Exportação. Uma
 observação autoritativa posterior de reaparecimento ou mudança cria nova época;
 pedido, fingerprint, variante e época são revalidados antes da publicação.
+Essa invalidação revoga demanda e publicação residente, mas conserva a entrada
+e o arquivo da geração publicada anterior. O planejamento não pode reutilizá-la
+porque revalida o fingerprint atual; somente a publicação atômica de uma
+sucessora troca o índice e então coleta a geração superada.
 Falha de protocolo, correlação, transporte ou validação descarta o candidato
 ainda não referenciado pelo índice e preserva a última geração publicada. Isso
 também cobre a perda da resposta depois que o Processador promoveu o arquivo
@@ -175,7 +188,7 @@ prova.
 | `Salvar como` | `ProjectCore` da futura issue 18 produz nova Identidade | recebe a nova autoridade e reserva namespace independente e vazio | `a_new_authorized_identity_reserves_an_independent_empty_namespace` |
 | Cópia externa gravável | promoção autoritativa da issue 10 produz nova Identidade | recebe namespace independente e vazio | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
 | Cópia externa somente leitura | resultado opaco da issue 10 nega autoridade editável | não monta Sessão nem namespace duplicado | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
-| original alterado | duas inspeções autoritativas estáveis do `MediaResolver` | invalida somente a representação daquela ocorrência | `monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes` |
+| original alterado | duas inspeções autoritativas estáveis do `MediaResolver` | invalida reuse/publicação residente somente daquela ocorrência e conserva a geração indexada até a sucessora verificada | `monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes` |
 | original ausente | inspeção autoritativa `Absent` do `MediaResolver` | mantém somente contexto visual; não valida o Original nem autoriza Exportação | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
 | origem de rede indisponível | inspeção inconclusiva `Unavailable` do `MediaResolver`; `Tentar novamente` abre contexto novo | preserva vínculo e última representação sem confirmar ausência nem oferecer Religação | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
 | índice corrompido | validação integral do `CacheEngine` | descarta o índice completo e reconstrói em trabalho novo | `corrupted_or_incompatible_index_is_discarded_and_rebuilt` |

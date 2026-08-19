@@ -905,11 +905,32 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
 });
 
 test("offers retry only for an unavailable occurrence and keeps Relink exclusive to absent", async () => {
-  const relinkedProjection: EditorProjection = {
+  const fourStateProjection: EditorProjection = {
     ...projection,
     state: {
       ...projection.state,
-      revision: projection.state.revision + 1,
+      album: {
+        ...projection.state.album,
+        media: [
+          ...projection.state.album.media,
+          {
+            ...projection.state.album.media[0],
+            id: "media-004",
+            name: "Floresta.jpg",
+          },
+        ],
+      },
+    },
+    mediaUsage: [
+      ...projection.mediaUsage,
+      { mediaId: "media-004", count: 0 },
+    ],
+  };
+  const relinkedProjection: EditorProjection = {
+    ...fourStateProjection,
+    state: {
+      ...fourStateProjection.state,
+      revision: fourStateProjection.state.revision + 1,
       dirty: true,
       canUndo: true,
     },
@@ -926,7 +947,7 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   render(
     <ProjectWorkspace
       exportPipelinePort={exportPipelinePort}
-      projection={projection}
+      projection={fourStateProjection}
       projectCorePort={projectCorePort}
       mediaPreviews={{
         "media-001": {
@@ -938,6 +959,16 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
           mediaId: "media-002",
           state: "unavailable",
           url: null,
+        },
+        "media-003": {
+          mediaId: "media-003",
+          state: "cache_unavailable",
+          url: "asset://localhost/cache/media-003-last.jpg",
+        },
+        "media-004": {
+          mediaId: "media-004",
+          state: "ready",
+          url: "asset://localhost/cache/media-004.jpg",
         },
       }}
       onRetryUnavailableMedia={onRetryUnavailableMedia}
@@ -951,6 +982,13 @@ test("offers retry only for an unavailable occurrence and keeps Relink exclusive
   expect(
     screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).toHaveLength(1);
+  expect(screen.getByRole("status", { name: /Prévia indisponível/i }))
+    .toBeInTheDocument();
+  const availabilityStatuses = screen.getAllByRole("status");
+  expect(availabilityStatuses).toHaveLength(3);
+  for (const status of availabilityStatuses) {
+    expect(status).toHaveTextContent(status.getAttribute("aria-label") ?? "");
+  }
   fireEvent.click(
     screen.getByRole("button", { name: /Religar arquivo de/i }),
   );

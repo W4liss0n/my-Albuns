@@ -165,9 +165,10 @@ impl MediaRetryInspection {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MediaRetryError {
     NotUnavailable,
+    AdoptionFailed(String),
 }
 
 impl std::fmt::Display for MediaRetryError {
@@ -176,6 +177,7 @@ impl std::fmt::Display for MediaRetryError {
             Self::NotUnavailable => formatter.write_str(
                 "A ocorrência de mídia não está confirmada como temporariamente indisponível.",
             ),
+            Self::AdoptionFailed(message) => formatter.write_str(message),
         }
     }
 }
@@ -381,31 +383,39 @@ impl MediaRuntime {
         {
             return MediaRuntimeUpdate::default();
         }
-        let current = current.get_or_insert_with(|| MediaResolutionProposal {
-            generation,
-            observations: Vec::new(),
-        });
-        let previous = current
-            .observations
-            .iter_mut()
-            .find(|current| current.media_id == observation.media_id);
-        let (changed, invalidated) = if let Some(previous) = previous {
-            let changed = *previous != observation;
-            let invalidated = invalidates_cache(previous, &observation);
-            *previous = observation.clone();
-            (changed, invalidated)
-        } else {
-            current.observations.push(observation.clone());
-            (true, false)
-        };
-        let media_id = observation.media_id.clone();
-        current.generation = generation;
-        MediaRuntimeUpdate {
-            observation_generation: generation,
-            changed_media_ids: changed.then(|| media_id.clone()).into_iter().collect(),
-            invalidated_media_ids: invalidated.then(|| media_id.clone()).into_iter().collect(),
-            revoked_preview_media_ids: invalidated.then_some(media_id).into_iter().collect(),
-        }
+        apply_occurrence(&mut current, generation, observation)
+    }
+}
+
+fn apply_occurrence(
+    current: &mut Option<MediaResolutionProposal>,
+    generation: u64,
+    observation: MediaObservation,
+) -> MediaRuntimeUpdate {
+    let current = current.get_or_insert_with(|| MediaResolutionProposal {
+        generation,
+        observations: Vec::new(),
+    });
+    let previous = current
+        .observations
+        .iter_mut()
+        .find(|current| current.media_id == observation.media_id);
+    let (changed, invalidated) = if let Some(previous) = previous {
+        let changed = *previous != observation;
+        let invalidated = invalidates_cache(previous, &observation);
+        *previous = observation.clone();
+        (changed, invalidated)
+    } else {
+        current.observations.push(observation.clone());
+        (true, false)
+    };
+    let media_id = observation.media_id.clone();
+    current.generation = generation;
+    MediaRuntimeUpdate {
+        observation_generation: generation,
+        changed_media_ids: changed.then(|| media_id.clone()).into_iter().collect(),
+        invalidated_media_ids: invalidated.then(|| media_id.clone()).into_iter().collect(),
+        revoked_preview_media_ids: invalidated.then_some(media_id).into_iter().collect(),
     }
 }
 
@@ -426,6 +436,7 @@ impl MediaMonitor {
         &self,
         runtime: &MediaRuntime,
         binding: &MediaBinding,
+        apply_update: impl FnOnce(&MediaRuntimeUpdate) -> Result<(), String>,
     ) -> Result<MediaRetryInspection, MediaRetryError> {
         let mut transition = self
             .transition
@@ -457,11 +468,15 @@ impl MediaMonitor {
             .next()
             .expect("an occurrence retry produces exactly one observation");
         let availability = observation.availability;
-        let update = runtime.apply_occurrence(generation, observation);
+        let mut staged = current;
+        let update = apply_occurrence(&mut staged, generation, observation.clone());
+        apply_update(&update).map_err(MediaRetryError::AdoptionFailed)?;
+        let committed = runtime.apply_occurrence(generation, observation);
+        debug_assert_eq!(committed, update);
         transition.pending = None;
         Ok(MediaRetryInspection {
             availability,
-            update,
+            update: committed,
         })
     }
 
@@ -590,7 +605,7 @@ mod tests {
             .clone();
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &selected)
+            .retry_unavailable(&runtime, &selected, |_| Ok(()))
             .expect("an unavailable occurrence can be inspected explicitly");
 
         assert_eq!(retried.availability(), MediaAvailability::Candidate);
@@ -640,7 +655,7 @@ mod tests {
         );
 
         let error = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding)
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
             .expect_err("absence is not eligible for the unavailable retry action");
 
         assert_eq!(error, MediaRetryError::NotUnavailable);
@@ -671,7 +686,7 @@ mod tests {
         });
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding)
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
             .expect("the reachable root can authoritatively establish absence");
 
         assert_eq!(retried.availability(), MediaAvailability::Absent);
@@ -700,7 +715,7 @@ mod tests {
         let runtime = MediaRuntime::default();
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding)
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
             .expect("the explicit action can resolve a provisional unavailable state");
 
         assert_eq!(retried.availability(), MediaAvailability::Candidate);
@@ -729,7 +744,7 @@ mod tests {
         let binding_before = binding.clone();
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding)
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
             .expect("an inaccessible root is still a completed retry inspection");
 
         assert_eq!(retried.availability(), MediaAvailability::Unavailable);
@@ -743,6 +758,61 @@ mod tests {
                 .observations()[0]
                 .availability,
             MediaAvailability::Unavailable
+        );
+    }
+
+    #[test]
+    fn explicit_retry_keeps_unavailable_when_cache_adoption_fails_and_can_be_retried() {
+        let root = tempfile::tempdir().expect("temporary transactional retry fixture");
+        let source = root.path().join("photo.jpg");
+        std::fs::write(&source, b"photo").expect("the Original fixture is writable");
+        let binding = MediaBinding {
+            media_id: "photo-transactional".into(),
+            kind: MediaKind::Photo,
+            logical_path: source,
+        };
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolutionProposal {
+            generation: 2,
+            observations: vec![MediaObservation {
+                media_id: binding.media_id.clone(),
+                kind: binding.kind,
+                logical_path: binding.logical_path.clone(),
+                availability: MediaAvailability::Unavailable,
+                physical_identity: None,
+                source_bytes: None,
+                source_created_unix_ms: None,
+                source_modified_unix_ms: None,
+            }],
+        });
+        let monitor = MediaMonitor::default();
+
+        let failure = monitor
+            .retry_unavailable(&runtime, &binding, |_| Err("Cache adoption failed".into()))
+            .expect_err("a failed Cache reaction cannot commit the new media observation");
+
+        assert_eq!(failure.to_string(), "Cache adoption failed");
+        assert_eq!(
+            runtime
+                .snapshot()
+                .expect("the previous Runtime observation is retained")
+                .observations()[0]
+                .availability,
+            MediaAvailability::Unavailable
+        );
+
+        let retried = monitor
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .expect("the explicit retry remains actionable after Cache adoption fails");
+
+        assert_eq!(retried.availability(), MediaAvailability::Candidate);
+        assert_eq!(
+            runtime
+                .snapshot()
+                .expect("the successful retry commits the new observation")
+                .observations()[0]
+                .availability,
+            MediaAvailability::Candidate
         );
     }
 

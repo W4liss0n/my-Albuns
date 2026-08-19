@@ -117,39 +117,16 @@ impl CacheService {
         let mut namespace_count = 0_usize;
         let mut releasable_namespace_count = 0_usize;
         for paths in namespaces {
-            match namespace_mutex(&self.app_paths, &paths).try_acquire() {
-                Ok(_reservation) => {
-                    synchronize_cache_writer(&self.app_paths, &paths)?;
-                    let Some(usage) = self.inspect_namespace(&paths)? else {
-                        continue;
-                    };
-                    occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
-                    releasable_bytes = checked_add_usage(releasable_bytes, usage.bytes())?;
-                    namespace_count += 1;
-                    releasable_namespace_count += 1;
-                }
+            let (usage, releasable) = match namespace_mutex(&self.app_paths, &paths).try_acquire() {
+                Ok(_reservation) => (self.inspect_quiesced_namespace(&paths)?, true),
                 Err(NamedMutexError::Conflict) => {
                     // An active namespace cannot be quiesced without blocking its editor. Take a
                     // guarded snapshot, then retry the reservation: if the owner closed during
                     // inspection, discard that snapshot and measure again after quiescence.
                     let active_snapshot = self.snapshot_active_namespace(&paths)?;
                     match namespace_mutex(&self.app_paths, &paths).try_acquire() {
-                        Ok(_reservation) => {
-                            synchronize_cache_writer(&self.app_paths, &paths)?;
-                            let Some(usage) = self.inspect_namespace(&paths)? else {
-                                continue;
-                            };
-                            occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
-                            releasable_bytes = checked_add_usage(releasable_bytes, usage.bytes())?;
-                            namespace_count += 1;
-                            releasable_namespace_count += 1;
-                        }
-                        Err(NamedMutexError::Conflict) => {
-                            if let Some(usage) = active_snapshot {
-                                occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
-                                namespace_count += 1;
-                            }
-                        }
+                        Ok(_reservation) => (self.inspect_quiesced_namespace(&paths)?, true),
+                        Err(NamedMutexError::Conflict) => (active_snapshot, false),
                         Err(NamedMutexError::Unavailable(reason)) => {
                             return Err(CacheServiceError::Reservation(reason));
                         }
@@ -157,6 +134,14 @@ impl CacheService {
                 }
                 Err(NamedMutexError::Unavailable(reason)) => {
                     return Err(CacheServiceError::Reservation(reason));
+                }
+            };
+            if let Some(usage) = usage {
+                occupied_bytes = checked_add_usage(occupied_bytes, usage.bytes())?;
+                namespace_count += 1;
+                if releasable {
+                    releasable_bytes = checked_add_usage(releasable_bytes, usage.bytes())?;
+                    releasable_namespace_count += 1;
                 }
             }
         }
@@ -307,6 +292,14 @@ impl CacheService {
         self.app_paths
             .inspect_cache_namespace(paths)
             .map_err(|error| CacheServiceError::Storage(error.to_string()))
+    }
+
+    fn inspect_quiesced_namespace(
+        &self,
+        paths: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, CacheServiceError> {
+        synchronize_cache_writer(&self.app_paths, paths)?;
+        self.inspect_namespace(paths)
     }
 
     fn snapshot_active_namespace(
