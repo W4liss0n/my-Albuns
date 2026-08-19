@@ -433,6 +433,19 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
   expect(sheetBar.alpha).toBe(0);
 });
 
+test("enters Sheet Edit Mode on the second pointer tap of a Sheet", async () => {
+  const onEditSheet = vi.fn();
+  renderCanvas({ onEditSheet });
+  await finishPixiInitialization();
+
+  const sheet = displayWithLabel("canvas-sheet-sheet-001");
+  sheet.emit("pointertap", { detail: 1, target: sheet });
+  expect(onEditSheet).not.toHaveBeenCalled();
+
+  sheet.emit("pointertap", { detail: 2, target: sheet });
+  expect(onEditSheet).toHaveBeenCalledWith("sheet-001");
+});
+
 test.each([
   {
     activeSides: "right" as const,
@@ -585,6 +598,7 @@ function hasVerticalSegmentAt(
 test("keeps the materialized Pixi scene stable across view-only updates", async () => {
   const callbacks = {
     onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),
     onViewportChange: vi.fn(),
@@ -889,6 +903,7 @@ test("materializes and releases only the viewport margin while navigating a long
   );
   const callbacks = {
     onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),
     onViewportChange: vi.fn(),
@@ -992,6 +1007,7 @@ test("reconciles only the composed sheet that changed", async () => {
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
     onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),
     onViewportChange: vi.fn(),

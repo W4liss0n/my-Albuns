@@ -46,6 +46,8 @@ interface ProjectWorkspaceProps {
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }
 
+const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
+
 export function ProjectWorkspace({
   projection,
   projectDialogPort,
@@ -117,6 +119,14 @@ export function ProjectWorkspace({
     onProjectionChange,
   });
   const workspacePanels = useWorkspacePanelLayout();
+  const sheetEditing = controller.canvasProps.mode.kind === "sheet-editing";
+  const mediaPanelHeight = sheetEditing
+    ? SHEET_EDITING_MEDIA_PANEL_HEIGHT
+    : workspacePanels.sizes.media;
+  const workspaceStyle = {
+    ...workspacePanels.style,
+    "--media-panel-height": `${mediaPanelHeight}px`,
+  };
   const {
     busy,
     message,
@@ -167,7 +177,7 @@ export function ProjectWorkspace({
       <div
         className="workspace-grid"
         ref={workspacePanels.workspaceRef}
-        style={workspacePanels.style}
+        style={workspaceStyle}
       >
         <section
           id="continuous-canvas"
@@ -187,8 +197,9 @@ export function ProjectWorkspace({
         </section>
 
         <WorkspacePanelSplitter
+          disabled={sheetEditing}
           panel="media"
-          size={workspacePanels.sizes.media}
+          size={mediaPanelHeight}
           onResizeStart={workspacePanels.beginResize}
           onResizeBy={workspacePanels.resizeBy}
         />

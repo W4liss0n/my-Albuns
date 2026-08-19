@@ -34,6 +34,7 @@ import {
   representativeProjection,
 } from "../test/projectFixtures";
 import type {
+  AlbumCanvasMode,
   CanvasMetrics,
   CanvasTechnicalGuides,
   PhotoTransformDelta,
@@ -45,12 +46,14 @@ import { useProjectMutationRunner } from "./useProjectMutationRunner";
 
 const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
+    mode: AlbumCanvasMode;
     continuousCanvasLayout: ContinuousCanvasLayout;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
     technicalGuides?: CanvasTechnicalGuides;
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
+    onEditSheet?(sheetId: string): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -400,6 +403,48 @@ test("derives the Canvas technical guides from the canonical document", () => {
     bleedUm: projection.state.document.bleedUm,
     safetyUm: projection.state.document.safetyUm,
   });
+});
+
+test("temporarily compacts the image panel during Sheet Edit Mode and restores its normal height", () => {
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const workspace = view.container.querySelector(
+    ".workspace-grid",
+  ) as HTMLElement;
+  const normalHeight = workspace.style.getPropertyValue(
+    "--media-panel-height",
+  );
+
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
+
+  expect(canvasHarness.props?.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
+  expect(
+    workspace.style.getPropertyValue("--media-panel-height"),
+  ).toBe("120px");
+  expect(
+    screen.getByRole("separator", {
+      name: "Redimensionar Painel de imagens",
+    }),
+  ).toHaveAttribute("aria-disabled", "true");
+
+  const input = document.createElement("input");
+  document.body.append(input);
+  fireEvent.keyDown(input, { key: "Escape" });
+
+  expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
+  expect(
+    workspace.style.getPropertyValue("--media-panel-height"),
+  ).toBe(normalHeight);
+  input.remove();
 });
 
 test("starts the implemented Lâmina export from the Arquivo menu", () => {

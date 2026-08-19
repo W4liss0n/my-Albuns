@@ -476,6 +476,7 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
     centeredSheetId: "sheet-001",
     viewport: { offsetX: 42 },
     onSelectFrame: vi.fn(),
+    onEditSheet: vi.fn(),
     onFocusSheet: vi.fn(),
     onCenteredSheetChange: vi.fn(),
     onViewportChange: vi.fn(),

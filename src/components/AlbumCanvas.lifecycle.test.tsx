@@ -160,6 +160,7 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
           centeredSheetId="sheet-001"
           viewport={{ offsetX: 42 }}
           onSelectFrame={() => undefined}
+          onEditSheet={() => undefined}
           onFocusSheet={() => undefined}
           onCenteredSheetChange={() => undefined}
           onViewportChange={() => undefined}

@@ -159,11 +159,13 @@ export function useWorkspacePanelLayout() {
 }
 
 export function WorkspacePanelSplitter({
+  disabled = false,
   panel,
   size,
   onResizeStart,
   onResizeBy,
 }: {
+  disabled?: boolean;
   panel: WorkspacePanel;
   size: number;
   onResizeStart(panel: WorkspacePanel): void;
@@ -177,6 +179,7 @@ export function WorkspacePanelSplitter({
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (
+      disabled ||
       event.key !== definition.increaseKey &&
       event.key !== decreaseKey
     ) {
@@ -198,13 +201,14 @@ export function WorkspacePanelSplitter({
       role="separator"
       aria-label={definition.label}
       aria-controls={definition.controls}
+      aria-disabled={disabled || undefined}
       aria-orientation={definition.orientation}
       aria-valuemin={definition.minimumSize}
       aria-valuemax={definition.maximumSize}
       aria-valuenow={Math.round(size)}
-      tabIndex={0}
+      tabIndex={disabled ? -1 : 0}
       onPointerDown={(event) => {
-        if (event.button !== 0) return;
+        if (disabled || event.button !== 0) return;
         event.preventDefault();
         onResizeStart(panel);
       }}

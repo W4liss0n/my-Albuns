@@ -102,7 +102,7 @@ function CanvasPreview() {
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
   const [viewport, setViewport] = useState({ offsetX: 0 });
-  const mode = useMemo<AlbumCanvasMode>(() => {
+  const [mode, setMode] = useState<AlbumCanvasMode>(() => {
     const parameters = new URLSearchParams(window.location.search);
     return parameters.get("mode") === "sheet-editing"
       ? {
@@ -110,7 +110,7 @@ function CanvasPreview() {
           sheetId: parameters.get("sheet") ?? "sheet-002",
         }
       : { kind: "normal" };
-  }, []);
+  });
 
   return (
     <main className="canvas-preview canvas-section" data-development-preview="canvas">
@@ -126,6 +126,9 @@ function CanvasPreview() {
         centeredSheetId={centeredSheetId}
         viewport={viewport}
         onSelectFrame={() => undefined}
+        onEditSheet={(sheetId) =>
+          setMode({ kind: "sheet-editing", sheetId })
+        }
         onFocusSheet={setFocusedSheetId}
         onCenteredSheetChange={setCenteredSheetId}
         onViewportChange={setViewport}

@@ -16,10 +16,10 @@ import type {
   ProjectedFrameBorder,
 } from "../domain/project";
 import type {
-  AlbumCanvasMode,
   CanvasTechnicalGuides,
   SheetBarMetadata,
 } from "./albumCanvasContract";
+import type { AlbumCanvasModePolicy } from "./albumCanvasMode";
 import {
   createCanvasSheetPresentation,
   MICROMETER_TO_CANVAS_PIXEL,
@@ -80,6 +80,7 @@ export interface SheetRenderNode {
 interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
   onSheetTap: (sheetId: string) => void;
+  onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string) => void;
   onPhotoPanStart: (
     photoNode: PhotoRenderNode,
@@ -107,7 +108,7 @@ export function createSheetRenderNode(
   sheetBarMetadata: SheetBarMetadata | undefined,
   frameBorder: ProjectedFrameBorder,
   technicalGuides: CanvasTechnicalGuides | undefined,
-  mode: AlbumCanvasMode["kind"],
+  modePolicy: AlbumCanvasModePolicy,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
 ): SheetRenderNode {
@@ -121,7 +122,11 @@ export function createSheetRenderNode(
   sheetContainer.cursor = "default";
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
     if (event.target === sheetContainer) {
-      callbacks.onSheetTap(sheet.sheetId);
+      if (event.detail >= 2) {
+        callbacks.onSheetDoubleTap(sheet.sheetId);
+      } else {
+        callbacks.onSheetTap(sheet.sheetId);
+      }
     }
   });
 
@@ -307,17 +312,25 @@ export function createSheetRenderNode(
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
+      if (event.detail >= 2) {
+        callbacks.onSheetDoubleTap(sheet.sheetId);
+        return;
+      }
       if (!event.altKey) {
         callbacks.onFrameTap(sheet.sheetId, frame.frameId);
       }
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
-      if (mode !== "normal" || !event.altKey || !photoNode) return;
+      if (!modePolicy.enablesPhotoTransform || !event.altKey || !photoNode) {
+        return;
+      }
       event.stopPropagation();
       callbacks.onPhotoPanStart(photoNode, event);
     });
     frameContainer.on("wheel", (event: FederatedWheelEvent) => {
-      if (mode !== "normal" || !event.altKey || !photoNode) return;
+      if (!modePolicy.enablesPhotoTransform || !event.altKey || !photoNode) {
+        return;
+      }
       callbacks.onPhotoWheel(photoNode, event);
     });
     activeContent.addChild(frameContainer);
@@ -361,10 +374,11 @@ export function createSheetRenderNode(
     }
   }
 
-  if (mode === "normal") {
+  if (modePolicy.masksBleed) {
     const bleedMask = createSheetBleedMask(sheet, technicalGuides);
     if (bleedMask) activeContent.addChild(bleedMask);
-  } else {
+  }
+  if (modePolicy.showsTechnicalGuides) {
     for (const guide of createSheetTechnicalGuideNodes(
       sheet,
       technicalGuides,
@@ -378,12 +392,16 @@ export function createSheetRenderNode(
     sheetBarMetadata,
     presentation,
   );
-  sheetBar.container.visible = mode === "normal";
+  sheetBar.container.visible = modePolicy.showsSheetBar;
   sheetBar.container.on(
     "pointertap",
     (event: FederatedPointerEvent) => {
       if (event.target === sheetBar.container) {
-        callbacks.onSheetTap(sheet.sheetId);
+        if (event.detail >= 2) {
+          callbacks.onSheetDoubleTap(sheet.sheetId);
+        } else {
+          callbacks.onSheetTap(sheet.sheetId);
+        }
       }
     },
   );

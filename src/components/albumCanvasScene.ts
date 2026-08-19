@@ -20,6 +20,10 @@ import {
   type PhotoRenderNode,
   type SheetRenderNode,
 } from "./albumCanvasRenderNodes";
+import {
+  albumCanvasModePolicy,
+  sheetsForCanvasMode,
+} from "./albumCanvasMode";
 import { applySheetBarScale } from "./sheetBarRenderNode";
 import { PhotoInteractionSession } from "./photoInteractionSession";
 import { ViewportTexturePool } from "./viewportTexturePool";
@@ -33,6 +37,7 @@ export class AlbumCanvasScene {
   private readonly photoNodes = new Map<string, PhotoRenderNode>();
   private input: AlbumCanvasProps | null = null;
   private projectId: string | null = null;
+  private modeSignature: string | null = null;
   private projectGeneration = 0;
   private canvasScale = 1;
   private lastCanvasMetrics: CanvasMetrics | null = null;
@@ -80,8 +85,20 @@ export class AlbumCanvasScene {
       this.projectId = input.projectId;
       this.projectGeneration += 1;
     }
+    const modeSignature = JSON.stringify(input.mode);
+    if (
+      this.modeSignature !== null &&
+      this.modeSignature !== modeSignature
+    ) {
+      this.resetTransientInteractions();
+    }
+    this.modeSignature = modeSignature;
     this.input = input;
-    const sheets = sheetsForMode(input);
+    const modePolicy = albumCanvasModePolicy(input.mode);
+    const sheets = sheetsForCanvasMode(
+      input.composition.sheets,
+      modePolicy,
+    );
     const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
@@ -89,7 +106,7 @@ export class AlbumCanvasScene {
       return;
     }
     const layout =
-      input.mode.kind === "normal"
+      modePolicy.enablesContinuousNavigation
         ? input.continuousCanvasLayout
         : createContinuousCanvasLayout(sheets);
 
@@ -100,19 +117,19 @@ export class AlbumCanvasScene {
     );
     this.canvasScale = scale;
     const boundedOffsetX =
-      input.mode.kind === "normal"
+      modePolicy.enablesContinuousNavigation
         ? layout.clampOffset(
             input.viewport.offsetX,
             scale,
             this.app.screen.width,
           )
         : (layout.centeredOffset(
-            input.mode.sheetId,
+            modePolicy.editingSheetId ?? "",
             scale,
             this.app.screen.width,
           ) ?? 0);
     if (
-      input.mode.kind === "normal" &&
+      modePolicy.enablesContinuousNavigation &&
       Math.abs(boundedOffsetX - input.viewport.offsetX) > 0.0001
     ) {
       input.onViewportChange({
@@ -121,7 +138,7 @@ export class AlbumCanvasScene {
       });
     }
 
-    if (input.mode.kind === "normal") {
+    if (modePolicy.enablesContinuousNavigation) {
       this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
     }
     this.reportCanvasMetrics(scale);
@@ -171,6 +188,7 @@ export class AlbumCanvasScene {
     this.previewTextures.sync([]);
     this.lastCanvasMetrics = null;
     this.lastMediaDemandSignature = null;
+    this.modeSignature = null;
   }
 
   private resetTransientInteractions() {
@@ -288,7 +306,7 @@ export class AlbumCanvasScene {
           sheetBarMetadata.get(sheet.sheetId) ?? null,
           this.input.composition.frameBorder,
           this.input.technicalGuides ?? null,
-          this.input.mode.kind,
+          albumCanvasModePolicy(this.input.mode),
           previewStates,
           backgroundPreviewStates,
           overlayPreviewStates,
@@ -369,7 +387,9 @@ export class AlbumCanvasScene {
       sheetBarMetadata,
       this.input?.composition.frameBorder ?? { kind: "none" },
       this.input?.technicalGuides,
-      this.input?.mode.kind ?? "normal",
+      albumCanvasModePolicy(
+        this.input?.mode ?? { kind: "normal" },
+      ),
       signature,
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
@@ -377,6 +397,9 @@ export class AlbumCanvasScene {
           if (!this.input) return;
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
+        },
+        onSheetDoubleTap: (sheetId) => {
+          this.input?.onEditSheet(sheetId);
         },
         onFrameTap: (sheetId, frameId) => {
           if (!this.input) return;
@@ -420,7 +443,11 @@ export class AlbumCanvasScene {
   }
 
   private readonly handleCanvasWheel = (event: WheelEvent) => {
-    if (!this.input || this.input.mode.kind !== "normal" || event.altKey) {
+    if (
+      !this.input ||
+      !albumCanvasModePolicy(this.input.mode).enablesContinuousNavigation ||
+      event.altKey
+    ) {
       return;
     }
     event.preventDefault();
@@ -437,14 +464,6 @@ export class AlbumCanvasScene {
     });
     this.synchronizeCenteredSheet(layout, nextOffset, this.canvasScale);
   };
-}
-
-function sheetsForMode(input: AlbumCanvasProps) {
-  if (input.mode.kind === "normal") return input.composition.sheets;
-  const editingSheetId = input.mode.sheetId;
-  return input.composition.sheets.filter(
-    (sheet) => sheet.sheetId === editingSheetId,
-  );
 }
 
 function mediaIdsForSheets(sheets: readonly ComposedSheet[]) {

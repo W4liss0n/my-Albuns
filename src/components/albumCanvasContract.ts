@@ -56,6 +56,7 @@ export interface AlbumCanvasProps {
   viewport: ViewportState;
   photoZoomPreview?: PhotoZoomPreview | null;
   onSelectFrame(frameId: string | null): void;
+  onEditSheet(sheetId: string): void;
   onFocusSheet(sheetId: string): void;
   onCenteredSheetChange(sheetId: string): void;
   onViewportChange(viewport: ViewportState): void;

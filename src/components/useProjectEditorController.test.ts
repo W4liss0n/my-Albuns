@@ -73,17 +73,30 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
       onProjectionChange: vi.fn(),
     }),
   );
+  const outsideButton = document.createElement("button");
+  const canvasHost = document.createElement("div");
+  const canvas = document.createElement("canvas");
+  const input = document.createElement("input");
+  canvasHost.className = "canvas-host";
+  canvasHost.append(canvas);
+  document.body.append(outsideButton, canvasHost, input);
 
   expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
 
-  fireEvent.keyDown(window, { key: "Enter" });
+  fireEvent.keyDown(outsideButton, { key: "Enter" });
+  expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
+
+  fireEvent.keyDown(canvas, { key: "Enter" });
 
   expect(view.result.current.canvasProps.mode).toEqual({
     kind: "sheet-editing",
     sheetId: "sheet-001",
   });
 
-  fireEvent.keyDown(window, { key: "Escape" });
+  fireEvent.keyDown(input, { key: "Escape" });
 
   expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
+  outsideButton.remove();
+  canvasHost.remove();
+  input.remove();
 });

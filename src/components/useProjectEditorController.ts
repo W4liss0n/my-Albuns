@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { EditorProjection } from "../domain/project";
 import type {
@@ -57,6 +57,47 @@ export function useProjectEditorController({
     commitInteraction: mutations.commitInteraction,
   });
 
+  const exitSheetEditing = useCallback(() => {
+    navigation.selectFrame(null);
+    setCanvasMode({ kind: "normal" });
+  }, [navigation.selectFrame]);
+
+  const enterSheetEditing = useCallback(
+    (sheetId: string) => {
+      if (
+        interactionBlocked ||
+        canvasMode.kind !== "normal" ||
+        !projection.state.album.sheets.some(
+          (sheet) => sheet.id === sheetId,
+        )
+      ) {
+        return;
+      }
+      const selectedFrameBelongsToTarget =
+        navigation.selectedFrameId === null ||
+        projection.state.album.sheets.some(
+          (sheet) =>
+            sheet.id === sheetId &&
+            sheet.frames.some(
+              (frame) => frame.id === navigation.selectedFrameId,
+            ),
+        );
+      if (!selectedFrameBelongsToTarget) {
+        navigation.selectFrame(null);
+      }
+      navigation.focusSheet(sheetId);
+      setCanvasMode({ kind: "sheet-editing", sheetId });
+    },
+    [
+      canvasMode.kind,
+      interactionBlocked,
+      navigation.focusSheet,
+      navigation.selectFrame,
+      navigation.selectedFrameId,
+      projection.state.album.sheets,
+    ],
+  );
+
   useEffect(() => {
     setCanvasMode({ kind: "normal" });
   }, [projection.state.projectId]);
@@ -68,47 +109,31 @@ export function useProjectEditorController({
         (sheet) => sheet.id === canvasMode.sheetId,
       );
     if (editingSheetStillExists) return;
-    navigation.selectFrame(null);
-    setCanvasMode({ kind: "normal" });
+    exitSheetEditing();
   }, [
     canvasMode,
-    navigation.selectFrame,
+    exitSheetEditing,
     projection.state.album.sheets,
   ]);
 
   useEffect(() => {
     const changeCanvasMode = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        interactionBlocked ||
-        isTextEntryTarget(event.target)
-      ) {
-        return;
-      }
-      if (event.key === "Enter" && canvasMode.kind === "normal") {
-        const sheetId = navigation.implicitSheetId;
-        if (!sheetId) return;
-        const selectedFrameBelongsToTarget =
-          navigation.selectedFrameId === null ||
-          projection.state.album.sheets.some(
-            (sheet) =>
-              sheet.id === sheetId &&
-              sheet.frames.some(
-                (frame) => frame.id === navigation.selectedFrameId,
-              ),
-          );
-        if (!selectedFrameBelongsToTarget) {
-          navigation.selectFrame(null);
-        }
-        navigation.focusSheet(sheetId);
-        setCanvasMode({ kind: "sheet-editing", sheetId });
+      if (event.defaultPrevented || event.repeat) return;
+      if (event.key === "Escape" && canvasMode.kind === "sheet-editing") {
+        exitSheetEditing();
         event.preventDefault();
         return;
       }
-      if (event.key === "Escape" && canvasMode.kind === "sheet-editing") {
-        navigation.selectFrame(null);
-        setCanvasMode({ kind: "normal" });
+      if (
+        event.key === "Enter" &&
+        canvasMode.kind === "normal" &&
+        !interactionBlocked &&
+        !isTextEntryTarget(event.target) &&
+        isCanvasFocusTarget(event.target)
+      ) {
+        const sheetId = navigation.implicitSheetId;
+        if (!sheetId) return;
+        enterSheetEditing(sheetId);
         event.preventDefault();
       }
     };
@@ -116,12 +141,10 @@ export function useProjectEditorController({
     return () => window.removeEventListener("keydown", changeCanvasMode);
   }, [
     canvasMode,
+    enterSheetEditing,
+    exitSheetEditing,
     interactionBlocked,
-    navigation.focusSheet,
     navigation.implicitSheetId,
-    navigation.selectFrame,
-    navigation.selectedFrameId,
-    projection.state.album.sheets,
   ]);
 
   const canvasProps: AlbumCanvasProps = {
@@ -139,6 +162,7 @@ export function useProjectEditorController({
     viewport: navigation.viewport,
     photoZoomPreview: photoGestures.photoZoomPreview,
     onSelectFrame: navigation.selectFrame,
+    onEditSheet: enterSheetEditing,
     onFocusSheet: navigation.focusSheet,
     onCenteredSheetChange: navigation.centerSheet,
     onViewportChange: navigation.setViewport,
@@ -189,5 +213,11 @@ function isTextEntryTarget(target: EventTarget | null) {
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
     (target instanceof HTMLElement && target.isContentEditable)
+  );
+}
+
+function isCanvasFocusTarget(target: EventTarget | null) {
+  return (
+    target instanceof Element && target.closest(".canvas-host") !== null
   );
 }
