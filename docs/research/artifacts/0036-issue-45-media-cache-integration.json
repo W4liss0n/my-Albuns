@@ -2,9 +2,9 @@
     "schemaVersion":  1,
     "gate":  "issue-45-media-cache-final-integration",
     "issue":  45,
-    "collectedAtUtc":  "2026-08-19T03:06:03.6128196Z",
+    "collectedAtUtc":  "2026-08-19T03:47:24.4041954Z",
     "fixedPoint":  "f6518d63b2c75656a58b6769e87abc318a913e23",
-    "gitCommit":  "77619b198612112dfc512d927482aca909b4c3ac",
+    "gitCommit":  "c76c542f0bd54f797ea24df915ae99abedbcc383",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -64,57 +64,57 @@
                        "name":  "clean-debug-sidecar-preparation",
                        "passed":  true,
                        "assertionCount":  2,
-                       "elapsedMs":  30623
+                       "elapsedMs":  27776
                    },
                    {
                        "name":  "rust-typescript-contracts",
                        "passed":  true,
                        "assertionCount":  65,
-                       "elapsedMs":  77150
+                       "elapsedMs":  126686
                    },
                    {
                        "name":  "frontend-tests",
                        "passed":  true,
                        "assertionCount":  213,
                        "fileCount":  27,
-                       "elapsedMs":  23543
+                       "elapsedMs":  23785
                    },
                    {
                        "name":  "frontend-typecheck",
                        "passed":  true,
                        "assertionCount":  1,
-                       "elapsedMs":  6184
+                       "elapsedMs":  5389
                    },
                    {
                        "name":  "rust-tests",
                        "passed":  true,
                        "assertionCount":  440,
                        "suiteResultCount":  29,
-                       "elapsedMs":  114427
+                       "elapsedMs":  152807
                    },
                    {
                        "name":  "rust-fmt-clippy-deny-warnings",
                        "passed":  true,
                        "assertionCount":  3,
-                       "elapsedMs":  34364
+                       "elapsedMs":  75076
                    },
                    {
                        "name":  "real-processor-cache-canvas-recovery",
                        "passed":  true,
                        "assertionCount":  9,
-                       "elapsedMs":  135910
+                       "elapsedMs":  202479
                    },
                    {
                        "name":  "windows-local-unc-mapped-long-paths",
                        "passed":  true,
                        "assertionCount":  11,
-                       "elapsedMs":  175912
+                       "elapsedMs":  185223
                    },
                    {
                        "name":  "release-build-and-nsis-package",
                        "passed":  true,
                        "assertionCount":  4,
-                       "elapsedMs":  345385
+                       "elapsedMs":  331183
                    },
                    {
                        "name":  "owned-process-lock-listener-cleanup",
@@ -684,13 +684,13 @@
                                                               "actual-tauri-album-canvas-pixi-webview2"
                                                           ],
                                            "cache":  {
-                                                         "failedProcessId":  13100,
+                                                         "failedProcessId":  30468,
                                                          "foreignTemporarySurvivedCleanup":  true,
                                                          "generatedCountAfterRestart":  1,
                                                          "metadataExistedAfterFailure":  false,
                                                          "metadataExistedAfterRestart":  true,
                                                          "removedTemporaryCount":  1,
-                                                         "restartedProcessId":  36528,
+                                                         "restartedProcessId":  7716,
                                                          "temporaryExistedAfterCleanup":  false,
                                                          "temporaryObservedAfterFailure":  true
                                                      },
@@ -707,8 +707,8 @@
                                                                                0
                                                                            ],
                                                           "compositionMediaOrder":  [
-                                                                                        "ca3c8425-d005-4969-b975-80682e31d8b9",
-                                                                                        "b9b9e5f8-3b81-4d54-99ac-1d0e1fd2dd9a"
+                                                                                        "b0252477-5d74-46b0-86b0-28d6a437d799",
+                                                                                        "a9183ae8-d73f-4445-b0c6-a3430a406c76"
                                                                                     ],
                                                           "equivalentBackgroundDemandCount":  2,
                                                           "finalJpegPixel":  [
@@ -722,13 +722,13 @@
                                                           "originalPathExposedToWebView":  false,
                                                           "overlayUrlOpaque":  true,
                                                           "processorIds":  [
-                                                                               25348,
-                                                                               5768,
-                                                                               18820
+                                                                               4988,
+                                                                               30732,
+                                                                               35524
                                                                            ],
-                                                          "singleFlightGenerationId":  "g-6655ee4cf92649a69e77eb87ec911b90",
+                                                          "singleFlightGenerationId":  "g-a0317f8f67a94100831161281601f424",
                                                           "singleFlightProcessorCount":  1,
-                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-21404-3c88d9\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-10860-6aa7b5\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
                                                           "actualTauriApp":  true,
                                                           "actualAlbumCanvas":  true,
                                                           "actualPixiRuntime":  true,
@@ -756,19 +756,19 @@
                                            "pause":  {
                                                          "cacheBlockedWhileExportLease":  true,
                                                          "cacheIndexAfterCancellation":  false,
-                                                         "cancelledProcessId":  7488,
+                                                         "cancelledProcessId":  16004,
                                                          "cancelledProcessReaped":  true,
                                                          "cancelledStage":  "cancelled",
                                                          "pauseReason":  "paused",
                                                          "processorExclusiveWhileExportLease":  true,
                                                          "resumedAfterExportTerminal":  true,
                                                          "resumedGenerationPublished":  true,
-                                                         "resumedProcessId":  37516
+                                                         "resumedProcessId":  16088
                                                      },
                                            "obsolete":  {
                                                             "cacheIndexAfterCancellation":  false,
                                                             "cancellationReason":  "obsolete",
-                                                            "cancelledProcessId":  19052,
+                                                            "cancelledProcessId":  38400,
                                                             "cancelledProcessReaped":  true,
                                                             "cancelledStage":  "cancelled",
                                                             "resumableAfterCancellation":  false,
@@ -784,7 +784,7 @@
                                                               "bindingReusedAfterRemapWithinAttempt":  true,
                                                               "cacheUnderLocalAppData":  true,
                                                               "explicitRetryRecaptured":  true,
-                                                              "firstPlanSha256":  "f15dcd42e7f743422fc71d9ac4694d2935d3c538e5923d79d4e2bd943c765886",
+                                                              "firstPlanSha256":  "deb8ca5ac0bf90cbb8a650b461c70faf76c078cb291bbaaf5b6a3c02ec4f3fe5",
                                                               "identityFailure":  "indeterminate",
                                                               "lockReleasedAfterOwnerDrop":  true,
                                                               "mappedAndLocalIdentity":  "same",
@@ -795,7 +795,7 @@
                                                               "planRoundTripLossless":  true,
                                                               "plansDistinct":  true,
                                                               "readOnlyBatchAllowedWhileLocked":  true,
-                                                              "retryPlanSha256":  "fb8da93d560921f2957481437d435af994588369733aca904abbf28dea09897b",
+                                                              "retryPlanSha256":  "e726ae38fbdb0993e2217db9ae47e37ac17fd6f5ef57e05233f1d4680bab4391",
                                                               "stagingInsideDestination":  true,
                                                               "unavailableBinding":  "unavailable",
                                                               "uncExportPublished":  true,
@@ -806,9 +806,9 @@
                                                                 "mappingRemovedBeforeDispatch":  true,
                                                                 "outputPublishedOnUnc":  true,
                                                                 "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
-                                                                "processorPid":  19000,
+                                                                "processorPid":  10820,
                                                                 "processorUsedFrozenOperationalPath":  true,
-                                                                "rootBindingPlanSha256":  "2f2a671fea4cda17b1b59320fcfe6d41aed643eff206f13f4bb440ea88ae1e3e",
+                                                                "rootBindingPlanSha256":  "b1225d387697d247c3b8b889a9740ae58f3701ef906383d2dda9b986e4d54130",
                                                                 "stagingRemoved":  true,
                                                                 "unavailableAttemptStartedProcessor":  false,
                                                                 "unavailableBindingFailedAtPrepare":  true
@@ -822,23 +822,23 @@
     "releaseArtifacts":  [
                              {
                                  "name":  "desktop-release",
-                                 "bytes":  17697792,
-                                 "sha256":  "b93d613d41599efb38e3d0db80abd815d8652d1eb075240c605c400a02bd9dd7"
+                                 "bytes":  17698304,
+                                 "sha256":  "4b6ef687b93453181962e206d608f258e7539597ec379426f52bf5b26516115c"
                              },
                              {
                                  "name":  "imaging-release",
                                  "bytes":  3631104,
-                                 "sha256":  "b93a98a6571c8955684678ed8e06cd990536ff4816ac395b94820e210a769cc8"
+                                 "sha256":  "17c3b5a511ce81636d466ac21aa5a65b0873832aaf06d23e13699e7c4439f4e6"
                              },
                              {
                                  "name":  "prepared-sidecar",
                                  "bytes":  3631104,
-                                 "sha256":  "b93a98a6571c8955684678ed8e06cd990536ff4816ac395b94820e210a769cc8"
+                                 "sha256":  "17c3b5a511ce81636d466ac21aa5a65b0873832aaf06d23e13699e7c4439f4e6"
                              },
                              {
                                  "name":  "nsis-installer",
-                                 "bytes":  4999915,
-                                 "sha256":  "923f63a05aa838d70f9a3c0c5904d3c45ccd61aa2f461770770133b0c696ac4c"
+                                 "bytes":  4997505,
+                                 "sha256":  "4ebc71ea0a16d5830a90bab40d26b468d9116465c483f27d9e04eecb21d98a73"
                              }
                          ],
     "cleanup":  {
