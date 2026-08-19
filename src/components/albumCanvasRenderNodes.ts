@@ -116,15 +116,18 @@ export function createSheetRenderNode(
   const presentation = createCanvasSheetPresentation(sheet);
   const width = presentation.visualWidthPx;
   const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
+  const dispatchSheetDoubleTap = (event: FederatedPointerEvent) => {
+    if (!(event.detail >= 2)) return false;
+    callbacks.onSheetDoubleTap(sheet.sheetId);
+    return true;
+  };
   sheetContainer.label = `canvas-sheet-${sheet.sheetId}`;
   sheetContainer.eventMode = "static";
   sheetContainer.hitArea = new Rectangle(0, 0, width, height);
   sheetContainer.cursor = "default";
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
     if (event.target === sheetContainer) {
-      if (event.detail >= 2) {
-        callbacks.onSheetDoubleTap(sheet.sheetId);
-      } else {
+      if (!dispatchSheetDoubleTap(event)) {
         callbacks.onSheetTap(sheet.sheetId);
       }
     }
@@ -312,10 +315,7 @@ export function createSheetRenderNode(
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
-      if (event.detail >= 2) {
-        callbacks.onSheetDoubleTap(sheet.sheetId);
-        return;
-      }
+      if (dispatchSheetDoubleTap(event)) return;
       if (!event.altKey) {
         callbacks.onFrameTap(sheet.sheetId, frame.frameId);
       }
@@ -397,9 +397,7 @@ export function createSheetRenderNode(
     "pointertap",
     (event: FederatedPointerEvent) => {
       if (event.target === sheetBar.container) {
-        if (event.detail >= 2) {
-          callbacks.onSheetDoubleTap(sheet.sheetId);
-        } else {
+        if (!dispatchSheetDoubleTap(event)) {
           callbacks.onSheetTap(sheet.sheetId);
         }
       }

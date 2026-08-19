@@ -1,14 +1,23 @@
 import type { ComposedSheet } from "../domain/project";
 import type { AlbumCanvasMode } from "./albumCanvasContract";
 
-export interface AlbumCanvasModePolicy {
-  editingSheetId: string | null;
-  enablesContinuousNavigation: boolean;
-  enablesPhotoTransform: boolean;
-  masksBleed: boolean;
-  showsSheetBar: boolean;
-  showsTechnicalGuides: boolean;
-}
+export type AlbumCanvasModePolicy =
+  | {
+      editingSheetId: null;
+      enablesContinuousNavigation: true;
+      enablesPhotoTransform: true;
+      masksBleed: true;
+      showsSheetBar: true;
+      showsTechnicalGuides: false;
+    }
+  | {
+      editingSheetId: string;
+      enablesContinuousNavigation: false;
+      enablesPhotoTransform: false;
+      masksBleed: false;
+      showsSheetBar: false;
+      showsTechnicalGuides: true;
+    };
 
 const NORMAL_MODE_POLICY: AlbumCanvasModePolicy = {
   editingSheetId: null,
@@ -37,7 +46,7 @@ export function sheetsForCanvasMode(
   sheets: readonly ComposedSheet[],
   policy: AlbumCanvasModePolicy,
 ) {
-  if (policy.editingSheetId === null) return sheets;
+  if (policy.enablesContinuousNavigation) return sheets;
   return sheets.filter(
     (sheet) => sheet.sheetId === policy.editingSheetId,
   );

@@ -124,7 +124,7 @@ export class AlbumCanvasScene {
             this.app.screen.width,
           )
         : (layout.centeredOffset(
-            modePolicy.editingSheetId ?? "",
+            modePolicy.editingSheetId,
             scale,
             this.app.screen.width,
           ) ?? 0);
