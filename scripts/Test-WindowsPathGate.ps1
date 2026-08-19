@@ -48,6 +48,7 @@ $sourceSnapshotBefore = Get-GateSourceSnapshot `
 $scratchRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $script:WorkspaceRoot '.scratch\windows-path-gate')
 )
+$scratchRootExisted = Test-Path -LiteralPath $scratchRoot
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $scratchRoot "run-$PID-$([DateTime]::UtcNow.Ticks)")
 )
@@ -348,6 +349,11 @@ finally {
     Remove-GateScratchDirectory `
         -Path $runRoot `
         -AllowedParent $scratchRoot
+    if (-not $scratchRootExisted -and
+            (Test-Path -LiteralPath $scratchRoot) -and
+            @(Get-ChildItem -LiteralPath $scratchRoot -Force).Count -eq 0) {
+        [System.IO.Directory]::Delete($scratchRoot)
+    }
 }
 
 $sourceSnapshotAfter = Get-GateSourceSnapshot `

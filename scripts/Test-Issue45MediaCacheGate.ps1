@@ -39,6 +39,8 @@ $scratchRoot = [System.IO.Path]::GetFullPath(
         $workspaceRoot `
         '.scratch\cargo-target-tests\issue-45-media-cache')
 )
+$scratchContainer = [System.IO.Path]::GetDirectoryName($scratchRoot)
+$scratchContainerExisted = Test-Path -LiteralPath $scratchContainer
 $scratchRootExisted = Test-Path -LiteralPath $scratchRoot
 $runRoot = $null
 $distPath = Join-Path $workspaceRoot 'dist'
@@ -47,6 +49,8 @@ $preparedSidecarPath = Join-Path `
     'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
 $sharedCargoTarget = Join-Path $workspaceRoot 'target'
 $windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
+$workspaceScratch = Join-Path $workspaceRoot '.scratch'
+$windowsPathScratch = Join-Path $workspaceRoot '.scratch\windows-path-gate'
 function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
     $existing = @(
         $Paths | Where-Object { Test-Path -LiteralPath $_ }
@@ -60,6 +64,8 @@ $ownedOutputPreflightPaths = @(
     $windowsPathTarget
     $distPath
     $sharedCargoTarget
+    $scratchContainer
+    $windowsPathScratch
 )
 Assert-Issue45OwnedOutputsAbsent -Paths $ownedOutputPreflightPaths
 $runnerMutex = [System.Threading.Mutex]::new(
@@ -291,6 +297,17 @@ function Clear-Issue45GateOutputs {
     }
 
     try {
+        if (Test-Path -LiteralPath $windowsPathScratch) {
+            Remove-GateScratchDirectory `
+                -Path $windowsPathScratch `
+                -AllowedParent $workspaceScratch
+        }
+    }
+    catch {
+        $cleanupFailures.Add("Windows path scratch: $($_.Exception.Message)")
+    }
+
+    try {
         if (-not [string]::IsNullOrWhiteSpace($runRoot) -and
                 (Test-Path -LiteralPath $runRoot)) {
             Remove-GateScratchDirectory -Path $runRoot -AllowedParent $scratchRoot
@@ -309,6 +326,17 @@ function Clear-Issue45GateOutputs {
     }
     catch {
         $cleanupFailures.Add("scratch root: $($_.Exception.Message)")
+    }
+
+    try {
+        if (-not $scratchContainerExisted -and
+                (Test-Path -LiteralPath $scratchContainer) -and
+                @(Get-ChildItem -LiteralPath $scratchContainer -Force).Count -eq 0) {
+            [System.IO.Directory]::Delete($scratchContainer)
+        }
+    }
+    catch {
+        $cleanupFailures.Add("scratch container: $($_.Exception.Message)")
     }
 
     if ($cleanupFailures.Count -ne 0) {
@@ -1250,14 +1278,19 @@ try {
     $outputPreflightAssertionCount = Test-OwnedOutputPreflightContracts
     $preflightCoversSharedCargoTarget =
         $ownedOutputPreflightPaths -contains $sharedCargoTarget
+    $preflightCoversOwnedScratch =
+        $ownedOutputPreflightPaths -contains $scratchContainer -and
+        $ownedOutputPreflightPaths -contains $windowsPathScratch
     $checks.Add([ordered]@{
         name = 'fail-closed-preexisting-output-preflight'
         passed = ($outputPreflightAssertionCount -eq 4 -and
-            $ownedOutputPreflightPaths.Count -eq 4 -and
-            $preflightCoversSharedCargoTarget)
-        assertionCount = $outputPreflightAssertionCount + 2
+            $ownedOutputPreflightPaths.Count -eq 6 -and
+            $preflightCoversSharedCargoTarget -and
+            $preflightCoversOwnedScratch)
+        assertionCount = $outputPreflightAssertionCount + 3
         requiredOutputPathCount = $ownedOutputPreflightPaths.Count
         sharedCargoTargetRequiredAbsent = $preflightCoversSharedCargoTarget
+        ownedScratchRequiredAbsent = $preflightCoversOwnedScratch
     })
 
     $proofParserAssertionCount = Test-ProofParserContracts
@@ -1621,18 +1654,24 @@ try {
     $sharedCargoTargetUntouched = -not (Test-Path -LiteralPath $sharedCargoTarget)
     $isolatedCargoTargetRemoved = -not (Test-Path -LiteralPath $gateTarget)
     $runScratchRemoved = -not (Test-Path -LiteralPath $runRoot)
+    $ownedScratchContainerRemoved = -not (Test-Path -LiteralPath $scratchContainer)
+    $windowsPathScratchRemoved = -not (Test-Path -LiteralPath $windowsPathScratch)
     if (-not $sharedCargoTargetUntouched `
             -or -not $isolatedCargoTargetRemoved `
-            -or -not $runScratchRemoved) {
-        throw 'The issue 45 gate touched the shared Cargo target or retained its isolated target.'
+            -or -not $runScratchRemoved `
+            -or -not $ownedScratchContainerRemoved `
+            -or -not $windowsPathScratchRemoved) {
+        throw 'The issue 45 gate touched the shared Cargo target or retained owned scratch.'
     }
     $checks.Add([ordered]@{
         name = 'isolated-cargo-target-cleanup'
         passed = $true
-        assertionCount = 3
+        assertionCount = 5
         sharedCargoTargetUntouched = $sharedCargoTargetUntouched
         isolatedCargoTargetRemoved = $isolatedCargoTargetRemoved
         runScratchRemoved = $runScratchRemoved
+        ownedScratchContainerRemoved = $ownedScratchContainerRemoved
+        windowsPathScratchRemoved = $windowsPathScratchRemoved
     })
 
     $imagingProofText = @($imagingEvidence.checks | ForEach-Object { $_.name }) -join "`n"
@@ -1969,6 +2008,8 @@ try {
         releaseArtifacts = $releaseArtifacts
         cleanup = [ordered]@{
             runScratchRemoved = $runScratchRemoved
+            ownedScratchContainerRemoved = $ownedScratchContainerRemoved
+            windowsPathScratchRemoved = $windowsPathScratchRemoved
             isolatedCargoTargetRemoved = $isolatedCargoTargetRemoved
             sharedCargoTargetUntouched = $sharedCargoTargetUntouched
             preparedSidecarRemoved = -not (Test-Path -LiteralPath $preparedSidecarPath)

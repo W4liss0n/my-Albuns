@@ -209,14 +209,15 @@ precisam estar ausentes no preflight: o runner falha antes de escrever, em vez
 de sobrescrever um output ignorado preexistente. Ele calcula hashes dos
 artefatos, mede listeners reais, exige locks exclusivos, drena somente Jobs
 próprios, remove todos os outputs que criou e só então monta as provas derivadas
-das fontes
-normativas. Uma prova terminal exige que o target isolado e o `runRoot` tenham
-sido removidos e que o `target` compartilhado continue ausente; qualquer escrita
-fora do scratch falha o gate. Depois da última leitura e da construção do
-relatório, captura novamente a árvore Git; após o `finally` e imediatamente
-antes e depois de publicar o JSON, repete essa verificação. Se a fonte mudar
-durante a publicação,
-o artefato anterior é restaurado. Uma fixture Git negativa altera um input
+das fontes normativas. Uma prova terminal exige que o target isolado e o
+`runRoot` tenham sido removidos, que os contêineres de scratch criados pela
+rodada também tenham sido descartados e que o `target` compartilhado continue
+ausente; qualquer escrita fora do scratch falha o gate. Depois da última leitura
+e da construção do relatório, captura novamente a árvore Git; após o `finally`
+e, imediatamente antes e depois de publicar o JSON, repete essa verificação. Se
+a fonte mudar
+durante a publicação, o artefato anterior é restaurado. Uma fixture Git
+negativa altera um input
 versionado justamente depois da leitura da prova e precisa ser rejeitada. O
 caminho de sucesso e o `finally` usam a mesma rotina medida de encerramento e
 verificação; qualquer falha também passa por ela antes da limpeza do scratch.
