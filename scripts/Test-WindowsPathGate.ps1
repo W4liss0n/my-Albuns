@@ -1,7 +1,8 @@
 param(
     [string] $OutputPath,
     [string] $UncRoot,
-    [string] $DriveLetter
+    [string] $DriveLetter,
+    [string] $ScratchRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,9 +46,26 @@ $sourceSnapshotBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $script:WorkspaceRoot `
     -EvidencePath $OutputPath
 
-$scratchRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $script:WorkspaceRoot '.scratch\windows-path-gate')
+$workspaceScratchRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot '.scratch')
 )
+$scratchRoot = if ([string]::IsNullOrWhiteSpace($ScratchRoot)) {
+    Join-Path $workspaceScratchRoot 'windows-path-gate'
+}
+elseif ([System.IO.Path]::IsPathRooted($ScratchRoot)) {
+    $ScratchRoot
+}
+else {
+    Join-Path $script:WorkspaceRoot $ScratchRoot
+}
+$scratchRoot = [System.IO.Path]::GetFullPath($scratchRoot)
+if (-not $scratchRoot.StartsWith(
+        $workspaceScratchRoot.TrimEnd('\', '/') +
+            [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The Windows path gate scratch root must be a child of the workspace .scratch directory.'
+}
 $scratchRootExisted = Test-Path -LiteralPath $scratchRoot
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $scratchRoot "run-$PID-$([DateTime]::UtcNow.Ticks)")

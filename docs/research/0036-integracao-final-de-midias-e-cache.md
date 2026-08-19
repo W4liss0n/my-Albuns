@@ -195,7 +195,12 @@ testes Rust, quality, recovery, Tauri debug e paths Windows herdam esse mesmo
 target isolado. O sidecar debug exigido pelo build script é preparado ali, e o
 release usa outro target exclusivo sob o mesmo scratch. Consumidores de
 executáveis resolvem `CARGO_TARGET_DIR` pela mesma regra do Cargo, inclusive
-quando relativo. Cada critério é derivado de provas nomeadas e não vazias nos
+quando relativo. O gate Windows aninhado recebe ainda um scratch exclusivo sob
+o `runRoot`; seu scratch standalone e seu target padrão nunca são limpos pelo
+runner da issue 45 depois que o mutex do processo filho é liberado. Uma
+sentinela byte a byte no scratch standalone precisa sobreviver à limpeza da
+rodada e somente o arquivo da própria prova pode ser removido depois. Cada
+critério é derivado de provas nomeadas e não vazias nos
 resultados comportamentais da própria rodada. O runner inicia ainda um processo
 controlado com listener TCP
 dentro de um Job Object privado, observa a árvore causal e encerra o Job pelo
@@ -212,10 +217,11 @@ próprios, remove todos os outputs que criou e só então monta as provas deriva
 das fontes normativas. Uma prova terminal exige que o target isolado e o
 `runRoot` tenham sido removidos, que os contêineres de scratch criados pela
 rodada também tenham sido descartados e que o `target` compartilhado continue
-ausente; qualquer escrita fora do scratch falha o gate. Depois da última leitura
-e da construção do relatório, captura novamente a árvore Git; após o `finally`
-e, imediatamente antes e depois de publicar o JSON, repete essa verificação. Se
-a fonte mudar
+ausente; o runner não remove roots globais que um gate Windows independente
+possa ter recriado. Qualquer escrita fora dos paths causais falha o gate. Depois
+da última leitura e da construção do relatório, captura novamente a árvore Git;
+após o `finally` e, imediatamente antes e depois de publicar o JSON, repete essa
+verificação. Se a fonte mudar
 durante a publicação, o artefato anterior é restaurado. Uma fixture Git
 negativa altera um input
 versionado justamente depois da leitura da prova e precisa ser rejeitada. O

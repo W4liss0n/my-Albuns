@@ -48,9 +48,12 @@ $preparedSidecarPath = Join-Path `
     $workspaceRoot `
     'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
 $sharedCargoTarget = Join-Path $workspaceRoot 'target'
-$windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
 $workspaceScratch = Join-Path $workspaceRoot '.scratch'
-$windowsPathScratch = Join-Path $workspaceRoot '.scratch\windows-path-gate'
+$standaloneWindowsPathScratch = Join-Path $workspaceScratch 'windows-path-gate'
+$windowsPathScratch = $null
+$independentWindowsPathScratchProbe = $null
+$independentWindowsPathScratchPreserved = $false
+$independentWindowsPathScratchProbeRemoved = $false
 function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
     $existing = @(
         $Paths | Where-Object { Test-Path -LiteralPath $_ }
@@ -61,11 +64,9 @@ function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
 }
 $ownedOutputPreflightPaths = @(
     $preparedSidecarPath
-    $windowsPathTarget
     $distPath
     $sharedCargoTarget
     $scratchContainer
-    $windowsPathScratch
 )
 Assert-Issue45OwnedOutputsAbsent -Paths $ownedOutputPreflightPaths
 $runnerMutex = [System.Threading.Mutex]::new(
@@ -275,17 +276,6 @@ function Clear-Issue45GateOutputs {
     }
 
     try {
-        if (Test-Path -LiteralPath $windowsPathTarget) {
-            Remove-GateScratchDirectory `
-                -Path $windowsPathTarget `
-                -AllowedParent (Join-Path $workspaceRoot 'target')
-        }
-    }
-    catch {
-        $cleanupFailures.Add("Windows path target: $($_.Exception.Message)")
-    }
-
-    try {
         if (Test-Path -LiteralPath $distPath) {
             Remove-GateScratchDirectory `
                 -Path $distPath `
@@ -294,17 +284,6 @@ function Clear-Issue45GateOutputs {
     }
     catch {
         $cleanupFailures.Add("frontend distribution: $($_.Exception.Message)")
-    }
-
-    try {
-        if (Test-Path -LiteralPath $windowsPathScratch) {
-            Remove-GateScratchDirectory `
-                -Path $windowsPathScratch `
-                -AllowedParent $workspaceScratch
-        }
-    }
-    catch {
-        $cleanupFailures.Add("Windows path scratch: $($_.Exception.Message)")
     }
 
     try {
@@ -368,6 +347,16 @@ if (-not [string]::Equals(
     throw 'The issue 45 gate scratch directory escaped its approved root.'
 }
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+$windowsPathScratch = [System.IO.Path]::GetFullPath(
+    (Join-Path $runRoot 'windows-path-scratch')
+)
+if (-not [string]::Equals(
+        [System.IO.Path]::GetDirectoryName($windowsPathScratch),
+        $runRoot,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The nested Windows path scratch escaped the issue 45 run root.'
+}
 $gateTarget = [System.IO.Path]::GetFullPath(
     (Join-Path $runRoot 'cargo-target')
 )
@@ -631,6 +620,122 @@ function Get-Sha256([string] $Path) {
     finally {
         $sha.Dispose()
         $stream.Dispose()
+    }
+}
+
+function New-IndependentWindowsPathScratchProbe {
+    $mutex = [System.Threading.Mutex]::new(
+        $false,
+        'Local\MyAlbuns.WindowsPathGateEvidence.v1'
+    )
+    $mutexHeld = $false
+    $rootExisted = $false
+    $path = $null
+    try {
+        try {
+            $mutexHeld = $mutex.WaitOne(0)
+        }
+        catch [System.Threading.AbandonedMutexException] {
+            $mutexHeld = $true
+        }
+        if (-not $mutexHeld) {
+            throw 'An independent Windows path gate is already active.'
+        }
+        $rootExisted = Test-Path -LiteralPath $standaloneWindowsPathScratch
+        New-Item `
+            -ItemType Directory `
+            -Force `
+            -Path $standaloneWindowsPathScratch |
+            Out-Null
+        $root = Get-Item -LiteralPath $standaloneWindowsPathScratch -Force
+        if (($root.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'The independent Windows path scratch probe refuses a reparse root.'
+        }
+        $path = Join-Path `
+            $standaloneWindowsPathScratch `
+            "issue-45-independent-$PID-$([guid]::NewGuid().ToString('N')).bin"
+        $bytes = [byte[]] (11, 23, 47, 89, 131, 197)
+        $stream = [System.IO.File]::Open(
+            $path,
+            [System.IO.FileMode]::CreateNew,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::Read
+        )
+        try {
+            $stream.Write($bytes, 0, $bytes.Length)
+            $stream.Flush($true)
+        }
+        finally {
+            $stream.Dispose()
+        }
+        return [pscustomobject]@{
+            path = $path
+            root = $standaloneWindowsPathScratch
+            rootExisted = $rootExisted
+            sha256 = Get-Sha256 -Path $path
+        }
+    }
+    catch {
+        if (-not [string]::IsNullOrWhiteSpace($path) -and
+                (Test-Path -LiteralPath $path -PathType Leaf)) {
+            [System.IO.File]::Delete($path)
+        }
+        if (-not $rootExisted -and
+                (Test-Path -LiteralPath $standaloneWindowsPathScratch -PathType Container) -and
+                @(Get-ChildItem -LiteralPath $standaloneWindowsPathScratch -Force).Count -eq 0) {
+            [System.IO.Directory]::Delete($standaloneWindowsPathScratch)
+        }
+        throw
+    }
+    finally {
+        if ($mutexHeld) {
+            $mutex.ReleaseMutex()
+        }
+        $mutex.Dispose()
+    }
+}
+
+function Test-IndependentWindowsPathScratchProbe([object] $Probe) {
+    if ($null -eq $Probe -or
+            -not (Test-Path -LiteralPath $Probe.path -PathType Leaf) -or
+            (Get-Sha256 -Path $Probe.path) -ne $Probe.sha256) {
+        throw 'The issue 45 cleanup changed an independent Windows path scratch sentinel.'
+    }
+    return 2
+}
+
+function Remove-IndependentWindowsPathScratchProbe([object] $Probe) {
+    if ($null -eq $Probe) {
+        return
+    }
+    if (Test-Path -LiteralPath $Probe.path -PathType Leaf) {
+        [System.IO.File]::Delete($Probe.path)
+    }
+    if (-not $Probe.rootExisted) {
+        $mutex = [System.Threading.Mutex]::new(
+            $false,
+            'Local\MyAlbuns.WindowsPathGateEvidence.v1'
+        )
+        $mutexHeld = $false
+        try {
+            try {
+                $mutexHeld = $mutex.WaitOne(0)
+            }
+            catch [System.Threading.AbandonedMutexException] {
+                $mutexHeld = $true
+            }
+            if ($mutexHeld -and
+                    (Test-Path -LiteralPath $Probe.root -PathType Container) -and
+                    @(Get-ChildItem -LiteralPath $Probe.root -Force).Count -eq 0) {
+                [System.IO.Directory]::Delete($Probe.root)
+            }
+        }
+        finally {
+            if ($mutexHeld) {
+                $mutex.ReleaseMutex()
+            }
+            $mutex.Dispose()
+        }
     }
 }
 
@@ -1275,16 +1380,17 @@ while ($true) { Start-Sleep -Seconds 1 }
 }
 
 try {
+    $independentWindowsPathScratchProbe =
+        New-IndependentWindowsPathScratchProbe
     $outputPreflightAssertionCount = Test-OwnedOutputPreflightContracts
     $preflightCoversSharedCargoTarget =
         $ownedOutputPreflightPaths -contains $sharedCargoTarget
     $preflightCoversOwnedScratch =
-        $ownedOutputPreflightPaths -contains $scratchContainer -and
-        $ownedOutputPreflightPaths -contains $windowsPathScratch
+        $ownedOutputPreflightPaths -contains $scratchContainer
     $checks.Add([ordered]@{
         name = 'fail-closed-preexisting-output-preflight'
         passed = ($outputPreflightAssertionCount -eq 4 -and
-            $ownedOutputPreflightPaths.Count -eq 6 -and
+            $ownedOutputPreflightPaths.Count -eq 4 -and
             $preflightCoversSharedCargoTarget -and
             $preflightCoversOwnedScratch)
         assertionCount = $outputPreflightAssertionCount + 3
@@ -1530,7 +1636,9 @@ try {
             '-File',
             (Join-Path $PSScriptRoot 'Test-WindowsPathGate.ps1'),
             '-OutputPath',
-            $windowsEvidencePath
+            $windowsEvidencePath,
+            '-ScratchRoot',
+            $windowsPathScratch
         )
     $windowsEvidence = Get-Content -LiteralPath $windowsEvidencePath -Raw |
         ConvertFrom-Json
@@ -1651,6 +1759,24 @@ try {
 
     Clear-Issue45GateOutputs
 
+    $independentScratchAssertionCount =
+        Test-IndependentWindowsPathScratchProbe `
+            -Probe $independentWindowsPathScratchProbe
+    $independentWindowsPathScratchPreserved = $true
+    $checks.Add([ordered]@{
+        name = 'independent-windows-path-scratch-preservation'
+        passed = $true
+        assertionCount = $independentScratchAssertionCount
+    })
+    Remove-IndependentWindowsPathScratchProbe `
+        -Probe $independentWindowsPathScratchProbe
+    $independentWindowsPathScratchProbeRemoved =
+        -not (Test-Path `
+            -LiteralPath $independentWindowsPathScratchProbe.path)
+    if (-not $independentWindowsPathScratchProbeRemoved) {
+        throw 'The issue 45 gate retained its independent scratch probe file.'
+    }
+
     $sharedCargoTargetUntouched = -not (Test-Path -LiteralPath $sharedCargoTarget)
     $isolatedCargoTargetRemoved = -not (Test-Path -LiteralPath $gateTarget)
     $runScratchRemoved = -not (Test-Path -LiteralPath $runRoot)
@@ -1768,6 +1894,7 @@ try {
         'windows-local-unc-mapped-long-paths'
         'release-build-and-nsis-package'
         'owned-process-lock-listener-cleanup'
+        'independent-windows-path-scratch-preservation'
         'isolated-cargo-target-cleanup'
         'complete-fail-closed-design-0010-matrix'
     )
@@ -2010,10 +2137,13 @@ try {
             runScratchRemoved = $runScratchRemoved
             ownedScratchContainerRemoved = $ownedScratchContainerRemoved
             windowsPathScratchRemoved = $windowsPathScratchRemoved
+            independentWindowsPathScratchPreserved =
+                $independentWindowsPathScratchPreserved
+            independentWindowsPathScratchProbeRemoved =
+                $independentWindowsPathScratchProbeRemoved
             isolatedCargoTargetRemoved = $isolatedCargoTargetRemoved
             sharedCargoTargetUntouched = $sharedCargoTargetUntouched
             preparedSidecarRemoved = -not (Test-Path -LiteralPath $preparedSidecarPath)
-            windowsPathTargetRemoved = -not (Test-Path -LiteralPath $windowsPathTarget)
             distRemoved = -not (Test-Path -LiteralPath $distPath)
             ownedProcesses = $ownedProcessCountAfter
             ownedListeners = $ownedListenerCountAfter
@@ -2051,10 +2181,16 @@ finally {
         Clear-Issue45GateOutputs
     }
     finally {
-        if ($runnerMutexHeld) {
-            $runnerMutex.ReleaseMutex()
+        try {
+            Remove-IndependentWindowsPathScratchProbe `
+                -Probe $independentWindowsPathScratchProbe
         }
-        $runnerMutex.Dispose()
+        finally {
+            if ($runnerMutexHeld) {
+                $runnerMutex.ReleaseMutex()
+            }
+            $runnerMutex.Dispose()
+        }
     }
     if ($null -ne $ownedCleanupFailure) {
         throw "The issue 45 gate failed closed during terminal process cleanup: $ownedCleanupFailure"
