@@ -220,7 +220,10 @@ quando relativo. O gate Windows aninhado recebe ainda um scratch exclusivo sob
 o `runRoot`; seu scratch standalone e seu target padrão nunca são limpos pelo
 runner da issue 45 depois que o mutex do processo filho é liberado. Uma
 sentinela byte a byte no scratch standalone precisa sobreviver à limpeza da
-rodada e somente o arquivo da própria prova pode ser removido depois. Cada
+rodada e somente o arquivo da própria prova pode ser removido depois. A jornada
+WebView2 de recuperação aguarda ainda todos os processos vinculados ao
+seu scratch antes de remover o perfil e repete locks transitórios sem abandonar
+o diretório. Cada
 critério é derivado de provas nomeadas e não vazias nos
 resultados comportamentais da própria rodada. O runner inicia ainda um processo
 controlado com listener TCP

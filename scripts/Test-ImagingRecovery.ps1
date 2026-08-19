@@ -434,9 +434,15 @@ finally {
         $previousProcessDataRoot,
         [System.EnvironmentVariableTarget]::Process
     )
+    Wait-GatePathProcessesExit `
+        -Path $evidenceDirectory `
+        -MaximumAttempts 100 `
+        -RetryDelayMilliseconds 250
     Remove-GateScratchDirectory `
         -Path $evidenceDirectory `
-        -AllowedParent $scratchRoot
+        -AllowedParent $scratchRoot `
+        -MaximumAttempts 100 `
+        -RetryDelayMilliseconds 250
 }
 
 $sourceSnapshotAfter = Get-GateSourceSnapshot `
