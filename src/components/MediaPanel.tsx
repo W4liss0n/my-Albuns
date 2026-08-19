@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image as ImageIcon,
+  ImageOff,
   Search,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 import type {
@@ -15,7 +17,7 @@ import type {
   MediaKind,
   MediaUsage,
 } from "../domain/project";
-import { AppIcon } from "../ui";
+import { AppIcon, EmptyState } from "../ui";
 import "./MediaPanel.css";
 
 export interface MediaPanelProps {
@@ -129,7 +131,29 @@ export function MediaPanel({
         </label>
       </div>
       <div className="media-strip" ref={stripRef}>
-        {activeMediaItems.map((media) => (
+        {activeMediaItems.length === 0 ? (
+          <EmptyState
+            className="media-empty-state"
+            density="compact"
+            description={
+              activeMediaKind === "photo"
+                ? "As Fotos importadas para este Projeto aparecerão aqui."
+                : "As Imagens decorativas importadas aparecerão aqui."
+            }
+            icon={
+              <AppIcon
+                icon={activeMediaKind === "photo" ? ImageOff : Sparkles}
+                size={16}
+              />
+            }
+            title={
+              activeMediaKind === "photo"
+                ? "Nenhuma Foto importada"
+                : "Nenhum Decorativo importado"
+            }
+          />
+        ) : (
+          activeMediaItems.map((media) => (
             <button
               className="media-card"
               type="button"
@@ -181,7 +205,8 @@ export function MediaPanel({
                 <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
               </span>
             </button>
-          ))}
+          ))
+        )}
       </div>
     </section>
   );

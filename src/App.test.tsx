@@ -208,7 +208,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     await screen.findByRole("button", { name: "Exportar Lâmina" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("navigation", { name: "Menu principal" }),
+    screen.getByRole("menubar", { name: "Menu principal" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
   expect(screen.getByText("Álbum Horizonte")).toBeInTheDocument();

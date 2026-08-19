@@ -29,6 +29,7 @@ import type { GraphicsDiagnostic } from "../application/graphics";
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import {
+  createEmptyProjection,
   createTwoSheetProjection,
   representativeProjection,
 } from "../test/projectFixtures";
@@ -268,10 +269,16 @@ function ProjectWorkspace({
 }
 
 function getApplicationCommand(
-  menuName: "Arquivo" | "Editar",
+  menuName:
+    | "Arquivo"
+    | "Editar"
+    | "Lâmina"
+    | "Exibir"
+    | "Ferramentas"
+    | "Ajuda",
   commandName: string,
 ) {
-  const menu = screen.getByRole("button", { name: menuName });
+  const menu = screen.getByRole("menuitem", { name: menuName });
   if (menu.getAttribute("aria-expanded") !== "true") {
     fireEvent.click(menu);
   }
@@ -321,6 +328,105 @@ beforeEach(() => {
   });
 });
 
+test("presents the canonical desktop menus and marks unfinished commands", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  for (const menuName of [
+    "Arquivo",
+    "Editar",
+    "Lâmina",
+    "Exibir",
+    "Ferramentas",
+    "Ajuda",
+  ]) {
+    expect(screen.getByRole("menuitem", { name: menuName })).toBeEnabled();
+  }
+  expect(screen.queryByRole("button", { name: "Inserir" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Visualizar" }),
+  ).not.toBeInTheDocument();
+
+  expect(getApplicationCommand("Arquivo", "Salvar")).toBeEnabled();
+  const newProject = getApplicationCommand("Arquivo", "Novo Projeto…");
+  expect(newProject).toBeDisabled();
+  expect(newProject).toHaveAttribute(
+    "data-placeholder-feature",
+    "new-project-from-project-window",
+  );
+
+  expect(getApplicationCommand("Editar", "Adicionar Frame")).toBeDisabled();
+  expect(getApplicationCommand("Editar", "Copiar")).toBeDisabled();
+  expect(
+    screen.queryByRole("menuitem", { name: "Copiar Frames" }),
+  ).not.toBeInTheDocument();
+  expect(
+    getApplicationCommand("Editar", "Trocar conteúdo dos Frames"),
+  ).toBeDisabled();
+  expect(
+    getApplicationCommand("Editar", "Salvar disposição como Layout"),
+  ).toBeDisabled();
+  const arrange = getApplicationCommand("Editar", "Organizar");
+  expect(arrange).toHaveAttribute("aria-haspopup", "menu");
+  fireEvent.click(arrange);
+  expect(
+    screen.getByRole("menuitem", { name: "Trazer para frente" }),
+  ).toBeDisabled();
+  expect(getApplicationCommand("Lâmina", "Adicionar depois")).toBeDisabled();
+  expect(getApplicationCommand("Exibir", "Painel de imagens")).toBeDisabled();
+  expect(getApplicationCommand("Ferramentas", "Configurações…")).toBeDisabled();
+  expect(getApplicationCommand("Ajuda", "Manual do MyAlbuns")).toBeDisabled();
+});
+
+test("starts the implemented Lâmina export from the Arquivo menu", () => {
+  const startSheet = vi.fn<ExportPort["startSheet"]>(() => ({
+    completion: Promise.resolve({
+      status: "completed",
+      result: { widthPx: 600, heightPx: 300 },
+    }),
+    cancel: async () => "not_found",
+  }));
+  render(
+    <ProjectWorkspace
+      exportPort={{ startSheet }}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(getApplicationCommand("Arquivo", "Exportar Lâmina…"));
+
+  expect(startSheet).toHaveBeenCalledWith("sheet-001", expect.any(Function));
+});
+
+test("uses shared empty states when the editor has no materialized content", () => {
+  const emptyProjection = createEmptyProjection();
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={emptyProjection}
+      projectSessionPort={projectSessionPortWithApply(async () =>
+        emptyProjection
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(
+    screen.getByRole("status", { name: "Nenhuma Foto importada" }),
+  ).toHaveClass("ui-empty-state");
+  expect(
+    screen.getByRole("status", { name: "Nenhuma Lâmina na Grade" }),
+  ).toHaveClass("ui-empty-state");
+});
+
 test("offers the three close choices for a native request and Cancel keeps the Project", async () => {
   const harness = projectWindowHarness();
   const dirtyProjection = {
@@ -357,7 +463,7 @@ test("offers the three close choices for a native request and Cancel keeps the P
 
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Editar", hidden: true }),
+    screen.getByRole("menuitem", { name: "Editar", hidden: true }),
   ).toBeDisabled();
 
   act(() => harness.dialog.emit("cancelProjectClose"));
@@ -395,7 +501,7 @@ test("uses the same close decision for the application command and blocks it whi
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
   expect(harness.port.requestClose).toHaveBeenCalledOnce();
   await waitFor(() =>
@@ -417,7 +523,7 @@ test("uses the same close decision for the application command and blocks it whi
 
   await act(async () => finish());
   expect(
-    screen.getByRole("button", { name: "Editar" }),
+    screen.getByRole("menuitem", { name: "Editar" }),
   ).toBeDisabled();
 });
 
@@ -473,7 +579,7 @@ test("sends Discard and resumes the unchanged Project after a conclusive save fa
     }),
   );
   act(() => failureHarness.dialog.emit("dismissProjectCloseFailure"));
-  await screen.findByRole("button", { name: "Editar" });
+  await screen.findByRole("menuitem", { name: "Editar" });
   expect(
     getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
@@ -512,7 +618,7 @@ test("never resumes or reports success after an indeterminate close save", async
   );
   act(() => harness.dialog.emit("dismissProjectCloseFailure"));
   expect(
-    screen.getByRole("button", { name: "Editar" }),
+    screen.getByRole("menuitem", { name: "Editar" }),
   ).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Exportar Lâmina" }),
@@ -551,7 +657,7 @@ test("blocks only Project commands while its Export attempt is active", async ()
   fireEvent.click(
     screen.getByRole("button", { name: "Exportar Lâmina" }),
   );
-  expect(screen.getByRole("button", { name: "Editar" })).toBeDisabled();
+  expect(screen.getByRole("menuitem", { name: "Editar" })).toBeDisabled();
 
   act(() => {
     emit({ event: "started", cancellable: true });

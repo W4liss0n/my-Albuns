@@ -114,6 +114,11 @@
   scrollbar-gutter: stable;
 }
 
+.media-empty-state {
+  min-height: 100%;
+  grid-column: 1 / -1;
+}
+
 .media-card {
   display: grid;
   min-width: 0;

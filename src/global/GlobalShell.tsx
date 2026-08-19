@@ -21,6 +21,7 @@ import {
   AppIcon,
   ApplicationHeader,
   BrandWordmark,
+  EmptyState,
 } from "../ui";
 
 interface GlobalShellProps {
@@ -185,10 +186,12 @@ export function GlobalShell({
         <main className="global-recent-projects">
           <h1 className="ui-section-eyebrow">Projetos recentes</h1>
           {recentProjects.length === 0 ? (
-            <div className="global-empty-state">
-              <strong>Nenhum Projeto recente</strong>
-              <p>Os Projetos abertos recentemente aparecerão aqui.</p>
-            </div>
+            <EmptyState
+              className="global-empty-state"
+              description="Os Projetos abertos recentemente aparecerão aqui."
+              icon={<AppIcon icon={FolderOpen} size={16} />}
+              title="Nenhum Projeto recente"
+            />
           ) : (
             <ul
               aria-label="Projetos recentes"

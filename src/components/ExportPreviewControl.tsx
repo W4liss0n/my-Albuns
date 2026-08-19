@@ -1,4 +1,10 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type {
   ProjectDialogAction,
@@ -23,19 +29,29 @@ interface ExportPreviewControlProps {
   sheetId: string | null;
 }
 
+export interface ExportPreviewControlHandle {
+  start(): void;
+}
+
 interface ExportNotification {
   kind: "error" | "success";
   message: string;
 }
 
-export function ExportPreviewControl({
-  dialogPort,
-  disabled = false,
-  exportPort,
-  onActiveChange,
-  projectId,
-  sheetId,
-}: ExportPreviewControlProps) {
+export const ExportPreviewControl = forwardRef<
+  ExportPreviewControlHandle,
+  ExportPreviewControlProps
+>(function ExportPreviewControl(
+  {
+    dialogPort,
+    disabled = false,
+    exportPort,
+    onActiveChange,
+    projectId,
+    sheetId,
+  },
+  ref,
+) {
   const [phase, setPhase] = useState<
     "idle" | "starting" | "running" | "cancelled" | "failed"
   >("idle");
@@ -59,6 +75,8 @@ export function ExportPreviewControl({
   const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
+
+  useImperativeHandle(ref, () => ({ start: startExport }));
 
   dialogActionListener.current = (action) => {
     switch (action) {
@@ -358,7 +376,7 @@ export function ExportPreviewControl({
       ) : null}
     </div>
   );
-}
+});
 
 function progressDialogState(
   event: Extract<ExportProgressEvent, { event: "progress" }>,

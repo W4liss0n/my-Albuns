@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 
 import type {
@@ -17,10 +17,15 @@ import {
   InlineNotice,
 } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
-import { ExportPreviewControl } from "./ExportPreviewControl";
+import { ApplicationMenuBar } from "./ApplicationMenuBar";
+import {
+  ExportPreviewControl,
+  type ExportPreviewControlHandle,
+} from "./ExportPreviewControl";
 import { InspectorPanel } from "./InspectorPanel";
 import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { MediaPanel } from "./MediaPanel";
+import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -28,8 +33,6 @@ import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
 } from "./workspacePanelLayout";
-
-type OpenApplicationMenu = "edit" | "file" | null;
 
 interface ProjectWorkspaceProps {
   projection: EditorProjection;
@@ -55,8 +58,8 @@ export function ProjectWorkspace({
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
-  const [openMenu, setOpenMenu] = useState<OpenApplicationMenu>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const exportControlRef = useRef<ExportPreviewControlHandle>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
       visibleMediaIds: [],
@@ -107,11 +110,6 @@ export function ProjectWorkspace({
     onProjectionChange,
     onError: reportCloseError,
   });
-  useEffect(() => {
-    if (projectClose.interactionBlocked) {
-      setOpenMenu(null);
-    }
-  }, [projectClose.interactionBlocked]);
   const controller = useProjectEditorController({
     interactionBlocked: exportActive || projectClose.interactionBlocked,
     projection,
@@ -129,6 +127,18 @@ export function ProjectWorkspace({
     photoCount,
   } = controller;
   const projectMetadata = projectAlbumMetadata(projection);
+  const commandsBlocked =
+    Boolean(busy) || exportActive || projectClose.interactionBlocked;
+  const applicationMenus = createProjectApplicationMenus({
+    canExport: controller.canvasProps.centeredSheetId !== null,
+    canRedo: projection.state.canRedo,
+    canUndo: projection.state.canUndo,
+    closeProject: () => void projectClose.requestClose(),
+    exportSheet: () => exportControlRef.current?.start(),
+    redo: () => void controller.redo(),
+    save: () => void controller.save(),
+    undo: () => void controller.undo(),
+  });
 
   return (
     <div className="app-shell">
@@ -139,154 +149,12 @@ export function ProjectWorkspace({
       />
 
       <div className="commandbar">
-        <nav className="app-menu" aria-label="Menu principal">
-          <div className="app-menu-entry">
-            <button
-              aria-expanded={openMenu === "file"}
-              aria-haspopup="menu"
-              disabled={
-                Boolean(busy) ||
-                exportActive ||
-                projectClose.interactionBlocked
-              }
-              type="button"
-              onClick={() =>
-                setOpenMenu((current) =>
-                  current === "file" ? null : "file",
-                )
-              }
-            >
-              Arquivo
-            </button>
-            {openMenu === "file" && (
-              <div className="app-menu-popup" role="menu">
-                <button
-                  aria-label="Salvar"
-                  disabled={
-                    Boolean(busy) ||
-                    exportActive ||
-                    projectClose.interactionBlocked
-                  }
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    void controller.save();
-                  }}
-                >
-                  <span>Salvar</span>
-                  <span className="app-menu-shortcut">Ctrl+S</span>
-                </button>
-                <span className="app-menu-separator" />
-                <button
-                  aria-label="Fechar Projeto"
-                  disabled={projectClose.interactionBlocked}
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    void projectClose.requestClose();
-                  }}
-                >
-                  <span>Fechar Projeto</span>
-                  <span className="app-menu-shortcut">Ctrl+W</span>
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="app-menu-entry">
-            <button
-              aria-expanded={openMenu === "edit"}
-              aria-haspopup="menu"
-              disabled={
-                Boolean(busy) ||
-                exportActive ||
-                projectClose.interactionBlocked
-              }
-              type="button"
-              onClick={() =>
-                setOpenMenu((current) =>
-                  current === "edit" ? null : "edit",
-                )
-              }
-            >
-              Editar
-            </button>
-            {openMenu === "edit" && (
-              <div className="app-menu-popup" role="menu">
-                <button
-                  aria-label="Desfazer"
-                  disabled={
-                    !projection.state.canUndo ||
-                    Boolean(busy) ||
-                    exportActive ||
-                    projectClose.interactionBlocked
-                  }
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    void controller.undo();
-                  }}
-                >
-                  <span>Desfazer</span>
-                  <span className="app-menu-shortcut">Ctrl+Z</span>
-                </button>
-                <button
-                  aria-label="Refazer"
-                  disabled={
-                    !projection.state.canRedo ||
-                    Boolean(busy) ||
-                    exportActive ||
-                    projectClose.interactionBlocked
-                  }
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    setOpenMenu(null);
-                    void controller.redo();
-                  }}
-                >
-                  <span>Refazer</span>
-                  <span className="app-menu-shortcut">Ctrl+Shift+Z</span>
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            disabled={
-              Boolean(busy) || exportActive || projectClose.interactionBlocked
-            }
-            type="button"
-          >
-            Inserir
-          </button>
-          <button
-            disabled={
-              Boolean(busy) || exportActive || projectClose.interactionBlocked
-            }
-            type="button"
-          >
-            Lâmina
-          </button>
-          <button
-            disabled={
-              Boolean(busy) || exportActive || projectClose.interactionBlocked
-            }
-            type="button"
-          >
-            Visualizar
-          </button>
-          <button
-            disabled={
-              Boolean(busy) || exportActive || projectClose.interactionBlocked
-            }
-            type="button"
-          >
-            Ajuda
-          </button>
-        </nav>
+        <ApplicationMenuBar
+          disabled={commandsBlocked}
+          groups={applicationMenus}
+        />
         <ExportPreviewControl
+          ref={exportControlRef}
           dialogPort={projectDialogPort}
           disabled={Boolean(busy) || projectClose.interactionBlocked}
           exportPort={exportPort}

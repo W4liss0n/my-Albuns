@@ -83,6 +83,12 @@ test("provides one shared lined section heading", () => {
   );
 });
 
+test("shares application menus and empty states across surfaces", () => {
+  expect(sharedStyles).toMatch(/\.ui-empty-state\s*\{/);
+  expect(welcomeStyles).not.toMatch(/\.global-empty-state\s+(?:strong|p)\s*\{/);
+  expect(projectWorkspaceSource).toContain("<ApplicationMenuBar");
+});
+
 test("shares floating notification chrome", () => {
   expect(sharedStyles).toMatch(/\.ui-inline-notice--floating\s*\{/);
   expect(projectWorkspaceSource).toContain("<InlineNotice");

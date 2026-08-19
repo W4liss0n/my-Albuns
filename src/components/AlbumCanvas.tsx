@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Layers3 } from "lucide-react";
 import { Application } from "pixi.js";
 
 import {
@@ -6,6 +7,7 @@ import {
   logReasonFromError,
 } from "../application/logging";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import { AppIcon, EmptyState } from "../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
 import {
@@ -318,9 +320,12 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
 
   if (!hasSheets) {
     return (
-      <div className="canvas-empty">
-        <p>Nenhuma Lâmina disponível para materialização.</p>
-      </div>
+      <EmptyState
+        className="canvas-empty"
+        description="Não há conteúdo de composição disponível neste Projeto."
+        icon={<AppIcon icon={Layers3} size={18} />}
+        title="Nenhuma Lâmina disponível"
+      />
     );
   }
 

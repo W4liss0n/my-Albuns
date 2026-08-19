@@ -213,6 +213,16 @@
   background: var(--ui-surface-muted);
 }
 
+.app-menu-entry > button[aria-expanded="true"] {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.app-menu > .app-menu-entry > button:disabled {
+  color: var(--ui-text-muted);
+  background: transparent;
+}
+
 .app-menu-popup {
   position: absolute;
   top: var(--ui-commandbar-height);
@@ -239,12 +249,24 @@
   text-align: left;
 }
 
-.app-menu-popup button:hover:not(:disabled) {
+.app-menu-popup button:hover:not(:disabled),
+.app-menu-popup button:focus-visible:not(:disabled) {
   color: #fff;
   background: var(--ui-accent);
+  outline: 0;
+}
+
+.app-menu-popup button:hover:not(:disabled) .app-menu-shortcut,
+.app-menu-popup button:focus-visible:not(:disabled) .app-menu-shortcut,
+.app-menu-popup button:hover:not(:disabled) .app-menu-cascade,
+.app-menu-popup button:focus-visible:not(:disabled) .app-menu-cascade {
+  color: rgb(255 255 255 / 72%);
 }
 
 .app-menu-popup button:disabled {
+  color: var(--ui-text-muted);
+  background: transparent;
+  cursor: default;
   opacity: 0.45;
 }
 
@@ -253,6 +275,21 @@
   height: 1px;
   margin: var(--ui-space-1) 0;
   background: var(--ui-border);
+}
+
+.app-menu-submenu {
+  position: relative;
+}
+
+.app-menu-submenu-popup {
+  top: calc(0px - var(--ui-space-1) - 1px);
+  left: calc(100% - var(--ui-space-1));
+}
+
+.app-menu-cascade {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-heading);
+  line-height: 1;
 }
 
 .app-menu-shortcut {
@@ -359,9 +396,8 @@ kbd {
 }
 
 .canvas-empty {
-  display: grid;
-  color: var(--ui-text-muted);
-  place-items: center;
+  width: 100%;
+  height: 100%;
 }
 
 .pixi-canvas {

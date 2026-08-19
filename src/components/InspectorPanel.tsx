@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "react-aria-components";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
 import type {
   ComposedPhoto,
@@ -14,7 +14,7 @@ import {
   readInspectorSectionPreference,
   writeInspectorSectionPreference,
 } from "../state/workspacePreferences";
-import { AppIcon } from "../ui";
+import { AppIcon, EmptyState } from "../ui";
 import { DocumentDpiControl } from "./DocumentDpiControl";
 import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { SheetPreview } from "./SheetPreview";
@@ -221,26 +221,35 @@ export function InspectorPanel({
               preferenceKey="album.sheet-grid"
               defaultOpen
             >
-              <div className="sheet-grid">
-                {sheets.map((sheet) => (
-                  <Button
-                    key={sheet.sheetId}
-                    className={
-                      sheet.sheetId === focusedSheetId
-                        ? "sheet-tile active"
-                        : "sheet-tile"
-                    }
-                    onPress={() => onNavigateToSheet(sheet.sheetId)}
-                  >
-                    <SheetPreview
-                      frameBorder={frameBorder}
-                      sheet={sheet}
-                      mediaPreviewUrls={mediaPreviewUrls}
-                    />
-                    <span>{String(sheet.number).padStart(2, "0")}</span>
-                  </Button>
-                ))}
-              </div>
+              {sheets.length === 0 ? (
+                <EmptyState
+                  density="compact"
+                  description="As Lâminas do Projeto aparecerão aqui."
+                  icon={<AppIcon icon={PanelsTopLeft} size={16} />}
+                  title="Nenhuma Lâmina na Grade"
+                />
+              ) : (
+                <div className="sheet-grid">
+                  {sheets.map((sheet) => (
+                    <Button
+                      key={sheet.sheetId}
+                      className={
+                        sheet.sheetId === focusedSheetId
+                          ? "sheet-tile active"
+                          : "sheet-tile"
+                      }
+                      onPress={() => onNavigateToSheet(sheet.sheetId)}
+                    >
+                      <SheetPreview
+                        frameBorder={frameBorder}
+                        sheet={sheet}
+                        mediaPreviewUrls={mediaPreviewUrls}
+                      />
+                      <span>{String(sheet.number).padStart(2, "0")}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
             </InspectorSection>
           </>
         )}
