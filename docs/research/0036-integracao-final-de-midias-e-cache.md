@@ -117,8 +117,11 @@ renomes e remoções concorrentes podem tornar a contagem momentaneamente
 aproximada, mas não indisponível. Reparse points e tipos inesperados continuam
 falhando fechados. Não há operação bulk pública que inspecione todos os
 namespaces sem antes classificá-los e coordená-los. Uma
-reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão;
-outro processo, portanto, não pode classificar aquele namespace como liberável.
+reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão. A
+chave normaliza o casing ASCII do namespace antes do hash, acompanhando a
+equivalência case-insensitive do pathname Windows; o casing armazenado que
+`read_dir` devolve não pode criar uma segunda reserva para o mesmo diretório.
+Outro processo, portanto, não pode classificar aquele namespace como liberável.
 
 A liberação parcial adquire apenas reservas disponíveis e remove somente esses
 Projetos. A limpeza total exige simultaneamente o gate de operação sem
@@ -197,8 +200,13 @@ próprio. `dist`, sidecar preparado e o target fixo de caminhos precisam estar
 ausentes no preflight: o runner falha antes de escrever, em vez de sobrescrever
 um output ignorado preexistente. Ele calcula hashes dos artefatos, mede
 listeners reais, exige locks exclusivos, drena somente Jobs próprios, remove
-todos os outputs que criou e só então captura novamente a árvore Git. O caminho
-de sucesso e o `finally` usam a mesma rotina medida de encerramento e
+todos os outputs que criou e só então monta as provas derivadas das fontes
+normativas. Depois da última leitura e da construção do relatório, captura
+novamente a árvore Git; após o `finally` e imediatamente antes e depois de
+publicar o JSON, repete essa verificação. Se a fonte mudar durante a publicação,
+o artefato anterior é restaurado. Uma fixture Git negativa altera um input
+versionado justamente depois da leitura da prova e precisa ser rejeitada. O
+caminho de sucesso e o `finally` usam a mesma rotina medida de encerramento e
 verificação; qualquer falha também passa por ela antes da limpeza do scratch.
 
 Resultados Rust são aceitos apenas por uma linha terminal exata `... ok`, e o
@@ -213,12 +221,15 @@ rejeitados — e `sourceInputsDirty` precisa ser o Booleano `false` exato. O mes
 contrato cobre os onze checks do gate Windows. As fixtures somam 16 asserções
 para recuperação e 18 para paths Windows. A matriz acima também
 é validada como conjunto exato e cada remoção unitária é usada como fixture
-negativa antes de aceitar as provas da rodada.
+negativa antes de aceitar as provas da rodada. Antes da publicação, o conjunto
+de checks de topo também precisa conter exatamente os nomes esperados, todos
+com `passed` Booleano `true`.
 
 O artefato canônico é
 [`artifacts/0036-issue-45-media-cache-integration.json`](artifacts/0036-issue-45-media-cache-integration.json).
 `sourceInputsDirty=false` significa que o mesmo commit limpo foi observado
-antes e depois de toda a rodada, excluindo apenas esse JSON de saída.
+antes da rodada, depois de todas as leituras que alimentam o relatório e nos
+dois lados da publicação terminal, excluindo apenas esse JSON de saída.
 
 Em Windows, a repetição é:
 

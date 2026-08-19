@@ -366,6 +366,75 @@ if ($standardModulePath -notin @($env:PSModulePath -split ';')) {
     $env:PSModulePath = "$standardModulePath;$env:PSModulePath"
 }
 $checks = [System.Collections.Generic.List[object]]::new()
+$json = $null
+
+function Assert-Issue45SourceUnchanged {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject] $Before,
+
+        [Parameter(Mandatory = $true)]
+        [string] $WorkspaceRoot,
+
+        [Parameter(Mandatory = $true)]
+        [string] $EvidencePath,
+
+        [Parameter(Mandatory = $true)]
+        [string] $Stage
+    )
+
+    $after = Get-GateSourceSnapshot `
+        -WorkspaceRoot $WorkspaceRoot `
+        -EvidencePath $EvidencePath
+    if (Test-GateSourceSnapshotsDirty -Before $Before -After $after) {
+        throw "The issue 45 gate source changed $Stage."
+    }
+    return $after
+}
+
+function Test-PostProofSourceMutationContract([string] $FixtureRoot) {
+    New-Item -ItemType Directory -Path $FixtureRoot | Out-Null
+    $inputPath = Join-Path $FixtureRoot 'behavior.txt'
+    $evidencePath = Join-Path $FixtureRoot 'evidence.json'
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($inputPath, "baseline`n", $encoding)
+    & git -C $FixtureRoot init --quiet
+    & git -C $FixtureRoot add -- behavior.txt
+    & git `
+        -C $FixtureRoot `
+        -c user.name='MyAlbuns Gate' `
+        -c user.email='gate@myalbuns.invalid' `
+        commit --quiet -m baseline
+    if ($LASTEXITCODE -ne 0) {
+        throw 'The post-proof provenance fixture could not create its clean input commit.'
+    }
+
+    $before = Get-GateSourceSnapshot `
+        -WorkspaceRoot $FixtureRoot `
+        -EvidencePath $evidencePath
+    [void] [System.IO.File]::ReadAllText($inputPath)
+    [System.IO.File]::WriteAllText($inputPath, "mutated after proof`n", $encoding)
+
+    $rejected = $false
+    try {
+        [void] (Assert-Issue45SourceUnchanged `
+            -Before $before `
+            -WorkspaceRoot $FixtureRoot `
+            -EvidencePath $evidencePath `
+            -Stage 'after the post-proof mutation fixture')
+    }
+    catch {
+        if ($_.Exception.Message -ne
+                'The issue 45 gate source changed after the post-proof mutation fixture.') {
+            throw
+        }
+        $rejected = $true
+    }
+    if (-not $rejected) {
+        throw 'The issue 45 gate accepted a behavioral input mutation after proof collection.'
+    }
+    return 1
+}
 
 function Get-NormalizedCommandOutput([object[]] $Lines) {
     $text = ($Lines | ForEach-Object { $_.ToString() }) -join "`n"
@@ -1194,6 +1263,14 @@ try {
         assertionCount = $windowsCheckSetAssertionCount
     })
 
+    $postProofMutationAssertionCount = Test-PostProofSourceMutationContract `
+        -FixtureRoot (Join-Path $runRoot 'post-proof-provenance-fixture')
+    $checks.Add([ordered]@{
+        name = 'fail-closed-post-proof-source-mutation'
+        passed = ($postProofMutationAssertionCount -eq 1)
+        assertionCount = $postProofMutationAssertionCount
+    })
+
     $cleanupProbe = Invoke-OwnedCleanupProbe
     $checks.Add([ordered]@{
         name = 'owned-process-listener-cleanup-probe'
@@ -1524,16 +1601,6 @@ try {
 
     Clear-Issue45GateOutputs
 
-    $sourceAfter = Get-GateSourceSnapshot `
-        -WorkspaceRoot $workspaceRoot `
-        -EvidencePath $OutputPath
-    $sourceInputsDirty = Test-GateSourceSnapshotsDirty `
-        -Before $sourceBefore `
-        -After $sourceAfter
-    if ($sourceInputsDirty) {
-        throw 'The issue 45 gate source changed during evidence collection.'
-    }
-
     $imagingProofText = @($imagingEvidence.checks | ForEach-Object { $_.name }) -join "`n"
     $windowsProofText = @($windowsEvidence.checks | ForEach-Object { $_.name }) -join "`n"
     $cacheServiceSource = Get-Content `
@@ -1611,6 +1678,30 @@ try {
         assertionCount = $designMatrixAssertionCount
         normativeRowCount = $designMatrixRows.Count
     })
+    $expectedTopLevelCheckNames = @(
+        'fail-closed-preexisting-output-preflight'
+        'fail-closed-named-proof-parser'
+        'fail-closed-imaging-recovery-check-set'
+        'fail-closed-windows-path-check-set'
+        'fail-closed-post-proof-source-mutation'
+        'owned-process-listener-cleanup-probe'
+        'clean-debug-sidecar-preparation'
+        'rust-typescript-contracts'
+        'frontend-tests'
+        'frontend-typecheck'
+        'rust-tests'
+        'rust-fmt-clippy-deny-warnings'
+        'real-processor-cache-canvas-recovery'
+        'windows-local-unc-mapped-long-paths'
+        'release-build-and-nsis-package'
+        'owned-process-lock-listener-cleanup'
+        'complete-fail-closed-design-0010-matrix'
+    )
+    if (-not (Test-ExactPassedCheckSet `
+            -Checks @($checks.ToArray()) `
+            -ExpectedNames $expectedTopLevelCheckNames)) {
+        throw 'The issue 45 top-level gate checks are not the exact passing Boolean set.'
+    }
     $designMatrixProofText = @(
         $designMatrixRows | ForEach-Object { $_.key }
     ) -join "`n"
@@ -1768,6 +1859,7 @@ try {
                 (New-RustProof -Name 'free_closed_projects_after_host_death_waits_before_measuring_and_removing')
                 (New-RustProof -Name 'clear_all_after_host_death_waits_before_measuring_and_removing')
                 (New-RustProof -Name 'reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation')
+                (New-RustProof -Name 'active_namespace_with_different_windows_casing_is_never_releasable')
             )
         New-VerifiedCriterion `
             -Name 'narrow-api-without-universal-coordinator' `
@@ -1850,16 +1942,12 @@ try {
             artifactLocks = 0
         }
     }
+    [void] (Assert-Issue45SourceUnchanged `
+        -Before $sourceBefore `
+        -WorkspaceRoot $workspaceRoot `
+        -EvidencePath $OutputPath `
+        -Stage 'while assembling the final report')
     $json = $report | ConvertTo-Json -Depth 12
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OutputPath) |
-        Out-Null
-    [System.IO.File]::WriteAllText(
-        $OutputPath,
-        $json + [System.Environment]::NewLine,
-        [System.Text.UTF8Encoding]::new($false)
-    )
-    Write-Output "Issue 45 Media and Cache report: $OutputPath"
-    Write-Output $json
 }
 finally {
     $env:PSModulePath = $previousModulePath
@@ -1891,3 +1979,45 @@ finally {
         throw "The issue 45 gate failed closed during terminal process cleanup: $ownedCleanupFailure"
     }
 }
+
+if ([string]::IsNullOrWhiteSpace($json)) {
+    throw 'The issue 45 gate produced no verified report for publication.'
+}
+[void] (Assert-Issue45SourceUnchanged `
+    -Before $sourceBefore `
+    -WorkspaceRoot $workspaceRoot `
+    -EvidencePath $OutputPath `
+    -Stage 'before terminal evidence publication')
+$evidenceExisted = Test-Path -LiteralPath $OutputPath -PathType Leaf
+$previousEvidence = if ($evidenceExisted) {
+    [System.IO.File]::ReadAllBytes($OutputPath)
+}
+else {
+    $null
+}
+try {
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $OutputPath) |
+        Out-Null
+    [System.IO.File]::WriteAllText(
+        $OutputPath,
+        $json + [System.Environment]::NewLine,
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    [void] (Assert-Issue45SourceUnchanged `
+        -Before $sourceBefore `
+        -WorkspaceRoot $workspaceRoot `
+        -EvidencePath $OutputPath `
+        -Stage 'during terminal evidence publication')
+}
+catch {
+    $publicationFailure = $_.Exception
+    if ($evidenceExisted) {
+        [System.IO.File]::WriteAllBytes($OutputPath, $previousEvidence)
+    }
+    else {
+        [System.IO.File]::Delete($OutputPath)
+    }
+    throw $publicationFailure
+}
+Write-Output "Issue 45 Media and Cache report: $OutputPath"
+Write-Output $json

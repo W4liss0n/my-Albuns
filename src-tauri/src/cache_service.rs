@@ -421,7 +421,13 @@ fn mutex_name(app_paths: &AppPaths, kind: &str, scope: &str) -> String {
         digest.update(unit.to_le_bytes());
     }
     digest.update([0]);
-    digest.update(scope.as_bytes());
+    // Cache namespace components are ASCII, while the Windows filesystem
+    // normally compares their pathnames without regard to casing. The mutex
+    // key must preserve that same equivalence or an enumerated casing alias
+    // could bypass the active Host's reservation.
+    for byte in scope.bytes() {
+        digest.update([byte.to_ascii_lowercase()]);
+    }
     let digest = digest.finalize();
     let suffix = digest[..16]
         .iter()
@@ -813,6 +819,63 @@ mod tests {
                 .freed_bytes,
             10
         );
+    }
+
+    #[test]
+    fn active_namespace_with_different_windows_casing_is_never_releasable() {
+        let root = tempfile::tempdir().expect("temporary Cache casing fixture");
+        let paths = app_paths(root.path());
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("project.myalbuns"));
+        let canonical_namespace =
+            project_data_namespace(&project.project_id().hyphenated().to_string());
+        let stored_namespace = canonical_namespace.to_ascii_uppercase();
+        let stored_paths = paths
+            .project_cache(&stored_namespace)
+            .expect("the differently-cased namespace remains structurally valid");
+        drop(
+            paths
+                .prepare_cache_storage(&stored_paths)
+                .expect("Windows creates the stored casing before reservation"),
+        );
+
+        let service = CacheService::new(paths);
+        let owner = service
+            .reserve_namespace(project.identity_authority())
+            .expect("the canonical identity reserves the same physical namespace");
+        std::fs::write(
+            stored_paths.media_directory().join("active.bin"),
+            b"active Cache",
+        )
+        .expect("the active Cache payload is writable through the stored casing");
+
+        let measured = service.measure().expect("active Cache usage is measurable");
+        assert_eq!(measured.occupied_bytes, 12);
+        assert_eq!(measured.releasable_bytes, 0);
+        assert_eq!(measured.namespace_count, 1);
+        assert_eq!(measured.releasable_namespace_count, 0);
+
+        let released = service
+            .free_closed_projects()
+            .expect("free space skips the differently-cased active namespace");
+        assert_eq!(released.measured_releasable_bytes, 0);
+        assert_eq!(released.freed_bytes, 0);
+        assert_eq!(released.removed_namespace_count, 0);
+        assert_eq!(released.skipped_active_namespace_count, 1);
+        assert!(stored_paths.root().is_dir());
+
+        drop(owner);
+        assert_eq!(
+            service
+                .free_closed_projects()
+                .expect("the same namespace becomes releasable after its owner closes")
+                .freed_bytes,
+            12
+        );
+        assert!(!stored_paths.root().exists());
     }
 
     #[test]
