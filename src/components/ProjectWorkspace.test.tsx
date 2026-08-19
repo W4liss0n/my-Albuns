@@ -1165,12 +1165,12 @@ test("shows Page numbers instead of cover and final aliases", () => {
   expect(
     tiles[0].style.getPropertyValue("--sheet-inactive-side-gradient"),
   ).toBe(
-    "linear-gradient(to right, #faf9f6 0%, #f4f1eb 58%, #ece7df 100%)",
+    "linear-gradient(to right, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
   expect(
     tiles[1].style.getPropertyValue("--sheet-inactive-side-gradient"),
   ).toBe(
-    "linear-gradient(to left, #faf9f6 0%, #f4f1eb 58%, #ece7df 100%)",
+    "linear-gradient(to left, #faf9f6 0%, #ebe3d8 58%, #cec2b2 100%)",
   );
 });
 

@@ -411,8 +411,8 @@ test.each([
         expect.objectContaining({
           colorStops: [
             { color: "#faf9f6", offset: 0 },
-            { color: "#f4f1eb", offset: 0.58 },
-            { color: "#ece7df", offset: 1 },
+            { color: "#ebe3d8", offset: 0.58 },
+            { color: "#cec2b2", offset: 1 },
           ],
           end: { x: gradientEndX, y: 0 },
           start: { x: gradientStartX, y: 0 },

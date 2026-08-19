@@ -52,9 +52,9 @@ export const SHEET_VISUAL_STYLE = {
   },
   inactiveSide: {
     outerEdge: "#faf9f6",
-    body: "#f4f1eb",
+    body: "#ebe3d8",
     bodyStopOffset: 0.58,
-    fold: "#ece7df",
+    fold: "#cec2b2",
   },
   photo: {
     stripeCount: 12,
