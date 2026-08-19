@@ -168,3 +168,12 @@ test("lets the continuous Canvas preview use the complete available height", () 
   );
   expect(canvasPreviewStyles).not.toContain("420px");
 });
+
+test("uses the focused Sheet instead of the Canvas perimeter as the keyboard focus indicator", () => {
+  expect(editorStyles).toMatch(
+    /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*none;/s,
+  );
+  expect(editorStyles).not.toMatch(
+    /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-accent\);/s,
+  );
+});

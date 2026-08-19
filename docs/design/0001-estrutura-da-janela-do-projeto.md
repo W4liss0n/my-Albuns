@@ -270,6 +270,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Dois cliques em uma Lâmina entram no modo para aquela Lâmina.
 - Com o foco no Canvas, `Enter` entra no modo para a Lâmina centralizada.
 - `Esc` encerra o modo e retorna ao Canvas contínuo.
+- O foco de teclado permanece visível no contorno da Lâmina em foco; o elemento Canvas não recebe contorno próprio no perímetro da área útil durante essa transição.
 
 Não existe faixa, rótulo, botão de retorno ou mudança adicional de fundo para identificar o modo. O isolamento da única Lâmina, o aumento do Canvas e a redução do Painel de imagens são a indicação visual suficiente.
 

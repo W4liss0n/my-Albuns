@@ -595,6 +595,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - As mídias do Painel de imagens formam uma grade iniciada no canto superior esquerdo, preenchida por colunas e novas linhas conforme a largura disponível. Quando necessário, a região rola verticalmente e nunca se transforma em uma faixa horizontal contínua.
 - Painel de imagens e Painel contextual reservam permanentemente a largura potencial de suas barras de rolagem vertical, evitando deslocamento horizontal do conteúdo quando elas aparecem ou desaparecem.
 - Dois cliques numa Lâmina entram no Modo de edição para ela. Com foco no Canvas, `Enter` entra para a Lâmina centralizada e `Esc` retorna ao Canvas contínuo.
+- O foco de teclado no Canvas é representado pelo contorno da Lâmina em foco. O elemento Canvas não desenha uma moldura no perímetro da área útil ao entrar ou sair do Modo de edição.
 - Dois cliques em uma Foto no Painel de imagens usam a Lâmina centralizada ou, no Modo de edição, a Lâmina isolada. Se houver placeholders, preenchem primeiro o mais à esquerda; sem placeholder, criam um novo Frame conforme as regras do modo.
 - O placeholder do duplo clique é ordenado pela coordenada horizontal da borda esquerda e, em empate, pela coordenada vertical da borda superior, ambas crescentes.
 - Em Layout travado sem placeholder, o duplo clique é recusado com orientação para arrastar a Foto até um placeholder disponível.
