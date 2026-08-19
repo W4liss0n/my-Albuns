@@ -76,13 +76,17 @@ export interface ContinuousCanvasLayout {
 
 export function createContinuousCanvasLayout(
   sheets: readonly ComposedSheet[],
+  visualWidthForSheet: (
+    sheet: ComposedSheet,
+    presentation: CanvasSheetPresentation,
+  ) => number = (_sheet, presentation) => presentation.visualWidthPx,
 ): ContinuousCanvasLayout {
   const measuredSheets = sheets.map((sheet, index) => {
     const presentation = createCanvasSheetPresentation(sheet);
     return {
       sheetId: sheet.sheetId,
       index,
-      width: presentation.visualWidthPx,
+      width: visualWidthForSheet(sheet, presentation),
     };
   });
   const entriesAtScale = (scale: number) => {

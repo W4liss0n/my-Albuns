@@ -1416,7 +1416,11 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
     });
   });
 
-  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(4);
+  const targetCenter =
+    canvasHarness.props!.continuousCanvasLayout.entriesAtScale(0.5)[1].center;
+  expect(useEditorView.getState().viewport.offsetX).toBeCloseTo(
+    1_000 / 2 - targetCenter * 0.5,
+  );
   expect(useEditorView.getState().focusedSheetId).toBe("sheet-002");
   expect(useEditorView.getState().centeredSheetId).toBe("sheet-002");
 });

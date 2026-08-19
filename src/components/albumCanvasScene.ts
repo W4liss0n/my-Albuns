@@ -339,7 +339,10 @@ export class AlbumCanvasScene {
       }
       applySheetBarScale(node.sheetBar, scale);
       applyPlaceholderLabelScale(node, scale);
-      node.container.position.set(entries[index].left, 0);
+      node.container.position.set(
+        entries[index].left - node.viewBounds.x,
+        0,
+      );
     }
   }
 

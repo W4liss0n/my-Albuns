@@ -3,6 +3,7 @@ import { Container, Graphics, Rectangle, Text } from "pixi.js";
 import type { ComposedSheet } from "../domain/project";
 import type { SheetBarMetadata } from "./albumCanvasContract";
 import type { CanvasSheetPresentation } from "./canvasGeometry";
+import type { CanvasSheetViewGeometry } from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 
@@ -21,15 +22,20 @@ export function createSheetBarRenderNode(
   sheet: ComposedSheet,
   metadata: SheetBarMetadata | undefined,
   presentation: CanvasSheetPresentation,
+  viewGeometry: CanvasSheetViewGeometry,
 ): SheetBarRenderNode {
   const style = SHEET_VISUAL_STYLE.sheetBar;
-  const width = presentation.visualWidthPx;
+  const width = viewGeometry.visibleOuterBounds.width;
   const bar = new Container();
   bar.label = `sheet-bar-${sheet.sheetId}`;
   bar.alpha = 0;
   bar.eventMode = "static";
   bar.hitArea = new Rectangle(0, 0, width, style.heightPx);
   bar.cursor = "default";
+  bar.position.set(
+    viewGeometry.visibleOuterBounds.x,
+    viewGeometry.visibleOuterBounds.y,
+  );
 
   const surface = new Graphics()
     .rect(0, 0, width, style.heightPx)
@@ -53,7 +59,12 @@ export function createSheetBarRenderNode(
 
   const pageNumbers = metadata?.pageNumbers ?? [];
   const horizontallyFixedElements: Container[] = [];
-  for (const page of sheetBarPages(sheet, pageNumbers, presentation)) {
+  for (const page of sheetBarPages(
+    sheet,
+    pageNumbers,
+    presentation,
+    viewGeometry,
+  )) {
     const pageLabel = createSheetBarText({
       text: String(page.number),
       x: page.x,
@@ -193,18 +204,27 @@ function sheetBarPages(
   sheet: ComposedSheet,
   pageNumbers: readonly number[],
   presentation: CanvasSheetPresentation,
+  viewGeometry: CanvasSheetViewGeometry,
 ) {
+  const relativeX = (absoluteX: number) =>
+    absoluteX - viewGeometry.visibleOuterBounds.x;
   if (sheet.activeSides === "both") {
+    const centerX =
+      presentation.activeOffsetXPx + presentation.activeWidthPx / 2;
+    const activeRight =
+      viewGeometry.activeBounds.x + viewGeometry.activeBounds.width;
     return [
       {
         number: pageNumbers[0],
         side: "left",
-        x: presentation.activeWidthPx / 4,
+        x: relativeX(
+          (viewGeometry.activeBounds.x + centerX) / 2,
+        ),
       },
       {
         number: pageNumbers[1],
         side: "right",
-        x: (presentation.activeWidthPx * 3) / 4,
+        x: relativeX((centerX + activeRight) / 2),
       },
     ].filter(
       (page): page is { number: number; side: string; x: number } =>
@@ -218,9 +238,10 @@ function sheetBarPages(
         {
           number: pageNumber,
           side: sheet.activeSides,
-          x:
-            presentation.activeOffsetXPx +
-            presentation.activeWidthPx / 2,
+          x: relativeX(
+            viewGeometry.activeBounds.x +
+              viewGeometry.activeBounds.width / 2,
+          ),
         },
       ];
 }

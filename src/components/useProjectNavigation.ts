@@ -9,7 +9,7 @@ import {
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import type { CanvasMetrics } from "./albumCanvasContract";
-import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 
 export function useProjectNavigation(projection: EditorProjection) {
   const selectedFrameId = useEditorView(
@@ -49,8 +49,14 @@ export function useProjectNavigation(projection: EditorProjection) {
 
   const canvasLayout = useMemo(
     () =>
-      createContinuousCanvasLayout(projection.composition.sheets),
-    [projection.composition.sheets],
+      createNormalCanvasLayout(
+        projection.composition.sheets,
+        projection.state.document.bleedUm,
+      ),
+    [
+      projection.composition.sheets,
+      projection.state.document.bleedUm,
+    ],
   );
 
   function centerCanvasOnSheet(

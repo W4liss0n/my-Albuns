@@ -7,9 +7,7 @@ import type {
   AlbumCanvasMode,
   SheetBarMetadata,
 } from "./components/albumCanvasContract";
-import {
-  createContinuousCanvasLayout,
-} from "./components/canvasGeometry";
+import { createNormalCanvasLayout } from "./components/canvasSheetViewGeometry";
 import {
   type CanvasGraphicsDiagnosticProbe,
   CanvasGraphicsDiagnosticProbeProvider,
@@ -85,6 +83,11 @@ const composition: CompositionPlan = {
   sheets: [...sheets],
 };
 
+const previewTechnicalGuides = {
+  bleedUm: 3_000,
+  safetyUm: 5_000,
+} as const;
+
 const sheetBarMetadata: readonly SheetBarMetadata[] = [
   { sheetId: "sheet-001", pageNumbers: [1] },
   { sheetId: "sheet-002", pageNumbers: [2, 3] },
@@ -95,7 +98,11 @@ const sheetBarMetadata: readonly SheetBarMetadata[] = [
 
 function CanvasPreview() {
   const layout = useMemo(
-    () => createContinuousCanvasLayout(composition.sheets),
+    () =>
+      createNormalCanvasLayout(
+        composition.sheets,
+        previewTechnicalGuides.bleedUm,
+      ),
     [],
   );
   const centeredOnce = useRef(false);
@@ -119,7 +126,7 @@ function CanvasPreview() {
         mode={mode}
         composition={composition}
         sheetBarMetadata={sheetBarMetadata}
-        technicalGuides={{ bleedUm: 3_000, safetyUm: 5_000 }}
+        technicalGuides={previewTechnicalGuides}
         continuousCanvasLayout={layout}
         selectedFrameId={null}
         focusedSheetId={focusedSheetId}

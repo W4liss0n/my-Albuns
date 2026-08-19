@@ -17,6 +17,7 @@ import type { Logger } from "../application/logging";
 import { silentLogger } from "../application/logging";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { createContinuousCanvasLayout } from "./canvasGeometry";
+import { createNormalCanvasLayout } from "./canvasSheetViewGeometry";
 import {
   CanvasGraphicsDiagnosticProbeProvider,
   type CanvasGraphicsDiagnosticProbe,
@@ -441,9 +442,14 @@ export function renderCanvas({
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
         technicalGuides={technicalGuides}
-        continuousCanvasLayout={createContinuousCanvasLayout(
-          compositionPlan.sheets,
-        )}
+        continuousCanvasLayout={
+          mode.kind === "normal"
+            ? createNormalCanvasLayout(
+                compositionPlan.sheets,
+                technicalGuides?.bleedUm,
+              )
+            : createContinuousCanvasLayout(compositionPlan.sheets)
+        }
         selectedFrameId={null}
         focusedSheetId="sheet-001"
         centeredSheetId="sheet-001"

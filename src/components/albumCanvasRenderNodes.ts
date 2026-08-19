@@ -24,6 +24,10 @@ import {
   createCanvasSheetPresentation,
   MICROMETER_TO_CANVAS_PIXEL,
 } from "./canvasGeometry";
+import {
+  createCanvasSheetViewGeometry,
+  type CanvasBounds,
+} from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
 import {
   createPhotoGeometry,
@@ -75,6 +79,7 @@ export interface SheetRenderNode {
   selectionOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
   sheetBar: SheetBarRenderNode;
+  viewBounds: CanvasBounds;
 }
 
 interface SheetRenderNodeCallbacks {
@@ -114,8 +119,12 @@ export function createSheetRenderNode(
 ): SheetRenderNode {
   const sheetContainer = new Container();
   const presentation = createCanvasSheetPresentation(sheet);
-  const width = presentation.visualWidthPx;
-  const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
+  const viewGeometry = createCanvasSheetViewGeometry(
+    sheet,
+    presentation,
+    technicalGuides?.bleedUm,
+    modePolicy.masksBleed,
+  );
   const dispatchSheetDoubleTap = (event: FederatedPointerEvent) => {
     if (!(event.detail >= 2)) return false;
     callbacks.onSheetDoubleTap(sheet.sheetId);
@@ -123,7 +132,12 @@ export function createSheetRenderNode(
   };
   sheetContainer.label = `canvas-sheet-${sheet.sheetId}`;
   sheetContainer.eventMode = "static";
-  sheetContainer.hitArea = new Rectangle(0, 0, width, height);
+  sheetContainer.hitArea = new Rectangle(
+    viewGeometry.visibleOuterBounds.x,
+    viewGeometry.visibleOuterBounds.y,
+    viewGeometry.visibleOuterBounds.width,
+    viewGeometry.visibleOuterBounds.height,
+  );
   sheetContainer.cursor = "default";
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
     if (event.target === sheetContainer) {
@@ -134,12 +148,14 @@ export function createSheetRenderNode(
   });
 
   sheetContainer.addChild(
-    ...createSheetSurfaceRenderNodes(sheet, width, height),
+    ...createSheetSurfaceRenderNodes(
+      sheet,
+      viewGeometry.visibleOuterBounds,
+    ),
   );
   const inactiveSide = createSheetInactiveSide(
     sheet,
-    presentation,
-    height,
+    viewGeometry.inactiveSideBounds,
   );
   if (inactiveSide) sheetContainer.addChild(inactiveSide.container);
 
@@ -184,7 +200,11 @@ export function createSheetRenderNode(
     }
   }
 
-  const centerLine = createSheetCenterLine(sheet, width, height);
+  const centerLine = createSheetCenterLine(
+    sheet,
+    presentation,
+    viewGeometry.visibleOuterBounds,
+  );
   if (centerLine) sheetContainer.addChild(centerLine);
 
   const selectionOutlines = new Map<string, Graphics>();
@@ -374,9 +394,16 @@ export function createSheetRenderNode(
     }
   }
 
-  if (modePolicy.masksBleed) {
-    const bleedMask = createSheetBleedMask(sheet, technicalGuides);
-    if (bleedMask) activeContent.addChild(bleedMask);
+  if (
+    modePolicy.masksBleed &&
+    (technicalGuides?.bleedUm ?? 0) > 0
+  ) {
+    const bleedMask = createSheetBleedMask(
+      sheet,
+      viewGeometry.activeBounds,
+    );
+    activeContent.mask = bleedMask;
+    sheetContainer.addChild(bleedMask);
   }
   if (modePolicy.showsTechnicalGuides) {
     for (const guide of createSheetTechnicalGuideNodes(
@@ -391,6 +418,7 @@ export function createSheetRenderNode(
     sheet,
     sheetBarMetadata,
     presentation,
+    viewGeometry,
   );
   sheetBar.container.visible = modePolicy.showsSheetBar;
   sheetBar.container.on(
@@ -412,7 +440,12 @@ export function createSheetRenderNode(
   sheetContainer.addChild(sheetBar.container);
 
   const focusOutline = new Graphics()
-    .rect(0, 0, width, height)
+    .rect(
+      viewGeometry.visibleOuterBounds.x,
+      viewGeometry.visibleOuterBounds.y,
+      viewGeometry.visibleOuterBounds.width,
+      viewGeometry.visibleOuterBounds.height,
+    )
     .stroke({
       alignment: 0,
       color: 0x2f7fba,
@@ -433,6 +466,7 @@ export function createSheetRenderNode(
     selectionOutlines,
     focusOutline,
     sheetBar,
+    viewBounds: viewGeometry.visibleOuterBounds,
   };
 }
 

@@ -10,6 +10,10 @@ import {
   type CanvasSheetPresentation,
   MICROMETER_TO_CANVAS_PIXEL,
 } from "./canvasGeometry";
+import {
+  activePageHorizontalEdges,
+  type CanvasBounds,
+} from "./canvasSheetViewGeometry";
 import { pixiColor } from "./pixiColor";
 import {
   inactiveSideGradientOrientation,
@@ -18,25 +22,22 @@ import {
 
 export function createSheetSurfaceRenderNodes(
   sheet: ComposedSheet,
-  width: number,
-  height: number,
+  bounds: CanvasBounds,
 ) {
   const shadowStyle = SHEET_VISUAL_STYLE.canvasShadow;
   const depthShadow = createLayeredSheetShadow(
     `sheet-shadow-depth-${sheet.sheetId}`,
-    width,
-    height,
+    bounds,
     shadowStyle.depth,
   );
   const closeShadow = createLayeredSheetShadow(
     `sheet-shadow-close-${sheet.sheetId}`,
-    width,
-    height,
+    bounds,
     shadowStyle.close,
   );
 
   const surface = new Graphics()
-    .rect(0, 0, width, height)
+    .rect(bounds.x, bounds.y, bounds.width, bounds.height)
     .fill({ color: pixiColor(sheet.base.rgb) })
     .stroke({
       color: pixiColor(SHEET_VISUAL_STYLE.surface.outline),
@@ -59,8 +60,7 @@ interface LayeredShadowStyle {
 
 function createLayeredSheetShadow(
   label: string,
-  width: number,
-  height: number,
+  bounds: CanvasBounds,
   style: LayeredShadowStyle,
 ) {
   const shadow = new Graphics();
@@ -68,10 +68,10 @@ function createLayeredSheetShadow(
     const spread = (style.spreadPx * step) / style.steps;
     shadow
       .rect(
-        -spread,
-        style.offsetYPx - spread,
-        width + spread * 2,
-        height + spread * 2,
+        bounds.x - spread,
+        bounds.y + style.offsetYPx - spread,
+        bounds.width + spread * 2,
+        bounds.height + spread * 2,
       )
       .fill({
         color: pixiColor(style.color),
@@ -85,12 +85,13 @@ function createLayeredSheetShadow(
 
 export function createSheetCenterLine(
   sheet: ComposedSheet,
-  width: number,
-  height: number,
+  presentation: CanvasSheetPresentation,
+  bounds: CanvasBounds,
 ) {
+  const centerX = presentation.visualWidthPx / 2;
   const centerLine = new Graphics()
-    .moveTo(width / 2, 0)
-    .lineTo(width / 2, height)
+    .moveTo(centerX, bounds.y)
+    .lineTo(centerX, bounds.y + bounds.height)
     .stroke({
       color: pixiColor(SHEET_VISUAL_STYLE.centerLine.color),
       width: SHEET_VISUAL_STYLE.centerLine.widthPx,
@@ -104,20 +105,16 @@ export function createSheetCenterLine(
 
 export function createSheetInactiveSide(
   sheet: ComposedSheet,
-  presentation: CanvasSheetPresentation,
-  height: number,
+  bounds: CanvasBounds | null,
 ) {
-  if (
-    sheet.activeSides === "both" ||
-    presentation.inactiveOffsetXPx === null
-  ) {
+  if (sheet.activeSides === "both" || bounds === null) {
     return null;
   }
   const style = SHEET_VISUAL_STYLE.inactiveSide;
   const inactiveSide = new Container();
   inactiveSide.label = `sheet-inactive-side-${sheet.sheetId}`;
   inactiveSide.eventMode = "none";
-  inactiveSide.position.set(presentation.inactiveOffsetXPx, 0);
+  inactiveSide.position.set(bounds.x, bounds.y);
 
   const orientation = inactiveSideGradientOrientation(sheet.activeSides);
   const gradient = new FillGradient({
@@ -131,7 +128,7 @@ export function createSheetInactiveSide(
     ],
   });
   const gradientSurface = new Graphics()
-    .rect(0, 0, presentation.activeWidthPx, height)
+    .rect(0, 0, bounds.width, bounds.height)
     .fill(gradient);
   gradientSurface.label = `sheet-inactive-side-gradient-${sheet.sheetId}`;
   gradientSurface.eventMode = "none";
@@ -178,7 +175,7 @@ export function createSheetTechnicalGuideNodes(
 ) {
   if (!guides) return [];
   const geometry = createCanvasGuideGeometry(sheet, guides);
-  const edges = activeGuideEdges(sheet.activeSides);
+  const edges = activePageHorizontalEdges(sheet.activeSides);
   return [
     guides.bleedUm > 0
       ? createDashedGuide({
@@ -203,45 +200,19 @@ export function createSheetTechnicalGuideNodes(
 
 export function createSheetBleedMask(
   sheet: ComposedSheet,
-  guides: CanvasTechnicalGuides | undefined,
+  activeBounds: CanvasBounds,
 ) {
-  if (!guides || guides.bleedUm <= 0) return null;
-  const geometry = createCanvasGuideGeometry(sheet, guides);
-  const inset = geometry.bleedInset;
-  if (inset <= 0) return null;
-
-  const { width, height } = geometry;
-  const innerHeight = Math.max(0, height - inset * 2);
-  const edges = activeGuideEdges(sheet.activeSides);
-  const mask = new Graphics().rect(0, 0, width, inset);
-  if (edges.right) {
-    mask.rect(width - inset, inset, inset, innerHeight);
-  }
-  mask.rect(0, height - inset, width, inset);
-  if (edges.left) {
-    mask.rect(0, inset, inset, innerHeight);
-  }
-  mask.fill({
-    color: pixiColor(SHEET_VISUAL_STYLE.bleedMask.fill),
-    alpha: SHEET_VISUAL_STYLE.bleedMask.opacity,
-  });
+  const mask = new Graphics()
+    .rect(
+      activeBounds.x,
+      activeBounds.y,
+      activeBounds.width,
+      activeBounds.height,
+    )
+    .fill(0xffffff);
   mask.label = `sheet-bleed-mask-${sheet.sheetId}`;
   mask.eventMode = "none";
   return mask;
-}
-
-interface GuideEdges {
-  right: boolean;
-  left: boolean;
-}
-
-function activeGuideEdges(
-  activeSides: ComposedSheet["activeSides"],
-): GuideEdges {
-  return {
-    right: activeSides !== "left",
-    left: activeSides !== "right",
-  };
 }
 
 function createCanvasGuideGeometry(
@@ -268,7 +239,7 @@ type CanvasGuideGeometry = ReturnType<typeof createCanvasGuideGeometry>;
 
 interface DashedGuideOptions {
   color: string;
-  edges: GuideEdges;
+  edges: ReturnType<typeof activePageHorizontalEdges>;
   geometry: CanvasGuideGeometry;
   inset: number;
   label: string;

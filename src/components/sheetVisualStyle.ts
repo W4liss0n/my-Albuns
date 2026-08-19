@@ -11,10 +11,6 @@ export const SHEET_VISUAL_STYLE = {
     opacity: 1,
     widthPx: 1,
   },
-  bleedMask: {
-    fill: "#f3f1ec",
-    opacity: 1,
-  },
   canvasShadow: {
     close: {
       color: "#3c362c",

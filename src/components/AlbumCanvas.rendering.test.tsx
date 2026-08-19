@@ -52,6 +52,42 @@ test("keeps the focused sheet outline flush against the outside edge", async () 
   });
 });
 
+test("keeps the focused sheet outline flush with the visible cut area in normal mode", async () => {
+  renderCanvas({
+    technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("canvas-sheet-sheet-001")).toMatchObject({
+    hitArea: { height: 294, width: 594, x: 3, y: 3 },
+    position: { x: -3 },
+  });
+  expect(displayWithLabel("sheet-surface-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 294, width: 594, x: 3, y: 3 }],
+  });
+  expect(displayWithLabel("sheet-center-line-sheet-001")).toMatchObject({
+    pathCommands: [
+      { kind: "moveTo", x: 300, y: 3 },
+      { kind: "lineTo", x: 300, y: 297 },
+    ],
+  });
+  expect(displayWithLabel("sheet-bar-sheet-001")).toMatchObject({
+    position: { x: 3, y: 3 },
+  });
+  expect(displayWithLabel("sheet-bar-surface-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 40, width: 594, x: 0, y: 0 }],
+  });
+  expect(displayWithLabel("sheet-bar-page-left-sheet-001")).toMatchObject({
+    position: { x: 148.5 },
+  });
+  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
+    position: { x: 445.5 },
+  });
+  expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 294, width: 594, x: 3, y: 3 }],
+  });
+});
+
 test("matches the reference Canvas surface, cut-area crop and empty Frame treatment in normal mode", async () => {
   const placeholderComposition: CompositionPlan = {
     ...composition,
@@ -89,7 +125,7 @@ test("matches the reference Canvas surface, cut-area crop and empty Frame treatm
     strokeStyles: unknown[];
   };
   expect(surface.rectCommands).toEqual([
-    { height: 300, width: 600, x: 0, y: 0 },
+    { height: 294, width: 594, x: 3, y: 3 },
   ]);
   expect(surface.strokeStyles).toContainEqual(
     expect.objectContaining({ pixelLine: true, width: 1 }),
@@ -167,14 +203,13 @@ test("matches the reference Canvas surface, cut-area crop and empty Frame treatm
       label.includes("sheet-safety-guide-"),
     ),
   ).toBe(false);
-  expect(displayWithLabel("sheet-bleed-mask-sheet-001")).toMatchObject({
-    rectCommands: [
-      { height: 3, width: 600, x: 0, y: 0 },
-      { height: 294, width: 3, x: 597, y: 3 },
-      { height: 3, width: 600, x: 0, y: 297 },
-      { height: 294, width: 3, x: 0, y: 3 },
-    ],
+  const bleedMask = displayWithLabel("sheet-bleed-mask-sheet-001");
+  expect(bleedMask).toMatchObject({
+    rectCommands: [{ height: 294, width: 594, x: 3, y: 3 }],
   });
+  expect(displayWithLabel("sheet-active-content-sheet-001").mask).toBe(
+    bleedMask,
+  );
 });
 
 test("shows the complete active surface and technical guides only in Sheet Edit Mode", async () => {
@@ -191,6 +226,12 @@ test("shows the complete active surface and technical guides only in Sheet Edit 
       ({ label }) => label === "sheet-bleed-mask-sheet-001",
     ),
   ).toBe(false);
+  expect(displayWithLabel("sheet-surface-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
+  });
+  expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
+  });
   expect(displayWithLabel("sheet-bar-sheet-001").visible).toBe(false);
 });
 
@@ -258,19 +299,19 @@ test.each([
 const singlePageEdgeCases = [
   {
     activeSides: "right" as const,
+    activeMask: { height: 294, width: 297, x: 300, y: 3 },
     omittedGuideX: 3,
     inactiveBoundaryX: 0,
-    omittedMaskX: 0,
+    inactivePosition: { x: 3, y: 3 },
     retainedGuideX: 297,
-    retainedMaskX: 297,
   },
   {
     activeSides: "left" as const,
+    activeMask: { height: 294, width: 297, x: 3, y: 3 },
     omittedGuideX: 297,
     inactiveBoundaryX: 300,
-    omittedMaskX: 297,
+    inactivePosition: { x: 300, y: 3 },
     retainedGuideX: 3,
-    retainedMaskX: 0,
   },
 ] as const;
 
@@ -318,8 +359,8 @@ test.each(singlePageEdgeCases)(
 );
 
 test.each(singlePageEdgeCases)(
-  "masks the Sangria only on active outer edges of a $activeSides single Page in normal mode",
-  async ({ activeSides, omittedMaskX, retainedMaskX }) => {
+  "clips the active $activeSides single Page and keeps the inactive side inside the same visible outline",
+  async ({ activeSides, activeMask, inactivePosition }) => {
     renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
       sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
@@ -327,27 +368,25 @@ test.each(singlePageEdgeCases)(
     });
     await finishPixiInitialization();
 
-    const bleedMask = displayWithLabel(
-      "sheet-bleed-mask-sheet-001",
-    ) as unknown as {
-      rectCommands: Array<{
-        height: number;
-        width: number;
-        x: number;
-      }>;
-    };
+    const bleedMask = displayWithLabel("sheet-bleed-mask-sheet-001");
+    expect(bleedMask).toMatchObject({ rectCommands: [activeMask] });
+    expect(displayWithLabel("sheet-active-content-sheet-001").mask).toBe(
+      bleedMask,
+    );
+    expect(displayWithLabel("canvas-sheet-sheet-001")).toMatchObject({
+      hitArea: { height: 294, width: 594, x: 3, y: 3 },
+    });
+    expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
+      rectCommands: [{ height: 294, width: 594, x: 3, y: 3 }],
+    });
+    expect(displayWithLabel("sheet-inactive-side-sheet-001")).toMatchObject({
+      position: inactivePosition,
+    });
     expect(
-      bleedMask.rectCommands.some(
-        ({ height, width, x }) =>
-          x === omittedMaskX && width === 3 && height === 294,
-      ),
-    ).toBe(false);
-    expect(
-      bleedMask.rectCommands.some(
-        ({ height, width, x }) =>
-          x === retainedMaskX && width === 3 && height === 294,
-      ),
-    ).toBe(true);
+      displayWithLabel("sheet-inactive-side-gradient-sheet-001"),
+    ).toMatchObject({
+      rectCommands: [{ height: 294, width: 297, x: 0, y: 0 }],
+    });
   },
 );
 

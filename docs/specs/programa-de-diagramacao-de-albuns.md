@@ -2,7 +2,7 @@
 status: ready-for-agent
 document: product-spec
 implementation-readiness: decision-tickets-required
-updated: 2026-08-10
+updated: 2026-08-19
 ---
 
 # Programa de Diagramação de Álbuns
@@ -555,6 +555,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A Lâmina possui cantos retos, contorno neutro de `1 px`, sombra curta e sombra ampla. Em Lâmina dupla, a divisão central usa um separador claro e discreto.
 - Frames vazios usam preenchimento neutro liso e contorno fino, sem ícone. No Canvas, `Adicionar Foto` permanece centralizado e visível, enquanto miniaturas da Grade omitem o rótulo. O cursor permanece o padrão do sistema sobre qualquer Frame; essa aparência transitória não substitui a Borda persistida do Frame.
 - Sangria e Área de segurança são projetadas a partir das medidas do Documento. No Modo normal do Canvas, somente a Área de corte permanece visível e nenhuma guia técnica é desenhada. No Modo de edição da Lâmina, a superfície ativa inteira aparece com guias tracejadas vermelha e azul, acima da composição. Essas guias pertencem somente à interface e nunca participam da Exportação.
+- No Modo normal do Canvas, superfície, sombras, foco, hover, área de interação e Barra da Lâmina acompanham os limites visíveis resultantes da máscara de Sangria; a separação horizontal de `46 px` também é medida entre esses limites. Em uma Lâmina de página única, o Lado inativo continua integrando esses limites. No Modo de edição da Lâmina, os mesmos elementos usam a superfície completa.
 - O modelo lógico mantém todas as Lâminas do Álbum e não impõe um máximo arbitrário. A cena detalhada e suas texturas são materializadas somente para a área visível e uma margem de pré-carga adjacente.
 - Ao sair dessa faixa, uma Lâmina conserva seu estado lógico, mas pode liberar recursos gráficos pesados; retornar à faixa reconstrói sua representação sem alterar o Projeto. A política concreta de residência e descarte será calibrada por testes de estresse com Álbuns longos.
 - No modo normal não existe uma Lâmina ativa exclusiva: todas as Lâminas apresentadas são interativas.
