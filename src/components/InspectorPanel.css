@@ -280,7 +280,8 @@
   font-weight: 400;
 }
 
-.sheet-tile.active .sheet-tile__number {
+.sheet-tile.active .sheet-tile__number,
+.sheet-tile.active .sheet-tile__pages {
   color: #fff;
   background: var(--ui-accent);
 }

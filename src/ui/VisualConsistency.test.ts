@@ -150,4 +150,7 @@ test("matches the compact sheet grid instead of using generic cards", () => {
   expect(inspectorPanelStyles).toMatch(
     /\.sheet-tile__number,\s*\n\.sheet-tile__pages\s*\{[^}]*position:\s*absolute;/s,
   );
+  expect(inspectorPanelStyles).toMatch(
+    /\.sheet-tile\.active \.sheet-tile__number,\s*\n\.sheet-tile\.active \.sheet-tile__pages\s*\{[^}]*color:\s*#fff;[^}]*background:\s*var\(--ui-accent\);/s,
+  );
 });
