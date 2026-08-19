@@ -406,7 +406,7 @@ test("starts the implemented Lâmina export from the Arquivo menu", () => {
   expect(startSheet).toHaveBeenCalledWith("sheet-001", expect.any(Function));
 });
 
-test("uses shared empty states when the editor has no materialized content", () => {
+test("uses contextual empty states when the editor has no materialized content", () => {
   const emptyProjection = createEmptyProjection();
   render(
     <ProjectWorkspace
@@ -419,9 +419,12 @@ test("uses shared empty states when the editor has no materialized content", () 
     />,
   );
 
-  expect(
-    screen.getByRole("status", { name: "Nenhuma Foto importada" }),
-  ).toHaveClass("ui-empty-state");
+  const mediaEmptyState = screen.getByRole("status", {
+    name: "Nenhuma Foto importada",
+  });
+
+  expect(mediaEmptyState).toHaveClass("ui-empty-state");
+  expect(mediaEmptyState).toHaveClass("media-empty-state--catalog");
   expect(
     screen.getByRole("status", { name: "Nenhuma Lâmina na Grade" }),
   ).toHaveClass("ui-empty-state");

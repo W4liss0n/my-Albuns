@@ -1,4 +1,12 @@
 .media-panel {
+  --media-placeholder-pattern: repeating-linear-gradient(
+    45deg,
+    #e9e6df 0,
+    #e9e6df 8px,
+    #f1efe9 8px,
+    #f1efe9 16px
+  );
+
   position: relative;
   display: grid;
   min-width: 0;
@@ -292,9 +300,63 @@
   scrollbar-gutter: stable;
 }
 
-.media-empty-state {
+.ui-empty-state.media-empty-state {
+  min-width: 0;
   min-height: 100%;
+  align-content: center;
+  justify-content: center;
+  justify-items: stretch;
+  padding: var(--ui-space-3);
   grid-column: 1 / -1;
+  grid-template-columns: 72px minmax(0, 280px);
+  grid-template-rows: repeat(3, auto);
+  column-gap: 14px;
+  row-gap: 2px;
+  text-align: left;
+}
+
+.media-empty-state > .ui-empty-state__icon {
+  display: grid;
+  width: 72px;
+  height: auto;
+  overflow: hidden;
+  border: 1px dashed var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text-muted);
+  aspect-ratio: 3 / 2;
+  background: var(--media-placeholder-pattern);
+  box-shadow: 0 1px 2px rgb(60 54 44 / 8%);
+  grid-column: 1;
+  grid-row: 1 / 4;
+  place-items: center;
+}
+
+.media-empty-state--filtered > .ui-empty-state__icon {
+  background: var(--ui-surface-muted);
+}
+
+.media-empty-state > .ui-empty-state__eyebrow {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.ui-empty-state.media-empty-state > strong {
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-label);
+  font-weight: 600;
+  grid-column: 2;
+  grid-row: 2;
+  line-height: 1.35;
+}
+
+.ui-empty-state.media-empty-state > p {
+  max-width: 280px;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-support);
+  grid-column: 2;
+  grid-row: 3;
+  line-height: 1.35;
+  text-wrap: pretty;
 }
 
 .media-card {
@@ -317,14 +379,7 @@
   overflow: hidden;
   border-radius: var(--ui-radius-small);
   aspect-ratio: 3 / 2;
-  background:
-    repeating-linear-gradient(
-      45deg,
-      #e9e6df 0,
-      #e9e6df 8px,
-      #f1efe9 8px,
-      #f1efe9 16px
-    );
+  background: var(--media-placeholder-pattern);
   box-shadow: 0 1px 2px rgb(60 54 44 / 10%);
   place-items: center;
   transition: box-shadow 100ms ease;

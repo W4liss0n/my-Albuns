@@ -5,8 +5,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { ImageOff, Sparkles } from "lucide-react";
-
 import type {
   MediaPreview,
   MediaPreviewDemand,
@@ -22,7 +20,7 @@ import {
   type MediaPanelViewPreferences,
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
-import { AppIcon, EmptyState } from "../ui";
+import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import "./MediaPanel.css";
 
@@ -184,34 +182,9 @@ export function MediaPanel({
         }
       >
         {activeMediaItems.length === 0 ? (
-          <EmptyState
-            className="media-empty-state"
-            density="compact"
-            description={
-              activeMediaKind === "photo"
-                ? "As Fotos importadas para este Projeto aparecerão aqui."
-                : "As Imagens decorativas importadas aparecerão aqui."
-            }
-            icon={
-              <AppIcon
-                icon={activeMediaKind === "photo" ? ImageOff : Sparkles}
-                size={16}
-              />
-            }
-            title={
-              activeMediaKind === "photo"
-                ? "Nenhuma Foto importada"
-                : "Nenhum Decorativo importado"
-            }
-          />
+          <MediaPanelEmptyState kind={activeMediaKind} reason="catalog" />
         ) : visibleMediaItems.length === 0 ? (
-          <EmptyState
-            className="media-empty-state"
-            density="compact"
-            description="Ajuste a busca ou o filtro de uso para ver outros itens."
-            icon={<AppIcon icon={ImageOff} size={16} />}
-            title="Nenhum item encontrado"
-          />
+          <MediaPanelEmptyState kind={activeMediaKind} reason="filtered" />
         ) : (
           visibleMediaItems.map((media) => {
             const usageCount = mediaUsageById.get(media.id) ?? 0;

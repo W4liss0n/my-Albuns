@@ -63,6 +63,44 @@ test("matches the reference toolbar and exposes unavailable import actions as pl
   }
 });
 
+test("renders an empty catalog as an integrated media thumbnail motif", () => {
+  render(
+    <MediaPanel
+      mediaItems={[]}
+      mediaUsage={[]}
+      onFillPhoto={vi.fn()}
+    />,
+  );
+
+  const emptyState = screen.getByRole("status", {
+    name: "Nenhuma Foto importada",
+  });
+  expect(emptyState).toHaveClass("ui-empty-state");
+  expect(emptyState).toHaveClass("media-empty-state--catalog");
+  expect(
+    within(emptyState).getByText("Fotos"),
+  ).toHaveClass("ui-empty-state__eyebrow");
+  expect(emptyState.querySelector(".ui-empty-state__icon")).not.toBeNull();
+});
+
+test("reuses the media motif when filters have no results", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.type(
+    screen.getByRole("searchbox", { name: "Buscar Fotos" }),
+    "inexistente",
+  );
+
+  const emptyState = screen.getByRole("status", {
+    name: "Nenhum item encontrado",
+  });
+  expect(emptyState).toHaveClass("media-empty-state--filtered");
+  expect(within(emptyState).getByText("Resultados")).toHaveClass(
+    "ui-empty-state__eyebrow",
+  );
+});
+
 test("combines accent-insensitive search with the usage filter and natural name order", async () => {
   const user = userEvent.setup();
   renderPanel();
