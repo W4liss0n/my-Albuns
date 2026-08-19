@@ -306,6 +306,9 @@ Superfície de trabalho dedicada a uma Sessão do Projeto.
 **Lâmina centralizada no Canvas**:
 Lâmina mais próxima do centro visual do Canvas e usada como contexto implícito quando um comando não possui alvo explícito.
 
+**Modo normal do Canvas**:
+Contexto de trabalho do Canvas contínuo que mantém a sequência de Lâminas navegável e permite interações diretas sem isolar uma única Lâmina.
+
 **Modo de edição da Lâmina**:
 Contexto de trabalho dedicado à edição estrutural dos Frames de uma única Lâmina.
 

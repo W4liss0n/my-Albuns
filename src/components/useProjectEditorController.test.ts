@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, fireEvent, renderHook } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type { ProjectSessionPort } from "../application/projectPorts";
@@ -63,4 +63,27 @@ test("routes editor changes through the shared Project mutation runner", async (
     deltaPanY: 0,
     deltaZoom: 0,
   });
+});
+
+test("enters the centered Sheet Edit Mode with Enter and returns to normal mode with Escape", () => {
+  const view = renderHook(() =>
+    useProjectEditorController({
+      projection: representativeProjection,
+      runProjectMutation: vi.fn(),
+      onProjectionChange: vi.fn(),
+    }),
+  );
+
+  expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
+
+  fireEvent.keyDown(window, { key: "Enter" });
+
+  expect(view.result.current.canvasProps.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
+
+  fireEvent.keyDown(window, { key: "Escape" });
+
+  expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
 });

@@ -16,6 +16,7 @@ import type {
   ProjectedFrameBorder,
 } from "../domain/project";
 import type {
+  AlbumCanvasMode,
   CanvasTechnicalGuides,
   SheetBarMetadata,
 } from "./albumCanvasContract";
@@ -106,6 +107,7 @@ export function createSheetRenderNode(
   sheetBarMetadata: SheetBarMetadata | undefined,
   frameBorder: ProjectedFrameBorder,
   technicalGuides: CanvasTechnicalGuides | undefined,
+  mode: AlbumCanvasMode["kind"],
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
 ): SheetRenderNode {
@@ -310,12 +312,12 @@ export function createSheetRenderNode(
       }
     });
     frameContainer.on("pointerdown", (event: FederatedPointerEvent) => {
-      if (!event.altKey || !photoNode) return;
+      if (mode !== "normal" || !event.altKey || !photoNode) return;
       event.stopPropagation();
       callbacks.onPhotoPanStart(photoNode, event);
     });
     frameContainer.on("wheel", (event: FederatedWheelEvent) => {
-      if (!event.altKey || !photoNode) return;
+      if (mode !== "normal" || !event.altKey || !photoNode) return;
       callbacks.onPhotoWheel(photoNode, event);
     });
     activeContent.addChild(frameContainer);
@@ -359,14 +361,16 @@ export function createSheetRenderNode(
     }
   }
 
-  const bleedMask = createSheetBleedMask(sheet, technicalGuides);
-  if (bleedMask) activeContent.addChild(bleedMask);
-
-  for (const guide of createSheetTechnicalGuideNodes(
-    sheet,
-    technicalGuides,
-  )) {
-    activeContent.addChild(guide);
+  if (mode === "normal") {
+    const bleedMask = createSheetBleedMask(sheet, technicalGuides);
+    if (bleedMask) activeContent.addChild(bleedMask);
+  } else {
+    for (const guide of createSheetTechnicalGuideNodes(
+      sheet,
+      technicalGuides,
+    )) {
+      activeContent.addChild(guide);
+    }
   }
 
   const sheetBar = createSheetBarRenderNode(
@@ -374,6 +378,7 @@ export function createSheetRenderNode(
     sheetBarMetadata,
     presentation,
   );
+  sheetBar.container.visible = mode === "normal";
   sheetBar.container.on(
     "pointertap",
     (event: FederatedPointerEvent) => {

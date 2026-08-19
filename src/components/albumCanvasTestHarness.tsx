@@ -5,6 +5,7 @@ import type { CompositionPlan } from "../domain/project";
 import type { MediaPreviewDemand } from "../application/projectPorts";
 import {
   AlbumCanvas as ProductionAlbumCanvas,
+  type AlbumCanvasMode,
   type AlbumCanvasProps,
   type CanvasMetrics,
   type CanvasTechnicalGuides,
@@ -383,6 +384,7 @@ vi.mock("pixi.js", () => {
 
 export function renderCanvas({
   projectId = "project-spike-001",
+  mode = { kind: "normal" },
   compositionPlan = composition,
   sheetBarMetadata = [
     { sheetId: "sheet-001", pageNumbers: [1, 2] },
@@ -405,6 +407,7 @@ export function renderCanvas({
   logger = silentLogger,
 }: {
   projectId?: string;
+  mode?: AlbumCanvasMode;
   compositionPlan?: CompositionPlan;
   sheetBarMetadata?: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
@@ -431,6 +434,7 @@ export function renderCanvas({
           canvasGraphicsDiagnosticProbe
         }
         projectId={projectId}
+        mode={mode}
         composition={compositionPlan}
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}

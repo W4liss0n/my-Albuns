@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { EditorProjection } from "../domain/project";
-import type { AlbumCanvasProps } from "./albumCanvasContract";
+import type {
+  AlbumCanvasMode,
+  AlbumCanvasProps,
+} from "./albumCanvasContract";
 import { usePhotoGestures } from "./usePhotoGestures";
 import { useProjectMutations } from "./useProjectMutations";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
@@ -21,6 +24,9 @@ export function useProjectEditorController({
   onProjectionChange,
 }: ProjectEditorControllerInput) {
   const navigation = useProjectNavigation(projection);
+  const [canvasMode, setCanvasMode] = useState<AlbumCanvasMode>({
+    kind: "normal",
+  });
   const mutations = useProjectMutations({
     interactionBlocked,
     projection,
@@ -51,8 +57,76 @@ export function useProjectEditorController({
     commitInteraction: mutations.commitInteraction,
   });
 
+  useEffect(() => {
+    setCanvasMode({ kind: "normal" });
+  }, [projection.state.projectId]);
+
+  useEffect(() => {
+    const editingSheetStillExists =
+      canvasMode.kind === "normal" ||
+      projection.state.album.sheets.some(
+        (sheet) => sheet.id === canvasMode.sheetId,
+      );
+    if (editingSheetStillExists) return;
+    navigation.selectFrame(null);
+    setCanvasMode({ kind: "normal" });
+  }, [
+    canvasMode,
+    navigation.selectFrame,
+    projection.state.album.sheets,
+  ]);
+
+  useEffect(() => {
+    const changeCanvasMode = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        interactionBlocked ||
+        isTextEntryTarget(event.target)
+      ) {
+        return;
+      }
+      if (event.key === "Enter" && canvasMode.kind === "normal") {
+        const sheetId = navigation.implicitSheetId;
+        if (!sheetId) return;
+        const selectedFrameBelongsToTarget =
+          navigation.selectedFrameId === null ||
+          projection.state.album.sheets.some(
+            (sheet) =>
+              sheet.id === sheetId &&
+              sheet.frames.some(
+                (frame) => frame.id === navigation.selectedFrameId,
+              ),
+          );
+        if (!selectedFrameBelongsToTarget) {
+          navigation.selectFrame(null);
+        }
+        navigation.focusSheet(sheetId);
+        setCanvasMode({ kind: "sheet-editing", sheetId });
+        event.preventDefault();
+        return;
+      }
+      if (event.key === "Escape" && canvasMode.kind === "sheet-editing") {
+        navigation.selectFrame(null);
+        setCanvasMode({ kind: "normal" });
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", changeCanvasMode);
+    return () => window.removeEventListener("keydown", changeCanvasMode);
+  }, [
+    canvasMode,
+    interactionBlocked,
+    navigation.focusSheet,
+    navigation.implicitSheetId,
+    navigation.selectFrame,
+    navigation.selectedFrameId,
+    projection.state.album.sheets,
+  ]);
+
   const canvasProps: AlbumCanvasProps = {
     projectId: projection.state.projectId,
+    mode: canvasMode,
     composition: projection.composition,
     sheetBarMetadata: projection.state.album.sheets.map((sheet) => ({
       sheetId: sheet.id,
@@ -107,4 +181,13 @@ export function useProjectEditorController({
     },
     dismissFeedback: mutations.dismissFeedback,
   };
+}
+
+function isTextEntryTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable)
+  );
 }

@@ -3,7 +3,10 @@ import ReactDOM from "react-dom/client";
 
 import "./App.css";
 import { AlbumCanvas } from "./components/AlbumCanvas";
-import type { SheetBarMetadata } from "./components/albumCanvasContract";
+import type {
+  AlbumCanvasMode,
+  SheetBarMetadata,
+} from "./components/albumCanvasContract";
 import {
   createContinuousCanvasLayout,
 } from "./components/canvasGeometry";
@@ -99,11 +102,21 @@ function CanvasPreview() {
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
   const [viewport, setViewport] = useState({ offsetX: 0 });
+  const mode = useMemo<AlbumCanvasMode>(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    return parameters.get("mode") === "sheet-editing"
+      ? {
+          kind: "sheet-editing",
+          sheetId: parameters.get("sheet") ?? "sheet-002",
+        }
+      : { kind: "normal" };
+  }, []);
 
   return (
     <main className="canvas-preview canvas-section" data-development-preview="canvas">
       <AlbumCanvas
         projectId="canvas-visual-preview"
+        mode={mode}
         composition={composition}
         sheetBarMetadata={sheetBarMetadata}
         technicalGuides={{ bleedUm: 3_000, safetyUm: 5_000 }}

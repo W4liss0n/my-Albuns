@@ -52,7 +52,7 @@ test("keeps the focused sheet outline flush against the outside edge", async () 
   });
 });
 
-test("matches the reference Canvas surface, technical guides and empty Frame treatment", async () => {
+test("matches the reference Canvas surface, cut-area crop and empty Frame treatment in normal mode", async () => {
   const placeholderComposition: CompositionPlan = {
     ...composition,
     sheets: composition.sheets.map((sheet) => ({
@@ -157,8 +157,16 @@ test("matches the reference Canvas surface, technical guides and empty Frame tre
   );
   expect(placeholderFrame.cursor).toBe("default");
 
-  expect(displayWithLabel("sheet-bleed-guide-sheet-001")).toBeDefined();
-  expect(displayWithLabel("sheet-safety-guide-sheet-001")).toBeDefined();
+  expect(
+    pixiLifecycle.displays.some(({ label }) =>
+      label.includes("sheet-bleed-guide-"),
+    ),
+  ).toBe(false);
+  expect(
+    pixiLifecycle.displays.some(({ label }) =>
+      label.includes("sheet-safety-guide-"),
+    ),
+  ).toBe(false);
   expect(displayWithLabel("sheet-bleed-mask-sheet-001")).toMatchObject({
     rectCommands: [
       { height: 3, width: 600, x: 0, y: 0 },
@@ -169,21 +177,35 @@ test("matches the reference Canvas surface, technical guides and empty Frame tre
   });
 });
 
+test("shows the complete active surface and technical guides only in Sheet Edit Mode", async () => {
+  renderCanvas({
+    mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+    technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-bleed-guide-sheet-001")).toBeDefined();
+  expect(displayWithLabel("sheet-safety-guide-sheet-001")).toBeDefined();
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "sheet-bleed-mask-sheet-001",
+    ),
+  ).toBe(false);
+  expect(displayWithLabel("sheet-bar-sheet-001").visible).toBe(false);
+});
+
 test.each([
   {
     guides: { bleedUm: 0, safetyUm: 5_000 },
-    expectedLabels: ["sheet-safety-guide-sheet-001"],
+    expectedLabels: [],
   },
   {
     guides: { bleedUm: 3_000, safetyUm: 0 },
-    expectedLabels: [
-      "sheet-bleed-mask-sheet-001",
-      "sheet-bleed-guide-sheet-001",
-    ],
+    expectedLabels: ["sheet-bleed-mask-sheet-001"],
   },
   { guides: { bleedUm: 0, safetyUm: 0 }, expectedLabels: [] },
 ])(
-  "disables zero-valued technical guides independently ($guides)",
+  "keeps technical guides hidden and applies only the normal-mode crop ($guides)",
   async ({ guides, expectedLabels }) => {
     renderCanvas({ technicalGuides: guides });
     await finishPixiInitialization();
@@ -203,6 +225,38 @@ test.each([
 
 test.each([
   {
+    guides: { bleedUm: 0, safetyUm: 5_000 },
+    expectedLabels: ["sheet-safety-guide-sheet-001"],
+  },
+  {
+    guides: { bleedUm: 3_000, safetyUm: 0 },
+    expectedLabels: ["sheet-bleed-guide-sheet-001"],
+  },
+  { guides: { bleedUm: 0, safetyUm: 0 }, expectedLabels: [] },
+])(
+  "disables zero-valued guides independently in Sheet Edit Mode ($guides)",
+  async ({ guides, expectedLabels }) => {
+    renderCanvas({
+      mode: { kind: "sheet-editing", sheetId: "sheet-001" },
+      technicalGuides: guides,
+    });
+    await finishPixiInitialization();
+
+    const technicalLabels = pixiLifecycle.displays
+      .map(({ label }) => label)
+      .filter((label) =>
+        [
+          "sheet-bleed-guide-sheet-001",
+          "sheet-safety-guide-sheet-001",
+          "sheet-bleed-mask-sheet-001",
+        ].includes(label),
+      );
+    expect(technicalLabels).toEqual(expectedLabels);
+  },
+);
+
+const singlePageEdgeCases = [
+  {
     activeSides: "right" as const,
     omittedGuideX: 3,
     inactiveBoundaryX: 0,
@@ -218,18 +272,19 @@ test.each([
     retainedGuideX: 3,
     retainedMaskX: 0,
   },
-])(
-  "omits guides and bleed mask on the inactive-side edge of a $activeSides single Page",
+] as const;
+
+test.each(singlePageEdgeCases)(
+  "omits technical guides on the inactive-side edge of a $activeSides single Page in Sheet Edit Mode",
   async ({
     activeSides,
     inactiveBoundaryX,
     omittedGuideX,
-    omittedMaskX,
     retainedGuideX,
-    retainedMaskX,
   }) => {
     renderCanvas({
       compositionPlan: createSinglePageComposition(activeSides),
+      mode: { kind: "sheet-editing", sheetId: "sheet-001" },
       sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
       technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
     });
@@ -254,6 +309,24 @@ test.each([
       guide.pathCommands.some(({ x }) => x === inactiveBoundaryX),
     ).toBe(true);
 
+    expect(
+      pixiLifecycle.displays.some(
+        ({ label }) => label === "sheet-bleed-mask-sheet-001",
+      ),
+    ).toBe(false);
+  },
+);
+
+test.each(singlePageEdgeCases)(
+  "masks the Sangria only on active outer edges of a $activeSides single Page in normal mode",
+  async ({ activeSides, omittedMaskX, retainedMaskX }) => {
+    renderCanvas({
+      compositionPlan: createSinglePageComposition(activeSides),
+      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
+    });
+    await finishPixiInitialization();
+
     const bleedMask = displayWithLabel(
       "sheet-bleed-mask-sheet-001",
     ) as unknown as {
@@ -261,7 +334,6 @@ test.each([
         height: number;
         width: number;
         x: number;
-        y: number;
       }>;
     };
     expect(
@@ -528,6 +600,7 @@ test("keeps the materialized Pixi scene stable across view-only updates", async 
   ) => (
     <AlbumCanvas
       projectId="project-spike-001"
+      mode={{ kind: "normal" }}
       composition={interactiveComposition}
       sheetBarMetadata={[]}
       continuousCanvasLayout={layout}
@@ -827,6 +900,7 @@ test("materializes and releases only the viewport margin while navigating a long
   const canvasAt = (focusedSheetId: string) => (
     <AlbumCanvas
       projectId="project-spike-001"
+      mode={{ kind: "normal" }}
       composition={longComposition}
       sheetBarMetadata={[]}
       mediaPreviewUrls={mediaPreviewUrls}
@@ -911,6 +985,7 @@ test("materializes and releases only the viewport margin while navigating a long
 test("reconciles only the composed sheet that changed", async () => {
   const canvasProps = {
     projectId: "project-spike-001",
+    mode: { kind: "normal" } as const,
     sheetBarMetadata: [],
     selectedFrameId: null,
     focusedSheetId: "sheet-001",

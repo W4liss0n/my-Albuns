@@ -38,8 +38,13 @@ export interface SheetBarMetadata {
   pageNumbers: readonly number[];
 }
 
+export type AlbumCanvasMode =
+  | { kind: "normal" }
+  | { kind: "sheet-editing"; sheetId: string };
+
 export interface AlbumCanvasProps {
   projectId: string;
+  mode: AlbumCanvasMode;
   composition: CompositionPlan;
   sheetBarMetadata: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;

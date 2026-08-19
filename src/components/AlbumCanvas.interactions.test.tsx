@@ -465,6 +465,7 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
     async (_delta: PhotoTransformDelta) => true,
   );
   const commonProps = {
+    mode: { kind: "normal" } as const,
     composition: interactiveComposition,
     sheetBarMetadata: [],
     continuousCanvasLayout: createContinuousCanvasLayout(

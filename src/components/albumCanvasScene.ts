@@ -9,6 +9,7 @@ import type {
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
+  createContinuousCanvasLayout,
   type ContinuousCanvasLayout,
   MICROMETER_TO_CANVAS_PIXEL,
 } from "./canvasGeometry";
@@ -80,14 +81,17 @@ export class AlbumCanvasScene {
       this.projectGeneration += 1;
     }
     this.input = input;
-    const sheets = input.composition.sheets;
+    const sheets = sheetsForMode(input);
     const firstSheet = sheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
       this.previewTextures.sync([]);
       return;
     }
-    const layout = input.continuousCanvasLayout;
+    const layout =
+      input.mode.kind === "normal"
+        ? input.continuousCanvasLayout
+        : createContinuousCanvasLayout(sheets);
 
     const sheetHeight = firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
     const scale = continuousCanvasScale(
@@ -95,19 +99,31 @@ export class AlbumCanvasScene {
       sheetHeight,
     );
     this.canvasScale = scale;
-    const boundedOffsetX = layout.clampOffset(
-      input.viewport.offsetX,
-      scale,
-      this.app.screen.width,
-    );
-    if (Math.abs(boundedOffsetX - input.viewport.offsetX) > 0.0001) {
+    const boundedOffsetX =
+      input.mode.kind === "normal"
+        ? layout.clampOffset(
+            input.viewport.offsetX,
+            scale,
+            this.app.screen.width,
+          )
+        : (layout.centeredOffset(
+            input.mode.sheetId,
+            scale,
+            this.app.screen.width,
+          ) ?? 0);
+    if (
+      input.mode.kind === "normal" &&
+      Math.abs(boundedOffsetX - input.viewport.offsetX) > 0.0001
+    ) {
       input.onViewportChange({
         ...input.viewport,
         offsetX: boundedOffsetX,
       });
     }
 
-    this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
+    if (input.mode.kind === "normal") {
+      this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
+    }
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
@@ -121,7 +137,12 @@ export class AlbumCanvasScene {
       this.app.screen.height,
     );
 
-    this.reconcileMaterializedSheets(layout, boundedOffsetX, scale);
+    this.reconcileMaterializedSheets(
+      sheets,
+      layout,
+      boundedOffsetX,
+      scale,
+    );
     this.updateDecorations();
     this.photoInteractions.applyExternalPreview();
   }
@@ -190,12 +211,12 @@ export class AlbumCanvasScene {
   }
 
   private reconcileMaterializedSheets(
+    sheets: readonly ComposedSheet[],
     layout: ContinuousCanvasLayout,
     boundedOffsetX: number,
     scale: number,
   ) {
     if (!this.input) return;
-    const sheets = this.input.composition.sheets;
     const entries = layout.entriesAtScale(scale);
     const viewportLeft = -boundedOffsetX / scale;
     const viewportRight = viewportLeft + this.app.screen.width / scale;
@@ -267,6 +288,7 @@ export class AlbumCanvasScene {
           sheetBarMetadata.get(sheet.sheetId) ?? null,
           this.input.composition.frameBorder,
           this.input.technicalGuides ?? null,
+          this.input.mode.kind,
           previewStates,
           backgroundPreviewStates,
           overlayPreviewStates,
@@ -347,6 +369,7 @@ export class AlbumCanvasScene {
       sheetBarMetadata,
       this.input?.composition.frameBorder ?? { kind: "none" },
       this.input?.technicalGuides,
+      this.input?.mode.kind ?? "normal",
       signature,
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
@@ -397,7 +420,9 @@ export class AlbumCanvasScene {
   }
 
   private readonly handleCanvasWheel = (event: WheelEvent) => {
-    if (!this.input || event.altKey) return;
+    if (!this.input || this.input.mode.kind !== "normal" || event.altKey) {
+      return;
+    }
     event.preventDefault();
     if (event.ctrlKey) return;
     const layout = this.input.continuousCanvasLayout;
@@ -412,6 +437,14 @@ export class AlbumCanvasScene {
     });
     this.synchronizeCenteredSheet(layout, nextOffset, this.canvasScale);
   };
+}
+
+function sheetsForMode(input: AlbumCanvasProps) {
+  if (input.mode.kind === "normal") return input.composition.sheets;
+  const editingSheetId = input.mode.sheetId;
+  return input.composition.sheets.filter(
+    (sheet) => sheet.sheetId === editingSheetId,
+  );
 }
 
 function mediaIdsForSheets(sheets: readonly ComposedSheet[]) {

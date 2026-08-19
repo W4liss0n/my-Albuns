@@ -149,6 +149,7 @@ test("does not let an abandoned StrictMode initialization destroy the active Can
       <LoggingProvider logger={logger}>
         <AlbumCanvas
           projectId="project-spike-001"
+          mode={{ kind: "normal" }}
           composition={composition}
           sheetBarMetadata={[]}
           continuousCanvasLayout={createContinuousCanvasLayout(

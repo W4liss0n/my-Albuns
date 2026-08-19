@@ -21,6 +21,7 @@ const isOpaqueCachePreview = (url: string) =>
   url.startsWith("myalbuns-cache://localhost/");
 
 export type {
+  AlbumCanvasMode,
   AlbumCanvasProps,
   CanvasMetrics,
   CanvasTechnicalGuides,

@@ -7,6 +7,7 @@ import {
   createContinuousCanvasLayout,
 } from "./canvasGeometry";
 import {
+  displayWithLabel,
   finishPixiInitialization,
   getPixiLifecycle,
   renderCanvas,
@@ -115,4 +116,36 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
     width: 900,
     scale: expectedScale,
   });
+});
+
+test("isolates the target sheet and suppresses continuous navigation in Sheet Edit Mode", async () => {
+  const onViewportChange = vi.fn();
+  renderCanvas({
+    compositionPlan: threeSheetComposition,
+    mode: { kind: "sheet-editing", sheetId: "sheet-002" },
+    onViewportChange,
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("canvas-sheet-sheet-002")).toBeDefined();
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "canvas-sheet-sheet-001",
+    ),
+  ).toBe(false);
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "canvas-sheet-sheet-003",
+    ),
+  ).toBe(false);
+  onViewportChange.mockClear();
+
+  pixiLifecycle.instances[0].canvas.dispatchEvent(
+    new WheelEvent("wheel", {
+      cancelable: true,
+      deltaY: 600,
+    }),
+  );
+
+  expect(onViewportChange).not.toHaveBeenCalled();
 });
