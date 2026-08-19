@@ -28,7 +28,7 @@ import {
 } from "./sheetVisualStyle";
 import {
   createSheetBarRenderNode,
-  setSheetBarHovered,
+  setSheetBarSheetHovered,
   stopSheetBarTransition,
   type SheetBarRenderNode,
 } from "./sheetBarRenderNode";
@@ -345,10 +345,10 @@ export function createSheetRenderNode(
     width,
   );
   sheetContainer.on("pointerenter", () => {
-    setSheetBarHovered(sheetBar, true);
+    setSheetBarSheetHovered(sheetBar, true);
   });
   sheetContainer.on("pointerleave", () => {
-    setSheetBarHovered(sheetBar, false);
+    setSheetBarSheetHovered(sheetBar, false);
   });
   sheetContainer.addChild(sheetBar.container);
 

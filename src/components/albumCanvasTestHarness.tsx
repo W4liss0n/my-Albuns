@@ -130,6 +130,7 @@ vi.mock("pixi.js", () => {
     position = new Point();
     rotation = 0;
     scale = new Point(1, 1);
+    tint = 0xffffff;
     visible = true;
 
     constructor() {

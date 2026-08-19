@@ -54,13 +54,21 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
   expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
     text: "2",
   });
-  expect(displayWithLabel("placeholder-sheet-bar-swap-sheet-001")).toMatchObject({
+  const swapAction = displayWithLabel(
+    "placeholder-sheet-bar-swap-sheet-001",
+  );
+  const layoutAction = displayWithLabel(
+    "placeholder-sheet-bar-layout-sheet-001",
+  );
+  expect(swapAction).toMatchObject({
     alpha: 0.45,
-    eventMode: "none",
+    eventMode: "static",
+    tint: 0x6d675d,
   });
-  expect(displayWithLabel("placeholder-sheet-bar-layout-sheet-001")).toMatchObject({
+  expect(layoutAction).toMatchObject({
     alpha: 0.45,
-    eventMode: "none",
+    eventMode: "static",
+    tint: 0x6d675d,
   });
   expect(
     screen.getByRole("button", {
@@ -83,6 +91,25 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
 
   sheet.emit("pointerenter", {});
   expect(sheetBar.alpha).toBe(0);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(sheetBar.alpha).toBe(0.55);
+
+  sheetBar.emit("pointerenter", {});
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(160);
+  });
+  expect(sheetBar.alpha).toBe(1);
+
+  for (const action of [swapAction, layoutAction]) {
+    action.emit("pointerenter", {});
+    expect(action).toMatchObject({ alpha: 1, tint: 0x2c2924 });
+    action.emit("pointerleave", {});
+    expect(action).toMatchObject({ alpha: 0.45, tint: 0x6d675d });
+  }
+
+  sheetBar.emit("pointerleave", {});
   await act(async () => {
     await vi.advanceTimersByTimeAsync(160);
   });
