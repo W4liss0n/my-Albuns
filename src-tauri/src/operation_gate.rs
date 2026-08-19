@@ -1,7 +1,6 @@
-use std::{fmt, os::windows::ffi::OsStrExt};
+use std::fmt;
 
 use myalbuns_paths::AppPaths;
-use sha2::{Digest, Sha256};
 
 use crate::named_mutex::{NamedMutex, NamedMutexError, NamedMutexGrant};
 
@@ -23,18 +22,8 @@ pub(crate) enum OperationGateError {
 
 impl OperationGate {
     pub(crate) fn new(app_paths: &AppPaths) -> Self {
-        let mut digest = Sha256::new();
-        for unit in app_paths.local_root().as_os_str().encode_wide() {
-            digest.update(unit.to_le_bytes());
-        }
-        let digest = digest.finalize();
-        let suffix = digest[..16]
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>();
-        let mutex_name = format!(r"Local\MyAlbuns.OperationGate.v1.{suffix}");
         Self {
-            mutex: NamedMutex::new(mutex_name, "myalbuns-operation-gate"),
+            mutex: NamedMutex::scoped(app_paths, "OperationGate", "", "myalbuns-operation-gate"),
         }
     }
 

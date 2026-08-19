@@ -1,13 +1,7 @@
-use std::{
-    fmt, fs,
-    io::{self, Write},
-    os::windows::ffi::OsStrExt,
-    path::PathBuf,
-};
+use std::fmt;
 
 use myalbuns_core::ProjectIdentityAuthority;
-use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan, publish_new_file};
-use sha2::{Digest, Sha256};
+use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan};
 
 use crate::{
     cache_engine::{AuthorizedCacheNamespace, CacheEngine},
@@ -69,8 +63,10 @@ impl CacheNamespaceOwner {
 
 impl CacheService {
     pub(crate) fn new(app_paths: AppPaths) -> Self {
-        let maintenance = NamedMutex::new(
-            mutex_name(&app_paths, "CacheMaintenance", "global"),
+        let maintenance = NamedMutex::scoped(
+            &app_paths,
+            "CacheMaintenance",
+            "global",
             "myalbuns-cache-maintenance",
         );
         Self {
@@ -317,29 +313,18 @@ impl CacheService {
             .map_err(map_reservation_error)
     }
 
-    fn schedule_file(&self) -> PathBuf {
-        self.app_paths.state_dir().join("clear-cache-on-startup.v1")
-    }
-
     fn clear_is_scheduled(&self) -> Result<bool, CacheServiceError> {
-        let path = self.schedule_file();
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => return Err(CacheServiceError::Storage(error.to_string())),
+        let Some(storage) = self
+            .app_paths
+            .open_cache_clear_schedule_storage()
+            .map_err(map_schedule_storage_error)?
+        else {
+            return Ok(false);
         };
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(CacheServiceError::Storage(
-                "o agendamento de limpeza não é um arquivo regular".into(),
-            ));
-        }
-        let bytes =
-            fs::read(&path).map_err(|error| CacheServiceError::Storage(error.to_string()))?;
-        if bytes != CLEAR_SCHEDULE_CONTENT {
-            return Err(CacheServiceError::Storage(
-                "o agendamento de limpeza é incompatível".into(),
-            ));
-        }
+        let Some(bytes) = storage.read_marker().map_err(map_schedule_storage_error)? else {
+            return Ok(false);
+        };
+        validate_schedule_content(&bytes)?;
         Ok(true)
     }
 
@@ -347,59 +332,54 @@ impl CacheService {
         if self.clear_is_scheduled()? {
             return Ok(());
         }
-        let path = self.schedule_file();
-        let parent = path.parent().ok_or_else(|| {
-            CacheServiceError::Storage("o agendamento não possui diretório pai".into())
-        })?;
-        fs::create_dir_all(parent)
-            .map_err(|error| CacheServiceError::Storage(error.to_string()))?;
-        let temporary = path.with_file_name(format!(
-            ".clear-cache-on-startup.{}.tmp",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-            .map_err(|error| CacheServiceError::Storage(error.to_string()))?;
-        let prepared = file
-            .write_all(CLEAR_SCHEDULE_CONTENT)
-            .and_then(|()| file.sync_all())
-            .map_err(|error| CacheServiceError::Storage(error.to_string()));
-        drop(file);
-        if let Err(error) = prepared {
-            let _ = fs::remove_file(&temporary);
-            return Err(error);
+        let storage = self
+            .app_paths
+            .prepare_cache_clear_schedule_storage()
+            .map_err(map_schedule_storage_error)?;
+        if storage
+            .publish_marker(CLEAR_SCHEDULE_CONTENT)
+            .map_err(map_schedule_storage_error)?
+        {
+            return Ok(());
         }
-        match publish_new_file(&temporary, &path) {
-            Ok(()) => Ok(()),
-            Err(error)
-                if error.kind() == io::ErrorKind::AlreadyExists
-                    || matches!(error.raw_os_error(), Some(80 | 183)) =>
-            {
-                let _ = fs::remove_file(&temporary);
-                self.clear_is_scheduled().and_then(|scheduled| {
-                    scheduled.then_some(()).ok_or_else(|| {
-                        CacheServiceError::Storage(
-                            "a publicação concorrente do agendamento não ficou visível".into(),
-                        )
-                    })
-                })
-            }
-            Err(error) => {
-                let _ = fs::remove_file(&temporary);
-                Err(CacheServiceError::Storage(error.to_string()))
-            }
-        }
+        let bytes = storage
+            .read_marker()
+            .map_err(map_schedule_storage_error)?
+            .ok_or_else(|| {
+                CacheServiceError::Storage(
+                    "a publicação concorrente do agendamento não ficou visível".into(),
+                )
+            })?;
+        validate_schedule_content(&bytes)
     }
 
     fn clear_schedule_marker(&self) -> Result<(), CacheServiceError> {
-        let path = self.schedule_file();
-        if !self.clear_is_scheduled()? {
+        let Some(storage) = self
+            .app_paths
+            .open_cache_clear_schedule_storage()
+            .map_err(map_schedule_storage_error)?
+        else {
             return Ok(());
-        }
-        fs::remove_file(path).map_err(|error| CacheServiceError::Storage(error.to_string()))
+        };
+        storage
+            .remove_marker_if_matches(CLEAR_SCHEDULE_CONTENT)
+            .map_err(map_schedule_storage_error)?;
+        Ok(())
     }
+}
+
+fn validate_schedule_content(bytes: &[u8]) -> Result<(), CacheServiceError> {
+    if bytes == CLEAR_SCHEDULE_CONTENT {
+        Ok(())
+    } else {
+        Err(CacheServiceError::Storage(
+            "o agendamento de limpeza é incompatível".into(),
+        ))
+    }
+}
+
+fn map_schedule_storage_error(error: myalbuns_paths::AppPathsError) -> CacheServiceError {
+    CacheServiceError::Storage(error.to_string())
 }
 
 fn namespace_mutex(app_paths: &AppPaths, paths: &CachePathPlan) -> NamedMutex {
@@ -408,8 +388,10 @@ fn namespace_mutex(app_paths: &AppPaths, paths: &CachePathPlan) -> NamedMutex {
         .file_name()
         .and_then(|value| value.to_str())
         .expect("a validated Cache namespace is UTF-8 and non-empty");
-    NamedMutex::new(
-        mutex_name(app_paths, "CacheNamespace", namespace),
+    NamedMutex::scoped(
+        app_paths,
+        "CacheNamespace",
+        namespace,
         "myalbuns-cache-namespace",
     )
 }
@@ -420,27 +402,6 @@ fn synchronize_cache_writer(
 ) -> Result<(), CacheServiceError> {
     await_cache_writer_quiescence(app_paths, paths)
         .map_err(|error| CacheServiceError::Reservation(error.to_string()))
-}
-
-fn mutex_name(app_paths: &AppPaths, kind: &str, scope: &str) -> String {
-    let mut digest = Sha256::new();
-    for unit in app_paths.local_root().as_os_str().encode_wide() {
-        digest.update(unit.to_le_bytes());
-    }
-    digest.update([0]);
-    // Cache namespace components are ASCII, while the Windows filesystem
-    // normally compares their pathnames without regard to casing. The mutex
-    // key must preserve that same equivalence or an enumerated casing alias
-    // could bypass the active Host's reservation.
-    for byte in scope.bytes() {
-        digest.update([byte.to_ascii_lowercase()]);
-    }
-    let digest = digest.finalize();
-    let suffix = digest[..16]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
-    format!(r"Local\MyAlbuns.{kind}.v1.{suffix}")
 }
 
 fn checked_add_usage(total: u64, bytes: u64) -> Result<u64, CacheServiceError> {
@@ -886,6 +847,60 @@ mod tests {
     }
 
     #[test]
+    fn active_cache_root_with_different_windows_casing_shares_every_reservation() {
+        let root = tempfile::tempdir().expect("temporary Cache root-casing fixture");
+        let paths = app_paths(root.path());
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let project = create_project(&core, root.path().join("project.myalbuns"));
+        let owner_service = CacheService::new(paths.clone());
+        let owner = owner_service
+            .reserve_namespace(project.identity_authority())
+            .expect("the canonical Host reserves its Cache");
+        let cache = owner.namespace().paths().clone();
+        std::fs::write(cache.media_directory().join("active.bin"), b"active Cache")
+            .expect("the active Cache payload is writable");
+
+        let alias = AppPaths::from_roots(
+            &std::path::PathBuf::from(root.path().join("roaming").to_string_lossy().to_uppercase()),
+            &std::path::PathBuf::from(root.path().join("local").to_string_lossy().to_uppercase()),
+        );
+        let alias_service = CacheService::new(alias);
+
+        let measured = alias_service
+            .measure()
+            .expect("the casing alias can observe the active Cache");
+        assert_eq!(measured.occupied_bytes, 12);
+        assert_eq!(measured.releasable_bytes, 0);
+        assert_eq!(measured.releasable_namespace_count, 0);
+
+        let released = alias_service
+            .free_closed_projects()
+            .expect("the casing alias skips the active namespace");
+        assert_eq!(released.freed_bytes, 0);
+        assert_eq!(released.skipped_active_namespace_count, 1);
+        assert!(cache.root().is_dir());
+        assert_eq!(
+            alias_service
+                .clear_all_or_schedule()
+                .expect("total cleanup is deferred through the same physical root"),
+            CacheClearAllOutcome::Scheduled
+        );
+        assert!(cache.root().is_dir());
+
+        drop(owner);
+        assert_eq!(
+            alias_service
+                .free_closed_projects()
+                .expect("the namespace is releasable only after its owner closes")
+                .freed_bytes,
+            12
+        );
+    }
+
+    #[test]
     fn free_closed_projects_quiesces_writers_before_measuring_removed_bytes() {
         let root = tempfile::tempdir().expect("temporary free-after-writer fixture");
         let payload = b"closed Cache payload";
@@ -967,6 +982,42 @@ mod tests {
         );
         assert!(!cache_root.exists());
         assert!(!service.measure().unwrap().clear_all_scheduled);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn scheduled_cleanup_never_reads_or_deletes_a_marker_through_a_state_junction() {
+        let root = tempfile::tempdir().expect("temporary scheduled-cleanup root");
+        let external = tempfile::tempdir().expect("external marker target");
+        let paths = app_paths(root.path());
+        std::fs::create_dir_all(paths.local_root()).expect("the application root exists");
+        let state = paths.state_dir();
+        let marker = external.path().join("clear-cache-on-startup.v1");
+        std::fs::write(&marker, super::CLEAR_SCHEDULE_CONTENT)
+            .expect("the external marker sentinel exists");
+        let output = Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(&state)
+            .arg(external.path())
+            .output()
+            .expect("the State junction command starts");
+        assert!(
+            output.status.success(),
+            "the State junction is created: stdout={}, stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let error = CacheService::new(paths)
+            .run_scheduled_cleanup()
+            .expect_err("a State reparse point fails closed");
+
+        assert!(matches!(error, CacheServiceError::Storage(_)));
+        assert_eq!(
+            std::fs::read(&marker).expect("the external marker survives"),
+            super::CLEAR_SCHEDULE_CONTENT
+        );
+        std::fs::remove_dir(&state).expect("the injected State junction is removed");
     }
 
     #[test]

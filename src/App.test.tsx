@@ -609,6 +609,68 @@ test("registers the Cache warning listener before the first preview demand", asy
   );
 });
 
+test("registers the media-change listener before the first preview demand", async () => {
+  let resolveMediaRegistration:
+    | ((dispose: () => void) => void)
+    | undefined;
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const prepareMediaPreviews = vi.fn(async () => []);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews,
+        onMediaChanged: (listener) =>
+          new Promise<() => void>((resolve) => {
+            resolveMediaRegistration = (dispose) => {
+              notifyMediaChanged = listener;
+              resolve(dispose);
+            };
+          }),
+        onCacheProcessorWarning: async () => () => undefined,
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await screen.findByRole("button", { name: "Salvar" });
+  await waitFor(() =>
+    expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+      "data-demand-reported",
+      "true",
+    ),
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(prepareMediaPreviews).not.toHaveBeenCalled();
+
+  act(() => resolveMediaRegistration?.(() => undefined));
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  act(() => notifyMediaChanged?.(["media-001"]));
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+});
+
 test("labels first-observation unavailability without claiming a previous preview", async () => {
   const prepareMediaPreviews = vi.fn().mockResolvedValue([
     { mediaId: "media-001", state: "unavailable" as const, url: null },
@@ -802,6 +864,83 @@ test("keeps retry actionable after an unavailable-media IPC failure without muta
     screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
   ).toBeEnabled();
   expect(screen.getByRole("status", { name: "Indisponível" })).toBeInTheDocument();
+  expect(relink).not.toHaveBeenCalled();
+  expect(apply).not.toHaveBeenCalled();
+});
+
+test("replaces unavailable retry with a cache-only failure after authoritative refresh", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const prepareMediaPreviews = vi
+    .fn()
+    .mockResolvedValueOnce([
+      { mediaId: "media-001", state: "unavailable" as const, url: null },
+    ])
+    .mockResolvedValueOnce([
+      {
+        mediaId: "media-001",
+        state: "cache_unavailable" as const,
+        url: null,
+      },
+    ]);
+  const retryUnavailableMedia = vi.fn();
+  const relink = vi.fn(async () => representativeProjection);
+  const apply = vi.fn(async () => representativeProjection);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews,
+        retryUnavailableMedia,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+        onCacheProcessorWarning: async () => () => undefined,
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load: async () => representativeProjection,
+        apply,
+        relink,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("button", {
+      name: /Tentar novamente o arquivo de/i,
+    }),
+  ).toBeEnabled();
+
+  act(() => notifyMediaChanged?.(["media-001"]));
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  expect(
+    screen.getByRole("status", { name: "Prévia indisponível" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+  ).not.toBeInTheDocument();
+  expect(retryUnavailableMedia).not.toHaveBeenCalled();
   expect(relink).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();
 });

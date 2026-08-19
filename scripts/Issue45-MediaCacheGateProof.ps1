@@ -576,10 +576,13 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root')
                     (New-RustProof -Name 'explicit_retry_keeps_unavailable_when_cache_adoption_fails_and_can_be_retried')
                     (New-RustProof -Name 'authoritative_media_availability_maps_exhaustively_without_cache_failures')
+                    (New-RustProof -Name 'registry_publication_failure_becomes_cache_unavailable_without_source_retry')
                     (New-RustProof -Name 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state')
                     (New-FrontendProof -Name 'offers retry only for an unavailable occurrence and keeps Relink exclusive to absent')
                     (New-FrontendProof -Name 'retries an unavailable occurrence explicitly and refreshes it without Relink')
                     (New-FrontendProof -Name 'keeps retry actionable after an unavailable-media IPC failure without mutating Project')
+                    (New-FrontendProof -Name 'replaces unavailable retry with a cache-only failure after authoritative refresh')
+                    (New-FrontendProof -Name 'registers the media-change listener before the first preview demand')
                     (New-FrontendProof -Name 'normalizes typed unavailable-media retry failures at the IPC adapter')
                     (New-FrontendProof -Name 'keeps the last known preview when linked media becomes unavailable')
                     (New-FrontendProof -Name 'keeps the last representation only as visual context when the Original is absent')
@@ -610,6 +613,10 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'authoritative_demand_revision_rejects_queued_and_late_obsolete_work')
                     (New-RustProof -Name 'obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation')
                     (New-RustProof -Name 'failed_validation_discards_the_candidate_and_preserves_the_last_published_generation')
+                    (New-RustProof -Name 'held_cache_storage_creates_and_drops_temporaries_in_the_physical_namespace')
+                    (New-RustProof -Name 'held_cache_storage_removes_only_the_physical_file_after_a_junction_swap')
+                    (New-RustProof -Name 'held_cache_storage_replaces_only_the_physical_file_after_a_junction_swap')
+                    (New-RustProof -Name 'recursive_cleanup_mutates_only_the_held_directory_after_a_junction_swap')
                 )
             New-VerifiedCriterion `
                 -Name 'processor-restart-once-then-nonblocking-suspension' `
@@ -625,7 +632,7 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'terminating_the_host_closes_its_job_and_terminates_the_active_processor')
                     (New-RustProof -Name 'attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process')
                     (New-RustProof -Name 'guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_handle')
-                    (New-RustProof -Name 'writer_wait_rejects_namespace_link_replacement_and_preserves_external_claim_files')
+                    (New-RustProof -Name 'writer_wait_finishes_in_the_held_namespace_and_preserves_external_claim_files')
                     (New-RustProof -Name 'fragmented_handshake_preserves_the_exact_process_instance')
                     (New-RustProof -Name 'processor_handshake_reports_the_exact_instance_seen_through_the_spawned_child_handle')
                     (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
@@ -664,6 +671,8 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'clear_all_after_host_death_waits_before_measuring_and_removing')
                     (New-RustProof -Name 'reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation')
                     (New-RustProof -Name 'active_namespace_with_different_windows_casing_is_never_releasable')
+                    (New-RustProof -Name 'active_cache_root_with_different_windows_casing_shares_every_reservation')
+                    (New-RustProof -Name 'scheduled_cleanup_never_reads_or_deletes_a_marker_through_a_state_junction')
                 )
             New-VerifiedCriterion `
                 -Name 'narrow-api-without-universal-coordinator' `

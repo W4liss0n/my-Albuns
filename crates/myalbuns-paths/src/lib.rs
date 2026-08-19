@@ -3,6 +3,7 @@
 mod app_paths;
 mod atomic_publish;
 mod cache;
+mod cache_schedule;
 mod error;
 mod export;
 mod guarded_fs;
@@ -22,6 +23,7 @@ pub use cache::{
     CacheArtifactFormat, CacheNamespaceUsage, CachePathPlan, CacheWriterClaimStorage,
     PendingCachePublication, PreparedCacheStorage, SynchronizedCachePublication,
 };
+pub use cache_schedule::CacheClearScheduleStorage;
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, ExportWriteAuthorization, PreparedExportStorage};
 pub use native_path_serde::NativePathDto;

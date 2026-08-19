@@ -723,6 +723,151 @@ fn creates_and_publishes_cache_files_below_the_held_directory() {
     );
 }
 
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_creates_and_drops_temporaries_in_the_physical_namespace() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-create")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let temporary = cache
+        .preview_temporary_file("media-01", "generation-01", CacheArtifactFormat::Jpeg, 42)
+        .expect("the temporary path is valid");
+    let published = cache
+        .preview_file("media-01", "generation-01", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    let external_temporary = external
+        .path()
+        .join(temporary.file_name().expect("the temporary has one name"));
+    std::fs::write(&external_temporary, b"external temporary sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("creation is relative to the held physical directory");
+    publication
+        .write_all(b"internal temporary")
+        .expect("the held temporary is writable");
+    drop(publication);
+
+    assert_eq!(
+        std::fs::read(&external_temporary).expect("the external sentinel survives"),
+        b"external temporary sentinel"
+    );
+    assert!(
+        !displaced
+            .join(temporary.file_name().expect("the temporary has one name"))
+            .exists(),
+        "drop deletes the exact held temporary"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_removes_only_the_physical_file_after_a_junction_swap() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-remove")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let removed = cache
+        .preview_file("media-01", "generation-old", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    std::fs::write(&removed, b"internal generation").expect("the internal generation exists");
+    let external_removed = external
+        .path()
+        .join(removed.file_name().expect("the generation has one name"));
+    std::fs::write(&external_removed, b"external generation sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+
+    assert!(
+        storage
+            .remove_existing_file(&removed)
+            .expect("removal is relative to the held physical directory")
+    );
+
+    assert_eq!(
+        std::fs::read(&external_removed).expect("the external sentinel survives"),
+        b"external generation sentinel"
+    );
+    assert!(
+        !displaced
+            .join(removed.file_name().expect("the generation has one name"))
+            .exists(),
+        "only the physical held generation is removed"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
+#[cfg(windows)]
+#[test]
+fn held_cache_storage_replaces_only_the_physical_file_after_a_junction_swap() {
+    let root = tempfile::tempdir().expect("temporary guarded Cache root");
+    let external = tempfile::tempdir().expect("external junction target");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-guarded-replace")
+        .expect("the Cache plan is valid");
+    let storage = paths
+        .prepare_cache_storage(&cache)
+        .expect("the physical directory chain is held");
+    let temporary = cache
+        .preview_temporary_file("media-01", "generation-new", CacheArtifactFormat::Jpeg, 42)
+        .expect("the temporary path is valid");
+    let published = cache
+        .preview_file("media-01", "generation-new", CacheArtifactFormat::Jpeg)
+        .expect("the final path is valid");
+    std::fs::write(&published, b"previous internal metadata")
+        .expect("the previous internal publication exists");
+    let external_published = external
+        .path()
+        .join(published.file_name().expect("the publication has one name"));
+    std::fs::write(&external_published, b"external metadata sentinel")
+        .expect("the external sentinel exists");
+    let displaced = replace_directory_with_junction(&cache.media_directory(), external.path());
+    let mut publication = storage
+        .begin_file_publication(&temporary, &published)
+        .expect("the physical temporary is opened");
+    publication
+        .write_all(b"replacement metadata")
+        .expect("the replacement is writable");
+    let synchronized = publication
+        .sync()
+        .expect("the physical temporary is synchronized");
+
+    synchronized
+        .publish()
+        .expect("rename and replacement stay relative to the held directory");
+
+    assert_eq!(
+        std::fs::read(&external_published).expect("the external sentinel survives"),
+        b"external metadata sentinel"
+    );
+    assert_eq!(
+        std::fs::read(
+            displaced.join(published.file_name().expect("the publication has one name"),)
+        )
+        .expect("the held publication is visible in the physical namespace"),
+        b"replacement metadata"
+    );
+    drop(storage);
+    restore_replaced_directory(&cache.media_directory(), &displaced);
+}
+
 #[test]
 fn dropping_a_synchronized_cache_file_discards_only_its_temporary() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
@@ -987,6 +1132,40 @@ fn rejects_a_cache_namespace_redirected_by_a_directory_link() {
 #[cfg(windows)]
 fn create_directory_link(source: &Path, destination: &Path) -> std::io::Result<()> {
     std::os::windows::fs::symlink_dir(source, destination)
+}
+
+#[cfg(windows)]
+fn replace_directory_with_junction(directory: &Path, external: &Path) -> PathBuf {
+    use std::process::Command;
+
+    let displaced = directory.with_file_name(format!(
+        "{}-displaced-{}",
+        directory
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("the Cache namespace has one UTF-8 component"),
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::rename(directory, &displaced).expect("the physical Cache namespace is displaced");
+    let output = Command::new("cmd")
+        .args(["/c", "mklink", "/J"])
+        .arg(directory)
+        .arg(external)
+        .output()
+        .expect("the junction command starts");
+    assert!(
+        output.status.success(),
+        "the junction is created: stdout={}, stderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    displaced
+}
+
+#[cfg(windows)]
+fn restore_replaced_directory(directory: &Path, displaced: &Path) {
+    std::fs::remove_dir(directory).expect("the injected junction is removed");
+    std::fs::rename(displaced, directory).expect("the physical Cache namespace is restored");
 }
 
 #[cfg(unix)]

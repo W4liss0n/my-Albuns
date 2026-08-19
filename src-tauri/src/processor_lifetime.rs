@@ -431,7 +431,7 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn writer_wait_rejects_namespace_link_replacement_and_preserves_external_claim_files() {
+    fn writer_wait_finishes_in_the_held_namespace_and_preserves_external_claim_files() {
         let root = tempfile::tempdir().expect("the guarded claim fixture exists");
         let (app_paths, paths) = cache_fixture(root.path());
         let claim_path = cache_writer_claim_path(&paths);
@@ -496,14 +496,17 @@ mod tests {
 
         worker.kill().expect("the exact writer is released");
         worker.wait().expect("the exact writer is reaped");
-        let synchronization_error = synchronization
+        synchronization
             .join()
             .expect("the guarded synchronization does not panic")
-            .expect_err("the guarded writer wait rejects the redirected namespace");
+            .expect("the guarded writer wait finishes through its held physical namespace");
+        assert!(
+            !displaced.join(CACHE_WRITER_CLAIM_FILE).exists(),
+            "the physical writer claim is removed after the exact writer exits"
+        );
         std::fs::remove_dir(paths.root()).expect("the injected junction is removed");
         std::fs::rename(&displaced, paths.root()).expect("the original namespace is restored");
 
-        assert_eq!(synchronization_error.kind(), std::io::ErrorKind::Other);
         assert_eq!(
             std::fs::read(&external_claim).expect("the external claim survives"),
             encoded

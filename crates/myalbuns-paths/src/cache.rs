@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
 };
@@ -13,7 +13,7 @@ use crate::{
     guarded_fs::{
         DirectoryGuard, GuardedFsError, create_new_deletable_file, delete_open_file,
         ensure_direct_child, is_reparse_point, open_deletable_file, open_directory,
-        open_existing_direct_child, remove_empty_directory, rename_open_file, validate_open_file,
+        open_existing_direct_child, open_readable_file, remove_empty_directory, rename_open_file,
     },
 };
 
@@ -24,7 +24,9 @@ const CACHE_WRITER_CLAIM_MAX_BYTES: usize = 1024;
 impl From<GuardedFsError> for AppPathsError {
     fn from(error: GuardedFsError) -> Self {
         match error {
-            GuardedFsError::Unavailable => Self::CacheStorageUnavailable,
+            GuardedFsError::AlreadyExists
+            | GuardedFsError::NotFound
+            | GuardedFsError::Unavailable => Self::CacheStorageUnavailable,
             GuardedFsError::OutsideRoot => Self::CacheStorageOutsideRoot,
         }
     }
@@ -69,9 +71,9 @@ impl CacheNamespaceUsage {
 
 /// Keeps the validated Cache directory chain open while artifacts are written.
 ///
-/// Open handles bind the verified physical chain, and each artifact opened by
-/// pathname is checked against it before publication. A later reparse-point
-/// replacement therefore cannot redirect the job outside that chain.
+/// Open handles bind the verified physical chain, and each artifact is opened,
+/// renamed, or removed as one component relative to its parent handle. A later
+/// reparse-point replacement therefore cannot redirect the job outside it.
 #[derive(Debug)]
 pub struct PreparedCacheStorage {
     directories: Vec<DirectoryGuard>,
@@ -94,7 +96,7 @@ pub struct CacheWriterClaimStorage {
 pub struct PendingCachePublication<'storage> {
     storage: &'storage PreparedCacheStorage,
     final_path: PathBuf,
-    temporary: TemporaryCacheFile,
+    temporary: TemporaryCacheFile<'storage>,
 }
 
 /// A synchronized Cache file that can be promoted to its final name.
@@ -103,10 +105,11 @@ pub struct PendingCachePublication<'storage> {
 pub struct SynchronizedCachePublication<'storage> {
     storage: &'storage PreparedCacheStorage,
     final_path: PathBuf,
-    temporary: TemporaryCacheFile,
+    temporary: TemporaryCacheFile<'storage>,
 }
 
-struct TemporaryCacheFile {
+struct TemporaryCacheFile<'storage> {
+    parent: &'storage DirectoryGuard,
     path: PathBuf,
     file: Option<File>,
     published: bool,
@@ -122,6 +125,12 @@ impl ExistingProjectCache {
         self.directories
             .last()
             .expect("an existing project Cache always contains its project directory")
+    }
+
+    fn cache_parent(&self) -> &DirectoryGuard {
+        self.directories
+            .get(self.directories.len().saturating_sub(2))
+            .expect("an existing project Cache always contains its Cache parent")
     }
 }
 
@@ -170,16 +179,11 @@ impl CacheWriterClaimStorage {
     /// guarded Project namespace.
     pub fn read_claim(&self) -> Result<Option<Vec<u8>>, AppPathsError> {
         let path = self.claim_path();
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        let mut file = match open_readable_file(self.project(), &path) {
+            Ok(file) => file,
+            Err(GuardedFsError::NotFound) => return Ok(None),
+            Err(error) => return Err(error.into()),
         };
-        if is_reparse_point(&metadata) || !metadata.is_file() {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
-        }
-        let mut file = File::open(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(self.project(), &path, &file)?;
         read_writer_claim_file(&mut file).map(Some)
     }
 
@@ -188,15 +192,11 @@ impl CacheWriterClaimStorage {
     pub fn remove_claim_if_matches(&self, expected: &[u8]) -> Result<bool, AppPathsError> {
         validate_writer_claim_bytes(expected)?;
         let path = self.claim_path();
-        let metadata = match fs::symlink_metadata(&path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        let mut file = match open_deletable_file(self.project(), &path) {
+            Ok(file) => file,
+            Err(GuardedFsError::NotFound) => return Ok(false),
+            Err(error) => return Err(error.into()),
         };
-        if is_reparse_point(&metadata) || !metadata.is_file() {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
-        }
-        let mut file = open_deletable_file(self.project(), &path)?;
         let observed = read_writer_claim_file(&mut file)?;
         if observed != expected {
             return Ok(false);
@@ -221,12 +221,11 @@ impl CacheWriterClaimStorage {
                 continue;
             }
             let path = entry.path();
-            let metadata =
-                fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-            if is_reparse_point(&metadata) || !metadata.is_file() {
-                return Err(AppPathsError::CacheStorageOutsideRoot);
-            }
-            let file = open_deletable_file(self.project(), &path)?;
+            let file = match open_deletable_file(self.project(), &path) {
+                Ok(file) => file,
+                Err(GuardedFsError::NotFound) => continue,
+                Err(error) => return Err(error.into()),
+            };
             delete_open_file(self.project(), &path, &file)?;
             drop(file);
             removed += 1;
@@ -379,11 +378,12 @@ impl PreparedCacheStorage {
         final_path: &Path,
     ) -> Result<PendingCachePublication<'storage>, AppPathsError> {
         self.validate_publication_paths(temporary_path, final_path)?;
-        let file = self.create_temporary_file(temporary_path)?;
+        let (parent, file) = self.create_temporary_file(temporary_path)?;
         Ok(PendingCachePublication {
             storage: self,
             final_path: final_path.to_path_buf(),
             temporary: TemporaryCacheFile {
+                parent,
                 path: temporary_path.to_path_buf(),
                 file: Some(file),
                 published: false,
@@ -391,39 +391,24 @@ impl PreparedCacheStorage {
         })
     }
 
-    fn create_temporary_file(&self, path: &Path) -> Result<File, AppPathsError> {
+    fn create_temporary_file(&self, path: &Path) -> Result<(&DirectoryGuard, File), AppPathsError> {
         let parent = self.parent_for(path)?;
-        match fs::symlink_metadata(path) {
-            Ok(metadata) if metadata.file_type().is_dir() => {
-                return Err(AppPathsError::CacheStorageUnavailable);
-            }
-            Ok(_) => fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        match open_deletable_file(parent, path) {
+            Ok(existing) => delete_open_file(parent, path, &existing)?,
+            Err(GuardedFsError::NotFound) => {}
+            Err(error) => return Err(error.into()),
         }
-
-        let file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(parent, path, &file)?;
-        Ok(file)
+        let file = create_new_deletable_file(parent, path)?;
+        Ok((parent, file))
     }
 
     pub fn open_existing_file(&self, path: &Path) -> Result<Option<File>, AppPathsError> {
         let parent = self.parent_for(path)?;
-        let metadata = match fs::symlink_metadata(path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
-        };
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
+        match open_readable_file(parent, path) {
+            Ok(file) => Ok(Some(file)),
+            Err(GuardedFsError::NotFound) => Ok(None),
+            Err(error) => Err(error.into()),
         }
-        let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(parent, path, &file)?;
-        Ok(Some(file))
     }
 
     pub fn remove_existing_file(&self, path: &Path) -> Result<bool, AppPathsError> {
@@ -434,18 +419,12 @@ impl PreparedCacheStorage {
             .take(2)
             .find(|directory| path.parent() == Some(directory.logical_path.as_path()))
             .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
-        let metadata = match fs::symlink_metadata(path) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        let file = match open_deletable_file(parent, path) {
+            Ok(file) => file,
+            Err(GuardedFsError::NotFound) => return Ok(false),
+            Err(error) => return Err(error.into()),
         };
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(AppPathsError::CacheStorageOutsideRoot);
-        }
-        let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(parent, path, &file)?;
-        drop(file);
-        fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        delete_open_file(parent, path, &file)?;
         Ok(true)
     }
 
@@ -477,29 +456,24 @@ impl PreparedCacheStorage {
         Ok(removed)
     }
 
-    fn replace_file(&self, temporary: &Path, final_path: &Path) -> Result<(), AppPathsError> {
+    fn replace_file(
+        &self,
+        temporary: &Path,
+        temporary_file: &File,
+        final_path: &Path,
+    ) -> Result<(), AppPathsError> {
         let (temporary_parent, final_parent) =
             self.validate_publication_paths(temporary, final_path)?;
-
-        let temporary_file =
-            File::open(temporary).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(temporary_parent, temporary, &temporary_file)?;
-        drop(temporary_file);
-
-        match fs::symlink_metadata(final_path) {
-            Ok(metadata) if metadata.file_type().is_dir() => {
-                return Err(AppPathsError::CacheStorageUnavailable);
-            }
-            Ok(_) => {
-                fs::remove_file(final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        debug_assert_eq!(temporary_parent.logical_path, final_parent.logical_path);
+        match open_deletable_file(final_parent, final_path) {
+            Ok(existing) => delete_open_file(final_parent, final_path, &existing)?,
+            Err(GuardedFsError::NotFound) => {}
+            Err(error) => return Err(error.into()),
         }
-        fs::rename(temporary, final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        let published =
-            File::open(final_path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        validate_open_file(final_parent, final_path, &published)?;
+        let target_name = final_path
+            .file_name()
+            .ok_or(AppPathsError::CacheStorageOutsideRoot)?;
+        rename_open_file(temporary_parent, temporary, temporary_file, target_name)?;
         Ok(())
     }
 
@@ -558,7 +532,7 @@ impl Write for PendingCachePublication<'_> {
 
 impl<'storage> PendingCachePublication<'storage> {
     pub fn sync(mut self) -> Result<SynchronizedCachePublication<'storage>, AppPathsError> {
-        self.temporary.sync_and_close()?;
+        self.temporary.sync()?;
         Ok(SynchronizedCachePublication {
             storage: self.storage,
             final_path: self.final_path,
@@ -569,35 +543,44 @@ impl<'storage> PendingCachePublication<'storage> {
 
 impl SynchronizedCachePublication<'_> {
     pub fn publish(mut self) -> Result<(), AppPathsError> {
-        self.storage
-            .replace_file(&self.temporary.path, &self.final_path)?;
+        self.storage.replace_file(
+            &self.temporary.path,
+            self.temporary.file(),
+            &self.final_path,
+        )?;
         self.temporary.published = true;
         Ok(())
     }
 }
 
-impl TemporaryCacheFile {
+impl TemporaryCacheFile<'_> {
+    fn file(&self) -> &File {
+        self.file
+            .as_ref()
+            .expect("a Cache publication always owns its exact temporary handle")
+    }
+
     fn file_mut(&mut self) -> &mut File {
         self.file
             .as_mut()
             .expect("a pending Cache publication always owns its temporary file")
     }
 
-    fn sync_and_close(&mut self) -> Result<(), AppPathsError> {
+    fn sync(&mut self) -> Result<(), AppPathsError> {
         self.file_mut()
             .sync_all()
-            .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-        drop(self.file.take());
-        Ok(())
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)
     }
 }
 
-impl Drop for TemporaryCacheFile {
+impl Drop for TemporaryCacheFile<'_> {
     fn drop(&mut self) {
-        drop(self.file.take());
-        if !self.published {
-            let _ = fs::remove_file(&self.path);
+        if !self.published
+            && let Some(file) = self.file.as_ref()
+        {
+            let _ = delete_open_file(self.parent, &self.path, file);
         }
+        drop(self.file.take());
     }
 }
 
@@ -734,8 +717,7 @@ fn measure_project_cache(
 }
 
 fn measure_open_file(parent: &DirectoryGuard, path: &Path) -> Result<u64, AppPathsError> {
-    let file = File::open(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
-    validate_open_file(parent, path, &file)?;
+    let file = open_readable_file(parent, path)?;
     file.metadata()
         .map(|metadata| metadata.len())
         .map_err(|_| AppPathsError::CacheStorageUnavailable)
@@ -819,8 +801,7 @@ pub(crate) fn clear_project_cache(
     };
 
     clear_project_directory(project_cache.project())?;
-    drop(project_cache);
-    remove_empty_directory(&plan.root)?;
+    remove_empty_directory(project_cache.cache_parent(), &plan.root)?;
     Ok(true)
 }
 
@@ -909,15 +890,14 @@ fn clear_project_directory(project: &DirectoryGuard) -> Result<(), AppPathsError
             return Err(AppPathsError::CacheStorageOutsideRoot);
         }
         if metadata.is_file() {
-            fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            remove_guarded_file(project, &path)?;
             continue;
         }
         if metadata.is_dir() && path.file_name() == Some(std::ffi::OsStr::new("Media")) {
             let media = open_existing_direct_child(project, &path)?
                 .ok_or(AppPathsError::CacheStorageUnavailable)?;
             clear_cache_files(&media)?;
-            drop(media);
-            remove_empty_directory(&path)?;
+            remove_empty_directory(project, &path)?;
             continue;
         }
         return Err(AppPathsError::CacheStorageOutsideRoot);
@@ -937,7 +917,7 @@ fn clear_cache_files(directory: &DirectoryGuard) -> Result<(), AppPathsError> {
         if is_reparse_point(&metadata) || !metadata.is_file() {
             return Err(AppPathsError::CacheStorageOutsideRoot);
         }
-        fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        remove_guarded_file(directory, &path)?;
     }
     Ok(())
 }
@@ -960,12 +940,35 @@ where
         if is_reparse_point(&metadata) {
             return Err(AppPathsError::CacheStorageOutsideRoot);
         }
-        if metadata.is_file() && is_temporary(&entry.file_name()) {
-            fs::remove_file(path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        if metadata.is_file()
+            && is_temporary(&entry.file_name())
+            && remove_guarded_file_if_present(directory, &path)?
+        {
             removed += 1;
         }
     }
     Ok(removed)
+}
+
+fn remove_guarded_file(directory: &DirectoryGuard, path: &Path) -> Result<(), AppPathsError> {
+    if remove_guarded_file_if_present(directory, path)? {
+        Ok(())
+    } else {
+        Err(AppPathsError::CacheStorageUnavailable)
+    }
+}
+
+fn remove_guarded_file_if_present(
+    directory: &DirectoryGuard,
+    path: &Path,
+) -> Result<bool, AppPathsError> {
+    let file = match open_deletable_file(directory, path) {
+        Ok(file) => file,
+        Err(GuardedFsError::NotFound) => return Ok(false),
+        Err(error) => return Err(error.into()),
+    };
+    delete_open_file(directory, path, &file)?;
+    Ok(true)
 }
 
 fn is_metadata_temporary_name_for(name: &std::ffi::OsStr, process_id: u32) -> bool {
@@ -996,4 +999,91 @@ fn preview_temporary_process_id(name: &std::ffi::OsStr) -> Option<u32> {
     )
     .then(|| process_id.parse::<u32>().ok())
     .flatten()
+}
+
+#[cfg(all(test, windows))]
+mod windows_mutation_tests {
+    use std::{path::Path, process::Command};
+
+    use super::{
+        AppPaths, clear_cache_files, open_existing_direct_child, open_existing_project_cache,
+        remove_empty_directory,
+    };
+
+    #[test]
+    fn recursive_cleanup_mutates_only_the_held_directory_after_a_junction_swap() {
+        let root = tempfile::tempdir().expect("temporary guarded cleanup root");
+        let external = tempfile::tempdir().expect("external cleanup target");
+        let paths = AppPaths::from_roots(root.path(), root.path());
+        let plan = paths
+            .project_cache("project-guarded-cleanup")
+            .expect("the Cache plan is valid");
+        drop(
+            paths
+                .prepare_cache_storage(&plan)
+                .expect("the physical Cache chain exists"),
+        );
+        let internal = plan.media_directory().join("same-name.bin");
+        std::fs::write(&internal, b"internal Cache file").expect("the internal Cache file exists");
+        let external_file = external.path().join("same-name.bin");
+        std::fs::write(&external_file, b"external sentinel").expect("the external sentinel exists");
+        let project_cache = open_existing_project_cache(&paths, &plan)
+            .expect("the Cache chain is inspectable")
+            .expect("the Project Cache exists");
+        let media = open_existing_direct_child(project_cache.project(), &plan.media_directory())
+            .expect("the Media directory is inspectable")
+            .expect("the Media directory exists");
+        let displaced = replace_directory_with_junction(&plan.media_directory(), external.path());
+
+        clear_cache_files(&media).expect("cleanup stays relative to the held Media handle");
+        assert_eq!(
+            std::fs::read(&external_file).expect("the external sentinel survives"),
+            b"external sentinel"
+        );
+        assert!(!displaced.join("same-name.bin").exists());
+        assert_eq!(
+            remove_empty_directory(project_cache.project(), &plan.media_directory()).unwrap_err(),
+            crate::guarded_fs::GuardedFsError::OutsideRoot,
+            "directory removal refuses the newly visible junction"
+        );
+
+        drop(media);
+        drop(project_cache);
+        restore_replaced_directory(&plan.media_directory(), &displaced);
+        assert!(
+            paths
+                .clear_project_cache(&plan)
+                .expect("the restored empty Cache is removable")
+        );
+    }
+
+    fn replace_directory_with_junction(directory: &Path, external: &Path) -> std::path::PathBuf {
+        let displaced = directory.with_file_name(format!(
+            "{}-displaced-{}",
+            directory
+                .file_name()
+                .and_then(|name| name.to_str())
+                .expect("the directory has one UTF-8 component"),
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::rename(directory, &displaced).expect("the physical directory is displaced");
+        let output = Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(directory)
+            .arg(external)
+            .output()
+            .expect("the junction command starts");
+        assert!(
+            output.status.success(),
+            "the junction is created: stdout={}, stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        displaced
+    }
+
+    fn restore_replaced_directory(directory: &Path, displaced: &Path) {
+        std::fs::remove_dir(directory).expect("the injected junction is removed");
+        std::fs::rename(displaced, directory).expect("the physical directory is restored");
+    }
 }

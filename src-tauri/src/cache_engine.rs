@@ -281,7 +281,6 @@ impl CacheDemandMediaUpdate {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct CacheMediaUpdateOutcome {
-    removed_generation_count: usize,
     demand_can_resume: bool,
     update_applied: bool,
 }
@@ -744,39 +743,34 @@ impl CacheEngine {
 
     pub(crate) fn apply_monitor_media_update(
         &self,
-        app_paths: &AppPaths,
         namespace: &AuthorizedCacheNamespace,
         registry: &CachePreviewRegistry,
         update: &MediaRuntimeUpdate,
-    ) -> Result<usize, CacheFailure> {
-        let outcome = self.apply_media_update(app_paths, namespace, registry, update, None)?;
-        Ok(outcome.removed_generation_count)
+    ) {
+        self.apply_media_update(namespace, registry, update, None);
     }
 
     pub(crate) fn apply_demand_media_update(
         &self,
-        app_paths: &AppPaths,
         namespace: &AuthorizedCacheNamespace,
         registry: &CachePreviewRegistry,
         demand: &mut CacheDemandRevision,
         update: &MediaRuntimeUpdate,
-    ) -> Result<CacheDemandMediaUpdate, CacheFailure> {
-        let outcome =
-            self.apply_media_update(app_paths, namespace, registry, update, Some(demand))?;
-        Ok(CacheDemandMediaUpdate {
+    ) -> CacheDemandMediaUpdate {
+        let outcome = self.apply_media_update(namespace, registry, update, Some(demand));
+        CacheDemandMediaUpdate {
             demand_can_resume: outcome.demand_can_resume,
             retry_required: outcome.update_applied && !outcome.demand_can_resume,
-        })
+        }
     }
 
     fn apply_media_update(
         &self,
-        _app_paths: &AppPaths,
         namespace: &AuthorizedCacheNamespace,
         registry: &CachePreviewRegistry,
         update: &MediaRuntimeUpdate,
         resume_demand: Option<&mut CacheDemandRevision>,
-    ) -> Result<CacheMediaUpdateOutcome, CacheFailure> {
+    ) -> CacheMediaUpdateOutcome {
         let observation_generation = update.observation_generation();
         let mut changed = update
             .changed_media_ids()
@@ -843,11 +837,10 @@ impl CacheEngine {
             demand_can_resume
         };
         if !update_applied {
-            return Ok(CacheMediaUpdateOutcome {
-                removed_generation_count: 0,
+            return CacheMediaUpdateOutcome {
                 demand_can_resume,
                 update_applied,
-            });
+            };
         }
         self.cancel_flights(namespace.project_id(), &applied_media_ids);
         let applied_revoked_previews = revoked_previews
@@ -861,7 +854,6 @@ impl CacheEngine {
         // fingerprint, so retaining it cannot make the stale bytes reusable.
         // `publish_cache_metadata` swaps the entry first and only then collects
         // the superseded file.
-        let removed_generation_count = 0;
         {
             let mut generations = self
                 .applied_observation_generations
@@ -874,11 +866,10 @@ impl CacheEngine {
                 );
             }
         }
-        Ok(CacheMediaUpdateOutcome {
-            removed_generation_count,
+        CacheMediaUpdateOutcome {
             demand_can_resume,
             update_applied,
-        })
+        }
     }
 
     fn cancel_flights(&self, project_id: &str, media_ids: &HashSet<String>) {
@@ -2433,18 +2424,14 @@ mod tests {
 
             let monitor_engine = Arc::clone(&engine);
             let monitor_registry = Arc::clone(&registry);
-            let monitor_app_paths = fixture.app_paths.clone();
             let monitor_namespace = fixture.work.namespace.clone();
             let (invalidated_tx, invalidated_rx) = mpsc::channel();
             let monitor_update = thread::spawn(move || {
-                monitor_engine
-                    .apply_monitor_media_update(
-                        &monitor_app_paths,
-                        &monitor_namespace,
-                        &monitor_registry,
-                        &MediaRuntimeUpdate::for_test(1, vec!["photo-a".to_owned()], vec![]),
-                    )
-                    .expect("the stable Monitor update revokes the resident preview");
+                monitor_engine.apply_monitor_media_update(
+                    &monitor_namespace,
+                    &monitor_registry,
+                    &MediaRuntimeUpdate::for_test(1, vec!["photo-a".to_owned()], vec![]),
+                );
                 invalidated_tx
                     .send(())
                     .expect("the test observes the Monitor update");
@@ -2512,31 +2499,25 @@ mod tests {
             [fixture.work.source.media_id()],
         );
 
-        engine
-            .apply_monitor_media_update(
-                &fixture.app_paths,
-                &fixture.work.namespace,
-                &registry,
-                &MediaRuntimeUpdate::for_test(
-                    2,
-                    vec![fixture.work.source.media_id().to_owned()],
-                    vec![],
-                ),
-            )
-            .expect("the Monitor wins and advances the invalidation epoch");
-        let stale_update = engine
-            .apply_demand_media_update(
-                &fixture.app_paths,
-                &fixture.work.namespace,
-                &registry,
-                &mut old_demand,
-                &MediaRuntimeUpdate::for_test(
-                    1,
-                    vec![fixture.work.source.media_id().to_owned()],
-                    vec![],
-                ),
-            )
-            .expect("the old command observes that it lost authority");
+        engine.apply_monitor_media_update(
+            &fixture.work.namespace,
+            &registry,
+            &MediaRuntimeUpdate::for_test(
+                2,
+                vec![fixture.work.source.media_id().to_owned()],
+                vec![],
+            ),
+        );
+        let stale_update = engine.apply_demand_media_update(
+            &fixture.work.namespace,
+            &registry,
+            &mut old_demand,
+            &MediaRuntimeUpdate::for_test(
+                1,
+                vec![fixture.work.source.media_id().to_owned()],
+                vec![],
+            ),
+        );
 
         assert!(
             !stale_update.demand_can_resume() && !stale_update.retry_required(),
@@ -2590,19 +2571,16 @@ mod tests {
                 2,
                 [fixture.work.source.media_id()],
             );
-            let outcome = engine
-                .apply_demand_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &mut old_demand,
-                    &MediaRuntimeUpdate::for_test(
-                        1,
-                        vec![fixture.work.source.media_id().to_owned()],
-                        vec![],
-                    ),
-                )
-                .expect("the confirmed observation is applied despite its retired caller");
+            let outcome = engine.apply_demand_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &mut old_demand,
+                &MediaRuntimeUpdate::for_test(
+                    1,
+                    vec![fixture.work.source.media_id().to_owned()],
+                    vec![],
+                ),
+            );
 
             assert!(!outcome.demand_can_resume());
             assert!(
@@ -2640,18 +2618,15 @@ mod tests {
                 .publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
                 .expect("the last known preview is resident");
 
-            engine
-                .apply_demand_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &mut demand,
-                    &MediaRuntimeUpdate::for_test_preserving_previews(
-                        1,
-                        vec![fixture.work.source.media_id().to_owned()],
-                    ),
-                )
-                .expect("the unavailable observation updates Runtime without revoking pixels");
+            engine.apply_demand_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &mut demand,
+                &MediaRuntimeUpdate::for_test_preserving_previews(
+                    1,
+                    vec![fixture.work.source.media_id().to_owned()],
+                ),
+            );
 
             let unavailable = registry
                 .retained_preview(
@@ -2834,22 +2809,16 @@ mod tests {
                 .expect("photo-b has a token")
                 .to_owned();
 
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(11, vec!["photo-b".to_owned()], vec![]),
-                )
-                .expect("generation 11 applies to photo-b first");
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
-                )
-                .expect("generation 10 still applies independently to photo-a");
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(11, vec!["photo-b".to_owned()], vec![]),
+            );
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
+            );
 
             assert_eq!(preview_status(&registry, &token_a), StatusCode::NOT_FOUND);
             assert_eq!(preview_status(&registry, &token_b), StatusCode::NOT_FOUND);
@@ -2871,14 +2840,11 @@ mod tests {
                 })
                 .expect("the first demand is current")
                 .expect("the first preview is resident");
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(11, vec!["photo-a".to_owned()], vec![]),
-                )
-                .expect("generation 11 revokes the older preview");
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(11, vec!["photo-a".to_owned()], vec![]),
+            );
             let newer_demand =
                 engine.reconcile_preview_demand(&registry, &project_id, 2, ["photo-a"]);
             let newer_preview = engine
@@ -2895,14 +2861,11 @@ mod tests {
                 .expect("the newer preview has a token")
                 .to_owned();
 
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
-                )
-                .expect("the stale generation is ignored");
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(10, vec!["photo-a".to_owned()], vec![]),
+            );
 
             assert_eq!(preview_status(&registry, &newer_token), StatusCode::OK);
         });
@@ -2925,18 +2888,15 @@ mod tests {
             panic!("the initial demand owns its flight");
         };
 
-        engine
-            .apply_monitor_media_update(
-                &fixture.app_paths,
-                &fixture.work.namespace,
-                &registry,
-                &MediaRuntimeUpdate::for_test(
-                    1,
-                    vec![fixture.work.source.media_id().to_owned()],
-                    vec![fixture.work.source.media_id().to_owned()],
-                ),
-            )
-            .expect("the stable Monitor update cancels the obsolete flight");
+        engine.apply_monitor_media_update(
+            &fixture.work.namespace,
+            &registry,
+            &MediaRuntimeUpdate::for_test(
+                1,
+                vec![fixture.work.source.media_id().to_owned()],
+                vec![fixture.work.source.media_id().to_owned()],
+            ),
+        );
         assert_eq!(
             invalidated_owner.cancellation().reason(),
             Some(crate::cache_activity_gate::CacheCancellationReason::Obsolete)
@@ -2993,18 +2953,15 @@ mod tests {
         std::fs::write(&candidate, b"candidate owned by the active flight")
             .expect("the active candidate exists before publication");
 
-        engine
-            .apply_monitor_media_update(
-                &fixture.app_paths,
-                &fixture.work.namespace,
-                &registry,
-                &MediaRuntimeUpdate::for_test(
-                    1,
-                    vec!["unrelated-media".into()],
-                    vec!["unrelated-media".into()],
-                ),
-            )
-            .expect("the unrelated stable update is accepted");
+        engine.apply_monitor_media_update(
+            &fixture.work.namespace,
+            &registry,
+            &MediaRuntimeUpdate::for_test(
+                1,
+                vec!["unrelated-media".into()],
+                vec!["unrelated-media".into()],
+            ),
+        );
 
         assert!(
             candidate.exists(),
@@ -3161,18 +3118,11 @@ mod tests {
                     fourth.artifact().format,
                 )
                 .expect("the current Photo B path is central");
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(
-                        10,
-                        vec!["photo-a".into()],
-                        vec!["photo-a".into()],
-                    ),
-                )
-                .expect("targeted invalidation revokes reuse without deleting G1");
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(10, vec!["photo-a".into()], vec!["photo-a".into()]),
+            );
             assert!(third_path.is_file());
             assert!(fourth_path.is_file());
 
@@ -3684,18 +3634,15 @@ mod tests {
                 b"changed Original requiring a candidate generation",
             )
             .expect("the Original changes before the invalid completion");
-            engine
-                .apply_monitor_media_update(
-                    &fixture.app_paths,
-                    &fixture.work.namespace,
-                    &registry,
-                    &MediaRuntimeUpdate::for_test(
-                        10,
-                        vec![published.media_id.clone()],
-                        vec![published.media_id.clone()],
-                    ),
-                )
-                .expect("the stable change invalidates logical reuse");
+            engine.apply_monitor_media_update(
+                &fixture.work.namespace,
+                &registry,
+                &MediaRuntimeUpdate::for_test(
+                    10,
+                    vec![published.media_id.clone()],
+                    vec![published.media_id.clone()],
+                ),
+            );
             assert!(
                 published_path.is_file(),
                 "logical invalidation retains G1 until a verified replacement is published"

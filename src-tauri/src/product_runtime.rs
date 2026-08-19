@@ -89,7 +89,6 @@ pub(crate) fn run(
         .manage(project_host)
         .manage(startup_handshake)
         .manage(cache_previews)
-        .manage(cache_service)
         .manage(cache_namespace_owner)
         .manage(CacheEngine::default())
         .manage(MediaRuntime::default())
@@ -336,31 +335,17 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             }
             let invalidated = update.invalidated_media_ids();
             if !changed.is_empty() || !invalidated.is_empty() {
-                let app_paths = app.state::<AppPaths>();
                 let namespace = app.state::<CacheNamespaceOwner>();
-                match app.state::<CacheEngine>().apply_monitor_media_update(
-                    &app_paths,
+                app.state::<CacheEngine>().apply_monitor_media_update(
                     namespace.namespace(),
                     app.state::<CachePreviewRegistry>().inner(),
                     update,
-                ) {
-                    Ok(removed_generation_count) => {
-                        tracing::info!(
-                            target: "myalbuns.desktop",
-                            invalidated_media_count = invalidated.len(),
-                            removed_generation_count,
-                            event = "linked_media_cache_invalidated",
-                        );
-                    }
-                    Err(error) => {
-                        tracing::warn!(
-                            target: "myalbuns.desktop",
-                            stage = ?error.stage,
-                            error = %error.message,
-                            event = "linked_media_cache_invalidation_failed",
-                        );
-                    }
-                }
+                );
+                tracing::info!(
+                    target: "myalbuns.desktop",
+                    invalidated_media_count = invalidated.len(),
+                    event = "linked_media_cache_invalidated",
+                );
             }
             if !changed.is_empty()
                 && let Some(window) = app.get_webview_window(PROJECT_WINDOW_LABEL)

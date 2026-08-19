@@ -57,7 +57,10 @@ da captura técnica usada para preparar um job não confirma indisponibilidade d
 Original. Nesses terminais a prévia usa o estado distinto
 `CacheUnavailable`, pode manter a última representação apenas como contexto e
 não oferece `Tentar novamente` nem Religação. Somente a inspeção autoritativa do
-`MediaResolver` produz `Unavailable` e sua ação explícita.
+`MediaResolver` produz `Unavailable` e sua ação explícita. A leitura e a
+validação finais do artefato pelo Registry obedecem à mesma regra: uma falha
+retorna `CacheUnavailable` na resposta da demanda, em vez de rejeitar o comando
+e deixar a WebView conservar um estado antigo da origem.
 
 O `CacheEngine` consome essas duas autoridades. A última representação válida
 pode permanecer visível como contexto quando o Original está ausente ou
@@ -80,6 +83,14 @@ JSON corrompido, entrada duplicada ou artefato inválido provocam reconstrução
 partir de trabalho novo, nunca aceitação parcial. Temporários pertencem à
 geração e ao processo que os criou; o sweep não remove temporários estrangeiros
 nem uma geração publicada por outro trabalho.
+
+No Windows, criação, abertura, descarte, substituição e coleta usam um único
+componente relativo ao handle físico do diretório já validado. O temporário
+permanece aberto desde a criação até o `sync` e a promoção; abandono marca esse
+mesmo handle para exclusão. Limpeza recursiva abre e remove cada arquivo pelo
+handle do pai, e remoção de diretório rejeita um pathname que passou a nomear
+uma junction. Assim, a troca concorrente de `Media` ou do namespace não pode
+apagar, truncar ou promover um homônimo fora do Cache autorizado.
 
 Há uma única exceção deliberada para a recuperação após queda total do Host:
 o novo Host primeiro adquire com exclusividade a reserva nomeada do namespace.
@@ -104,7 +115,7 @@ inspeção fecham a abertura do namespace, em vez de aceitar estado parcial.
 Toda leitura, publicação e remoção da claim passa por
 `CacheWriterClaimStorage`, da biblioteca central `myalbuns-paths`. Essa guarda
 mantém aberta a cadeia física validada de diretórios durante a espera da
-instância exata e revalida cada arquivo aberto contra ela. A preparação da
+instância exata e abre cada arquivo por um nome relativo a essa autoridade. A preparação da
 espera adquire essa guarda e o handle da instância exata como uma única
 fronteira produtiva antes de qualquer readiness; a prova concorrente confirma
 que o Processador continua vivo e o waiter bloqueado antes de substituir o
@@ -120,10 +131,12 @@ ainda atual. Uma segunda falha suspende novos trabalhos de Cache e emite o
 evento tipado `myalbuns://cache-processor-warning`. A Tela de Projeto mostra o
 aviso como status não modal; edição, Salvamento e a representação já disponível
 continuam funcionando. A primeira demanda de prévia só é enviada depois que a
-Promise de registro desse listener resolve; assim a própria falha que causa a
-suspensão não pode preceder a observação do aviso. Falha ao registrar suspende
-somente novos pedidos de Cache e não bloqueia edição ou Salvamento. Cada sidecar
-é contido, antes do dispatch, em um Job
+Promise de registro desse listener e a Promise do listener de mudança estável
+de mídia resolvem para o mesmo Projeto e port. Assim nem a própria falha que
+causa a suspensão nem a confirmação autoritativa do Monitor podem preceder seus
+observadores na WebView. Falha ao registrar suspende somente novos pedidos de
+Cache e não bloqueia edição ou Salvamento. Cada sidecar é contido, antes do
+dispatch, em um Job
 Object privado com `KILL_ON_JOB_CLOSE`; ele não sobrevive à queda do Host que
 possui a reserva do namespace. O estado externo é deliberadamente estreito:
 somente `suspended` atravessa IPC, sem expor o supervisor ou criar um
@@ -145,11 +158,13 @@ renomes e remoções concorrentes podem tornar a contagem momentaneamente
 aproximada, mas não indisponível. Reparse points e tipos inesperados continuam
 falhando fechados. Não há operação bulk pública que inspecione todos os
 namespaces sem antes classificá-los e coordená-los. Uma
-reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão. A
-chave normaliza o casing ASCII do namespace antes do hash, acompanhando a
-equivalência case-insensitive do pathname Windows; o casing armazenado que
-`read_dir` devolve não pode criar uma segunda reserva para o mesmo diretório.
-Outro processo, portanto, não pode classificar aquele namespace como liberável.
+reserva por namespace usa mutex nomeado do Windows e vive por toda a Sessão. Um
+único construtor de mutex aplica o case mapping não linguístico do próprio
+Windows à raiz local e normaliza o namespace ASCII antes do hash. `CacheService`
+e `OperationGate` compartilham essa identidade: casing diferente da raiz ou o
+casing armazenado que `read_dir` devolve não pode criar uma segunda reserva para
+o mesmo diretório. Outro processo, portanto, não pode classificar aquele
+namespace como liberável.
 
 A liberação parcial adquire apenas reservas disponíveis e remove somente esses
 Projetos. A limpeza total exige simultaneamente o gate de operação sem
@@ -157,6 +172,11 @@ Processador/Projeto ativo, a lease de manutenção e todas as reservas de
 namespace. Se isso não for possível, um marcador `create-only` agenda a ação
 para o próximo início seguro. Chamadores concorrentes convergem para um único
 marcador idempotente.
+O marcador fixo também pertence a uma guarda estreita de `myalbuns-paths`: a
+cadeia até `State` permanece aberta, publicação é create-only relativa ao handle
+e remoção exige os mesmos bytes pelo mesmo arquivo aberto. Uma junction em
+`State` falha fechada e nunca transforma um marcador externo em autoridade de
+limpeza.
 
 No início do Global, a WebView é criada oculta dentro do `setup`, mas a limpeza
 agendada é executada no executor dedicado a operações bloqueantes. Um gate de

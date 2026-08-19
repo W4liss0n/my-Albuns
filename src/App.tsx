@@ -40,7 +40,7 @@ interface AppProps {
   logger: Logger;
 }
 
-interface CacheWarningSubscription {
+interface MediaPreviewSubscription {
   projectId: string;
   port: MediaPreviewPort;
 }
@@ -71,8 +71,10 @@ function App({
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const [cacheProcessorWarning, setCacheProcessorWarning] =
     useState<CacheProcessorWarning | null>(null);
+  const [mediaChangeSubscription, setMediaChangeSubscription] =
+    useState<MediaPreviewSubscription | null>(null);
   const [cacheWarningSubscription, setCacheWarningSubscription] =
-    useState<CacheWarningSubscription | null>(null);
+    useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
   const loggerRef = useRef(logger);
@@ -212,6 +214,10 @@ function App({
       .then((dispose) => {
         if (active) {
           unlisten = dispose;
+          setMediaChangeSubscription({
+            projectId,
+            port: mediaPreviewPort,
+          });
         } else {
           dispose();
         }
@@ -229,6 +235,11 @@ function App({
     return () => {
       active = false;
       unlisten?.();
+      setMediaChangeSubscription((current) =>
+        current?.projectId === projectId && current.port === mediaPreviewPort
+          ? null
+          : current,
+      );
     };
   }, [logger, mediaPreviewPort, projectId]);
 
@@ -265,6 +276,11 @@ function App({
     return () => {
       active = false;
       unlisten?.();
+      setCacheWarningSubscription((current) =>
+        current?.projectId === projectId && current.port === mediaPreviewPort
+          ? null
+          : current,
+      );
     };
   }, [mediaPreviewPort, projectId]);
 
@@ -275,9 +291,18 @@ function App({
   const cacheWarningListenerReady =
     cacheWarningSubscription?.projectId === projectId &&
     cacheWarningSubscription.port === mediaPreviewPort;
+  const mediaChangeListenerReady =
+    mediaChangeSubscription?.projectId === projectId &&
+    mediaChangeSubscription.port === mediaPreviewPort;
 
   useEffect(() => {
-    if (!projectId || !cacheWarningListenerReady) return;
+    if (
+      !projectId ||
+      !cacheWarningListenerReady ||
+      !mediaChangeListenerReady
+    ) {
+      return;
+    }
     if (mediaDemandSequence.current.projectId !== projectId) {
       mediaDemandSequence.current = { projectId, revision: 0 };
     }
@@ -340,6 +365,7 @@ function App({
     editorGraphics.supported,
     logger,
     mediaDemand,
+    mediaChangeListenerReady,
     mediaRefreshRevision,
     mediaPreviewPort,
     projectId,
