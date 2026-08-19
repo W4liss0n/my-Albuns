@@ -153,6 +153,7 @@ pub(crate) fn run(
             crate::project_commands::project_state,
             crate::project_commands::apply_project_intent,
             crate::project_commands::relink_media,
+            crate::media_preview_commands::retry_unavailable_media,
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,
             crate::project_commands::save_project,

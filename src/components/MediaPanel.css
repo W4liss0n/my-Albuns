@@ -107,7 +107,7 @@
   gap: 5px;
 }
 
-.media-relink {
+.media-recovery-action {
   min-height: 24px;
   border: 1px solid rgb(201 154 93 / 38%);
   border-radius: 6px;
@@ -116,7 +116,7 @@
   font-size: 0.58rem;
 }
 
-.media-relink:disabled {
+.media-recovery-action:disabled {
   opacity: 0.5;
 }
 

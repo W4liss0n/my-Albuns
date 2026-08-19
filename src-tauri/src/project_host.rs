@@ -245,6 +245,14 @@ impl ProjectHost {
         })
     }
 
+    pub(crate) fn authorized_media_binding(&self, media_id: &str) -> Result<MediaBinding, String> {
+        self.authorized_media_catalog()?
+            .bindings
+            .into_iter()
+            .find(|binding| binding.media_id == media_id)
+            .ok_or_else(|| "A ocorrência de mídia não pertence ao Projeto atual.".into())
+    }
+
     pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
         let frozen = self
             .project()?
@@ -976,6 +984,67 @@ mod tests {
         let frontend_projection =
             serde_json::to_string(&projection).expect("the editor projection serializes");
         assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn public_host_runtime_retry_reinspects_without_mutating_media_ref_or_project() {
+        let root = tempfile::tempdir().expect("temporary media retry Host fixture");
+        let media_path = root.path().join("Background.png");
+        std::fs::write(&media_path, b"linked Original")
+            .expect("the linked Original fixture is writable");
+        let initial =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: media_path.clone(),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ));
+        let fixture = fixture_with_initial(initial);
+        let before = fixture
+            .host
+            .projection()
+            .expect("the Project is available before retry authorization");
+        let media_id = before.state.album.media[0].id.to_string();
+
+        let binding = fixture
+            .host
+            .authorized_media_binding(&media_id)
+            .expect("the Host authorizes the current occurrence binding");
+        let mut unavailable_sample = binding.clone();
+        unavailable_sample.logical_path = "relative-unavailable-source.png".into();
+        let runtime = MediaRuntime::default();
+        let resolver = MediaResolver;
+        runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding)
+            .expect("the Runtime repeats the authoritative inspection through the Host binding");
+
+        let after = fixture
+            .host
+            .projection()
+            .expect("the Project remains available after retry authorization");
+        assert_eq!(binding.media_id, media_id);
+        assert_eq!(binding.logical_path, media_path);
+        assert_eq!(
+            retried.availability(),
+            crate::media_runtime::MediaAvailability::Candidate
+        );
+        assert_eq!(after.state.revision, before.state.revision);
+        assert_eq!(after.state.saved_revision, before.state.saved_revision);
+        assert_eq!(after.state.dirty, before.state.dirty);
+        assert_eq!(after.state.can_undo, before.state.can_undo);
+        assert_eq!(after.state.can_redo, before.state.can_redo);
+        assert_eq!(
+            fixture
+                .host
+                .authorized_media_catalog()
+                .expect("the authorized catalog is unchanged")
+                .bindings[0],
+            binding
+        );
     }
 
     #[test]

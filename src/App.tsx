@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GraphicsDiagnostic,
@@ -142,6 +142,43 @@ function App({
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId ?? "";
+  const retryUnavailableMedia = useCallback(
+    async (mediaId: string) => {
+      const operationId = createLogInstanceId("media-retry");
+      logger.write({
+        level: "info",
+        component: "media-preview",
+        event: "media_retry_started",
+        operationId,
+        projectId,
+      });
+      try {
+        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
+        setMediaPreviews((current) => ({
+          ...current,
+          [mediaId]: preview,
+        }));
+        setMediaRefreshRevision((revision) => revision + 1);
+        logger.write({
+          level: "info",
+          component: "media-preview",
+          event: "media_retry_completed",
+          operationId,
+          projectId,
+        });
+      } catch (error: unknown) {
+        logger.write({
+          level: "warn",
+          component: "media-preview",
+          event: "media_retry_failed",
+          operationId,
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      }
+    },
+    [logger, mediaPreviewPort, projectId],
+  );
   useEffect(() => {
     if (!projectId || uiReadyProject.current === projectId) return;
     uiReadyProject.current = projectId;
@@ -358,6 +395,7 @@ function App({
           runProjectMutation={runProjectMutation}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setMediaDemand}
+          onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
         />

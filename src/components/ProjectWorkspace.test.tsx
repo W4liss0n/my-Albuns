@@ -207,15 +207,17 @@ function projectCorePortWithApply(
 
 type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
-  "runProjectMutation" | "projectWindowPort"
+  "runProjectMutation" | "projectWindowPort" | "onRetryUnavailableMedia"
 > & {
   projectCorePort: ProjectCorePort;
   projectWindowPort?: ProjectWindowPort;
+  onRetryUnavailableMedia?: (mediaId: string) => Promise<void>;
 };
 
 function ProjectWorkspace({
   projectCorePort,
   projectWindowPort = inertProjectWindowPort,
+  onRetryUnavailableMedia = async () => undefined,
   projection,
   ...props
 }: TestProjectWorkspaceProps) {
@@ -229,6 +231,7 @@ function ProjectWorkspace({
       projection={projection}
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
+      onRetryUnavailableMedia={onRetryUnavailableMedia}
     />
   );
 }
@@ -901,7 +904,7 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   );
 });
 
-test("offers public Relink only for an absent occurrence and applies the returned projection", async () => {
+test("offers retry only for an unavailable occurrence and keeps Relink exclusive to absent", async () => {
   const relinkedProjection: EditorProjection = {
     ...projection,
     state: {
@@ -919,6 +922,7 @@ test("offers public Relink only for an absent occurrence and applies the returne
     relink,
   };
   const onProjectionChange = vi.fn();
+  const onRetryUnavailableMedia = vi.fn(async () => undefined);
   render(
     <ProjectWorkspace
       exportPipelinePort={exportPipelinePort}
@@ -936,6 +940,7 @@ test("offers public Relink only for an absent occurrence and applies the returne
           url: null,
         },
       }}
+      onRetryUnavailableMedia={onRetryUnavailableMedia}
       onProjectionChange={onProjectionChange}
     />,
   );
@@ -943,11 +948,18 @@ test("offers public Relink only for an absent occurrence and applies the returne
   expect(
     screen.getAllByRole("button", { name: /Religar arquivo de/i }),
   ).toHaveLength(1);
+  expect(
+    screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  ).toHaveLength(1);
   fireEvent.click(
     screen.getByRole("button", { name: /Religar arquivo de/i }),
   );
+  fireEvent.click(
+    screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  );
 
   await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001"));
+  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002");
   expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });
 

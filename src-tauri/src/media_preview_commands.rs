@@ -51,6 +51,58 @@ impl MediaPreviewCommandError {
             message: "Não foi possível preparar as representações reduzidas do Projeto.".into(),
         }
     }
+
+    fn retry_failed(error: impl std::fmt::Display) -> Self {
+        Self {
+            code: MediaPreviewCommandErrorCode::ReadFailed,
+            message: format!("Não foi possível tentar novamente a inspeção da mídia: {error}"),
+        }
+    }
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn retry_unavailable_media(
+    media_id: String,
+    window: WebviewWindow,
+    project_host: State<'_, ProjectHost>,
+    engine: State<'_, CacheEngine>,
+    registry: State<'_, CachePreviewRegistry>,
+    media_runtime: State<'_, MediaRuntime>,
+    media_monitor: State<'_, MediaMonitor>,
+    app_paths: State<'_, AppPaths>,
+    namespace_owner: State<'_, CacheNamespaceOwner>,
+) -> Result<MediaPreview, MediaPreviewCommandError> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
+    let binding = project_host
+        .authorized_media_binding(&media_id)
+        .map_err(MediaPreviewCommandError::retry_failed)?;
+    let monitor = media_monitor.inner().clone();
+    let runtime = media_runtime.inner().clone();
+    let inspection =
+        tauri::async_runtime::spawn_blocking(move || monitor.retry_unavailable(&runtime, &binding))
+            .await
+            .map_err(MediaPreviewCommandError::retry_failed)?
+            .map_err(MediaPreviewCommandError::retry_failed)?;
+    let namespace = namespace_owner.namespace();
+    engine
+        .apply_monitor_media_update(&app_paths, namespace, registry.inner(), inspection.update())
+        .map_err(|failure| MediaPreviewCommandError::retry_failed(failure.message))?;
+    let state = match inspection.availability() {
+        MediaAvailability::Candidate => MediaPreviewState::Ready,
+        MediaAvailability::Absent => MediaPreviewState::Absent,
+        MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
+    };
+    let retained = (state != MediaPreviewState::Ready)
+        .then(|| registry.retained_preview(&media_id, state))
+        .flatten();
+    Ok(retained.unwrap_or(MediaPreview {
+        media_id,
+        state,
+        url: None,
+    }))
 }
 
 #[tauri::command]

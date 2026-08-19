@@ -177,6 +177,12 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
         throw normalizeMediaPreviewError(error);
       },
     ),
+  retryUnavailableMedia: (mediaId) =>
+    invoke<IpcMediaPreview>("retry_unavailable_media", { mediaId }).catch(
+      (error: unknown) => {
+        throw normalizeMediaPreviewError(error);
+      },
+    ),
   onMediaChanged: (listener) =>
     listen<IpcLinkedMediaChanged>(
       "myalbuns://linked-media-changed",

@@ -19,6 +19,7 @@ export interface MediaPanelProps {
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
   onRelinkMedia(mediaId: string): void;
+  onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function MediaPanel({
   onMediaDemandChange,
   onFillPhoto,
   onRelinkMedia,
+  onRetryUnavailableMedia,
   relinkDisabled = false,
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
@@ -185,12 +187,22 @@ export function MediaPanel({
             {mediaPreviews[media.id]?.state === "absent" && (
               <button
                 aria-label={`Religar arquivo de ${media.name}`}
-                className="media-relink"
+                className="media-recovery-action"
                 disabled={relinkDisabled}
                 type="button"
                 onClick={() => onRelinkMedia(media.id)}
               >
                 Religar arquivo
+              </button>
+            )}
+            {mediaPreviews[media.id]?.state === "unavailable" && (
+              <button
+                aria-label={`Tentar novamente o arquivo de ${media.name}`}
+                className="media-recovery-action"
+                type="button"
+                onClick={() => void onRetryUnavailableMedia(media.id)}
+              >
+                Tentar novamente
               </button>
             )}
           </div>

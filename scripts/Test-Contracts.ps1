@@ -31,8 +31,12 @@ function Test-FilesEqual {
         [string] $Right
     )
 
-    (Get-FileHash -LiteralPath $Left -Algorithm SHA256).Hash -eq
-        (Get-FileHash -LiteralPath $Right -Algorithm SHA256).Hash
+    $leftBytes = [System.IO.File]::ReadAllBytes($Left)
+    $rightBytes = [System.IO.File]::ReadAllBytes($Right)
+    [System.Collections.StructuralComparisons]::StructuralEqualityComparer.Equals(
+        $leftBytes,
+        $rightBytes
+    )
 }
 
 function Compare-GeneratedContract {

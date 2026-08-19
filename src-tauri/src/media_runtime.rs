@@ -149,6 +149,39 @@ impl MediaMonitorPoll {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MediaRetryInspection {
+    availability: MediaAvailability,
+    update: MediaRuntimeUpdate,
+}
+
+impl MediaRetryInspection {
+    pub(crate) fn availability(&self) -> MediaAvailability {
+        self.availability
+    }
+
+    pub(crate) fn update(&self) -> &MediaRuntimeUpdate {
+        &self.update
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum MediaRetryError {
+    NotUnavailable,
+}
+
+impl std::fmt::Display for MediaRetryError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotUnavailable => formatter.write_str(
+                "A ocorrência de mídia não está confirmada como temporariamente indisponível.",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for MediaRetryError {}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct MediaResolver;
 
@@ -332,6 +365,48 @@ impl MediaRuntime {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone()
     }
+
+    fn apply_occurrence(
+        &self,
+        generation: u64,
+        observation: MediaObservation,
+    ) -> MediaRuntimeUpdate {
+        let mut current = self
+            .current
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if current
+            .as_ref()
+            .is_some_and(|current| current.generation >= generation)
+        {
+            return MediaRuntimeUpdate::default();
+        }
+        let current = current.get_or_insert_with(|| MediaResolutionProposal {
+            generation,
+            observations: Vec::new(),
+        });
+        let previous = current
+            .observations
+            .iter_mut()
+            .find(|current| current.media_id == observation.media_id);
+        let (changed, invalidated) = if let Some(previous) = previous {
+            let changed = *previous != observation;
+            let invalidated = invalidates_cache(previous, &observation);
+            *previous = observation.clone();
+            (changed, invalidated)
+        } else {
+            current.observations.push(observation.clone());
+            (true, false)
+        };
+        let media_id = observation.media_id.clone();
+        current.generation = generation;
+        MediaRuntimeUpdate {
+            observation_generation: generation,
+            changed_media_ids: changed.then(|| media_id.clone()).into_iter().collect(),
+            invalidated_media_ids: invalidated.then(|| media_id.clone()).into_iter().collect(),
+            revoked_preview_media_ids: invalidated.then_some(media_id).into_iter().collect(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -347,6 +422,49 @@ struct MediaMonitorTransition {
 }
 
 impl MediaMonitor {
+    pub(crate) fn retry_unavailable(
+        &self,
+        runtime: &MediaRuntime,
+        binding: &MediaBinding,
+    ) -> Result<MediaRetryInspection, MediaRetryError> {
+        let mut transition = self
+            .transition
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let current = runtime.snapshot();
+        if current
+            .as_ref()
+            .and_then(|current| {
+                current
+                    .observations
+                    .iter()
+                    .find(|observation| observation.media_id == binding.media_id)
+            })
+            .is_some_and(|observation| observation.availability != MediaAvailability::Unavailable)
+        {
+            return Err(MediaRetryError::NotUnavailable);
+        }
+        let generation = next_observation_generation(
+            &mut transition,
+            current.as_ref().map(|current| current.generation),
+        );
+        let proposal = self
+            .resolver
+            .observe(generation, std::slice::from_ref(binding));
+        let observation = proposal
+            .observations
+            .into_iter()
+            .next()
+            .expect("an occurrence retry produces exactly one observation");
+        let availability = observation.availability;
+        let update = runtime.apply_occurrence(generation, observation);
+        transition.pending = None;
+        Ok(MediaRetryInspection {
+            availability,
+            update,
+        })
+    }
+
     pub(crate) fn poll(
         &self,
         runtime: &MediaRuntime,
@@ -359,13 +477,12 @@ impl MediaMonitor {
             .transition
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        transition.next_generation = transition
-            .next_generation
-            .checked_add(1)
-            .expect("a MediaMonitor generation cannot exhaust u64");
-        let generation = transition.next_generation;
-        let proposal = self.resolver.observe(generation, bindings);
         let current = runtime.snapshot();
+        let generation = next_observation_generation(
+            &mut transition,
+            current.as_ref().map(|current| current.generation),
+        );
+        let proposal = self.resolver.observe(generation, bindings);
         let update = match current {
             Some(current) if current.observations == proposal.observations => {
                 transition.pending = None;
@@ -389,6 +506,18 @@ impl MediaMonitor {
             update,
         }
     }
+}
+
+fn next_observation_generation(
+    transition: &mut MediaMonitorTransition,
+    current_generation: Option<u64>,
+) -> u64 {
+    transition.next_generation = transition
+        .next_generation
+        .max(current_generation.unwrap_or_default())
+        .checked_add(1)
+        .expect("a MediaMonitor generation cannot exhaust u64");
+    transition.next_generation
 }
 
 fn invalidates_cache(previous: &MediaObservation, current: &MediaObservation) -> bool {
@@ -415,8 +544,207 @@ mod tests {
     use myalbuns_core::MediaKind;
 
     use super::{
-        MediaAvailability, MediaBinding, MediaMonitor, MediaResolutionProposal, MediaRuntime,
+        MediaAvailability, MediaBinding, MediaMonitor, MediaObservation, MediaResolutionProposal,
+        MediaResolver, MediaRetryError, MediaRuntime,
     };
+
+    #[test]
+    fn explicit_retry_reinspects_only_the_unavailable_occurrence_with_a_fresh_path_context() {
+        let root = tempfile::tempdir().expect("temporary explicit retry fixture");
+        let selected_path = root.path().join("photo-a.jpg");
+        let untouched_path = root.path().join("photo-b.jpg");
+        std::fs::write(&selected_path, b"photo-a").expect("the selected Original is writable");
+        std::fs::write(&untouched_path, b"photo-b").expect("the other Original is writable");
+        let selected = MediaBinding {
+            media_id: "photo-a".into(),
+            kind: MediaKind::Photo,
+            logical_path: selected_path.clone(),
+        };
+        let selected_before = selected.clone();
+        let untouched = MediaBinding {
+            media_id: "photo-b".into(),
+            kind: MediaKind::Photo,
+            logical_path: untouched_path.clone(),
+        };
+        let runtime = MediaRuntime::default();
+        let resolver = MediaResolver;
+        let mut prior = resolver.observe(7, &[selected.clone(), untouched.clone()]);
+        let selected_prior = prior
+            .observations
+            .iter_mut()
+            .find(|observation| observation.media_id == selected.media_id)
+            .expect("the selected observation is present in the fixture");
+        selected_prior.availability = MediaAvailability::Unavailable;
+        selected_prior.physical_identity = None;
+        selected_prior.source_bytes = None;
+        selected_prior.source_created_unix_ms = None;
+        selected_prior.source_modified_unix_ms = None;
+        runtime.apply(prior);
+        let untouched_before = runtime
+            .snapshot()
+            .expect("the unavailable state is registered")
+            .observations()
+            .iter()
+            .find(|observation| observation.media_id == untouched.media_id)
+            .expect("the other occurrence is registered")
+            .clone();
+
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &selected)
+            .expect("an unavailable occurrence can be inspected explicitly");
+
+        assert_eq!(retried.availability(), MediaAvailability::Candidate);
+        assert_eq!(retried.update().changed_media_ids(), ["photo-a"]);
+        assert_eq!(retried.update().invalidated_media_ids(), ["photo-a"]);
+        assert_eq!(
+            selected, selected_before,
+            "retry never rewrites the binding"
+        );
+        let snapshot = runtime.snapshot().expect("retry updates observed state");
+        assert_eq!(snapshot.observations().len(), 2);
+        assert_eq!(
+            snapshot
+                .observations()
+                .iter()
+                .find(|observation| observation.media_id == "photo-a")
+                .expect("the selected observation remains present")
+                .logical_path,
+            selected_path
+        );
+        assert_eq!(
+            snapshot
+                .observations()
+                .iter()
+                .find(|observation| observation.media_id == "photo-b")
+                .expect("the other observation remains present"),
+            &untouched_before,
+            "retry is scoped to one occurrence"
+        );
+    }
+
+    #[test]
+    fn explicit_retry_rejects_absent_occurrences_without_changing_runtime() {
+        let root = tempfile::tempdir().expect("temporary absent retry fixture");
+        let binding = MediaBinding {
+            media_id: "photo-absent".into(),
+            kind: MediaKind::Photo,
+            logical_path: root.path().join("missing.jpg"),
+        };
+        let resolver = MediaResolver;
+        let runtime = MediaRuntime::default();
+        runtime.apply(resolver.observe(3, std::slice::from_ref(&binding)));
+        let before = runtime.snapshot().expect("absence is registered");
+        assert_eq!(
+            before.observations()[0].availability,
+            MediaAvailability::Absent
+        );
+
+        let error = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding)
+            .expect_err("absence is not eligible for the unavailable retry action");
+
+        assert_eq!(error, MediaRetryError::NotUnavailable);
+        assert_eq!(runtime.snapshot(), Some(before));
+    }
+
+    #[test]
+    fn explicit_retry_changes_unavailable_to_absent_after_authoritative_inspection() {
+        let root = tempfile::tempdir().expect("temporary unavailable-to-absent fixture");
+        let binding = MediaBinding {
+            media_id: "photo-returned-root".into(),
+            kind: MediaKind::Photo,
+            logical_path: root.path().join("still-missing.jpg"),
+        };
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolutionProposal {
+            generation: 4,
+            observations: vec![MediaObservation {
+                media_id: binding.media_id.clone(),
+                kind: binding.kind,
+                logical_path: binding.logical_path.clone(),
+                availability: MediaAvailability::Unavailable,
+                physical_identity: None,
+                source_bytes: None,
+                source_created_unix_ms: None,
+                source_modified_unix_ms: None,
+            }],
+        });
+
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding)
+            .expect("the reachable root can authoritatively establish absence");
+
+        assert_eq!(retried.availability(), MediaAvailability::Absent);
+        assert_eq!(retried.update().changed_media_ids(), [binding.media_id]);
+        assert!(retried.update().invalidated_media_ids().is_empty());
+        assert_eq!(
+            runtime
+                .snapshot()
+                .expect("the new authoritative absence is stored")
+                .observations()[0]
+                .availability,
+            MediaAvailability::Absent
+        );
+    }
+
+    #[test]
+    fn explicit_retry_can_establish_the_first_observation_for_provisional_unavailability() {
+        let root = tempfile::tempdir().expect("temporary first retry fixture");
+        let source = root.path().join("photo.jpg");
+        std::fs::write(&source, b"photo").expect("the Original fixture is writable");
+        let binding = MediaBinding {
+            media_id: "photo-first".into(),
+            kind: MediaKind::Photo,
+            logical_path: source,
+        };
+        let runtime = MediaRuntime::default();
+
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding)
+            .expect("the explicit action can resolve a provisional unavailable state");
+
+        assert_eq!(retried.availability(), MediaAvailability::Candidate);
+        assert_eq!(retried.update().changed_media_ids(), ["photo-first"]);
+        assert!(retried.update().invalidated_media_ids().is_empty());
+        assert_eq!(
+            runtime
+                .snapshot()
+                .expect("the first authoritative observation is registered")
+                .observations()[0]
+                .availability,
+            MediaAvailability::Candidate
+        );
+    }
+
+    #[test]
+    fn explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root() {
+        let binding = MediaBinding {
+            media_id: "photo-offline".into(),
+            kind: MediaKind::Photo,
+            logical_path: "relative-path-remains-unavailable.jpg".into(),
+        };
+        let resolver = MediaResolver;
+        let runtime = MediaRuntime::default();
+        runtime.apply(resolver.observe(2, std::slice::from_ref(&binding)));
+        let binding_before = binding.clone();
+
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding)
+            .expect("an inaccessible root is still a completed retry inspection");
+
+        assert_eq!(retried.availability(), MediaAvailability::Unavailable);
+        assert!(retried.update().changed_media_ids().is_empty());
+        assert!(retried.update().invalidated_media_ids().is_empty());
+        assert_eq!(binding, binding_before);
+        assert_eq!(
+            runtime
+                .snapshot()
+                .expect("the retry keeps an observed unavailable state")
+                .observations()[0]
+                .availability,
+            MediaAvailability::Unavailable
+        );
+    }
 
     #[test]
     fn resolver_monitor_and_runtime_keep_observed_state_outside_media_refs() {

@@ -187,6 +187,7 @@ export interface MediaPreviewPort {
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
   ): Promise<readonly MediaPreview[] | null>;
+  retryUnavailableMedia(mediaId: string): Promise<MediaPreview>;
   onMediaChanged(
     listener: (mediaIds: readonly string[]) => void,
   ): Promise<() => void>;

@@ -569,7 +569,16 @@ function New-Issue45VerifiedCriteria {
                 -Name 'authoritative-absent-unavailable-and-visual-context' `
                 -Requirements @(
                     (New-RustProof -Name 'resolver_monitor_and_runtime_keep_observed_state_outside_media_refs')
+                    (New-RustProof -Name 'public_host_runtime_retry_reinspects_without_mutating_media_ref_or_project')
+                    (New-RustProof -Name 'explicit_retry_rejects_absent_occurrences_without_changing_runtime')
+                    (New-RustProof -Name 'explicit_retry_changes_unavailable_to_absent_after_authoritative_inspection')
+                    (New-RustProof -Name 'explicit_retry_can_establish_the_first_observation_for_provisional_unavailability')
+                    (New-RustProof -Name 'explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root')
                     (New-RustProof -Name 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state')
+                    (New-FrontendProof -Name 'offers retry only for an unavailable occurrence and keeps Relink exclusive to absent')
+                    (New-FrontendProof -Name 'retries an unavailable occurrence explicitly and refreshes it without Relink')
+                    (New-FrontendProof -Name 'keeps retry actionable after an unavailable-media IPC failure without mutating Project')
+                    (New-FrontendProof -Name 'normalizes typed unavailable-media retry failures at the IPC adapter')
                     (New-FrontendProof -Name 'keeps the last known preview when linked media becomes unavailable')
                     (New-FrontendProof -Name 'keeps the last representation only as visual context when the Original is absent')
                     (New-RustProof -Name 'export_plan_rejects_missing_originals_at_the_typed_plan_stage')
@@ -580,7 +589,7 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history')
                     (New-RustProof -Name 'public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence')
                     (New-RustProof -Name 'monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes')
-                    (New-FrontendProof -Name 'offers public Relink only for an absent occurrence and applies the returned projection')
+                    (New-FrontendProof -Name 'offers retry only for an unavailable occurrence and keeps Relink exclusive to absent')
                 )
             New-VerifiedCriterion `
                 -Name 'discardable-complete-index-and-candidate-validation' `

@@ -3,7 +3,7 @@ status: current
 document: technical-research
 ticket: 45-integracao-final-midias-cache
 date: 2026-08-18
-updated: 2026-08-18
+updated: 2026-08-19
 ---
 
 # Integração final de Mídias externas e Cache
@@ -38,6 +38,17 @@ pendentes. Antes de aplicar, o Host confirma novamente que a mesma ocorrência e
 o mesmo vínculo continuam atuais. O monitor reinspeciona a nova referência, e
 o Cache invalida somente esse `mediaId`, mesmo quando duas ocorrências apontavam
 para o mesmo arquivo físico.
+
+Uma ocorrência confirmada como `Unavailable` oferece `Tentar novamente`, nunca
+Religação. A WebView envia somente o `mediaId`; o Host relê o binding atual da
+ocorrência e o `MediaResolver` cria outro `OperationPathContext` para uma nova
+inspeção autoritativa. `MediaRuntime` substitui somente essa observação e o
+`CacheEngine` reage à nova geração antes de outra demanda de prévia. Se a raiz
+continuar inacessível, o estado e a ação permanecem; se ela voltar e o arquivo
+não existir, o resultado passa a `Absent` e somente então oferece Religação; se
+o Original reaparecer, a demanda normal reconstrói ou revalida a representação.
+O fluxo não chama `ProjectSession`, não cria Histórico e não altera caminho,
+`MediaRef`, revisão, dirty, Undo/Redo ou conteúdo salvo.
 
 O `CacheEngine` consome essas duas autoridades. A última representação válida
 pode permanecer visível como contexto quando o Original está ausente ou
@@ -166,7 +177,7 @@ prova.
 | Cópia externa somente leitura | resultado opaco da issue 10 nega autoridade editável | não monta Sessão nem namespace duplicado | `cache_consumes_authoritative_identity_transitions_without_owning_them` |
 | original alterado | duas inspeções autoritativas estáveis do `MediaResolver` | invalida somente a representação daquela ocorrência | `monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes` |
 | original ausente | inspeção autoritativa `Absent` do `MediaResolver` | mantém somente contexto visual; não valida o Original nem autoriza Exportação | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
-| origem de rede indisponível | inspeção inconclusiva `Unavailable` do `MediaResolver` | preserva vínculo e última representação sem confirmar ausência | `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
+| origem de rede indisponível | inspeção inconclusiva `Unavailable` do `MediaResolver`; `Tentar novamente` abre contexto novo | preserva vínculo e última representação sem confirmar ausência nem oferecer Religação | `explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root`; `offers retry only for an unavailable occurrence and keeps Relink exclusive to absent`; `absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state` |
 | índice corrompido | validação integral do `CacheEngine` | descarta o índice completo e reconstrói em trabalho novo | `corrupted_or_incompatible_index_is_discarded_and_rebuilt` |
 | job obsoleto termina | demanda autoritativa revalidada pelo `CacheEngine` | descarta a geração candidata sem publicá-la | `obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation` |
 | queda durante geração | Host e supervisor da issue 44 publicam a claim da instância contida | aguarda o Processador terminar, coleta temporário e preserva a geração publicada | `reopening_after_host_death_recovers_the_contained_processors_temporary` |
