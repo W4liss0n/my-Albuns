@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Image as ImageIcon,
-  ImageOff,
-  Search,
-  SlidersHorizontal,
-  Sparkles,
-} from "lucide-react";
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { ImageOff, Sparkles } from "lucide-react";
 
 import type {
   MediaPreview,
@@ -17,7 +17,13 @@ import type {
   MediaKind,
   MediaUsage,
 } from "../domain/project";
+import {
+  createMediaPanelViewPreferences,
+  type MediaPanelViewPreferences,
+  type MediaUsageFilter,
+} from "../state/mediaPanelPreferences";
 import { AppIcon, EmptyState } from "../ui";
+import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import "./MediaPanel.css";
 
 export interface MediaPanelProps {
@@ -28,6 +34,11 @@ export interface MediaPanelProps {
   onFillPhoto(mediaId: string): void;
 }
 
+const naturalNameCollator = new Intl.Collator("pt-BR", {
+  numeric: true,
+  sensitivity: "base",
+});
+
 export function MediaPanel({
   mediaItems,
   mediaUsage,
@@ -37,17 +48,48 @@ export function MediaPanel({
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
     useState<MediaKind>("photo");
-  const mediaUsageById = new Map(
-    mediaUsage.map((usage) => [usage.mediaId, usage.count]),
+  const [searchByKind, setSearchByKind] = useState<Record<MediaKind, string>>({
+    decorative: "",
+    photo: "",
+  });
+  const [preferencesByKind, setPreferencesByKind] = useState<
+    Record<MediaKind, MediaPanelViewPreferences>
+  >(() => ({
+    decorative: createMediaPanelViewPreferences(),
+    photo: createMediaPanelViewPreferences(),
+  }));
+  const mediaUsageById = useMemo(
+    () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
+    [mediaUsage],
   );
   const activeMediaItems = useMemo(
     () => mediaItems.filter((media) => media.kind === activeMediaKind),
     [activeMediaKind, mediaItems],
   );
-  const stripRef = useRef<HTMLDivElement>(null);
+  const search = searchByKind[activeMediaKind];
+  const preferences = preferencesByKind[activeMediaKind];
+  const { sortDirection, thumbnailSize, usageFilter } = preferences;
+  const visibleMediaItems = useMemo(() => {
+    const normalizedSearch = normalizeSearchText(search);
+    const direction = sortDirection === "ascending" ? 1 : -1;
+    return activeMediaItems
+      .filter((media) => {
+        const usageCount = mediaUsageById.get(media.id) ?? 0;
+        return (
+          passesUsageFilter(usageCount, usageFilter) &&
+          normalizeSearchText(media.name).includes(normalizedSearch)
+        );
+      })
+      .sort(
+        (left, right) =>
+          direction * naturalNameCollator.compare(left.name, right.name),
+      );
+  }, [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+  const gridRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!onMediaDemandChange) return;
-    const root = stripRef.current;
+    const root = gridRef.current;
     const targets = root?.querySelectorAll<HTMLElement>("[data-media-id]");
     onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
     if (!root || !targets?.length || !("IntersectionObserver" in globalThis)) {
@@ -57,10 +99,10 @@ export function MediaPanel({
     const visible = new Set<string>();
     const resident = new Set<string>();
     const emitDemand = () => {
-      const visibleMediaIds = activeMediaItems
+      const visibleMediaIds = visibleMediaItems
         .map(({ id }) => id)
         .filter((mediaId) => visible.has(mediaId));
-      const preloadMediaIds = activeMediaItems
+      const preloadMediaIds = visibleMediaItems
         .map(({ id }) => id)
         .filter(
           (mediaId) => resident.has(mediaId) && !visible.has(mediaId),
@@ -92,7 +134,19 @@ export function MediaPanel({
       visibleObserver.disconnect();
       preloadObserver.disconnect();
     };
-  }, [activeMediaItems, onMediaDemandChange]);
+  }, [onMediaDemandChange, visibleMediaItems]);
+
+  function updatePreferences(
+    nextPreferences: Partial<MediaPanelViewPreferences>,
+  ) {
+    setPreferencesByKind((current) => ({
+      ...current,
+      [activeMediaKind]: {
+        ...current[activeMediaKind],
+        ...nextPreferences,
+      },
+    }));
+  }
 
   return (
     <section
@@ -100,37 +154,35 @@ export function MediaPanel({
       className="media-panel"
       aria-label="Painel de imagens"
     >
-      <div className="media-panel-head">
-        <div className="media-tabs" aria-label="Tipo de recurso">
-          <button
-            aria-label="Fotos"
-            className={activeMediaKind === "photo" ? "active" : undefined}
-            type="button"
-            onClick={() => setActiveMediaKind("photo")}
-          >
-            <AppIcon icon={ImageIcon} size={16} />
-          </button>
-          <button
-            aria-label="Decorativos"
-            className={
-              activeMediaKind === "decorative" ? "active" : undefined
-            }
-            type="button"
-            onClick={() => setActiveMediaKind("decorative")}
-          >
-            <AppIcon icon={SlidersHorizontal} size={16} />
-          </button>
-        </div>
-        <span className="media-kind-chip">
-          {activeMediaKind === "photo" ? "Todas" : "Decorativos"}
-          <small>{activeMediaItems.length}</small>
-        </span>
-        <label className="media-search">
-          <AppIcon icon={Search} size={12} />
-          <input aria-label="Buscar imagens" placeholder="Buscar…" />
-        </label>
-      </div>
-      <div className="media-strip" ref={stripRef}>
+      <MediaPanelToolbar
+        activeMediaKind={activeMediaKind}
+        itemCount={visibleMediaItems.length}
+        preferences={preferences}
+        search={search}
+        onActiveMediaKindChange={setActiveMediaKind}
+        onPreferencesChange={updatePreferences}
+        onSearchChange={(nextSearch) =>
+          setSearchByKind((current) => ({
+            ...current,
+            [activeMediaKind]: nextSearch,
+          }))
+        }
+      />
+      <div
+        aria-label={
+          activeMediaKind === "photo"
+            ? "Grade de Fotos"
+            : "Grade de Decorativos"
+        }
+        className="media-grid"
+        ref={gridRef}
+        role="group"
+        style={
+          {
+            "--media-thumbnail-size": `${thumbnailSize}px`,
+          } as CSSProperties
+        }
+      >
         {activeMediaItems.length === 0 ? (
           <EmptyState
             className="media-empty-state"
@@ -152,8 +204,16 @@ export function MediaPanel({
                 : "Nenhum Decorativo importado"
             }
           />
+        ) : visibleMediaItems.length === 0 ? (
+          <EmptyState
+            className="media-empty-state"
+            density="compact"
+            description="Ajuste a busca ou o filtro de uso para ver outros itens."
+            icon={<AppIcon icon={ImageOff} size={16} />}
+            title="Nenhum item encontrado"
+          />
         ) : (
-          activeMediaItems.map((media) => (
+          visibleMediaItems.map((media) => (
             <button
               className="media-card"
               type="button"
@@ -215,4 +275,20 @@ export function MediaPanel({
 function mediaCardBackground(media: MediaCatalogItem) {
   const palette = media.palette ?? ["#26323A", "#53636D", "#A6B0B6"];
   return `linear-gradient(135deg, ${palette[0]}, ${palette[1]} 56%, ${palette[2]})`;
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+function passesUsageFilter(
+  usageCount: number,
+  usageFilter: MediaUsageFilter,
+) {
+  if (usageFilter === "used") return usageCount > 0;
+  if (usageFilter === "unused") return usageCount === 0;
+  return true;
 }

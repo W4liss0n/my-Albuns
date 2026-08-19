@@ -1095,6 +1095,26 @@ test("merges only Panel viewport and one-row preload margin with Canvas demand",
   );
 });
 
+test("resizes media cards without restarting Panel demand observers", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const observerCount = observedViewports.length;
+  fireEvent.change(
+    screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
+    { target: { value: "124" } },
+  );
+
+  expect(observerCount).toBe(2);
+  expect(observedViewports).toHaveLength(observerCount);
+});
+
 test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () => {
   const mediaPreviewUrls = {
     "decorative-overlay": decorativePreviewUrl,
