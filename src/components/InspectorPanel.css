@@ -274,6 +274,12 @@
   font-weight: 400;
 }
 
+.sheet-tile:hover:not(.active) .sheet-tile__number,
+.sheet-tile:hover:not(.active) .sheet-tile__pages {
+  color: var(--ui-text);
+  background: var(--ui-border-strong);
+}
+
 .sheet-tile.active .sheet-tile__number,
 .sheet-tile.active .sheet-tile__pages {
   color: #fff;
