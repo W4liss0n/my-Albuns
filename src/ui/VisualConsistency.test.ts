@@ -63,6 +63,15 @@ test("shares dense application chrome metrics", () => {
   expect(documentDpiSource).toContain("<ActionButton");
 });
 
+test("uses the shared subtle shadow below the media toolbar", () => {
+  expect(themeStyles).toContain(
+    "--ui-shadow-toolbar: 0 2px 6px rgb(60 54 44 / 8%);",
+  );
+  expect(mediaPanelStyles).toMatch(
+    /\.media-toolbar\s*\{[^}]*box-shadow:\s*var\(--ui-shadow-toolbar\);/s,
+  );
+});
+
 test("shares regular action and footer metrics", () => {
   expect(themeStyles).toContain("--ui-control-height: 31px;");
   expect(themeStyles).toContain("--ui-control-padding-inline: 15px;");

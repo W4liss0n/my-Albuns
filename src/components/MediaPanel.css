@@ -18,6 +18,7 @@
   align-items: stretch;
   border-bottom: 1px solid var(--ui-border);
   background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-toolbar);
   white-space: nowrap;
 }
 

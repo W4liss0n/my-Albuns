@@ -32,6 +32,7 @@
   --ui-warning-border: #e7d5a7;
   --ui-warning-text: #74571f;
   --ui-warning-soft: #fbf3df;
+  --ui-shadow-toolbar: 0 2px 6px rgb(60 54 44 / 8%);
   --ui-shadow-dialog: 0 22px 60px rgb(60 54 44 / 18%);
   --ui-shadow-menu: 0 12px 28px rgb(60 54 44 / 16%);
   --ui-radius-small: 4px;
