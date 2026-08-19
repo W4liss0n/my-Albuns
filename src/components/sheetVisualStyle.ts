@@ -51,11 +51,11 @@ export const SHEET_VISUAL_STYLE = {
     numberFontSizePx: 12.5,
   },
   inactiveSide: {
-    light: "#f3f1ec",
-    dark: "#e2ddd4",
-    stripeOpacity: 0.62,
-    stripeWidthPx: 2,
-    stripeGapPx: 10,
+    fill: "#f4f1eb",
+    foldShadow: "#8a847a",
+    foldShadowOpacity: 0.09,
+    foldShadowWidthPx: 12,
+    foldShadowSteps: 6,
   },
   photo: {
     stripeCount: 12,

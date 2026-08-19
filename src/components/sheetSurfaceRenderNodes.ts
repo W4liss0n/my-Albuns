@@ -106,20 +106,32 @@ export function createSheetInactiveSide(
 ) {
   if (presentation.inactiveOffsetXPx === null) return null;
   const style = SHEET_VISUAL_STYLE.inactiveSide;
-  const inactiveSide = createDiagonalStripeSurface({
-    baseLabel: `sheet-inactive-side-base-${sheet.sheetId}`,
-    dark: style.dark,
-    height,
-    label: `sheet-inactive-side-${sheet.sheetId}`,
-    light: style.light,
-    maskLabel: `sheet-inactive-side-mask-${sheet.sheetId}`,
-    stripeGapPx: style.stripeGapPx,
-    stripeOpacity: style.stripeOpacity,
-    stripesLabel: `sheet-inactive-side-stripes-${sheet.sheetId}`,
-    stripeWidthPx: style.stripeWidthPx,
-    width: presentation.activeWidthPx,
-  });
+  const inactiveSide = new Container();
+  inactiveSide.label = `sheet-inactive-side-${sheet.sheetId}`;
+  inactiveSide.eventMode = "none";
   inactiveSide.position.set(presentation.inactiveOffsetXPx, 0);
+
+  const base = new Graphics()
+    .rect(0, 0, presentation.activeWidthPx, height)
+    .fill({ color: pixiColor(style.fill) });
+  base.label = `sheet-inactive-side-base-${sheet.sheetId}`;
+  base.eventMode = "none";
+
+  const foldShadow = new Graphics();
+  for (let step = style.foldShadowSteps; step >= 1; step -= 1) {
+    const width =
+      (style.foldShadowWidthPx * step) / style.foldShadowSteps;
+    const x = sheet.activeSides === "right"
+      ? presentation.activeWidthPx - width
+      : 0;
+    foldShadow.rect(x, 0, width, height).fill({
+      color: pixiColor(style.foldShadow),
+      alpha: style.foldShadowOpacity / style.foldShadowSteps,
+    });
+  }
+  foldShadow.label = `sheet-inactive-side-fold-shadow-${sheet.sheetId}`;
+  foldShadow.eventMode = "none";
+  inactiveSide.addChild(base, foldShadow);
   return inactiveSide;
 }
 
@@ -129,78 +141,40 @@ export function createCanvasFramePlaceholder(
   frameHeight: number,
 ) {
   const style = SHEET_VISUAL_STYLE.canvasPlaceholder;
-  return createDiagonalStripeSurface({
-    baseLabel: `frame-placeholder-base-${frameId}`,
-    dark: style.dark,
-    height: frameHeight,
-    label: `frame-placeholder-${frameId}`,
-    light: style.light,
-    maskLabel: `frame-placeholder-mask-${frameId}`,
-    stripeGapPx: style.stripeGapPx,
-    stripeOpacity: 1,
-    stripesLabel: `frame-placeholder-stripes-${frameId}`,
-    stripeWidthPx: style.stripeWidthPx,
-    width: frameWidth,
-  });
-}
-
-interface DiagonalStripeSurfaceOptions {
-  baseLabel: string;
-  dark: string;
-  height: number;
-  label: string;
-  light: string;
-  maskLabel: string;
-  stripeGapPx: number;
-  stripeOpacity: number;
-  stripesLabel: string;
-  stripeWidthPx: number;
-  width: number;
-}
-
-function createDiagonalStripeSurface({
-  baseLabel,
-  dark,
-  height,
-  label,
-  light,
-  maskLabel,
-  stripeGapPx,
-  stripeOpacity,
-  stripesLabel,
-  stripeWidthPx,
-  width,
-}: DiagonalStripeSurfaceOptions) {
-  const surface = new Container();
-  surface.label = label;
-  surface.eventMode = "none";
+  const placeholder = new Container();
+  placeholder.label = `frame-placeholder-${frameId}`;
+  placeholder.eventMode = "none";
   const base = new Graphics()
-    .rect(0, 0, width, height)
-    .fill({ color: pixiColor(light) });
-  base.label = baseLabel;
+    .rect(0, 0, frameWidth, frameHeight)
+    .fill({ color: pixiColor(style.light) });
+  base.label = `frame-placeholder-base-${frameId}`;
   base.eventMode = "none";
 
   const stripes = new Graphics();
-  const period = stripeWidthPx + stripeGapPx;
-  for (let offset = -height; offset < width; offset += period) {
+  const period = style.stripeWidthPx + style.stripeGapPx;
+  for (
+    let offset = -frameHeight;
+    offset < frameWidth;
+    offset += period
+  ) {
     stripes
       .moveTo(offset, 0)
-      .lineTo(offset + stripeWidthPx, 0)
-      .lineTo(offset + stripeWidthPx + height, height)
-      .lineTo(offset + height, height)
+      .lineTo(offset + style.stripeWidthPx, 0)
+      .lineTo(offset + style.stripeWidthPx + frameHeight, frameHeight)
+      .lineTo(offset + frameHeight, frameHeight)
       .lineTo(offset, 0);
   }
-  stripes.fill({ color: pixiColor(dark), alpha: stripeOpacity });
-  stripes.label = stripesLabel;
+  stripes.fill({ color: pixiColor(style.dark) });
+  stripes.label = `frame-placeholder-stripes-${frameId}`;
   stripes.eventMode = "none";
   const clip = new Graphics()
-    .rect(0, 0, width, height)
+    .rect(0, 0, frameWidth, frameHeight)
     .fill(0xffffff);
-  clip.label = maskLabel;
+  clip.label = `frame-placeholder-mask-${frameId}`;
   clip.eventMode = "none";
   stripes.mask = clip;
-  surface.addChild(base, stripes, clip);
-  return surface;
+  placeholder.addChild(base, stripes, clip);
+  return placeholder;
 }
 
 export function createSheetTechnicalGuideNodes(

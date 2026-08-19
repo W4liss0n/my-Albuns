@@ -351,6 +351,7 @@ test.each([
     activeSides: "right" as const,
     activeOffsetXPx: 300,
     inactiveOffsetXPx: 0,
+    shadingX: 288,
     pageX: 450,
     missingPageLabel: "sheet-bar-page-left-sheet-001",
   },
@@ -358,6 +359,7 @@ test.each([
     activeSides: "left" as const,
     activeOffsetXPx: 0,
     inactiveOffsetXPx: 300,
+    shadingX: 0,
     pageX: 150,
     missingPageLabel: "sheet-bar-page-right-sheet-001",
   },
@@ -369,6 +371,7 @@ test.each([
     inactiveOffsetXPx,
     missingPageLabel,
     pageX,
+    shadingX,
   }) => {
     const onFocusSheet = vi.fn();
     renderCanvas({
@@ -386,16 +389,22 @@ test.each([
       position: { x: inactiveOffsetXPx, y: 0 },
     });
     expect(displayWithLabel("sheet-inactive-side-base-sheet-001")).toMatchObject({
-      fillStyles: [expect.objectContaining({ color: 0xf3f1ec })],
+      fillStyles: [expect.objectContaining({ color: 0xf4f1eb })],
       rectCommands: [{ height: 300, width: 300, x: 0, y: 0 }],
     });
-    expect(displayWithLabel("sheet-inactive-side-stripes-sheet-001")).toMatchObject({
-      fillStyles: [expect.objectContaining({ alpha: 0.62, color: 0xe2ddd4 })],
+    expect(displayWithLabel("sheet-inactive-side-fold-shadow-sheet-001")).toMatchObject({
+      fillStyles: expect.arrayContaining([
+        expect.objectContaining({ alpha: 0.015, color: 0x8a847a }),
+      ]),
+      rectCommands: expect.arrayContaining([
+        { height: 300, width: 12, x: shadingX, y: 0 },
+      ]),
     });
     expect(
-      displayWithLabel("sheet-inactive-side-stripes-sheet-001").pathCommands
-        .length,
-    ).toBeGreaterThan(0);
+      pixiLifecycle.displays.some(
+        ({ label }) => label === "sheet-inactive-side-stripes-sheet-001",
+      ),
+    ).toBe(false);
     expect(displayWithLabel("sheet-active-content-sheet-001")).toMatchObject({
       position: { x: activeOffsetXPx, y: 0 },
     });
