@@ -1,14 +1,15 @@
 use std::{
     ffi::c_void,
-    fs,
-    io::{self, Write},
+    io,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
-    path::{Path, PathBuf},
     ptr,
     time::Duration,
 };
 
-use myalbuns_paths::{CachePathPlan, ProcessInstanceHandle, ProcessInstanceId, publish_new_file};
+use myalbuns_paths::{
+    AppPaths, AppPathsError, CachePathPlan, CacheWriterClaimStorage, ProcessInstanceHandle,
+    ProcessInstanceId,
+};
 use serde::{Deserialize, Serialize};
 use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
 use windows_sys::Win32::System::{
@@ -20,8 +21,13 @@ use windows_sys::Win32::System::{
     Threading::{PROCESS_SET_QUOTA, PROCESS_TERMINATE, WaitForSingleObject},
 };
 
+#[cfg(test)]
+use std::path::PathBuf;
+
 const CACHE_WRITER_CLAIM_SCHEMA_VERSION: u32 = 1;
+#[cfg(test)]
 const CACHE_WRITER_CLAIM_FILE: &str = ".processor-writer.v1.json";
+#[cfg(test)]
 const CACHE_WRITER_TEMPORARY_PREFIX: &str = ".processor-writer-";
 const CACHE_WRITER_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -44,7 +50,7 @@ pub(crate) struct ProcessorChildLifetime {
     job: Option<OwnedHandle>,
     process: ProcessInstanceHandle,
     process_instance: ProcessInstanceId,
-    claim_path: Option<PathBuf>,
+    claim_storage: Option<CacheWriterClaimStorage>,
 }
 
 impl ProcessorChildLifetime {
@@ -95,57 +101,43 @@ impl ProcessorChildLifetime {
             job: Some(job),
             process,
             process_instance,
-            claim_path: None,
+            claim_storage: None,
         })
     }
 
     /// Publishes the exact contained Processor instance before the Host sends
     /// a Cache command. A replacement Host can then wait for the instance's
     /// signaled exit before inspecting or deleting the namespace.
-    pub(crate) fn publish_cache_writer_claim(&mut self, paths: &CachePathPlan) -> io::Result<()> {
-        if self.claim_path.is_some() {
+    pub(crate) fn publish_cache_writer_claim(
+        &mut self,
+        app_paths: &AppPaths,
+        paths: &CachePathPlan,
+    ) -> io::Result<()> {
+        if self.claim_storage.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 "the Processor already owns a Cache writer claim",
             ));
         }
-        ensure_cache_root(paths.root())?;
-        let claim_path = cache_writer_claim_path(paths);
-        match fs::symlink_metadata(&claim_path) {
-            Ok(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "a Cache writer claim already exists",
-                ));
-            }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
+        let storage = app_paths
+            .open_cache_writer_claim_storage(paths)
+            .map_err(cache_storage_error)?
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    "the Cache writer claim namespace does not exist",
+                )
+            })?;
         let claim = CacheWriterClaim {
             schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
             process: self.process_instance,
         };
         let encoded = serde_json::to_vec(&claim)
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-        let temporary = paths.root().join(format!(
-            "{CACHE_WRITER_TEMPORARY_PREFIX}{}.tmp",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)?;
-        let prepared = file.write_all(&encoded).and_then(|()| file.sync_all());
-        drop(file);
-        if let Err(error) = prepared {
-            let _ = fs::remove_file(&temporary);
-            return Err(error);
-        }
-        if let Err(error) = publish_new_file(&temporary, &claim_path) {
-            let _ = fs::remove_file(&temporary);
-            return Err(error);
-        }
-        self.claim_path = Some(claim_path);
+        storage
+            .publish_claim(&encoded)
+            .map_err(cache_storage_error)?;
+        self.claim_storage = Some(storage);
         Ok(())
     }
 }
@@ -160,43 +152,42 @@ impl Drop for ProcessorChildLifetime {
         if unsafe { WaitForSingleObject(self.process.as_raw_handle(), 0) } != WAIT_OBJECT_0 {
             return;
         }
-        let Some(claim_path) = self.claim_path.take() else {
+        let Some(claim_storage) = self.claim_storage.take() else {
             return;
         };
         let expected = CacheWriterClaim {
             schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
             process: self.process_instance,
         };
-        if read_cache_writer_claim(&claim_path).is_ok_and(|claim| claim == expected) {
-            let _ = fs::remove_file(claim_path);
+        if let Ok(encoded) = serde_json::to_vec(&expected) {
+            let _ = claim_storage.remove_claim_if_matches(&encoded);
         }
     }
 }
 
 /// Waits for a writer claim left by a dead Host before any authoritative
 /// namespace inspection, recovery, or deletion begins.
-pub(crate) fn await_cache_writer_quiescence(paths: &CachePathPlan) -> io::Result<()> {
-    match ensure_cache_root(paths.root()) {
-        Ok(()) => {}
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error),
-    }
-    let claim_path = cache_writer_claim_path(paths);
-    let claim = match fs::symlink_metadata(&claim_path) {
-        Ok(metadata) => {
-            if metadata.file_type().is_symlink() || !metadata.is_file() {
-                return Err(io::Error::other(
-                    "the Cache writer claim is not a regular file",
-                ));
-            }
-            read_cache_writer_claim(&claim_path)?
-        }
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            remove_abandoned_claim_temporaries(paths)?;
+pub(crate) fn await_cache_writer_quiescence(
+    app_paths: &AppPaths,
+    paths: &CachePathPlan,
+) -> io::Result<()> {
+    let Some(storage) = app_paths
+        .open_cache_writer_claim_storage(paths)
+        .map_err(cache_storage_error)?
+    else {
+        return Ok(());
+    };
+    let encoded = match storage.read_claim().map_err(cache_storage_error)? {
+        Some(encoded) => encoded,
+        None => {
+            storage
+                .discard_claim_temporaries()
+                .map_err(cache_storage_error)?;
             return Ok(());
         }
-        Err(error) => return Err(error),
     };
+    let claim: CacheWriterClaim = serde_json::from_slice(&encoded)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     if claim.schema_version != CACHE_WRITER_CLAIM_SCHEMA_VERSION {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
@@ -211,53 +202,28 @@ pub(crate) fn await_cache_writer_quiescence(paths: &CachePathPlan) -> io::Result
             "the previous Cache writer did not terminate in time",
         ));
     }
-    fs::remove_file(&claim_path)?;
-    remove_abandoned_claim_temporaries(paths)
+    if !storage
+        .remove_claim_if_matches(&encoded)
+        .map_err(cache_storage_error)?
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "the Cache writer claim changed during synchronization",
+        ));
+    }
+    storage
+        .discard_claim_temporaries()
+        .map_err(cache_storage_error)?;
+    Ok(())
 }
 
+#[cfg(test)]
 fn cache_writer_claim_path(paths: &CachePathPlan) -> PathBuf {
     paths.root().join(CACHE_WRITER_CLAIM_FILE)
 }
 
-fn ensure_cache_root(root: &Path) -> io::Result<()> {
-    let metadata = fs::symlink_metadata(root)?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(io::Error::other(
-            "the Cache writer claim root is not a regular directory",
-        ));
-    }
-    Ok(())
-}
-
-fn read_cache_writer_claim(path: &Path) -> io::Result<CacheWriterClaim> {
-    let bytes = fs::read(path)?;
-    if bytes.is_empty() || bytes.len() > 1024 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "the Cache writer claim has an invalid size",
-        ));
-    }
-    serde_json::from_slice(&bytes)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
-}
-
-fn remove_abandoned_claim_temporaries(paths: &CachePathPlan) -> io::Result<()> {
-    for entry in fs::read_dir(paths.root())? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if !name.starts_with(CACHE_WRITER_TEMPORARY_PREFIX) || !name.ends_with(".tmp") {
-            continue;
-        }
-        let metadata = fs::symlink_metadata(entry.path())?;
-        if metadata.file_type().is_symlink() || !metadata.is_file() {
-            return Err(io::Error::other(
-                "a Cache writer claim temporary is not a regular file",
-            ));
-        }
-        fs::remove_file(entry.path())?;
-    }
-    Ok(())
+fn cache_storage_error(error: AppPathsError) -> io::Error {
+    io::Error::other(error)
 }
 
 #[cfg(test)]
@@ -280,8 +246,9 @@ mod tests {
     use myalbuns_paths::{AppPaths, ProcessInstanceId};
 
     use super::{
-        CACHE_WRITER_CLAIM_SCHEMA_VERSION, CacheWriterClaim, ProcessorChildLifetime,
-        await_cache_writer_quiescence, cache_writer_claim_path,
+        CACHE_WRITER_CLAIM_FILE, CACHE_WRITER_CLAIM_SCHEMA_VERSION, CACHE_WRITER_TEMPORARY_PREFIX,
+        CacheWriterClaim, ProcessorChildLifetime, await_cache_writer_quiescence,
+        cache_writer_claim_path,
     };
 
     const HOST_READY_ENV: &str = "MYALBUNS_PROCESSOR_LIFETIME_HOST_READY";
@@ -304,7 +271,7 @@ mod tests {
         }
     }
 
-    fn cache_fixture(root: &std::path::Path) -> myalbuns_paths::CachePathPlan {
+    fn cache_fixture(root: &std::path::Path) -> (AppPaths, myalbuns_paths::CachePathPlan) {
         let roaming = root.join("roaming");
         let local = root.join("local");
         std::fs::create_dir_all(&roaming).expect("the roaming fixture root exists");
@@ -318,12 +285,28 @@ mod tests {
                 .prepare_cache_storage(&paths)
                 .expect("the Cache storage is prepared"),
         );
-        paths
+        (app_paths, paths)
     }
 
     fn child_identity(child: &std::process::Child) -> ProcessInstanceId {
         ProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast::<c_void>())
             .expect("the exact child identity is observable through its causal handle")
+    }
+
+    #[cfg(windows)]
+    fn create_directory_junction(source: &std::path::Path, destination: &std::path::Path) {
+        let output = Command::new("cmd.exe")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(destination)
+            .arg(source)
+            .output()
+            .expect("the Windows junction command starts");
+        assert!(
+            output.status.success(),
+            "the Windows junction is created: stdout={}, stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     #[test]
@@ -367,7 +350,7 @@ mod tests {
     #[test]
     fn recycled_pid_claim_is_removed_only_after_exact_instance_mismatch() {
         let root = tempfile::tempdir().expect("the stale claim fixture exists");
-        let paths = cache_fixture(root.path());
+        let (app_paths, paths) = cache_fixture(root.path());
         let current = ProcessInstanceId::current().expect("the test process has an identity");
         let stale = ProcessInstanceId::from_wire(
             current.process_id(),
@@ -388,7 +371,7 @@ mod tests {
         )
         .expect("the stale claim is writable");
 
-        await_cache_writer_quiescence(&paths)
+        await_cache_writer_quiescence(&app_paths, &paths)
             .expect("a PID reused by another exact instance is already quiescent");
 
         assert!(!claim_path.exists());
@@ -397,15 +380,89 @@ mod tests {
     #[test]
     fn corrupted_cache_writer_claim_fails_closed_and_is_preserved() {
         let root = tempfile::tempdir().expect("the corrupt claim fixture exists");
-        let paths = cache_fixture(root.path());
+        let (app_paths, paths) = cache_fixture(root.path());
         let claim_path = cache_writer_claim_path(&paths);
         std::fs::write(&claim_path, b"{").expect("the corrupt claim is writable");
 
-        let error = await_cache_writer_quiescence(&paths)
+        let error = await_cache_writer_quiescence(&app_paths, &paths)
             .expect_err("an unprovable writer identity must block namespace recovery");
 
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
         assert!(claim_path.is_file());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn writer_wait_rejects_namespace_link_replacement_and_preserves_external_claim_files() {
+        let root = tempfile::tempdir().expect("the guarded claim fixture exists");
+        let (app_paths, paths) = cache_fixture(root.path());
+        let claim_path = cache_writer_claim_path(&paths);
+        let worker_spawned = root.path().join("guarded-worker.spawned");
+        let worker_active = root.path().join("guarded-worker.active");
+        let mut worker = Command::new(env::current_exe().expect("the test executable is known"))
+            .arg("processor_lifetime::tests::processor_lifetime_worker_process")
+            .args(["--ignored", "--exact", "--nocapture"])
+            .env(WORKER_SPAWNED_ENV, &worker_spawned)
+            .env(WORKER_ACTIVE_ENV, &worker_active)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the exact writer fixture starts");
+        wait_for_file(&worker_spawned, &mut worker, "the exact writer");
+        let claim = CacheWriterClaim {
+            schema_version: CACHE_WRITER_CLAIM_SCHEMA_VERSION,
+            process: child_identity(&worker),
+        };
+        let encoded = serde_json::to_vec(&claim).expect("the writer claim serializes");
+        std::fs::write(&claim_path, &encoded).expect("the writer claim is published");
+
+        let external = tempfile::tempdir().expect("the external target exists");
+        let external_claim = external.path().join(CACHE_WRITER_CLAIM_FILE);
+        let external_temporary = external
+            .path()
+            .join(format!("{CACHE_WRITER_TEMPORARY_PREFIX}external.tmp"));
+        std::fs::write(&external_claim, &encoded).expect("the external claim sentinel exists");
+        std::fs::write(&external_temporary, b"external temporary sentinel")
+            .expect("the external temporary sentinel exists");
+
+        let synchronized_paths = paths.clone();
+        let synchronized_app_paths = app_paths.clone();
+        let (started_sender, started_receiver) = std::sync::mpsc::channel();
+        let synchronization = thread::spawn(move || {
+            started_sender
+                .send(())
+                .expect("the waiter start is observed");
+            await_cache_writer_quiescence(&synchronized_app_paths, &synchronized_paths)
+        });
+        started_receiver
+            .recv()
+            .expect("the writer waiter has started");
+        thread::sleep(Duration::from_millis(250));
+
+        let displaced = paths.root().with_file_name("processor-claim-displaced");
+        std::fs::rename(paths.root(), &displaced)
+            .expect("the logical namespace can move during the writer wait");
+        create_directory_junction(external.path(), paths.root());
+
+        worker.kill().expect("the exact writer is released");
+        worker.wait().expect("the exact writer is reaped");
+        let synchronization_error = synchronization
+            .join()
+            .expect("the guarded synchronization does not panic")
+            .expect_err("the guarded writer wait rejects the redirected namespace");
+        std::fs::remove_dir(paths.root()).expect("the injected junction is removed");
+        std::fs::rename(&displaced, paths.root()).expect("the original namespace is restored");
+
+        assert_eq!(synchronization_error.kind(), std::io::ErrorKind::Other);
+        assert_eq!(
+            std::fs::read(&external_claim).expect("the external claim survives"),
+            encoded
+        );
+        assert_eq!(
+            std::fs::read(&external_temporary).expect("the external temporary survives"),
+            b"external temporary sentinel"
+        );
     }
 
     #[test]

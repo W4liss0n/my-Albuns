@@ -2,7 +2,7 @@
   "permission": [
     {
       "identifier": "global-window-commands",
-      "description": "Allows validating, creating, or opening Projetos, selecting provisional Imagens decorativas, and reading local Tela de Boas-vindas state.",
+      "description": "Allows validating, creating, or opening Projetos, selecting provisional Imagens decorativas, reading local Tela de Boas-vindas state, and managing Cache only from the global window.",
       "commands": {
         "allow": [
           "complete_graphics_gate",
@@ -15,7 +15,10 @@
           "validate_project_configuration",
           "choose_provisional_decorative",
           "release_provisional_decorative",
-          "clear_provisional_decoratives"
+          "clear_provisional_decoratives",
+          "cache_service_status",
+          "free_closed_project_cache",
+          "clear_all_cache"
         ],
         "deny": []
       }

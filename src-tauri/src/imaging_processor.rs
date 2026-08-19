@@ -18,7 +18,8 @@ use myalbuns_imaging_protocol::{
     root_binding_plan_sha256 as digest_root_binding_plan,
 };
 use myalbuns_logging::{LOG_DIRECTORY_ENV, ProcessRole};
-use tauri::AppHandle;
+use myalbuns_paths::AppPaths;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::{
     ShellExt,
     process::{CommandChild, CommandEvent},
@@ -460,7 +461,8 @@ async fn invoke_once(
         }
     };
     if let ImagingCommand::BuildCache(request) = command
-        && let Err(error) = processor_lifetime.publish_cache_writer_claim(&request.cache_paths)
+        && let Err(error) = processor_lifetime
+            .publish_cache_writer_claim(&app.state::<AppPaths>(), &request.cache_paths)
     {
         let claim_message =
             format!("Não foi possível publicar a autoridade do Processador sobre o Cache: {error}");

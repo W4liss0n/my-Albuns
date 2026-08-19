@@ -4,11 +4,11 @@ use directories::BaseDirs;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    AppPathsError, CachePathPlan, PreparedCacheStorage,
+    AppPathsError, CachePathPlan, CacheWriterClaimStorage, PreparedCacheStorage,
     cache::{
         CacheNamespaceUsage, clear_project_cache, discard_abandoned_project_cache_temporaries,
         discard_project_cache_temporaries, inspect_cache_namespace, list_cache_namespaces,
-        prepare_cache_storage, snapshot_active_cache_namespace,
+        open_cache_writer_claim_storage, prepare_cache_storage, snapshot_active_cache_namespace,
     },
 };
 
@@ -111,6 +111,13 @@ impl AppPaths {
         plan: &CachePathPlan,
     ) -> Result<PreparedCacheStorage, AppPathsError> {
         prepare_cache_storage(self, plan)
+    }
+
+    pub fn open_cache_writer_claim_storage(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<CacheWriterClaimStorage>, AppPathsError> {
+        open_cache_writer_claim_storage(self, plan)
     }
 
     pub fn clear_project_cache(&self, plan: &CachePathPlan) -> Result<bool, AppPathsError> {

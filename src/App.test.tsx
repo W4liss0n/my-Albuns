@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
@@ -39,16 +39,19 @@ vi.mock("./components/AlbumCanvas", () => ({
       limits: null;
     }) => void;
   }) => {
+    const [demandReported, setDemandReported] = useState(false);
     useEffect(() => {
       onMediaDemandChange?.({
         visibleMediaIds: ["media-001"],
         preloadMediaIds: [],
       });
+      setDemandReported(true);
     }, [onMediaDemandChange]);
     return (
       <>
         <div
           data-testid="album-canvas"
+          data-demand-reported={demandReported}
           data-media-preview={mediaPreviewUrls?.["media-001"] ?? ""}
         />
         <button
@@ -515,6 +518,79 @@ test("shows a non-blocking warning when repeated processor failures suspend Cach
   );
   expect(screen.getByRole("button", { name: "Salvar" })).toBeEnabled();
   expect(screen.getByTestId("album-canvas")).toBeInTheDocument();
+});
+
+test("registers the Cache warning listener before the first preview demand", async () => {
+  let resolveWarningRegistration:
+    | ((dispose: () => void) => void)
+    | undefined;
+  let warnCacheSuspended:
+    | ((warning: { state: "suspended"; message: string }) => void)
+    | undefined;
+  const prepareMediaPreviews = vi.fn(async () => {
+    warnCacheSuspended?.({
+      state: "suspended",
+      message:
+        "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+    });
+    return [];
+  });
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        prepareMediaPreviews,
+        onMediaChanged: async () => () => undefined,
+        onCacheProcessorWarning: (listener) =>
+          new Promise<() => void>((resolve) => {
+            resolveWarningRegistration = (dispose) => {
+              warnCacheSuspended = listener;
+              resolve(dispose);
+            };
+          }),
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load: async () => representativeProjection,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await screen.findByRole("button", { name: "Salvar" });
+  await waitFor(() =>
+    expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+      "data-demand-reported",
+      "true",
+    ),
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(prepareMediaPreviews).not.toHaveBeenCalled();
+
+  act(() => resolveWarningRegistration?.(() => undefined));
+
+  await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(
+    screen.getByRole("status", { name: "Cache suspenso" }),
+  ).toHaveTextContent(
+    "O Cache foi suspenso após falhas repetidas do Processador de Imagens.",
+  );
 });
 
 test("labels first-observation unavailability without claiming a previous preview", async () => {

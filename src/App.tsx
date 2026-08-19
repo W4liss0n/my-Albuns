@@ -40,6 +40,11 @@ interface AppProps {
   logger: Logger;
 }
 
+interface CacheWarningSubscription {
+  projectId: string;
+  port: MediaPreviewPort;
+}
+
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -66,8 +71,15 @@ function App({
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const [cacheProcessorWarning, setCacheProcessorWarning] =
     useState<CacheProcessorWarning | null>(null);
+  const [cacheWarningSubscription, setCacheWarningSubscription] =
+    useState<CacheWarningSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
+  const loggerRef = useRef(logger);
+
+  useEffect(() => {
+    loggerRef.current = logger;
+  }, [logger]);
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -195,13 +207,17 @@ function App({
       .then((dispose) => {
         if (active) {
           unlisten = dispose;
+          setCacheWarningSubscription({
+            projectId,
+            port: mediaPreviewPort,
+          });
         } else {
           dispose();
         }
       })
       .catch((error: unknown) => {
         if (!active) return;
-        logger.write({
+        loggerRef.current.write({
           level: "warn",
           component: "media-preview",
           event: "cache_processor_warning_subscription_failed",
@@ -213,14 +229,18 @@ function App({
       active = false;
       unlisten?.();
     };
-  }, [logger, mediaPreviewPort, projectId]);
+  }, [mediaPreviewPort, projectId]);
 
   useEffect(() => {
     setMediaPreviews({});
   }, [projectId]);
 
+  const cacheWarningListenerReady =
+    cacheWarningSubscription?.projectId === projectId &&
+    cacheWarningSubscription.port === mediaPreviewPort;
+
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !cacheWarningListenerReady) return;
     if (mediaDemandSequence.current.projectId !== projectId) {
       mediaDemandSequence.current = { projectId, revision: 0 };
     }
@@ -279,6 +299,7 @@ function App({
       active = false;
     };
   }, [
+    cacheWarningListenerReady,
     editorGraphics.supported,
     logger,
     mediaDemand,

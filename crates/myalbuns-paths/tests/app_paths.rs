@@ -578,6 +578,41 @@ fn prepares_the_cache_only_as_directories_below_the_authorized_root() {
 }
 
 #[test]
+fn guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_handle() {
+    let root = tempfile::tempdir().expect("temporary LocalAppData root");
+    let paths = AppPaths::from_roots(root.path(), root.path());
+    let cache = paths
+        .project_cache("project-claim")
+        .expect("the Cache plan is valid");
+    drop(
+        paths
+            .prepare_cache_storage(&cache)
+            .expect("the Cache directory chain is created"),
+    );
+    let storage = paths
+        .open_cache_writer_claim_storage(&cache)
+        .expect("the physical Cache chain is valid")
+        .expect("the Cache namespace exists");
+    let expected = br#"{"schemaVersion":1,"process":{"processId":42,"creationTime":99}}"#;
+
+    storage
+        .publish_claim(expected)
+        .expect("the create-only claim is renamed relative to the guarded directory handle");
+    assert_eq!(
+        storage.read_claim().unwrap().as_deref(),
+        Some(expected.as_slice())
+    );
+    assert!(storage.publish_claim(b"other").is_err());
+    assert!(!storage.remove_claim_if_matches(b"other").unwrap());
+    assert_eq!(
+        storage.read_claim().unwrap().as_deref(),
+        Some(expected.as_slice())
+    );
+    assert!(storage.remove_claim_if_matches(expected).unwrap());
+    assert_eq!(storage.read_claim().unwrap(), None);
+}
+
+#[test]
 fn inspects_only_direct_cache_namespaces_and_measures_their_files() {
     let root = tempfile::tempdir().expect("temporary LocalAppData root");
     let paths = AppPaths::from_roots(root.path(), root.path());

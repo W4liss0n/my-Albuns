@@ -77,12 +77,25 @@ somente suas gerações referenciadas e coleta finais órfãos; se estiver ausen
 incompatível ou corrompido, coleta todas as gerações finais e reconstrói o índice
 em trabalho novo. Claim incompatível, falha de consulta, timeout ou erro de
 inspeção fecham a abertura do namespace, em vez de aceitar estado parcial.
+Toda leitura, publicação e remoção da claim passa por
+`CacheWriterClaimStorage`, da biblioteca central `myalbuns-paths`. Essa guarda
+mantém aberta a cadeia física validada de diretórios durante a espera da
+instância exata e revalida cada arquivo aberto contra ela. Publicação create-only
+usa `NtSetInformationFile`, a entrada indicada pela documentação Win32 para
+user mode, com o diretório físico como raiz relativa; remoção condicional usa
+`SetFileInformationByHandle` no mesmo handle aberto com `DELETE`. Se o pathname do
+namespace for trocado por junction durante a espera, a operação rejeita o novo
+alvo e preserva suas claims e temporários externos.
 
 Uma falha abrupta do Processador permite exatamente um restart para o trabalho
 ainda atual. Uma segunda falha suspende novos trabalhos de Cache e emite o
 evento tipado `myalbuns://cache-processor-warning`. A Tela de Projeto mostra o
 aviso como status não modal; edição, Salvamento e a representação já disponível
-continuam funcionando. Cada sidecar é contido, antes do dispatch, em um Job
+continuam funcionando. A primeira demanda de prévia só é enviada depois que a
+Promise de registro desse listener resolve; assim a própria falha que causa a
+suspensão não pode preceder a observação do aviso. Falha ao registrar suspende
+somente novos pedidos de Cache e não bloqueia edição ou Salvamento. Cada sidecar
+é contido, antes do dispatch, em um Job
 Object privado com `KILL_ON_JOB_CLOSE`; ele não sobrevive à queda do Host que
 possui a reserva do namespace. O estado externo é deliberadamente estreito:
 somente `suspended` atravessa IPC, sem expor o supervisor ou criar um
@@ -127,7 +140,9 @@ Esse recorte não cria store, registry ou coordenador universal. Ele também nã
 reimplementa promoção, movimento, alias ou `Salvar cópia como…`, pertencentes à
 issue 10, nem `Salvar como…` e a nova Identidade da issue 18. A issue 16 consome
 somente as três operações estreitas de serviço; as referências e transições de
-Mídia permanecem no contrato da issue 11.
+Mídia permanecem no contrato da issue 11. Os três comandos são permitidos
+explicitamente apenas pela capability da janela Global; a capability do
+Projeto permanece disjunta e não herda administração de Cache.
 
 ## Matriz do design 0010
 

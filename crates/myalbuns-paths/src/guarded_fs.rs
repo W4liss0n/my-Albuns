@@ -131,6 +131,201 @@ pub(crate) fn validate_open_file(
     Ok(())
 }
 
+#[cfg(windows)]
+pub(crate) fn create_new_deletable_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+) -> Result<File, GuardedFsError> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::{
+        Foundation::GENERIC_WRITE,
+        Storage::FileSystem::{DELETE, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+    };
+
+    validate_child_location(parent, path)?;
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .access_mode(GENERIC_WRITE | DELETE)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .open(path)
+        .map_err(|_| GuardedFsError::Unavailable)?;
+    if let Err(error) = validate_open_file(parent, path, &file) {
+        let _ = mark_open_file_for_deletion(&file);
+        drop(file);
+        return Err(error);
+    }
+    Ok(file)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn create_new_deletable_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+) -> Result<File, GuardedFsError> {
+    validate_child_location(parent, path)?;
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|_| GuardedFsError::Unavailable)?;
+    validate_open_file(parent, path, &file)?;
+    Ok(file)
+}
+
+#[cfg(windows)]
+pub(crate) fn open_deletable_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+) -> Result<File, GuardedFsError> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::{
+        Foundation::GENERIC_READ,
+        Storage::FileSystem::{DELETE, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE},
+    };
+
+    validate_child_location(parent, path)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .access_mode(GENERIC_READ | DELETE)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .open(path)
+        .map_err(|_| GuardedFsError::Unavailable)?;
+    validate_open_file(parent, path, &file)?;
+    Ok(file)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn open_deletable_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+) -> Result<File, GuardedFsError> {
+    validate_child_location(parent, path)?;
+    let file = File::open(path).map_err(|_| GuardedFsError::Unavailable)?;
+    validate_open_file(parent, path, &file)?;
+    Ok(file)
+}
+
+#[cfg(windows)]
+pub(crate) fn delete_open_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+    file: &File,
+) -> Result<(), GuardedFsError> {
+    validate_open_file(parent, path, file)?;
+    mark_open_file_for_deletion(file)
+}
+
+#[cfg(windows)]
+fn mark_open_file_for_deletion(file: &File) -> Result<(), GuardedFsError> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_DISPOSITION_INFO, FileDispositionInfo, SetFileInformationByHandle,
+    };
+
+    let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+    // SAFETY: file is a live handle opened with DELETE access and disposition
+    // points to the documented buffer for FileDispositionInfo.
+    if unsafe {
+        SetFileInformationByHandle(
+            file.as_raw_handle().cast(),
+            FileDispositionInfo,
+            std::ptr::from_ref(&disposition).cast(),
+            std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+        )
+    } == 0
+    {
+        return Err(GuardedFsError::Unavailable);
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub(crate) fn delete_open_file(
+    parent: &DirectoryGuard,
+    path: &Path,
+    file: &File,
+) -> Result<(), GuardedFsError> {
+    validate_open_file(parent, path, file)?;
+    fs::remove_file(path).map_err(|_| GuardedFsError::Unavailable)
+}
+
+#[cfg(windows)]
+pub(crate) fn rename_open_file(
+    parent: &DirectoryGuard,
+    source_path: &Path,
+    file: &File,
+    target_name: &std::ffi::OsStr,
+) -> Result<(), GuardedFsError> {
+    use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+    use windows_sys::{
+        Wdk::Storage::FileSystem::{
+            FILE_RENAME_INFORMATION, FileRenameInformation, NtSetInformationFile,
+        },
+        Win32::System::IO::IO_STATUS_BLOCK,
+    };
+
+    validate_open_file(parent, source_path, file)?;
+    if Path::new(target_name).components().count() != 1 {
+        return Err(GuardedFsError::OutsideRoot);
+    }
+    let target: Vec<u16> = target_name.encode_wide().collect();
+    let target_bytes = target
+        .len()
+        .checked_mul(std::mem::size_of::<u16>())
+        .and_then(|length| u32::try_from(length).ok())
+        .ok_or(GuardedFsError::Unavailable)?;
+    let buffer_bytes = std::mem::size_of::<FILE_RENAME_INFORMATION>()
+        .checked_add(target_bytes as usize)
+        .ok_or(GuardedFsError::Unavailable)?;
+    let mut buffer = vec![0_u64; buffer_bytes.div_ceil(std::mem::size_of::<u64>())];
+    let rename = buffer.as_mut_ptr().cast::<FILE_RENAME_INFORMATION>();
+    // SAFETY: buffer is aligned and sized for the fixed header plus every
+    // encoded target-name byte. RootDirectory remains live for the call.
+    unsafe {
+        (*rename).Anonymous.ReplaceIfExists = false;
+        (*rename).RootDirectory = parent.containment_handle.as_raw_handle().cast();
+        (*rename).FileNameLength = target_bytes;
+        std::ptr::copy_nonoverlapping(
+            target.as_ptr(),
+            std::ptr::addr_of_mut!((*rename).FileName).cast::<u16>(),
+            target.len(),
+        );
+    }
+    let mut io_status = IO_STATUS_BLOCK::default();
+    // SAFETY: rename addresses the initialized buffer described above, the
+    // source handle was opened with DELETE access, and io_status is writable
+    // for the documented user-mode NtSetInformationFile call.
+    let status = unsafe {
+        NtSetInformationFile(
+            file.as_raw_handle().cast(),
+            &mut io_status,
+            rename.cast(),
+            u32::try_from(buffer_bytes).map_err(|_| GuardedFsError::Unavailable)?,
+            FileRenameInformation,
+        )
+    };
+    if status < 0 {
+        return Err(GuardedFsError::Unavailable);
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub(crate) fn rename_open_file(
+    parent: &DirectoryGuard,
+    source_path: &Path,
+    file: &File,
+    target_name: &std::ffi::OsStr,
+) -> Result<(), GuardedFsError> {
+    validate_open_file(parent, source_path, file)?;
+    if Path::new(target_name).components().count() != 1 {
+        return Err(GuardedFsError::OutsideRoot);
+    }
+    fs::rename(source_path, parent.logical_path.join(target_name))
+        .map_err(|_| GuardedFsError::Unavailable)
+}
+
 fn same_component(left: &std::ffi::OsStr, right: &std::ffi::OsStr) -> bool {
     match (left.to_str(), right.to_str()) {
         (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),

@@ -225,6 +225,33 @@ mod tests {
     }
 
     #[test]
+    fn global_cache_service_commands_are_explicitly_allowed_only_to_global_window() {
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+        let project_commands = allowed_commands(&project_permission);
+        let global_commands = allowed_commands(&global_permission);
+
+        for command in [
+            "cache_service_status",
+            "free_closed_project_cache",
+            "clear_all_cache",
+        ] {
+            assert!(
+                global_commands.contains(command),
+                "the Global capability must explicitly allow {command}"
+            );
+            assert!(
+                !project_commands.contains(command),
+                "the Project capability must not inherit {command}"
+            );
+        }
+    }
+
+    #[test]
     fn windows_bundle_uses_current_user_nsis_and_evergreen_webview2() {
         let config = config();
         let bundle = &config["bundle"];

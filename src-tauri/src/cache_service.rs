@@ -76,7 +76,7 @@ impl CacheService {
         let reservation = namespace_mutex(&self.app_paths, namespace.paths())
             .try_acquire()
             .map_err(map_reservation_error)?;
-        synchronize_cache_writer(namespace.paths())?;
+        synchronize_cache_writer(&self.app_paths, namespace.paths())?;
         let recovery = CacheEngine::recover_reserved_namespace(&self.app_paths, &namespace)
             .map_err(|error| CacheServiceError::Storage(error.message))?;
         if recovery.removed_temporary_count > 0
@@ -106,7 +106,7 @@ impl CacheService {
         for paths in namespaces {
             match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(_reservation) => {
-                    synchronize_cache_writer(&paths)?;
+                    synchronize_cache_writer(&self.app_paths, &paths)?;
                     let Some(usage) = self.inspect_namespace(&paths)? else {
                         continue;
                     };
@@ -122,7 +122,7 @@ impl CacheService {
                     let active_snapshot = self.snapshot_active_namespace(&paths)?;
                     match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                         Ok(_reservation) => {
-                            synchronize_cache_writer(&paths)?;
+                            synchronize_cache_writer(&self.app_paths, &paths)?;
                             let Some(usage) = self.inspect_namespace(&paths)? else {
                                 continue;
                             };
@@ -163,7 +163,7 @@ impl CacheService {
         for paths in namespaces {
             match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(reservation) => {
-                    synchronize_cache_writer(&paths)?;
+                    synchronize_cache_writer(&self.app_paths, &paths)?;
                     if let Some(usage) = self.inspect_namespace(&paths)? {
                         reserved.push((usage, reservation));
                     }
@@ -243,7 +243,7 @@ impl CacheService {
         for paths in namespaces {
             match namespace_mutex(&self.app_paths, &paths).try_acquire() {
                 Ok(reservation) => {
-                    synchronize_cache_writer(&paths)?;
+                    synchronize_cache_writer(&self.app_paths, &paths)?;
                     if let Some(usage) = self.inspect_namespace(&paths)? {
                         reserved.push((usage, reservation));
                     }
@@ -407,8 +407,11 @@ fn namespace_mutex(app_paths: &AppPaths, paths: &CachePathPlan) -> NamedMutex {
     )
 }
 
-fn synchronize_cache_writer(paths: &CachePathPlan) -> Result<(), CacheServiceError> {
-    await_cache_writer_quiescence(paths)
+fn synchronize_cache_writer(
+    app_paths: &AppPaths,
+    paths: &CachePathPlan,
+) -> Result<(), CacheServiceError> {
+    await_cache_writer_quiescence(app_paths, paths)
         .map_err(|error| CacheServiceError::Reservation(error.to_string()))
 }
 
@@ -1350,7 +1353,7 @@ mod tests {
         let mut lifetime = ProcessorChildLifetime::attach(worker_identity)
             .expect("the Host contains the Processor before dispatch");
         lifetime
-            .publish_cache_writer_claim(owner.namespace().paths())
+            .publish_cache_writer_claim(&service.app_paths, owner.namespace().paths())
             .expect("the Host publishes the contained Processor claim before dispatch");
         worker
             .stdin

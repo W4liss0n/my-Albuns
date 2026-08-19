@@ -1722,12 +1722,15 @@ try {
                 (New-RustProof -Name 'repeated_processor_crashes_suspend_new_cache_work_after_one_restart')
                 (New-RustProof -Name 'repeated_processor_failure_suspends_before_fallible_recovery_cleanup')
                 (New-FrontendProof -Name 'shows a non-blocking warning when repeated processor failures suspend Cache')
+                (New-FrontendProof -Name 'registers the Cache warning listener before the first preview demand')
             )
         New-VerifiedCriterion `
             -Name 'tracer-44-host-death-and-real-recovery' `
             -Requirements @(
                 (New-RustProof -Name 'terminating_the_host_closes_its_job_and_terminates_the_active_processor')
                 (New-RustProof -Name 'attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process')
+                (New-RustProof -Name 'guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_handle')
+                (New-RustProof -Name 'writer_wait_rejects_namespace_link_replacement_and_preserves_external_claim_files')
                 (New-RustProof -Name 'fragmented_handshake_preserves_the_exact_process_instance')
                 (New-RustProof -Name 'processor_handshake_reports_the_exact_instance_seen_through_the_spawned_child_handle')
                 (New-RustProof -Name 'reopening_after_host_death_recovers_the_contained_processors_temporary')
@@ -1775,6 +1778,7 @@ try {
                 (New-ExactProof -Source 'cache-service-source' -Text $narrowApiProofText -Name 'no-bulk-cache-namespace-inspection')
                 (New-FrontendProof -Name 'maps the Project and media ports to the desktop commands')
                 (New-FrontendProof -Name 'initializes the native dialog used by the productive relink command')
+                (New-RustProof -Name 'global_cache_service_commands_are_explicitly_allowed_only_to_global_window')
             )
         New-VerifiedCriterion `
             -Name 'complete-design-0010-producer-consumer-matrix' `

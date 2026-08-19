@@ -1,7 +1,7 @@
 use std::{
     collections::HashSet,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -11,10 +11,15 @@ use crate::{
     AppPaths, AppPathsError,
     app_paths::{media_cache_key, valid_cache_component, valid_namespace_component},
     guarded_fs::{
-        DirectoryGuard, GuardedFsError, ensure_direct_child, is_reparse_point, open_directory,
-        open_existing_direct_child, remove_empty_directory, validate_open_file,
+        DirectoryGuard, GuardedFsError, create_new_deletable_file, delete_open_file,
+        ensure_direct_child, is_reparse_point, open_deletable_file, open_directory,
+        open_existing_direct_child, remove_empty_directory, rename_open_file, validate_open_file,
     },
 };
+
+const CACHE_WRITER_CLAIM_FILE: &str = ".processor-writer.v1.json";
+const CACHE_WRITER_TEMPORARY_PREFIX: &str = ".processor-writer-";
+const CACHE_WRITER_CLAIM_MAX_BYTES: usize = 1024;
 
 impl From<GuardedFsError> for AppPathsError {
     fn from(error: GuardedFsError) -> Self {
@@ -64,11 +69,23 @@ impl CacheNamespaceUsage {
 
 /// Keeps the validated Cache directory chain open while artifacts are written.
 ///
-/// On Windows the handles deny directory replacement, so a reparse point
-/// cannot redirect a job after containment has been verified.
+/// Open handles bind the verified physical chain, and each artifact opened by
+/// pathname is checked against it before publication. A later reparse-point
+/// replacement therefore cannot redirect the job outside that chain.
 #[derive(Debug)]
 pub struct PreparedCacheStorage {
     directories: Vec<DirectoryGuard>,
+}
+
+/// Keeps the validated Project Cache directory chain open while a Host
+/// publishes, waits for, or removes the exact Processor writer claim.
+///
+/// The open directory handles bind every claim operation to the validated
+/// physical namespace. A later pathname replacement therefore cannot redirect
+/// publication or deletion through a junction.
+#[derive(Debug)]
+pub struct CacheWriterClaimStorage {
+    project_cache: ExistingProjectCache,
 }
 
 /// A Cache file that is still being written.
@@ -106,6 +123,140 @@ impl ExistingProjectCache {
             .last()
             .expect("an existing project Cache always contains its project directory")
     }
+}
+
+impl CacheWriterClaimStorage {
+    fn project(&self) -> &DirectoryGuard {
+        self.project_cache.project()
+    }
+
+    fn claim_path(&self) -> PathBuf {
+        self.project().logical_path.join(CACHE_WRITER_CLAIM_FILE)
+    }
+
+    /// Atomically publishes one opaque, bounded claim inside the guarded
+    /// namespace. Existing claims are never replaced.
+    pub fn publish_claim(&self, bytes: &[u8]) -> Result<(), AppPathsError> {
+        validate_writer_claim_bytes(bytes)?;
+        let temporary = self.project().logical_path.join(format!(
+            "{CACHE_WRITER_TEMPORARY_PREFIX}{}.tmp",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let mut file = create_new_deletable_file(self.project(), &temporary)?;
+        let prepared = file
+            .write_all(bytes)
+            .and_then(|()| file.sync_all())
+            .map_err(|_| AppPathsError::CacheStorageUnavailable);
+        if let Err(error) = prepared {
+            let _ = delete_open_file(self.project(), &temporary, &file);
+            drop(file);
+            return Err(error);
+        }
+        if let Err(error) = rename_open_file(
+            self.project(),
+            &temporary,
+            &file,
+            std::ffi::OsStr::new(CACHE_WRITER_CLAIM_FILE),
+        ) {
+            let _ = delete_open_file(self.project(), &temporary, &file);
+            drop(file);
+            return Err(error.into());
+        }
+        drop(file);
+        Ok(())
+    }
+
+    /// Reads the claim through an open file whose physical parent is the
+    /// guarded Project namespace.
+    pub fn read_claim(&self) -> Result<Option<Vec<u8>>, AppPathsError> {
+        let path = self.claim_path();
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
+        if is_reparse_point(&metadata) || !metadata.is_file() {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let mut file = File::open(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+        validate_open_file(self.project(), &path, &file)?;
+        read_writer_claim_file(&mut file).map(Some)
+    }
+
+    /// Removes the claim only when the bytes observed through the guarded
+    /// namespace still match the expected exact Process instance.
+    pub fn remove_claim_if_matches(&self, expected: &[u8]) -> Result<bool, AppPathsError> {
+        validate_writer_claim_bytes(expected)?;
+        let path = self.claim_path();
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(_) => return Err(AppPathsError::CacheStorageUnavailable),
+        };
+        if is_reparse_point(&metadata) || !metadata.is_file() {
+            return Err(AppPathsError::CacheStorageOutsideRoot);
+        }
+        let mut file = open_deletable_file(self.project(), &path)?;
+        let observed = read_writer_claim_file(&mut file)?;
+        if observed != expected {
+            return Ok(false);
+        }
+        delete_open_file(self.project(), &path, &file)?;
+        drop(file);
+        Ok(true)
+    }
+
+    /// Discards only well-formed writer-claim temporaries after the exact
+    /// previous writer has been proven quiescent.
+    pub fn discard_claim_temporaries(&self) -> Result<usize, AppPathsError> {
+        let mut removed = 0_usize;
+        for entry in fs::read_dir(&self.project().logical_path)
+            .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+        {
+            let entry = entry.map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                continue;
+            };
+            if !name.starts_with(CACHE_WRITER_TEMPORARY_PREFIX) || !name.ends_with(".tmp") {
+                continue;
+            }
+            let path = entry.path();
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+            if is_reparse_point(&metadata) || !metadata.is_file() {
+                return Err(AppPathsError::CacheStorageOutsideRoot);
+            }
+            let file = open_deletable_file(self.project(), &path)?;
+            delete_open_file(self.project(), &path, &file)?;
+            drop(file);
+            removed += 1;
+        }
+        Ok(removed)
+    }
+}
+
+fn validate_writer_claim_bytes(bytes: &[u8]) -> Result<(), AppPathsError> {
+    if bytes.is_empty() || bytes.len() > CACHE_WRITER_CLAIM_MAX_BYTES {
+        return Err(AppPathsError::CacheStorageUnavailable);
+    }
+    Ok(())
+}
+
+fn read_writer_claim_file(file: &mut File) -> Result<Vec<u8>, AppPathsError> {
+    let size = file
+        .metadata()
+        .map_err(|_| AppPathsError::CacheStorageUnavailable)?
+        .len();
+    let mut bytes = Vec::with_capacity(
+        usize::try_from(size)
+            .unwrap_or(CACHE_WRITER_CLAIM_MAX_BYTES.saturating_add(1))
+            .min(CACHE_WRITER_CLAIM_MAX_BYTES.saturating_add(1)),
+    );
+    file.take((CACHE_WRITER_CLAIM_MAX_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|_| AppPathsError::CacheStorageUnavailable)?;
+    validate_writer_claim_bytes(&bytes)?;
+    Ok(bytes)
 }
 
 impl CachePathPlan {
@@ -458,6 +609,15 @@ pub(crate) fn prepare_cache_storage(
         return Err(AppPathsError::CacheStorageOutsideRoot);
     }
     plan.prepare_storage()
+}
+
+pub(crate) fn open_cache_writer_claim_storage(
+    app_paths: &AppPaths,
+    plan: &CachePathPlan,
+) -> Result<Option<CacheWriterClaimStorage>, AppPathsError> {
+    open_existing_project_cache(app_paths, plan).map(|project_cache| {
+        project_cache.map(|project_cache| CacheWriterClaimStorage { project_cache })
+    })
 }
 
 pub(crate) fn list_cache_namespaces(
