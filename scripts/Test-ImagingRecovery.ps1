@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Gate-SourceProvenance.ps1')
 . (Join-Path $PSScriptRoot 'Gate-ScratchDirectory.ps1')
 Initialize-MyAlbunsToolchain
+$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path `
@@ -239,8 +240,8 @@ try {
     }
     $tauriBuildStopwatch.Stop()
     $applicationPath = Join-Path `
-        $script:WorkspaceRoot `
-        'target\debug\myalbuns-desktop.exe'
+        $cargoTargetDirectory `
+        'debug\myalbuns-desktop.exe'
     if (-not (Test-Path -LiteralPath $applicationPath -PathType Leaf)) {
         throw 'The actual debug Tauri application executable was not produced.'
     }

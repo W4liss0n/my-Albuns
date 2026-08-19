@@ -88,7 +88,9 @@ $mappedDrive = "$DriveLetter`:"
 $preflightPath = Join-Path $UncRoot 'preflight.tmp'
 $evidencePath = Join-Path $runRoot 'path-evidence.json'
 $sidecarEvidencePath = Join-Path $runRoot 'sidecar-evidence.json'
-$targetDirectory = Join-Path $script:WorkspaceRoot 'target\windows-path-gate'
+$targetDirectory = Join-Path `
+    (Resolve-MyAlbunsCargoTargetDirectory) `
+    'windows-path-gate'
 $builtProcessorPath = Join-Path $targetDirectory 'debug\myalbuns-imaging.exe'
 $processorPath = Join-Path $runRoot 'bin\myalbuns-imaging.exe'
 $protocolSourcePath = Join-Path `

@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Local-Toolchain.ps1')
 Initialize-MyAlbunsToolchain
+$cargoTargetDirectory = Resolve-MyAlbunsCargoTargetDirectory
 
 Push-Location $script:WorkspaceRoot
 $previousTestProcessor = $env:MYALBUNS_TEST_IMAGING_PROCESSOR
@@ -36,8 +37,8 @@ try {
     }
 
     $env:MYALBUNS_TEST_IMAGING_PROCESSOR = Join-Path `
-        $script:WorkspaceRoot `
-        'target\debug\myalbuns-imaging.exe'
+        $cargoTargetDirectory `
+        'debug\myalbuns-imaging.exe'
     & $script:CargoExecutable test `
         -p myalbuns-desktop `
         'project_host::tests::reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor' `

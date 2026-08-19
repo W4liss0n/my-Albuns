@@ -45,6 +45,7 @@ $distPath = Join-Path $workspaceRoot 'dist'
 $preparedSidecarPath = Join-Path `
     $workspaceRoot `
     'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
+$sharedCargoTarget = Join-Path $workspaceRoot 'target'
 $windowsPathTarget = Join-Path $workspaceRoot 'target\windows-path-gate'
 function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
     $existing = @(
@@ -54,11 +55,13 @@ function Assert-Issue45OwnedOutputsAbsent([string[]] $Paths) {
         throw "The issue 45 gate requires its output paths to be absent before the run: $($existing -join ', ')."
     }
 }
-Assert-Issue45OwnedOutputsAbsent -Paths @(
+$ownedOutputPreflightPaths = @(
     $preparedSidecarPath
     $windowsPathTarget
     $distPath
+    $sharedCargoTarget
 )
+Assert-Issue45OwnedOutputsAbsent -Paths $ownedOutputPreflightPaths
 $runnerMutex = [System.Threading.Mutex]::new(
     $false,
     'Local\MyAlbuns.Issue45MediaCacheGate.v1'
@@ -337,6 +340,17 @@ if (-not [string]::Equals(
     throw 'The issue 45 gate scratch directory escaped its approved root.'
 }
 New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
+$gateTarget = [System.IO.Path]::GetFullPath(
+    (Join-Path $runRoot 'cargo-target')
+)
+if (-not [string]::Equals(
+        [System.IO.Path]::GetDirectoryName($gateTarget),
+        $runRoot,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The issue 45 Cargo target escaped its approved run scratch.'
+}
+$env:CARGO_TARGET_DIR = $gateTarget
 
 $preexistingProcesses = @(Get-WorkspaceProcesses)
 if ($preexistingProcesses.Count -ne 0) {
@@ -1234,10 +1248,16 @@ while ($true) { Start-Sleep -Seconds 1 }
 
 try {
     $outputPreflightAssertionCount = Test-OwnedOutputPreflightContracts
+    $preflightCoversSharedCargoTarget =
+        $ownedOutputPreflightPaths -contains $sharedCargoTarget
     $checks.Add([ordered]@{
         name = 'fail-closed-preexisting-output-preflight'
-        passed = ($outputPreflightAssertionCount -eq 4)
-        assertionCount = $outputPreflightAssertionCount
+        passed = ($outputPreflightAssertionCount -eq 4 -and
+            $ownedOutputPreflightPaths.Count -eq 4 -and
+            $preflightCoversSharedCargoTarget)
+        assertionCount = $outputPreflightAssertionCount + 2
+        requiredOutputPathCount = $ownedOutputPreflightPaths.Count
+        sharedCargoTargetRequiredAbsent = $preflightCoversSharedCargoTarget
     })
 
     $proofParserAssertionCount = Test-ProofParserContracts
@@ -1285,8 +1305,6 @@ try {
         independentSentinelSurvived = $cleanupProbe.independentSentinelSurvived
     })
 
-    $bootstrapTarget = Join-Path $runRoot 'bootstrap-target'
-    $env:CARGO_TARGET_DIR = $bootstrapTarget
     $sidecarPreparationRun = Invoke-RecordedCommand `
         -Name 'debug-sidecar-preparation' `
         -FilePath $windowsPowerShell `
@@ -1299,7 +1317,6 @@ try {
             '-Profile',
             'debug'
         )
-    $env:CARGO_TARGET_DIR = $previousTargetDirectory
     if (-not (Test-Path -LiteralPath $preparedSidecarPath -PathType Leaf)) {
         throw 'The clean evidence run did not prepare the required debug sidecar.'
     }
@@ -1518,7 +1535,7 @@ try {
             '-Action',
             'build'
         )
-    $env:CARGO_TARGET_DIR = $previousTargetDirectory
+    $env:CARGO_TARGET_DIR = $gateTarget
 
     $installerCandidates = @(
         Get-ChildItem `
@@ -1600,6 +1617,23 @@ try {
     })
 
     Clear-Issue45GateOutputs
+
+    $sharedCargoTargetUntouched = -not (Test-Path -LiteralPath $sharedCargoTarget)
+    $isolatedCargoTargetRemoved = -not (Test-Path -LiteralPath $gateTarget)
+    $runScratchRemoved = -not (Test-Path -LiteralPath $runRoot)
+    if (-not $sharedCargoTargetUntouched `
+            -or -not $isolatedCargoTargetRemoved `
+            -or -not $runScratchRemoved) {
+        throw 'The issue 45 gate touched the shared Cargo target or retained its isolated target.'
+    }
+    $checks.Add([ordered]@{
+        name = 'isolated-cargo-target-cleanup'
+        passed = $true
+        assertionCount = 3
+        sharedCargoTargetUntouched = $sharedCargoTargetUntouched
+        isolatedCargoTargetRemoved = $isolatedCargoTargetRemoved
+        runScratchRemoved = $runScratchRemoved
+    })
 
     $imagingProofText = @($imagingEvidence.checks | ForEach-Object { $_.name }) -join "`n"
     $windowsProofText = @($windowsEvidence.checks | ForEach-Object { $_.name }) -join "`n"
@@ -1695,6 +1729,7 @@ try {
         'windows-local-unc-mapped-long-paths'
         'release-build-and-nsis-package'
         'owned-process-lock-listener-cleanup'
+        'isolated-cargo-target-cleanup'
         'complete-fail-closed-design-0010-matrix'
     )
     $topLevelChecks = @(
@@ -1933,7 +1968,9 @@ try {
         }
         releaseArtifacts = $releaseArtifacts
         cleanup = [ordered]@{
-            runScratchRemoved = $true
+            runScratchRemoved = $runScratchRemoved
+            isolatedCargoTargetRemoved = $isolatedCargoTargetRemoved
+            sharedCargoTargetUntouched = $sharedCargoTargetUntouched
             preparedSidecarRemoved = -not (Test-Path -LiteralPath $preparedSidecarPath)
             windowsPathTargetRemoved = -not (Test-Path -LiteralPath $windowsPathTarget)
             distRemoved = -not (Test-Path -LiteralPath $distPath)

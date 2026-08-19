@@ -39,3 +39,21 @@ function Initialize-MyAlbunsToolchain {
     $env:PATH = "$cargoBin;$env:PATH"
     $env:MYALBUNS_LOCAL_TOOLCHAIN_INITIALIZED = '1'
 }
+
+function Resolve-MyAlbunsCargoTargetDirectory {
+    if ([string]::IsNullOrWhiteSpace($env:CARGO_TARGET_DIR)) {
+        return [System.IO.Path]::GetFullPath(
+            (Join-Path $script:WorkspaceRoot 'target')
+        )
+    }
+    if ([System.IO.Path]::IsPathRooted($env:CARGO_TARGET_DIR)) {
+        return [System.IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
+    }
+
+    # Every repository script invokes Cargo with the workspace as its current
+    # directory. Cargo resolves a relative CARGO_TARGET_DIR against that
+    # current directory, so consumers of built executables must do the same.
+    return [System.IO.Path]::GetFullPath(
+        (Join-Path $script:WorkspaceRoot $env:CARGO_TARGET_DIR)
+    )
+}

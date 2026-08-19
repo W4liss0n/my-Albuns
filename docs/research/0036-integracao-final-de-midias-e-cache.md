@@ -190,24 +190,32 @@ com bundle NSIS. Contagens vazias fecham o gate.
 
 Os relatórios transitivos são produzidos novamente dentro do scratch da rodada;
 nenhum artefato anterior é aceito. Antes do primeiro contrato Tauri, o runner
-compila e prepara no próprio scratch o sidecar debug exigido pelo build script;
-o release usa outro `CARGO_TARGET_DIR` exclusivo sob esse scratch. Cada critério
-é derivado de provas nomeadas e não vazias nos resultados comportamentais da
-própria rodada. O runner inicia ainda um processo controlado com listener TCP
+fixa um `CARGO_TARGET_DIR` absoluto e exclusivo sob o `runRoot`; contratos,
+testes Rust, quality, recovery, Tauri debug e paths Windows herdam esse mesmo
+target isolado. O sidecar debug exigido pelo build script é preparado ali, e o
+release usa outro target exclusivo sob o mesmo scratch. Consumidores de
+executáveis resolvem `CARGO_TARGET_DIR` pela mesma regra do Cargo, inclusive
+quando relativo. Cada critério é derivado de provas nomeadas e não vazias nos
+resultados comportamentais da própria rodada. O runner inicia ainda um processo
+controlado com listener TCP
 dentro de um Job Object privado, observa a árvore causal e encerra o Job pelo
 mesmo caminho usado no `finally`, exigindo contagens finais zero. Um
 processo-sentinela concorrente, criado depois do snapshot mas fora desse Job,
 precisa permanecer vivo; portanto proximidade temporal, pathname e PID parental
 nunca autorizam encerramento. Cada identidade observada combina PID e instante
 de criação e nenhuma identidade do snapshot pré-gate pode entrar num Job
-próprio. `dist`, sidecar preparado e o target fixo de caminhos precisam estar
-ausentes no preflight: o runner falha antes de escrever, em vez de sobrescrever
-um output ignorado preexistente. Ele calcula hashes dos artefatos, mede
-listeners reais, exige locks exclusivos, drena somente Jobs próprios, remove
-todos os outputs que criou e só então monta as provas derivadas das fontes
-normativas. Depois da última leitura e da construção do relatório, captura
-novamente a árvore Git; após o `finally` e imediatamente antes e depois de
-publicar o JSON, repete essa verificação. Se a fonte mudar durante a publicação,
+próprio. `dist`, sidecar preparado e todo o `target` compartilhado da worktree
+precisam estar ausentes no preflight: o runner falha antes de escrever, em vez
+de sobrescrever um output ignorado preexistente. Ele calcula hashes dos
+artefatos, mede listeners reais, exige locks exclusivos, drena somente Jobs
+próprios, remove todos os outputs que criou e só então monta as provas derivadas
+das fontes
+normativas. Uma prova terminal exige que o target isolado e o `runRoot` tenham
+sido removidos e que o `target` compartilhado continue ausente; qualquer escrita
+fora do scratch falha o gate. Depois da última leitura e da construção do
+relatório, captura novamente a árvore Git; após o `finally` e imediatamente
+antes e depois de publicar o JSON, repete essa verificação. Se a fonte mudar
+durante a publicação,
 o artefato anterior é restaurado. Uma fixture Git negativa altera um input
 versionado justamente depois da leitura da prova e precisa ser rejeitada. O
 caminho de sucesso e o `finally` usam a mesma rotina medida de encerramento e
