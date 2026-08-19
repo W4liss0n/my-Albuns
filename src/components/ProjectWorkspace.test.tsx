@@ -1083,6 +1083,69 @@ test("presents the Grade with reference metadata and navigation state", () => {
   );
 });
 
+test("shows Page numbers instead of cover and final aliases", () => {
+  const projectionWithSinglePageEnds: EditorProjection = {
+    ...twoSheetProjection,
+    state: {
+      ...twoSheetProjection.state,
+      album: {
+        ...twoSheetProjection.state.album,
+        sheets: twoSheetProjection.state.album.sheets.map((sheet, index) => ({
+          ...sheet,
+          activeSides: index === 0 ? "right" : "left",
+          pageNumbers: [index + 1],
+        })),
+      },
+    },
+    composition: {
+      ...twoSheetProjection.composition,
+      sheets: twoSheetProjection.composition.sheets.map((sheet, index) => {
+        const widthUm = sheet.widthUm / 2;
+        return {
+          ...sheet,
+          activeSides: index === 0 ? "right" : "left",
+          widthUm,
+          base: {
+            ...sheet.base,
+            drawRect: { ...sheet.base.drawRect, width: widthUm },
+          },
+          backgrounds: sheet.backgrounds.map((background) => ({
+            ...background,
+            drawRect: { ...background.drawRect, width: widthUm },
+          })),
+          frames: [],
+          overlays: [],
+        };
+      }),
+    },
+  };
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithSinglePageEnds}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => projectionWithSinglePageEnds,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const tiles = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-tile"),
+  );
+  expect(
+    tiles.map(
+      (tile) => tile.querySelector(".sheet-tile__pages")?.textContent,
+    ),
+  ).toEqual(["1", "2"]);
+  expect(tiles[0]).toHaveAccessibleName(
+    "Ir para Lâmina 01, Lâmina inicial, Página 1",
+  );
+  expect(tiles[1]).toHaveAccessibleName(
+    "Ir para Lâmina 02, Lâmina final, Página 2",
+  );
+});
+
 test("uses reduced Cache previews in the media panel and Canvas", () => {
   const mediaPreviewUrls = {
     "media-001": "asset://localhost/cache/media-001.jpg",

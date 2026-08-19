@@ -379,13 +379,13 @@ function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
   if (sheet.role === "initial" && sheet.pageNumbers.length === 1) {
     return {
       accessibleLabel: `Lâmina inicial, Página ${firstPage}`,
-      visualLabel: "capa",
+      visualLabel: String(firstPage),
     };
   }
   if (sheet.role === "final" && sheet.pageNumbers.length === 1) {
     return {
       accessibleLabel: `Lâmina final, Página ${firstPage}`,
-      visualLabel: "final",
+      visualLabel: String(firstPage),
     };
   }
   return firstPage === lastPage
