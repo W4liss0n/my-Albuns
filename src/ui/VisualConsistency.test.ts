@@ -96,3 +96,28 @@ test("shares floating notification chrome", () => {
   expect(exportSource).toContain("floating");
   expect(exportStyles).not.toContain("position: fixed");
 });
+
+test("keeps media hover and selection on the straight image border", () => {
+  expect(mediaPanelStyles).toMatch(
+    /\.media-thumb\s*\{[^}]*border:\s*3px solid #fff;[^}]*border-radius:\s*0;/s,
+  );
+  expect(mediaPanelStyles).toMatch(
+    /\.media-card:hover \.media-thumb\s*\{\s*border-color:\s*var\(--ui-border-strong\);\s*\}/,
+  );
+  expect(mediaPanelStyles).toMatch(
+    /\.media-card\[data-selected="true"\] \.media-thumb\s*\{\s*border-color:\s*var\(--ui-accent\);\s*\}/,
+  );
+  expect(mediaPanelStyles).toMatch(
+    /\.media-thumb img\s*\{[^}]*object-fit:\s*contain;/s,
+  );
+  expect(mediaPanelStyles).toContain("user-select: none;");
+  expect(mediaPanelStyles).not.toMatch(
+    /\.media-card:hover \.media-thumb\s*\{[^}]*box-shadow/s,
+  );
+  expect(mediaPanelStyles).toMatch(
+    /\.media-card:focus-visible \.media-thumb\s*\{[^}]*outline:\s*1px solid var\(--ui-text-muted\);/s,
+  );
+  expect(mediaPanelStyles).not.toMatch(
+    /\.media-card:focus(?:-visible)? \.media-thumb\s*\{[^}]*border-color:/s,
+  );
+});

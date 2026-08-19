@@ -8,7 +8,7 @@ import { MediaPanel } from "./MediaPanel";
 const mediaItems: readonly MediaCatalogItem[] = [
   media("photo-album-10", "photo", "Álbum 10"),
   media("photo-album-2", "photo", "album 2"),
-  media("photo-retrato", "photo", "Retrato"),
+  media("photo-retrato", "photo", "Retrato", 800, 1200),
   media("decorative-overlay", "decorative", "Overlay dourado"),
 ];
 
@@ -224,18 +224,164 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   expect(restoredPhotoSize).toHaveValue("84");
 });
 
-test("shows media usage as a reference badge instead of generic inline metadata", () => {
-  renderPanel();
+test("uses image orientation and opacity without visible names or usage counts", () => {
+  render(
+    <MediaPanel
+      mediaItems={mediaItems}
+      mediaPreviews={{
+        "photo-album-10": {
+          mediaId: "photo-album-10",
+          state: "ready",
+          url: "/album-10.jpg",
+        },
+        "photo-retrato": {
+          mediaId: "photo-retrato",
+          state: "ready",
+          url: "/retrato.jpg",
+        },
+      }}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+    />,
+  );
 
   const usedCard = document.querySelector<HTMLElement>(
     '[data-media-id="photo-album-10"]',
   );
-  expect(usedCard).not.toBeNull();
-  expect(
-    within(usedCard!).getByLabelText("Usada 2 vezes"),
-  ).toHaveClass("media-usage-badge");
-  expect(usedCard).toHaveAccessibleName("Álbum 10. Usada 2 vezes");
-  expect(usedCard?.querySelector(".media-meta small")).toBeNull();
+  const portraitCard = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-retrato"]',
+  );
+
+  expect(usedCard).toHaveAttribute("data-used", "true");
+  expect(usedCard).toHaveAccessibleName("Álbum 10. Já usada");
+  expect(usedCard).not.toHaveTextContent("Álbum 10");
+  expect(usedCard?.querySelector(".media-usage-badge")).toBeNull();
+  expect(usedCard?.querySelector(".media-meta")).toBeNull();
+  const landscapeThumb = usedCard?.querySelector<HTMLElement>(".media-thumb");
+  const portraitThumb =
+    portraitCard?.querySelector<HTMLElement>(".media-thumb");
+
+  expect(landscapeThumb).toHaveAttribute("data-portrait", "false");
+  expect(landscapeThumb).toHaveAttribute("data-has-preview", "true");
+  expect(landscapeThumb).toHaveStyle({
+    "--media-aspect-ratio": "1200 / 800",
+  });
+  expect(portraitThumb).toHaveAttribute("data-portrait", "true");
+  expect(portraitThumb).toHaveStyle({
+    "--media-aspect-ratio": "800 / 1200",
+  });
+});
+
+test("keeps selection on media ids and supports click, Ctrl, Shift, and Ctrl+A", () => {
+  renderPanel();
+
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  const album10 = screen.getByRole("button", {
+    name: "Álbum 10. Já usada",
+  });
+  const portrait = screen.getByRole("button", {
+    name: "Retrato. Já usada",
+  });
+  const grid = screen.getByRole("group", { name: "Grade de Fotos" });
+
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(album2);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "false");
+
+  fireEvent.click(portrait, { ctrlKey: true });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(album10, { shiftKey: true });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "false");
+
+  fireEvent.keyDown(grid, { ctrlKey: true, key: "a" });
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+});
+
+test("preserves a selected group on right click and replaces it for an unselected item", () => {
+  renderPanel();
+
+  const album2 = screen.getByRole("button", { name: "album 2" });
+  const album10 = screen.getByRole("button", {
+    name: "Álbum 10. Já usada",
+  });
+  const portrait = screen.getByRole("button", {
+    name: "Retrato. Já usada",
+  });
+
+  fireEvent.click(album2);
+  fireEvent.click(portrait, { ctrlKey: true });
+  fireEvent.contextMenu(portrait);
+  expect(album2).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.contextMenu(album10);
+  expect(album2).toHaveAttribute("aria-pressed", "false");
+  expect(album10).toHaveAttribute("aria-pressed", "true");
+  expect(portrait).toHaveAttribute("aria-pressed", "false");
+});
+
+test("removes hidden items from the transient media selection", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  await user.click(screen.getByRole("button", { name: "album 2" }));
+  const search = screen.getByRole("searchbox", { name: "Buscar Fotos" });
+  await user.type(search, "retrato");
+  await user.clear(search);
+
+  expect(screen.getByRole("button", { name: "album 2" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("uses the intrinsic preview ratio when source dimensions are unavailable", () => {
+  const mediaWithoutDimensions = media(
+    "photo-no-metadata",
+    "photo",
+    "Sem metadados",
+    null,
+    null,
+  );
+  render(
+    <MediaPanel
+      mediaItems={[mediaWithoutDimensions]}
+      mediaPreviews={{
+        "photo-no-metadata": {
+          mediaId: "photo-no-metadata",
+          state: "ready",
+          url: "/portrait-without-metadata.jpg",
+        },
+      }}
+      mediaUsage={[]}
+      onFillPhoto={vi.fn()}
+    />,
+  );
+
+  const image = document.querySelector<HTMLImageElement>(
+    '[data-media-id="photo-no-metadata"] img',
+  );
+  expect(image).not.toBeNull();
+  Object.defineProperties(image!, {
+    naturalHeight: { configurable: true, value: 1200 },
+    naturalWidth: { configurable: true, value: 800 },
+  });
+  fireEvent.load(image!);
+
+  const thumb = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-no-metadata"] .media-thumb',
+  );
+  expect(thumb).toHaveAttribute("data-portrait", "true");
+  expect(thumb).toHaveStyle({
+    "--media-aspect-ratio": "800 / 1200",
+  });
 });
 
 function renderPanel() {
@@ -248,14 +394,20 @@ function renderPanel() {
   );
 }
 
-function media(id: string, kind: MediaCatalogItem["kind"], name: string) {
+function media(
+  id: string,
+  kind: MediaCatalogItem["kind"],
+  name: string,
+  sourceWidthPx: number | null = 1200,
+  sourceHeightPx: number | null = 800,
+) {
   return {
     id,
     kind,
     name,
     palette: null,
-    sourceHeightPx: 800,
-    sourceWidthPx: 1200,
+    sourceHeightPx,
+    sourceWidthPx,
   } satisfies MediaCatalogItem;
 }
 

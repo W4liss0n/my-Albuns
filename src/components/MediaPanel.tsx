@@ -4,6 +4,8 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
 } from "react";
 import type {
   MediaPreview,
@@ -56,6 +58,15 @@ export function MediaPanel({
     decorative: createMediaPanelViewPreferences(),
     photo: createMediaPanelViewPreferences(),
   }));
+  const [selectedMediaIds, setSelectedMediaIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(
+    null,
+  );
+  const [intrinsicPreviewSizes, setIntrinsicPreviewSizes] = useState<
+    Readonly<Record<string, IntrinsicPreviewSize>>
+  >({});
   const mediaUsageById = useMemo(
     () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
     [mediaUsage],
@@ -83,6 +94,14 @@ export function MediaPanel({
           direction * naturalNameCollator.compare(left.name, right.name),
       );
   }, [activeMediaItems, mediaUsageById, search, sortDirection, usageFilter]);
+  const visibleMediaIds = useMemo(
+    () => visibleMediaItems.map(({ id }) => id),
+    [visibleMediaItems],
+  );
+  const visibleMediaIdSet = useMemo(
+    () => new Set(visibleMediaIds),
+    [visibleMediaIds],
+  );
   const emptyStateReason =
     activeMediaItems.length === 0
       ? "catalog"
@@ -90,6 +109,18 @@ export function MediaPanel({
         ? "filtered"
         : null;
   const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSelectedMediaIds((current) => {
+      const visibleSelection = new Set(
+        [...current].filter((mediaId) => visibleMediaIdSet.has(mediaId)),
+      );
+      return visibleSelection.size === current.size ? current : visibleSelection;
+    });
+    setSelectionAnchorId((current) =>
+      current && visibleMediaIdSet.has(current) ? current : null,
+    );
+  }, [visibleMediaIdSet]);
 
   useEffect(() => {
     if (!onMediaDemandChange) return;
@@ -152,11 +183,97 @@ export function MediaPanel({
     }));
   }
 
+  function selectMedia(
+    mediaId: string,
+    event: MouseEvent<HTMLButtonElement>,
+  ) {
+    if (
+      event.shiftKey &&
+      selectionAnchorId &&
+      visibleMediaIdSet.has(selectionAnchorId)
+    ) {
+      const anchorIndex = visibleMediaIds.indexOf(selectionAnchorId);
+      const selectedIndex = visibleMediaIds.indexOf(mediaId);
+      const rangeStart = Math.min(anchorIndex, selectedIndex);
+      const rangeEnd = Math.max(anchorIndex, selectedIndex);
+      setSelectedMediaIds(
+        new Set(visibleMediaIds.slice(rangeStart, rangeEnd + 1)),
+      );
+      return;
+    }
+
+    if (event.ctrlKey || event.metaKey) {
+      setSelectedMediaIds((current) => {
+        const next = new Set(current);
+        if (next.has(mediaId)) next.delete(mediaId);
+        else next.add(mediaId);
+        return next;
+      });
+      return;
+    }
+
+    setSelectedMediaIds(new Set([mediaId]));
+    setSelectionAnchorId(mediaId);
+  }
+
+  function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
+    if (
+      !(event.ctrlKey || event.metaKey) ||
+      event.key.toLocaleLowerCase("pt-BR") !== "a" ||
+      (event.target as HTMLElement).matches(
+        "input, textarea, select, [contenteditable='true']",
+      )
+    ) {
+      return;
+    }
+    event.preventDefault();
+    setSelectedMediaIds(new Set(visibleMediaIds));
+    setSelectionAnchorId((current) =>
+      current && visibleMediaIdSet.has(current)
+        ? current
+        : (visibleMediaIds[0] ?? null),
+    );
+  }
+
+  function selectMediaForContextMenu(mediaId: string) {
+    if (selectedMediaIds.has(mediaId)) return;
+    setSelectedMediaIds(new Set([mediaId]));
+    setSelectionAnchorId(mediaId);
+  }
+
+  function captureIntrinsicPreviewSize(
+    mediaId: string,
+    previewUrl: string,
+    image: HTMLImageElement,
+  ) {
+    const { naturalHeight, naturalWidth } = image;
+    if (naturalWidth <= 0 || naturalHeight <= 0) return;
+    setIntrinsicPreviewSizes((current) => {
+      const previous = current[mediaId];
+      if (
+        previous?.previewUrl === previewUrl &&
+        previous.width === naturalWidth &&
+        previous.height === naturalHeight
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        [mediaId]: {
+          height: naturalHeight,
+          previewUrl,
+          width: naturalWidth,
+        },
+      };
+    });
+  }
+
   return (
     <section
       id="media-panel"
       className="media-panel"
       aria-label="Painel de imagens"
+      onKeyDown={selectAllVisibleMedia}
     >
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
@@ -196,13 +313,16 @@ export function MediaPanel({
         ) : (
           visibleMediaItems.map((media) => {
             const usageCount = mediaUsageById.get(media.id) ?? 0;
+            const isUsed = usageCount > 0;
+            const isSelected = selectedMediaIds.has(media.id);
             const preview = mediaPreviews[media.id];
-            const usageLabel =
-              usageCount === 0
-                ? null
-                : usageCount === 1
-                  ? "Usada 1 vez"
-                  : `Usada ${usageCount} vezes`;
+            const intrinsicPreviewSize = intrinsicPreviewSizes[media.id];
+            const previewGeometry = mediaPreviewGeometry(
+              media,
+              intrinsicPreviewSize?.previewUrl === preview?.url
+                ? intrinsicPreviewSize
+                : undefined,
+            );
             const availabilityLabel =
               preview?.state !== "unavailable"
                 ? null
@@ -211,7 +331,7 @@ export function MediaPanel({
                   : "Indisponível";
             const accessibleLabel = [
               media.name,
-              usageLabel,
+              isUsed ? "Já usada" : null,
               availabilityLabel,
             ]
               .filter(Boolean)
@@ -219,10 +339,15 @@ export function MediaPanel({
             return (
               <button
                 aria-label={accessibleLabel}
+                aria-pressed={isSelected}
                 className="media-card"
                 type="button"
                 key={media.id}
                 data-media-id={media.id}
+                data-selected={String(isSelected)}
+                data-used={String(isUsed)}
+                onClick={(event) => selectMedia(media.id, event)}
+                onContextMenu={() => selectMediaForContextMenu(media.id)}
                 onDoubleClick={
                   media.kind === "photo"
                     ? () => onFillPhoto(media.id)
@@ -234,25 +359,31 @@ export function MediaPanel({
                     : undefined
                 }
               >
-                <span className="media-thumb">
+                <span
+                  className="media-thumb"
+                  data-has-preview={String(Boolean(preview?.url))}
+                  data-portrait={String(previewGeometry.isPortrait)}
+                  style={
+                    {
+                      "--media-aspect-ratio": previewGeometry.aspectRatio,
+                    } as CSSProperties
+                  }
+                >
                   {preview?.url && (
                     <img
                       alt=""
                       draggable="false"
                       loading="lazy"
+                      onLoad={(event) => {
+                        if (!preview.url || hasSourceDimensions(media)) return;
+                        captureIntrinsicPreviewSize(
+                          media.id,
+                          preview.url,
+                          event.currentTarget,
+                        );
+                      }}
                       src={preview.url}
                     />
-                  )}
-                  {usageCount > 0 && (
-                    <span
-                      aria-label={
-                        usageLabel ?? undefined
-                      }
-                      className="media-usage-badge"
-                    >
-                      <span aria-hidden="true" className="media-usage-dot" />
-                      {usageCount === 1 ? "1 uso" : `${usageCount} usos`}
-                    </span>
                   )}
                   {preview?.state === "unavailable" && (
                     <span
@@ -266,15 +397,55 @@ export function MediaPanel({
                     </span>
                   )}
                 </span>
-                <span className="media-meta">
-                  <strong>{media.name}</strong>
-                </span>
               </button>
             );
           })
         )}
       </div>
     </section>
+  );
+}
+
+interface MediaPreviewGeometry {
+  aspectRatio: string;
+  isPortrait: boolean;
+}
+
+interface IntrinsicPreviewSize {
+  height: number;
+  previewUrl: string;
+  width: number;
+}
+
+function mediaPreviewGeometry(
+  media: MediaCatalogItem,
+  intrinsicSize?: IntrinsicPreviewSize,
+): MediaPreviewGeometry {
+  const { sourceHeightPx, sourceWidthPx } = media;
+  const width = hasSourceDimensions(media)
+    ? sourceWidthPx
+    : intrinsicSize?.width;
+  const height = hasSourceDimensions(media)
+    ? sourceHeightPx
+    : intrinsicSize?.height;
+  if (!width || !height) return { aspectRatio: "1 / 1", isPortrait: false };
+  return {
+    aspectRatio: `${width} / ${height}`,
+    isPortrait: height > width,
+  };
+}
+
+function hasSourceDimensions(
+  media: MediaCatalogItem,
+): media is MediaCatalogItem & {
+  sourceHeightPx: number;
+  sourceWidthPx: number;
+} {
+  return (
+    media.sourceWidthPx !== null &&
+    media.sourceHeightPx !== null &&
+    media.sourceWidthPx > 0 &&
+    media.sourceHeightPx > 0
   );
 }
 

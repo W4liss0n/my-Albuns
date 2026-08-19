@@ -1146,8 +1146,12 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
 
   fireEvent.click(screen.getByRole("button", { name: "Decorativos" }));
 
-  expect(screen.getByText("Overlay translúcido.png")).toBeInTheDocument();
-  expect(screen.queryByText("Serra ao amanhecer.jpg")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: /^Overlay translúcido\.png/ }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /^Serra ao amanhecer\.jpg/ }),
+  ).not.toBeInTheDocument();
   expect(
     view.container.querySelector<HTMLImageElement>(
       `.media-thumb img[src="${decorativePreviewUrl}"]`,
@@ -1161,7 +1165,7 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(mediaPreviewUrls);
 });
 
-test("renders media usage from the derived Editor projection", () => {
+test("renders derived media usage as the thumbnail opacity state", () => {
   render(
     <ProjectWorkspace
       exportPort={exportPort}
@@ -1171,10 +1175,11 @@ test("renders media usage from the derived Editor projection", () => {
     />,
   );
 
-  expect(screen.getByLabelText("Usada 1 vez")).toHaveClass(
-    "media-usage-badge",
-  );
-  expect(screen.queryByText("0 usos")).not.toBeInTheDocument();
+  const usedMedia = screen.getByRole("button", {
+    name: "Serra ao amanhecer.jpg. Já usada",
+  });
+  expect(usedMedia).toHaveAttribute("data-used", "true");
+  expect(usedMedia).not.toHaveTextContent("Serra ao amanhecer.jpg");
 });
 
 test("centers a Grade navigation target in the visible Canvas", () => {
@@ -1507,7 +1512,9 @@ test("uses the Canvas-centered sheet for a media double click", () => {
   act(() => {
     canvasHarness.props?.onCenteredSheetChange?.("sheet-002");
   });
-  fireEvent.doubleClick(screen.getByText("Campo.jpg").closest("button")!);
+  fireEvent.doubleClick(
+    screen.getByRole("button", { name: "Campo.jpg" }),
+  );
 
   expect(apply).toHaveBeenCalledWith({
     kind: "fillLeftmostPlaceholder",
