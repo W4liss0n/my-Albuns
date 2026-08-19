@@ -144,6 +144,9 @@ test("matches the compact sheet grid instead of using generic cards", () => {
   expect(inspectorPanelStyles).toMatch(
     /\.sheet-tile\.active\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--ui-accent\),\s*var\(--ui-shadow-thumbnail\);/s,
   );
+  expect(inspectorPanelStyles).toMatch(
+    /\.sheet-tile:hover:not\(\.active\)\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--ui-border-strong\),\s*var\(--ui-shadow-thumbnail\);/s,
+  );
   expect(inspectorPanelStyles).not.toMatch(
     /\.sheet-tile\.active\s*\{[^}]*background:\s*var\(--ui-accent-soft\);/s,
   );

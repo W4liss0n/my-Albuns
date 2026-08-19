@@ -199,9 +199,9 @@
   transition: box-shadow 100ms ease;
 }
 
-.sheet-tile:hover {
+.sheet-tile:hover:not(.active) {
   box-shadow:
-    0 0 0 1px var(--ui-border-strong),
+    0 0 0 2px var(--ui-border-strong),
     var(--ui-shadow-thumbnail);
 }
 
@@ -211,12 +211,6 @@
 }
 
 .sheet-tile.active {
-  box-shadow:
-    0 0 0 2px var(--ui-accent),
-    var(--ui-shadow-thumbnail);
-}
-
-.sheet-tile.active:hover {
   box-shadow:
     0 0 0 2px var(--ui-accent),
     var(--ui-shadow-thumbnail);
