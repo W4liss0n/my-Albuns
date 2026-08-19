@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowDownAZ,
-  ArrowUpAZ,
-  ChevronUp,
+  ChevronDown,
   Image as ImageIcon,
-  Layers3,
-  Search,
+  ListFilter,
+  Plus,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
 
@@ -30,6 +29,7 @@ interface MediaPanelToolbarProps {
 }
 
 const PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
+type OpenPopup = "import" | "options" | null;
 
 export function MediaPanelToolbar({
   activeMediaKind,
@@ -40,25 +40,28 @@ export function MediaPanelToolbar({
   preferences,
   search,
 }: MediaPanelToolbarProps) {
-  const [importMenuOpen, setImportMenuOpen] = useState(false);
+  const [openPopup, setOpenPopup] = useState<OpenPopup>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const optionsButtonRef = useRef<HTMLButtonElement>(null);
   const activeKindLabel =
     activeMediaKind === "photo" ? "Fotos" : "Decorativos";
 
   useEffect(() => {
-    if (!importMenuOpen) return;
+    if (!openPopup) return;
 
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (
         event.target instanceof Node &&
         !rootRef.current?.contains(event.target)
       ) {
-        setImportMenuOpen(false);
+        setOpenPopup(null);
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setImportMenuOpen(false);
+      const restoreOptionsFocus = openPopup === "options";
+      setOpenPopup(null);
+      if (restoreOptionsFocus) optionsButtonRef.current?.focus();
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePointer);
@@ -67,10 +70,10 @@ export function MediaPanelToolbar({
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [importMenuOpen]);
+  }, [openPopup]);
 
   function changeMediaKind(mediaKind: MediaKind) {
-    setImportMenuOpen(false);
+    setOpenPopup(null);
     onActiveMediaKindChange(mediaKind);
   }
 
@@ -95,23 +98,31 @@ export function MediaPanelToolbar({
           type="button"
           onClick={() => changeMediaKind("decorative")}
         >
-          <AppIcon icon={Layers3} size={16} />
+          <AppIcon icon={SlidersHorizontal} size={14} />
         </button>
       </div>
 
       <div className="media-import-menu">
         <button
-          aria-expanded={importMenuOpen}
+          aria-expanded={openPopup === "import"}
           aria-haspopup="menu"
           className="media-toolbar-text-button"
           type="button"
-          onClick={() => setImportMenuOpen((open) => !open)}
+          onClick={() =>
+            setOpenPopup((current) =>
+              current === "import" ? null : "import",
+            )
+          }
         >
           <span>Importar</span>
-          <AppIcon icon={ChevronUp} size={12} />
+          <AppIcon icon={ChevronDown} size={12} />
         </button>
-        {importMenuOpen && (
-          <div aria-label="Importar" className="media-popup media-import-popup" role="menu">
+        {openPopup === "import" && (
+          <div
+            aria-label="Importar"
+            className="media-popup media-import-popup"
+            role="menu"
+          >
             {/* PLACEHOLDER UI: import commands await their application port. */}
             <button
               data-placeholder-feature="import-media-files"
@@ -135,126 +146,158 @@ export function MediaPanelToolbar({
         )}
       </div>
 
-      <label className="media-toolbar-filter">
-        <span className="ui-visually-hidden">Filtro de uso</span>
-        <select
-          aria-label="Filtro de uso"
-          value={preferences.usageFilter}
-          onChange={(event) =>
-            onPreferencesChange({
-              usageFilter: event.target.value as MediaUsageFilter,
-            })
-          }
-        >
-          <option value="all">Todas</option>
-          <option value="used">Usadas</option>
-          <option value="unused">Não usadas</option>
-        </select>
-        <small>{itemCount}</small>
-      </label>
-
-      <div className="media-toolbar-spacer" />
-
-      <div
-        aria-label={`Busca em ${activeKindLabel}`}
-        className="media-search"
-        role="search"
-      >
-        <AppIcon icon={Search} size={12} />
-        <input
-          aria-label={`Buscar ${activeKindLabel}`}
-          placeholder="Buscar…"
-          role="searchbox"
-          value={search}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
-        {search && (
+      <div className="media-folder-bar">
+        <div className="media-folder-strip">
           <button
-            aria-label="Limpar busca"
+            aria-label={`Todas ${itemCount}`}
+            aria-pressed="true"
+            className="media-folder-chip active"
             type="button"
-            onClick={() => onSearchChange("")}
           >
-            <AppIcon icon={X} size={12} />
+            <span>Todas</span>
+            <small>{itemCount}</small>
           </button>
-        )}
+          {/*
+            PLACEHOLDER UI: organization chips belong here after the Project
+            exposes Media organization folders through an application port.
+          */}
+        </div>
+        <button
+          aria-label="Nova pasta de organização"
+          className="media-folder-add"
+          data-placeholder-feature="media-organization-folders"
+          disabled
+          title={PLACEHOLDER_TITLE}
+          type="button"
+        >
+          <AppIcon icon={Plus} size={12} />
+        </button>
       </div>
 
-      <label className="media-toolbar-sort">
-        <span>Ordenar:</span>
-        <select aria-label="Ordenar por" value="name" onChange={() => undefined}>
-          <option value="name">Nome</option>
-          {/* PLACEHOLDER UI: MediaCatalogItem has no date metadata yet. */}
-          <option
-            data-placeholder-feature="sort-media-by-created-at"
-            disabled
-            value="created-at"
-          >
-            Data de criação
-          </option>
-          <option
-            data-placeholder-feature="sort-media-by-modified-at"
-            disabled
-            value="modified-at"
-          >
-            Data de alteração
-          </option>
-        </select>
-      </label>
+      <div className="media-toolbar-actions">
+        <div
+          aria-label={`Busca em ${activeKindLabel}`}
+          className="media-search"
+          role="search"
+        >
+          <input
+            aria-label={`Buscar ${activeKindLabel}`}
+            placeholder="Buscar…"
+            role="searchbox"
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+          />
+          {search && (
+            <button
+              aria-label="Limpar busca"
+              type="button"
+              onClick={() => onSearchChange("")}
+            >
+              <AppIcon icon={X} size={12} />
+            </button>
+          )}
+        </div>
 
-      <button
-        aria-label={
-          preferences.sortDirection === "ascending"
-            ? "Ordem crescente"
-            : "Ordem decrescente"
-        }
-        className="media-sort-direction"
-        title={
-          preferences.sortDirection === "ascending"
-            ? "Ordem crescente"
-            : "Ordem decrescente"
-        }
-        type="button"
-        onClick={() =>
-          onPreferencesChange({
-            sortDirection:
-              preferences.sortDirection === "ascending"
-                ? "descending"
-                : "ascending",
-          })
-        }
-      >
-        <AppIcon
-          icon={
-            preferences.sortDirection === "ascending"
-              ? ArrowDownAZ
-              : ArrowUpAZ
+        <button
+          aria-controls="media-panel-options"
+          aria-expanded={openPopup === "options"}
+          aria-label="Filtro, ordem e tamanho"
+          className={`media-options-button${openPopup === "options" ? " active" : ""}`}
+          ref={optionsButtonRef}
+          title="Filtro, ordem e tamanho"
+          type="button"
+          onClick={() =>
+            setOpenPopup((current) =>
+              current === "options" ? null : "options",
+            )
           }
-          size={14}
-        />
-      </button>
+        >
+          <AppIcon icon={ListFilter} size={14} />
+        </button>
 
-      <label className="media-toolbar-size">
-        <span className="ui-visually-hidden">Tamanho das miniaturas</span>
-        <input
-          aria-label="Tamanho das miniaturas"
-          max={MEDIA_THUMBNAIL_MAX_SIZE}
-          min={MEDIA_THUMBNAIL_MIN_SIZE}
-          step="2"
-          title={`Tamanho das miniaturas: ${preferences.thumbnailSize} px`}
-          type="range"
-          value={preferences.thumbnailSize}
-          onChange={(event) =>
-            onPreferencesChange({
-              thumbnailSize: Number(event.target.value),
-            })
-          }
-          onDoubleClick={() =>
-            onPreferencesChange({
-              thumbnailSize: MEDIA_THUMBNAIL_DEFAULT_SIZE,
-            })
-          }
-        />
-      </label>
+        {openPopup === "options" && (
+          <div
+            aria-label="Filtro, ordem e tamanho"
+            className="media-popup media-options-popup"
+            id="media-panel-options"
+            role="group"
+          >
+            <label className="media-options-row">
+              <span>Filtro</span>
+              <select
+                aria-label="Filtro de uso"
+                value={preferences.usageFilter}
+                onChange={(event) =>
+                  onPreferencesChange({
+                    usageFilter: event.target.value as MediaUsageFilter,
+                  })
+                }
+              >
+                <option value="all">Todas</option>
+                <option value="used">Usadas</option>
+                <option value="unused">Não usadas</option>
+              </select>
+            </label>
+
+            <label className="media-options-row">
+              <span>Ordem</span>
+              <select
+                aria-label="Ordenar por"
+                value={`name-${preferences.sortDirection}`}
+                onChange={(event) => {
+                  if (event.target.value === "name-ascending") {
+                    onPreferencesChange({ sortDirection: "ascending" });
+                  }
+                  if (event.target.value === "name-descending") {
+                    onPreferencesChange({ sortDirection: "descending" });
+                  }
+                }}
+              >
+                <option value="name-ascending">Nome</option>
+                <option value="name-descending">Nome (inverso)</option>
+                {/* PLACEHOLDER UI: MediaCatalogItem has no date metadata yet. */}
+                <option
+                  data-placeholder-feature="sort-media-by-created-at"
+                  disabled
+                  value="created-at"
+                >
+                  Data de criação
+                </option>
+                <option
+                  data-placeholder-feature="sort-media-by-modified-at"
+                  disabled
+                  value="modified-at"
+                >
+                  Data de alteração
+                </option>
+              </select>
+            </label>
+
+            <label className="media-options-row media-options-size">
+              <span>Tamanho</span>
+              <input
+                aria-label="Tamanho das miniaturas"
+                max={MEDIA_THUMBNAIL_MAX_SIZE}
+                min={MEDIA_THUMBNAIL_MIN_SIZE}
+                step="2"
+                title={`Tamanho das miniaturas: ${preferences.thumbnailSize} px`}
+                type="range"
+                value={preferences.thumbnailSize}
+                onChange={(event) =>
+                  onPreferencesChange({
+                    thumbnailSize: Number(event.target.value),
+                  })
+                }
+                onDoubleClick={() =>
+                  onPreferencesChange({
+                    thumbnailSize: MEDIA_THUMBNAIL_DEFAULT_SIZE,
+                  })
+                }
+              />
+            </label>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

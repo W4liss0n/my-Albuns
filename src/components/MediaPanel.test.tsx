@@ -32,11 +32,19 @@ test("matches the reference toolbar and exposes unavailable import actions as pl
     "false",
   );
   expect(screen.getByRole("searchbox", { name: "Buscar Fotos" })).toBeVisible();
-  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toBeVisible();
-  expect(screen.getByRole("combobox", { name: "Ordenar por" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Todas 3" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   expect(
-    screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
+    screen.getByRole("button", { name: "Nova pasta de organização" }),
+  ).toHaveAttribute("data-placeholder-feature", "media-organization-folders");
+  expect(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
   ).toBeVisible();
+  expect(
+    screen.queryByRole("combobox", { name: "Filtro de uso" }),
+  ).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Importar" }));
   const importMenu = screen.getByRole("menu", { name: "Importar" });
@@ -57,14 +65,46 @@ test("combines accent-insensitive search with the usage filter and natural name 
   await user.type(screen.getByRole("searchbox", { name: "Buscar Fotos" }), "album");
   expect(visibleMediaIds()).toEqual(["photo-album-2", "photo-album-10"]);
 
-  await user.click(screen.getByRole("button", { name: "Ordem crescente" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-descending",
+  );
   expect(visibleMediaIds()).toEqual(["photo-album-10", "photo-album-2"]);
-  await user.click(screen.getByRole("button", { name: "Ordem decrescente" }));
-  await user.selectOptions(screen.getByRole("combobox", { name: "Filtro de uso" }), "used");
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-ascending",
+  );
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Filtro de uso" }),
+    "used",
+  );
   expect(visibleMediaIds()).toEqual(["photo-album-10"]);
   expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
     "used",
   );
+});
+
+test("treats compact options as a disclosure and restores its trigger on Escape", async () => {
+  const user = userEvent.setup();
+  renderPanel();
+
+  const trigger = screen.getByRole("button", {
+    name: "Filtro, ordem e tamanho",
+  });
+  await user.click(trigger);
+  const usageFilter = screen.getByRole("combobox", { name: "Filtro de uso" });
+  await user.click(usageFilter);
+  expect(usageFilter).toHaveFocus();
+
+  await user.keyboard("{Escape}");
+
+  expect(trigger).toHaveFocus();
+  expect(
+    screen.queryByRole("combobox", { name: "Filtro de uso" }),
+  ).not.toBeInTheDocument();
 });
 
 test("keeps independent search text for Fotos and Decorativos", async () => {
@@ -91,6 +131,9 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   const user = userEvent.setup();
   renderPanel();
 
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
   const size = screen.getByRole("slider", { name: "Tamanho das miniaturas" });
   fireEvent.change(size, { target: { value: "124" } });
 
@@ -106,19 +149,39 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   );
 
   await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
   const decorativeSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
-  expect(decorativeSize).toHaveValue("90");
+  expect(decorativeSize).toHaveValue("84");
   fireEvent.change(decorativeSize, { target: { value: "110" } });
 
   await user.click(screen.getByRole("button", { name: "Fotos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
   const restoredPhotoSize = screen.getByRole("slider", {
     name: "Tamanho das miniaturas",
   });
   expect(restoredPhotoSize).toHaveValue("124");
   fireEvent.doubleClick(restoredPhotoSize);
-  expect(restoredPhotoSize).toHaveValue("90");
+  expect(restoredPhotoSize).toHaveValue("84");
+});
+
+test("shows media usage as a reference badge instead of generic inline metadata", () => {
+  renderPanel();
+
+  const usedCard = document.querySelector<HTMLElement>(
+    '[data-media-id="photo-album-10"]',
+  );
+  expect(usedCard).not.toBeNull();
+  expect(
+    within(usedCard!).getByLabelText("Usada 2 vezes"),
+  ).toHaveClass("media-usage-badge");
+  expect(usedCard).toHaveAccessibleName("Álbum 10. Usada 2 vezes");
+  expect(usedCard?.querySelector(".media-meta small")).toBeNull();
 });
 
 function renderPanel() {

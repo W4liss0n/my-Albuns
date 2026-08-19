@@ -156,7 +156,7 @@ export function MediaPanel({
     >
       <MediaPanelToolbar
         activeMediaKind={activeMediaKind}
-        itemCount={visibleMediaItems.length}
+        itemCount={activeMediaItems.length}
         preferences={preferences}
         search={search}
         onActiveMediaKindChange={setActiveMediaKind}
@@ -213,68 +213,88 @@ export function MediaPanel({
             title="Nenhum item encontrado"
           />
         ) : (
-          visibleMediaItems.map((media) => (
-            <button
-              className="media-card"
-              type="button"
-              key={media.id}
-              data-media-id={media.id}
-              onDoubleClick={
-                media.kind === "photo"
-                  ? () => onFillPhoto(media.id)
-                  : undefined
-              }
-              title={
-                media.kind === "photo"
-                  ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                  : undefined
-              }
-            >
-              <span
-                className="media-thumb"
-                style={{
-                  background: mediaCardBackground(media),
-                }}
+          visibleMediaItems.map((media) => {
+            const usageCount = mediaUsageById.get(media.id) ?? 0;
+            const preview = mediaPreviews[media.id];
+            const usageLabel =
+              usageCount === 0
+                ? null
+                : usageCount === 1
+                  ? "Usada 1 vez"
+                  : `Usada ${usageCount} vezes`;
+            const availabilityLabel =
+              preview?.state !== "unavailable"
+                ? null
+                : preview.url
+                  ? "Indisponível · prévia anterior"
+                  : "Indisponível";
+            const accessibleLabel = [
+              media.name,
+              usageLabel,
+              availabilityLabel,
+            ]
+              .filter(Boolean)
+              .join(". ");
+            return (
+              <button
+                aria-label={accessibleLabel}
+                className="media-card"
+                type="button"
+                key={media.id}
+                data-media-id={media.id}
+                onDoubleClick={
+                  media.kind === "photo"
+                    ? () => onFillPhoto(media.id)
+                    : undefined
+                }
+                title={
+                  media.kind === "photo"
+                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                    : undefined
+                }
               >
-                {mediaPreviews[media.id]?.url && (
-                  <img
-                    alt=""
-                    draggable="false"
-                    loading="lazy"
-                    src={mediaPreviews[media.id].url ?? undefined}
-                  />
-                )}
-                {mediaPreviews[media.id]?.state === "unavailable" && (
-                  <span
-                    aria-label={
-                      mediaPreviews[media.id].url
+                <span className="media-thumb">
+                  {preview?.url && (
+                    <img
+                      alt=""
+                      draggable="false"
+                      loading="lazy"
+                      src={preview.url}
+                    />
+                  )}
+                  {usageCount > 0 && (
+                    <span
+                      aria-label={
+                        usageLabel ?? undefined
+                      }
+                      className="media-usage-badge"
+                    >
+                      <span aria-hidden="true" className="media-usage-dot" />
+                      {usageCount === 1 ? "1 uso" : `${usageCount} usos`}
+                    </span>
+                  )}
+                  {preview?.state === "unavailable" && (
+                    <span
+                      aria-label={availabilityLabel ?? undefined}
+                      className="media-availability"
+                      role="status"
+                    >
+                      {preview.url
                         ? "Indisponível · prévia anterior"
-                        : "Indisponível"
-                    }
-                    className="media-availability"
-                    role="status"
-                  >
-                    {mediaPreviews[media.id].url
-                      ? "Indisponível · prévia anterior"
-                      : "Indisponível"}
-                  </span>
-                )}
-              </span>
-              <span className="media-meta">
-                <strong>{media.name}</strong>
-                <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
-              </span>
-            </button>
-          ))
+                        : "Indisponível"}
+                    </span>
+                  )}
+                </span>
+                <span className="media-meta">
+                  <strong>{media.name}</strong>
+                </span>
+              </button>
+            );
+          })
         )}
       </div>
     </section>
   );
-}
-
-function mediaCardBackground(media: MediaCatalogItem) {
-  const palette = media.palette ?? ["#26323A", "#53636D", "#A6B0B6"];
-  return `linear-gradient(135deg, ${palette[0]}, ${palette[1]} 56%, ${palette[2]})`;
 }
 
 function normalizeSearchText(value: string) {

@@ -1106,6 +1106,9 @@ test("resizes media cards without restarting Panel demand observers", () => {
   );
 
   const observerCount = observedViewports.length;
+  fireEvent.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
   fireEvent.change(
     screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
     { target: { value: "124" } },
@@ -1165,8 +1168,10 @@ test("renders media usage from the derived Editor projection", () => {
     />,
   );
 
-  expect(screen.getByText("1 usos")).toBeInTheDocument();
-  expect(screen.getAllByText("0 usos")).toHaveLength(2);
+  expect(screen.getByLabelText("Usada 1 vez")).toHaveClass(
+    "media-usage-badge",
+  );
+  expect(screen.queryByText("0 usos")).not.toBeInTheDocument();
 });
 
 test("centers a Grade navigation target in the visible Canvas", () => {

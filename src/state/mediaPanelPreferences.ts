@@ -9,7 +9,7 @@ export interface MediaPanelViewPreferences {
 
 export const MEDIA_THUMBNAIL_MIN_SIZE = 58;
 export const MEDIA_THUMBNAIL_MAX_SIZE = 132;
-export const MEDIA_THUMBNAIL_DEFAULT_SIZE = 90;
+export const MEDIA_THUMBNAIL_DEFAULT_SIZE = 84;
 
 /**
  * PLACEHOLDER INTEGRATION: Ordenação/Filtro must be hydrated through the

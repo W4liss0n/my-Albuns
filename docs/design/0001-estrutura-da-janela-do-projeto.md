@@ -292,15 +292,17 @@ Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esq
 - Se houver rejeições, a Tela de Problemas é aberta ao final com as colunas `Arquivo` e `Motivo`.
 - Todos os novos itens aceitos por uma seleção, uma pasta ou uma única soltura formam uma ação de Undo/Redo e deixam o Projeto alterado. Desfazer remove somente esses vínculos do Painel; refazer os restaura. Arquivos originais e duplicatas preexistentes nunca são afetados.
 - Se a operação não criar nenhum item novo, ela não adiciona uma entrada ao Histórico nem marca alterações pendentes.
-- Contém os controles de busca, ordenação e Filtro de uso já especificados.
+- A barra segue a referência moderna: abas e `Importar` à esquerda; o chip ativo `Todas`, chips de organização e a ação circular tracejada de nova pasta no espaço central; busca e o botão `Filtro, ordem e tamanho` à direita.
+- Enquanto o modelo e os comandos de pastas de organização não existirem, os chips adicionais e a ação de nova pasta permanecem explicitamente marcados no código como interface placeholder; `Todas` usa sempre a contagem real da aba.
+- A busca permanece diretamente visível. Filtro de uso, Ordenação e Tamanho ficam reunidos em um popover compacto aberto pelo botão `Filtro, ordem e tamanho`, sem selects ou slider permanentes na barra.
 - A busca filtra a grade em tempo real pelo Nome do arquivo, ignorando maiúsculas, minúsculas e acentos, e atua somente na aba atualmente visível.
 - Busca e demais filtros formam uma interseção: por exemplo, `Não usadas` com um texto mostra apenas os itens que atendem às duas condições. A Ordenação escolhida continua determinando a sequência dos resultados.
 - `Fotos` e `Decorativos` conservam textos de busca independentes enquanto a Janela do Projeto estiver aberta. Um `X` dentro do campo limpa somente o texto da aba atual.
 - O texto buscado é estado temporário da Janela: não altera o Projeto, não participa de Undo/Redo e não volta na sessão seguinte.
-- Um slider único na barra do Painel ajusta continuamente o tamanho das miniaturas da aba ativa. A grade se reorganiza em tempo real durante o gesto.
+- Um slider único no popover `Filtro, ordem e tamanho` ajusta continuamente o tamanho das miniaturas da aba ativa. A grade se reorganiza em tempo real durante o gesto.
 - Cada miniatura preserva a proporção inteira da imagem, sem corte. Dois cliques no slider restauram o tamanho médio padrão, seguindo a convenção geral dos sliders do aplicativo.
 - `Fotos` e `Decorativos` guardam tamanhos independentes como preferências globais do usuário, reutilizadas entre Projetos e sessões e sem efeito no Projeto ou em Undo/Redo.
-- Mínimo, máximo e tamanho médio exatos serão calibrados no protótipo.
+- O slider usa o intervalo de `58 px` a `132 px`, em passos de `2 px`, e restaura `84 px` como tamanho médio.
 - Um clique simples seleciona somente a mídia acionada e a torna a âncora da seleção; `Ctrl` + clique adiciona ou remove itens individualmente.
 - `Shift` + clique seleciona o intervalo contínuo entre a âncora e o item acionado na ordem atualmente visível, já considerando Busca, filtros e Ordenação.
 - `Ctrl + A` seleciona somente todos os itens atualmente visíveis na aba ativa. Itens ocultos pela Busca ou pelos filtros permanecem fora da seleção e de qualquer ação em lote subsequente.
