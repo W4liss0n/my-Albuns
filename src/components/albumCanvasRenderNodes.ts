@@ -353,8 +353,13 @@ export function createSheetRenderNode(
   sheetContainer.addChild(sheetBar.container);
 
   const focusOutline = new Graphics()
-    .rect(-2, -2, width + 4, height + 4)
-    .stroke({ color: 0x2f7fba, width: 2, alpha: 0.9 });
+    .rect(0, 0, width, height)
+    .stroke({
+      alignment: 0,
+      color: 0x2f7fba,
+      width: 2,
+      alpha: 0.9,
+    });
   focusOutline.label = `sheet-focus-${sheet.sheetId}`;
   focusOutline.eventMode = "none";
   focusOutline.visible = false;

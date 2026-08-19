@@ -40,6 +40,18 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
   });
 });
 
+test("keeps the focused sheet outline flush against the outside edge", async () => {
+  renderCanvas();
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
+    rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
+    strokeStyles: [
+      expect.objectContaining({ alignment: 0, width: 2 }),
+    ],
+  });
+});
+
 test("matches the reference Canvas surface, technical guides and empty Frame treatment", async () => {
   const placeholderComposition: CompositionPlan = {
     ...composition,
