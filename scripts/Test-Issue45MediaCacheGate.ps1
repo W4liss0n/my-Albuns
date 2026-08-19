@@ -1697,8 +1697,11 @@ try {
         'owned-process-lock-listener-cleanup'
         'complete-fail-closed-design-0010-matrix'
     )
+    $topLevelChecks = @(
+        $checks | ForEach-Object { [pscustomobject] $_ }
+    )
     if (-not (Test-ExactPassedCheckSet `
-            -Checks @($checks.ToArray()) `
+            -Checks $topLevelChecks `
             -ExpectedNames $expectedTopLevelCheckNames)) {
         throw 'The issue 45 top-level gate checks are not the exact passing Boolean set.'
     }
