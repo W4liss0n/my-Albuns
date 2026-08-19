@@ -346,23 +346,86 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
   expect(sheetBar.alpha).toBe(0);
 });
 
-test("centers the canonical page number on a single-page sheet bar", async () => {
-  renderCanvas({
-    compositionPlan: createSinglePageComposition("right"),
-    sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
-  });
-  await finishPixiInitialization();
+test.each([
+  {
+    activeSides: "right" as const,
+    activeOffsetXPx: 300,
+    inactiveOffsetXPx: 0,
+    pageX: 450,
+    missingPageLabel: "sheet-bar-page-left-sheet-001",
+  },
+  {
+    activeSides: "left" as const,
+    activeOffsetXPx: 0,
+    inactiveOffsetXPx: 300,
+    pageX: 150,
+    missingPageLabel: "sheet-bar-page-right-sheet-001",
+  },
+])(
+  "presents the inactive $activeSides edge side without making it content",
+  async ({
+    activeSides,
+    activeOffsetXPx,
+    inactiveOffsetXPx,
+    missingPageLabel,
+    pageX,
+  }) => {
+    const onFocusSheet = vi.fn();
+    renderCanvas({
+      compositionPlan: createSinglePageComposition(activeSides),
+      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      onFocusSheet,
+    });
+    await finishPixiInitialization();
 
-  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
-    position: { x: 150, y: 20 },
-    text: "1",
-  });
-  expect(
-    pixiLifecycle.displays.some(
-      ({ label }) => label === "sheet-bar-page-left-sheet-001",
-    ),
-  ).toBe(false);
-});
+    expect(displayWithLabel("sheet-surface-sheet-001")).toMatchObject({
+      rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
+    });
+    expect(displayWithLabel("sheet-inactive-side-sheet-001")).toMatchObject({
+      eventMode: "none",
+      position: { x: inactiveOffsetXPx, y: 0 },
+    });
+    expect(displayWithLabel("sheet-inactive-side-base-sheet-001")).toMatchObject({
+      fillStyles: [expect.objectContaining({ color: 0xf3f1ec })],
+      rectCommands: [{ height: 300, width: 300, x: 0, y: 0 }],
+    });
+    expect(displayWithLabel("sheet-inactive-side-stripes-sheet-001")).toMatchObject({
+      fillStyles: [expect.objectContaining({ alpha: 0.62, color: 0xe2ddd4 })],
+    });
+    expect(
+      displayWithLabel("sheet-inactive-side-stripes-sheet-001").pathCommands
+        .length,
+    ).toBeGreaterThan(0);
+    expect(displayWithLabel("sheet-active-content-sheet-001")).toMatchObject({
+      position: { x: activeOffsetXPx, y: 0 },
+    });
+    expect(displayWithLabel("canvas-sheet-sheet-001")).toMatchObject({
+      hitArea: { height: 300, width: 600, x: 0, y: 0 },
+    });
+    const sheetBar = displayWithLabel("sheet-bar-sheet-001");
+    expect(sheetBar).toMatchObject({
+      hitArea: { height: 40, width: 600, x: 0, y: 0 },
+    });
+    sheetBar.emit("pointertap", { target: sheetBar });
+    expect(onFocusSheet).toHaveBeenCalledWith("sheet-001");
+    expect(displayWithLabel("sheet-center-line-sheet-001")).toMatchObject({
+      pathCommands: [
+        { kind: "moveTo", x: 300, y: 0 },
+        { kind: "lineTo", x: 300, y: 300 },
+      ],
+    });
+    expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
+      rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
+    });
+    expect(displayWithLabel(`sheet-bar-page-${activeSides}-sheet-001`)).toMatchObject({
+      position: { x: pageX, y: 20 },
+      text: "1",
+    });
+    expect(
+      pixiLifecycle.displays.some(({ label }) => label === missingPageLabel),
+    ).toBe(false);
+  },
+);
 
 function createSinglePageComposition(
   activeSides: "left" | "right",

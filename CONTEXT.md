@@ -67,7 +67,7 @@ _Evitar_: Dupla de páginas
 Lado de uma Lâmina que representa uma Página e participa da composição.
 
 **Lado inativo**:
-Lado de uma Lâmina que não representa uma Página, não contém conteúdo e não recebe interação.
+Lado de uma Lâmina que não representa uma Página, não contém conteúdo e não recebe interação própria de Página. Sua representação pode integrar hover, foco e ações da Lâmina.
 _Evitar_: Página vazia, página em branco
 
 **Página**:

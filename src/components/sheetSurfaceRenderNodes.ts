@@ -6,7 +6,10 @@ import {
   SHEET_GUIDE_STYLE,
 } from "../ui/sheetGuideGeometry";
 import type { CanvasTechnicalGuides } from "./albumCanvasContract";
-import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
+import {
+  type CanvasSheetPresentation,
+  MICROMETER_TO_CANVAS_PIXEL,
+} from "./canvasGeometry";
 import { pixiColor } from "./pixiColor";
 import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 
@@ -82,7 +85,6 @@ export function createSheetCenterLine(
   width: number,
   height: number,
 ) {
-  if (sheet.activeSides !== "both") return null;
   const centerLine = new Graphics()
     .moveTo(width / 2, 0)
     .lineTo(width / 2, height)
@@ -97,46 +99,108 @@ export function createSheetCenterLine(
   return centerLine;
 }
 
+export function createSheetInactiveSide(
+  sheet: ComposedSheet,
+  presentation: CanvasSheetPresentation,
+  height: number,
+) {
+  if (presentation.inactiveOffsetXPx === null) return null;
+  const style = SHEET_VISUAL_STYLE.inactiveSide;
+  const inactiveSide = createDiagonalStripeSurface({
+    baseLabel: `sheet-inactive-side-base-${sheet.sheetId}`,
+    dark: style.dark,
+    height,
+    label: `sheet-inactive-side-${sheet.sheetId}`,
+    light: style.light,
+    maskLabel: `sheet-inactive-side-mask-${sheet.sheetId}`,
+    stripeGapPx: style.stripeGapPx,
+    stripeOpacity: style.stripeOpacity,
+    stripesLabel: `sheet-inactive-side-stripes-${sheet.sheetId}`,
+    stripeWidthPx: style.stripeWidthPx,
+    width: presentation.activeWidthPx,
+  });
+  inactiveSide.position.set(presentation.inactiveOffsetXPx, 0);
+  return inactiveSide;
+}
+
 export function createCanvasFramePlaceholder(
   frameId: string,
   frameWidth: number,
   frameHeight: number,
 ) {
   const style = SHEET_VISUAL_STYLE.canvasPlaceholder;
-  const placeholder = new Container();
-  placeholder.label = `frame-placeholder-${frameId}`;
-  placeholder.eventMode = "none";
+  return createDiagonalStripeSurface({
+    baseLabel: `frame-placeholder-base-${frameId}`,
+    dark: style.dark,
+    height: frameHeight,
+    label: `frame-placeholder-${frameId}`,
+    light: style.light,
+    maskLabel: `frame-placeholder-mask-${frameId}`,
+    stripeGapPx: style.stripeGapPx,
+    stripeOpacity: 1,
+    stripesLabel: `frame-placeholder-stripes-${frameId}`,
+    stripeWidthPx: style.stripeWidthPx,
+    width: frameWidth,
+  });
+}
+
+interface DiagonalStripeSurfaceOptions {
+  baseLabel: string;
+  dark: string;
+  height: number;
+  label: string;
+  light: string;
+  maskLabel: string;
+  stripeGapPx: number;
+  stripeOpacity: number;
+  stripesLabel: string;
+  stripeWidthPx: number;
+  width: number;
+}
+
+function createDiagonalStripeSurface({
+  baseLabel,
+  dark,
+  height,
+  label,
+  light,
+  maskLabel,
+  stripeGapPx,
+  stripeOpacity,
+  stripesLabel,
+  stripeWidthPx,
+  width,
+}: DiagonalStripeSurfaceOptions) {
+  const surface = new Container();
+  surface.label = label;
+  surface.eventMode = "none";
   const base = new Graphics()
-    .rect(0, 0, frameWidth, frameHeight)
-    .fill({ color: pixiColor(style.light) });
-  base.label = `frame-placeholder-base-${frameId}`;
+    .rect(0, 0, width, height)
+    .fill({ color: pixiColor(light) });
+  base.label = baseLabel;
   base.eventMode = "none";
 
   const stripes = new Graphics();
-  const period = style.stripeWidthPx + style.stripeGapPx;
-  for (
-    let offset = -frameHeight;
-    offset < frameWidth;
-    offset += period
-  ) {
+  const period = stripeWidthPx + stripeGapPx;
+  for (let offset = -height; offset < width; offset += period) {
     stripes
       .moveTo(offset, 0)
-      .lineTo(offset + style.stripeWidthPx, 0)
-      .lineTo(offset + style.stripeWidthPx + frameHeight, frameHeight)
-      .lineTo(offset + frameHeight, frameHeight)
+      .lineTo(offset + stripeWidthPx, 0)
+      .lineTo(offset + stripeWidthPx + height, height)
+      .lineTo(offset + height, height)
       .lineTo(offset, 0);
   }
-  stripes.fill({ color: pixiColor(style.dark) });
-  stripes.label = `frame-placeholder-stripes-${frameId}`;
+  stripes.fill({ color: pixiColor(dark), alpha: stripeOpacity });
+  stripes.label = stripesLabel;
   stripes.eventMode = "none";
   const clip = new Graphics()
-    .rect(0, 0, frameWidth, frameHeight)
+    .rect(0, 0, width, height)
     .fill(0xffffff);
-  clip.label = `frame-placeholder-mask-${frameId}`;
+  clip.label = maskLabel;
   clip.eventMode = "none";
   stripes.mask = clip;
-  placeholder.addChild(base, stripes, clip);
-  return placeholder;
+  surface.addChild(base, stripes, clip);
+  return surface;
 }
 
 export function createSheetTechnicalGuideNodes(

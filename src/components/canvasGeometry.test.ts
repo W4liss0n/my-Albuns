@@ -97,6 +97,28 @@ test("keeps the visible gap between sheets fixed while Canvas scale changes", ()
   }
 });
 
+test("reserves the same two-page footprint for single-page edge sheets", () => {
+  const layout = createContinuousCanvasLayout([
+    {
+      ...threeSheets[0],
+      activeSides: "right",
+      widthUm: 300_000,
+    },
+    threeSheets[1],
+    {
+      ...threeSheets[2],
+      activeSides: "left",
+      widthUm: 300_000,
+    },
+  ]);
+
+  expect(layout.entriesAtScale(1)).toMatchObject([
+    { left: 0, width: 600, center: 300, right: 600 },
+    { left: 646, width: 600, center: 946, right: 1_246 },
+    { left: 1_292, width: 600, center: 1_592, right: 1_892 },
+  ]);
+});
+
 test("measures sheet geometry once and reuses it", () => {
   let widthReads = 0;
   const measuredSheets: CompositionPlan["sheets"] = threeSheets.map(

@@ -17,7 +17,10 @@ import type {
   CanvasTechnicalGuides,
   SheetBarMetadata,
 } from "./albumCanvasContract";
-import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
+import {
+  createCanvasSheetPresentation,
+  MICROMETER_TO_CANVAS_PIXEL,
+} from "./canvasGeometry";
 import { pixiColor } from "./pixiColor";
 import {
   createPhotoGeometry,
@@ -39,6 +42,7 @@ import {
   createCanvasFramePlaceholder,
   createSheetBleedMask,
   createSheetCenterLine,
+  createSheetInactiveSide,
   createSheetSurfaceRenderNodes,
   createSheetTechnicalGuideNodes,
 } from "./sheetSurfaceRenderNodes";
@@ -102,7 +106,8 @@ export function createSheetRenderNode(
   callbacks: SheetRenderNodeCallbacks,
 ): SheetRenderNode {
   const sheetContainer = new Container();
-  const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+  const presentation = createCanvasSheetPresentation(sheet);
+  const width = presentation.visualWidthPx;
   const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
   sheetContainer.label = `canvas-sheet-${sheet.sheetId}`;
   sheetContainer.eventMode = "static";
@@ -117,6 +122,18 @@ export function createSheetRenderNode(
   sheetContainer.addChild(
     ...createSheetSurfaceRenderNodes(sheet, width, height),
   );
+  const inactiveSide = createSheetInactiveSide(
+    sheet,
+    presentation,
+    height,
+  );
+  if (inactiveSide) sheetContainer.addChild(inactiveSide);
+
+  const activeContent = new Container();
+  activeContent.label = `sheet-active-content-${sheet.sheetId}`;
+  activeContent.eventMode = "passive";
+  activeContent.position.set(presentation.activeOffsetXPx, 0);
+  sheetContainer.addChild(activeContent);
 
   for (const background of sheet.backgrounds) {
     const x = background.drawRect.x * MICROMETER_TO_CANVAS_PIXEL;
@@ -131,7 +148,7 @@ export function createSheetRenderNode(
         .fill({ color: pixiColor(background.rgb) });
       color.label = `background-color-${background.rgb}`;
       color.eventMode = "none";
-      sheetContainer.addChild(color);
+      activeContent.addChild(color);
       continue;
     }
     const previewTexture = callbacks.previewTextureFor(background.mediaId);
@@ -142,14 +159,14 @@ export function createSheetRenderNode(
       sprite.width = backgroundWidth;
       sprite.height = backgroundHeight;
       sprite.eventMode = "none";
-      sheetContainer.addChild(sprite);
+      activeContent.addChild(sprite);
     } else {
       const fallback = new Graphics()
         .rect(x, y, backgroundWidth, backgroundHeight)
         .fill({ color: 0xd8dee2 });
       fallback.label = `background-media-fallback-${background.mediaId}`;
       fallback.eventMode = "none";
-      sheetContainer.addChild(fallback);
+      activeContent.addChild(fallback);
     }
   }
 
@@ -288,7 +305,7 @@ export function createSheetRenderNode(
       if (!event.altKey || !photoNode) return;
       callbacks.onPhotoWheel(photoNode, event);
     });
-    sheetContainer.addChild(frameContainer);
+    activeContent.addChild(frameContainer);
   }
 
   for (const composedOverlay of sheet.overlays) {
@@ -307,7 +324,7 @@ export function createSheetRenderNode(
       overlay.height =
         composedOverlay.drawRect.height * MICROMETER_TO_CANVAS_PIXEL;
       overlay.eventMode = "none";
-      sheetContainer.addChild(overlay);
+      activeContent.addChild(overlay);
     } else {
       const overlayStyle = SHEET_VISUAL_STYLE.overlay;
       const overlay = new Graphics()
@@ -325,24 +342,32 @@ export function createSheetRenderNode(
         });
       overlay.label = `decorative-overlay-fallback-${composedOverlay.mediaId}`;
       overlay.eventMode = "none";
-      sheetContainer.addChild(overlay);
+      activeContent.addChild(overlay);
     }
   }
 
   const bleedMask = createSheetBleedMask(sheet, technicalGuides);
-  if (bleedMask) sheetContainer.addChild(bleedMask);
+  if (bleedMask) activeContent.addChild(bleedMask);
 
   for (const guide of createSheetTechnicalGuideNodes(
     sheet,
     technicalGuides,
   )) {
-    sheetContainer.addChild(guide);
+    activeContent.addChild(guide);
   }
 
   const sheetBar = createSheetBarRenderNode(
     sheet,
     sheetBarMetadata,
-    width,
+    presentation,
+  );
+  sheetBar.container.on(
+    "pointertap",
+    (event: FederatedPointerEvent) => {
+      if (event.target === sheetBar.container) {
+        callbacks.onSheetTap(sheet.sheetId);
+      }
+    },
   );
   sheetContainer.on("pointerenter", () => {
     setSheetBarSheetHovered(sheetBar, true);

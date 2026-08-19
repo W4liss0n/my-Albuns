@@ -51,8 +51,11 @@ export const SHEET_VISUAL_STYLE = {
     numberFontSizePx: 12.5,
   },
   inactiveSide: {
-    fill: "#d8d4cc",
-    opacity: 0.88,
+    light: "#f3f1ec",
+    dark: "#e2ddd4",
+    stripeOpacity: 0.62,
+    stripeWidthPx: 2,
+    stripeGapPx: 10,
   },
   photo: {
     stripeCount: 12,

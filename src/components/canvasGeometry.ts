@@ -6,6 +6,35 @@ export const MICROMETER_TO_CANVAS_PIXEL =
 export const SHEET_GAP_PX = 46;
 export const CANVAS_VERTICAL_MARGIN_PX = 28;
 
+export interface CanvasSheetPresentation {
+  activeOffsetXPx: number;
+  activeWidthPx: number;
+  inactiveOffsetXPx: number | null;
+  visualWidthPx: number;
+}
+
+export function createCanvasSheetPresentation(
+  sheet: Pick<ComposedSheet, "activeSides" | "widthUm">,
+): CanvasSheetPresentation {
+  const activeWidthPx = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+  if (sheet.activeSides === "both") {
+    return {
+      activeOffsetXPx: 0,
+      activeWidthPx,
+      inactiveOffsetXPx: null,
+      visualWidthPx: activeWidthPx,
+    };
+  }
+
+  return {
+    activeOffsetXPx: sheet.activeSides === "right" ? activeWidthPx : 0,
+    activeWidthPx,
+    inactiveOffsetXPx:
+      sheet.activeSides === "right" ? 0 : activeWidthPx,
+    visualWidthPx: activeWidthPx * 2,
+  };
+}
+
 export function continuousCanvasScale(
   canvasHeight: number,
   sheetHeight: number,
@@ -48,11 +77,14 @@ export interface ContinuousCanvasLayout {
 export function createContinuousCanvasLayout(
   sheets: readonly ComposedSheet[],
 ): ContinuousCanvasLayout {
-  const measuredSheets = sheets.map((sheet, index) => ({
-    sheetId: sheet.sheetId,
-    index,
-    width: sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL,
-  }));
+  const measuredSheets = sheets.map((sheet, index) => {
+    const presentation = createCanvasSheetPresentation(sheet);
+    return {
+      sheetId: sheet.sheetId,
+      index,
+      width: presentation.visualWidthPx,
+    };
+  });
   const entriesAtScale = (scale: number) => {
     const safeScale = Math.max(scale, Number.EPSILON);
     const gap = SHEET_GAP_PX / safeScale;

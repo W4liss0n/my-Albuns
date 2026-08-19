@@ -30,6 +30,7 @@ const pixiLifecycle = vi.hoisted(() => ({
     eventMode: string;
     filters: unknown[];
     handlers: Map<string, (event: unknown) => void>;
+    hitArea: unknown;
     label: string;
     mask: unknown;
     pathCommands: Array<{
@@ -343,7 +344,14 @@ vi.mock("pixi.js", () => {
     FederatedPointerEvent: class {},
     FederatedWheelEvent: class {},
     Graphics,
-    Rectangle: class {},
+    Rectangle: class {
+      constructor(
+        readonly x = 0,
+        readonly y = 0,
+        readonly width = 0,
+        readonly height = 0,
+      ) {}
+    },
     Sprite,
     Text,
   };

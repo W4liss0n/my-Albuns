@@ -131,7 +131,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero que a Lâmina inicial de página única tenha somente o lado direito ativo, para representar corretamente sua posição.
 1. Como pessoa diagramadora, quero que a Lâmina final de página única tenha somente o lado esquerdo ativo, para representar corretamente sua posição.
 1. Como pessoa diagramadora, quero que Lâminas internas sejam sempre duplas, para manter ambos os lados ativos no interior do Álbum.
-1. Como pessoa diagramadora, quero que o lado inativo não contenha Página, conteúdo ou interação, para não confundi-lo com uma página vazia.
+1. Como pessoa diagramadora, quero que o lado inativo não contenha Página, conteúdo ou interação própria de Página, mesmo quando o Canvas contínuo o apresente como uma metade visual desativada que participa do hover, foco e ações da Lâmina, para não confundi-lo com uma página vazia sem quebrar a unidade visual da Lâmina.
 1. Como pessoa diagramadora, quero reordenar Lâminas e atualizar seus papéis pela posição, para reorganizar a sequência do Álbum.
 1. Como pessoa diagramadora, quero arrastar uma Lâmina por sua Barra usando um espaço reservado móvel e um fantasma visual, para compreender a posição resultante antes de confirmar.
 1. Como pessoa diagramadora, quero adicionar antes/depois, duplicar, excluir ou converter uma extremidade pelo menu `Lâmina`, para editar a estrutura usando a Lâmina centralizada.
@@ -659,7 +659,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 - Cada Projeto representa exatamente um Álbum independente, formado por ao menos duas Lâminas ordenadas.
 - O papel de uma Lâmina como inicial, interna ou final deriva de sua posição na sequência.
-- Uma Lâmina possui lados esquerdo e direito; somente lados ativos representam Páginas. Um lado inativo não contém conteúdo e não permite interação.
+- Uma Lâmina possui lados esquerdo e direito; somente lados ativos representam Páginas. Um lado inativo não contém conteúdo nem permite interação própria de Página, embora sua representação possa integrar hover, foco e ações da Lâmina.
 - As Lâminas inicial e final podem ser duplas ou de página única. Na inicial simples, somente o lado direito fica ativo; na final simples, somente o esquerdo.
 - Uma Página única permanece presa à extremidade correspondente. Reordenações não podem deslocá-la indiretamente para outra posição.
 - Pressionar uma área não interativa da Barra e ultrapassar o limiar de arraste inicia a reordenação; os controles da Barra não iniciam o gesto.
