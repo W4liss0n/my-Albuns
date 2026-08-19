@@ -7,6 +7,7 @@ import {
   AlbumCanvas as ProductionAlbumCanvas,
   type AlbumCanvasProps,
   type CanvasMetrics,
+  type CanvasTechnicalGuides,
   type PhotoTransformDelta,
   type PhotoTransformPreview,
   type SheetBarMetadata,
@@ -27,6 +28,7 @@ const pixiLifecycle = vi.hoisted(() => ({
     alpha: number;
     children: unknown[];
     eventMode: string;
+    filters: unknown[];
     handlers: Map<string, (event: unknown) => void>;
     label: string;
     mask: unknown;
@@ -116,6 +118,7 @@ vi.mock("pixi.js", () => {
     children: DisplayObject[] = [];
     cursor = "";
     eventMode = "";
+    filters: unknown[] = [];
     handlers = new Map<string, (event: unknown) => void>();
     hitArea: unknown = null;
     label = "";
@@ -354,6 +357,7 @@ export function renderCanvas({
     { sheetId: "sheet-001", pageNumbers: [1, 2] },
   ],
   mediaPreviewUrls,
+  technicalGuides,
   onCanvasMetricsChange = vi.fn<(metrics: CanvasMetrics) => void>(),
   onFocusSheet = vi.fn<(sheetId: string) => void>(),
   onCenteredSheetChange = vi.fn<(sheetId: string) => void>(),
@@ -373,6 +377,7 @@ export function renderCanvas({
   compositionPlan?: CompositionPlan;
   sheetBarMetadata?: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  technicalGuides?: CanvasTechnicalGuides;
   onCanvasMetricsChange?: (metrics: CanvasMetrics) => void;
   onFocusSheet?: (sheetId: string) => void;
   onCenteredSheetChange?: (sheetId: string) => void;
@@ -398,6 +403,7 @@ export function renderCanvas({
         composition={compositionPlan}
         sheetBarMetadata={sheetBarMetadata}
         mediaPreviewUrls={mediaPreviewUrls}
+        technicalGuides={technicalGuides}
         continuousCanvasLayout={createContinuousCanvasLayout(
           compositionPlan.sheets,
         )}

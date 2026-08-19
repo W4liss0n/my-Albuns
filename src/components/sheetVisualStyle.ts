@@ -7,9 +7,29 @@ export const SHEET_VISUAL_STYLE = {
     cornerRadiusPx: 3,
   },
   centerLine: {
-    color: "#887b6c",
-    opacity: 0.32,
+    color: "#eeeae1",
+    opacity: 1,
     widthPx: 1,
+  },
+  bleedMask: {
+    fill: "#f3f1ec",
+    opacity: 1,
+  },
+  canvasShadow: {
+    close: {
+      color: "#3c362c",
+      offsetYPx: 1,
+      opacity: 0.16,
+      spreadPx: 1.5,
+      steps: 2,
+    },
+    depth: {
+      color: "#3c362c",
+      offsetYPx: 5,
+      opacity: 0.12,
+      spreadPx: 8,
+      steps: 6,
+    },
   },
   sheetBar: {
     heightPx: 40,
@@ -52,6 +72,12 @@ export const SHEET_VISUAL_STYLE = {
     crossOpacity: 0.75,
     crossWidthPx: 1.4,
     crossHalfLengthPx: 12,
+  },
+  canvasPlaceholder: {
+    light: "#e6e1d7",
+    dark: "#dcd6ca",
+    stripeWidthPx: 4,
+    stripeGapPx: 4,
   },
   frame: {
     outline: "#ffffff",

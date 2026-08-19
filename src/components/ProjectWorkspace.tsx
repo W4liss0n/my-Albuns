@@ -177,6 +177,10 @@ export function ProjectWorkspace({
           <AlbumCanvas
             {...controller.canvasProps}
             mediaPreviewUrls={mediaPreviewUrls}
+            technicalGuides={{
+              bleedUm: projection.state.document.bleedUm,
+              safetyUm: projection.state.document.safetyUm,
+            }}
             onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
           />

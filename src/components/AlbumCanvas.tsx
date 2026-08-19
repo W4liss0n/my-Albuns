@@ -23,6 +23,7 @@ const isOpaqueCachePreview = (url: string) =>
 export type {
   AlbumCanvasProps,
   CanvasMetrics,
+  CanvasTechnicalGuides,
   PhotoTransformDelta,
   PhotoTransformPreview,
   PhotoZoomPreview,

@@ -39,9 +39,10 @@ const sheets: readonly ComposedSheet[] = [
   createSheet({
     activeSides: "both",
     frames: [
-      placeholder("sheet-002-top", 24_000, 24_000, 552_000, 126_000),
-      placeholder("sheet-002-left", 24_000, 162_000, 264_000, 114_000),
-      placeholder("sheet-002-right", 312_000, 162_000, 264_000, 114_000),
+      placeholder("sheet-002-top", 21_000, 21_000, 258_000, 124_500),
+      placeholder("sheet-002-left", 21_000, 154_500, 124_500, 124_500),
+      placeholder("sheet-002-center", 154_500, 154_500, 124_500, 124_500),
+      placeholder("sheet-002-right", 321_000, 21_000, 258_000, 258_000),
     ],
     number: 2,
     widthUm: 600_000,
@@ -105,6 +106,7 @@ function CanvasPreview() {
         projectId="canvas-visual-preview"
         composition={composition}
         sheetBarMetadata={sheetBarMetadata}
+        technicalGuides={{ bleedUm: 3_000, safetyUm: 5_000 }}
         continuousCanvasLayout={layout}
         selectedFrameId={null}
         focusedSheetId={focusedSheetId}

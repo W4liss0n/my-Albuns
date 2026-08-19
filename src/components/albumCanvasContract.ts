@@ -28,6 +28,11 @@ export interface CanvasMetrics {
   scale: number;
 }
 
+export interface CanvasTechnicalGuides {
+  bleedUm: number;
+  safetyUm: number;
+}
+
 export interface SheetBarMetadata {
   sheetId: string;
   pageNumbers: readonly number[];
@@ -38,6 +43,7 @@ export interface AlbumCanvasProps {
   composition: CompositionPlan;
   sheetBarMetadata: readonly SheetBarMetadata[];
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  technicalGuides?: CanvasTechnicalGuides;
   continuousCanvasLayout: ContinuousCanvasLayout;
   selectedFrameId: string | null;
   focusedSheetId: string | null;

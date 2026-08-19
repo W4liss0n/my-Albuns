@@ -13,7 +13,10 @@ import type {
   NormalizedPan,
   ProjectedFrameBorder,
 } from "../domain/project";
-import type { SheetBarMetadata } from "./albumCanvasContract";
+import type {
+  CanvasTechnicalGuides,
+  SheetBarMetadata,
+} from "./albumCanvasContract";
 import { MICROMETER_TO_CANVAS_PIXEL } from "./canvasGeometry";
 import { pixiColor } from "./pixiColor";
 import {
@@ -32,6 +35,13 @@ import {
   stopSheetBarTransition,
   type SheetBarRenderNode,
 } from "./sheetBarRenderNode";
+import {
+  createCanvasFramePlaceholder,
+  createSheetBleedMask,
+  createSheetCenterLine,
+  createSheetSurfaceRenderNodes,
+  createSheetTechnicalGuideNodes,
+} from "./sheetSurfaceRenderNodes";
 
 const PAN_OUTSIDE_OPACITY = 0.24;
 
@@ -87,6 +97,7 @@ export function createSheetRenderNode(
   sheet: ComposedSheet,
   sheetBarMetadata: SheetBarMetadata | undefined,
   frameBorder: ProjectedFrameBorder,
+  technicalGuides: CanvasTechnicalGuides | undefined,
   signature: string,
   callbacks: SheetRenderNodeCallbacks,
 ): SheetRenderNode {
@@ -103,24 +114,9 @@ export function createSheetRenderNode(
     }
   });
 
-  const shadow = new Graphics()
-    .roundRect(0, 6, width, height, 3)
-    .fill({ color: 0x3c362c, alpha: 0.12 });
-  const surface = new Graphics()
-    .roundRect(
-      0,
-      0,
-      width,
-      height,
-      SHEET_VISUAL_STYLE.surface.cornerRadiusPx,
-    )
-    .fill({ color: pixiColor(sheet.base.rgb) })
-    .stroke({
-      color: pixiColor(SHEET_VISUAL_STYLE.surface.outline),
-      width: SHEET_VISUAL_STYLE.surface.outlineWidthPx,
-      alpha: SHEET_VISUAL_STYLE.surface.outlineOpacity,
-    });
-  sheetContainer.addChild(shadow, surface);
+  sheetContainer.addChild(
+    ...createSheetSurfaceRenderNodes(sheet, width, height),
+  );
 
   for (const background of sheet.backgrounds) {
     const x = background.drawRect.x * MICROMETER_TO_CANVAS_PIXEL;
@@ -157,17 +153,8 @@ export function createSheetRenderNode(
     }
   }
 
-  if (sheet.activeSides === "both") {
-    const centerLine = new Graphics()
-      .moveTo(width / 2, 0)
-      .lineTo(width / 2, height)
-      .stroke({
-        color: pixiColor(SHEET_VISUAL_STYLE.centerLine.color),
-        width: SHEET_VISUAL_STYLE.centerLine.widthPx,
-        alpha: SHEET_VISUAL_STYLE.centerLine.opacity,
-      });
-    sheetContainer.addChild(centerLine);
-  }
+  const centerLine = createSheetCenterLine(sheet, width, height);
+  if (centerLine) sheetContainer.addChild(centerLine);
 
   const selectionOutlines = new Map<string, Graphics>();
   const photoNodes: PhotoRenderNode[] = [];
@@ -238,8 +225,11 @@ export function createSheetRenderNode(
       photoNodes.push(photoNode);
     } else {
       frameContainer.addChild(
-        createPlaceholder(frameWidth, frameHeight),
-        createPlaceholderCross(frameWidth, frameHeight),
+        createCanvasFramePlaceholder(
+          frame.frameId,
+          frameWidth,
+          frameHeight,
+        ),
       );
     }
 
@@ -337,6 +327,16 @@ export function createSheetRenderNode(
       overlay.eventMode = "none";
       sheetContainer.addChild(overlay);
     }
+  }
+
+  const bleedMask = createSheetBleedMask(sheet, technicalGuides);
+  if (bleedMask) sheetContainer.addChild(bleedMask);
+
+  for (const guide of createSheetTechnicalGuideNodes(
+    sheet,
+    technicalGuides,
+  )) {
+    sheetContainer.addChild(guide);
   }
 
   const sheetBar = createSheetBarRenderNode(
@@ -469,34 +469,6 @@ function createPhotoPreviewLayer({
       }),
   );
   return photoLayer;
-}
-
-function createPlaceholder(frameWidth: number, frameHeight: number) {
-  return new Graphics()
-    .rect(0, 0, frameWidth, frameHeight)
-    .fill({ color: pixiColor(SHEET_VISUAL_STYLE.placeholder.fill) })
-    .stroke({
-      color: pixiColor(SHEET_VISUAL_STYLE.placeholder.outline),
-      width: SHEET_VISUAL_STYLE.placeholder.outlineWidthPx,
-      alpha: SHEET_VISUAL_STYLE.placeholder.outlineOpacity,
-    });
-}
-
-function createPlaceholderCross(
-  frameWidth: number,
-  frameHeight: number,
-) {
-  const style = SHEET_VISUAL_STYLE.placeholder;
-  return new Graphics()
-    .moveTo(frameWidth / 2 - style.crossHalfLengthPx, frameHeight / 2)
-    .lineTo(frameWidth / 2 + style.crossHalfLengthPx, frameHeight / 2)
-    .moveTo(frameWidth / 2, frameHeight / 2 - style.crossHalfLengthPx)
-    .lineTo(frameWidth / 2, frameHeight / 2 + style.crossHalfLengthPx)
-    .stroke({
-      color: pixiColor(style.crossColor),
-      width: style.crossWidthPx,
-      alpha: style.crossOpacity,
-    });
 }
 
 function createThirdsGuides(frameWidth: number, frameHeight: number) {

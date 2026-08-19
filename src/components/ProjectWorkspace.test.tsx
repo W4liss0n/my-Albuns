@@ -35,6 +35,7 @@ import {
 } from "../test/projectFixtures";
 import type {
   CanvasMetrics,
+  CanvasTechnicalGuides,
   PhotoTransformDelta,
   PhotoTransformPreview,
 } from "./AlbumCanvas";
@@ -46,6 +47,7 @@ const canvasHarness = vi.hoisted(() => ({
   props: null as null | {
     continuousCanvasLayout: ContinuousCanvasLayout;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    technicalGuides?: CanvasTechnicalGuides;
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
@@ -382,6 +384,22 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
   expect(getApplicationCommand("Exibir", "Painel de imagens")).toBeDisabled();
   expect(getApplicationCommand("Ferramentas", "Configurações…")).toBeDisabled();
   expect(getApplicationCommand("Ajuda", "Manual do MyAlbuns")).toBeDisabled();
+});
+
+test("derives the Canvas technical guides from the canonical document", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(canvasHarness.props?.technicalGuides).toEqual({
+    bleedUm: projection.state.document.bleedUm,
+    safetyUm: projection.state.document.safetyUm,
+  });
 });
 
 test("starts the implemented Lâmina export from the Arquivo menu", () => {

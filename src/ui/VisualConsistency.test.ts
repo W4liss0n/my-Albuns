@@ -11,6 +11,7 @@ const welcomeStyles = readStyles("src/global/GlobalShell.css");
 const newProjectStyles = readStyles("src/global/NewProjectFlow.css");
 const previewStyles = readStyles("src/global/NewProjectPreviewPanel.css");
 const editorStyles = readStyles("src/App.css");
+const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
 const documentDpiSource = readStyles("src/components/DocumentDpiControl.tsx");
@@ -159,4 +160,11 @@ test("matches the compact sheet grid instead of using generic cards", () => {
   expect(inspectorPanelStyles).toMatch(
     /\.sheet-tile\.active \.sheet-tile__number,\s*\n\.sheet-tile\.active \.sheet-tile__pages\s*\{[^}]*color:\s*#fff;[^}]*background:\s*var\(--ui-accent\);/s,
   );
+});
+
+test("lets the continuous Canvas preview use the complete available height", () => {
+  expect(canvasPreviewStyles).toMatch(
+    /\.canvas-preview\s*\{[^}]*height:\s*100%;/s,
+  );
+  expect(canvasPreviewStyles).not.toContain("420px");
 });

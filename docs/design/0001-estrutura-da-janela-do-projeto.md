@@ -126,7 +126,10 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Essa referência é recalculada durante a navegação e permanece independente da Lâmina ou do Frame em foco. Ela não cria uma seleção exclusiva; apenas fornece o destino para comandos que não receberam um alvo pelo ponteiro, inclusive o duplo clique em uma mídia no Painel de imagens.
 - O Canvas não depende de uma coluna lateral de thumbnails.
 - O modo normal do Canvas contínuo não oferece Zoom.
-- Todas as Lâminas usam a mesma escala automática, calculada para que a altura completa caiba no Canvas com margem visual ao redor.
+- A área útil usa o neutro compartilhado do Canvas. Todas as Lâminas usam a mesma escala automática, calculada para que a altura completa caiba com `28 px` de margem visual superior e inferior; a separação horizontal entre superfícies é de `46 px` na tela.
+- Cada Lâmina tem cantos retos, contorno neutro de `1 px` e sombra em duas camadas — uma curta para separar a borda e outra ampla para dar profundidade sem aparência de card. A linha central de uma Lâmina dupla usa o mesmo separador claro do modelo de referência.
+- Um Frame vazio é representado por faixas diagonais neutras, sem ícone central ou card interno. A representação pertence somente à interface e não altera a Borda persistida do Frame.
+- Sangria e Área de segurança são projetadas diretamente das medidas canônicas do Documento como guias tracejadas vermelha e azul. Valor zero desativa somente a guia correspondente; em uma Página única, a borda voltada ao lado inativo não recebe guia. No modo normal, uma camada transitória neutra mascara somente a faixa de Sangria acima da composição e abaixo das guias; máscara e guias permanecem abaixo da Barra da Lâmina e fora da Exportação.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
 - A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
@@ -523,11 +526,10 @@ As propriedades em lote respeitam o tipo do elemento:
 - No Modo de edição, a ausência de seleção de Frame/Foto mostra `Design da Lâmina`; selecionar um desses elementos substitui esse contexto pelo de Frame e Foto.
 - A primeira versão não oferece comandos de alinhamento ou distribuição de Frames; a seleção múltipla não implica essas ferramentas.
 - Termos internos de persistência e herança, como `default` e `custom`, nunca aparecem literalmente na interface.
-- A imagem de referência é conceitual e não obriga a copiar seu estilo visual.
+- A imagem de referência continua conceitual para comportamentos não especificados; margens, espaçamento, profundidade, cantos, linha central e tratamento de Frame vazio definidos acima são requisitos visuais aceitos.
 
 ## Decisões ainda abertas
 
-- margem e centralização exatas da escala automática do Canvas contínuo;
 - limite máximo do Zoom exclusivo do Modo de edição, a ser calibrado no protótipo;
 - largura proporcional exata da faixa central de soltura dos Decorativos, a ser calibrada no protótipo;
 - proporção inicial exata do Frame placeholder criado manualmente.

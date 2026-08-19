@@ -1,3 +1,7 @@
+import {
+  createSheetGuideGeometry,
+  SHEET_GUIDE_STYLE,
+} from "../ui/sheetGuideGeometry";
 import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 
 interface SheetGuideLayerProps {
@@ -7,13 +11,11 @@ interface SheetGuideLayerProps {
 export function SheetGuideLayer({
   geometry: { bleedUm, heightUm, safetyUm, widthUm },
 }: SheetGuideLayerProps) {
-  const smallestSide = Math.min(widthUm, heightUm);
-  const bleed = Math.max(0, Math.min(bleedUm, smallestSide / 4));
-  const safety = Math.max(0, Math.min(safetyUm, smallestSide / 4));
-  const safetyInset = bleed + safety;
-  const dashLength = Math.max(2, heightUm * 0.01);
-  const dashGap = Math.max(2, heightUm * 0.008);
-  const strokeWidth = Math.max(1, heightUm * 0.003);
+  const guideGeometry = createSheetGuideGeometry({
+    bleedUm,
+    heightUm,
+    safetyUm,
+  });
 
   return (
     <g
@@ -23,32 +25,38 @@ export function SheetGuideLayer({
     >
       <line
         stroke="#d7d2c8"
-        strokeWidth={strokeWidth}
+        strokeWidth={guideGeometry.strokeWidthUm}
         x1={widthUm / 2}
         x2={widthUm / 2}
         y1={0}
         y2={heightUm}
       />
-      <rect
-        fill="none"
-        height={Math.max(1, heightUm - bleed * 2)}
-        stroke="#c57c70"
-        strokeDasharray={`${dashLength} ${dashGap}`}
-        strokeWidth={strokeWidth}
-        width={Math.max(1, widthUm - bleed * 2)}
-        x={bleed}
-        y={bleed}
-      />
-      <rect
-        fill="none"
-        height={Math.max(1, heightUm - safetyInset * 2)}
-        stroke="#6f9fbe"
-        strokeDasharray={`${dashLength} ${dashGap}`}
-        strokeWidth={strokeWidth}
-        width={Math.max(1, widthUm - safetyInset * 2)}
-        x={safetyInset}
-        y={safetyInset}
-      />
+      {bleedUm > 0 ? (
+        <rect
+          fill="none"
+          height={Math.max(1, heightUm - guideGeometry.bleedInsetUm * 2)}
+          stroke={SHEET_GUIDE_STYLE.bleed}
+          strokeDasharray={`${guideGeometry.dashLengthUm} ${guideGeometry.dashGapUm}`}
+          strokeOpacity={SHEET_GUIDE_STYLE.opacity}
+          strokeWidth={guideGeometry.strokeWidthUm}
+          width={Math.max(1, widthUm - guideGeometry.bleedInsetUm * 2)}
+          x={guideGeometry.bleedInsetUm}
+          y={guideGeometry.bleedInsetUm}
+        />
+      ) : null}
+      {safetyUm > 0 ? (
+        <rect
+          fill="none"
+          height={Math.max(1, heightUm - guideGeometry.safetyInsetUm * 2)}
+          stroke={SHEET_GUIDE_STYLE.safety}
+          strokeDasharray={`${guideGeometry.dashLengthUm} ${guideGeometry.dashGapUm}`}
+          strokeOpacity={SHEET_GUIDE_STYLE.opacity}
+          strokeWidth={guideGeometry.strokeWidthUm}
+          width={Math.max(1, widthUm - guideGeometry.safetyInsetUm * 2)}
+          x={guideGeometry.safetyInsetUm}
+          y={guideGeometry.safetyInsetUm}
+        />
+      ) : null}
     </g>
   );
 }

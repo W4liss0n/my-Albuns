@@ -40,6 +40,218 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
   });
 });
 
+test("matches the reference Canvas surface, technical guides and empty Frame treatment", async () => {
+  const placeholderComposition: CompositionPlan = {
+    ...composition,
+    sheets: composition.sheets.map((sheet) => ({
+      ...sheet,
+      frames: [
+        {
+          borderFillRects: [],
+          clipRect: {
+            x: 24_000,
+            y: 24_000,
+            width: 252_000,
+            height: 252_000,
+          },
+          frameId: "frame-placeholder",
+          photo: null,
+          zIndex: 0,
+        },
+      ],
+    })),
+  };
+  renderCanvas({
+    compositionPlan: placeholderComposition,
+    technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
+  });
+  await finishPixiInitialization();
+
+  const surface = displayWithLabel("sheet-surface-sheet-001") as unknown as {
+    rectCommands: Array<{
+      height: number;
+      width: number;
+      x: number;
+      y: number;
+    }>;
+    strokeStyles: unknown[];
+  };
+  expect(surface.rectCommands).toEqual([
+    { height: 300, width: 600, x: 0, y: 0 },
+  ]);
+  expect(surface.strokeStyles).toContainEqual(
+    expect.objectContaining({ pixelLine: true, width: 1 }),
+  );
+
+  const closeShadow = displayWithLabel(
+    "sheet-shadow-close-sheet-001",
+  ) as unknown as {
+    filters: unknown[];
+    rectCommands: unknown[];
+  };
+  const depthShadow = displayWithLabel(
+    "sheet-shadow-depth-sheet-001",
+  ) as unknown as {
+    filters: unknown[];
+    rectCommands: unknown[];
+  };
+  expect(closeShadow.filters).toEqual([]);
+  expect(depthShadow.filters).toEqual([]);
+  expect(closeShadow.rectCommands.length).toBeLessThan(
+    depthShadow.rectCommands.length,
+  );
+
+  const centerLine = displayWithLabel(
+    "sheet-center-line-sheet-001",
+  ) as unknown as { strokeStyles: Array<{ color: number }> };
+  expect(centerLine.strokeStyles).toContainEqual(
+    expect.objectContaining({ color: 0xeeeae1 }),
+  );
+
+  const placeholderBase = displayWithLabel(
+    "frame-placeholder-base-frame-placeholder",
+  ) as unknown as { fillStyles: Array<{ color: number }> };
+  const placeholderStripes = displayWithLabel(
+    "frame-placeholder-stripes-frame-placeholder",
+  ) as unknown as {
+    fillStyles: Array<{ color: number }>;
+    pathCommands: unknown[];
+  };
+  expect(placeholderBase.fillStyles).toContainEqual(
+    expect.objectContaining({ color: 0xe6e1d7 }),
+  );
+  expect(placeholderStripes.fillStyles).toContainEqual(
+    expect.objectContaining({ color: 0xdcd6ca }),
+  );
+  expect(placeholderStripes.pathCommands.length).toBeGreaterThan(0);
+  expect(
+    getPixiLifecycle().displays.some(
+      ({ label }) => label === "frame-placeholder-cross-frame-placeholder",
+    ),
+  ).toBe(false);
+
+  expect(displayWithLabel("sheet-bleed-guide-sheet-001")).toBeDefined();
+  expect(displayWithLabel("sheet-safety-guide-sheet-001")).toBeDefined();
+  expect(displayWithLabel("sheet-bleed-mask-sheet-001")).toMatchObject({
+    rectCommands: [
+      { height: 3, width: 600, x: 0, y: 0 },
+      { height: 294, width: 3, x: 597, y: 3 },
+      { height: 3, width: 600, x: 0, y: 297 },
+      { height: 294, width: 3, x: 0, y: 3 },
+    ],
+  });
+});
+
+test.each([
+  {
+    guides: { bleedUm: 0, safetyUm: 5_000 },
+    expectedLabels: ["sheet-safety-guide-sheet-001"],
+  },
+  {
+    guides: { bleedUm: 3_000, safetyUm: 0 },
+    expectedLabels: [
+      "sheet-bleed-mask-sheet-001",
+      "sheet-bleed-guide-sheet-001",
+    ],
+  },
+  { guides: { bleedUm: 0, safetyUm: 0 }, expectedLabels: [] },
+])(
+  "disables zero-valued technical guides independently ($guides)",
+  async ({ guides, expectedLabels }) => {
+    renderCanvas({ technicalGuides: guides });
+    await finishPixiInitialization();
+
+    const technicalLabels = pixiLifecycle.displays
+      .map(({ label }) => label)
+      .filter((label) =>
+        [
+          "sheet-bleed-guide-sheet-001",
+          "sheet-safety-guide-sheet-001",
+          "sheet-bleed-mask-sheet-001",
+        ].includes(label),
+      );
+    expect(technicalLabels).toEqual(expectedLabels);
+  },
+);
+
+test.each([
+  {
+    activeSides: "right" as const,
+    omittedGuideX: 3,
+    inactiveBoundaryX: 0,
+    omittedMaskX: 0,
+    retainedGuideX: 297,
+    retainedMaskX: 297,
+  },
+  {
+    activeSides: "left" as const,
+    omittedGuideX: 297,
+    inactiveBoundaryX: 300,
+    omittedMaskX: 297,
+    retainedGuideX: 3,
+    retainedMaskX: 0,
+  },
+])(
+  "omits guides and bleed mask on the inactive-side edge of a $activeSides single Page",
+  async ({
+    activeSides,
+    inactiveBoundaryX,
+    omittedGuideX,
+    omittedMaskX,
+    retainedGuideX,
+    retainedMaskX,
+  }) => {
+    renderCanvas({
+      compositionPlan: createSinglePageComposition(activeSides),
+      sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+      technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
+    });
+    await finishPixiInitialization();
+
+    const guide = displayWithLabel(
+      "sheet-bleed-guide-sheet-001",
+    ) as unknown as {
+      pathCommands: Array<{
+        kind: "lineTo" | "moveTo";
+        x: number;
+        y: number;
+      }>;
+    };
+    expect(hasVerticalSegmentAt(guide.pathCommands, omittedGuideX)).toBe(
+      false,
+    );
+    expect(hasVerticalSegmentAt(guide.pathCommands, retainedGuideX)).toBe(
+      true,
+    );
+    expect(
+      guide.pathCommands.some(({ x }) => x === inactiveBoundaryX),
+    ).toBe(true);
+
+    const bleedMask = displayWithLabel(
+      "sheet-bleed-mask-sheet-001",
+    ) as unknown as {
+      rectCommands: Array<{
+        height: number;
+        width: number;
+        x: number;
+        y: number;
+      }>;
+    };
+    expect(
+      bleedMask.rectCommands.some(
+        ({ height, width, x }) =>
+          x === omittedMaskX && width === 3 && height === 294,
+      ),
+    ).toBe(false);
+    expect(
+      bleedMask.rectCommands.some(
+        ({ height, width, x }) =>
+          x === retainedMaskX && width === 3 && height === 294,
+      ),
+    ).toBe(true);
+  },
+);
+
 test("materializes the integrated Sheet Bar instead of a loose sheet label", async () => {
   vi.useFakeTimers();
   renderCanvas();
@@ -123,12 +335,32 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
 });
 
 test("centers the canonical page number on a single-page sheet bar", async () => {
-  const singlePageComposition: CompositionPlan = {
+  renderCanvas({
+    compositionPlan: createSinglePageComposition("right"),
+    sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
+  });
+  await finishPixiInitialization();
+
+  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
+    position: { x: 150, y: 20 },
+    text: "1",
+  });
+  expect(
+    pixiLifecycle.displays.some(
+      ({ label }) => label === "sheet-bar-page-left-sheet-001",
+    ),
+  ).toBe(false);
+});
+
+function createSinglePageComposition(
+  activeSides: "left" | "right",
+): CompositionPlan {
+  return {
     ...composition,
     sheets: [
       {
         ...composition.sheets[0],
-        activeSides: "right",
+        activeSides,
         widthUm: 300_000,
         base: {
           ...composition.sheets[0].base,
@@ -144,22 +376,27 @@ test("centers the canonical page number on a single-page sheet bar", async () =>
       },
     ],
   };
-  renderCanvas({
-    compositionPlan: singlePageComposition,
-    sheetBarMetadata: [{ sheetId: "sheet-001", pageNumbers: [1] }],
-  });
-  await finishPixiInitialization();
+}
 
-  expect(displayWithLabel("sheet-bar-page-right-sheet-001")).toMatchObject({
-    position: { x: 150, y: 20 },
-    text: "1",
+function hasVerticalSegmentAt(
+  commands: Array<{
+    kind: "lineTo" | "moveTo";
+    x: number;
+    y: number;
+  }>,
+  x: number,
+) {
+  return commands.some((command, index) => {
+    const next = commands[index + 1];
+    return (
+      command.kind === "moveTo" &&
+      next?.kind === "lineTo" &&
+      command.x === x &&
+      next.x === x &&
+      command.y !== next.y
+    );
   });
-  expect(
-    pixiLifecycle.displays.some(
-      ({ label }) => label === "sheet-bar-page-left-sheet-001",
-    ),
-  ).toBe(false);
-});
+}
 
 test("keeps the materialized Pixi scene stable across view-only updates", async () => {
   const callbacks = {

@@ -265,6 +265,7 @@ export class AlbumCanvasScene {
           sheet,
           sheetBarMetadata.get(sheet.sheetId) ?? null,
           this.input.composition.frameBorder,
+          this.input.technicalGuides ?? null,
           previewStates,
           backgroundPreviewStates,
           overlayPreviewStates,
@@ -343,6 +344,7 @@ export class AlbumCanvasScene {
       sheet,
       sheetBarMetadata,
       this.input?.composition.frameBorder ?? { kind: "none" },
+      this.input?.technicalGuides,
       signature,
       {
         previewTextureFor: (mediaId) => this.previewTextureFor(mediaId),
