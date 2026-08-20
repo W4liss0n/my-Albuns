@@ -19,8 +19,9 @@ Ele combina três classes de evidência:
 
 - um corpus sintético determinístico, versionado como teste ignorado e executado
   em perfil `release` para cobrir os formatos e metadados de borda;
-- três recortes fotográficos da captura de referência versionada
-  `docs/assets/referencia-layout-editor.png`, normalizados para `1.600 px`, para
+- três recortes fotográficos da fixture histórica versionada
+  `crates/myalbuns-imaging/tests/assets/photographic-quality-corpus.png`,
+  normalizados para `1.600 px`, para
   comparar taxa e fidelidade entre qualidades JPEG sem depender de arquivos
   externos ou de caminhos locais;
 - as medições reais já registradas em
@@ -96,9 +97,11 @@ metadado, mas manteve 2 × 1 px porque PNG não recebe rotação implícita.
 
 ### Sweep fotográfico de qualidade JPEG
 
-A fonte do sweep é a captura de referência
-`docs/assets/referencia-layout-editor.png`, SHA-256
+A fonte do sweep é a fixture técnica histórica
+`crates/myalbuns-imaging/tests/assets/photographic-quality-corpus.png`, SHA-256
 `3c42f4e7833de4d0bb280091583d1075f059b9f005cfbb8dc30ae62d03a1e52b`.
+Ela é preservada apenas para tornar esta medição reproduzível e não constitui
+uma referência visual vigente da interface.
 O instrumento recorta três fotografias distintas nas caixas
 `[x, y, largura, altura]` `grupo-familiar [0, 140, 325, 465]`,
 `retrato-triplo [390, 140, 350, 465]` e

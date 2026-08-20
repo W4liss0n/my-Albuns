@@ -5,17 +5,17 @@ document: design
 
 # Estrutura da Janela do Projeto
 
-**Referência visual:** [imagem fornecida pelo autor](../assets/referencia-layout-editor.png)
+**Referência visual vigente:** [pacote interativo fornecido pelo autor](../references/ui-programa-diagramacao/myalbuns.dc.html)
 
-**Referência complementar:** [Painel de Layouts horizontal](../assets/referencia-painel-de-layouts-horizontal.png)
-
-![Referência de disposição da Janela do Projeto](../assets/referencia-layout-editor.png)
+![Miniatura da referência visual vigente](../references/ui-programa-diagramacao/thumbnail.webp)
 
 ## Objetivo
 
 Manter a composição do Álbum como foco principal, permitir navegação contínua entre Lâminas e concentrar ferramentas em duas regiões persistentes: o Painel de imagens na parte inferior e um Painel contextual à direita.
 
-A referência fixa a organização espacial, não o estilo visual final, as cores ou o tamanho exato de cada região.
+O pacote vigente fixa a organização espacial e a base visual. A especificação e
+as decisões aceitas posteriormente prevalecem nos detalhes que foram refinados
+durante a implementação.
 
 ## Comportamento desktop da WebView
 
@@ -165,7 +165,7 @@ Frames com Travessia central permanecem inalterados. A ação fica indisponível
 
 O controle central em forma de grade abre ou fecha o Painel de Layouts para aquela Lâmina. O clique fornece um alvo explícito: não depende da Lâmina centralizada no Canvas nem cria uma Lâmina ativa exclusiva para os demais comandos.
 
-![Referência do Painel de Layouts horizontal](../assets/referencia-painel-de-layouts-horizontal.png)
+[O Painel de Layouts pode ser consultado na referência visual vigente](../references/ui-programa-diagramacao/myalbuns.dc.html).
 
 O Painel de Layouts é uma única faixa horizontal compartilhada:
 

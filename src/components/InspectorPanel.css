@@ -26,13 +26,13 @@
   min-height: var(--ui-toolbar-height);
   align-items: center;
   justify-content: flex-start;
-  padding: 0 var(--ui-space-4);
+  padding: 0 var(--ui-space-3);
   border: 0;
   color: var(--ui-text);
   background: var(--ui-surface);
   font-size: var(--ui-font-size-label);
-  font-weight: 600;
-  gap: var(--ui-space-1);
+  font-weight: 650;
+  gap: var(--ui-space-2);
   text-align: left;
 }
 
@@ -52,16 +52,8 @@
   font-weight: 400;
 }
 
-.inspector-section-chevron {
-  display: grid;
-  width: 14px;
-  flex: none;
-  color: var(--ui-text-muted);
-  place-items: center;
-}
-
 .inspector-section-content {
-  padding: var(--ui-space-2) var(--ui-space-4) var(--ui-space-4);
+  padding: 0 var(--ui-space-3) var(--ui-space-3);
 }
 
 .context-heading {
@@ -90,10 +82,11 @@
 }
 
 .property-row {
-  display: grid;
-  min-height: 25px;
+  display: flex;
+  min-height: var(--ui-toolbar-height);
   align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--ui-border);
   gap: var(--ui-space-3);
 }
 
@@ -108,7 +101,6 @@
   font-size: var(--ui-font-size-caption);
   font-weight: 500;
   text-align: right;
-  white-space: nowrap;
 }
 
 .document-settings-group {
@@ -182,8 +174,8 @@
 
 .sheet-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  gap: var(--ui-space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
 }
 
 .sheet-tile {

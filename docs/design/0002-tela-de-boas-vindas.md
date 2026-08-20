@@ -5,6 +5,8 @@ document: design
 
 # Tela de Boas-vindas
 
+**Referência visual vigente:** [Tela de Boas-vindas](../references/ui-programa-diagramacao/Boas-vindas.dc.html)
+
 ## Objetivo
 
 A Tela de Boas-vindas é a superfície principal visível do processo `MyAlbuns.exe`. Ela funciona como ponto de entrada e coordenação do aplicativo, sem incorporar Canvas, composição ou qualquer estado criativo de um Projeto.

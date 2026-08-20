@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>
+html,body{margin:0;padding:0;height:100%;background:#f0eee9}
+*{box-sizing:border-box}
+a{color:oklch(0.52 0.13 250);text-decoration:none}
+a:hover{color:oklch(0.44 0.14 250)}
+input,select,button{font-family:inherit}
+::-webkit-scrollbar{height:11px;width:11px}
+::-webkit-scrollbar-thumb{background:#d0ccc2;border-radius:99px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#b9b4a9;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+</style></helmet>
+
+<div style="min-height:100vh;background:#f0eee9;color:#2c2924;font-family:'Helvetica Neue',Helvetica,system-ui,sans-serif;font-size:13px">
+
+  <div style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;height:46px;padding:0 22px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+    <span style="font-weight:600;letter-spacing:.14em;font-size:10px;color:oklch(0.55 0.13 250);text-transform:uppercase">myalbuns</span>
+    <span style="color:#cdc8be">·</span>
+    <span style="font-size:13px;font-weight:600">Janelas de tela</span>
+    <span style="flex:1"></span>
+    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">altura fixa · só o corpo rola · ação principal no rodapé à direita</span>
+  </div>
+
+  <div style="padding:26px 22px 60px;display:flex;flex-direction:column;gap:34px">
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Anatomia</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start">
+        <div style="flex:none;width:470px;height:262px;display:flex;flex-direction:column;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;overflow:hidden">
+          <div style="height:46px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;background:#f6f4ef;border-bottom:1px dashed #ccc6b9">
+            <span style="font-size:12px;font-weight:600">Cabeçalho</span>
+            <span style="font-size:11.5px;color:#6b665e">título + contexto do que está aberto</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px ui-monospace,Menlo,monospace;color:#a29c92">46 px</span>
+          </div>
+          <div style="flex:1;min-height:0;display:flex;align-items:center;gap:10px;padding:0 14px;background:#fdfcfa">
+            <span style="font-size:12px;font-weight:600">Corpo</span>
+            <span style="font-size:11.5px;color:#6b665e">rola sozinho quando passa da altura</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px ui-monospace,Menlo,monospace;color:#a29c92">overflow: auto</span>
+          </div>
+          <div style="height:54px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;background:#f6f4ef;border-top:1px dashed #ccc6b9">
+            <span style="font-size:12px;font-weight:600">Rodapé</span>
+            <span style="font-size:11.5px;color:#6b665e">ação principal à direita</span>
+            <span style="flex:1"></span>
+            <span style="font:400 10px ui-monospace,Menlo,monospace;color:#a29c92">54 px</span>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:11px;padding-top:2px">
+          <div style="display:flex;gap:9px"><span style="flex:none;width:5px;height:5px;margin-top:6px;border-radius:50%;background:oklch(0.55 0.13 250)"></span><span style="font-size:12.5px;color:#4a4640;line-height:1.5;text-wrap:pretty">Quatro larguras, nada entre elas: <b>760</b> para tarefa, <b>840</b> para preferências, <b>780</b> para relatório, <b>1040</b> quando a janela tem preview ao vivo.</span></div>
+          <div style="display:flex;gap:9px"><span style="flex:none;width:5px;height:5px;margin-top:6px;border-radius:50%;background:oklch(0.55 0.13 250)"></span><span style="font-size:12.5px;color:#4a4640;line-height:1.5;text-wrap:pretty">A altura é fixa. A janela não cresce com o conteúdo, o corpo rola.</span></div>
+          <div style="display:flex;gap:9px"><span style="flex:none;width:5px;height:5px;margin-top:6px;border-radius:50%;background:oklch(0.55 0.13 250)"></span><span style="font-size:12.5px;color:#4a4640;line-height:1.5;text-wrap:pretty">Uma janela não abre outra janela. Sobre ela cabe apenas um modal de 380 px.</span></div>
+          <div style="display:flex;gap:9px"><span style="flex:none;width:5px;height:5px;margin-top:6px;border-radius:50%;background:oklch(0.55 0.13 250)"></span><span style="font-size:12.5px;color:#4a4640;line-height:1.5;text-wrap:pretty">Tarefa e relatório confirmam no rodapé. Preferências aplicam na hora e só têm <b>Fechar</b>.</span></div>
+          <div style="display:flex;gap:9px"><span style="flex:none;width:5px;height:5px;margin-top:6px;border-radius:50%;background:oklch(0.55 0.13 250)"></span><span style="font-size:12.5px;color:#4a4640;line-height:1.5;text-wrap:pretty">Esc fecha, exceto com trabalho em andamento.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Janela de tarefa</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="padding:26px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+        <div style="width:760px;height:520px;display:flex;flex-direction:column;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 24px 60px rgba(60,54,44,.24);overflow:hidden">
+
+          <div style="height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 8px 0 16px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+            <sc-if value="{{ barraMac }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;gap:6px;padding-right:4px">
+                <span style="width:11px;height:11px;border-radius:50%;background:#e0a09a"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#ded2a4"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#b8cfae"></span>
+              </span>
+            </sc-if>
+            <span style="font-size:13px;font-weight:600">Exportar álbum</span>
+            <span style="color:#d5d0c6">·</span>
+            <span style="font-size:12.5px;color:#6b665e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Formatura Medicina 2026 · 18 lâminas</span>
+            <span style="flex:1"></span>
+            <sc-if value="{{ barraX }}" hint-placeholder-val="{{ true }}">
+              <button type="button" style="flex:none;width:31px;height:31px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#8a847a;cursor:default" style-hover="background:#efece4;color:#2c2924">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.6 4.6 11.4 11.4M11.4 4.6 4.6 11.4"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex">
+            <div style="flex:1;min-width:0;overflow:auto;padding:18px 20px 22px;display:flex;flex-direction:column;gap:18px">
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Formato</span>
+                <div style="display:flex;gap:0;padding:2px;background:#efece5;border-radius:6px;width:max-content">
+                  <span style="padding:5px 15px;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(60,54,44,.14);font-size:12.5px;font-weight:600">PDF</span>
+                  <span style="padding:5px 15px;border-radius:4px;font-size:12.5px;color:#6b665e">JPEG</span>
+                  <span style="padding:5px 15px;border-radius:4px;font-size:12.5px;color:#6b665e">PNG</span>
+                </div>
+              </div>
+
+              <div style="width:262px;display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Qualidade</span>
+                <div style="display:flex;align-items:center;gap:8px;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                  <span style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Gráfica — 300 dpi</span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#8a847a" stroke-width="1.6"><path d="m4 6.5 4 3.5 4-3.5"></path></svg>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Montagem</span>
+                <div style="display:flex;gap:0;padding:2px;background:#efece5;border-radius:6px;width:max-content">
+                  <span style="padding:5px 15px;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(60,54,44,.14);font-size:12.5px;font-weight:600">Lâmina inteira</span>
+                  <span style="padding:5px 15px;border-radius:4px;font-size:12.5px;color:#6b665e">Páginas separadas</span>
+                </div>
+                <span style="font-size:11.5px;color:#8a847a">A lâmina sai como uma folha dupla de 60 × 30 cm.</span>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="width:14px;height:14px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:3px;background:oklch(0.55 0.13 250);color:#fff;font-size:9px">✓</span>
+                <span style="font-size:12.5px">Marcas de corte e registro</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Lâminas</span>
+                <div style="display:flex;gap:0;padding:2px;background:#efece5;border-radius:6px;width:max-content">
+                  <span style="padding:5px 15px;border-radius:4px;background:#fff;box-shadow:0 1px 2px rgba(60,54,44,.14);font-size:12.5px;font-weight:600">Todas — 18</span>
+                  <span style="padding:5px 15px;border-radius:4px;font-size:12.5px;color:#6b665e">Intervalo</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Pasta de destino</span>
+                <div style="display:flex;gap:8px">
+                  <div style="flex:1;min-width:0;display:flex;align-items:center;height:31px;padding:0 10px;background:#f4f2ec;border:1px solid #e2ded4;border-radius:5px;font:400 11.5px ui-monospace,Menlo,monospace;color:#6b665e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/myalbuns/exportados/2026-08-13</div>
+                  <button type="button" style="flex:none;height:31px;padding:0 13px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Escolher…</button>
+                </div>
+              </div>
+
+            </div>
+
+            <div style="width:252px;flex:none;padding:18px;background:#f7f6f2;border-left:1px solid #eae6dd;overflow:auto;display:flex;flex-direction:column;gap:12px">
+              <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Resumo</span>
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <span style="font-size:13.5px;font-weight:600">1 arquivo PDF</span>
+                <span style="font-size:12px;color:#6b665e;line-height:1.45;text-wrap:pretty">18 lâminas inteiras de 60 × 30 cm</span>
+              </div>
+              <div style="height:1px;background:#e6e2d9"></div>
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;gap:10px;font-size:12px"><span style="flex:1;color:#6b665e">Tamanho</span><span>≈ 412 MB</span></div>
+                <div style="display:flex;gap:10px;font-size:12px"><span style="flex:1;color:#6b665e">Tempo</span><span>≈ 4 min</span></div>
+              </div>
+              <sc-if value="{{ avisos }}" hint-placeholder-val="{{ true }}">
+                <div style="margin-top:2px;padding:11px 12px;background:oklch(0.96 0.035 85);border:1px solid oklch(0.88 0.06 85);border-radius:6px;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:center;gap:7px">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="oklch(0.55 0.13 70)" stroke-width="1.5"><path d="M8 4.4v4M8 11.1v.1"></path></svg>
+                    <span style="font-size:12px;font-weight:600;color:oklch(0.42 0.09 70)">1 aviso</span>
+                  </div>
+                  <span style="font-size:11.5px;color:oklch(0.45 0.06 70);line-height:1.45;text-wrap:pretty">A lâmina 09 tem uma imagem a 180 dpi. Ela sai impressa mais macia que o resto.</span>
+                  <a href="#" style="font-size:11.5px;font-weight:500">Ver lâmina 09</a>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#fbfaf8;border-top:1px solid #eeeae2">
+            <span style="flex:1"></span>
+            <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+            <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Exportar</button>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ legendas }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:12px 2px 0;max-width:700px">
+          <div style="font-size:12.5px;font-weight:600">Duas colunas: escolhas à esquerda, consequência à direita</div>
+          <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Só entra aqui o que muda de uma exportação para outra. Sangria, tamanho e perfil de cor vêm das configurações do álbum e não são repetidos. O resumo recalcula a cada mudança e é o único lugar onde avisos aparecem.</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Janela de preferências</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="padding:26px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+        <div style="width:840px;height:534px;display:flex;flex-direction:column;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 24px 60px rgba(60,54,44,.24);overflow:hidden">
+
+          <div style="height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 8px 0 16px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+            <sc-if value="{{ barraMac }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;gap:6px;padding-right:4px">
+                <span style="width:11px;height:11px;border-radius:50%;background:#e0a09a"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#ded2a4"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#b8cfae"></span>
+              </span>
+            </sc-if>
+            <span style="font-size:13px;font-weight:600">Configurações</span>
+            <span style="flex:1"></span>
+            <sc-if value="{{ barraX }}" hint-placeholder-val="{{ true }}">
+              <button type="button" style="flex:none;width:31px;height:31px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#8a847a;cursor:default" style-hover="background:#efece4;color:#2c2924">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.6 4.6 11.4 11.4M11.4 4.6 4.6 11.4"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+
+          <div style="flex:1;min-height:0;display:flex">
+            <div style="width:196px;flex:none;padding:12px 10px;background:#f7f6f2;border-right:1px solid #eae6dd;display:flex;flex-direction:column;gap:2px">
+              <span style="padding:7px 11px;border-radius:5px;font-size:12.5px;color:#4a4640;cursor:default" style-hover="background:#efece4">Geral</span>
+              <span style="padding:7px 11px;border-radius:5px;font-size:12.5px;color:#4a4640;cursor:default" style-hover="background:#efece4">Aparência</span>
+              <span style="padding:7px 11px;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:600;cursor:default">Imagens</span>
+              <span style="padding:7px 11px;border-radius:5px;font-size:12.5px;color:#4a4640;cursor:default" style-hover="background:#efece4">Exportação</span>
+              <span style="padding:7px 11px;border-radius:5px;font-size:12.5px;color:#4a4640;cursor:default" style-hover="background:#efece4">Atalhos</span>
+              <span style="padding:7px 11px;border-radius:5px;font-size:12.5px;color:#4a4640;cursor:default" style-hover="background:#efece4">Armazenamento</span>
+              <span style="flex:1"></span>
+              <span style="padding:0 11px;font:400 10.5px ui-monospace,Menlo,monospace;color:#a29c92">myalbuns 3.2.1</span>
+            </div>
+
+            <div style="flex:1;min-width:0;overflow:auto;padding:6px 24px 24px">
+
+              <div style="padding:16px 0 4px;font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Importação</div>
+              <div style="display:flex;align-items:flex-start;gap:20px;padding:14px 0;border-bottom:1px solid #f0ece4">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:12.5px;font-weight:600">Resolução de trabalho</span>
+                  <span style="font-size:11.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">Tamanho usado na tela. O arquivo original nunca é alterado e volta inteiro na exportação.</span>
+                </div>
+                <div style="flex:none;width:172px;display:flex;align-items:center;gap:8px;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                  <span style="flex:1;font-size:12.5px">2048 px no lado maior</span>
+                  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#8a847a" stroke-width="1.6"><path d="m4 6.5 4 3.5 4-3.5"></path></svg>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:20px;padding:14px 0;border-bottom:1px solid #f0ece4">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:12.5px;font-weight:600">Girar pelo EXIF ao importar</span>
+                  <span style="font-size:11.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">Usa a orientação gravada pela câmera em vez de pedir confirmação foto por foto.</span>
+                </div>
+                <button type="button" onClick="{{ toggleExif }}" style="flex:none;width:34px;height:19px;padding:2px;border:0;border-radius:99px;background:{{ exifBg }};cursor:default;display:flex;justify-content:{{ exifPos }}">
+                  <span style="width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(60,54,44,.3)"></span>
+                </button>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:20px;padding:14px 0">
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                  <span style="font-size:12.5px;font-weight:600">Avisar sobre baixa resolução</span>
+                  <span style="font-size:11.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">Marca a imagem na lâmina quando ela fica abaixo de 240 dpi no tamanho em que foi colocada.</span>
+                </div>
+                <button type="button" onClick="{{ toggleAviso }}" style="flex:none;width:34px;height:19px;padding:2px;border:0;border-radius:99px;background:{{ avisoBg }};cursor:default;display:flex;justify-content:{{ avisoPos }}">
+                  <span style="width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(60,54,44,.3)"></span>
+                </button>
+              </div>
+
+              <div style="padding:22px 0 4px;font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Ao arrastar para a lâmina</div>
+              <div style="display:flex;flex-direction:column;gap:10px;padding:14px 0;border-bottom:1px solid #f0ece4">
+                <div style="display:flex;gap:9px;align-items:flex-start">
+                  <span style="flex:none;width:14px;height:14px;margin-top:1px;border-radius:50%;border:4px solid oklch(0.55 0.13 250);background:#fff"></span>
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:12.5px;font-weight:600">Preencher o frame e cortar o excesso</span>
+                    <span style="font-size:11.5px;color:#6b665e">Sem bordas vazias. A posição do corte pode ser ajustada depois.</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:9px;align-items:flex-start">
+                  <span style="flex:none;width:14px;height:14px;margin-top:1px;border-radius:50%;border:1px solid #cfc9bd;background:#fff"></span>
+                  <div style="display:flex;flex-direction:column;gap:2px">
+                    <span style="font-size:12.5px;font-weight:600;color:#4a4640">Encaixar a foto inteira no frame</span>
+                    <span style="font-size:11.5px;color:#6b665e">Nada é cortado; sobra fundo nas laterais.</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <div style="height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#fbfaf8;border-top:1px solid #eeeae2">
+            <button type="button" style="height:31px;padding:0 12px;border:0;border-radius:5px;background:transparent;color:#6b665e;font-size:12.5px;cursor:default" style-hover="background:#efece4;color:#2c2924">Restaurar padrões</button>
+            <span style="flex:1"></span>
+            <span style="font-size:11.5px;color:#9b958a">As alterações valem na hora</span>
+            <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Fechar</button>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ legendas }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:12px 2px 0;max-width:700px">
+          <div style="font-size:12.5px;font-weight:600">Categorias à esquerda, uma linha por ajuste</div>
+          <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Cada linha tem nome, uma frase dizendo o efeito real e o controle à direita, alinhado com os outros. Sem OK e sem Cancelar: nada aqui espera confirmação.</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Janela de relatório</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="padding:26px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+        <div style="width:780px;height:406px;display:flex;flex-direction:column;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 24px 60px rgba(60,54,44,.24);overflow:hidden">
+
+          <div style="height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 8px 0 16px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+            <sc-if value="{{ barraMac }}" hint-placeholder-val="{{ false }}">
+              <span style="display:flex;gap:6px;padding-right:4px">
+                <span style="width:11px;height:11px;border-radius:50%;background:#e0a09a"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#ded2a4"></span>
+                <span style="width:11px;height:11px;border-radius:50%;background:#b8cfae"></span>
+              </span>
+            </sc-if>
+            <span style="font-size:13px;font-weight:600">Arquivos com problema</span>
+            <span style="color:#d5d0c6">·</span>
+            <span style="font-size:12.5px;color:#6b665e">4 de 214 imagens não abriram</span>
+            <span style="flex:1"></span>
+            <sc-if value="{{ barraX }}" hint-placeholder-val="{{ true }}">
+              <button type="button" style="flex:none;width:31px;height:31px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#8a847a;cursor:default" style-hover="background:#efece4;color:#2c2924">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.6 4.6 11.4 11.4M11.4 4.6 4.6 11.4"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+
+          <div style="flex:none;display:flex;align-items:center;gap:12px;padding:9px 16px;background:#f7f6f2;border-bottom:1px solid #eae6dd;font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:#a29c92">
+            <span style="flex:none;width:14px"></span>
+            <span style="flex:1;min-width:0">Arquivo</span>
+            <span style="flex:none;width:176px">Pasta</span>
+            <span style="flex:none;width:148px">Problema</span>
+            <span style="flex:none;width:148px">Ação</span>
+          </div>
+
+          <div style="flex:1;min-height:0;overflow:auto">
+
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f2eee7">
+              <span style="flex:none;width:14px;display:flex;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.18 25)"></span></span>
+              <span style="flex:1;min-width:0;font:400 12px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IMG_4417.CR3</span>
+              <span style="flex:none;width:176px;font:400 11px ui-monospace,Menlo,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/fotos/medicina/brutos</span>
+              <span style="flex:none;width:148px;font-size:11.5px;color:#6b665e">Não está mais na pasta</span>
+              <span style="flex:none;width:148px;display:flex;gap:8px;justify-content:flex-start"><button type="button" style="height:28px;width:104px;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Localizar…</button><button type="button" title="Abrir pasta" style="flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4.6h4L7.2 6H14v6.2a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8V4.6Z"></path></svg></button></span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f2eee7">
+              <span style="flex:none;width:14px;display:flex;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.18 25)"></span></span>
+              <span style="flex:1;min-width:0;font:400 12px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IMG_4418.CR3</span>
+              <span style="flex:none;width:176px;font:400 11px ui-monospace,Menlo,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/fotos/medicina/brutos</span>
+              <span style="flex:none;width:148px;font-size:11.5px;color:#6b665e">Não está mais na pasta</span>
+              <span style="flex:none;width:148px;display:flex;gap:8px;justify-content:flex-start"><button type="button" style="height:28px;width:104px;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Localizar…</button><button type="button" title="Abrir pasta" style="flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4.6h4L7.2 6H14v6.2a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8V4.6Z"></path></svg></button></span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f2eee7">
+              <span style="flex:none;width:14px;display:flex;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.62 0.15 70)"></span></span>
+              <span style="flex:1;min-width:0;font:400 12px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">retrato-turma.heic</span>
+              <span style="flex:none;width:176px;font:400 11px ui-monospace,Menlo,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/downloads</span>
+              <span style="flex:none;width:148px;font-size:11.5px;color:#6b665e">Formato não suportado</span>
+              <span style="flex:none;width:148px;display:flex;gap:8px;justify-content:flex-start"><button type="button" style="height:28px;width:104px;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Converter</button><button type="button" title="Abrir pasta" style="flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4.6h4L7.2 6H14v6.2a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8V4.6Z"></path></svg></button></span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #f2eee7">
+              <span style="flex:none;width:14px;display:flex;justify-content:center"><span style="width:7px;height:7px;border-radius:50%;background:oklch(0.55 0.18 25)"></span></span>
+              <span style="flex:1;min-width:0;font:400 12px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">DSC_0091.jpg</span>
+              <span style="flex:none;width:176px;font:400 11px ui-monospace,Menlo,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/fotos/medicina/selecionadas</span>
+              <span style="flex:none;width:148px;font-size:11.5px;color:#6b665e">Arquivo danificado</span>
+              <span style="flex:none;width:148px;display:flex;gap:8px;justify-content:flex-start"><button type="button" style="height:28px;width:104px;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924">Remover</button><button type="button" title="Abrir pasta" style="flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 4.6h4L7.2 6H14v6.2a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8V4.6Z"></path></svg></button></span>
+            </div>
+
+            <div style="padding:14px 16px;font-size:11.5px;color:#9b958a;text-wrap:pretty">Os arquivos que continuarem na lista ficam marcados nas lâminas como espaço reservado.</div>
+          </div>
+
+          <div style="height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#fbfaf8;border-top:1px solid #eeeae2">
+            <button type="button" style="height:31px;padding:0 12px;border:0;border-radius:5px;background:transparent;color:#6b665e;font-size:12.5px;cursor:default" style-hover="background:#efece4;color:#2c2924">Copiar lista</button>
+            <span style="flex:1"></span>
+            <button type="button" style="display:flex;align-items:center;gap:7px;height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 8a5 5 0 1 1-1.7-3.8M13 2.6V5h-2.4"></path></svg>
+              <span>Tentar novamente</span>
+            </button>
+            <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Ignorar</button>
+            <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Localizar…</button>
+          </div>
+        </div>
+      </div>
+      <sc-if value="{{ legendas }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:12px 2px 0;max-width:700px">
+          <div style="font-size:12.5px;font-weight:600">Quatro colunas fixas: arquivo, pasta, problema, ação</div>
+          <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">As colunas têm largura fixa, então o olho desce reto por cada uma. A janela fica aberta enquanto o usuário conserta os arquivos por fora: <b>Tentar novamente</b> relê a lista e as linhas resolvidas desaparecem.</div>
+        </div>
+      </sc-if>
+    </div>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;estiloBarra&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Botão fechar&quot;,&quot;Semáforo macOS&quot;],&quot;default&quot;:&quot;Botão fechar&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Janela&quot;},&quot;mostrarLegendas&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Página&quot;},&quot;mostrarAvisos&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Janela&quot;}}">
+class Component extends DCLogic {
+  state = { exif: true, aviso: false };
+
+  renderVals() {
+    const barra = this.props.estiloBarra ?? "Botão fechar";
+    const on = "oklch(0.55 0.13 250)", off = "#d5d0c6";
+    return {
+      barraX: barra === "Botão fechar",
+      barraMac: barra !== "Botão fechar",
+      legendas: this.props.mostrarLegendas ?? true,
+      avisos: this.props.mostrarAvisos ?? true,
+      exifBg: this.state.exif ? on : off,
+      exifPos: this.state.exif ? "flex-end" : "flex-start",
+      avisoBg: this.state.aviso ? on : off,
+      avisoPos: this.state.aviso ? "flex-end" : "flex-start",
+      toggleExif: () => this.setState(s => ({ exif: !s.exif })),
+      toggleAviso: () => this.setState(s => ({ aviso: !s.aviso }))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -8,6 +8,9 @@ This repository uses a single domain context.
 - Read the accepted ADRs relevant to the change.
 - Read the canonical product specification before changing product behaviour.
 - Read the linked design documents and delivery ticket for the area being changed.
+- For visual UI work, use
+  `docs/references/ui-programa-diagramacao/README.md` and its linked package as
+  the only visual reference. Historical research fixtures are not UI references.
 
 ## Normative ownership
 

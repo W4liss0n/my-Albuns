@@ -5,6 +5,8 @@ document: design
 
 # Criação de Projeto
 
+**Referência visual vigente:** [Criação de Projeto](../references/ui-programa-diagramacao/Criar%20projeto.dc.html)
+
 ## Objetivo
 
 O fluxo de `Novo Projeto` coleta apenas as definições iniciais do Álbum. Nome e Localização permanecem sob responsabilidade do diálogo nativo do Windows.

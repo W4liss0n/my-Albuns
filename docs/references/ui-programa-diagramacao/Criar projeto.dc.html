@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>
+html,body{margin:0;padding:0;height:100%;background:#f0eee9}
+*{box-sizing:border-box}
+a{color:oklch(0.52 0.13 250);text-decoration:none}
+a:hover{color:oklch(0.44 0.14 250)}
+input,select,button{font-family:inherit}
+input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:99px;background:#e2ded4}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;margin-top:-4.5px;border-radius:50%;background:#fff;border:1px solid #c6c0b4;box-shadow:0 1px 2px rgba(60,54,44,.25)}
+::-webkit-scrollbar{height:11px;width:11px}
+::-webkit-scrollbar-thumb{background:#d0ccc2;border-radius:99px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#b9b4a9;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+</style></helmet>
+
+<div style="min-height:100vh;background:#f0eee9;color:#2c2924;font-family:'Helvetica Neue',Helvetica,system-ui,sans-serif;font-size:13px">
+
+  <div style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;height:46px;padding:0 22px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+    <span style="font-weight:600;letter-spacing:.14em;font-size:10px;color:oklch(0.55 0.13 250);text-transform:uppercase">myalbuns</span>
+    <span style="color:#cdc8be">·</span>
+    <span style="font-size:13px;font-weight:600">Criar projeto</span>
+    <span style="flex:1"></span>
+    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">dois passos · o preview acompanha os dois</span>
+  </div>
+
+  <div style="padding:26px 22px 60px;display:flex;flex-direction:column;gap:14px">
+
+    <div style="padding:26px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+      <div style="width:1040px;height:580px;flex:none;display:flex;flex-direction:column;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 24px 60px rgba(60,54,44,.24);overflow:hidden">
+
+        <div style="height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 8px 0 16px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+          <sc-if value="{{ barraMac }}" hint-placeholder-val="{{ false }}">
+            <span style="display:flex;gap:6px;padding-right:4px">
+              <span style="width:11px;height:11px;border-radius:50%;background:#e0a09a"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#ded2a4"></span>
+              <span style="width:11px;height:11px;border-radius:50%;background:#b8cfae"></span>
+            </span>
+          </sc-if>
+          <span style="font-size:13px;font-weight:600">Novo projeto</span>
+          <span style="flex:1"></span>
+          <div style="display:flex;align-items:center;gap:9px">
+            <button type="button" onClick="{{ irPasso1 }}" style="display:flex;align-items:center;gap:7px;padding:0;border:0;background:transparent;cursor:default">
+              <span style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:{{ p1Bg }};color:{{ p1Cor }};font-size:10.5px;font-weight:600">1</span>
+              <span style="font-size:12px;font-weight:{{ p1Peso }};color:{{ p1Texto }}">Configurações</span>
+            </button>
+            <span style="width:16px;height:1px;background:#d9d4ca"></span>
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="width:18px;height:18px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:{{ p2Bg }};color:{{ p2Cor }};font-size:10.5px;font-weight:600">2</span>
+              <span style="font-size:12px;font-weight:{{ p2Peso }};color:{{ p2Texto }}">Personalização</span>
+            </div>
+          </div>
+          <span style="flex:1"></span>
+          <sc-if value="{{ barraX }}" hint-placeholder-val="{{ true }}">
+            <button type="button" style="flex:none;width:31px;height:31px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#8a847a;cursor:default" style-hover="background:#efece4;color:#2c2924">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.6 4.6 11.4 11.4M11.4 4.6 4.6 11.4"></path></svg>
+            </button>
+          </sc-if>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex">
+
+          <div onClick="{{ selAmbos }}" style="flex:1;min-width:0;display:flex;flex-direction:column;background:#f0eee9;border-right:1px solid #eae6dd;cursor:default">
+            <div style="flex:none;height:50px;display:flex;align-items:center;gap:9px;padding:0 16px">
+              <sc-if value="{{ ehPasso2 }}" hint-placeholder-val="{{ false }}">
+                <span style="font-size:12px;font-weight:600;color:#4a4640">{{ alvoTitulo }}</span>
+              </sc-if>
+              <span style="flex:1"></span>
+              <span style="font:400 10.5px ui-monospace,Menlo,monospace;color:#a29c92">{{ resumoPreview }}</span>
+              <sc-if value="{{ guias }}" hint-placeholder-val="{{ true }}">
+                <span style="display:flex;align-items:center;gap:12px;padding-left:4px">
+                  <span style="display:flex;align-items:center;gap:5px">
+                    <span style="width:12px;height:0;border-top:1px dashed rgba(190,90,90,.85)"></span>
+                    <span style="font-size:10.5px;color:#a29c92">sangria</span>
+                  </span>
+                  <span style="display:flex;align-items:center;gap:5px">
+                    <span style="width:12px;height:0;border-top:1px dashed rgba(90,120,190,.85)"></span>
+                    <span style="font-size:10.5px;color:#a29c92">área segura</span>
+                  </span>
+                </span>
+              </sc-if>
+            </div>
+
+            <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:0 16px 16px">
+              <div style="position:relative;background:#fbfaf8;box-shadow:0 10px 30px rgba(60,54,44,.22)">
+                <div style="display:flex;outline:{{ outlineSpread }};outline-offset:3px">
+
+                <div onClick="{{ selEsq }}" style="position:relative;width:{{ pagW }};height:{{ pagH }};padding:{{ margemEsq }};background:{{ fundoEsq }};opacity:{{ opEsq }};outline:{{ outlineEsq }};outline-offset:-1px;overflow:hidden;cursor:default">
+                  <div style="height:100%;display:grid;grid-template-columns:{{ colsEsq }};grid-template-rows:{{ rowsEsq }};gap:{{ gapEsq }}">
+                    <sc-for list="{{ framesEsq }}" as="f" hint-placeholder-count="2">
+                      <div style="background:#e0dbd2;border-radius:2px;border:{{ f.bw }} solid {{ f.bc }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="position:absolute;inset:0;background:{{ ovEsq }};border:{{ ovBordaEsq }};opacity:{{ ovOpEsq }};pointer-events:none"></div>
+                  <sc-if value="{{ guias }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;inset:{{ sangriaInset }};border:1px dashed rgba(190,90,90,.6);pointer-events:none"></div>
+                    <div style="position:absolute;inset:{{ seguraInset }};border:1px dashed rgba(90,120,190,.55);pointer-events:none"></div>
+                  </sc-if>
+                </div>
+
+                <div style="width:1px;background:rgba(60,54,44,.18)"></div>
+
+                <div onClick="{{ selDir }}" style="position:relative;width:{{ pagW }};height:{{ pagH }};padding:{{ margemDir }};background:{{ fundoDir }};opacity:{{ opDir }};outline:{{ outlineDir }};outline-offset:-1px;overflow:hidden;cursor:default">
+                  <div style="height:100%;display:grid;grid-template-columns:{{ colsDir }};grid-template-rows:{{ rowsDir }};gap:{{ gapDir }}">
+                    <sc-for list="{{ framesDir }}" as="f" hint-placeholder-count="2">
+                      <div style="background:#e0dbd2;border-radius:2px;border:{{ f.bw }} solid {{ f.bc }}"></div>
+                    </sc-for>
+                  </div>
+                  <div style="position:absolute;inset:0;background:{{ ovDir }};border:{{ ovBordaDir }};opacity:{{ ovOpDir }};pointer-events:none"></div>
+                  <sc-if value="{{ guias }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;inset:{{ sangriaInset }};border:1px dashed rgba(190,90,90,.6);pointer-events:none"></div>
+                    <div style="position:absolute;inset:{{ seguraInset }};border:1px dashed rgba(90,120,190,.55);pointer-events:none"></div>
+                  </sc-if>
+                </div>
+
+                </div>
+
+              </div>
+            </div>
+
+            <div style="flex:none;padding:0 16px 14px;font-size:11.5px;color:#8a847a;text-wrap:pretty">{{ dica }}</div>
+          </div>
+
+          <sc-if value="{{ ehPasso1 }}" hint-placeholder-val="{{ true }}">
+            <div style="width:312px;flex:none;overflow:visible;padding:18px;background:#f7f6f2;display:flex;flex-direction:column;gap:17px">
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Predefinição</span>
+                <div style="display:flex;gap:8px">
+                  <div style="flex:1;min-width:0;position:relative;display:flex">
+                    <select value="{{ preSel }}" onChange="{{ setPre }}" style="flex:1;min-width:0;height:31px;padding:0 28px 0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;font-size:12.5px;color:#2c2924;outline:none;appearance:none;-webkit-appearance:none;cursor:default">
+                      <option value="">Nenhuma</option>
+                      <sc-for list="{{ predefinicoes }}" as="p" hint-placeholder-count="3">
+                        <option value="{{ p.rotulo }}">{{ p.rotulo }}</option>
+                      </sc-for>
+                    </select>
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="#8a847a" stroke-width="1.6" style="position:absolute;top:11px;right:10px;pointer-events:none"><path d="m4 6.5 4 3.5 4-3.5"></path></svg>
+                  </div>
+                  <div style="flex:none;position:relative">
+                    <button type="button" onClick="{{ abrirSalvar }}" title="Salvar atual como predefinição" style="width:31px;height:31px;display:flex;align-items:center;justify-content:center;border:1px solid {{ btnSalvarBorda }};border-radius:5px;background:{{ btnSalvarBg }};color:{{ btnSalvarCor }};cursor:default" style-hover="border-color:#c6c0b4">
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 3h7.5L13 5.5V13H3zM5.5 3v3.5h5V3M5.5 13v-3.5h5V13"></path></svg>
+                    </button>
+                    <sc-if value="{{ salvando }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;top:38px;right:0;z-index:10;width:240px;padding:11px;background:#fffefc;border:1px solid #ddd8ce;border-radius:7px;box-shadow:0 10px 26px rgba(60,54,44,.2);display:flex;flex-direction:column;gap:9px">
+                        <span style="position:absolute;top:-5px;right:11px;width:8px;height:8px;background:#fffefc;border-left:1px solid #ddd8ce;border-top:1px solid #ddd8ce;transform:rotate(45deg)"></span>
+                        <span style="font-size:11.5px;font-weight:600;color:#4a4640">Salvar predefinição</span>
+                        <input type="text" value="{{ nomePre }}" onInput="{{ setNomePre }}" placeholder="Nome da predefinição" style="height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;font-size:12.5px;color:#2c2924;outline:none" style-focus="border-color:oklch(0.62 0.1 250)">
+                        <div style="display:flex;gap:7px;justify-content:flex-end">
+                          <button type="button" onClick="{{ cancelarSalvar }}" style="height:28px;padding:0 11px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4">Cancelar</button>
+                          <button type="button" onClick="{{ confirmarSalvar }}" style="height:28px;padding:0 13px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Salvar</button>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+                <span style="font-size:11px;color:#8a847a;text-wrap:pretty">A predefinição guarda os dois passos: medidas e personalização.</span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Unidade</span>
+                <div style="display:flex;gap:0;padding:2px;background:#efece5;border-radius:6px;width:max-content">
+                  <sc-for list="{{ unidades }}" as="u" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ u.on }}" style="padding:5px 15px;border:0;border-radius:4px;background:{{ u.bg }};box-shadow:{{ u.sombra }};color:{{ u.cor }};font-size:12.5px;font-weight:{{ u.peso }};cursor:default">{{ u.rotulo }}</button>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Tamanho da lâmina fechada</span>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="display:flex;align-items:center;width:98px;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                    <input type="text" value="{{ campoLarg }}" onInput="{{ setLarg }}" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:12.5px;color:#2c2924">
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">{{ un }}</span>
+                  </div>
+                  <span style="font-size:12.5px;color:#9b958a">×</span>
+                  <div style="display:flex;align-items:center;width:98px;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                    <input type="text" value="{{ campoAlt }}" onInput="{{ setAlt }}" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:12.5px;color:#2c2924">
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">{{ un }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Sangria e área segura</span>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                    <span style="font-size:11px;color:#8a847a">Sangria</span>
+                    <div style="display:flex;align-items:center;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                      <input type="text" value="{{ campoSangria }}" onInput="{{ setSangria }}" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:12.5px;color:#2c2924">
+                      <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">{{ un }}</span>
+                    </div>
+                  </div>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                    <span style="font-size:11px;color:#8a847a">Área segura</span>
+                    <div style="display:flex;align-items:center;height:31px;padding:0 10px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                      <input type="text" value="{{ campoSegura }}" onInput="{{ setSegura }}" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:12.5px;color:#2c2924">
+                      <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">{{ un }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:7px;width:150px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Lâminas</span>
+                <div style="display:flex;align-items:center;height:31px;padding:0 4px 0 11px;background:#fff;border:1px solid #ddd8ce;border-radius:5px">
+                  <span style="flex:1;font-size:12.5px">{{ laminas }}</span>
+                  <button type="button" onClick="{{ menosLamina }}" style="width:24px;height:24px;border:0;border-radius:4px;background:transparent;color:#6b665e;font-size:14px;cursor:default" style-hover="background:#efece4">−</button>
+                  <button type="button" onClick="{{ maisLamina }}" style="width:24px;height:24px;border:0;border-radius:4px;background:transparent;color:#6b665e;font-size:14px;cursor:default" style-hover="background:#efece4">+</button>
+                </div>
+              </div>
+
+              <div style="margin-top:auto;padding:11px 13px;background:#fff;border:1px solid #eae6dd;border-radius:6px;font-size:11.5px;color:#6b665e;text-wrap:pretty">Medidas, sangria e área segura valem para o álbum inteiro e podem ser alteradas depois nas configurações do projeto.</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ ehPasso2 }}" hint-placeholder-val="{{ false }}">
+            <div style="width:312px;flex:none;overflow:auto;padding:18px;background:#f7f6f2;display:flex;flex-direction:column;gap:13px">
+
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">{{ alvoTitulo }}</span>
+                <span style="flex:1;height:1px;background:#e6e2d9"></span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Fundo</span>
+                <div style="display:flex;flex-wrap:wrap;gap:7px">
+                  <sc-for list="{{ fundos }}" as="c" hint-placeholder-count="6">
+                    <button type="button" onClick="{{ c.on }}" style="width:28px;height:28px;border-radius:5px;border:2px solid {{ c.anel }};background:{{ c.cor }};box-shadow:inset 0 0 0 1px rgba(60,54,44,.12);cursor:default"></button>
+                  </sc-for>
+                </div>
+                <button type="button" style="height:31px;padding:0 12px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12px;cursor:default" style-hover="border-color:#c6c0b4">Usar imagem…</button>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Sobreposição</span>
+                <sc-if value="{{ semOverlay }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" onClick="{{ escolherImg }}" style="display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border:1px dashed #cfc9bd;border-radius:6px;background:#fff;color:#6b665e;font-size:12px;cursor:default" style-hover="border-color:#a9a29a;color:#2c2924">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 3.5h11v9h-11zM2.5 10l3-2.6 2.6 2.2 2.4-2 3 2.6"></path></svg>
+                    <span>Escolher imagem…</span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ temOverlay }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:9px;padding:8px;background:#fff;border:1px solid #e2ded4;border-radius:6px">
+                    <span style="flex:none;display:block;position:relative;width:34px;height:34px;border-radius:4px;background:#efe9de;box-shadow:inset 0 0 0 1px rgba(60,54,44,.12);overflow:hidden">
+                      <span style="position:absolute;inset:0;background:{{ ovThumbBg }};border:{{ ovThumbBorda }}"></span>
+                    </span>
+                    <span style="flex:1;min-width:0;font:400 11px ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ovNome }}</span>
+                    <button type="button" onClick="{{ trocarImg }}" style="flex:none;height:28px;padding:0 10px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:11.5px;cursor:default" style-hover="border-color:#c6c0b4">Trocar</button>
+                    <button type="button" onClick="{{ removerImg }}" title="Remover" style="flex:none;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#8a847a;cursor:default" style-hover="background:#efece4;color:#2c2924">
+                      <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.6 4.6 11.4 11.4M11.4 4.6 4.6 11.4"></path></svg>
+                    </button>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="flex:none;font-size:11.5px;color:#6b665e">Força</span>
+                    <input type="range" min="5" max="100" step="5" value="{{ ovForca }}" onInput="{{ setForca }}" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)">
+                    <span style="flex:none;width:34px;text-align:right;font:400 11px ui-monospace,Menlo,monospace;color:#8a847a">{{ ovForcaTxt }}</span>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;padding-top:2px">
+                <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Todas as lâminas</span>
+                <span style="flex:1;height:1px;background:#e6e2d9"></span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <span style="font-size:11.5px;font-weight:600;color:#4a4640">Frames</span>
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="flex:1;font-size:11.5px;color:#6b665e">Borda padrão</span>
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#8a847a">{{ bordaTxt }}</span>
+                  </div>
+                  <input type="range" min="0" max="8" step="1" value="{{ bordaVal }}" onInput="{{ setBorda }}" style="width:100%;accent-color:oklch(0.55 0.13 250)">
+                  <div style="display:flex;gap:7px;padding-top:2px">
+                    <sc-for list="{{ bordaCores }}" as="c" hint-placeholder-count="3">
+                      <button type="button" onClick="{{ c.on }}" style="width:24px;height:24px;border-radius:5px;border:2px solid {{ c.anel }};background:{{ c.cor }};box-shadow:inset 0 0 0 1px rgba(60,54,44,.12);cursor:default"></button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="flex:1;font-size:11.5px;color:#6b665e">Espaço entre frames</span>
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#8a847a">{{ gapTxt }}</span>
+                  </div>
+                  <input type="range" min="0" max="24" step="1" value="{{ gapVal }}" onInput="{{ setGap }}" style="width:100%;accent-color:oklch(0.55 0.13 250)">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="flex:1;font-size:11.5px;color:#6b665e">Margem da página</span>
+                    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#8a847a">{{ margemTxt }}</span>
+                  </div>
+                  <input type="range" min="0" max="40" step="1" value="{{ margemVal }}" onInput="{{ setMargem }}" style="width:100%;accent-color:oklch(0.55 0.13 250)">
+                </div>
+              </div>
+
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="height:54px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#fbfaf8;border-top:1px solid #eeeae2">
+          <sc-if value="{{ ehPasso2 }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ irPasso1 }}" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Voltar</button>
+          </sc-if>
+          <span style="flex:1"></span>
+          <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+          <button type="button" onClick="{{ acaoPrincipal }}" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">{{ rotuloPrincipal }}</button>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{ legenda }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:0 2px;max-width:700px">
+        <div style="font-size:12.5px;font-weight:600">O preview fica nos dois passos</div>
+        <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">No passo 1 ele mostra a proporção real da lâmina aberta conforme o tamanho escolhido. No passo 2 ele passa a receber os ajustes, e o lado é escolhido clicando direto na página; clicar no fundo volta para a lâmina inteira.</div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;estiloBarra&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Botão fechar&quot;,&quot;Semáforo macOS&quot;],&quot;default&quot;:&quot;Botão fechar&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Janela&quot;},&quot;mostrarGuias&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview&quot;},&quot;mostrarLegenda&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Página&quot;}}">
+const IMGS = [
+  { nome: "moldura-ouro.png", bg: "none", borda: "7px solid rgba(201,168,106,.92)", mini: "3px solid rgba(201,168,106,.92)" },
+  { nome: "textura-papel.png", bg: "repeating-linear-gradient(115deg, rgba(120,96,60,.38) 0 2px, rgba(255,255,255,0) 2px 6px)", borda: "0", mini: "0" },
+  { nome: "luz-vinheta.png", bg: "radial-gradient(ellipse at center, rgba(0,0,0,0) 42%, rgba(20,14,6,.85) 100%)", borda: "0", mini: "0" }
+];
+const GRADES = { 1: ["1fr", "1fr"], 2: ["1fr 1fr", "1fr"], 3: ["1fr 1fr 1fr", "1fr"], 4: ["1fr 1fr", "1fr 1fr"] };
+
+const PRES = [
+  { nome: "Gráfica 30 × 30", mm: { larg: 300, alt: 300, sangria: 3, segura: 5 }, laminas: 18,
+    est: { fundo: "#f7f5f0", ovImg: -1, forca: 45 },
+    geral: { grade: 2, borda: 0, bordaCor: "#ffffff", gap: 6, margem: 14 } },
+  { nome: "Fine art 25 × 25", mm: { larg: 250, alt: 250, sangria: 5, segura: 8 }, laminas: 24,
+    est: { fundo: "#eee6d8", ovImg: 0, forca: 45 },
+    geral: { grade: 2, borda: 4, bordaCor: "#ffffff", gap: 12, margem: 24 } },
+  { nome: "Book 20 × 30", mm: { larg: 200, alt: 300, sangria: 3, segura: 6 }, laminas: 12,
+    est: { fundo: "#ffffff", ovImg: -1, forca: 45 },
+    geral: { grade: 2, borda: 1, bordaCor: "#2c2924", gap: 4, margem: 10 } }
+];
+const FAT = { mm: 1, cm: 10, pol: 25.4 };
+
+class Component extends DCLogic {
+  state = {
+    passo: 1,
+    unidade: "mm",
+    campos: { larg: "300", alt: "300", sangria: "3", segura: "5" },
+    pre: "", extras: [], salvando: false, nomePre: "",
+    laminas: 18,
+    lado: "ambos",
+    geral: { grade: 2, borda: 0, bordaCor: "#ffffff", gap: 6, margem: 14 },
+    esq: { fundo: "#f7f5f0", ovImg: -1, forca: 45 },
+    dir: { fundo: "#f7f5f0", ovImg: -1, forca: 45 }
+  };
+
+  num(k) { const v = parseFloat(String(this.state.campos[k]).replace(",", ".")); return isNaN(v) ? 0 : v; }
+
+  fmt(mmv, un) {
+    const d = un === "mm" ? 0 : un === "cm" ? 1 : 2;
+    return String(parseFloat((mmv / FAT[un]).toFixed(d)));
+  }
+
+  setCampo(k, v) {
+    const limpo = v.replace(/[^0-9.,]/g, "");
+    this.setState(s => ({ pre: "", campos: Object.assign({}, s.campos, { [k]: limpo }) }));
+  }
+
+  trocarUnidade(un) {
+    this.setState(s => {
+      const c = {};
+      Object.keys(s.campos).forEach(k => {
+        const mmv = (parseFloat(String(s.campos[k]).replace(",", ".")) || 0) * FAT[s.unidade];
+        c[k] = this.fmt(mmv, un);
+      });
+      return { unidade: un, campos: c };
+    });
+  }
+
+  aplicarPre(p) {
+    this.setState(s => {
+      const c = {};
+      Object.keys(p.mm).forEach(k => { c[k] = this.fmt(p.mm[k], s.unidade); });
+      return { pre: p.nome, campos: c, laminas: p.laminas, geral: Object.assign({}, p.geral), esq: Object.assign({}, p.est), dir: Object.assign({}, p.est) };
+    });
+  }
+
+  ativo() { return this.state.lado === "direita" ? this.state.dir : this.state.esq; }
+
+  set(k, v) {
+    this.setState(s => {
+      const alvo = s.lado === "ambos" ? ["esq", "dir"] : s.lado === "direita" ? ["dir"] : ["esq"];
+      const n = {};
+      alvo.forEach(l => { n[l] = Object.assign({}, s[l], { [k]: v }); });
+      return n;
+    });
+  }
+
+  setGeral(k, v) {
+    this.setState(s => ({ geral: Object.assign({}, s.geral, { [k]: v }) }));
+  }
+
+  chip(on, extra) {
+    return Object.assign({
+      bg: on ? "oklch(0.55 0.13 250)" : "#fff",
+      borda: on ? "oklch(0.55 0.13 250)" : "#ddd8ce",
+      cor: on ? "#fff" : "#4a4640",
+      peso: on ? "600" : "400"
+    }, extra);
+  }
+
+  ladoPag(chave) {
+    const s = this.state, c = s[chave], G = s.geral;
+    const lado = s.passo === 1 ? "ambos" : s.lado;
+    const sel = lado === "ambos" || lado === (chave === "esq" ? "esquerda" : "direita");
+    const g = GRADES[G.grade];
+    const frames = [];
+    for (let i = 0; i < G.grade; i++) frames.push({ bw: G.borda + "px", bc: G.bordaCor });
+    return {
+      fundo: c.fundo, cols: g[0], rows: g[1], gap: G.gap + "px", margem: G.margem + "px",
+      frames: frames,
+      ov: c.ovImg >= 0 ? IMGS[c.ovImg].bg : "none",
+      ovBorda: c.ovImg >= 0 ? IMGS[c.ovImg].borda : "0",
+      ovOp: c.ovImg >= 0 ? c.forca / 100 : 0,
+      op: sel ? 1 : 0.4,
+      outline: sel && lado !== "ambos" ? "2px solid oklch(0.55 0.13 250)" : "0"
+    };
+  }
+
+  renderVals() {
+    const s = this.state, a = this.ativo(), p2 = s.passo === 2;
+    const barra = this.props.estiloBarra ?? "Botão fechar";
+    const larg = this.num("larg") || 1, alt = this.num("alt") || 1;
+    const escala = Math.min(340 / alt, 700 / (larg * 2));
+    const h = Math.round(alt * escala), w = Math.round(larg * escala);
+    const E = this.ladoPag("esq"), D = this.ladoPag("dir");
+    const aberta = parseFloat((larg * 2).toFixed(2)) + " × " + parseFloat(alt.toFixed(2)) + " " + s.unidade;
+
+    return {
+      barraX: barra === "Botão fechar", barraMac: barra !== "Botão fechar",
+      guias: this.props.mostrarGuias ?? true,
+      legenda: this.props.mostrarLegenda ?? true,
+
+      ehPasso1: !p2, ehPasso2: p2,
+      p1Bg: p2 ? "#e4e0d6" : "oklch(0.55 0.13 250)", p1Cor: p2 ? "#8a847a" : "#fff",
+      p1Texto: p2 ? "#8a847a" : "#2c2924", p1Peso: p2 ? "400" : "600",
+      p2Bg: p2 ? "oklch(0.55 0.13 250)" : "#e4e0d6", p2Cor: p2 ? "#fff" : "#8a847a",
+      p2Texto: p2 ? "#2c2924" : "#8a847a", p2Peso: p2 ? "600" : "400",
+      irPasso1: () => this.setState({ passo: 1 }),
+      acaoPrincipal: () => this.setState({ passo: 2 }),
+      rotuloPrincipal: p2 ? "Criar projeto" : "Continuar",
+
+      un: s.unidade,
+      campoLarg: s.campos.larg, campoAlt: s.campos.alt,
+      campoSangria: s.campos.sangria, campoSegura: s.campos.segura,
+      setLarg: e => this.setCampo("larg", e.target.value),
+      setAlt: e => this.setCampo("alt", e.target.value),
+      setSangria: e => this.setCampo("sangria", e.target.value),
+      setSegura: e => this.setCampo("segura", e.target.value),
+      unidades: ["mm", "cm", "pol"].map(u => ({
+        rotulo: u,
+        bg: s.unidade === u ? "#fff" : "transparent",
+        sombra: s.unidade === u ? "0 1px 2px rgba(60,54,44,.14)" : "none",
+        cor: s.unidade === u ? "#2c2924" : "#6b665e",
+        peso: s.unidade === u ? "600" : "400",
+        on: () => this.trocarUnidade(u)
+      })),
+      laminas: s.laminas,
+      menosLamina: () => this.setState(st => ({ laminas: Math.max(4, st.laminas - 2) })),
+      maisLamina: () => this.setState(st => ({ laminas: Math.min(60, st.laminas + 2) })),
+      predefinicoes: (s.extras || []).concat(PRES).map(p => ({ rotulo: p.nome })),
+      preSel: s.pre,
+      setPre: e => {
+        const p = (s.extras || []).concat(PRES).find(x => x.nome === e.target.value);
+        if (p) this.aplicarPre(p); else this.setState({ pre: "" });
+      },
+      salvando: !!s.salvando,
+      btnSalvarBg: s.salvando ? "#efece4" : "#fff",
+      btnSalvarBorda: s.salvando ? "#c6c0b4" : "#ddd8ce",
+      btnSalvarCor: s.salvando ? "#2c2924" : "#4a4640",
+      nomePre: s.nomePre || "",
+      setNomePre: e => this.setState({ nomePre: e.target.value }),
+      abrirSalvar: () => this.setState({ salvando: true, nomePre: "" }),
+      cancelarSalvar: () => this.setState({ salvando: false, nomePre: "" }),
+      confirmarSalvar: () => this.setState(st => {
+        const nome = (st.nomePre || "").trim();
+        if (!nome) return { salvando: false, nomePre: "" };
+        const mm = {};
+        Object.keys(st.campos).forEach(k => { mm[k] = (parseFloat(String(st.campos[k]).replace(",", ".")) || 0) * FAT[st.unidade]; });
+        const novo = { nome: nome, mm: mm, laminas: st.laminas, geral: Object.assign({}, st.geral), est: Object.assign({}, st.esq) };
+        return { extras: [novo].concat(st.extras || []), pre: nome, salvando: false, nomePre: "" };
+      }),
+      seguraInset: Math.max(0, Math.round(h * this.num("segura") / alt)) + "px",
+      sangriaInset: Math.max(1, Math.round(h * this.num("sangria") / alt)) + "px",
+
+      resumoPreview: p2 ? "lâmina aberta " + aberta : "lâmina aberta " + aberta + " · " + s.laminas + " lâminas",
+      dica: p2
+        ? (s.lado === "ambos"
+            ? "Fundo e sobreposição valem para as duas páginas. Clique em uma delas para editar só um lado."
+            : "Fundo e sobreposição valem só para a página " + (s.lado === "direita" ? "direita" : "esquerda") + ". Clique fora da lâmina para voltar às duas.")
+        : "Proporção real da lâmina aberta. O desenho das páginas é definido no passo 2.",
+      alvoTitulo: s.lado === "ambos" ? "Lâmina inteira" : s.lado === "direita" ? "Página direita" : "Página esquerda",
+      selEsq: e => { e.stopPropagation(); if (p2) this.setState({ lado: "esquerda" }); },
+      selDir: e => { e.stopPropagation(); if (p2) this.setState({ lado: "direita" }); },
+      selAmbos: () => { if (p2) this.setState({ lado: "ambos" }); },
+      outlineSpread: p2 && s.lado === "ambos" ? "2px solid oklch(0.55 0.13 250)" : "0",
+
+      pagW: w + "px", pagH: h + "px",
+      fundoEsq: E.fundo, colsEsq: E.cols, rowsEsq: E.rows, gapEsq: E.gap, margemEsq: E.margem,
+      framesEsq: E.frames, ovEsq: E.ov, ovBordaEsq: E.ovBorda, ovOpEsq: E.ovOp, opEsq: E.op, outlineEsq: E.outline,
+      fundoDir: D.fundo, colsDir: D.cols, rowsDir: D.rows, gapDir: D.gap, margemDir: D.margem,
+      framesDir: D.frames, ovDir: D.ov, ovBordaDir: D.ovBorda, ovOpDir: D.ovOp, opDir: D.op, outlineDir: D.outline,
+
+      fundos: ["#ffffff", "#f7f5f0", "#eee6d8", "#d9dbd4", "#2c2924", "#1d2a3a"].map(c => ({
+        cor: c, anel: a.fundo === c ? "oklch(0.55 0.13 250)" : "transparent",
+        on: () => this.set("fundo", c)
+      })),
+      temOverlay: a.ovImg >= 0,
+      semOverlay: a.ovImg < 0,
+      ovNome: a.ovImg >= 0 ? IMGS[a.ovImg].nome : "",
+      ovThumbBg: a.ovImg >= 0 ? IMGS[a.ovImg].bg : "none",
+      ovThumbBorda: a.ovImg >= 0 ? IMGS[a.ovImg].mini : "0",
+      escolherImg: () => this.set("ovImg", 0),
+      trocarImg: () => this.set("ovImg", (a.ovImg + 1) % IMGS.length),
+      removerImg: () => this.set("ovImg", -1),
+      ovForca: a.forca, ovForcaTxt: a.forca + "%",
+      setForca: e => this.set("forca", +e.target.value),
+
+      bordaVal: s.geral.borda, bordaTxt: s.geral.borda === 0 ? "sem borda" : s.geral.borda + " px",
+      setBorda: e => this.setGeral("borda", +e.target.value),
+      bordaCores: ["#ffffff", "#2c2924", "#c9a86a"].map(c => ({
+        cor: c, anel: s.geral.bordaCor === c ? "oklch(0.55 0.13 250)" : "transparent",
+        on: () => this.setGeral("bordaCor", c)
+      })),
+      gapVal: s.geral.gap, gapTxt: s.geral.gap + " px", setGap: e => this.setGeral("gap", +e.target.value),
+      margemVal: s.geral.margem, margemTxt: s.geral.margem + " px", setMargem: e => this.setGeral("margem", +e.target.value)
+    };
+  }
+}
+
+</script>
+</body>
+</html>

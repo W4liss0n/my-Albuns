@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>
+html,body{margin:0;padding:0;height:100%;background:#f0eee9}
+*{box-sizing:border-box}
+a{color:oklch(0.52 0.13 250);text-decoration:none}
+a:hover{color:oklch(0.44 0.14 250)}
+input,select,button{font-family:inherit}
+::-webkit-scrollbar{height:11px;width:11px}
+::-webkit-scrollbar-thumb{background:#d0ccc2;border-radius:99px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#b9b4a9;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+@keyframes indet{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+@keyframes stripes{0%{background-position:0 0}100%{background-position:22px 0}}
+</style></helmet>
+
+<div style="min-height:100vh;background:#f0eee9;color:#2c2924;font-family:'Helvetica Neue',Helvetica,system-ui,sans-serif;font-size:13px">
+
+  <div style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;height:46px;padding:0 22px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+    <span style="font-weight:600;letter-spacing:.14em;font-size:10px;color:oklch(0.55 0.13 250);text-transform:uppercase">myalbuns</span>
+    <span style="color:#cdc8be">·</span>
+    <span style="font-size:13px;font-weight:600">Modais padrão</span>
+    <span style="flex:1"></span>
+    <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">largura 380 px · rodapé alinhado à direita · ação principal à direita</span>
+  </div>
+
+  <div style="padding:26px 22px 60px;display:flex;flex-direction:column;gap:34px">
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Progresso</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px">
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="padding:16px 18px 6px;font-size:13px;font-weight:600">Exportando PDF para gráfica</div>
+              <div style="padding:0 18px 16px;display:flex;flex-direction:column;gap:9px">
+                <div style="font-size:12.5px;color:#6b665e">{{ detLinha }}</div>
+                <div style="height:5px;background:#e9e5dc;border-radius:99px;overflow:hidden">
+                  <div style="height:100%;width:{{ detPct }};background:oklch(0.55 0.13 250);border-radius:99px"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">
+                  <span>{{ detPct }}</span>
+                  <span style="flex:1"></span>
+                  <span>{{ detResta }}</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Progresso determinado</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Quando o total é conhecido. Mostra quantidade, porcentagem e tempo restante.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="padding:16px 18px 6px;font-size:13px;font-weight:600">Analisando imagens</div>
+              <div style="padding:0 18px 16px;display:flex;flex-direction:column;gap:9px">
+                <div style="font-size:12.5px;color:#6b665e">Lendo metadados e resolução das fotos importadas.</div>
+                <div style="position:relative;height:5px;background:#e9e5dc;border-radius:99px;overflow:hidden">
+                  <div style="position:absolute;top:0;left:0;height:100%;width:30%;background:oklch(0.55 0.13 250);border-radius:99px;animation:indet 1.5s cubic-bezier(.6,.05,.35,.95) infinite"></div>
+                </div>
+                <div style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">sem estimativa de tempo</div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Progresso indeterminado</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Quando não dá para medir o total. Nunca mostra porcentagem falsa.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="padding:16px 18px 6px;font-size:13px;font-weight:600">Exportando 3 álbuns</div>
+              <div style="padding:0 18px 14px;display:flex;flex-direction:column;gap:10px">
+                <div style="height:5px;background:#e9e5dc;border-radius:99px;overflow:hidden">
+                  <div style="height:100%;width:58%;background:oklch(0.55 0.13 250);border-radius:99px"></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:9px;font-size:12.5px;color:#2c2924">
+                  <span style="width:13px;height:13px;flex:none;border-radius:50%;border:2px solid oklch(0.55 0.13 250);border-right-color:transparent"></span>
+                  <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">15 anos Beatriz</span>
+                  <span style="flex:none;font:400 10.5px ui-monospace,Menlo,monospace;color:#8a847a">lâmina 7 de 18</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;font:400 11px ui-monospace,Menlo,monospace;color:#8a847a">
+                  <span>álbum 2 de 3</span>
+                  <span style="flex:1"></span>
+                  <span>1 concluído · 1 na fila</span>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Progresso em lote</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Resumo do conjunto: item em andamento, posição na fila e contagem. Não lista item por item.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Perguntas e confirmações</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px">
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="display:flex;gap:13px;padding:18px">
+                <span style="flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:oklch(0.94 0.03 250);color:oklch(0.5 0.13 250)">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.2 6.1a1.9 1.9 0 1 1 2.7 1.8c-.6.3-.9.7-.9 1.3M8 11.6v.1"></path></svg>
+                </span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                  <div style="font-size:13px;font-weight:600;text-wrap:pretty">Aplicar este layout a todas as lâminas?</div>
+                  <div style="font-size:12.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">As 6 lâminas do álbum passam a usar a grade de 4 frames. As imagens já posicionadas são redistribuídas.</div>
+                  <button type="button" onClick="{{ toggleNaoPerguntar }}" style="display:flex;align-items:center;gap:8px;margin-top:4px;padding:0;border:0;background:transparent;color:#8a847a;font-size:11.5px;cursor:default" style-hover="color:#3a3630">
+                    <span style="width:13px;height:13px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid {{ npBorder }};border-radius:3px;background:{{ npBg }};color:#fff;font-size:9px">{{ npMark }}</span>
+                    <span>Não perguntar novamente</span>
+                  </button>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+                <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Aplicar</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Pergunta</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Título é a pergunta; o botão principal repete o verbo da ação, nunca “OK”.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="display:flex;gap:13px;padding:18px">
+                <span style="flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:oklch(0.94 0.04 25);color:oklch(0.52 0.18 25)">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 4.6v4M8 11.2v.1"></path></svg>
+                </span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                  <div style="font-size:13px;font-weight:600;text-wrap:pretty">Excluir a lâmina 04?</div>
+                  <div style="font-size:12.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">Os 5 frames e o texto desta lâmina são removidos. As fotos continuam disponíveis no painel de imagens.</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+                <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.52 0.18 25);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.46 0.19 25)">Excluir lâmina</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Confirmação destrutiva</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Vermelho só aqui. O corpo diz exatamente o que se perde.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="padding:18px;display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:13px;font-weight:600;text-wrap:pretty">Salvar as alterações em “Formatura Medicina 2026”?</div>
+                <div style="font-size:12.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">Há 14 alterações feitas depois do último salvamento, ocorrido há 26 minutos.</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#6b665e;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;color:#2c2924">Descartar</button>
+                <span style="flex:1"></span>
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Cancelar</button>
+                <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Salvar</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Três saídas</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">A opção que descarta trabalho fica isolada à esquerda, longe do clique padrão.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px">
+        <span style="font:600 9.5px ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:#a29c92">Mensagens</span>
+        <span style="flex:1;height:1px;background:#e2ded4"></span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:18px">
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="display:flex;gap:13px;padding:18px">
+                <span style="flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:oklch(0.94 0.04 25);color:oklch(0.52 0.18 25)">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5.2 5.2 10.8 10.8M10.8 5.2 5.2 10.8"></path></svg>
+                </span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                  <div style="font-size:13px;font-weight:600;text-wrap:pretty">Não foi possível exportar o PDF</div>
+                  <div style="font-size:12.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">A lâmina 09 usa uma imagem que não está mais na pasta de origem. Reconecte o arquivo e exporte novamente.</div>
+                  <div style="padding:8px 10px;background:#f4f2ec;border:1px solid #e5e1d8;border-radius:5px;font:400 10.5px ui-monospace,Menlo,monospace;color:#8a847a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">IMG_4417.CR3 · ~/fotos/medicina/brutos</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Fechar</button>
+                <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Localizar arquivo…</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Erro</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Diz a causa, mostra o arquivo envolvido e oferece a correção como ação principal.</div>
+          </div>
+        </div>
+
+        <div style="flex:none;width:420px">
+          <div style="padding:22px;background:#e8e5de;border:1px solid #e2ded4;border-radius:6px;display:flex;justify-content:center">
+            <div style="width:380px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 18px 40px rgba(60,54,44,.2)">
+              <div style="display:flex;gap:13px;padding:18px">
+                <span style="flex:none;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:oklch(0.94 0.05 150);color:oklch(0.5 0.12 150)">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m3.8 8.3 2.9 2.9 5.5-6.2"></path></svg>
+                </span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+                  <div style="font-size:13px;font-weight:600;text-wrap:pretty">Exportação concluída</div>
+                  <div style="font-size:12.5px;color:#6b665e;line-height:1.45;text-wrap:pretty">3 álbuns, 76 lâminas, 412 MB em PDF com marcas de corte.</div>
+                  <div style="font:400 10.5px ui-monospace,Menlo,monospace;color:#8a847a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">~/myalbuns/exportados/2026-08-12</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:8px;padding:11px 14px;border-top:1px solid #eeeae2;background:#fbfaf8;border-radius:0 0 6px 6px">
+                <button type="button" style="height:31px;padding:0 15px;border:1px solid #ddd8ce;border-radius:5px;background:#fff;color:#2c2924;font-size:12.5px;cursor:default" style-hover="border-color:#c6c0b4;background:#fdfcfa">Abrir pasta</button>
+                <button type="button" style="height:31px;padding:0 18px;border:0;border-radius:5px;background:oklch(0.55 0.13 250);color:#fff;font-size:12.5px;font-weight:500;cursor:default" style-hover="background:oklch(0.49 0.14 250)">Concluir</button>
+              </div>
+            </div>
+          </div>
+          <div style="padding:11px 2px 0">
+            <div style="font-size:12.5px;font-weight:600">Conclusão</div>
+            <div style="font-size:11.5px;color:#6b665e;text-wrap:pretty">Fecha o ciclo do progresso, com números do que foi gerado e o caminho de saída.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+class Component extends DCLogic {
+  state = { pct: 34, nao: false };
+
+  componentDidMount() {
+    this.t = setInterval(() => this.setState(s => ({ pct: s.pct >= 100 ? 4 : s.pct + 2 })), 700);
+  }
+  componentWillUnmount() { clearInterval(this.t); }
+
+  toggleNaoPerguntar = () => this.setState(s => ({ nao: !s.nao }));
+
+  renderVals() {
+    const s = this.state, total = 40;
+    const feita = Math.max(1, Math.round(total * s.pct / 100));
+    return {
+      detPct: s.pct + "%",
+      detLinha: "Lâmina " + feita + " de " + total + " · Formatura Medicina 2026",
+      detResta: "cerca de " + Math.max(1, Math.round((100 - s.pct) / 6)) + " min restantes",
+      npMark: s.nao ? "✓" : "",
+      npBg: s.nao ? "oklch(0.55 0.13 250)" : "#fff",
+      npBorder: s.nao ? "oklch(0.55 0.13 250)" : "#cfc9bd",
+      toggleNaoPerguntar: this.toggleNaoPerguntar
+    };
+  }
+}
+
+</script>
+</body>
+</html>

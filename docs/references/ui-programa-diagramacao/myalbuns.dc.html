@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><style>
+html,body{margin:0;padding:0;height:100%;background:#f0eee9;overflow:hidden}
+*{box-sizing:border-box}
+a{color:oklch(0.52 0.13 250);text-decoration:none}
+a:hover{color:oklch(0.44 0.14 250)}
+input,select,button{font-family:inherit}
+::-webkit-scrollbar{height:11px;width:11px}
+::-webkit-scrollbar-thumb{background:#d0ccc2;border-radius:99px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#b9b4a9;background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+[data-tagstrip]::-webkit-scrollbar,[data-ovstrip]::-webkit-scrollbar{height:0;width:0}
+[data-folderstrip]::-webkit-scrollbar{height:0;width:0}
+</style></helmet>
+<div style="height:100vh;display:flex;flex-direction:column;background:#f0eee9;color:#2c2924;font-family:'Helvetica Neue',Helvetica,system-ui,sans-serif;font-size:13px;overflow:hidden;user-select:none">
+
+  <div style="height:38px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;background:#fbfaf8;border-bottom:1px solid #e5e1d8">
+    <div style="display:flex;gap:7px;align-items:center">
+      <span style="width:10px;height:10px;border-radius:50%;background:#ddd8ce"></span>
+      <span style="width:10px;height:10px;border-radius:50%;background:#ddd8ce"></span>
+      <span style="width:10px;height:10px;border-radius:50%;background:#ddd8ce"></span>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px">
+      <span style="font-weight:600;letter-spacing:.14em;font-size:10px;color:oklch(0.55 0.13 250);text-transform:uppercase">myalbuns</span>
+      <span style="color:#cdc8be">·</span>
+      <span style="color:#3a3630;font-weight:500">Formatura Medicina 2026 — Turma B</span>
+      <span style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">30×30 cm · 6 lâminas</span>
+    </div>
+    <div style="font:400 11px ui-monospace,Menlo,monospace;color:#9b958a">salvo há 2 min</div>
+  </div>
+
+  <div style="height:31px;flex:none;display:flex;align-items:stretch;background:#fbfaf8;border-bottom:1px solid #e5e1d8;position:relative;z-index:40">
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="arquivo" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgArquivo }};color:{{ fgArquivo }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Arquivo</button>
+      <sc-if value="{{ mArquivo }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:252px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Novo álbum…</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘N</span></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Abrir…</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘O</span></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Importar imagens…</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⇧⌘I</span></div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Salvar</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘S</span></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Exportar PDF para gráfica…</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘E</span></div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Exportar JPG por lâmina…</div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Fechar projeto</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘W</span></div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="editar" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgEditar }};color:{{ fgEditar }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Editar</button>
+      <sc-if value="{{ mEditar }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:232px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Desfazer mover frame</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘Z</span></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;color:#bab5ab"><span>Refazer</span><span style="color:#cdc8be;font:400 11px ui-monospace,monospace">⇧⌘Z</span></div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Duplicar seleção</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘D</span></div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Substituir imagem do frame</div>
+          <div style="display:flex;justify-content:space-between;gap:20px;padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff"><span>Selecionar tudo na lâmina</span><span style="color:#a8a29a;font:400 11px ui-monospace,monospace">⌘A</span></div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="inserir" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgInserir }};color:{{ fgInserir }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Inserir</button>
+      <sc-if value="{{ mInserir }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:214px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Frame de imagem</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Forma / faixa</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Máscara decorativa</div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Grade automática…</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="lamina" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgLamina }};color:{{ fgLamina }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Lâmina</button>
+      <sc-if value="{{ mLamina }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:240px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Nova lâmina depois desta</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Duplicar lâmina</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Excluir lâmina</div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Aplicar design do álbum</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Trocar layout da grade…</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="visualizar" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgVisualizar }};color:{{ fgVisualizar }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Visualizar</button>
+      <sc-if value="{{ mVisualizar }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:242px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Réguas e guias</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Margem e sangria</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Simular lombada</div>
+          <div style="height:1px;background:#edeae3;margin:5px 0"></div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Painel de imagens</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Modo apresentação</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative;display:flex;align-items:stretch">
+      <button type="button" data-menu="ajuda" onClick="{{ toggleMenu }}" style="padding:0 12px;border:0;background:{{ bgAjuda }};color:{{ fgAjuda }};font-size:12.5px;cursor:default" style-hover="background:#eceae3">Ajuda</button>
+      <sc-if value="{{ mAjuda }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;top:31px;left:0;min-width:218px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 12px 28px rgba(60,54,44,.16);padding:5px 0">
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Manual do myalbuns</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Atalhos de teclado</div>
+          <div style="padding:5px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Especificações da gráfica</div>
+        </div>
+      </sc-if>
+    </div>
+    <div style="flex:1"></div>
+    <button type="button" style="padding:0 20px;border:0;background:oklch(0.55 0.13 250);color:#fff;cursor:default;font-size:12px;font-weight:500" style-hover="background:oklch(0.48 0.14 250)">Exportar</button>
+  </div>
+
+  <div style="flex:1;display:flex;min-height:0">
+
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+
+      <div style="flex:1;display:flex;flex-direction:column;min-height:0;background:#e8e5de">
+        <sc-if value="{{ layoutOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:none;display:flex;flex-direction:column;background:#fbfaf8;border-bottom:1px solid #ddd8ce">
+            <div style="flex:none;height:32px;display:flex;align-items:center;gap:9px;padding:0 12px;border-bottom:1px solid #e9e5dc">
+              <span style="font-size:12.5px;font-weight:600;color:#2c2924">Layouts</span>
+              <span style="font:400 10.5px ui-monospace,Menlo,monospace;color:#a29c92">{{ layoutFor }}</span>
+              <div style="flex:1"></div>
+            </div>
+            <div style="flex:none;display:flex;align-items:stretch;gap:14px;padding:0 14px 0 0;border-bottom:1px solid #e9e5dc">
+              <span style="flex:none;width:30px;align-self:stretch;display:flex;align-items:center;justify-content:center;background:#f4f2ec;border-right:1px solid #e9e5dc;font:600 9.5px ui-monospace,Menlo,monospace;color:#6d675d;letter-spacing:.12em;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg)">Automáticos</span>
+              <div data-tagstrip="1" style="flex:1;min-width:0;display:flex;align-items:flex-start;gap:14px;padding:12px 3px 12px;overflow-x:auto;overflow-y:visible">
+                <div data-lay="a1" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:flex">
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:flex">
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a1" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a1" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a2" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(1,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(1,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a2" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a2" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a3" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;grid-column:1 / span 2"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:flex">
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a3" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a3" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a4" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a4" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a4" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a5" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:2;min-width:0;padding:0;display:flex"><span style="background:#e6e1d7;flex:1"></span></div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(1,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a5" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a5" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a6" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;grid-column:1 / span 2"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a6" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a6" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a7" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:0;display:flex"><span style="background:#e6e1d7;flex:1"></span></div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(3,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;grid-column:1 / span 2"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a7" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a7" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="a8" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:3px">
+                      <span style="background:#e6e1d7;grid-row:1 / span 2"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(1,1fr);grid-template-rows:repeat(3,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="a8" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="a8" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="flex:none;display:flex;align-items:stretch;gap:14px;padding:0 14px 0 0">
+              <span style="flex:none;width:30px;align-self:stretch;display:flex;align-items:center;justify-content:center;background:#f4f2ec;border-right:1px solid #e9e5dc;font:600 9.5px ui-monospace,Menlo,monospace;color:#6d675d;letter-spacing:.12em;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg)">Customizados</span>
+              <div data-tagstrip="1" style="flex:1;min-width:0;display:flex;align-items:flex-start;gap:14px;padding:12px 3px 12px;overflow-x:auto;overflow-y:visible">
+                <div data-lay="c1" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;grid-column:1 / span 3"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:2fr 1fr;gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;grid-column:1 / span 2"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="c1" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="c1" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    <button type="button" data-act="del" data-lay="c1" onClick="{{ layAction }}" title="Apagar layout" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.16 25)">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2.5 3.5h7M4.8 3.5V2.3h2.4v1.2M3.6 3.5l.4 6h4l.4-6"></path></svg>
+                    </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="c2" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:flex">
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(1,1fr);grid-template-rows:repeat(3,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="c2" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="c2" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    <button type="button" data-act="del" data-lay="c2" onClick="{{ layAction }}" title="Apagar layout" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.16 25)">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2.5 3.5h7M4.8 3.5V2.3h2.4v1.2M3.6 3.5l.4 6h4l.4-6"></path></svg>
+                    </button>
+                    </div>
+                  </div>
+                </div>
+                <div data-lay="c3" onClick="{{ pickLayout }}" style="flex:none;display:flex;cursor:default">
+                  <div style="position:relative;display:flex;width:104px;height:52px;background:#fff;box-shadow:0 0 0 1px #ddd8ce" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250)">
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="flex:1;min-width:0;padding:5px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:3px">
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                      <span style="background:#e6e1d7;"></span>
+                    </div>
+                    <div style="position:absolute;top:3px;right:3px;display:flex;gap:2px;opacity:0;transition:opacity .12s ease" style-hover="opacity:1">
+                      <button type="button" data-act="fav" data-lay="c3" onClick="{{ layAction }}" title="Favoritar" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.62 0.15 75)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 1.6l1.4 2.9 3.1.4-2.3 2.2.6 3.1L6 8.7l-2.8 1.5.6-3.1L1.5 4.9l3.1-.4z"></path></svg>
+                      </button>
+                      <button type="button" data-act="lock" data-lay="c3" onClick="{{ layAction }}" title="Travar na lâmina" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.13 250)">
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2.6" y="5.4" width="6.8" height="5" rx="0.8"></rect><path d="M4.2 5.4V3.9a1.8 1.8 0 013.6 0v1.5"></path></svg>
+                      </button>
+                    <button type="button" data-act="del" data-lay="c3" onClick="{{ layAction }}" title="Apagar layout" style="flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;border:0;background:rgba(255,255,255,.9);color:#8a847a;cursor:default" style-hover="color:oklch(0.52 0.16 25)">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M2.5 3.5h7M4.8 3.5V2.3h2.4v1.2M3.6 3.5l.4 6h4l.4-6"></path></svg>
+                    </button>
+                    </div>
+                  </div>
+                </div>
+                <div style="flex:none;display:flex;cursor:default">
+                  <div style="display:flex;align-items:center;justify-content:center;width:104px;height:52px;border:1.5px dashed #cfcabf;background:#fff;color:#a8a29a;font-size:17px;font-weight:300" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250)">+</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+        <div ref="{{ canvasRef }}" onClick="{{ bgClick }}" style="flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:46px;padding:28px 46px">
+
+          <div data-l="1" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+              <div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL1 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">verso</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">capa</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L01</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:repeating-linear-gradient(135deg,#e4e0d7 0 6px,#dcd8ce 6px 12px);display:flex;align-items:center;justify-content:center">
+                <span style="font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">verso da capa</span>
+              </div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#2b2823;position:relative;padding:8%;display:flex;flex-direction:column;justify-content:flex-end;gap:12px">
+                <div data-obj="capa-foto" onClick="{{ selectObj }}" style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#3b3833 0 8px,#332f2a 8px 16px);cursor:default"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-l="2" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 0 0 2px oklch(0.6 0.13 250),0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+<div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL2 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">2</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">3</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L02</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:3%">
+                <div data-obj="f-2a" onClick="{{ selectObj }}" style="grid-column:1 / span 2;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-2b" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-2c" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:flex;flex-direction:column;gap:12px;box-shadow:inset 1px 0 0 #eeeae1">
+                <div data-obj="f-2d" onClick="{{ selectObj }}" style="flex:1;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-l="3" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+<div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL3 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">4</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">5</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L03</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:2.5%">
+                <div data-obj="f-3a" onClick="{{ selectObj }}" style="grid-column:1 / span 3;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-3b" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-3c" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-3d" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#2b2823;padding:9%;display:flex;align-items:center;justify-content:center">
+                <div data-obj="f-3e" onClick="{{ selectObj }}" style="width:100%;aspect-ratio:1;background:repeating-linear-gradient(45deg,#403c36 0 8px,#37332e 8px 16px);cursor:default"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-l="4" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+<div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL4 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">6</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">7</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L04</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;position:relative">
+                <div data-obj="f-4a" onClick="{{ selectObj }}" style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:2.5%;box-shadow:inset 1px 0 0 #eeeae1">
+                <div data-obj="f-4b" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-4c" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-4d" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-4e" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-4f" onClick="{{ selectObj }}" style="grid-column:1 / span 2;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-l="5" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+<div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL5 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">8</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">9</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L05</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:2%">
+                <div data-obj="f-5a" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5b" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5c" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5d" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5e" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5f" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5g" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div data-obj="f-5h" onClick="{{ selectObj }}" style="background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+              </div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#fdfcfa;padding:7%;display:flex;flex-direction:column;gap:3%;box-shadow:inset 1px 0 0 #eeeae1">
+                <div data-obj="f-5i" onClick="{{ selectObj }}" style="flex:2;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                <div style="flex:1;display:flex;gap:3%">
+                  <div data-obj="f-5j" onClick="{{ selectObj }}" style="flex:1;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                  <div data-obj="f-5k" onClick="{{ selectObj }}" style="flex:1;background:repeating-linear-gradient(45deg,#e6e1d7 0 8px,#dcd6ca 8px 16px);cursor:default"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div data-l="6" onMouseEnter="{{ enterL }}" onMouseLeave="{{ leaveL }}" style="flex:none;height:100%;display:flex;flex-direction:column;gap:7px">
+            <div style="flex:1;min-height:0;display:flex;width:{{ spreadW }};position:relative;box-shadow:0 1px 3px rgba(60,54,44,.16),0 16px 32px rgba(60,54,44,.12)">
+<div style="position:absolute;top:0;left:0;right:0;z-index:5;height:40px;display:flex;align-items:center;background:rgba(251,250,248,.96);border-bottom:1px solid #e9e5dc;opacity:{{ opL6 }};transition:opacity .14s ease">
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">10</span>
+                <span style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">contracapa</span>
+                <button type="button" title="Inverter posições dos frames" style="position:absolute;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default;font-size:15px" style-hover="color:#2c2924">⇄</button>
+                <button type="button" title="Layout da lâmina" onClick="{{ openLayout }}" style="position:absolute;left:50%;transform:translateX(-50%);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border:0;border-radius:5px;background:transparent;color:#6d675d;cursor:default" style-hover="color:#2c2924">
+                  <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.15"><rect x="1" y="1" width="4" height="4"></rect><rect x="7" y="1" width="4" height="4"></rect><rect x="1" y="7" width="4" height="4"></rect><rect x="7" y="7" width="4" height="4"></rect></svg>
+                </button>
+                <span style="position:absolute;right:11px;font:500 12.5px ui-monospace,Menlo,monospace;letter-spacing:.08em;color:#6d675d">L06</span>
+              </div>
+
+              <div style="flex:none;width:{{ pageW }};height:100%;background:#2b2823;padding:11%;display:flex;flex-direction:column;justify-content:flex-end"></div>
+              <div style="flex:none;width:{{ pageW }};height:100%;background:repeating-linear-gradient(135deg,#e4e0d7 0 6px,#dcd8ce 6px 12px);display:flex;align-items:center;justify-content:center">
+                <span style="font:400 12.5px ui-monospace,Menlo,monospace;color:#8a847a">contracapa</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:none;height:100%;display:flex;flex-direction:column;gap:9px">
+            <div style="flex:1;min-height:0;width:176px;border:1.5px dashed #cfcabf;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;color:#a8a29a;cursor:default;background:rgba(255,255,255,.45)" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250);background:rgba(255,255,255,.8)">
+              <span style="font-size:22px;font-weight:300">+</span>
+              <span style="font:400 11px ui-monospace,Menlo,monospace">nova lâmina</span>
+            </div>
+            <div style="flex:none;height:14px"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <sc-if value="{{ imgPanelOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;display:flex;flex-direction:column;min-height:0">
+      <div onMouseDown="{{ startDragH }}" style="height:7px;flex:none;display:flex;align-items:center;justify-content:center;background:#e8e5de;border-top:1px solid #ddd8ce;border-bottom:1px solid #ddd8ce;cursor:row-resize">
+        <span style="width:30px;height:2px;border-radius:99px;background:#c4bfb4"></span>
+      </div>
+
+      <div style="position:relative;height:{{ imgH }};flex:none;display:flex;flex-direction:column;background:#fbfaf8;min-height:0">
+        <div style="flex:none;height:34px;display:flex;flex-wrap:nowrap;align-items:center;gap:0 8px;padding:0 10px 0 0;border-bottom:1px solid #e9e5dc;overflow:hidden">
+          <div style="flex:none;display:flex;align-items:stretch;height:34px;border-right:1px solid #e9e5dc">
+            <button type="button" data-mode="imagens" onClick="{{ setMode }}" title="Imagens" style="width:34px;display:flex;align-items:center;justify-content:center;border:0;background:{{ bgModeImg }};color:{{ fgModeImg }};cursor:default;box-shadow:{{ underImg }}">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.8" y="3" width="12.4" height="10" rx="1.4"></rect><circle cx="5.6" cy="6.6" r="1.2"></circle><path d="M2.4 11.4l3.3-3 3 2.6 2-1.7 2.6 2.3"></path></svg>
+            </button>
+            <button type="button" data-mode="estilos" onClick="{{ setMode }}" title="Personalização das lâminas" style="width:34px;display:flex;align-items:center;justify-content:center;border:0;background:{{ bgModeSty }};color:{{ fgModeSty }};cursor:default;box-shadow:{{ underSty }}">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"></path><circle cx="5.6" cy="4.5" r="1.7" fill="#fbfaf8"></circle><circle cx="10.4" cy="8" r="1.7" fill="#fbfaf8"></circle><circle cx="6.8" cy="11.5" r="1.7" fill="#fbfaf8"></circle></svg>
+            </button>
+          </div>
+          <div style="flex:none;position:relative;display:flex;align-items:stretch;height:34px;border-right:1px solid #e9e5dc;z-index:30">
+            <button type="button" data-menu="importar" onClick="{{ toggleMenu }}" style="display:flex;align-items:center;gap:6px;height:100%;padding:0 10px;border:0;background:{{ bgImportar }};color:#3a3630;cursor:default;font-size:12px" style-hover="background:#f0eee8">
+              <span>Importar</span>
+              <span style="font-size:7px;color:#a29c92">▼</span>
+            </button>
+            <sc-if value="{{ mImportar }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;bottom:34px;left:0;min-width:198px;background:#fffefc;border:1px solid #e0dbd1;border-radius:6px;box-shadow:0 -10px 26px rgba(60,54,44,.16);padding:5px 0">
+                <div style="padding:6px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Importar arquivos…</div>
+                <div style="padding:6px 12px;cursor:default" style-hover="background:oklch(0.55 0.13 250);color:#fff">Importar pastas…</div>
+              </div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ modeEstilos }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1 1 200px;min-width:0;display:flex;align-items:center;gap:6px;height:34px;padding-left:10px">
+            <div data-tagstrip="1" style="flex:0 1 auto;min-width:44px;display:flex;align-items:center;gap:6px;height:34px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+              <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:oklch(0.55 0.13 250);color:#fff;font-size:11.5px;cursor:default;white-space:nowrap">Todos<span style="font:400 10px ui-monospace,monospace;color:rgba(255,255,255,.65)">10</span></span>
+              <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Fundos<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">4</span></span>
+              <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Overlays<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">4</span></span>
+              <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Marca da turma<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">2</span></span>
+            </div>
+              <span title="Nova pasta de recursos" style="flex:none;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:99px;border:1px dashed #cfcabf;color:#8a847a;font-size:14px;font-weight:300;cursor:default" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250)">+</span>
+            </div>
+            <div style="flex:none;width:8px"></div>
+            <div style="flex:none;display:flex;align-items:stretch;height:30px">
+              <input type="text" placeholder="Buscar…" value="{{ assetQ }}" onChange="{{ setAssetQ }}" style="flex:none;width:92px;height:100%;padding:0 7px;background:transparent;border:0;border-right:1px solid #e9e5dc;color:#2c2924;font-size:12px;outline:none" />
+              <button type="button" onClick="{{ toggleAssetOpts }}" title="Formato, uso e tamanho" style="flex:none;width:32px;height:100%;display:flex;align-items:center;justify-content:center;border:0;background:{{ assetOptsBg }};color:{{ assetOptsFg }};cursor:default" style-hover="background:#f0eee8;color:#2c2924">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"></path></svg>
+              </button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ modeImagens }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1 1 200px;min-width:0;display:flex;align-items:center;gap:6px;height:34px;padding-left:10px">
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:oklch(0.55 0.13 250);color:#fff;font-size:11.5px;cursor:default;white-space:nowrap">Todas<span style="font:400 10px ui-monospace,monospace;color:rgba(255,255,255,.65)">248</span></span>
+            <div style="position:relative;flex:0 1 auto;min-width:44px;height:34px;display:flex;align-items:center;overflow:hidden">
+              <div data-folderstrip="1" ref="{{ folderRef }}" onScroll="{{ onFolderScroll }}" onWheel="{{ onFolderWheel }}" style="width:100%;min-width:0;display:flex;align-items:center;gap:6px;height:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none">
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Sessão estúdio<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">86</span></span>
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Colação de grau<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">104</span></span>
+            <span style="flex:none;display:flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:99px;background:#f0eee8;color:#5c564c;font-size:11.5px;cursor:default;white-space:nowrap" style-hover="background:#e7e4db;color:#2c2924">Baile<span style="font:400 10px ui-monospace,monospace;color:#a8a29a">58</span></span>
+          </div>
+              <span style="position:absolute;left:0;right:0;bottom:1px;height:3px;border-radius:99px;background:#e7e4db;opacity:{{ folderBarOp }};pointer-events:none">
+                <span style="position:absolute;top:0;bottom:0;left:{{ folderThumbLeft }};width:{{ folderThumbW }};border-radius:99px;background:#c6c0b4"></span>
+              </span>
+            </div>
+            <span title="Nova pasta de organização" style="flex:none;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:99px;border:1px dashed #cfcabf;color:#8a847a;font-size:14px;font-weight:300;cursor:default" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250)">+</span>
+          </div>
+          <div style="flex:none;width:8px"></div>
+          <div style="flex:none;display:flex;align-items:stretch;height:30px">
+            <input type="text" placeholder="Buscar…" value="{{ q }}" onChange="{{ setQ }}" style="flex:none;width:92px;height:100%;padding:0 7px;background:transparent;border:0;border-right:1px solid #e9e5dc;color:#2c2924;font-size:12px;outline:none" />
+            <button type="button" onClick="{{ toggleImgOpts }}" title="Filtro, ordem e tamanho" style="flex:none;width:32px;height:100%;display:flex;align-items:center;justify-content:center;border:0;background:{{ imgOptsBg }};color:{{ imgOptsFg }};cursor:default" style-hover="background:#f0eee8;color:#2c2924">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3"></path></svg>
+            </button>
+          </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ imgOptsPopover }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ fecharOpts }}" style="position:fixed;inset:0;z-index:39"></div>
+          <div style="position:absolute;top:36px;right:10px;z-index:40;width:212px;padding:11px;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 12px 28px rgba(60,54,44,.18);display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Filtro</span>
+              <select value="{{ filter }}" onChange="{{ setFilterSel }}" style="flex:1;min-width:0;height:26px;padding:0 5px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font-size:11.5px;outline:none;cursor:default">
+                <option value="todas">Todas</option>
+                <option value="usadas">Usadas</option>
+                <option value="naousadas">Livres</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Ordem</span>
+              <select onChange="{{ setSort }}" style="flex:1;min-width:0;height:26px;padding:0 5px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font-size:11.5px;outline:none;cursor:default">
+                <option value="nome">Nome</option>
+                <option value="data">Data</option>
+                <option value="cor">Cor</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Tamanho</span>
+              <input type="range" min="58" max="132" step="2" value="{{ thumb }}" onChange="{{ setThumb }}" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)" />
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ assetOptsPopover }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ fecharOpts }}" style="position:fixed;inset:0;z-index:39"></div>
+          <div style="position:absolute;top:36px;right:10px;z-index:40;width:212px;padding:11px;background:#fffefc;border:1px solid #e0dbd1;border-radius:7px;box-shadow:0 12px 28px rgba(60,54,44,.18);display:flex;flex-direction:column;gap:11px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Formato</span>
+              <select value="{{ assetExt }}" onChange="{{ setAssetExt }}" style="flex:1;min-width:0;height:26px;padding:0 5px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font-size:11.5px;outline:none;cursor:default">
+                <option value="todos">Todos</option>
+                <option value="PNG">PNG</option>
+                <option value="JPG">JPEG</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Uso</span>
+              <select value="{{ assetUse }}" onChange="{{ setAssetUse }}" style="flex:1;min-width:0;height:26px;padding:0 5px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font-size:11.5px;outline:none;cursor:default">
+                <option value="todos">Todos</option>
+                <option value="usados">Em uso</option>
+                <option value="livres">Sem uso</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <span style="flex:none;width:52px;font-size:11px;color:#8a847a">Tamanho</span>
+              <input type="range" min="58" max="132" step="2" value="{{ thumb }}" onChange="{{ setThumb }}" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)" />
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ modeEstilos }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;overflow-y:auto;padding:10px 12px;min-height:0">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ thumb }}px,1fr));gap:10px">
+            <sc-for list="{{ assets }}" as="a" hint-placeholder-count="10">
+              <div data-asset="{{ a.id }}" onClick="{{ pickAsset }}" style="display:flex;flex-direction:column;gap:4px;cursor:grab">
+                <div style="position:relative;aspect-ratio:3/2;border-radius:4px;overflow:hidden;background:{{ a.swatch }};box-shadow:{{ a.ring }}" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250),0 1px 2px rgba(60,54,44,.12)">
+                  <span style="position:absolute;top:4px;left:4px;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.93);font:400 8.5px ui-monospace,monospace;color:#6d675d;letter-spacing:.06em">{{ a.ext }}</span>
+                  <sc-if value="{{ a.inUse }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;bottom:4px;right:4px;display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.93);font:400 9px ui-monospace,monospace;color:#6d675d;box-shadow:0 1px 2px rgba(60,54,44,.14)">
+                      <span style="width:5px;height:5px;border-radius:50%;background:oklch(0.6 0.13 250)"></span>{{ a.role }}
+                    </span>
+                  </sc-if>
+                </div>
+                <span style="font:400 9.5px ui-monospace,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</span>
+              </div>
+            </sc-for>
+            <div onClick="{{ touchDesign }}" title="Importar recurso PNG/JPEG" style="display:flex;flex-direction:column;gap:4px;cursor:default">
+              <div style="aspect-ratio:3/2;border:1.5px dashed #cfcabf;border-radius:4px;background:#fff;color:#a8a29a;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:300" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250);background:oklch(0.98 0.012 250)">+</div>
+              <span style="font:400 9.5px ui-monospace,monospace;color:#a8a29a">importar</span>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+        <sc-if value="{{ modeImagens }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;overflow-y:auto;padding:10px 12px;min-height:0">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax({{ thumb }}px,1fr));gap:10px">
+            <sc-for list="{{ photos }}" as="p" hint-placeholder-count="18">
+              <div style="display:flex;flex-direction:column;gap:4px;cursor:grab">
+                <div style="position:relative;aspect-ratio:3/2;border-radius:4px;overflow:hidden;background:repeating-linear-gradient(45deg,#e2ddd3 0 7px,#d9d3c7 7px 14px);box-shadow:0 1px 2px rgba(60,54,44,.12)" style-hover="box-shadow:0 0 0 2px oklch(0.6 0.13 250),0 1px 2px rgba(60,54,44,.12)">
+                  <sc-if value="{{ p.showUsed }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;top:4px;right:4px;display:flex;align-items:center;gap:4px;padding:2px 6px;border-radius:99px;background:rgba(255,255,255,.93);font:400 9px ui-monospace,monospace;color:#6d675d;box-shadow:0 1px 2px rgba(60,54,44,.14)">
+                      <span style="width:5px;height:5px;border-radius:50%;background:oklch(0.68 0.15 62)"></span>{{ p.usedIn }}
+                    </span>
+                  </sc-if>
+                </div>
+                <span style="font:400 9.5px ui-monospace,monospace;color:#9b958a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+      </div>
+      </sc-if>
+
+    </div>
+
+    <div onMouseDown="{{ startDragV }}" style="width:7px;flex:none;display:flex;align-items:center;justify-content:center;background:#e8e5de;border-left:1px solid #ddd8ce;border-right:1px solid #ddd8ce;cursor:col-resize">
+      <span style="width:2px;height:30px;border-radius:99px;background:#c4bfb4"></span>
+    </div>
+
+    <div style="width:{{ panelW }};flex:none;background:#fbfaf8;display:flex;flex-direction:column;overflow-y:auto;user-select:text">
+
+      <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:oklch(0.97 0.014 250);border-bottom:1px solid #e2ded4">
+          <span style="width:7px;height:7px;border-radius:50%;background:oklch(0.6 0.13 250);flex:none"></span>
+          <span style="flex:1;font-size:12.5px;font-weight:600;color:#2c2924">{{ selTitle }}</span>
+          <span style="font:400 10px ui-monospace,monospace;color:#a8a29a">{{ selName }}</span>
+          <button type="button" onClick="{{ clearSel }}" title="Desselecionar" style="width:18px;height:18px;flex:none;border:0;border-radius:5px;background:transparent;color:#a8a29a;cursor:default;font-size:13px;line-height:1" style-hover="background:#e6e2d8;color:#2c2924">×</button>
+        </div>
+        <div style="padding:13px;display:flex;flex-direction:column;gap:14px;border-bottom:1px solid #e9e5dc">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid #e2ded4;border-radius:5px;background:#fff;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;flex:none">X</span><span style="font:400 12px ui-monospace,monospace;color:#3a3630;overflow:hidden">{{ selX }}</span></div>
+            <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid #e2ded4;border-radius:5px;background:#fff;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;flex:none">Y</span><span style="font:400 12px ui-monospace,monospace;color:#3a3630;overflow:hidden">{{ selY }}</span></div>
+            <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid #e2ded4;border-radius:5px;background:#fff;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;flex:none">L</span><span style="font:400 12px ui-monospace,monospace;color:#3a3630;overflow:hidden">{{ selW }}</span></div>
+            <div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 9px;border:1px solid #e2ded4;border-radius:5px;background:#fff;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;flex:none">A</span><span style="font:400 12px ui-monospace,monospace;color:#3a3630;overflow:hidden">{{ selH }}</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#8a847a">Alinhar na página</span>
+            <div style="display:flex;border:1px solid #ddd8ce;border-radius:5px;overflow:hidden;background:#fff">
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">⇤</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">↔</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">⇥</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">⇡</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">↕</button>
+              <button type="button" style="flex:1;height:26px;border:0;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">⇣</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#8a847a">Preenchimento do frame</span>
+            <div style="display:flex;border:1px solid #ddd8ce;border-radius:5px;overflow:hidden;background:#fff">
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #ddd8ce;background:oklch(0.55 0.13 250);color:#fff;cursor:default;font-size:11.5px;font-weight:500" style-hover="background:oklch(0.49 0.14 250)">Cobrir</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11.5px" style-hover="background:#f4f2ec;color:#2c2924">Conter</button>
+              <button type="button" style="flex:1;height:26px;border:0;background:transparent;color:#6d675d;cursor:default;font-size:11.5px" style-hover="background:#f4f2ec;color:#2c2924">Livre</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#8a847a">Imagem no frame</span>
+            <div style="display:flex;align-items:center;gap:9px;height:38px;padding:0 8px;border:1px solid #e2ded4;border-radius:5px;background:#fff;min-width:0">
+              <span style="width:26px;height:26px;flex:none;border-radius:3px;background:repeating-linear-gradient(45deg,#e2ddd3 0 5px,#d9d3c7 5px 10px)"></span>
+              <span style="flex:1;min-width:0;font:400 11px ui-monospace,monospace;color:#4d473e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ selFile }}</span>
+              <button type="button" style="flex:none;height:23px;padding:0 9px;border:1px solid #ddd8ce;border-radius:5px;background:#fbfaf8;color:#4d473e;cursor:default;font-size:11px" style-hover="background:#f0eee8;color:#2c2924">Trocar</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#8a847a">Escala da imagem</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="range" min="100" max="240" value="118" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)" />
+              <span style="font:400 11px ui-monospace,monospace;color:#6d675d;min-width:34px">118%</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Rotação</span><input type="text" value="0°" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+            <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Opacidade</span><input type="text" value="100%" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:11px;color:#8a847a">Ordem</span>
+            <div style="display:flex;border:1px solid #ddd8ce;border-radius:5px;overflow:hidden;background:#fff">
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">Frente</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">Avançar</button>
+              <button type="button" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">Recuar</button>
+              <button type="button" style="flex:1;height:26px;border:0;background:transparent;color:#6d675d;cursor:default;font-size:11px" style-hover="background:#f4f2ec;color:#2c2924">Fundo</button>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;height:31px;padding:0 10px;border-radius:5px;background:oklch(0.96 0.03 145)">
+            <span style="font-size:11.5px;color:#4d473e">Resolução na impressão</span>
+            <span style="font:500 11.5px ui-monospace,monospace;color:oklch(0.46 0.12 145)">312 dpi</span>
+          </div>
+          <label style="display:flex;align-items:center;gap:9px;font-size:12px;color:#4d473e;min-width:0">
+            <input type="checkbox" style="accent-color:oklch(0.55 0.13 250)" />
+            <span>Bloquear posição</span>
+          </label>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ noSel }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="border-bottom:1px solid #e9e5dc">
+          <button type="button" data-sec="info" onClick="{{ toggleSec }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:11px 13px;background:transparent;border:0;color:#2c2924;cursor:default;text-align:left" style-hover="background:#f6f4ef">
+            <span style="font-size:8px;color:#a8a29a;width:9px">{{ caretInfo }}</span>
+            <span style="flex:1;font-size:12.5px;font-weight:600">Informações do álbum</span>
+            <sc-if value="{{ dirtyInfo }}" hint-placeholder-val="{{ false }}">
+              <span style="width:6px;height:6px;border-radius:50%;background:oklch(0.68 0.15 62)"></span>
+            </sc-if>
+          </button>
+          <sc-if value="{{ openInfo }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:0 13px 13px;display:flex;flex-direction:column;gap:12px">
+              <label style="display:flex;flex-direction:column;gap:5px;min-width:0">
+                <span style="font-size:11px;color:#8a847a">Nome do projeto</span>
+                <input type="text" value="Formatura Medicina 2026 — Turma B" onChange="{{ touchInfo }}" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font-size:12px;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" />
+              </label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Largura</span><input type="text" value="30 cm" onChange="{{ touchInfo }}" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+                <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Altura</span><input type="text" value="30 cm" onChange="{{ touchInfo }}" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:11px;color:#8a847a">Margens (cm)</span>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;width:20px;flex:none">sup</span><input type="text" value="1,2" onChange="{{ touchInfo }}" style="flex:1;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></div>
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;width:20px;flex:none">inf</span><input type="text" value="1,2" onChange="{{ touchInfo }}" style="flex:1;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></div>
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;width:20px;flex:none">int</span><input type="text" value="1,8" onChange="{{ touchInfo }}" style="flex:1;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></div>
+                  <div style="display:flex;align-items:center;gap:6px;min-width:0"><span style="font:400 10px ui-monospace,monospace;color:#a29c92;width:20px;flex:none">ext</span><input type="text" value="1,2" onChange="{{ touchInfo }}" style="flex:1;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></div>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Sangria</span><input type="text" value="0,3 cm" onChange="{{ touchInfo }}" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+                <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Lombada</span><input type="text" value="0,9 cm" onChange="{{ touchInfo }}" style="width:100%;min-width:0;height:28px;padding:0 9px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="flex:1;font-size:11px;color:{{ hintInfoColor }}">{{ hintInfo }}</span>
+                <button type="button" onClick="{{ applyInfo }}" style="flex:none;height:26px;padding:0 14px;border:0;border-radius:5px;background:{{ btnInfoBg }};color:{{ btnInfoFg }};cursor:default;font-size:12px;font-weight:500">Aplicar</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="border-bottom:1px solid #e9e5dc">
+          <button type="button" data-sec="design" onClick="{{ toggleSec }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:11px 13px;background:transparent;border:0;color:#2c2924;cursor:default;text-align:left" style-hover="background:#f6f4ef">
+            <span style="font-size:8px;color:#a8a29a;width:9px">{{ caretDesign }}</span>
+            <span style="flex:1;font-size:12.5px;font-weight:600">Design do álbum</span>
+            <sc-if value="{{ dirtyDesign }}" hint-placeholder-val="{{ false }}">
+              <span style="width:6px;height:6px;border-radius:50%;background:oklch(0.68 0.15 62)"></span>
+            </sc-if>
+          </button>
+          <sc-if value="{{ openDesign }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:0 13px 13px;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:11px;color:#8a847a">Fundo das lâminas</span>
+                <div style="display:flex;align-items:stretch;gap:9px;padding:6px;border:1px solid #e2ded4;border-radius:6px;background:#f6f4ef">
+                  <div style="flex:none;width:52px;display:flex;flex-direction:column;gap:4px">
+                    <button type="button" data-bg="cor" onClick="{{ pickBg }}" title="Cor de fundo" style="width:100%;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:linear-gradient(150deg,#fdfcfa 0 48%,#e8e3d9 48% 74%,#2b2823 74%);cursor:default;box-shadow:{{ ringCor }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                    <span style="font:400 9px ui-monospace,monospace;color:#a8a29a;text-align:center">cor</span>
+                  </div>
+                  <span style="flex:none;width:1px;background:#e2ded4;margin:2px 0"></span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;gap:6px">
+                      <button type="button" data-bg="img1" onClick="{{ pickBg }}" title="EST_2451.raw" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:repeating-linear-gradient(45deg,#e2ddd3 0 6px,#d6d0c3 6px 12px);cursor:default;box-shadow:{{ ringImg1 }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                      <button type="button" data-bg="img2" onClick="{{ pickBg }}" title="BAI_2508.raw" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:repeating-linear-gradient(135deg,#cfc9bd 0 6px,#c2bbae 6px 12px);cursor:default;box-shadow:{{ ringImg2 }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                      <button type="button" onClick="{{ touchDesign }}" title="Escolher imagem…" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1.5px dashed #cfcabf;border-radius:5px;background:#fff;color:#a8a29a;cursor:default;font-size:16px;font-weight:300;display:flex;align-items:center;justify-content:center" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250);background:oklch(0.98 0.012 250)">+</button>
+                    </div>
+                    <span style="font:400 9px ui-monospace,monospace;color:#a8a29a">imagens recentes</span>
+                  </div>
+                </div>
+                <span style="font:400 10px ui-monospace,monospace;color:#a8a29a">{{ bgHint }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:11px;color:#8a847a">Overlay</span>
+                <div style="display:flex;align-items:stretch;gap:9px;padding:6px;border:1px solid #e2ded4;border-radius:6px;background:#f6f4ef">
+                  <div style="flex:none;width:52px;display:flex;flex-direction:column;gap:4px">
+                    <button type="button" data-ov="nenhum" onClick="{{ pickOv }}" title="Sem overlay" style="width:100%;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:linear-gradient(135deg,#fff 0 47%,#ddd8ce 47% 53%,#fff 53%);cursor:default;box-shadow:{{ ringOvNone }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                    <span style="font:400 9px ui-monospace,monospace;color:#a8a29a;text-align:center">sem</span>
+                  </div>
+                  <span style="flex:none;width:1px;background:#e2ded4;margin:2px 0"></span>
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+                    <div style="display:flex;gap:6px">
+                      <button type="button" data-ov="vinheta" onClick="{{ pickOv }}" title="vinheta_suave.png" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:radial-gradient(ellipse at center,#fdfcfa 40%,#cdc6b8 100%);cursor:default;box-shadow:{{ ringOvVin }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                      <button type="button" data-ov="papel" onClick="{{ pickOv }}" title="textura_papel_01.png" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1px solid #ddd8ce;border-radius:5px;background:repeating-linear-gradient(115deg,#f4f1ea 0 3px,#e4dfd4 3px 6px);cursor:default;box-shadow:{{ ringOvPap }}" style-hover="border-color:oklch(0.6 0.13 250)"></button>
+                      <button type="button" onClick="{{ touchDesign }}" title="Escolher imagem…" style="flex:1;min-width:0;aspect-ratio:1;padding:0;border:1.5px dashed #cfcabf;border-radius:5px;background:#fff;color:#a8a29a;cursor:default;font-size:16px;font-weight:300;display:flex;align-items:center;justify-content:center" style-hover="border-color:oklch(0.6 0.13 250);color:oklch(0.52 0.13 250);background:oklch(0.98 0.012 250)">+</button>
+                    </div>
+                    <span style="font:400 9px ui-monospace,monospace;color:#a8a29a">overlays recentes</span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <input type="range" min="0" max="100" value="24" onChange="{{ touchDesign }}" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)" />
+                  <span style="font:400 11px ui-monospace,monospace;color:#6d675d;min-width:30px">24%</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:11px;color:#8a847a">Borda dos frames</span>
+                <div style="display:flex;border:1px solid #ddd8ce;border-radius:5px;overflow:hidden;background:#fff">
+                  <button type="button" onClick="{{ touchDesign }}" style="flex:1;height:26px;border:0;border-right:1px solid #eae6dd;background:transparent;color:#6d675d;cursor:default;font-size:11.5px" style-hover="background:#f4f2ec;color:#2c2924">Sem</button>
+                  <button type="button" onClick="{{ touchDesign }}" style="flex:1;height:26px;border:0;border-right:1px solid #ddd8ce;background:oklch(0.55 0.13 250);color:#fff;cursor:default;font-size:11.5px;font-weight:500" style-hover="background:oklch(0.49 0.14 250)">Fina</button>
+                  <button type="button" onClick="{{ touchDesign }}" style="flex:1;height:26px;border:0;background:transparent;color:#6d675d;cursor:default;font-size:11.5px" style-hover="background:#f4f2ec;color:#2c2924">Passepartout</button>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                  <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Espessura</span><input type="text" value="1 pt" onChange="{{ touchDesign }}" style="width:100%;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+                  <label style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font-size:11px;color:#8a847a">Canto</span><input type="text" value="0 mm" onChange="{{ touchDesign }}" style="width:100%;min-width:0;height:26px;padding:0 8px;background:#fff;border:1px solid #ddd8ce;border-radius:5px;color:#2c2924;font:400 12px ui-monospace,monospace;outline:none" style-focus="border-color:oklch(0.6 0.13 250)" /></label>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:11px;color:#8a847a">Espaço entre frames</span>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <input type="range" min="0" max="30" value="8" onChange="{{ touchDesign }}" style="flex:1;min-width:0;accent-color:oklch(0.55 0.13 250)" />
+                  <span style="font:400 11px ui-monospace,monospace;color:#6d675d;min-width:34px">8 px</span>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="flex:1;font-size:11px;color:{{ hintDesignColor }}">{{ hintDesign }}</span>
+                <button type="button" onClick="{{ applyDesign }}" style="flex:none;height:26px;padding:0 14px;border:0;border-radius:5px;background:{{ btnDesignBg }};color:{{ btnDesignFg }};cursor:default;font-size:12px;font-weight:500">Aplicar</button>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="border-bottom:1px solid #e9e5dc">
+          <button type="button" data-sec="grade" onClick="{{ toggleSec }}" style="width:100%;display:flex;align-items:center;gap:9px;padding:11px 13px;background:transparent;border:0;color:#2c2924;cursor:default;text-align:left" style-hover="background:#f6f4ef">
+            <span style="font-size:8px;color:#a8a29a;width:9px">{{ caretGrade }}</span>
+            <span style="flex:1;font-size:12.5px;font-weight:600">Grade de lâminas</span>
+            <span style="font:400 10px ui-monospace,monospace;color:#a8a29a">6</span>
+          </button>
+          <sc-if value="{{ openGrade }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:0 13px 14px;display:grid;grid-template-columns:1fr 1fr;gap:9px">
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 1px #ddd8ce,0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:repeating-linear-gradient(135deg,#e4e0d7 0 4px,#dcd8ce 4px 8px)"></div><div style="flex:1;background:#2b2823"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:rgba(251,250,248,.94);color:#6d675d">01</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">capa</span></div>
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 2px oklch(0.6 0.13 250),0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:#efeae1"></div><div style="flex:1;background:#f7f4ef"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:oklch(0.55 0.13 250);color:#fff">02</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">pág 2–3</span></div>
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 1px #ddd8ce,0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:#efeae1"></div><div style="flex:1;background:#2b2823"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:rgba(251,250,248,.94);color:#6d675d">03</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">pág 4–5</span></div>
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 1px #ddd8ce,0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:#e3ded4"></div><div style="flex:1;background:#f7f4ef"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:rgba(251,250,248,.94);color:#6d675d">04</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">pág 6–7</span></div>
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 1px #ddd8ce,0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:#efeae1"></div><div style="flex:1;background:#f7f4ef"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:rgba(251,250,248,.94);color:#6d675d">05</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">pág 8–9</span></div>
+              <div style="position:relative;display:flex;aspect-ratio:2;overflow:hidden;box-shadow:0 0 0 1px #ddd8ce,0 1px 2px rgba(60,54,44,.08);cursor:default"><div style="flex:1;background:#2b2823"></div><div style="flex:1;background:repeating-linear-gradient(135deg,#e4e0d7 0 4px,#dcd8ce 4px 8px)"></div><span style="position:absolute;top:0;left:0;height:13px;padding:0 4px;display:flex;align-items:center;font:500 9px ui-monospace,monospace;letter-spacing:.06em;background:rgba(251,250,248,.94);color:#6d675d">06</span><span style="position:absolute;bottom:0;right:0;height:13px;padding:0 4px;display:flex;align-items:center;background:rgba(251,250,248,.9);font:400 9px ui-monospace,monospace;color:#8a847a">final</span></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showRulers&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Canvas&quot;},&quot;showUsedBadges&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Painel de imagens&quot;}}">
+class Component extends DCLogic {
+  state = {
+    menu: null, sel: null, q: "", filter: "todas", sort: "nome",
+    thumb: 84, imgH: 200, panelW: 306, pageH: 300,
+    openInfo: true, openDesign: true, openGrade: true,
+    dirtyInfo: false, dirtyDesign: false, savedInfo: false, savedDesign: false,
+    bg: "cor", ov: "nenhum", mode: "imagens", asset: null, hoverL: 0,
+    layoutOpen: false, layoutL: 0,
+    assetQ: "", assetExt: "todos", assetUse: "todos"
+  };
+
+  photosAll = (() => {
+    const groups = ["EST", "COL", "BAI"];
+    const out = [];
+    for (let i = 1; i <= 60; i++) {
+      const g = groups[i % 3];
+      out.push({
+        id: i,
+        name: g + "_" + String(2400 + i * 3) + ".raw",
+        used: i % 5 === 0 || i % 7 === 0,
+        usedIn: "L" + String((i % 5) + 2).padStart(2, "0"),
+        date: 20260710 + (i % 9),
+        hue: (i * 37) % 360
+      });
+    }
+    return out;
+  })();
+
+  assetsAll = [
+    { id: "a1", name: "textura_papel_01.png", ext: "PNG", swatch: "repeating-linear-gradient(90deg,#f4f1ea 0 3px,#eae5db 3px 6px)", inUse: true, role: "overlay" },
+    { id: "a2", name: "fundo_marmore.jpg", ext: "JPG", swatch: "linear-gradient(135deg,#f2efe8,#ddd6c9 60%,#e9e4da)", inUse: true, role: "fundo" },
+    { id: "a3", name: "vinheta_suave.png", ext: "PNG", swatch: "radial-gradient(ellipse at center,#fdfcfa 40%,#cdc6b8 100%)", inUse: false, role: "" },
+    { id: "a4", name: "gradiente_base.png", ext: "PNG", swatch: "linear-gradient(#fdfcfa 35%,#b8b1a3)", inUse: false, role: "" },
+    { id: "a5", name: "linho_bege.jpg", ext: "JPG", swatch: "repeating-linear-gradient(45deg,#e6e1d7 0 5px,#dcd6ca 5px 10px)", inUse: false, role: "" },
+    { id: "a6", name: "brasao_turma.png", ext: "PNG", swatch: "radial-gradient(circle at 50% 45%,#c9c2b4 0 26%,#f2efe8 27%)", inUse: true, role: "capa" },
+    { id: "a7", name: "papel_kraft.jpg", ext: "JPG", swatch: "repeating-linear-gradient(135deg,#e0d6c2 0 6px,#d6cbb5 6px 12px)", inUse: false, role: "" },
+    { id: "a8", name: "grao_fino.png", ext: "PNG", swatch: "repeating-conic-gradient(#efece5 0 25%,#e4e0d6 0 50%)", inUse: false, role: "" },
+    { id: "a9", name: "moldura_fina.png", ext: "PNG", swatch: "linear-gradient(#fdfcfa,#fdfcfa) padding-box,linear-gradient(#b8b1a3,#b8b1a3) border-box", inUse: false, role: "" },
+    { id: "a10", name: "fundo_grafite.jpg", ext: "JPG", swatch: "linear-gradient(160deg,#3a3630,#2b2823)", inUse: true, role: "L03" }
+  ];
+
+  objMeta = {
+    "capa-foto": { kind: "imagem", w: "30,6 cm", h: "30,6 cm", x: "-0,3", y: "-0,3" }
+  };
+
+  measure = () => {
+    const el = this.canvasEl;
+    if (!el) return;
+    const pageH = Math.max(120, el.clientHeight - 62);
+    if (pageH !== this.state.pageH) this.setState({ pageH });
+  };
+
+  componentDidMount() {
+    const el = this.canvasEl;
+    this.measure();
+    if (el && window.ResizeObserver) {
+      this.ro = new ResizeObserver(this.measure);
+      this.ro.observe(el);
+    }
+    window.addEventListener("resize", this.measure);
+    this.onKey = (e) => { if (e.key === "Escape") this.clearSelection(); };
+    document.addEventListener("keydown", this.onKey);
+    if (el) {
+      this.onWheel = (e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+          el.scrollLeft += e.deltaY;
+          e.preventDefault();
+        }
+      };
+      el.addEventListener("wheel", this.onWheel, { passive: false });
+    }
+    this.onDoc = (e) => {
+      if (!e.target.closest || !e.target.closest("[data-menu]")) {
+        if (this.state.menu) this.setState({ menu: null });
+      }
+    };
+    document.addEventListener("click", this.onDoc);
+    this.onWinResize = () => this.medirFolder();
+    window.addEventListener("resize", this.onWinResize);
+  }
+
+  componentWillUnmount() {
+    if (this.canvasEl && this.onWheel) this.canvasEl.removeEventListener("wheel", this.onWheel);
+    document.removeEventListener("click", this.onDoc);
+    document.removeEventListener("keydown", this.onKey);
+    window.removeEventListener("resize", this.measure);
+    window.removeEventListener("resize", this.onWinResize);
+    if (this.ro) this.ro.disconnect();
+    if (this.folderRO) this.folderRO.disconnect();
+    clearTimeout(this.tInfo);
+    clearTimeout(this.tDesign);
+    this.stopDrag();
+  }
+
+  stopDrag = () => {
+    window.removeEventListener("mousemove", this.onMove);
+    window.removeEventListener("mouseup", this.stopDrag);
+    document.body.style.cursor = "";
+  };
+
+  beginDrag(axis, e) {
+    e.preventDefault();
+    const start = axis === "y" ? e.clientY : e.clientX;
+    const from = axis === "y" ? this.state.imgH : this.state.panelW;
+    this.onMove = (ev) => {
+      const d = (axis === "y" ? ev.clientY : ev.clientX) - start;
+      if (axis === "y") this.setState({ imgH: Math.max(64, Math.min(window.innerHeight - 300, from - d)) }, this.measure);
+      else this.setState({ panelW: Math.max(240, Math.min(520, from - d)) }, this.measure);
+    };
+    document.body.style.cursor = axis === "y" ? "row-resize" : "col-resize";
+    window.addEventListener("mousemove", this.onMove);
+    window.addEventListener("mouseup", this.stopDrag);
+  }
+
+  clearSelection() {
+    this.paintSelection(null);
+    if (this.state.sel) this.setState({ sel: null });
+  }
+
+  paintSelection(el) {
+    if (this.selEl && this.selEl !== el) {
+      this.selEl.style.outline = "";
+      this.selEl.style.outlineOffset = "";
+      this.selEl.style.boxShadow = "";
+    }
+    this.selEl = el;
+    if (el) {
+      el.style.outline = "2px solid oklch(0.6 0.13 250)";
+      el.style.outlineOffset = "-1px";
+      el.style.boxShadow = "0 0 0 4px oklch(0.6 0.13 250 / 0.18)";
+    }
+  }
+
+  folderRef = el => {
+    if (!el || el === this.folderEl) return;
+    this.folderEl = el;
+    if (typeof ResizeObserver !== "undefined") {
+      if (!this.folderRO) this.folderRO = new ResizeObserver(() => this.medirFolder());
+      this.folderRO.disconnect();
+      this.folderRO.observe(el);
+      for (const filho of el.children) this.folderRO.observe(filho);
+    }
+    requestAnimationFrame(() => this.medirFolder());
+  };
+
+  componentDidUpdate() {
+    this.medirFolder();
+  }
+
+  medirFolder() {
+    const el = this.folderEl;
+    if (!el || !el.isConnected) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const frac = Math.round((el.clientWidth / (el.scrollWidth || 1)) * 1000) / 1000;
+    const pos = max > 0 ? Math.round((el.scrollLeft / max) * 1000) / 1000 : 0;
+    if (this.state.fFrac !== frac || this.state.fPos !== pos) this.setState({ fFrac: frac, fPos: pos });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const fFrac = s.fFrac == null ? 1 : s.fFrac, fPos = s.fPos || 0;
+    const thumbPct = Math.max(12, Math.round(fFrac * 100));
+    const showUsed = this.props.showUsedBadges ?? true;
+    const m = s.sel ? (this.objMeta[s.sel] || { kind: "frame", w: "12,4 cm", h: "9,3 cm", x: "3,0", y: "4,2" }) : null;
+
+    let list = this.photosAll.filter(p => {
+      if (s.filter === "usadas" && !p.used) return false;
+      if (s.filter === "naousadas" && p.used) return false;
+      if (s.q && !p.name.toLowerCase().includes(s.q.toLowerCase())) return false;
+      return true;
+    });
+    if (s.sort === "data") list = list.slice().sort((a, b) => b.date - a.date);
+    else if (s.sort === "cor") list = list.slice().sort((a, b) => a.hue - b.hue);
+    list = list.map(p => ({ ...p, showUsed: showUsed && p.used }));
+
+    const usedCount = this.photosAll.filter(p => p.used).length;
+    const menuOn = "#eceae3";
+    const bgHints = {
+      cor: "Cor sólida — escolha no seletor de cor",
+      img1: "EST_2451.raw · adicionada há 2 min",
+      img2: "BAI_2508.raw · adicionada há 8 min"
+    };
+    const ring = (k) => s.bg === k ? "0 0 0 2px oklch(0.6 0.13 250)" : "none";
+
+    const touch = (k) => () => {
+      const key = k === "info" ? "dirtyInfo" : "dirtyDesign";
+      const saved = k === "info" ? "savedInfo" : "savedDesign";
+      this.setState({ [key]: true, [saved]: false });
+    };
+    const apply = (k) => () => {
+      const key = k === "info" ? "dirtyInfo" : "dirtyDesign";
+      const saved = k === "info" ? "savedInfo" : "savedDesign";
+      const timer = k === "info" ? "tInfo" : "tDesign";
+      if (!this.state[key]) return;
+      this.setState({ [key]: false, [saved]: true });
+      clearTimeout(this[timer]);
+      this[timer] = setTimeout(() => this.setState({ [saved]: false }), 2400);
+    };
+
+    return {
+      canvasRef: (el) => { this.canvasEl = el; },
+      photos: list,
+      q: s.q,
+      thumb: s.thumb,
+      imgH: s.imgH + "px",
+      panelW: s.panelW + "px",
+      spreadW: (s.pageH * 2) + "px",
+      pageW: s.pageH + "px",
+      countLabel: list.length + " de " + this.photosAll.length,
+      usedLabel: usedCount + " usadas · " + (this.photosAll.length - usedCount) + " livres",
+      statusLamina: "Lâmina 02 de 06 · páginas 2–3",
+      statusSel: s.sel ? "seleção: " + s.sel : "nada selecionado",
+      hasSel: !!s.sel,
+      noSel: !s.sel,
+      clearSel: () => this.clearSelection(),
+      imgOptsPopover: !!s.imgOptsOpen && s.mode !== "estilos",
+      imgOptsBg: s.imgOptsOpen ? "#f0eee8" : "transparent",
+      imgOptsFg: s.imgOptsOpen ? "#2c2924" : "#8a847a",
+      toggleImgOpts: () => this.setState(st => ({ imgOptsOpen: !st.imgOptsOpen, assetOptsOpen: false })),
+      assetOptsPopover: !!s.assetOptsOpen && s.mode === "estilos",
+      assetOptsBg: s.assetOptsOpen ? "#f0eee8" : "transparent",
+      assetOptsFg: s.assetOptsOpen ? "#2c2924" : "#8a847a",
+      toggleAssetOpts: () => this.setState(st => ({ assetOptsOpen: !st.assetOptsOpen, imgOptsOpen: false })),
+      fecharOpts: () => this.setState({ imgOptsOpen: false, assetOptsOpen: false }),
+      folderRef: this.folderRef,
+      onFolderScroll: () => this.medirFolder(),
+      onFolderWheel: e => {
+        const el = this.folderEl;
+        if (!el || el.scrollWidth <= el.clientWidth) return;
+        const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        if (!d) return;
+        e.preventDefault();
+        el.scrollLeft += d;
+      },
+      folderBarOp: fFrac < 0.995 ? 1 : 0,
+      folderThumbW: thumbPct + "%",
+      folderThumbLeft: Math.round(fPos * (100 - thumbPct)) + "%",
+      selTitle: "Frame selecionado",
+      selName: s.sel || "",
+      selFile: "EST_2418.raw",
+      selW: m ? m.w : "", selH: m ? m.h : "", selX: m ? m.x : "", selY: m ? m.y : "",
+      openInfo: s.openInfo, openDesign: s.openDesign, openGrade: s.openGrade,
+      caretInfo: s.openInfo ? "▼" : "▶",
+      caretDesign: s.openDesign ? "▼" : "▶",
+      caretGrade: s.openGrade ? "▼" : "▶",
+      dirtyInfo: s.dirtyInfo,
+      dirtyDesign: s.dirtyDesign,
+      hintInfo: s.dirtyInfo ? "Alterações não aplicadas" : (s.savedInfo ? "Aplicado às 6 lâminas" : ""),
+      hintDesign: s.dirtyDesign ? "Alterações não aplicadas" : (s.savedDesign ? "Aplicado às 6 lâminas" : ""),
+      hintInfoColor: s.dirtyInfo ? "oklch(0.55 0.14 62)" : "oklch(0.5 0.11 145)",
+      hintDesignColor: s.dirtyDesign ? "oklch(0.55 0.14 62)" : "oklch(0.5 0.11 145)",
+      btnInfoBg: s.dirtyInfo ? "oklch(0.55 0.13 250)" : "#eae6dd",
+      btnInfoFg: s.dirtyInfo ? "#fff" : "#a8a29a",
+      btnDesignBg: s.dirtyDesign ? "oklch(0.55 0.13 250)" : "#eae6dd",
+      btnDesignFg: s.dirtyDesign ? "#fff" : "#a8a29a",
+      touchInfo: touch("info"),
+      touchDesign: touch("design"),
+      applyInfo: apply("info"),
+      applyDesign: apply("design"),
+      bgHint: bgHints[s.bg] || "",
+      ringCor: ring("cor"), ringImg1: ring("img1"), ringImg2: ring("img2"),
+      pickBg: (e) => { this.setState({ bg: e.currentTarget.dataset.bg }); touch("design")(); },
+      pickOv: (e) => { this.setState({ ov: e.currentTarget.dataset.ov }); touch("design")(); },
+      ringOvNone: s.ov === "nenhum" ? "0 0 0 2px oklch(0.6 0.13 250)" : "none",
+      ringOvVin: s.ov === "vinheta" ? "0 0 0 2px oklch(0.6 0.13 250)" : "none",
+      ringOvPap: s.ov === "papel" ? "0 0 0 2px oklch(0.6 0.13 250)" : "none",
+      ringOvGrad: s.ov === "gradiente" ? "0 0 0 2px oklch(0.6 0.13 250)" : "none",
+      assets: this.assetsAll
+        .filter(a => {
+          if (s.assetExt !== "todos" && a.ext !== s.assetExt) return false;
+          if (s.assetUse === "usados" && !a.inUse) return false;
+          if (s.assetUse === "livres" && a.inUse) return false;
+          if (s.assetQ && !a.name.toLowerCase().includes(s.assetQ.toLowerCase())) return false;
+          return true;
+        })
+        .map(a => ({
+          ...a,
+          ring: s.asset === a.id
+            ? "0 0 0 2px oklch(0.6 0.13 250),0 1px 2px rgba(60,54,44,.12)"
+            : "0 1px 2px rgba(60,54,44,.12)"
+        })),
+      assetQ: s.assetQ,
+      assetExt: s.assetExt,
+      assetUse: s.assetUse,
+      setAssetQ: (e) => this.setState({ assetQ: e.target.value }),
+      setAssetExt: (e) => this.setState({ assetExt: e.target.value }),
+      setAssetUse: (e) => this.setState({ assetUse: e.target.value }),
+      pickAsset: (e) => this.setState({ asset: e.currentTarget.dataset.asset }),
+      opL1: s.hoverL === 1 ? 0.55 : 0,
+      opL2: s.hoverL === 2 ? 0.55 : 0,
+      opL3: s.hoverL === 3 ? 0.55 : 0,
+      opL4: s.hoverL === 4 ? 0.55 : 0,
+      opL5: s.hoverL === 5 ? 0.55 : 0,
+      opL6: s.hoverL === 6 ? 0.55 : 0,
+      layoutOpen: s.layoutOpen,
+      imgPanelOpen: !s.layoutOpen,
+      layoutFor: s.layoutL ? "lâmina " + String(s.layoutL).padStart(2, "0") : "",
+      openLayout: (e) => {
+        e.stopPropagation();
+        const col = e.currentTarget.closest("[data-l]");
+        this.setState({ layoutOpen: true, layoutL: col ? Number(col.dataset.l) : 0 });
+      },
+      closeLayout: () => this.setState({ layoutOpen: false }),
+      layAction: (e) => {
+        e.stopPropagation();
+        const b = e.currentTarget;
+        const act = b.dataset.act;
+        if (act === "del") { const card = b.closest("[data-lay]"); if (card) card.style.display = "none"; return; }
+        const on = b.dataset.on === "1";
+        b.dataset.on = on ? "" : "1";
+        b.style.color = on ? "#8a847a" : (act === "fav" ? "oklch(0.62 0.15 75)" : "oklch(0.52 0.13 250)");
+        const card = b.closest("[data-lay]");
+        const ov = b.parentElement;
+        if (ov) ov.style.opacity = on && !ov.querySelector('[data-on="1"]') ? "" : "1";
+        if (card && act === "lock") card.firstElementChild.style.boxShadow = on ? "0 0 0 1px #ddd8ce" : "0 0 0 2px oklch(0.6 0.13 250)";
+      },
+      pickLayout: (e) => {
+        const el = e.currentTarget.firstElementChild;
+        if (this.layEl && this.layEl !== el) this.layEl.style.boxShadow = "0 0 0 1px #ddd8ce";
+        this.layEl = el;
+        el.style.boxShadow = "0 0 0 2px oklch(0.6 0.13 250)";
+      },
+      enterL: (e) => this.setState({ hoverL: Number(e.currentTarget.dataset.l) }),
+      leaveL: () => this.setState({ hoverL: 0 }),
+      modeImagens: s.mode === "imagens",
+      modeEstilos: s.mode === "estilos",
+      setMode: (e) => this.setState({ mode: e.currentTarget.dataset.mode, imgOptsOpen: false, assetOptsOpen: false }),
+      bgModeImg: s.mode === "imagens" ? "#f0eee8" : "transparent",
+      bgModeSty: s.mode === "estilos" ? "#f0eee8" : "transparent",
+      fgModeImg: s.mode === "imagens" ? "oklch(0.52 0.13 250)" : "#a29c92",
+      fgModeSty: s.mode === "estilos" ? "oklch(0.52 0.13 250)" : "#a29c92",
+      underImg: s.mode === "imagens" ? "inset 0 -2px 0 oklch(0.55 0.13 250)" : "none",
+      underSty: s.mode === "estilos" ? "inset 0 -2px 0 oklch(0.55 0.13 250)" : "none",
+      showRulers: this.props.showRulers ?? true,
+      filter: s.filter,
+      mArquivo: s.menu === "arquivo",
+      mEditar: s.menu === "editar",
+      mInserir: s.menu === "inserir",
+      mLamina: s.menu === "lamina",
+      mVisualizar: s.menu === "visualizar",
+      mAjuda: s.menu === "ajuda",
+      mImportar: s.menu === "importar",
+      bgImportar: s.menu === "importar" ? "#f0eee8" : "transparent",
+      bgArquivo: s.menu === "arquivo" ? menuOn : "transparent",
+      bgEditar: s.menu === "editar" ? menuOn : "transparent",
+      bgInserir: s.menu === "inserir" ? menuOn : "transparent",
+      bgLamina: s.menu === "lamina" ? menuOn : "transparent",
+      bgVisualizar: s.menu === "visualizar" ? menuOn : "transparent",
+      bgAjuda: s.menu === "ajuda" ? menuOn : "transparent",
+      fgArquivo: s.menu === "arquivo" ? "#2c2924" : "#3a3630",
+      fgEditar: s.menu === "editar" ? "#2c2924" : "#3a3630",
+      fgInserir: s.menu === "inserir" ? "#2c2924" : "#3a3630",
+      fgLamina: s.menu === "lamina" ? "#2c2924" : "#3a3630",
+      fgVisualizar: s.menu === "visualizar" ? "#2c2924" : "#3a3630",
+      fgAjuda: s.menu === "ajuda" ? "#2c2924" : "#3a3630",
+      toggleMenu: (e) => {
+        const n = e.currentTarget.dataset.menu;
+        this.setState(st => ({ menu: st.menu === n ? null : n }));
+      },
+      toggleSec: (e) => {
+        const k = { info: "openInfo", design: "openDesign", grade: "openGrade" }[e.currentTarget.dataset.sec];
+        this.setState(st => ({ [k]: !st[k] }));
+      },
+      selectObj: (e) => {
+        e.stopPropagation();
+        const el = e.currentTarget;
+        this.paintSelection(el);
+        this.setState({ sel: el.dataset.obj });
+      },
+      bgClick: (e) => { if (!e.target.closest("[data-obj]")) this.clearSelection(); },
+      startDragH: (e) => this.beginDrag("y", e),
+      startDragV: (e) => this.beginDrag("x", e),
+      setQ: (e) => this.setState({ q: e.target.value }),
+      setFilterSel: (e) => this.setState({ filter: e.target.value }),
+      setSort: (e) => this.setState({ sort: e.target.value }),
+      setThumb: (e) => this.setState({ thumb: Number(e.target.value) })
+    };
+  }
+}
+</script>
+</body>
+</html>

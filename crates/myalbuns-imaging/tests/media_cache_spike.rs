@@ -29,8 +29,7 @@ const MAX_DECODER_ALLOC_BYTES: u64 = 512 * 1024 * 1024;
 const OPAQUE_JPEG_QUALITY: u8 = 84;
 const JPEG_QUALITY_CANDIDATES: [u8; 6] = [72, 76, 80, 84, 88, 92];
 const SRGB_PROFILE: &[u8] = include_bytes!("../assets/sRGB2014.icc");
-const PHOTOGRAPHIC_REFERENCE: &[u8] =
-    include_bytes!("../../../docs/assets/referencia-layout-editor.png");
+const PHOTOGRAPHIC_CORPUS: &[u8] = include_bytes!("assets/photographic-quality-corpus.png");
 
 struct PhotographicFixture {
     name: &'static str,
@@ -114,7 +113,7 @@ fn measured_media_cache_policy() {
         .map(|fixture| {
             json!({
                 "name": fixture.name,
-                "sourceAsset": "docs/assets/referencia-layout-editor.png",
+                "sourceAsset": "crates/myalbuns-imaging/tests/assets/photographic-quality-corpus.png",
                 "crop": fixture.crop,
                 "normalizedDimensions": [fixture.image.width(), fixture.image.height()],
                 "normalizedRgbSha256": format!("{:x}", Sha256::digest(fixture.image.as_raw())),
@@ -282,7 +281,7 @@ fn measured_media_cache_policy() {
             },
             "jpegQualitySweep": {
                 "method": "aggregate-psnr-mae-and-normalized-rate-distortion-knee-v1",
-                "sourceAssetSha256": format!("{:x}", Sha256::digest(PHOTOGRAPHIC_REFERENCE)),
+                "sourceAssetSha256": format!("{:x}", Sha256::digest(PHOTOGRAPHIC_CORPUS)),
                 "corpus": photographic_corpus_evidence,
                 "candidates": quality_sweep_evidence,
                 "selectedQuality": selected_quality
@@ -307,7 +306,7 @@ fn measured_media_cache_policy() {
 }
 
 fn photographic_quality_corpus() -> Vec<PhotographicFixture> {
-    let reference = decode_with_policy(PHOTOGRAPHIC_REFERENCE, ImageFormat::Png).to_rgb8();
+    let reference = decode_with_policy(PHOTOGRAPHIC_CORPUS, ImageFormat::Png).to_rgb8();
     let crops = [
         ("grupo-familiar", [0, 140, 325, 465]),
         ("retrato-triplo", [390, 140, 350, 465]),
