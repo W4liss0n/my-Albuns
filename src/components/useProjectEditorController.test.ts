@@ -13,6 +13,10 @@ import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 function projectSessionPort(): ProjectSessionPort {
   return {
     load: async () => representativeProjection,
+    validateAlbumInformation: async () => ({
+      errors: [],
+      impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+    }),
     apply: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,

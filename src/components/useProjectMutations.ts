@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type {
+  AlbumInformation,
   EditorProjection,
   ProjectIntent,
 } from "../domain/project";
@@ -125,12 +126,11 @@ export function useProjectMutations({
     message,
     applyWithStatus,
     commitInteraction,
-    applyDpi: async (dpi: number) => {
-      await commitInteraction({
-        kind: "setDpi",
-        dpi,
-      });
-    },
+    applyAlbumInformation: (information: AlbumInformation) =>
+      commitInteraction({
+        kind: "setAlbumInformation",
+        information,
+      }),
     save: () => void saveVisibleRevision(),
     undo: () =>
       void runWithGlobalFeedback("Desfazendo", (port) =>

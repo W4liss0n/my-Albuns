@@ -1,4 +1,6 @@
 import type {
+  AlbumInformation,
+  AlbumInformationValidation,
   EditorProjection,
   ProjectIntent,
 } from "../domain/project";
@@ -171,6 +173,9 @@ export interface ProjectStartupPort {
 
 export interface ProjectSessionPort {
   load(operationId: string): Promise<EditorProjection>;
+  validateAlbumInformation(
+    information: AlbumInformation,
+  ): Promise<AlbumInformationValidation>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;

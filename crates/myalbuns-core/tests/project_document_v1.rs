@@ -1,15 +1,15 @@
 use std::{fs, path::Path};
 
 use myalbuns_core::{
-    ActiveSides, Background, BackgroundContent, CoreError, CreateAuthorization, CreateProjectError,
-    CreateProjectRequest, DisplayUnit, DocumentFailure, EndSheetFormat, FrameBorder,
-    InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
-    InitialOverlayContent, InitialProject, InitialProjectConfiguration,
-    InitialProjectPersonalization, InitialProjectValidationError as ValidationError,
-    LoadProjectError, LoadProjectRequest, LoadedProjectRevision, OpenProjectError,
-    OpenProjectRequest, Overlay, OverlayContent, PathFailure, ProjectCore, ProjectIntent,
-    ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb, SaveProjectError,
-    SaveProjectOutcome, SheetRole,
+    ActiveSides, AlbumInformation, AlbumInformationImpact, Background, BackgroundContent,
+    CoreError, CreateAuthorization, CreateProjectError, CreateProjectRequest, DisplayUnit,
+    DocumentFailure, EndSheetFormat, FrameBorder, InitialBackground, InitialBackgroundContent,
+    InitialFrameBorder, InitialOverlay, InitialOverlayContent, InitialProject,
+    InitialProjectConfiguration, InitialProjectPersonalization, LoadProjectError,
+    LoadProjectRequest, LoadedProjectRevision, OpenProjectError, OpenProjectRequest, Overlay,
+    OverlayContent, PathFailure, ProjectConfigurationValidationError as ValidationError,
+    ProjectCore, ProjectIntent, ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb,
+    SaveProjectError, SaveProjectOutcome, SheetRole,
 };
 use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier, project_data_namespace};
 
@@ -1790,6 +1790,192 @@ fn changing_dpi_updates_the_authoritative_projection_without_writing_the_project
         persisted_before,
         "a creative action must not write before Save"
     );
+}
+
+#[test]
+fn changing_album_information_is_one_atomic_authoritative_revision() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Informações editáveis.myalbuns");
+    let core = project_core_with_identity_storage(directory.path());
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Cm,
+        sheet_width_um: 700_000,
+        sheet_height_um: 350_000,
+        dpi: 240,
+        bleed_um: 4_000,
+        safety_um: 6_000,
+        first_sheet: EndSheetFormat::SinglePage,
+        last_sheet: EndSheetFormat::SinglePage,
+    };
+    assert_eq!(
+        project.validate_album_information(&information),
+        myalbuns_core::AlbumInformationValidation {
+            errors: vec![],
+            impact: Some(AlbumInformationImpact {
+                sheet_width_px: 6_614,
+                page_width_px: 3_307,
+                height_px: 3_307,
+            }),
+        }
+    );
+
+    let changed = project
+        .apply(ProjectIntent::SetAlbumInformation { information })
+        .expect("all Album information changes are valid");
+    assert_eq!(changed.state.revision, 1);
+    assert_eq!(
+        changed.state.document.display_unit,
+        ProjectedDisplayUnit::Cm
+    );
+    assert_eq!(changed.state.document.sheet_width_um, 700_000);
+    assert_eq!(changed.state.document.sheet_height_um, 350_000);
+    assert_eq!(changed.state.document.dpi, 240);
+    assert_eq!(changed.state.document.bleed_um, 4_000);
+    assert_eq!(changed.state.document.safety_um, 6_000);
+    assert_eq!(
+        changed.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    assert_eq!(
+        changed.state.album.sheets[1].active_sides,
+        ProjectedActiveSides::Left
+    );
+
+    let undone = project
+        .undo()
+        .expect("the complete form is one Undo action");
+    assert_eq!(undone.state.revision, 0);
+    assert_eq!(undone.state.document.sheet_width_um, 600_000);
+    assert_eq!(undone.state.document.dpi, 300);
+    assert_eq!(
+        undone.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Both
+    );
+    assert_eq!(
+        undone.state.album.sheets[1].active_sides,
+        ProjectedActiveSides::Both
+    );
+
+    let redone = project
+        .redo()
+        .expect("the complete form is one Redo action");
+    assert_eq!(redone.state.revision, 1);
+    assert_eq!(redone.state.document.sheet_width_um, 700_000);
+    assert_eq!(
+        redone.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+
+    assert_eq!(
+        project
+            .save(1)
+            .expect("the complete Album information revision is persisted"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+    drop(project);
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the saved Album information reopens")
+        .projection();
+    assert_eq!(
+        reopened.state.document.display_unit,
+        ProjectedDisplayUnit::Cm
+    );
+    assert_eq!(reopened.state.document.sheet_width_um, 700_000);
+    assert_eq!(reopened.state.document.sheet_height_um, 350_000);
+    assert_eq!(reopened.state.document.dpi, 240);
+    assert_eq!(reopened.state.document.bleed_um, 4_000);
+    assert_eq!(reopened.state.document.safety_um, 6_000);
+    assert_eq!(
+        reopened.state.album.sheets[0].active_sides,
+        ProjectedActiveSides::Right
+    );
+    assert_eq!(
+        reopened.state.album.sheets[1].active_sides,
+        ProjectedActiveSides::Left
+    );
+}
+
+#[test]
+fn invalid_album_information_does_not_consume_history() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Informações inválidas.myalbuns");
+    let core = project_core_with_identity_storage(directory.path());
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    let initial = project.projection();
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Mm,
+        sheet_width_um: 600_000,
+        sheet_height_um: 300_000,
+        dpi: 300,
+        bleed_um: 160_000,
+        safety_um: 3_000,
+        first_sheet: EndSheetFormat::Double,
+        last_sheet: EndSheetFormat::Double,
+    };
+
+    assert_eq!(
+        project.validate_album_information(&information).errors,
+        [ValidationError::BleedEliminatesCutArea]
+    );
+    assert_eq!(
+        project
+            .apply(ProjectIntent::SetAlbumInformation { information })
+            .expect_err("invalid Album information is rejected"),
+        CoreError::InvalidAlbumInformation(vec![ValidationError::BleedEliminatesCutArea,])
+    );
+    assert_eq!(project.projection(), initial);
+}
+
+#[test]
+fn dimensional_change_requires_the_current_sheet_proportion() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Proporção protegida.myalbuns");
+    let core = project_core_with_identity_storage(directory.path());
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the productive Project opens");
+    let initial = project.projection();
+    let information = AlbumInformation {
+        display_unit: DisplayUnit::Mm,
+        sheet_width_um: 700_000,
+        sheet_height_um: 300_000,
+        dpi: 300,
+        bleed_um: 3_000,
+        safety_um: 3_000,
+        first_sheet: EndSheetFormat::Double,
+        last_sheet: EndSheetFormat::Double,
+    };
+
+    assert_eq!(
+        project.validate_album_information(&information).errors,
+        [ValidationError::SheetDimensionsNotProportional]
+    );
+    assert_eq!(
+        project
+            .apply(ProjectIntent::SetAlbumInformation { information })
+            .expect_err("an incompatible proportion is rejected"),
+        CoreError::InvalidAlbumInformation(vec![ValidationError::SheetDimensionsNotProportional,])
+    );
+    assert_eq!(project.projection(), initial);
 }
 
 #[test]

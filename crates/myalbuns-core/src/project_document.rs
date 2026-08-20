@@ -4,13 +4,16 @@ use std::{
 };
 
 use myalbuns_paths::validate_external_path;
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 use uuid::Uuid;
 
 use crate::model::MediaKind;
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub enum DisplayUnit {
     Mm,
     Cm,
@@ -274,12 +277,95 @@ impl ProjectDocument {
         validate_project_state(&candidate)?;
         Ok(candidate)
     }
+
+    pub(crate) fn validate_album_information(
+        &self,
+        information: &AlbumInformation,
+    ) -> AlbumInformationValidation {
+        let mut errors = information.configuration(self.sheets.len()).map_or_else(
+            || vec![ProjectConfigurationValidationError::SheetCountTooSmall],
+            |configuration| configuration.validation_errors(),
+        );
+        let dimensions_are_valid = !errors.iter().any(|error| {
+            matches!(
+                error,
+                ProjectConfigurationValidationError::SheetWidthNotPositive
+                    | ProjectConfigurationValidationError::SheetWidthAboveSafeInteger
+                    | ProjectConfigurationValidationError::SheetWidthNotEven
+                    | ProjectConfigurationValidationError::SheetWidthRasterOutOfRange
+                    | ProjectConfigurationValidationError::SheetHeightNotPositive
+                    | ProjectConfigurationValidationError::SheetHeightAboveSafeInteger
+                    | ProjectConfigurationValidationError::SheetHeightRasterOutOfRange
+            )
+        });
+        let dimensions_changed = information.sheet_width_um
+            != signed_persisted_value(self.document.sheet_width_um())
+            || information.sheet_height_um
+                != signed_persisted_value(self.document.sheet_height_um());
+        if dimensions_are_valid
+            && dimensions_changed
+            && !dimensions_keep_proportion(
+                self.document.sheet_width_um(),
+                self.document.sheet_height_um(),
+                information.sheet_width_um,
+                information.sheet_height_um,
+            )
+        {
+            errors.push(ProjectConfigurationValidationError::SheetDimensionsNotProportional);
+        }
+        let impact = errors
+            .is_empty()
+            .then(|| album_information_impact(information))
+            .flatten();
+        AlbumInformationValidation { errors, impact }
+    }
+
+    pub(crate) fn with_album_information(
+        &self,
+        information: AlbumInformation,
+    ) -> Result<Self, Vec<ProjectConfigurationValidationError>> {
+        let validation = self.validate_album_information(&information);
+        if !validation.errors.is_empty() {
+            return Err(validation.errors);
+        }
+
+        let mut candidate = self.clone();
+        candidate.document = DocumentSettings::new(
+            information.display_unit,
+            u64::try_from(information.sheet_width_um)
+                .map_err(|_| vec![ProjectConfigurationValidationError::SheetWidthNotPositive])?,
+            u64::try_from(information.sheet_height_um)
+                .map_err(|_| vec![ProjectConfigurationValidationError::SheetHeightNotPositive])?,
+            u32::try_from(information.dpi)
+                .map_err(|_| vec![ProjectConfigurationValidationError::DpiOutOfRange])?,
+            u64::try_from(information.bleed_um)
+                .map_err(|_| vec![ProjectConfigurationValidationError::BleedNegative])?,
+            u64::try_from(information.safety_um)
+                .map_err(|_| vec![ProjectConfigurationValidationError::SafetyNegative])?,
+        );
+        let last_index = candidate.sheets.len() - 1;
+        candidate.sheets[0].active_sides = information.first_sheet.active_sides(true);
+        candidate.sheets[last_index].active_sides = information.last_sheet.active_sides(false);
+        validate_project_state(&candidate).map_err(|()| validation.errors)?;
+        Ok(candidate)
+    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
 pub enum EndSheetFormat {
     Double,
     SinglePage,
+}
+
+impl EndSheetFormat {
+    fn active_sides(self, first: bool) -> ActiveSides {
+        match (self, first) {
+            (Self::Double, _) => ActiveSides::Both,
+            (Self::SinglePage, true) => ActiveSides::Right,
+            (Self::SinglePage, false) => ActiveSides::Left,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -439,8 +525,9 @@ fn initial_overlay_content(
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum InitialProjectValidationError {
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectConfigurationValidationError {
     SheetWidthNotPositive,
     SheetWidthAboveSafeInteger,
     SheetWidthNotEven,
@@ -448,6 +535,7 @@ pub enum InitialProjectValidationError {
     SheetHeightNotPositive,
     SheetHeightAboveSafeInteger,
     SheetHeightRasterOutOfRange,
+    SheetDimensionsNotProportional,
     DpiOutOfRange,
     SheetCountTooSmall,
     BleedNegative,
@@ -456,6 +544,60 @@ pub enum InitialProjectValidationError {
     SafetyNegative,
     SafetyAboveSafeInteger,
     SafetyEliminatesSafeArea,
+}
+
+fn dimensions_keep_proportion(
+    current_width_um: u64,
+    current_height_um: u64,
+    next_width_um: i64,
+    next_height_um: i64,
+) -> bool {
+    i128::from(current_width_um) * i128::from(next_height_um)
+        == i128::from(current_height_um) * i128::from(next_width_um)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumInformation {
+    pub display_unit: DisplayUnit,
+    pub sheet_width_um: i64,
+    pub sheet_height_um: i64,
+    pub dpi: i64,
+    pub bleed_um: i64,
+    pub safety_um: i64,
+    pub first_sheet: EndSheetFormat,
+    pub last_sheet: EndSheetFormat,
+}
+
+impl AlbumInformation {
+    fn configuration(self, sheet_count: usize) -> Option<InitialProjectConfiguration> {
+        Some(InitialProjectConfiguration::new(
+            self.display_unit,
+            self.sheet_width_um,
+            self.sheet_height_um,
+            self.dpi,
+            self.bleed_um,
+            self.safety_um,
+            i64::try_from(sheet_count).ok()?,
+            self.first_sheet,
+            self.last_sheet,
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumInformationValidation {
+    pub errors: Vec<ProjectConfigurationValidationError>,
+    pub impact: Option<AlbumInformationImpact>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumInformationImpact {
+    pub sheet_width_px: u32,
+    pub page_width_px: u32,
+    pub height_px: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -497,7 +639,7 @@ impl InitialProjectConfiguration {
         }
     }
 
-    pub fn validation_errors(&self) -> Vec<InitialProjectValidationError> {
+    pub fn validation_errors(&self) -> Vec<ProjectConfigurationValidationError> {
         validation_errors(InitialProjectValidationValues {
             sheet_width_um: i128::from(self.sheet_width_um),
             sheet_height_um: i128::from(self.sheet_height_um),
@@ -675,8 +817,10 @@ struct InitialProjectValidationValues {
     sheet_count: i128,
 }
 
-fn validation_errors(values: InitialProjectValidationValues) -> Vec<InitialProjectValidationError> {
-    use InitialProjectValidationError as Error;
+fn validation_errors(
+    values: InitialProjectValidationValues,
+) -> Vec<ProjectConfigurationValidationError> {
+    use ProjectConfigurationValidationError as Error;
 
     let mut errors = Vec::new();
     let safe_integer = i128::from(MAX_SAFE_INTEGER);
@@ -762,11 +906,25 @@ fn validation_errors(values: InitialProjectValidationValues) -> Vec<InitialProje
 }
 
 fn raster_axis_is_valid(micrometers: i128, dpi: i128) -> bool {
+    raster_axis_pixels(micrometers, dpi).is_some_and(|pixels| (1..=65_535).contains(&pixels))
+}
+
+fn raster_axis_pixels(micrometers: i128, dpi: i128) -> Option<i128> {
     micrometers
         .checked_mul(dpi)
         .and_then(|numerator| numerator.checked_add(12_700))
         .map(|numerator| numerator / 25_400)
-        .is_some_and(|pixels| (1..=65_535).contains(&pixels))
+}
+
+fn album_information_impact(information: &AlbumInformation) -> Option<AlbumInformationImpact> {
+    let width = i128::from(information.sheet_width_um);
+    let height = i128::from(information.sheet_height_um);
+    let dpi = i128::from(information.dpi);
+    Some(AlbumInformationImpact {
+        sheet_width_px: u32::try_from(raster_axis_pixels(width, dpi)?).ok()?,
+        page_width_px: u32::try_from(raster_axis_pixels(width / 2, dpi)?).ok()?,
+        height_px: u32::try_from(raster_axis_pixels(height, dpi)?).ok()?,
+    })
 }
 
 fn signed_persisted_value(value: u64) -> i64 {

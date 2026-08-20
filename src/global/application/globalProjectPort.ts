@@ -81,6 +81,7 @@ export const PROJECT_CONFIGURATION_VALIDATION_CODES = [
   "sheetHeightNotPositive",
   "sheetHeightAboveSafeInteger",
   "sheetHeightRasterOutOfRange",
+  "sheetDimensionsNotProportional",
   "dpiOutOfRange",
   "sheetCountTooSmall",
   "bleedNegative",

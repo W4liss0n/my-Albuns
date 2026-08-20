@@ -14,6 +14,11 @@ export type ProjectDialogProgress =
 export type ProjectDialogState =
   | {
       busy: boolean;
+      details: readonly string[];
+      kind: "albumInformationConfirmation";
+    }
+  | {
+      busy: boolean;
       kind: "projectCloseConfirmation";
     }
   | {
@@ -34,9 +39,11 @@ export type ProjectDialogState =
     };
 
 export type ProjectDialogAction =
+  | "cancelAlbumInformation"
   | "cancelExport"
   | "cancelProjectClose"
   | "discardAndClose"
+  | "confirmAlbumInformation"
   | "dismissExport"
   | "dismissProjectCloseFailure"
   | "retryExport"

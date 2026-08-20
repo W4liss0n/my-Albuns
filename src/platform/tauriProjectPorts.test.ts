@@ -202,6 +202,16 @@ test("resolves a queued cancellation as not_found when completion fails before s
 });
 
 test("maps the Project and media ports to the desktop commands", async () => {
+  const information = {
+    displayUnit: "mm" as const,
+    sheetWidthUm: 600_000,
+    sheetHeightUm: 300_000,
+    dpi: 300,
+    bleedUm: 3_000,
+    safetyUm: 3_000,
+    firstSheet: "double" as const,
+    lastSheet: "double" as const,
+  };
   const intent: ProjectIntent = {
     kind: "fillLeftmostPlaceholder",
     sheetId: "sheet-002",
@@ -209,6 +219,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   };
 
   await tauriProjectSessionPort.load("project-load-1");
+  await tauriProjectSessionPort.validateAlbumInformation(information);
   await tauriProjectSessionPort.apply(intent);
   await tauriProjectSessionPort.undo();
   await tauriProjectSessionPort.redo();
@@ -229,12 +240,15 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(invoke).toHaveBeenNthCalledWith(1, "project_state", {
     operationId: "project-load-1",
   });
-  expect(invoke).toHaveBeenNthCalledWith(2, "apply_project_intent", {
+  expect(invoke).toHaveBeenNthCalledWith(2, "validate_album_information", {
+    information,
+  });
+  expect(invoke).toHaveBeenNthCalledWith(3, "apply_project_intent", {
     intent,
   });
-  expect(invoke).toHaveBeenNthCalledWith(3, "undo_project");
-  expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
-  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews", {
+  expect(invoke).toHaveBeenNthCalledWith(4, "undo_project");
+  expect(invoke).toHaveBeenNthCalledWith(5, "redo_project");
+  expect(invoke).toHaveBeenNthCalledWith(6, "prepare_media_previews", {
     demand,
   });
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");

@@ -10,6 +10,16 @@ export function parseProjectDialogState(
   if (!isRecord(value) || typeof value.kind !== "string") return null;
 
   switch (value.kind) {
+    case "albumInformationConfirmation":
+      return typeof value.busy === "boolean" &&
+        Array.isArray(value.details) &&
+        value.details.every((detail) => typeof detail === "string")
+        ? {
+            busy: value.busy,
+            details: value.details,
+            kind: value.kind,
+          }
+        : null;
     case "projectCloseConfirmation":
       return typeof value.busy === "boolean"
         ? { busy: value.busy, kind: value.kind }

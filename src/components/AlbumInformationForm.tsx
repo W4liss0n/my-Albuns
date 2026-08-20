@@ -1,0 +1,501 @@
+import { useEffect, useMemo, useState } from "react";
+
+import type {
+  AlbumInformation,
+  AlbumInformationImpact,
+  AlbumInformationValidation,
+  DocumentSnapshot,
+  EndSheetFormat,
+  SheetSnapshot,
+} from "../domain/project";
+import {
+  createPhysicalFieldDraft,
+  displayUnitLabel,
+  editPhysicalFieldDraft,
+  formatMicrometers,
+  type PhysicalFieldDraft,
+} from "../application/physicalMeasurements";
+import {
+  parseIntegerText,
+  presentConfigurationValidationErrors,
+  type DimensionsErrors,
+} from "../global/application/newProjectDimensions";
+
+interface AlbumInformationFormProps {
+  document: DocumentSnapshot;
+  formId: string;
+  sheetStates: readonly SheetSnapshot[];
+  onApply(
+    information: AlbumInformation,
+    baseline: AlbumInformation,
+    impact: AlbumInformationImpact,
+  ): void | Promise<unknown>;
+  onReadyChange(ready: boolean): void;
+  onValidate(
+    information: AlbumInformation,
+  ): Promise<AlbumInformationValidation>;
+}
+
+interface AlbumInformationDraft {
+  displayUnit: DocumentSnapshot["displayUnit"];
+  sheetWidth: PhysicalFieldDraft;
+  sheetHeight: PhysicalFieldDraft;
+  dpi: string;
+  bleed: PhysicalFieldDraft;
+  safety: PhysicalFieldDraft;
+  firstSheet: EndSheetFormat;
+  lastSheet: EndSheetFormat;
+}
+
+const UNIT_OPTIONS = [
+  { value: "mm", label: "mm" },
+  { value: "cm", label: "cm" },
+  { value: "in", label: "pol" },
+] as const;
+
+const END_SHEET_OPTIONS = [
+  { value: "double", label: "Lâmina dupla" },
+  { value: "singlePage", label: "Página única" },
+] as const;
+
+export function AlbumInformationForm({
+  document,
+  formId,
+  sheetStates,
+  onApply,
+  onReadyChange,
+  onValidate,
+}: AlbumInformationFormProps) {
+  const baseline = useMemo(
+    () => createDraft(document, sheetStates),
+    [document, sheetStates],
+  );
+  const [draft, setDraft] = useState(baseline);
+  const [validated, setValidated] = useState<{
+    key: string;
+    errors: DimensionsErrors;
+    impact: AlbumInformationImpact | null;
+  } | null>(null);
+  const [validationFailed, setValidationFailed] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => {
+    setDraft(baseline);
+  }, [baseline]);
+
+  const local = toCandidate(draft);
+  const candidate = local.information;
+  const baselineInformation = toCandidate(baseline).information;
+  const candidateKey = candidate ? JSON.stringify(candidate) : "";
+  const dirty = candidateKey !== JSON.stringify(baselineInformation);
+
+  useEffect(() => {
+    if (!candidate || !dirty || Object.keys(local.errors).length > 0) {
+      setValidated(null);
+      setValidationFailed(false);
+      return;
+    }
+
+    let current = true;
+    setValidated(null);
+    setValidationFailed(false);
+    void onValidate(candidate)
+      .then((result) => {
+        if (!current) return;
+        setValidated({
+          key: candidateKey,
+          errors: presentConfigurationValidationErrors(result.errors),
+          impact: result.impact,
+        });
+      })
+      .catch(() => {
+        if (current) setValidationFailed(true);
+      });
+    return () => {
+      current = false;
+    };
+  }, [candidateKey, dirty, onValidate]);
+
+  const validationCurrent = validated?.key === candidateKey;
+  const errors = mergeErrors(
+    local.errors,
+    validationCurrent ? validated.errors : {},
+  );
+  const ready = Boolean(
+    candidate &&
+      dirty &&
+      validationCurrent &&
+      validated.impact &&
+      Object.keys(errors).length === 0 &&
+      !validationFailed &&
+      !applying,
+  );
+
+  useEffect(() => {
+    onReadyChange(ready);
+  }, [onReadyChange, ready]);
+
+  async function submit() {
+    if (
+      !candidate ||
+      !baselineInformation ||
+      !validated?.impact ||
+      !ready
+    ) {
+      return;
+    }
+    setApplying(true);
+    try {
+      await onApply(candidate, baselineInformation, validated.impact);
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  function setField<Key extends keyof AlbumInformationDraft>(
+    key: Key,
+    value: AlbumInformationDraft[Key],
+  ) {
+    setDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function setMeasurement(
+    key: "sheetWidth" | "sheetHeight" | "bleed" | "safety",
+    text: string,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      [key]: editPhysicalFieldDraft(
+        current[key],
+        text,
+        current.displayUnit,
+      ),
+    }));
+  }
+
+  function changeUnit(unit: DocumentSnapshot["displayUnit"]) {
+    setDraft((current) => {
+      if (unit === current.displayUnit) return current;
+      return {
+        ...current,
+        displayUnit: unit,
+        sheetWidth: createPhysicalFieldDraft(current.sheetWidth.valueUm, unit),
+        sheetHeight: createPhysicalFieldDraft(
+          current.sheetHeight.valueUm,
+          unit,
+        ),
+        bleed: createPhysicalFieldDraft(current.bleed.valueUm, unit),
+        safety: createPhysicalFieldDraft(current.safety.valueUm, unit),
+      };
+    });
+  }
+
+  const pageWidth = draft.sheetWidth.hasExactValue
+    ? draft.sheetWidth.valueUm
+    : undefined;
+  const pageHeight = draft.sheetHeight.hasExactValue
+    ? draft.sheetHeight.valueUm
+    : undefined;
+  const pageDimensionValid =
+    pageWidth !== undefined && pageWidth > 0 && pageWidth % 2 === 0;
+
+  return (
+    <form
+      id={formId}
+      className="album-information-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <section className="inspector-subsection">
+        <h3>Estrutura</h3>
+        <div className="inspector-readout-grid">
+          <SelectField
+            label="Primeira Lâmina"
+            value={draft.firstSheet}
+            options={END_SHEET_OPTIONS}
+            onChange={(value) => setField("firstSheet", value as EndSheetFormat)}
+          />
+          <SelectField
+            label="Última Lâmina"
+            value={draft.lastSheet}
+            options={END_SHEET_OPTIONS}
+            onChange={(value) => setField("lastSheet", value as EndSheetFormat)}
+          />
+        </div>
+      </section>
+
+      <section className="inspector-subsection">
+        <h3>Documento</h3>
+        <div className="document-compact-controls">
+          <SelectField
+            label="Unidade"
+            value={draft.displayUnit}
+            options={UNIT_OPTIONS}
+            onChange={(value) =>
+              changeUnit(value as DocumentSnapshot["displayUnit"])
+            }
+          />
+          <TextField
+            error={firstError(errors.dpi)}
+            inputMode="numeric"
+            label="DPI"
+            value={draft.dpi}
+            onChange={(value) => setField("dpi", value)}
+          />
+        </div>
+        <fieldset className="album-information-dimension">
+          <legend>Dimensão da Lâmina</legend>
+          <div className="inspector-readout-grid">
+            <MeasurementField
+              error={firstError(errors.sheetWidth)}
+              label="Largura"
+              unit={draft.displayUnit}
+              value={draft.sheetWidth.text}
+              onChange={(value) => setMeasurement("sheetWidth", value)}
+            />
+            <MeasurementField
+              error={firstError(errors.sheetHeight)}
+              label="Altura"
+              unit={draft.displayUnit}
+              value={draft.sheetHeight.text}
+              onChange={(value) => setMeasurement("sheetHeight", value)}
+            />
+          </div>
+        </fieldset>
+        <div aria-label="Dimensão da Página" className="inspector-dimension" role="group">
+          <span className="inspector-dimension__title">Dimensão da Página</span>
+          <div className="inspector-readout-grid">
+            <IntegratedReadout
+              label="Largura"
+              value={
+                pageDimensionValid
+                  ? `${formatMicrometers(pageWidth / 2, draft.displayUnit)} ${displayUnitLabel(draft.displayUnit)}`
+                  : "—"
+              }
+            />
+            <IntegratedReadout
+              label="Altura"
+              value={
+                pageHeight !== undefined && pageHeight > 0
+                  ? `${formatMicrometers(pageHeight, draft.displayUnit)} ${displayUnitLabel(draft.displayUnit)}`
+                  : "—"
+              }
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="inspector-subsection">
+        <h3>Áreas técnicas</h3>
+        <div className="inspector-readout-grid">
+          <MeasurementField
+            error={firstError(errors.bleed)}
+            label="Sangria"
+            unit={draft.displayUnit}
+            value={draft.bleed.text}
+            onChange={(value) => setMeasurement("bleed", value)}
+          />
+          <MeasurementField
+            error={firstError(errors.safety)}
+            label="Área de segurança"
+            unit={draft.displayUnit}
+            value={draft.safety.text}
+            onChange={(value) => setMeasurement("safety", value)}
+          />
+        </div>
+        {validationFailed ? (
+          <p className="album-information-form__status" role="alert">
+            Não foi possível validar as alterações.
+          </p>
+        ) : null}
+      </section>
+    </form>
+  );
+}
+
+function createDraft(
+  document: DocumentSnapshot,
+  sheetStates: readonly SheetSnapshot[],
+): AlbumInformationDraft {
+  return {
+    displayUnit: document.displayUnit,
+    sheetWidth: createPhysicalFieldDraft(
+      document.sheetWidthUm,
+      document.displayUnit,
+    ),
+    sheetHeight: createPhysicalFieldDraft(
+      document.sheetHeightUm,
+      document.displayUnit,
+    ),
+    dpi: String(document.dpi),
+    bleed: createPhysicalFieldDraft(document.bleedUm, document.displayUnit),
+    safety: createPhysicalFieldDraft(document.safetyUm, document.displayUnit),
+    firstSheet: endSheetFormat(sheetStates[0]),
+    lastSheet: endSheetFormat(sheetStates[sheetStates.length - 1]),
+  };
+}
+
+function endSheetFormat(sheet: SheetSnapshot | undefined): EndSheetFormat {
+  return sheet?.activeSides === "both" ? "double" : "singlePage";
+}
+
+function toCandidate(draft: AlbumInformationDraft): {
+  information: AlbumInformation | null;
+  errors: DimensionsErrors;
+} {
+  const sheetWidthUm = draft.sheetWidth.hasExactValue
+    ? draft.sheetWidth.valueUm
+    : null;
+  const sheetHeightUm = draft.sheetHeight.hasExactValue
+    ? draft.sheetHeight.valueUm
+    : null;
+  const bleedUm = draft.bleed.hasExactValue ? draft.bleed.valueUm : null;
+  const safetyUm = draft.safety.hasExactValue ? draft.safety.valueUm : null;
+  const dpi = parseIntegerText(draft.dpi);
+  const errors: DimensionsErrors = {};
+  if (sheetWidthUm === null) errors.sheetWidth = [invalidMeasurementMessage()];
+  if (sheetHeightUm === null) errors.sheetHeight = [invalidMeasurementMessage()];
+  if (bleedUm === null) errors.bleed = [invalidMeasurementMessage()];
+  if (safetyUm === null) errors.safety = [invalidMeasurementMessage()];
+  if (dpi === null) errors.dpi = ["Informe o DPI como um número inteiro suportado."];
+  if (
+    sheetWidthUm === null ||
+    sheetHeightUm === null ||
+    bleedUm === null ||
+    safetyUm === null ||
+    dpi === null
+  ) {
+    return { information: null, errors };
+  }
+  return {
+    errors,
+    information: {
+      displayUnit: draft.displayUnit,
+      sheetWidthUm,
+      sheetHeightUm,
+      dpi,
+      bleedUm,
+      safetyUm,
+      firstSheet: draft.firstSheet,
+      lastSheet: draft.lastSheet,
+    },
+  };
+}
+
+function invalidMeasurementMessage() {
+  return "Informe uma medida decimal que corresponda a micrômetros inteiros.";
+}
+
+function mergeErrors(...sources: DimensionsErrors[]): DimensionsErrors {
+  return Object.assign({}, ...sources);
+}
+
+function firstError(errors: readonly string[] | undefined) {
+  return errors?.[0];
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange(value: string): void;
+}) {
+  return (
+    <label className="album-information-field">
+      <span>{label}</span>
+      <select
+        aria-label={label}
+        className="ui-field-control"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextField({
+  error,
+  inputMode,
+  label,
+  value,
+  onChange,
+}: {
+  error?: string;
+  inputMode: "decimal" | "numeric";
+  label: string;
+  value: string;
+  onChange(value: string): void;
+}) {
+  return (
+    <label className="album-information-field">
+      <span>{label}</span>
+      <input
+        aria-invalid={Boolean(error)}
+        aria-label={label}
+        className="ui-field-control"
+        inputMode={inputMode}
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.currentTarget.value)}
+      />
+      {error ? <span className="album-information-field__error" role="alert">{error}</span> : null}
+    </label>
+  );
+}
+
+function MeasurementField({
+  error,
+  label,
+  unit,
+  value,
+  onChange,
+}: {
+  error?: string;
+  label: string;
+  unit: DocumentSnapshot["displayUnit"];
+  value: string;
+  onChange(value: string): void;
+}) {
+  return (
+    <label className="album-information-field">
+      <span>{label}</span>
+      <span className="album-measurement-control">
+        <input
+          aria-invalid={Boolean(error)}
+          aria-label={label}
+          className="ui-field-control"
+          inputMode="decimal"
+          type="text"
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        <span aria-hidden="true">{displayUnitLabel(unit)}</span>
+      </span>
+      {error ? <span className="album-information-field__error" role="alert">{error}</span> : null}
+    </label>
+  );
+}
+
+function IntegratedReadout({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="inspector-readout-field">
+      <span>{label}</span>
+      <output aria-label={label} className="inspector-readout inspector-readout--integrated">
+        {value}
+      </output>
+    </div>
+  );
+}

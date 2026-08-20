@@ -4,6 +4,18 @@ import type {
   ProjectDisplayUnit,
   ProjectEndSheetFormat,
 } from "./globalProjectPort";
+import {
+  createPhysicalFieldDraft,
+  editPhysicalFieldDraft,
+  type PhysicalFieldDraft,
+} from "../../application/physicalMeasurements";
+
+export {
+  displayUnitLabel,
+  formatMicrometers,
+  parsePhysicalText,
+} from "../../application/physicalMeasurements";
+export type { PhysicalFieldDraft } from "../../application/physicalMeasurements";
 
 export type PhysicalFieldName =
   | "closedSheetWidth"
@@ -18,12 +30,6 @@ export type DimensionsFieldName =
   | "safety"
   | "dpi"
   | "sheetCount";
-
-interface PhysicalFieldDraft {
-  text: string;
-  valueUm: number;
-  hasExactValue: boolean;
-}
 
 export interface NewProjectDimensionsDraft {
   displayUnit: ProjectDisplayUnit;
@@ -50,18 +56,7 @@ export const DIMENSIONS_FIELD_ORDER: readonly DimensionsFieldName[] = [
   "safety",
 ];
 
-const MICROMETERS_PER_UNIT: Record<ProjectDisplayUnit, bigint> = {
-  mm: 1_000n,
-  cm: 10_000n,
-  in: 25_400n,
-};
-
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-const PRESENTATION_DECIMALS: Record<ProjectDisplayUnit, number> = {
-  mm: 3,
-  cm: 4,
-  in: 3,
-};
 
 const validationPresentation: Record<
   ProjectConfigurationValidationCode,
@@ -95,6 +90,11 @@ const validationPresentation: Record<
   sheetHeightRasterOutOfRange: {
     field: "sheetHeight",
     message: "A altura raster deve ficar entre 1 e 65.535 pixels.",
+  },
+  sheetDimensionsNotProportional: {
+    field: "sheetWidth",
+    message:
+      "Mantenha a proporção atual da Lâmina para preservar a composição.",
   },
   dpiOutOfRange: {
     field: "dpi",
@@ -131,29 +131,18 @@ const validationPresentation: Record<
   },
 };
 
-function physicalField(
-  valueUm: number,
-  unit: ProjectDisplayUnit,
-): PhysicalFieldDraft {
-  return {
-    text: formatMicrometers(valueUm, unit),
-    valueUm,
-    hasExactValue: true,
-  };
-}
-
 export function createDefaultDimensionsDraft(): NewProjectDimensionsDraft {
   const displayUnit = "mm";
   return {
     displayUnit,
-    closedSheetWidth: physicalField(300_000, displayUnit),
-    sheetHeight: physicalField(300_000, displayUnit),
+    closedSheetWidth: createPhysicalFieldDraft(300_000, displayUnit),
+    sheetHeight: createPhysicalFieldDraft(300_000, displayUnit),
     dpiText: "300",
     sheetCountText: "18",
     firstSheet: "double",
     lastSheet: "double",
-    bleed: physicalField(3_000, displayUnit),
-    safety: physicalField(5_000, displayUnit),
+    bleed: createPhysicalFieldDraft(3_000, displayUnit),
+    safety: createPhysicalFieldDraft(5_000, displayUnit),
   };
 }
 
@@ -162,14 +151,13 @@ export function editPhysicalField(
   field: PhysicalFieldName,
   text: string,
 ): NewProjectDimensionsDraft {
-  const parsed = parsePhysicalText(text, draft.displayUnit);
   return {
     ...draft,
-    [field]: {
+    [field]: editPhysicalFieldDraft(
+      draft[field],
       text,
-      valueUm: parsed ?? draft[field].valueUm,
-      hasExactValue: parsed !== null,
-    },
+      draft.displayUnit,
+    ),
   };
 }
 
@@ -184,25 +172,17 @@ export function changeDisplayUnit(
   return {
     ...draft,
     displayUnit,
-    closedSheetWidth: physicalField(
+    closedSheetWidth: createPhysicalFieldDraft(
       draft.closedSheetWidth.valueUm,
       displayUnit,
     ),
-    sheetHeight: physicalField(draft.sheetHeight.valueUm, displayUnit),
-    bleed: physicalField(draft.bleed.valueUm, displayUnit),
-    safety: physicalField(draft.safety.valueUm, displayUnit),
+    sheetHeight: createPhysicalFieldDraft(
+      draft.sheetHeight.valueUm,
+      displayUnit,
+    ),
+    bleed: createPhysicalFieldDraft(draft.bleed.valueUm, displayUnit),
+    safety: createPhysicalFieldDraft(draft.safety.valueUm, displayUnit),
   };
-}
-
-export function formatMicrometers(
-  valueUm: number,
-  unit: ProjectDisplayUnit,
-): string {
-  return formatMicrometerFraction(valueUm, 1, unit);
-}
-
-export function displayUnitLabel(unit: ProjectDisplayUnit): string {
-  return unit === "in" ? "pol" : unit;
 }
 
 export function getLocalInputErrors(
@@ -279,57 +259,7 @@ export function presentConfigurationValidationErrors(
   return errors;
 }
 
-function formatMicrometerFraction(
-  numeratorUm: number,
-  divisor: number,
-  unit: ProjectDisplayUnit,
-): string {
-  const negative = numeratorUm < 0;
-  const magnitude = BigInt(Math.abs(numeratorUm));
-  const denominator = MICROMETERS_PER_UNIT[unit] * BigInt(divisor);
-  const decimalPlaces = PRESENTATION_DECIMALS[unit];
-  const scale = 10n ** BigInt(decimalPlaces);
-  const rounded = (magnitude * scale + denominator / 2n) / denominator;
-  const integer = rounded / scale;
-  const decimals = (rounded % scale)
-    .toString()
-    .padStart(decimalPlaces, "0")
-    .replace(/0+$/, "");
-  const sign = negative && rounded !== 0n ? "-" : "";
-
-  return `${sign}${integer}${decimals ? `.${decimals}` : ""}`;
-}
-
-function parsePhysicalText(
-  text: string,
-  unit: ProjectDisplayUnit,
-): number | null {
-  const normalized = text.trim().replace(",", ".");
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
-    return null;
-  }
-
-  const negative = normalized.startsWith("-");
-  const unsigned = normalized.replace(/^[+-]/, "");
-  const [whole = "0", fraction = ""] = unsigned.split(".");
-  const denominator = 10n ** BigInt(fraction.length);
-  const digits = `${whole || "0"}${fraction}`;
-  let numerator = BigInt(digits || "0") * MICROMETERS_PER_UNIT[unit];
-  if (negative) {
-    numerator = -numerator;
-  }
-  if (numerator % denominator !== 0n) {
-    return null;
-  }
-
-  const value = numerator / denominator;
-  if (value > MAX_SAFE_INTEGER || value < -MAX_SAFE_INTEGER) {
-    return null;
-  }
-  return Number(value);
-}
-
-function parseIntegerText(text: string): number | null {
+export function parseIntegerText(text: string): number | null {
   const normalized = text.trim();
   if (!/^[+-]?\d+$/.test(normalized)) {
     return null;

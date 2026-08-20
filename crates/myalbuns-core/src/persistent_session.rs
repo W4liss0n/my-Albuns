@@ -71,6 +71,11 @@ impl PersistentProjectSession {
             .filter(|revision| *revision <= MAX_SAFE_INTEGER)
             .ok_or(CoreError::RevisionSpaceExhausted)?;
         let project = match intent {
+            ProjectIntent::SetAlbumInformation { information } => self
+                .current
+                .project
+                .with_album_information(information)
+                .map_err(CoreError::InvalidAlbumInformation)?,
             ProjectIntent::SetDpi { dpi } => self
                 .current
                 .project

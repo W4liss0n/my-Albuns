@@ -153,6 +153,7 @@ pub(crate) fn run(
             crate::logging::frontend_log,
             project_ui_ready,
             crate::project_commands::project_state,
+            crate::project_commands::validate_album_information,
             crate::project_commands::apply_project_intent,
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,

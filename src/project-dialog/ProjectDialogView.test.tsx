@@ -4,6 +4,33 @@ import { expect, test, vi } from "vitest";
 
 import { ProjectDialogView } from "./ProjectDialogView";
 
+test("confirms all Album information changes as one action", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+
+  render(
+    <ProjectDialogView
+      onAction={onAction}
+      state={{
+        busy: false,
+        details: ["Lâmina: 700 mm × 350 mm", "DPI: 240"],
+        kind: "albumInformationConfirmation",
+      }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "Aplicar alterações no Álbum?",
+  });
+  expect(dialog).toHaveTextContent("Lâmina: 700 mm × 350 mm");
+  await user.click(within(dialog).getByRole("button", { name: "Aplicar" }));
+  await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
+  expect(onAction.mock.calls).toEqual([
+    ["confirmAlbumInformation"],
+    ["cancelAlbumInformation"],
+  ]);
+});
+
 test("projects close decisions through the standard confirmation dialog", async () => {
   const user = userEvent.setup();
   const onAction = vi.fn();

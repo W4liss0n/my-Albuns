@@ -31,8 +31,21 @@ function Test-FilesEqual {
         [string] $Right
     )
 
-    (Get-FileHash -LiteralPath $Left -Algorithm SHA256).Hash -eq
-        (Get-FileHash -LiteralPath $Right -Algorithm SHA256).Hash
+    function Get-Sha256 {
+        param([string] $Path)
+
+        $stream = [System.IO.File]::OpenRead($Path)
+        $algorithm = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            [System.BitConverter]::ToString($algorithm.ComputeHash($stream))
+        }
+        finally {
+            $algorithm.Dispose()
+            $stream.Dispose()
+        }
+    }
+
+    (Get-Sha256 -Path $Left) -eq (Get-Sha256 -Path $Right)
 }
 
 function Compare-GeneratedContract {

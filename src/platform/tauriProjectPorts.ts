@@ -2,6 +2,8 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import type {
+  AlbumInformation,
+  AlbumInformationValidation,
   EditorProjection,
   ProjectIntent,
 } from "../domain/project";
@@ -146,6 +148,10 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
 export const tauriProjectSessionPort: ProjectSessionPort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
+  validateAlbumInformation: (information: AlbumInformation) =>
+    invoke<AlbumInformationValidation>("validate_album_information", {
+      information,
+    }),
   apply: (intent: ProjectIntent) =>
     invoke<EditorProjection>("apply_project_intent", { intent }),
   undo: () => invoke<EditorProjection>("undo_project"),

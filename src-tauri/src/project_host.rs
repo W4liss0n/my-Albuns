@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    EditableProject, EditorProjection, ProjectIdentityAuthority, ProjectIntent, RenderSnapshot,
-    SaveProjectError, SaveProjectOutcome,
+    AlbumInformation, AlbumInformationValidation, EditableProject, EditorProjection,
+    ProjectIdentityAuthority, ProjectIntent, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -78,6 +78,13 @@ impl ProjectHost {
         self.project()?
             .apply(intent)
             .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn validate_album_information(
+        &self,
+        information: &AlbumInformation,
+    ) -> Result<AlbumInformationValidation, String> {
+        Ok(self.project()?.validate_album_information(information))
     }
 
     pub(crate) fn undo(&self) -> Result<EditorProjection, String> {

@@ -9,7 +9,10 @@ use crate::{
     persistent_projection,
     persistent_session::PersistentProjectSession,
     project::ProjectCore,
-    project_document::{InitialProject, ProjectDocument, ProjectRevision},
+    project_document::{
+        AlbumInformation, AlbumInformationValidation, InitialProject, ProjectDocument,
+        ProjectRevision,
+    },
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
         IdentityRegistryLookup, OpenStoreError, PathFailure, ProjectIdentityLease,
@@ -211,6 +214,13 @@ impl EditableProject {
         }
         self.session.apply(intent)?;
         Ok(self.projection())
+    }
+
+    pub fn validate_album_information(
+        &self,
+        information: &AlbumInformation,
+    ) -> AlbumInformationValidation {
+        self.project().validate_album_information(information)
     }
 
     pub fn undo(&mut self) -> Option<EditorProjection> {

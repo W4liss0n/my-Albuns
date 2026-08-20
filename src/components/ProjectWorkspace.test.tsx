@@ -234,6 +234,10 @@ function projectSessionPortWithApply(
 ): ProjectSessionPort {
   return {
     load: async () => projection,
+    validateAlbumInformation: async () => ({
+      errors: [],
+      impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+    }),
     apply,
     undo: async () => projection,
     redo: async () => projection,
@@ -245,7 +249,10 @@ function projectSessionPortWithApply(
 
 type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
-  "runProjectMutation" | "projectDialogPort" | "projectWindowPort"
+  | "runProjectMutation"
+  | "projectDialogPort"
+  | "projectWindowPort"
+  | "validateAlbumInformation"
 > & {
   projectDialogPort?: ProjectDialogPort;
   projectSessionPort: ProjectSessionPort;
@@ -270,6 +277,7 @@ function ProjectWorkspace({
       projection={projection}
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
+      validateAlbumInformation={projectSessionPort.validateAlbumInformation}
     />
   );
 }
@@ -880,35 +888,32 @@ test("shows the physical configuration projected from the opened Project", () =>
   const sheetDimensions = within(
     albumInformation.getByRole("group", { name: "Dimensão da Lâmina" }),
   );
-  expect(sheetDimensions.getByLabelText("Largura")).toHaveTextContent(
-    "50,8 cm",
+  expect(sheetDimensions.getByRole("textbox", { name: "Largura" })).toHaveValue(
+    "50.8",
   );
-  expect(sheetDimensions.getByLabelText("Altura")).toHaveTextContent(
-    "25,4 cm",
-  );
-  expect(sheetDimensions.getByLabelText("Largura")).toHaveClass(
-    "inspector-readout--field-placeholder",
+  expect(sheetDimensions.getByRole("textbox", { name: "Altura" })).toHaveValue(
+    "25.4",
   );
 
   const pageDimensions = within(
     albumInformation.getByRole("group", { name: "Dimensão da Página" }),
   );
   expect(pageDimensions.getByLabelText("Largura")).toHaveTextContent(
-    "25,4 cm",
+    "25.4 cm",
   );
   expect(pageDimensions.getByLabelText("Altura")).toHaveTextContent(
-    "25,4 cm",
+    "25.4 cm",
   );
   expect(pageDimensions.getByLabelText("Largura")).toHaveClass(
     "inspector-readout--integrated",
   );
   expect(albumInformation.getByLabelText("DPI")).toHaveValue("240");
-  expect(albumInformation.getByText("Sangria").parentElement).toHaveTextContent(
-    "0,25 cm",
+  expect(albumInformation.getByRole("textbox", { name: "Sangria" })).toHaveValue(
+    "0.25",
   );
   expect(
-    albumInformation.getByText("Área de segurança").parentElement,
-  ).toHaveTextContent("0,5 cm");
+    albumInformation.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("0.5");
 });
 
 test("uses the current reference layout for the Album context", () => {
@@ -960,12 +965,12 @@ test("uses the current reference layout for the Album context", () => {
     albumInformationSection.querySelector(
       '[data-placeholder-feature="album-end-sheet-settings"]',
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
   expect(
     albumInformationSection.querySelector(
       '[data-placeholder-feature="album-technical-area-settings"]',
     ),
-  ).toBeInTheDocument();
+  ).not.toBeInTheDocument();
   const compactControls = albumInformationSection.querySelector(
     ".document-compact-controls",
   ) as HTMLElement;
@@ -1030,7 +1035,7 @@ test("presents an empty per-side Overlay as absent", () => {
   ).toBeInTheDocument();
 });
 
-test("applies one DPI change and renders the authoritative projection returned by the Project", async () => {
+test("confirms and applies Album information as one authoritative Project change", async () => {
   const initialProjection: EditorProjection = {
     ...projection,
     state: {
@@ -1057,12 +1062,14 @@ test("applies one DPI change and renders the authoritative projection returned b
   };
   const apply = vi.fn(async () => changedProjection);
   const projectSessionPort = projectSessionPortWithApply(apply);
+  const dialog = projectDialogHarness();
   const onProjectionChange = vi.fn();
 
   const view = render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={initialProjection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={onProjectionChange}
     />,
@@ -1082,9 +1089,11 @@ test("applies one DPI change and renders the authoritative projection returned b
   });
   fireEvent.change(input, { target: { value: "600" } });
   expect(apply).not.toHaveBeenCalled();
-  expect(
-    albumInformationBeforeApply.getByRole("button", { name: "Aplicar" }),
-  ).toBeEnabled();
+  await waitFor(() =>
+    expect(
+      albumInformationBeforeApply.getByRole("button", { name: "Aplicar" }),
+    ).toBeEnabled(),
+  );
 
   await act(async () => {
     fireEvent.click(
@@ -1093,8 +1102,34 @@ test("applies one DPI change and renders the authoritative projection returned b
     await Promise.resolve();
   });
 
+  expect(apply).not.toHaveBeenCalled();
+  expect(dialog.present).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      busy: false,
+      kind: "albumInformationConfirmation",
+    }),
+  );
+
+  await act(async () => {
+    dialog.emit("confirmAlbumInformation");
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
   expect(apply).toHaveBeenCalledOnce();
-  expect(apply).toHaveBeenCalledWith({ kind: "setDpi", dpi: 600 });
+  expect(apply).toHaveBeenCalledWith({
+    kind: "setAlbumInformation",
+    information: {
+      displayUnit: "mm",
+      sheetWidthUm: initialProjection.state.document.sheetWidthUm,
+      sheetHeightUm: initialProjection.state.document.sheetHeightUm,
+      dpi: 600,
+      bleedUm: initialProjection.state.document.bleedUm,
+      safetyUm: initialProjection.state.document.safetyUm,
+      firstSheet: "double",
+      lastSheet: "double",
+    },
+  });
   expect(onProjectionChange).toHaveBeenCalledWith(changedProjection);
 
   view.rerender(

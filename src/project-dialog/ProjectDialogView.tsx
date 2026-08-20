@@ -18,6 +18,30 @@ export function ProjectDialogView({
   state,
 }: ProjectDialogViewProps) {
   switch (state.kind) {
+    case "albumInformationConfirmation":
+      return (
+        <ConfirmationDialog
+          cancelAction={{
+            disabled: state.busy,
+            label: "Cancelar",
+            onClick: () => onAction("cancelAlbumInformation"),
+          }}
+          confirmAction={{
+            disabled: state.busy,
+            label: state.busy ? "Aplicando…" : "Aplicar",
+            onClick: () => onAction("confirmAlbumInformation"),
+          }}
+          description="As alterações serão aplicadas juntas e poderão ser desfeitas em uma única ação."
+          title="Aplicar alterações no Álbum?"
+        >
+          {state.details.map((detail) => (
+            <div className="ui-standard-message__detail" key={detail}>
+              {detail}
+            </div>
+          ))}
+        </ConfirmationDialog>
+      );
+
     case "projectCloseConfirmation":
       return (
         <ConfirmationDialog

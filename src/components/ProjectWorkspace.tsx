@@ -6,6 +6,7 @@ import type {
   MediaPreview,
   MediaPreviewDemand,
   ProjectWindowPort,
+  ProjectSessionPort,
 } from "../application/projectPorts";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -28,6 +29,7 @@ import { MediaPanel } from "./MediaPanel";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
+import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import {
   useWorkspacePanelLayout,
@@ -40,6 +42,7 @@ interface ProjectWorkspaceProps {
   exportPort: ExportPort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
+  validateAlbumInformation: ProjectSessionPort["validateAlbumInformation"];
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
@@ -54,6 +57,7 @@ export function ProjectWorkspace({
   exportPort,
   projectWindowPort,
   runProjectMutation,
+  validateAlbumInformation,
   mediaPreviews = {},
   onMediaDemandChange,
   onProjectionChange,
@@ -118,6 +122,11 @@ export function ProjectWorkspace({
     runProjectMutation,
     onProjectionChange,
   });
+  const albumInformationApply = useAlbumInformationApplyController({
+    projectDialogPort,
+    onApply: controller.applyAlbumInformation,
+    onError: setCloseMessage,
+  });
   const workspacePanels = useWorkspacePanelLayout();
   const sheetEditing = controller.canvasProps.mode.kind === "sheet-editing";
   const mediaPanelHeight = sheetEditing
@@ -137,7 +146,10 @@ export function ProjectWorkspace({
   } = controller;
   const projectMetadata = projectAlbumMetadata(projection);
   const commandsBlocked =
-    Boolean(busy) || exportActive || projectClose.interactionBlocked;
+    Boolean(busy) ||
+    exportActive ||
+    projectClose.interactionBlocked ||
+    albumInformationApply.active;
   const applicationMenus = createProjectApplicationMenus({
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
@@ -226,7 +238,8 @@ export function ProjectWorkspace({
           onBeginPhotoZoom={controller.beginZoomGesture}
           onUpdatePhotoZoom={controller.updateZoomGesture}
           onFinishPhotoZoom={controller.finishZoomGesture}
-          onApplyDpi={controller.applyDpi}
+          onApplyAlbumInformation={albumInformationApply.requestApply}
+          onValidateAlbumInformation={validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
         />
 

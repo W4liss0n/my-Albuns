@@ -3,6 +3,9 @@ import { Button } from "react-aria-components";
 import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
 import type {
+  AlbumInformation,
+  AlbumInformationImpact,
+  AlbumInformationValidation,
   ComposedPhoto,
   ComposedSheet,
   DocumentSnapshot,
@@ -16,7 +19,7 @@ import {
   writeInspectorSectionPreference,
 } from "../state/workspacePreferences";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
-import { DocumentDpiControl } from "./DocumentDpiControl";
+import { AlbumInformationForm } from "./AlbumInformationForm";
 import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { SheetPreview } from "./SheetPreview";
 import { inactiveSideCssGradient } from "./sheetVisualStyle";
@@ -51,7 +54,14 @@ export interface InspectorPanelProps {
   onBeginPhotoZoom(): void;
   onUpdatePhotoZoom(value: number): void;
   onFinishPhotoZoom(): void | Promise<void>;
-  onApplyDpi(dpi: number): void | Promise<void>;
+  onApplyAlbumInformation(
+    information: AlbumInformation,
+    baseline: AlbumInformation,
+    impact: AlbumInformationImpact,
+  ): void | Promise<unknown>;
+  onValidateAlbumInformation(
+    information: AlbumInformation,
+  ): Promise<AlbumInformationValidation>;
   onNavigateToSheet(sheetId: string): void;
 }
 
@@ -71,7 +81,8 @@ export function InspectorPanel({
   onBeginPhotoZoom,
   onUpdatePhotoZoom,
   onFinishPhotoZoom,
-  onApplyDpi,
+  onApplyAlbumInformation,
+  onValidateAlbumInformation,
   onNavigateToSheet,
 }: InspectorPanelProps) {
   const [informationDirty, setInformationDirty] = useState(false);
@@ -168,11 +179,12 @@ export function InspectorPanel({
               defaultOpen
             >
               <div className="inspector-subsections">
-                <AlbumProjectSettings
+                <AlbumInformationForm
                   document={document}
                   formId={ALBUM_INFORMATION_FORM_ID}
-                  onApplyDpi={onApplyDpi}
-                  onDirtyChange={setInformationDirty}
+                  onApply={onApplyAlbumInformation}
+                  onReadyChange={setInformationDirty}
+                  onValidate={onValidateAlbumInformation}
                   sheetStates={sheetStates}
                 />
               </div>
@@ -323,39 +335,6 @@ function InspectorSection({
     </section>
   );
 }
-
-function InspectorDimensionReadout({
-  fieldPlaceholder = false,
-  heightUm,
-  label,
-  unit,
-  widthUm,
-}: {
-  fieldPlaceholder?: boolean;
-  heightUm: number;
-  label: string;
-  unit: DocumentSnapshot["displayUnit"];
-  widthUm: number;
-}) {
-  return (
-    <div aria-label={label} className="inspector-dimension" role="group">
-      <span className="inspector-dimension__title">{label}</span>
-      <div className="inspector-readout-grid">
-        <InspectorReadout
-          fieldPlaceholder={fieldPlaceholder}
-          label="Largura"
-          value={formatMeasurement(widthUm, unit)}
-        />
-        <InspectorReadout
-          fieldPlaceholder={fieldPlaceholder}
-          label="Altura"
-          value={formatMeasurement(heightUm, unit)}
-        />
-      </div>
-    </div>
-  );
-}
-
 function InspectorReadout({
   fieldPlaceholder = false,
   label,
@@ -384,95 +363,6 @@ function InspectorReadout({
         {value}
       </output>
     </div>
-  );
-}
-
-function AlbumProjectSettings({
-  document,
-  formId,
-  onApplyDpi,
-  onDirtyChange,
-  sheetStates,
-}: {
-  document: DocumentSnapshot;
-  formId: string;
-  onApplyDpi(dpi: number): void | Promise<void>;
-  onDirtyChange(dirty: boolean): void;
-  sheetStates: readonly SheetSnapshot[];
-}) {
-  return (
-    <>
-      <section
-        className="inspector-subsection"
-        data-placeholder-feature="album-end-sheet-settings"
-      >
-        <h3>Estrutura</h3>
-        <div className="inspector-readout-grid">
-          <InspectorReadout
-            fieldPlaceholder
-            label="Primeira Lâmina"
-            value={sheetFormat(sheetStates[0])}
-          />
-          <InspectorReadout
-            fieldPlaceholder
-            label="Última Lâmina"
-            value={sheetFormat(sheetStates[sheetStates.length - 1])}
-          />
-        </div>
-      </section>
-      <section className="inspector-subsection">
-        <h3>Documento</h3>
-        <div className="document-compact-controls">
-          <InspectorReadout
-            fieldPlaceholder
-            label="Unidade"
-            value={document.displayUnit}
-          />
-          <DocumentDpiControl
-            dpi={document.dpi}
-            formId={formId}
-            onApplyDpi={onApplyDpi}
-            onDirtyChange={onDirtyChange}
-          />
-        </div>
-        <div
-          className="inspector-field-stack"
-          data-placeholder-feature="album-document-dimensions"
-        >
-          <InspectorDimensionReadout
-            fieldPlaceholder
-            heightUm={document.sheetHeightUm}
-            label="Dimensão da Lâmina"
-            unit={document.displayUnit}
-            widthUm={document.sheetWidthUm}
-          />
-        </div>
-        <InspectorDimensionReadout
-          heightUm={document.sheetHeightUm}
-          label="Dimensão da Página"
-          unit={document.displayUnit}
-          widthUm={document.sheetWidthUm / 2}
-        />
-      </section>
-      <section
-        className="inspector-subsection"
-        data-placeholder-feature="album-technical-area-settings"
-      >
-        <h3>Áreas técnicas</h3>
-        <div className="inspector-readout-grid">
-          <InspectorReadout
-            fieldPlaceholder
-            label="Sangria"
-            value={formatMeasurement(document.bleedUm, document.displayUnit)}
-          />
-          <InspectorReadout
-            fieldPlaceholder
-            label="Área de segurança"
-            value={formatMeasurement(document.safetyUm, document.displayUnit)}
-          />
-        </div>
-      </section>
-    </>
   );
 }
 
@@ -702,9 +592,4 @@ function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
         accessibleLabel: `Páginas ${firstPage}–${lastPage}`,
         visualLabel: `${firstPage}–${lastPage}`,
       };
-}
-
-function sheetFormat(sheet: SheetSnapshot | undefined) {
-  if (!sheet) return "—";
-  return sheet.activeSides === "both" ? "Lâmina dupla" : "Página única";
 }

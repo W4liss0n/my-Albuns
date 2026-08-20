@@ -9,6 +9,7 @@ pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-
 pub(crate) const PROJECT_DIALOG_STATE_EVENT: &str = "myalbuns://project-dialog-state";
 const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
+const MAX_DIALOG_DETAILS: usize = 8;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -31,6 +32,10 @@ pub(crate) enum ProjectDialogProgress {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum ProjectDialogState {
+    AlbumInformationConfirmation {
+        busy: bool,
+        details: Vec<String>,
+    },
     ProjectCloseConfirmation {
         busy: bool,
     },
@@ -52,6 +57,16 @@ pub(crate) enum ProjectDialogState {
 impl ProjectDialogState {
     fn sanitized(self) -> Self {
         match self {
+            Self::AlbumInformationConfirmation { busy, details } => {
+                Self::AlbumInformationConfirmation {
+                    busy,
+                    details: details
+                        .into_iter()
+                        .take(MAX_DIALOG_DETAILS)
+                        .map(bound_text)
+                        .collect(),
+                }
+            }
             Self::ProjectCloseConfirmation { busy } => Self::ProjectCloseConfirmation { busy },
             Self::ProjectCloseFailure { message } => Self::ProjectCloseFailure {
                 message: bound_text(message),
@@ -95,6 +110,10 @@ impl ProjectDialogState {
 
     fn dimensions(&self) -> (f64, f64) {
         match self {
+            Self::AlbumInformationConfirmation { .. } => (
+                520.0,
+                280.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
+            ),
             Self::ProjectCloseConfirmation { .. } => (
                 520.0,
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
@@ -114,9 +133,11 @@ impl ProjectDialogState {
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ProjectDialogAction {
+    CancelAlbumInformation,
     CancelExport,
     CancelProjectClose,
     DiscardAndClose,
+    ConfirmAlbumInformation,
     DismissExport,
     DismissProjectCloseFailure,
     RetryExport,

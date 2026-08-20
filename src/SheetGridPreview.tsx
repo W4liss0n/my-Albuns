@@ -2,7 +2,9 @@ import { useState } from "react";
 
 import { InspectorPanel } from "./components/InspectorPanel";
 import type {
+  AlbumInformation,
   ComposedSheet,
+  DocumentSnapshot,
   ProjectedActiveSides,
   SheetRole,
   SheetSnapshot,
@@ -20,7 +22,7 @@ const sheetColors = [
 ] as const;
 const sheetPageNumbers = [[1], [2, 3], [4, 5], [6, 7], [8, 9], [10]] as const;
 
-const sheetStates: readonly SheetSnapshot[] = sheetColors.map((_, index) => {
+const initialSheetStates: readonly SheetSnapshot[] = sheetColors.map((_, index) => {
   const number = index + 1;
   const activeSides = activeSidesFor(number);
   return {
@@ -35,7 +37,7 @@ const sheetStates: readonly SheetSnapshot[] = sheetColors.map((_, index) => {
   };
 });
 
-const sheets: readonly ComposedSheet[] = sheetStates.map((state, index) => {
+const sheets: readonly ComposedSheet[] = initialSheetStates.map((state, index) => {
   const source = representativeProjection.composition.sheets[0];
   const drawRect = {
     height: state.heightUm,
@@ -73,21 +75,59 @@ const previewUrl =
 
 export function SheetGridPreview() {
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
+  const [document, setDocument] = useState<DocumentSnapshot>(
+    representativeProjection.state.document,
+  );
+  const [sheetStates, setSheetStates] = useState(initialSheetStates);
+
+  function applyInformation(information: AlbumInformation) {
+    setDocument({
+      displayUnit: information.displayUnit,
+      sheetWidthUm: information.sheetWidthUm,
+      sheetHeightUm: information.sheetHeightUm,
+      dpi: information.dpi,
+      bleedUm: information.bleedUm,
+      safetyUm: information.safetyUm,
+    });
+    setSheetStates((current) =>
+      current.map((sheet, index) => ({
+        ...sheet,
+        activeSides:
+          index === 0
+            ? information.firstSheet === "double"
+              ? "both"
+              : "right"
+            : index === current.length - 1
+              ? information.lastSheet === "double"
+                ? "both"
+                : "left"
+              : sheet.activeSides,
+      })),
+    );
+  }
 
   return (
     <main className="sheet-grid-preview" data-development-preview="sheet-grid">
       <InspectorPanel
         displayedPhotoPanX={0}
         displayedPhotoZoom={1}
-        document={representativeProjection.state.document}
+        document={document}
         frameBorder={representativeProjection.composition.frameBorder}
         focusedSheetId={focusedSheetId}
         mediaPreviewUrls={previewUrl ? { "media-001": previewUrl } : {}}
-        onApplyDpi={async () => undefined}
+        onApplyAlbumInformation={applyInformation}
         onBeginPhotoZoom={() => undefined}
         onFinishPhotoZoom={async () => undefined}
         onNavigateToSheet={setFocusedSheetId}
         onUpdatePhotoZoom={() => undefined}
+        onValidateAlbumInformation={async () => ({
+          errors: [],
+          impact: {
+            sheetWidthPx: 7_087,
+            pageWidthPx: 3_543,
+            heightPx: 3_543,
+          },
+        })}
         selectedComposedPhoto={null}
         selectedFrame={null}
         sheetStates={sheetStates}

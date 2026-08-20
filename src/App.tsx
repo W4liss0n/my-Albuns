@@ -296,6 +296,7 @@ function App({
           projectDialogPort={projectDialogPort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
+          validateAlbumInformation={projectSessionPort.validateAlbumInformation}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setMediaDemand}
           onProjectionChange={setProjection}

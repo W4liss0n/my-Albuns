@@ -14,7 +14,7 @@ const editorStyles = readStyles("src/App.css");
 const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
-const documentDpiSource = readStyles("src/components/DocumentDpiControl.tsx");
+const albumInformationSource = readStyles("src/components/AlbumInformationForm.tsx");
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
 const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
 const exportSource = readStyles("src/components/ExportPreviewControl.tsx");
@@ -60,8 +60,8 @@ test("shares dense application chrome metrics", () => {
   expect(sharedStyles).toContain(
     "height: var(--ui-compact-control-height);",
   );
-  expect(documentDpiSource).toContain('className="ui-field-control"');
-  expect(documentDpiSource).not.toContain("<ActionButton");
+  expect(albumInformationSource).toContain('className="ui-field-control"');
+  expect(albumInformationSource).not.toContain("<ActionButton");
 });
 
 test("uses the shared subtle shadow below the media toolbar", () => {

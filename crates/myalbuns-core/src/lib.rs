@@ -29,11 +29,12 @@ pub use project::{
     ProjectCore,
 };
 pub use project_document::{
-    ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat,
-    FrameBorder, InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+    ActiveSides, AlbumInformation, AlbumInformationImpact, AlbumInformationValidation, Background,
+    BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat, FrameBorder,
+    InitialBackground, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
     InitialOverlayContent, InitialProject, InitialProjectConfiguration,
-    InitialProjectPersonalization, InitialProjectValidationError, MediaRef, Overlay,
-    OverlayContent, ProjectDocument, ProjectSheet, Rgb, VisualDefaults,
+    InitialProjectPersonalization, MediaRef, Overlay, OverlayContent,
+    ProjectConfigurationValidationError, ProjectDocument, ProjectSheet, Rgb, VisualDefaults,
 };
 pub use project_store::{
     DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,

@@ -24,6 +24,8 @@ function defaultCloseAction(
   state: ProjectDialogState,
 ): ProjectDialogAction | null {
   switch (state.kind) {
+    case "albumInformationConfirmation":
+      return state.busy ? null : "cancelAlbumInformation";
     case "projectCloseConfirmation":
       return state.busy ? null : "cancelProjectClose";
     case "projectCloseFailure":

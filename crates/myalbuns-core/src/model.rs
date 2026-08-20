@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use ts_rs::TS;
 
-use crate::project_document::{DisplayUnit, DocumentSettings};
+use crate::project_document::{
+    AlbumInformation, DisplayUnit, DocumentSettings, ProjectConfigurationValidationError,
+};
 
 pub(crate) const PROJECT_DOCUMENT_SCHEMA_VERSION: u32 = 4;
 pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 6;
@@ -500,6 +502,9 @@ impl RenderSnapshot {
 )]
 #[ts(tag = "kind")]
 pub enum ProjectIntent {
+    SetAlbumInformation {
+        information: AlbumInformation,
+    },
     SetDpi {
         dpi: u32,
     },
@@ -521,6 +526,8 @@ pub enum CoreError {
     EditableSessionInvalidated,
     #[error("O DPI {0} não é válido para as dimensões atuais do Projeto")]
     InvalidDpi(u32),
+    #[error("As Informações do Álbum não são válidas")]
+    InvalidAlbumInformation(Vec<ProjectConfigurationValidationError>),
     #[error("A Sessão do Projeto esgotou o intervalo seguro de Revisões")]
     RevisionSpaceExhausted,
     #[error("A intenção não é compatível com o Documento de Projeto v1")]

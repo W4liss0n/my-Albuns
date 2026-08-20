@@ -84,6 +84,10 @@ const projection = createEmptyProjection();
 
 const projectSessionPort: ProjectSessionPort = {
   load: async () => projection,
+  validateAlbumInformation: async () => ({
+    errors: [],
+    impact: { sheetWidthPx: 7_087, pageWidthPx: 3_543, heightPx: 3_543 },
+  }),
   apply: async () => projection,
   undo: async () => projection,
   redo: async () => projection,

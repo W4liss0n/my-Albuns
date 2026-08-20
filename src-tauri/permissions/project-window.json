@@ -8,6 +8,7 @@
           "frontend_log",
           "project_ui_ready",
           "project_state",
+          "validate_album_information",
           "apply_project_intent",
           "undo_project",
           "redo_project",

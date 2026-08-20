@@ -1,6 +1,6 @@
 use myalbuns_core::{
-    EditorProjection, PathFailure, ProjectIntent, SaveProjectError,
-    SaveProjectOutcome as CoreSaveProjectOutcome,
+    AlbumInformation, AlbumInformationValidation, EditorProjection, PathFailure, ProjectIntent,
+    SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use tauri::{State, WebviewWindow};
@@ -38,6 +38,7 @@ pub(crate) fn apply_project_intent(
     state: State<'_, ProjectHost>,
 ) -> Result<EditorProjection, String> {
     let intent_kind = match &intent {
+        ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
@@ -61,6 +62,23 @@ pub(crate) fn apply_project_intent(
         event = "project_intent_applied",
     );
     Ok(projection)
+}
+
+#[tauri::command]
+pub(crate) fn validate_album_information(
+    information: AlbumInformation,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<AlbumInformationValidation, String> {
+    let validation = state.validate_album_information(&information)?;
+    tracing::debug!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        window_label = window.label(),
+        error_count = validation.errors.len(),
+        event = "album_information_validated",
+    );
+    Ok(validation)
 }
 
 #[tauri::command]

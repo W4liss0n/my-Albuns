@@ -4,7 +4,7 @@ use myalbuns_core::{
     InitialFrameBorder as CoreInitialFrameBorder, InitialOverlay as CoreInitialOverlay,
     InitialOverlayContent as CoreInitialOverlayContent, InitialProject,
     InitialProjectConfiguration as CoreProjectConfiguration, InitialProjectPersonalization,
-    InitialProjectValidationError as CoreValidationError, Rgb,
+    ProjectConfigurationValidationError as CoreValidationError, Rgb,
 };
 use myalbuns_paths::NativePathDto;
 use serde::{Deserialize, Serialize};
@@ -147,37 +147,13 @@ impl InitialProjectCreationConfiguration {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ProjectConfigurationValidation {
-    errors: Vec<ProjectConfigurationValidationError>,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-enum ProjectConfigurationValidationError {
-    SheetWidthNotPositive,
-    SheetWidthAboveSafeInteger,
-    SheetWidthNotEven,
-    SheetWidthRasterOutOfRange,
-    SheetHeightNotPositive,
-    SheetHeightAboveSafeInteger,
-    SheetHeightRasterOutOfRange,
-    DpiOutOfRange,
-    SheetCountTooSmall,
-    BleedNegative,
-    BleedAboveSafeInteger,
-    BleedEliminatesCutArea,
-    SafetyNegative,
-    SafetyAboveSafeInteger,
-    SafetyEliminatesSafeArea,
+    errors: Vec<CoreValidationError>,
 }
 
 pub(crate) fn validate_configuration(
     configuration: InitialProjectConfiguration,
 ) -> ProjectConfigurationValidation {
-    let errors = to_core_configuration(configuration)
-        .validation_errors()
-        .into_iter()
-        .map(validation_error)
-        .collect();
+    let errors = to_core_configuration(configuration).validation_errors();
     ProjectConfigurationValidation { errors }
 }
 
@@ -278,50 +254,6 @@ fn end_sheet_format(format: InitialSheetFormat) -> EndSheetFormat {
     match format {
         InitialSheetFormat::Double => EndSheetFormat::Double,
         InitialSheetFormat::SinglePage => EndSheetFormat::SinglePage,
-    }
-}
-
-fn validation_error(error: CoreValidationError) -> ProjectConfigurationValidationError {
-    match error {
-        CoreValidationError::SheetWidthNotPositive => {
-            ProjectConfigurationValidationError::SheetWidthNotPositive
-        }
-        CoreValidationError::SheetWidthAboveSafeInteger => {
-            ProjectConfigurationValidationError::SheetWidthAboveSafeInteger
-        }
-        CoreValidationError::SheetWidthNotEven => {
-            ProjectConfigurationValidationError::SheetWidthNotEven
-        }
-        CoreValidationError::SheetWidthRasterOutOfRange => {
-            ProjectConfigurationValidationError::SheetWidthRasterOutOfRange
-        }
-        CoreValidationError::SheetHeightNotPositive => {
-            ProjectConfigurationValidationError::SheetHeightNotPositive
-        }
-        CoreValidationError::SheetHeightAboveSafeInteger => {
-            ProjectConfigurationValidationError::SheetHeightAboveSafeInteger
-        }
-        CoreValidationError::SheetHeightRasterOutOfRange => {
-            ProjectConfigurationValidationError::SheetHeightRasterOutOfRange
-        }
-        CoreValidationError::DpiOutOfRange => ProjectConfigurationValidationError::DpiOutOfRange,
-        CoreValidationError::SheetCountTooSmall => {
-            ProjectConfigurationValidationError::SheetCountTooSmall
-        }
-        CoreValidationError::BleedNegative => ProjectConfigurationValidationError::BleedNegative,
-        CoreValidationError::BleedAboveSafeInteger => {
-            ProjectConfigurationValidationError::BleedAboveSafeInteger
-        }
-        CoreValidationError::BleedEliminatesCutArea => {
-            ProjectConfigurationValidationError::BleedEliminatesCutArea
-        }
-        CoreValidationError::SafetyNegative => ProjectConfigurationValidationError::SafetyNegative,
-        CoreValidationError::SafetyAboveSafeInteger => {
-            ProjectConfigurationValidationError::SafetyAboveSafeInteger
-        }
-        CoreValidationError::SafetyEliminatesSafeArea => {
-            ProjectConfigurationValidationError::SafetyEliminatesSafeArea
-        }
     }
 }
 
@@ -520,8 +452,8 @@ mod tests {
         ];
 
         for (error, expected_code) in cases {
-            let encoded = serde_json::to_value(validation_error(error))
-                .expect("the mapped validation error serializes");
+            let encoded =
+                serde_json::to_value(error).expect("the canonical validation error serializes");
             assert_eq!(encoded, expected_code);
         }
     }
