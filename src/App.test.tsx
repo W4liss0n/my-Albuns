@@ -671,10 +671,8 @@ test("registers the media-change listener before the first preview demand", asyn
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
 });
 
-test("labels first-observation unavailability without claiming a previous preview", async () => {
-  const prepareMediaPreviews = vi.fn().mockResolvedValue([
-    { mediaId: "media-001", state: "unavailable" as const, url: null },
-  ]);
+test("keeps recovery actions hidden until the first authoritative media observation", async () => {
+  const prepareMediaPreviews = vi.fn().mockResolvedValue([]);
 
   render(
     <App
@@ -707,10 +705,13 @@ test("labels first-observation unavailability without claiming a previous previe
   );
 
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   expect(
-    await screen.findByRole("status", { name: "Indisponível" }),
-  ).toBeInTheDocument();
-  expect(screen.queryByText("Indisponível · prévia anterior")).not.toBeInTheDocument();
+    screen.queryByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Religar arquivo de/i }),
+  ).not.toBeInTheDocument();
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     "",

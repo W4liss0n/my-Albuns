@@ -443,7 +443,7 @@ impl MediaMonitor {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let current = runtime.snapshot();
-        if current
+        if !current
             .as_ref()
             .and_then(|current| {
                 current
@@ -451,7 +451,7 @@ impl MediaMonitor {
                     .iter()
                     .find(|observation| observation.media_id == binding.media_id)
             })
-            .is_some_and(|observation| observation.availability != MediaAvailability::Unavailable)
+            .is_some_and(|observation| observation.availability == MediaAvailability::Unavailable)
         {
             return Err(MediaRetryError::NotUnavailable);
         }
@@ -703,8 +703,8 @@ mod tests {
     }
 
     #[test]
-    fn explicit_retry_can_establish_the_first_observation_for_provisional_unavailability() {
-        let root = tempfile::tempdir().expect("temporary first retry fixture");
+    fn explicit_retry_rejects_a_missing_authoritative_observation() {
+        let root = tempfile::tempdir().expect("temporary missing observation fixture");
         let source = root.path().join("photo.jpg");
         std::fs::write(&source, b"photo").expect("the Original fixture is writable");
         let binding = MediaBinding {
@@ -714,21 +714,69 @@ mod tests {
         };
         let runtime = MediaRuntime::default();
 
-        let retried = MediaMonitor::default()
+        let error = MediaMonitor::default()
             .retry_unavailable(&runtime, &binding, |_| Ok(()))
-            .expect("the explicit action can resolve a provisional unavailable state");
+            .expect_err("Retry requires an authoritative Unavailable observation");
 
-        assert_eq!(retried.availability(), MediaAvailability::Candidate);
-        assert_eq!(retried.update().changed_media_ids(), ["photo-first"]);
-        assert!(retried.update().invalidated_media_ids().is_empty());
+        assert_eq!(error, MediaRetryError::NotUnavailable);
+        assert!(runtime.snapshot().is_none());
+    }
+
+    #[test]
+    fn explicit_retry_rejects_an_occurrence_missing_from_the_authoritative_snapshot() {
+        let root = tempfile::tempdir().expect("temporary missing occurrence fixture");
+        let selected_path = root.path().join("selected.jpg");
+        let observed_path = root.path().join("observed.jpg");
+        std::fs::write(&selected_path, b"selected").expect("the selected Original is writable");
+        std::fs::write(&observed_path, b"observed").expect("the observed Original is writable");
+        let selected = MediaBinding {
+            media_id: "photo-selected".into(),
+            kind: MediaKind::Photo,
+            logical_path: selected_path,
+        };
+        let observed = MediaBinding {
+            media_id: "photo-observed".into(),
+            kind: MediaKind::Photo,
+            logical_path: observed_path,
+        };
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolver.observe(3, std::slice::from_ref(&observed)));
+        let before = runtime
+            .snapshot()
+            .expect("the other occurrence is observed");
+
+        let error = MediaMonitor::default()
+            .retry_unavailable(&runtime, &selected, |_| Ok(()))
+            .expect_err("an occurrence absent from the snapshot is not Unavailable");
+
+        assert_eq!(error, MediaRetryError::NotUnavailable);
+        assert_eq!(runtime.snapshot(), Some(before));
+    }
+
+    #[test]
+    fn explicit_retry_rejects_available_occurrences_without_changing_runtime() {
+        let root = tempfile::tempdir().expect("temporary available retry fixture");
+        let source = root.path().join("photo.jpg");
+        std::fs::write(&source, b"photo").expect("the Original fixture is writable");
+        let binding = MediaBinding {
+            media_id: "photo-available".into(),
+            kind: MediaKind::Photo,
+            logical_path: source,
+        };
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolver.observe(4, std::slice::from_ref(&binding)));
+        let before = runtime.snapshot().expect("availability is registered");
         assert_eq!(
-            runtime
-                .snapshot()
-                .expect("the first authoritative observation is registered")
-                .observations()[0]
-                .availability,
+            before.observations()[0].availability,
             MediaAvailability::Candidate
         );
+
+        let error = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .expect_err("an available occurrence is not eligible for Retry");
+
+        assert_eq!(error, MediaRetryError::NotUnavailable);
+        assert_eq!(runtime.snapshot(), Some(before));
     }
 
     #[test]

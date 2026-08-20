@@ -211,11 +211,10 @@ pub(crate) async fn prepare_media_previews(
         if !engine.demand_is_current(&demand_revision) {
             return Ok(Some(Vec::new()));
         }
-        let availability = observations
-            .get(media_id.as_str())
-            .copied()
-            .unwrap_or(MediaAvailability::Unavailable);
-        let state = preview_state(availability);
+        let Some(state) = projected_preview_state(observations.get(media_id.as_str()).copied())
+        else {
+            continue;
+        };
         if state != MediaPreviewState::Ready {
             previews.push(contextual_preview(
                 &engine,
@@ -362,6 +361,10 @@ fn preview_state(availability: MediaAvailability) -> MediaPreviewState {
         MediaAvailability::Absent => MediaPreviewState::Absent,
         MediaAvailability::Unavailable => MediaPreviewState::Unavailable,
     }
+}
+
+fn projected_preview_state(availability: Option<MediaAvailability>) -> Option<MediaPreviewState> {
+    availability.map(preview_state)
 }
 
 fn cache_failure_state() -> MediaPreviewState {
@@ -512,7 +515,9 @@ mod tests {
         media_runtime::MediaAvailability,
     };
 
-    use super::{cache_failure_state, cache_publication_or_context, ordered_demand, preview_state};
+    use super::{
+        cache_failure_state, cache_publication_or_context, ordered_demand, projected_preview_state,
+    };
 
     #[test]
     fn visible_media_precedes_preload_and_equivalent_demands_are_grouped() {
@@ -529,22 +534,27 @@ mod tests {
     }
 
     #[test]
-    fn authoritative_media_availability_maps_exhaustively_without_cache_failures() {
+    fn only_authoritative_media_availability_is_projected_to_the_product() {
         assert_eq!(
-            preview_state(MediaAvailability::Candidate),
-            MediaPreviewState::Ready
+            projected_preview_state(None),
+            None,
+            "an unconsolidated first sample cannot authorize a source recovery action"
         );
         assert_eq!(
-            preview_state(MediaAvailability::Absent),
-            MediaPreviewState::Absent
+            projected_preview_state(Some(MediaAvailability::Candidate)),
+            Some(MediaPreviewState::Ready)
         );
         assert_eq!(
-            preview_state(MediaAvailability::Unavailable),
-            MediaPreviewState::Unavailable
+            projected_preview_state(Some(MediaAvailability::Absent)),
+            Some(MediaPreviewState::Absent)
+        );
+        assert_eq!(
+            projected_preview_state(Some(MediaAvailability::Unavailable)),
+            Some(MediaPreviewState::Unavailable)
         );
         assert_ne!(
-            preview_state(MediaAvailability::Unavailable),
-            MediaPreviewState::CacheUnavailable,
+            projected_preview_state(Some(MediaAvailability::Unavailable)),
+            Some(MediaPreviewState::CacheUnavailable),
             "a Cache failure is not an authoritative statement about the Original"
         );
         assert_eq!(cache_failure_state(), MediaPreviewState::CacheUnavailable);

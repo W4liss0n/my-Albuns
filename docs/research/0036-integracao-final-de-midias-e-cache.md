@@ -52,6 +52,13 @@ o Original reaparecer, a demanda normal reconstrói ou revalida a representaçã
 O fluxo não chama `ProjectSession`, não cria Histórico e não altera caminho,
 `MediaRef`, revisão, dirty, Undo/Redo ou conteúdo salvo.
 
+Uma primeira amostra ainda não consolidada não é uma observação sobre a origem:
+a demanda omite a prévia dessa ocorrência e a WebView não oferece ação de
+recuperação. O comando de repetição falha fechado quando o `MediaRuntime` não
+tem snapshot, quando a ocorrência não aparece no snapshot ou quando a
+observação atual é `Candidate` ou `Absent`; somente uma observação exatamente
+`Unavailable` autoriza `Tentar novamente`.
+
 Falha do Processador, de validação do protocolo, do armazenamento do Cache ou
 da captura técnica usada para preparar um job não confirma indisponibilidade do
 Original. Nesses terminais a prévia usa o estado distinto
