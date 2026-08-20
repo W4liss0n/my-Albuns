@@ -409,25 +409,27 @@ Novas configurações globais devem ser incorporadas a `Informações do Álbum`
 
 `Quantidade de Lâminas` é um campo exclusivo do diálogo de criação e não aparece como configuração editável em `Informações do Álbum`. Depois da criação, adicionar ou excluir Lâminas continua sendo uma ação estrutural explícita do editor, não a alteração de um valor global.
 
-`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. Seu `Aplicar` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
+`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` no fim de `Informações do Álbum` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
 
-Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibidos, sem alterar tamanho físico ou pixels. Largura, altura e DPI permanecem pendentes até um único `Aplicar`, cuja confirmação apresenta o tamanho físico e a resolução final.
+Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibidos, sem alterar tamanho físico ou pixels. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
 
 Dimensões e DPI são confirmados atomicamente em uma única ação de Undo/Redo. A transformação dimensional segue seus limites seguros; a parte de DPI altera a resolução em pixels das representações derivadas e da Exportação sem, por si só, mudar Frames, Pan ou enquadramentos. O resultado permanece não salvo até `Salvar`.
 
-Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. `Enter` ou a saída do campo confirma um valor válido, atualiza imediatamente máscara e guias e cria uma ação de Undo/Redo por campo. Valor inválido permanece sem aplicação e apresenta o erro no próprio campo; não existe botão `Aplicar` nem modal para esse grupo.
+Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. Seus valores também permanecem pendentes até o `Aplicar` de `Informações do Álbum`. Valor inválido permanece sem aplicação, apresenta o erro no próprio campo e bloqueia a ação.
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 
-Clicar no preview de imagem de Background ou Overlay abre um seletor compacto contendo somente os Decorativos já importados no Projeto. Escolher um item altera imediatamente o padrão correspondente, atualiza as aplicações que acompanham o design do Álbum e cria uma única ação de Undo/Redo.
+Clicar no preview de imagem de Background ou Overlay abre um seletor compacto contendo somente os Decorativos já importados no Projeto. Escolher um item atualiza somente o draft visual até o `Aplicar` no fim de `Design do Álbum`.
 
 O seletor não importa arquivos e não aceita arraste. A importação de novos Decorativos permanece exclusivamente no Painel de imagens.
 
-`Padrão dos Frames` apresenta uma prévia simples de Frame e os controles `Exibir borda`, cor e espessura na Unidade do Projeto. Cada alteração entra imediatamente como uma ação de Undo/Redo e atualiza somente os Frames que usam o design do Álbum.
+`Padrão dos Frames` apresenta uma prévia simples de Frame e os controles `Exibir borda`, cor e espessura na Unidade do Projeto. Cada alteração permanece no mesmo draft visual.
 
 Opacidade não pertence ao padrão global e não aparece nesse grupo; ela permanece no contexto individual de Frame.
 
-Não existe um botão geral `Salvar configurações`. Mudanças simples, como cor ou Borda padrão, alteram o estado do Projeto imediatamente e criam a ação de Undo/Redo correspondente. Mudanças estruturais ou dimensionais possuem `Aplicar` próprio, pré-validação e confirmação do impacto antes de entrarem atomicamente no Projeto.
+`Informações do Álbum` e `Design do Álbum` possuem, cada um, um único botão `Aplicar` ao final do conteúdo. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente Background, Overlay e padrão dos Frames. Cada ação válida entra no Projeto como uma única operação de Undo/Redo.
+
+`Aplicar` não salva o arquivo. Mudanças estruturais ou dimensionais continuam sujeitas a pré-validação e confirmação do impacto antes de entrarem atomicamente no Projeto.
 
 Aplicar uma configuração nunca grava o arquivo automaticamente. Toda mudança continua pendente até o comando manual `Salvar`.
 

@@ -1,12 +1,39 @@
+import { useState } from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import { DocumentDpiControl } from "./DocumentDpiControl";
 
+const FORM_ID = "test-album-information";
+
+function DpiControlHarness({
+  dpi,
+  onApplyDpi,
+}: {
+  dpi: number;
+  onApplyDpi(dpi: number): void | Promise<void>;
+}) {
+  const [dirty, setDirty] = useState(false);
+
+  return (
+    <>
+      <DocumentDpiControl
+        dpi={dpi}
+        formId={FORM_ID}
+        onApplyDpi={onApplyDpi}
+        onDirtyChange={setDirty}
+      />
+      <button disabled={!dirty} form={FORM_ID} type="submit">
+        Aplicar
+      </button>
+    </>
+  );
+}
+
 test("mantém o DPI digitado como draft e aplica uma única alteração consolidada", () => {
   const onApplyDpi = vi.fn();
 
-  render(<DocumentDpiControl dpi={300} onApplyDpi={onApplyDpi} />);
+  render(<DpiControlHarness dpi={300} onApplyDpi={onApplyDpi} />);
 
   const input = screen.getByRole("textbox", { name: "DPI" });
   fireEvent.change(input, { target: { value: "600" } });
@@ -14,7 +41,7 @@ test("mantém o DPI digitado como draft e aplica uma única alteração consolid
   expect(input).toHaveValue("600");
   expect(onApplyDpi).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Aplicar DPI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
 
   expect(onApplyDpi).toHaveBeenCalledOnce();
   expect(onApplyDpi).toHaveBeenCalledWith(600);
@@ -25,7 +52,7 @@ test.each(["", "0", "1201", "300.5", "trezentos"])(
   (draft) => {
     const onApplyDpi = vi.fn();
 
-    render(<DocumentDpiControl dpi={300} onApplyDpi={onApplyDpi} />);
+    render(<DpiControlHarness dpi={300} onApplyDpi={onApplyDpi} />);
 
     const input = screen.getByRole("textbox", { name: "DPI" });
     fireEvent.change(input, { target: { value: draft } });
@@ -46,7 +73,7 @@ test("impede uma segunda solicitação enquanto a alteração aguarda", async ()
   });
   const onApplyDpi = vi.fn(() => pending);
 
-  render(<DocumentDpiControl dpi={300} onApplyDpi={onApplyDpi} />);
+  render(<DpiControlHarness dpi={300} onApplyDpi={onApplyDpi} />);
 
   const input = screen.getByRole("textbox", { name: "DPI" });
   const form = input.closest("form")!;
@@ -55,7 +82,6 @@ test("impede uma segunda solicitação enquanto a alteração aguarda", async ()
   fireEvent.submit(form);
 
   expect(onApplyDpi).toHaveBeenCalledOnce();
-  expect(screen.getByRole("button", { name: "Aplicar DPI" })).toBeDisabled();
 
   await act(async () => {
     finish();
@@ -66,17 +92,17 @@ test("impede uma segunda solicitação enquanto a alteração aguarda", async ()
 test("sincroniza o draft com o DPI autoritativo de uma nova projeção", () => {
   const onApplyDpi = vi.fn();
   const view = render(
-    <DocumentDpiControl dpi={300} onApplyDpi={onApplyDpi} />,
+    <DpiControlHarness dpi={300} onApplyDpi={onApplyDpi} />,
   );
   const input = screen.getByRole("textbox", { name: "DPI" });
 
   fireEvent.change(input, { target: { value: "600" } });
   expect(input).toHaveValue("600");
 
-  view.rerender(<DocumentDpiControl dpi={240} onApplyDpi={onApplyDpi} />);
+  view.rerender(<DpiControlHarness dpi={240} onApplyDpi={onApplyDpi} />);
 
   expect(input).toHaveValue("240");
-  expect(screen.getByRole("button", { name: "Aplicar DPI" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
   fireEvent.submit(input.closest("form")!);
   expect(onApplyDpi).not.toHaveBeenCalled();
 });

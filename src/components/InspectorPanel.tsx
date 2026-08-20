@@ -15,7 +15,7 @@ import {
   readInspectorSectionPreference,
   writeInspectorSectionPreference,
 } from "../state/workspacePreferences";
-import { AppIcon, EmptyState } from "../ui";
+import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { DocumentDpiControl } from "./DocumentDpiControl";
 import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { SheetPreview } from "./SheetPreview";
@@ -32,6 +32,8 @@ const PHOTO_ZOOM_KEYS = new Set([
   "PageUp",
   "PageDown",
 ]);
+
+const ALBUM_INFORMATION_FORM_ID = "album-information-settings";
 
 export interface InspectorPanelProps {
   selectedFrame: FrameSnapshot | null;
@@ -72,6 +74,7 @@ export function InspectorPanel({
   onApplyDpi,
   onNavigateToSheet,
 }: InspectorPanelProps) {
+  const [informationDirty, setInformationDirty] = useState(false);
   const sheetStateById = new Map(
     sheetStates.map((sheet) => [sheet.id, sheet] as const),
   );
@@ -156,9 +159,22 @@ export function InspectorPanel({
               <div className="inspector-subsections">
                 <AlbumProjectSettings
                   document={document}
+                  formId={ALBUM_INFORMATION_FORM_ID}
                   onApplyDpi={onApplyDpi}
+                  onDirtyChange={setInformationDirty}
                   sheetStates={sheetStates}
                 />
+                <div className="album-section-actions">
+                  <ActionButton
+                    density="compact"
+                    form={ALBUM_INFORMATION_FORM_ID}
+                    type="submit"
+                    variant="primary"
+                    disabled={!informationDirty}
+                  >
+                    Aplicar
+                  </ActionButton>
+                </div>
               </div>
             </InspectorSection>
             <InspectorSection
@@ -358,11 +374,15 @@ function InspectorReadout({
 
 function AlbumProjectSettings({
   document,
+  formId,
   onApplyDpi,
+  onDirtyChange,
   sheetStates,
 }: {
   document: DocumentSnapshot;
+  formId: string;
   onApplyDpi(dpi: number): void | Promise<void>;
+  onDirtyChange(dirty: boolean): void;
   sheetStates: readonly SheetSnapshot[];
 }) {
   return (
@@ -393,7 +413,12 @@ function AlbumProjectSettings({
             label="Unidade"
             value={document.displayUnit}
           />
-          <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
+          <DocumentDpiControl
+            dpi={document.dpi}
+            formId={formId}
+            onApplyDpi={onApplyDpi}
+            onDirtyChange={onDirtyChange}
+          />
         </div>
         <div
           className="inspector-field-stack"
@@ -507,6 +532,14 @@ function AlbumVisualDefaultsPlaceholder({
           </div>
         )}
       </section>
+      <div
+        className="album-section-actions"
+        data-placeholder-feature="album-design-apply"
+      >
+        <ActionButton density="compact" disabled variant="primary">
+          Aplicar
+        </ActionButton>
+      </div>
     </div>
   );
 }

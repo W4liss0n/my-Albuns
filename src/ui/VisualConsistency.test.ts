@@ -61,7 +61,7 @@ test("shares dense application chrome metrics", () => {
     "height: var(--ui-compact-control-height);",
   );
   expect(documentDpiSource).toContain('className="ui-field-control"');
-  expect(documentDpiSource).toContain("<ActionButton");
+  expect(documentDpiSource).not.toContain("<ActionButton");
 });
 
 test("uses the shared subtle shadow below the media toolbar", () => {

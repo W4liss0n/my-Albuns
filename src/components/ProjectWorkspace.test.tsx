@@ -961,6 +961,15 @@ test("uses the current reference layout for the Album context", () => {
   ) as HTMLElement;
   expect(within(compactControls).getByLabelText("Unidade")).toBeInTheDocument();
   expect(within(compactControls).getByLabelText("DPI")).toBeInTheDocument();
+  expect(
+    albumInformation.getByRole("button", { name: "Aplicar" }),
+  ).toBeDisabled();
+  expect(albumDesign.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  expect(
+    albumDesignSection.querySelector(
+      '[data-placeholder-feature="album-design-apply"]',
+    ),
+  ).toBeInTheDocument();
   expect(albumInformation.getByText("Estrutura")).toBeInTheDocument();
   expect(albumInformation.getByText("Documento")).toBeInTheDocument();
   expect(albumInformation.getByText("Áreas técnicas")).toBeInTheDocument();
@@ -1051,12 +1060,22 @@ test("applies one DPI change and renders the authoritative projection returned b
   if (albumInformationTrigger.getAttribute("aria-expanded") !== "true") {
     fireEvent.click(albumInformationTrigger);
   }
-  const input = screen.getByRole("textbox", { name: "DPI" });
+  const albumInformationBeforeApply = within(
+    albumInformationTrigger.closest("section") as HTMLElement,
+  );
+  const input = albumInformationBeforeApply.getByRole("textbox", {
+    name: "DPI",
+  });
   fireEvent.change(input, { target: { value: "600" } });
   expect(apply).not.toHaveBeenCalled();
+  expect(
+    albumInformationBeforeApply.getByRole("button", { name: "Aplicar" }),
+  ).toBeEnabled();
 
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Aplicar DPI" }));
+    fireEvent.click(
+      albumInformationBeforeApply.getByRole("button", { name: "Aplicar" }),
+    );
     await Promise.resolve();
   });
 

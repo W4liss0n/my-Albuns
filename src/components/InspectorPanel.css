@@ -169,8 +169,6 @@
 
 .document-dpi-control {
   display: grid;
-  align-items: end;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--ui-space-2);
 }
 
@@ -182,15 +180,10 @@
   gap: var(--ui-space-1);
 }
 
-.document-dpi-control .ui-action-button {
-  align-self: end;
-}
-
 .document-dpi-control [role="alert"] {
   color: var(--ui-danger);
   font-size: var(--ui-font-size-caption);
   line-height: 1.35;
-  grid-column: 1 / -1;
 }
 
 .document-compact-controls {
@@ -198,6 +191,13 @@
   align-items: end;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: var(--ui-space-3);
+}
+
+.album-section-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-border);
 }
 
 .inspector-subsection {
