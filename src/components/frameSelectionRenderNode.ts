@@ -25,7 +25,7 @@ export function createFrameSelectionRenderNode(
   height: number,
   showResizeHandlePlaceholders: boolean,
 ): FrameSelectionRenderNode {
-  const style = SHEET_VISUAL_STYLE.frameSelection;
+  const handleStyle = SHEET_VISUAL_STYLE.frameSelection;
   const container = new Container();
   container.label = `frame-selection-container-${frameId}`;
   container.eventMode = "none";
@@ -33,13 +33,7 @@ export function createFrameSelectionRenderNode(
 
   const outline = new Graphics()
     .rect(0, 0, width, height)
-    .stroke({
-      alignment: 0.5,
-      color: pixiColor(style.outline),
-      width: style.outlineWidthPx,
-      alpha: style.outlineOpacity,
-      pixelLine: true,
-    });
+    .stroke(SHEET_VISUAL_STYLE.technicalOutlineStroke);
   outline.label = `frame-selection-${frameId}`;
   outline.eventMode = "none";
   container.addChild(outline);
@@ -52,19 +46,19 @@ export function createFrameSelectionRenderNode(
   // events until the Frame resize gesture and its domain mutation exist.
   const resizeHandlePlaceholders = RESIZE_HANDLE_POSITIONS.map(
     ({ name, xRatio, yRatio }) => {
-      const halfSize = style.handleSizePx / 2;
+      const halfSize = handleStyle.handleSizePx / 2;
       const handle = new Graphics()
         .rect(
           -halfSize,
           -halfSize,
-          style.handleSizePx,
-          style.handleSizePx,
+          handleStyle.handleSizePx,
+          handleStyle.handleSizePx,
         )
-        .fill({ color: pixiColor(style.handleFill) })
+        .fill({ color: pixiColor(handleStyle.handleFill) })
         .stroke({
           alignment: 0,
-          color: pixiColor(style.handleOutline),
-          width: style.handleOutlineWidthPx,
+          color: pixiColor(handleStyle.handleOutline),
+          width: handleStyle.handleOutlineWidthPx,
           pixelLine: true,
         });
       handle.label =

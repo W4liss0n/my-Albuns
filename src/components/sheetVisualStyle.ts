@@ -74,10 +74,14 @@ export const SHEET_VISUAL_STYLE = {
     outlineOpacity: 0.72,
     outlineWidthPx: 1,
   },
+  technicalOutlineStroke: {
+    alignment: 0.5,
+    color: 0x2f7fba,
+    width: 1,
+    alpha: 1,
+    pixelLine: true,
+  },
   frameSelection: {
-    outline: "#2f7fba",
-    outlineOpacity: 1,
-    outlineWidthPx: 1,
     handleFill: "#ffffff",
     handleOutline: "#2f7fba",
     handleOutlineWidthPx: 1,

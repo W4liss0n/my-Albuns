@@ -457,12 +457,7 @@ export function createSheetRenderNode(
       viewGeometry.visibleOuterBounds.width,
       viewGeometry.visibleOuterBounds.height,
     )
-    .stroke({
-      alignment: 0,
-      color: 0x2f7fba,
-      width: 2,
-      alpha: 0.9,
-    });
+    .stroke(SHEET_VISUAL_STYLE.technicalOutlineStroke);
   focusOutline.label = `sheet-focus-${sheet.sheetId}`;
   focusOutline.eventMode = "none";
   focusOutline.visible = false;

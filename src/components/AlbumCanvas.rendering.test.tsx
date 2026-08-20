@@ -40,19 +40,24 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
   });
 });
 
-test("keeps the focused sheet outline flush against the outside edge", async () => {
+test("aligns the focused Sheet outline with its exact geometry", async () => {
   renderCanvas();
   await finishPixiInitialization();
 
   expect(displayWithLabel("sheet-focus-sheet-001")).toMatchObject({
     rectCommands: [{ height: 300, width: 600, x: 0, y: 0 }],
     strokeStyles: [
-      expect.objectContaining({ alignment: 0, width: 2 }),
+      expect.objectContaining({
+        alignment: 0.5,
+        color: 0x2f7fba,
+        pixelLine: true,
+        width: 1,
+      }),
     ],
   });
 });
 
-test("keeps the focused sheet outline flush with the visible cut area in normal mode", async () => {
+test("aligns the focused Sheet outline with the visible cut area in normal mode", async () => {
   renderCanvas({
     technicalGuides: { bleedUm: 3_000, safetyUm: 5_000 },
   });
