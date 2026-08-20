@@ -629,8 +629,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A transformação de largura e altura respeita os limites dimensionais seguros; a mudança de DPI recalcula a resolução em pixels das representações derivadas e da Exportação sem, isoladamente, alterar geometria, Pan ou enquadramentos.
 - `Áreas técnicas` apresenta Sangria e segurança na Unidade do Projeto. Os valores permanecem pendentes até o `Aplicar` de `Informações do Álbum`; valor inválido segue o Tooltip compartilhado e dispensável das entradas e bloqueia a aplicação.
 - `Padrões visuais` começa com uma miniatura do padrão global, não de uma Lâmina específica. Hover e clique selecionam esquerda, direita ou Ambos os lados pela região central; Background e Overlay abaixo atuam no escopo escolhido.
-- Clicar no preview de Background ou Overlay abre um seletor compacto com somente os Decorativos já importados no Projeto. Escolher um item altera somente o draft visual até o `Aplicar` de `Design do Álbum`.
-- Esse seletor não aceita arraste nem importa arquivos; novos Decorativos continuam sendo importados exclusivamente pelo Painel de imagens.
+- Background e Overlay apresentam faixas compactas sempre visíveis: cor ou `Sem Overlay`, quando aplicável, e todos os Decorativos já importados no Projeto. Clicar diretamente numa opção altera somente o draft visual até o `Aplicar` de `Design do Álbum`, sem abrir seletor adicional abaixo da faixa.
+- Essas faixas não aceitam arraste nem importam arquivos; novos Decorativos continuam sendo importados exclusivamente pelo Painel de imagens.
 - `Padrão dos Frames` mostra uma prévia simples, `Exibir borda`, cor e espessura na Unidade do Projeto. Suas alterações permanecem no mesmo draft visual.
 - Opacidade não integra o padrão global e permanece disponível somente no contexto individual do Frame.
 - Configurações globais futuras entram em `Informações do Álbum` quando alteram estrutura, documento ou áreas técnicas, e em `Design do Álbum` quando alteram a aparência. Ajustes exclusivos de uma Lâmina ou elemento permanecem fora de ambas.

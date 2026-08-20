@@ -5,7 +5,6 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { X } from "lucide-react";
 
 import type {
   DocumentSnapshot,
@@ -18,7 +17,6 @@ import type { NewProjectPersonalizationDraft } from "../global/application/newPr
 import type { NewProjectPreviewGeometry } from "../global/newProjectPreviewGeometry";
 import { PersonalizationScopeSurface } from "../global/PersonalizationScopeSurface";
 import { ProportionalPreviewViewport } from "../global/ProportionalPreviewViewport";
-import { ActionButton, AppIcon } from "../ui";
 import { AlbumFrameBorderPreview } from "./AlbumFrameBorderPreview";
 import {
   setAlbumBackground,
@@ -59,9 +57,6 @@ export function AlbumDesignForm({
   const [hoveredScope, setHoveredScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
-  const [openPicker, setOpenPicker] = useState<"background" | "overlay" | null>(
-    null,
-  );
   const [borderEditor, setBorderEditor] = useState(() =>
     value.frameBorder.kind === "solid"
       ? { rgb: value.frameBorder.rgb, widthUm: value.frameBorder.widthUm }
@@ -101,12 +96,10 @@ export function AlbumDesignForm({
 
   function chooseBackground(content: ProjectedBackgroundContent) {
     setDraft((current) => setAlbumBackground(current, scope, content));
-    setOpenPicker(null);
   }
 
   function chooseOverlay(content: ProjectedOverlayContent | null) {
     setDraft((current) => setAlbumOverlay(current, scope, content));
-    setOpenPicker(null);
   }
 
   function updateBorder(next: typeof borderEditor) {
@@ -152,19 +145,26 @@ export function AlbumDesignForm({
           {scopeLabel(scope)}
         </p>
         <VisualDefaultControl
-          currentLabel={backgroundLabel(background)}
-          currentPreview={backgroundPreview(background, mediaPreviewUrls)}
           decorativeMedia={decorativeMedia}
           label="Background"
           mediaPreviewUrls={mediaPreviewUrls}
-          open={openPicker === "background"}
-          onOpenChange={(open) => setOpenPicker(open ? "background" : null)}
+          selectedMediaId={
+            background?.kind === "media" ? background.mediaId : null
+          }
           onSelect={(mediaId) =>
             chooseBackground({ kind: "media", mediaId })
           }
         >
-          <label className="visual-default-picker__color">
-            <span className="ui-visually-hidden">Cor do Background</span>
+          <label
+            className="visual-default-picker__option visual-default-picker__color"
+            data-selected={background?.kind === "color" || undefined}
+          >
+            <span
+              aria-hidden="true"
+              className="visual-default-picker__tile"
+              style={{ background: backgroundColor(background) }}
+            />
+            <span>cor</span>
             <input
               aria-label="Cor do Background"
               type="color"
@@ -179,13 +179,11 @@ export function AlbumDesignForm({
           </label>
         </VisualDefaultControl>
         <VisualDefaultControl
-          currentLabel={overlayLabel(overlay)}
-          currentPreview={overlayPreview(overlay, mediaPreviewUrls)}
           decorativeMedia={decorativeMedia}
           label="Overlay"
           mediaPreviewUrls={mediaPreviewUrls}
-          open={openPicker === "overlay"}
-          onOpenChange={(open) => setOpenPicker(open ? "overlay" : null)}
+          noneSelected={overlay === null}
+          selectedMediaId={overlay?.mediaId ?? null}
           onSelect={(mediaId) => chooseOverlay({ kind: "media", mediaId })}
           onClear={() => chooseOverlay(null)}
         />
@@ -277,116 +275,69 @@ export function AlbumDesignForm({
 
 function VisualDefaultControl({
   children,
-  currentLabel,
-  currentPreview,
   decorativeMedia,
   label,
   mediaPreviewUrls,
-  open,
+  noneSelected = false,
   onClear,
-  onOpenChange,
   onSelect,
+  selectedMediaId,
 }: {
   children?: ReactNode;
-  currentLabel: string;
-  currentPreview: CSSProperties;
   decorativeMedia: readonly MediaCatalogItem[];
   label: "Background" | "Overlay";
   mediaPreviewUrls: Readonly<Record<string, string>>;
-  open: boolean;
+  noneSelected?: boolean;
   onClear?: () => void;
-  onOpenChange(open: boolean): void;
   onSelect(mediaId: string): void;
+  selectedMediaId: string | null;
 }) {
-  const recent = decorativeMedia.slice(0, 2);
   return (
     <div className="visual-default-field">
       <span className="album-design-label">{label}</span>
-      <div className="visual-default-picker">
-        <button
-          aria-expanded={open}
-          aria-haspopup="dialog"
-          aria-label={`Escolher ${label}`}
-          className="visual-default-picker__current"
-          type="button"
-          onClick={() => onOpenChange(!open)}
-        >
-          <span
-            aria-hidden="true"
-            className={`visual-default-picker__preview ${
-              currentLabel === "sem" ? "visual-default-picker__preview--none" : ""
-            }`}
-            style={currentPreview}
-          />
-          <span>{currentLabel}</span>
-        </button>
-        <span aria-hidden="true" className="visual-default-picker__divider" />
-        <div className="visual-default-picker__recent">
-          <div className="visual-default-picker__tiles">
-            {children}
-            {recent.map((media) => (
-              <button
-                aria-label={`Usar ${label} ${media.name}`}
-                className="visual-default-picker__tile"
-                key={media.id}
-                style={decorativePreview(media, mediaPreviewUrls)}
-                type="button"
-                onClick={() => onSelect(media.id)}
-              />
-            ))}
-            <button
-              aria-label={`Abrir mais opções de ${label}`}
-              className="visual-default-picker__add"
-              type="button"
-              onClick={() => onOpenChange(!open)}
-            >
-              +
-            </button>
-          </div>
-          <span>{recent.length ? "Decorativos recentes" : "Sem Decorativos"}</span>
-        </div>
-      </div>
-      {open ? (
-        <div
-          aria-label={`Escolher ${label}`}
-          className="album-design-decorative-picker"
-          role="dialog"
-        >
-          {onClear ? (
-            <ActionButton density="compact" variant="quiet" onClick={onClear}>
-              <AppIcon icon={X} size={12} />
-              Sem Overlay
-            </ActionButton>
-          ) : null}
-          {decorativeMedia.length ? (
-            decorativeMedia.map((media) => (
-              <button
-                aria-label={`Selecionar ${label} ${media.name}`}
-                className="album-design-decorative-option"
-                key={media.id}
-                type="button"
-                onClick={() => onSelect(media.id)}
-              >
-                <span
-                  aria-hidden="true"
-                  style={decorativePreview(media, mediaPreviewUrls)}
-                />
-                <span>{media.name}</span>
-              </button>
-            ))
-          ) : (
-            <p>Nenhum Decorativo importado.</p>
-          )}
-          <ActionButton
-            aria-label={`Fechar seletor de ${label}`}
-            density="compact"
-            variant="quiet"
-            onClick={() => onOpenChange(false)}
+      <div
+        aria-label={`Opções de ${label}`}
+        className="visual-default-picker"
+        role="group"
+      >
+        {children}
+        {onClear ? (
+          <button
+            aria-label="Sem Overlay"
+            aria-pressed={noneSelected}
+            className="visual-default-picker__option"
+            type="button"
+            onClick={onClear}
           >
-            Fechar
-          </ActionButton>
-        </div>
-      ) : null}
+            <span
+              aria-hidden="true"
+              className="visual-default-picker__tile visual-default-picker__preview--none"
+            />
+            <span>sem</span>
+          </button>
+        ) : null}
+        {decorativeMedia.map((media) => (
+          <button
+            aria-label={`Usar ${label} ${media.name}`}
+            aria-pressed={selectedMediaId === media.id}
+            className="visual-default-picker__option"
+            key={media.id}
+            title={media.name}
+            type="button"
+            onClick={() => onSelect(media.id)}
+          >
+            <span
+              aria-hidden="true"
+              className="visual-default-picker__tile"
+              style={decorativePreview(media, mediaPreviewUrls)}
+            />
+            <span>{media.name}</span>
+          </button>
+        ))}
+        {decorativeMedia.length === 0 ? (
+          <span className="visual-default-picker__empty">Sem Decorativos</span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -486,32 +437,6 @@ function sameOverlay(
 
 function backgroundColor(content: ProjectedBackgroundContent | null) {
   return content?.kind === "color" ? content.rgb : "#FFFFFF";
-}
-
-function backgroundLabel(content: ProjectedBackgroundContent | null) {
-  if (content === null) return "por lado";
-  return content.kind === "color" ? "cor" : "imagem";
-}
-
-function overlayLabel(content: ProjectedOverlayContent | null | undefined) {
-  if (content === undefined) return "por lado";
-  return content === null ? "sem" : "imagem";
-}
-
-function backgroundPreview(
-  content: ProjectedBackgroundContent | null,
-  mediaPreviewUrls: Readonly<Record<string, string>>,
-): CSSProperties {
-  if (content === null) return {};
-  if (content.kind === "color") return { background: content.rgb };
-  return mediaPreview(content.mediaId, mediaPreviewUrls);
-}
-
-function overlayPreview(
-  content: ProjectedOverlayContent | null | undefined,
-  mediaPreviewUrls: Readonly<Record<string, string>>,
-): CSSProperties {
-  return content ? mediaPreview(content.mediaId, mediaPreviewUrls) : {};
 }
 
 function decorativePreview(

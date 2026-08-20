@@ -1051,14 +1051,18 @@ test("edits and applies the complete Album design draft as one intent", async ()
   fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
     target: { value: "#f7f5f0" },
   });
-  fireEvent.click(
-    albumDesign.getByRole("button", { name: "Escolher Overlay" }),
-  );
+  expect(
+    albumDesign.queryByRole("button", { name: "Escolher Overlay" }),
+  ).not.toBeInTheDocument();
+  expect(
+    albumDesign.queryByRole("button", { name: /Abrir mais opções/ }),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     albumDesign.getByRole("button", {
-      name: "Selecionar Overlay Overlay translúcido.png",
+      name: "Usar Overlay Overlay translúcido.png",
     }),
   );
+  expect(albumDesign.queryByRole("dialog")).not.toBeInTheDocument();
   const frame = albumDesign.getByLabelText("Frame demonstrativo esquerdo 1");
   const overlay = albumDesign.getByLabelText("Overlay do lado esquerdo");
   expect(

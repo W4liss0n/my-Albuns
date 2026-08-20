@@ -423,9 +423,9 @@ Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Proje
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 
-Clicar no preview de imagem de Background ou Overlay abre um seletor compacto contendo somente os Decorativos já importados no Projeto. Escolher um item atualiza somente o draft visual até o `Aplicar` de `Design do Álbum`.
+Background e Overlay usam faixas compactas sempre visíveis. A primeira reúne a cor e todos os Decorativos já importados no Projeto; a segunda reúne `Sem Overlay` e esses mesmos Decorativos. Clicar diretamente numa opção atualiza somente o draft visual até o `Aplicar` de `Design do Álbum`, sem abrir seletor adicional abaixo da faixa.
 
-O seletor não importa arquivos e não aceita arraste. A importação de novos Decorativos permanece exclusivamente no Painel de imagens.
+As faixas não importam arquivos e não aceitam arraste. A importação de novos Decorativos permanece exclusivamente no Painel de imagens.
 
 `Padrão dos Frames` apresenta uma prévia simples de Frame e os controles `Exibir borda`, cor e espessura na Unidade do Projeto. Cada alteração permanece no mesmo draft visual.
 
