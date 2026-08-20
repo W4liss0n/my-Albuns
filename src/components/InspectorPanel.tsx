@@ -40,7 +40,6 @@ export interface InspectorPanelProps {
   displayedPhotoZoom: number;
   displayedPhotoPanX: number;
   zoomCommitting: boolean;
-  photoCount: number;
   document: DocumentSnapshot;
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
@@ -62,7 +61,6 @@ export function InspectorPanel({
   displayedPhotoZoom,
   displayedPhotoPanX,
   zoomCommitting,
-  photoCount,
   document,
   sheetStates,
   sheets,
@@ -159,7 +157,6 @@ export function InspectorPanel({
             >
               <AlbumInformation
                 document={document}
-                photoCount={photoCount}
                 projectName={projectName}
                 sheetStates={sheetStates}
               />
@@ -305,12 +302,10 @@ function InspectorSection({
 
 function AlbumInformation({
   document,
-  photoCount,
   projectName,
   sheetStates,
 }: {
   document: DocumentSnapshot;
-  photoCount: number;
   projectName: string;
   sheetStates: readonly SheetSnapshot[];
 }) {
@@ -325,10 +320,6 @@ function AlbumInformation({
       <InspectorReadout label="Nome do Projeto" value={projectName} plain wide />
       <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
       <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
-      <InspectorReadout
-        label="Fotos importadas"
-        value={String(photoCount)}
-      />
       <InspectorReadout
         label="Fotos posicionadas"
         value={String(positionedPhotoCount)}
@@ -498,12 +489,7 @@ function AlbumVisualDefaultsPlaceholder({
   displayUnit: DocumentSnapshot["displayUnit"];
   visualDefaults: ProjectedVisualDefaults;
 }) {
-  const hasOverlay =
-    visualDefaults.overlay.scope === "bothSides"
-      ? visualDefaults.overlay.both !== null
-      : visualDefaults.overlay.left !== null ||
-        visualDefaults.overlay.right !== null;
-  const frameBorderEnabled = visualDefaults.frameBorder.kind === "solid";
+  const visualState = albumVisualDefaultsView(visualDefaults);
 
   return (
     <div
@@ -513,20 +499,16 @@ function AlbumVisualDefaultsPlaceholder({
       <div className="album-design-group">
         <h3>Padrões visuais</h3>
         <VisualDefaultPlaceholder
-          currentLabel={backgroundContentLabel(visualDefaults.background)}
+          currentLabel={visualState.background.label}
           label="Background"
           previewClassName="visual-default-picker__preview--background"
-          previewStyle={backgroundPreviewStyle(visualDefaults.background)}
+          previewStyle={visualState.background.style}
           recentLabel="backgrounds recentes"
         />
         <VisualDefaultPlaceholder
-          currentLabel={overlayContentLabel(visualDefaults.overlay)}
+          currentLabel={visualState.overlay.label}
           label="Overlay"
-          previewClassName={
-            hasOverlay
-              ? "visual-default-picker__preview--overlay"
-              : "visual-default-picker__preview--none"
-          }
+          previewClassName={visualState.overlay.previewClassName}
           recentLabel="overlays recentes"
         />
       </div>
@@ -536,7 +518,7 @@ function AlbumVisualDefaultsPlaceholder({
         <div className="frame-border-placeholder" aria-hidden="true">
           <span
             className={
-              frameBorderEnabled
+              visualState.frameBorder.enabled
                 ? "frame-border-placeholder__option"
                 : "frame-border-placeholder__option is-current"
             }
@@ -545,7 +527,7 @@ function AlbumVisualDefaultsPlaceholder({
           </span>
           <span
             className={
-              frameBorderEnabled
+              visualState.frameBorder.enabled
                 ? "frame-border-placeholder__option is-current"
                 : "frame-border-placeholder__option"
             }
@@ -553,17 +535,17 @@ function AlbumVisualDefaultsPlaceholder({
             Com borda
           </span>
         </div>
-        {visualDefaults.frameBorder.kind === "solid" && (
+        {visualState.frameBorder.enabled && (
           <div className="frame-border-summary">
             <span
               aria-hidden="true"
               className="frame-border-summary__swatch"
-              style={{ background: visualDefaults.frameBorder.rgb }}
+              style={{ background: visualState.frameBorder.rgb }}
             />
             <InspectorReadout
               label="Espessura"
               value={formatMeasurement(
-                visualDefaults.frameBorder.widthUm,
+                visualState.frameBorder.widthUm,
                 displayUnit,
               )}
             />
@@ -612,34 +594,57 @@ function VisualDefaultPlaceholder({
   );
 }
 
-function backgroundPreviewStyle(
-  background: ProjectedVisualDefaults["background"],
-): CSSProperties | undefined {
-  if (background.scope === "bothSides") {
-    return background.both.kind === "color"
-      ? { background: background.both.rgb }
-      : undefined;
-  }
-
-  if (background.left.kind !== "color" || background.right.kind !== "color") {
-    return undefined;
-  }
+function albumVisualDefaultsView(defaults: ProjectedVisualDefaults) {
+  const frameBorder =
+    defaults.frameBorder.kind === "solid"
+      ? {
+          enabled: true as const,
+          rgb: defaults.frameBorder.rgb,
+          widthUm: defaults.frameBorder.widthUm,
+        }
+      : { enabled: false as const };
 
   return {
-    background: `linear-gradient(90deg, ${background.left.rgb} 0 50%, ${background.right.rgb} 50% 100%)`,
+    background: backgroundVisualState(defaults.background),
+    frameBorder,
+    overlay: overlayVisualState(defaults.overlay),
   };
 }
 
-function backgroundContentLabel(
+function backgroundVisualState(
   background: ProjectedVisualDefaults["background"],
-) {
-  if (background.scope === "perSide") return "por lado";
-  return background.both.kind === "color" ? "cor" : "imagem";
+): { label: string; style?: CSSProperties } {
+  if (background.scope === "bothSides") {
+    return background.both.kind === "color"
+      ? { label: "cor", style: { background: background.both.rgb } }
+      : { label: "imagem" };
+  }
+
+  if (background.left.kind !== "color" || background.right.kind !== "color") {
+    return { label: "por lado" };
+  }
+
+  return {
+    label: "por lado",
+    style: {
+      background: `linear-gradient(90deg, ${background.left.rgb} 0 50%, ${background.right.rgb} 50% 100%)`,
+    },
+  };
 }
 
-function overlayContentLabel(overlay: ProjectedVisualDefaults["overlay"]) {
-  if (overlay.scope === "perSide") return "por lado";
-  return overlay.both === null ? "sem" : "imagem";
+function overlayVisualState(
+  overlay: ProjectedVisualDefaults["overlay"],
+): { label: string; previewClassName: string } {
+  if (overlay.scope === "bothSides" && overlay.both === null) {
+    return {
+      label: "sem",
+      previewClassName: "visual-default-picker__preview--none",
+    };
+  }
+  return {
+    label: overlay.scope === "bothSides" ? "imagem" : "por lado",
+    previewClassName: "visual-default-picker__preview--overlay",
+  };
 }
 
 function PropertyRow({ label, value }: { label: string; value: string }) {

@@ -89,7 +89,6 @@ export function SheetGridPreview() {
         onFinishPhotoZoom={async () => undefined}
         onNavigateToSheet={setFocusedSheetId}
         onUpdatePhotoZoom={() => undefined}
-        photoCount={3}
         selectedComposedPhoto={null}
         selectedFrame={null}
         sheetStates={sheetStates}

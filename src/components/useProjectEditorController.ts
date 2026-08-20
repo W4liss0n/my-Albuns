@@ -174,11 +174,6 @@ export function useProjectEditorController({
     displayedPhotoPanX: photoGestures.displayedPhotoPanX,
     zoomCommitting: photoGestures.zoomCommitting,
     sheetCount: projection.state.album.sheets.length,
-    photoCount: projection.state.album.sheets.reduce(
-      (count, sheet) =>
-        count + sheet.frames.filter((frame) => frame.photo).length,
-      0,
-    ),
     canvasProps,
     navigateToSheet: navigation.navigateToSheet,
     beginZoomGesture: photoGestures.beginZoomGesture,

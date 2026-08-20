@@ -134,7 +134,6 @@ export function ProjectWorkspace({
     selectedComposedPhoto,
     displayedPhotoZoom,
     displayedPhotoPanX,
-    photoCount,
   } = controller;
   const projectMetadata = projectAlbumMetadata(projection);
   const commandsBlocked =
@@ -218,7 +217,6 @@ export function ProjectWorkspace({
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}
           zoomCommitting={controller.zoomCommitting}
-          photoCount={photoCount}
           document={projection.state.document}
           sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
