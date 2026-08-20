@@ -168,7 +168,6 @@ impl MediaRetryInspection {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum MediaRetryError {
     NotUnavailable,
-    AdoptionFailed(String),
 }
 
 impl std::fmt::Display for MediaRetryError {
@@ -177,7 +176,6 @@ impl std::fmt::Display for MediaRetryError {
             Self::NotUnavailable => formatter.write_str(
                 "A ocorrência de mídia não está confirmada como temporariamente indisponível.",
             ),
-            Self::AdoptionFailed(message) => formatter.write_str(message),
         }
     }
 }
@@ -436,7 +434,7 @@ impl MediaMonitor {
         &self,
         runtime: &MediaRuntime,
         binding: &MediaBinding,
-        apply_update: impl FnOnce(&MediaRuntimeUpdate) -> Result<(), String>,
+        apply_update: impl FnOnce(&MediaRuntimeUpdate),
     ) -> Result<MediaRetryInspection, MediaRetryError> {
         let mut transition = self
             .transition
@@ -470,7 +468,7 @@ impl MediaMonitor {
         let availability = observation.availability;
         let mut staged = current;
         let update = apply_occurrence(&mut staged, generation, observation.clone());
-        apply_update(&update).map_err(MediaRetryError::AdoptionFailed)?;
+        apply_update(&update);
         let committed = runtime.apply_occurrence(generation, observation);
         debug_assert_eq!(committed, update);
         transition.pending = None;
@@ -605,7 +603,7 @@ mod tests {
             .clone();
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &selected, |_| Ok(()))
+            .retry_unavailable(&runtime, &selected, |_| {})
             .expect("an unavailable occurrence can be inspected explicitly");
 
         assert_eq!(retried.availability(), MediaAvailability::Candidate);
@@ -655,7 +653,7 @@ mod tests {
         );
 
         let error = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect_err("absence is not eligible for the unavailable retry action");
 
         assert_eq!(error, MediaRetryError::NotUnavailable);
@@ -686,7 +684,7 @@ mod tests {
         });
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect("the reachable root can authoritatively establish absence");
 
         assert_eq!(retried.availability(), MediaAvailability::Absent);
@@ -715,7 +713,7 @@ mod tests {
         let runtime = MediaRuntime::default();
 
         let error = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect_err("Retry requires an authoritative Unavailable observation");
 
         assert_eq!(error, MediaRetryError::NotUnavailable);
@@ -746,7 +744,7 @@ mod tests {
             .expect("the other occurrence is observed");
 
         let error = MediaMonitor::default()
-            .retry_unavailable(&runtime, &selected, |_| Ok(()))
+            .retry_unavailable(&runtime, &selected, |_| {})
             .expect_err("an occurrence absent from the snapshot is not Unavailable");
 
         assert_eq!(error, MediaRetryError::NotUnavailable);
@@ -772,7 +770,7 @@ mod tests {
         );
 
         let error = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect_err("an available occurrence is not eligible for Retry");
 
         assert_eq!(error, MediaRetryError::NotUnavailable);
@@ -792,7 +790,7 @@ mod tests {
         let binding_before = binding.clone();
 
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect("an inaccessible root is still a completed retry inspection");
 
         assert_eq!(retried.availability(), MediaAvailability::Unavailable);
@@ -810,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_retry_keeps_unavailable_when_cache_adoption_fails_and_can_be_retried() {
+    fn explicit_retry_reacts_to_cache_before_committing_runtime() {
         let root = tempfile::tempdir().expect("temporary transactional retry fixture");
         let source = root.path().join("photo.jpg");
         std::fs::write(&source, b"photo").expect("the Original fixture is writable");
@@ -834,25 +832,31 @@ mod tests {
             }],
         });
         let monitor = MediaMonitor::default();
-
-        let failure = monitor
-            .retry_unavailable(&runtime, &binding, |_| Err("Cache adoption failed".into()))
-            .expect_err("a failed Cache reaction cannot commit the new media observation");
-
-        assert_eq!(failure.to_string(), "Cache adoption failed");
-        assert_eq!(
-            runtime
-                .snapshot()
-                .expect("the previous Runtime observation is retained")
-                .observations()[0]
-                .availability,
-            MediaAvailability::Unavailable
-        );
+        let mut cache_reacted = false;
 
         let retried = monitor
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
-            .expect("the explicit retry remains actionable after Cache adoption fails");
+            .retry_unavailable(&runtime, &binding, |update| {
+                assert_eq!(
+                    update.changed_media_ids(),
+                    std::slice::from_ref(&binding.media_id)
+                );
+                assert_eq!(
+                    update.invalidated_media_ids(),
+                    std::slice::from_ref(&binding.media_id)
+                );
+                assert_eq!(
+                    runtime
+                        .snapshot()
+                        .expect("Runtime remains at the authoritative prior state during reaction")
+                        .observations()[0]
+                        .availability,
+                    MediaAvailability::Unavailable
+                );
+                cache_reacted = true;
+            })
+            .expect("the infallible Cache reaction precedes the Runtime commit");
 
+        assert!(cache_reacted);
         assert_eq!(retried.availability(), MediaAvailability::Candidate);
         assert_eq!(
             runtime

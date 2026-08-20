@@ -1019,7 +1019,7 @@ mod tests {
         let resolver = MediaResolver;
         runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
         let retried = MediaMonitor::default()
-            .retry_unavailable(&runtime, &binding, |_| Ok(()))
+            .retry_unavailable(&runtime, &binding, |_| {})
             .expect("the Runtime repeats the authoritative inspection through the Host binding");
 
         let after = fixture

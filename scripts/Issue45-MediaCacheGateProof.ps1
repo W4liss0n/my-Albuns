@@ -576,7 +576,7 @@ function New-Issue45VerifiedCriteria {
                     (New-RustProof -Name 'explicit_retry_rejects_absent_occurrences_without_changing_runtime')
                     (New-RustProof -Name 'explicit_retry_changes_unavailable_to_absent_after_authoritative_inspection')
                     (New-RustProof -Name 'explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root')
-                    (New-RustProof -Name 'explicit_retry_keeps_unavailable_when_cache_adoption_fails_and_can_be_retried')
+                    (New-RustProof -Name 'explicit_retry_reacts_to_cache_before_committing_runtime')
                     (New-RustProof -Name 'only_authoritative_media_availability_is_projected_to_the_product')
                     (New-RustProof -Name 'registry_publication_failure_becomes_cache_unavailable_without_source_retry')
                     (New-RustProof -Name 'absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state')

@@ -44,13 +44,14 @@ Religação. A WebView envia somente o `mediaId`; o Host relê o binding atual d
 ocorrência e o `MediaResolver` cria outro `OperationPathContext` para uma nova
 inspeção autoritativa. `MediaRuntime` substitui somente essa observação e o
 `CacheEngine` reage à nova geração antes de outra demanda de prévia. A adoção é
-uma transição única: se essa reação falhar, `MediaRuntime` conserva
-`Unavailable` e a próxima tentativa continua autorizada. Se a raiz
-continuar inacessível, o estado e a ação permanecem; se ela voltar e o arquivo
-não existir, o resultado passa a `Absent` e somente então oferece Religação; se
-o Original reaparecer, a demanda normal reconstrói ou revalida a representação.
-O fluxo não chama `ProjectSession`, não cria Histórico e não altera caminho,
-`MediaRef`, revisão, dirty, Undo/Redo ou conteúdo salvo.
+uma transição infalível em memória: o `CacheEngine` reage ao update preparado
+enquanto o `MediaRuntime` ainda conserva o `Unavailable` anterior e, somente
+depois, o Runtime registra a nova observação. Se a raiz continuar inacessível,
+o estado e a ação permanecem; se ela voltar e o arquivo não existir, o
+resultado passa a `Absent` e somente então oferece Religação; se o Original
+reaparecer, a demanda normal reconstrói ou revalida a representação. O fluxo
+não chama `ProjectSession`, não cria Histórico e não altera caminho, `MediaRef`,
+revisão, dirty, Undo/Redo ou conteúdo salvo.
 
 Uma primeira amostra ainda não consolidada não é uma observação sobre a origem:
 a demanda omite a prévia dessa ocorrência e a WebView não oferece ação de

@@ -90,7 +90,6 @@ pub(crate) async fn retry_unavailable_media(
                 &retry_registry,
                 update,
             );
-            Ok(())
         })
     })
     .await
