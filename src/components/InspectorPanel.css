@@ -139,7 +139,7 @@
   white-space: nowrap;
 }
 
-.album-information .inspector-readout {
+.inspector-readout--integrated {
   height: auto;
   min-height: 18px;
   padding: 0;
@@ -168,8 +168,7 @@
   font-weight: 600;
 }
 
-.inspector-subsections,
-.album-visual-defaults-placeholder {
+.inspector-subsections {
   display: grid;
   gap: var(--ui-space-4);
 }

@@ -390,33 +390,38 @@ Nas bordas superior e inferior da área visível da Grade, o arraste inicia rola
 
 Enquanto a Grade apresenta essa prévia, o Canvas mantém a última ordem confirmada até a soltura válida.
 
-`Informações do Álbum` é uma visão somente de consulta. Ela mostra:
+`Informações do Álbum` reúne a visão de consulta e as configurações globais não visuais do Projeto.
 
+Sua visão de consulta mostra:
+
+- nome do Projeto;
 - quantidade atual de Lâminas e Páginas;
-- dimensões da Lâmina e da Página, Unidade e DPI;
-- formato da primeira e da última Lâmina;
-- Sangria e Área de segurança;
+- dimensão calculada da Página;
+- quantidade de Fotos posicionadas;
 - quantidade de Frames placeholder e Arquivos originais ausentes, distinguindo quantos ausentes estão em uso.
 
-Como nenhum valor é editável nessa visão, os dados usam texto integrado à superfície do Painel em vez de caixas que sugiram campos de entrada. `Dimensão da Lâmina` e `Dimensão da Página` formam grupos distintos, cada um com `Largura` e `Altura` apresentadas separadamente.
+Esses dados somente de consulta usam texto integrado à superfície do Painel em vez de caixas que sugiram campos de entrada. Controles editáveis e configurações ainda sem operação implementada preservam a aparência de campo; estas últimas são marcadas explicitamente como placeholder no código. `Dimensão da Lâmina`, nas configurações de `Documento`, e `Dimensão da Página`, na consulta calculada, formam grupos distintos, cada um com `Largura` e `Altura` apresentadas separadamente.
 
-Frames placeholder e originais ausentes em uso são destacados como bloqueios de Exportação. Originais ausentes sem uso aparecem como aviso, sem impedir a saída. Nenhum valor é editado nessa seção.
+Frames placeholder e originais ausentes em uso são destacados como bloqueios de Exportação. Originais ausentes sem uso aparecem como aviso, sem impedir a saída.
 
 Clicar em `Frames placeholder` expande a `Grade de Lâminas` e destaca as Lâminas afetadas. Clicar em `Originais ausentes` abre o Painel de imagens no filtro `Ausentes`; badges nas abas `Fotos` e `Decorativos` mostram quantos itens ausentes existem em cada categoria.
 
 Quando `Ausentes` é aberto pelo aviso, o Painel guarda a aba e os filtros anteriores. Encerrar essa visualização restaura exatamente o estado anterior; o modo de diagnóstico não é persistido entre sessões nem substitui as preferências normais do Painel.
 
-`Design do Álbum` centraliza todas as configurações globais editáveis do Projeto, e não somente Background e Overlay. Sua organização inicial é:
+As configurações não visuais de `Informações do Álbum` são organizadas em:
 
 1. `Estrutura`: configuração das extremidades;
 2. `Documento`: Unidade, largura e altura da Lâmina e DPI;
 3. `Áreas técnicas`: valores de Sangria e Área de segurança;
-4. `Padrões visuais`: Background e Overlay padrão, incluindo seus escopos;
-5. `Padrão dos Frames`: presença, cor e espessura da Borda padrão.
 
-Novas configurações globais devem ser incorporadas ao grupo correspondente ou justificar um novo grupo; ajustes exclusivos de uma Lâmina ou elemento não pertencem a essa seção.
+`Design do Álbum` é reservado à aparência e contém:
 
-`Quantidade de Lâminas` é um campo exclusivo do diálogo de criação e não aparece como configuração editável em `Design do Álbum`. Depois da criação, adicionar ou excluir Lâminas continua sendo uma ação estrutural explícita do editor, não a alteração de um valor global.
+1. `Padrões visuais`: Background e Overlay padrão, incluindo seus escopos;
+2. `Padrão dos Frames`: presença, cor e espessura da Borda padrão.
+
+Novas configurações globais devem ser incorporadas a `Informações do Álbum` quando alterarem estrutura, documento ou áreas técnicas, e a `Design do Álbum` quando alterarem a aparência. Ajustes exclusivos de uma Lâmina ou elemento não pertencem a essas seções.
+
+`Quantidade de Lâminas` é um campo exclusivo do diálogo de criação e não aparece como configuração editável em `Informações do Álbum`. Depois da criação, adicionar ou excluir Lâminas continua sendo uma ação estrutural explícita do editor, não a alteração de um valor global.
 
 `Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. Seu `Aplicar` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
 

@@ -157,6 +157,7 @@ export function InspectorPanel({
             >
               <AlbumInformation
                 document={document}
+                onApplyDpi={onApplyDpi}
                 projectName={projectName}
                 sheetStates={sheetStates}
               />
@@ -168,17 +169,10 @@ export function InspectorPanel({
               preferenceKey="album.design"
               defaultOpen
             >
-              <div className="inspector-subsections">
-                <AlbumProjectSettings
-                  document={document}
-                  onApplyDpi={onApplyDpi}
-                  sheetStates={sheetStates}
-                />
-                <AlbumVisualDefaultsPlaceholder
-                  displayUnit={document.displayUnit}
-                  visualDefaults={visualDefaults}
-                />
-              </div>
+              <AlbumVisualDefaultsPlaceholder
+                displayUnit={document.displayUnit}
+                visualDefaults={visualDefaults}
+              />
             </InspectorSection>
             <InspectorSection
               accessibleTitle="Grade de Lâminas"
@@ -302,15 +296,15 @@ function InspectorSection({
 
 function AlbumInformation({
   document,
+  onApplyDpi,
   projectName,
   sheetStates,
 }: {
   document: DocumentSnapshot;
+  onApplyDpi(dpi: number): void | Promise<void>;
   projectName: string;
   sheetStates: readonly SheetSnapshot[];
 }) {
-  const firstSheet = sheetStates[0];
-  const lastSheet = sheetStates[sheetStates.length - 1];
   const frames = sheetStates.flatMap((sheet) => sheet.frames);
   const placeholderCount = frames.filter((frame) => frame.photo === null).length;
   const positionedPhotoCount = frames.length - placeholderCount;
@@ -330,47 +324,11 @@ function AlbumInformation({
         </div>
       </section>
 
-      <section className="inspector-subsection">
-        <h3>Documento</h3>
-        <InspectorDimensionReadout
-          heightUm={document.sheetHeightUm}
-          label="Dimensão da Lâmina"
-          unit={document.displayUnit}
-          widthUm={document.sheetWidthUm}
-        />
-        <InspectorDimensionReadout
-          heightUm={document.sheetHeightUm}
-          label="Dimensão da Página"
-          unit={document.displayUnit}
-          widthUm={document.sheetWidthUm / 2}
-        />
-        <div className="inspector-readout-grid">
-          <InspectorReadout label="Unidade" value={document.displayUnit} />
-          <InspectorReadout label="Resolução" value={`${document.dpi} DPI`} />
-        </div>
-      </section>
-
-      <section className="inspector-subsection">
-        <h3>Estrutura e acabamento</h3>
-        <div className="inspector-readout-grid">
-          <InspectorReadout
-            label="Primeira Lâmina"
-            value={sheetFormat(firstSheet)}
-          />
-          <InspectorReadout
-            label="Última Lâmina"
-            value={sheetFormat(lastSheet)}
-          />
-          <InspectorReadout
-            label="Sangria"
-            value={formatMeasurement(document.bleedUm, document.displayUnit)}
-          />
-          <InspectorReadout
-            label="Área de segurança"
-            value={formatMeasurement(document.safetyUm, document.displayUnit)}
-          />
-        </div>
-      </section>
+      <AlbumProjectSettings
+        document={document}
+        onApplyDpi={onApplyDpi}
+        sheetStates={sheetStates}
+      />
 
       <section
         className="inspector-subsection"
@@ -395,11 +353,13 @@ function AlbumInformation({
 }
 
 function InspectorDimensionReadout({
+  fieldPlaceholder = false,
   heightUm,
   label,
   unit,
   widthUm,
 }: {
+  fieldPlaceholder?: boolean;
   heightUm: number;
   label: string;
   unit: DocumentSnapshot["displayUnit"];
@@ -410,10 +370,12 @@ function InspectorDimensionReadout({
       <span className="inspector-dimension__title">{label}</span>
       <div className="inspector-readout-grid">
         <InspectorReadout
+          fieldPlaceholder={fieldPlaceholder}
           label="Largura"
           value={formatMeasurement(widthUm, unit)}
         />
         <InspectorReadout
+          fieldPlaceholder={fieldPlaceholder}
           label="Altura"
           value={formatMeasurement(heightUm, unit)}
         />
@@ -423,12 +385,14 @@ function InspectorDimensionReadout({
 }
 
 function InspectorReadout({
+  fieldPlaceholder = false,
   label,
   placeholderFeature,
   plain = false,
   tone,
   value,
 }: {
+  fieldPlaceholder?: boolean;
   label: string;
   placeholderFeature?: string;
   plain?: boolean;
@@ -444,8 +408,11 @@ function InspectorReadout({
       <output
         aria-label={label}
         className={[
-          "ui-field-control",
           "inspector-readout",
+          fieldPlaceholder ? "ui-field-control" : "",
+          fieldPlaceholder
+            ? "inspector-readout--field-placeholder"
+            : "inspector-readout--integrated",
           plain ? "inspector-readout--plain" : "",
           tone ? `inspector-readout--${tone}` : "",
         ]
@@ -477,10 +444,12 @@ function AlbumProjectSettings({
         <h3>Estrutura</h3>
         <div className="inspector-readout-grid">
           <InspectorReadout
+            fieldPlaceholder
             label="Primeira Lâmina"
             value={sheetFormat(sheetStates[0])}
           />
           <InspectorReadout
+            fieldPlaceholder
             label="Última Lâmina"
             value={sheetFormat(sheetStates[sheetStates.length - 1])}
           />
@@ -492,14 +461,25 @@ function AlbumProjectSettings({
           className="inspector-field-stack"
           data-placeholder-feature="album-document-dimensions"
         >
-          <InspectorReadout label="Unidade" value={document.displayUnit} />
+          <InspectorReadout
+            fieldPlaceholder
+            label="Unidade"
+            value={document.displayUnit}
+          />
           <InspectorDimensionReadout
+            fieldPlaceholder
             heightUm={document.sheetHeightUm}
             label="Dimensão da Lâmina"
             unit={document.displayUnit}
             widthUm={document.sheetWidthUm}
           />
         </div>
+        <InspectorDimensionReadout
+          heightUm={document.sheetHeightUm}
+          label="Dimensão da Página"
+          unit={document.displayUnit}
+          widthUm={document.sheetWidthUm / 2}
+        />
         <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
       </section>
       <section
@@ -509,10 +489,12 @@ function AlbumProjectSettings({
         <h3>Áreas técnicas</h3>
         <div className="inspector-readout-grid">
           <InspectorReadout
+            fieldPlaceholder
             label="Sangria"
             value={formatMeasurement(document.bleedUm, document.displayUnit)}
           />
           <InspectorReadout
+            fieldPlaceholder
             label="Área de segurança"
             value={formatMeasurement(document.safetyUm, document.displayUnit)}
           />
@@ -533,7 +515,7 @@ function AlbumVisualDefaultsPlaceholder({
 
   return (
     <div
-      className="album-visual-defaults-placeholder"
+      className="inspector-subsections album-visual-defaults-placeholder"
       data-placeholder-feature="album-design-visual-defaults"
     >
       <section className="inspector-subsection">
@@ -583,6 +565,7 @@ function AlbumVisualDefaultsPlaceholder({
               style={{ background: visualState.frameBorder.rgb }}
             />
             <InspectorReadout
+              fieldPlaceholder
               label="Espessura"
               value={formatMeasurement(
                 visualState.frameBorder.widthUm,

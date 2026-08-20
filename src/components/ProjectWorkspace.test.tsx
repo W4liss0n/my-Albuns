@@ -886,6 +886,9 @@ test("shows the physical configuration projected from the opened Project", () =>
   expect(sheetDimensions.getByLabelText("Altura")).toHaveTextContent(
     "25,4 cm",
   );
+  expect(sheetDimensions.getByLabelText("Largura")).toHaveClass(
+    "inspector-readout--field-placeholder",
+  );
 
   const pageDimensions = within(
     albumInformation.getByRole("group", { name: "Dimensão da Página" }),
@@ -896,19 +899,20 @@ test("shows the physical configuration projected from the opened Project", () =>
   expect(pageDimensions.getByLabelText("Altura")).toHaveTextContent(
     "25,4 cm",
   );
-  expect(albumInformation.getByText("Resolução").parentElement).toHaveTextContent(
-    "240 DPI",
+  expect(pageDimensions.getByLabelText("Largura")).toHaveClass(
+    "inspector-readout--integrated",
   );
+  expect(albumInformation.getByLabelText("DPI")).toHaveValue("240");
   expect(albumInformation.getByText("Sangria").parentElement).toHaveTextContent(
     "0,25 cm",
   );
-  expect(albumInformation.getByText("Área de segurança").parentElement).toHaveTextContent(
-    "0,5 cm",
-  );
+  expect(
+    albumInformation.getByText("Área de segurança").parentElement,
+  ).toHaveTextContent("0,5 cm");
 });
 
 test("uses the current reference layout for the Album context", () => {
-  const view = render(
+  render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
@@ -917,36 +921,53 @@ test("uses the current reference layout for the Album context", () => {
     />,
   );
 
-  expect(screen.getByLabelText("Nome do Projeto")).toHaveTextContent(
+  const albumInformationSection = screen
+    .getByRole("button", { name: "Informações do Álbum" })
+    .closest("section") as HTMLElement;
+  const albumDesignSection = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
+  const albumInformation = within(albumInformationSection);
+  const albumDesign = within(albumDesignSection);
+
+  expect(albumInformation.getByLabelText("Nome do Projeto")).toHaveTextContent(
     "Álbum Horizonte",
   );
-  expect(screen.getByLabelText("Nome do Projeto")).toHaveClass(
-    "inspector-readout",
+  expect(albumInformation.getByLabelText("Nome do Projeto")).toHaveClass(
+    "inspector-readout--integrated",
   );
   expect(
     screen.getByRole("button", { name: "Design do Álbum" }),
   ).toHaveAttribute("aria-expanded", "true");
   expect(
-    view.container.querySelector(
+    albumDesignSection.querySelector(
       '[data-placeholder-feature="album-design-visual-defaults"]',
     ),
   ).toBeInTheDocument();
   expect(
-    view.container.querySelector(
+    albumInformationSection.querySelector(
       '[data-placeholder-feature="album-end-sheet-settings"]',
     ),
   ).toBeInTheDocument();
   expect(
-    view.container.querySelector(
+    albumInformationSection.querySelector(
       '[data-placeholder-feature="album-technical-area-settings"]',
     ),
   ).toBeInTheDocument();
   expect(
-    view.container.querySelector(
+    albumInformationSection.querySelector(
       '[data-placeholder-feature="album-missing-originals-summary"]',
     ),
   ).toHaveTextContent("Não disponível");
-  expect(screen.getByText("cor")).toBeInTheDocument();
+  expect(albumInformation.getByText("Estrutura")).toBeInTheDocument();
+  expect(albumInformation.getByText("Documento")).toBeInTheDocument();
+  expect(albumInformation.getByText("Áreas técnicas")).toBeInTheDocument();
+  expect(albumDesign.queryByText("Estrutura")).not.toBeInTheDocument();
+  expect(albumDesign.queryByText("Documento")).not.toBeInTheDocument();
+  expect(albumDesign.queryByText("Áreas técnicas")).not.toBeInTheDocument();
+  expect(albumDesign.getByText("Padrões visuais")).toBeInTheDocument();
+  expect(albumDesign.getByText("Padrão dos Frames")).toBeInTheDocument();
+  expect(albumDesign.getByText("cor")).toBeInTheDocument();
 });
 
 test("presents an empty per-side Overlay as absent", () => {
@@ -1022,11 +1043,11 @@ test("applies one DPI change and renders the authoritative projection returned b
     />,
   );
 
-  const albumDesign = screen.getByRole("button", {
-    name: "Design do Álbum",
+  const albumInformationTrigger = screen.getByRole("button", {
+    name: "Informações do Álbum",
   });
-  if (albumDesign.getAttribute("aria-expanded") !== "true") {
-    fireEvent.click(albumDesign);
+  if (albumInformationTrigger.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(albumInformationTrigger);
   }
   const input = screen.getByRole("textbox", { name: "DPI" });
   fireEvent.change(input, { target: { value: "600" } });
@@ -1055,10 +1076,9 @@ test("applies one DPI change and renders the authoritative projection returned b
       .getByRole("button", { name: "Informações do Álbum" })
       .closest("section") as HTMLElement,
   );
-  expect(albumInformation.getByText("Resolução").parentElement).toHaveTextContent(
-    "600 DPI",
+  expect(albumInformation.getByRole("textbox", { name: "DPI" })).toHaveValue(
+    "600",
   );
-  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
   expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 

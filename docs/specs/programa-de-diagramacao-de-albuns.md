@@ -95,7 +95,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero redimensionar o Painel contextual por um divisor vertical, para equilibrar ferramentas e área de composição.
 1. Como pessoa diagramadora, quero ocultar o Painel contextual, para dedicar toda a largura à composição quando não precisar das ferramentas.
 1. Como pessoa diagramadora, quero um único Painel contextual com seções recolhíveis, para reutilizar o espaço sem abrir janelas auxiliares.
-1. Como pessoa diagramadora, quero consultar um resumo em Informações do Álbum e alterar todas as configurações globais do Projeto em Design do Álbum, para encontrar cada responsabilidade em um local previsível.
+1. Como pessoa diagramadora, quero encontrar resumo e configurações não visuais em Informações do Álbum e escolhas visuais em Design do Álbum, para localizar cada responsabilidade em um local previsível.
 1. Como pessoa diagramadora, quero que selecionar um Frame ou Foto troque o Painel para preview, informações, Design e Ajustes e Efeitos, para editar o elemento no mesmo local.
 1. Como pessoa diagramadora, quero restaurar um slider com dois cliques, para voltar rapidamente ao valor padrão sem ocupar espaço com outro botão.
 
@@ -615,13 +615,16 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Na Grade, clique sem arraste centraliza a Lâmina. Arrastar além do limiar cria espaço reservado, fantasma e deslocamento das células intermediárias segundo a sequência, usando as mesmas validações, cancelamento e Undo/Redo do arraste pela Barra.
 - Durante esse arraste, aproximar o fantasma das bordas superior ou inferior rola verticalmente o contêiner visível da Grade, com velocidade progressiva e atualização contínua do espaço reservado.
 - Somente a superfície que iniciou o arraste mostra a prévia de reordenação. Canvas ou Grade oposto mantém a ordem confirmada e sincroniza de uma vez apenas depois da soltura válida.
-- `Informações do Álbum` é somente de leitura e resume quantidade de Lâminas e Páginas, dimensões da Lâmina e da Página, Unidade, DPI, formatos das extremidades, Sangria, segurança e contagens de Frames placeholder ou Arquivos originais ausentes, distinguindo os ausentes em uso.
-- Seus valores aparecem como texto integrado ao Painel, sem a aparência de campos editáveis. `Dimensão da Lâmina` e `Dimensão da Página` apresentam `Largura` e `Altura` separadamente.
-- Placeholders e originais ausentes em uso são destacados como bloqueios de Exportação; ausentes não usados são apenas aviso. Todas as alterações globais permanecem em `Design do Álbum`.
+- `Informações do Álbum` reúne o resumo do Projeto e suas configurações globais não visuais: estrutura das extremidades, Unidade, dimensões da Lâmina, DPI, Sangria e segurança.
+- O resumo de consulta apresenta quantidade de Lâminas e Páginas, dimensão calculada da Página e contagens de Frames placeholder ou Arquivos originais ausentes, distinguindo os ausentes em uso.
+- Valores somente de consulta aparecem como texto integrado ao Painel, sem a aparência de campos editáveis. Controles editáveis e configurações ainda não implementadas mantêm a aparência de campo; estas últimas permanecem identificadas como placeholder no código.
+- `Dimensão da Lâmina` e `Dimensão da Página` apresentam `Largura` e `Altura` separadamente.
+- Placeholders e originais ausentes em uso são destacados como bloqueios de Exportação; ausentes não usados são apenas aviso.
 - Clicar em placeholders expande a Grade de Lâminas destacando as afetadas. Clicar em originais ausentes abre o Painel de imagens no filtro `Ausentes`, com badges de quantidade nas abas `Fotos` e `Decorativos`.
 - `Ausentes` aberto pelo aviso é uma visualização temporária: guarda aba e filtros anteriores, restaura-os ao ser encerrada e não é persistida como preferência entre sessões.
-- `Design do Álbum` começa organizado em `Estrutura` (configuração das extremidades), `Documento` (Unidade, dimensões da Lâmina e DPI), `Áreas técnicas` (Sangria e segurança), `Padrões visuais` (Background e Overlay) e `Padrão dos Frames` (presença, cor e espessura da Borda).
-- `Quantidade de Lâminas` existe somente no diálogo de criação. Depois disso, a quantidade muda apenas como consequência dos comandos explícitos de adicionar ou excluir Lâminas, nunca por um campo global em `Design do Álbum`.
+- `Informações do Álbum` organiza configurações em `Estrutura` (configuração das extremidades), `Documento` (Unidade, dimensões da Lâmina e DPI) e `Áreas técnicas` (Sangria e segurança).
+- `Design do Álbum` contém somente `Padrões visuais` (Background e Overlay) e `Padrão dos Frames` (presença, cor e espessura da Borda).
+- `Quantidade de Lâminas` existe somente no diálogo de criação. Depois disso, a quantidade muda apenas como consequência dos comandos explícitos de adicionar ou excluir Lâminas, nunca por um campo global em `Informações do Álbum`.
 - `Estrutura` contém somente `Primeira Lâmina` e `Última Lâmina`, cada uma com as opções independentes `Lâmina dupla` e `Página única`. `Aplicar` apresenta o impacto antes de confirmar as conversões.
 - Em `Documento`, trocar Unidade converte imediatamente somente os valores exibidos. Largura, altura e DPI permanecem pendentes até um único `Aplicar`, que apresenta tamanho físico e resolução finais e confirma tudo atomicamente em uma ação de Undo/Redo.
 - A transformação de largura e altura respeita os limites dimensionais seguros; a mudança de DPI recalcula a resolução em pixels das representações derivadas e da Exportação sem, isoladamente, alterar geometria, Pan ou enquadramentos.
@@ -632,8 +635,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Esse seletor não aceita arraste nem importa arquivos; novos Decorativos continuam sendo importados exclusivamente pelo Painel de imagens.
 - `Padrão dos Frames` mostra uma prévia simples, `Exibir borda`, cor e espessura na Unidade do Projeto. Cada alteração é uma ação imediata de Undo/Redo e atualiza os Frames que usam o design do Álbum.
 - Opacidade não integra o padrão global e permanece disponível somente no contexto individual do Frame.
-- Configurações globais futuras entram no grupo correspondente ou justificam um novo grupo; ajustes exclusivos de uma Lâmina ou elemento permanecem fora de `Design do Álbum`.
-- `Design do Álbum` não possui um botão geral de salvamento. Mudanças simples são aplicadas imediatamente ao estado aberto e entram em Undo/Redo; mudanças estruturais ou dimensionais possuem `Aplicar` próprio, validação e confirmação do impacto.
+- Configurações globais futuras entram em `Informações do Álbum` quando alteram estrutura, documento ou áreas técnicas, e em `Design do Álbum` quando alteram a aparência. Ajustes exclusivos de uma Lâmina ou elemento permanecem fora de ambas.
+- As configurações do Álbum não possuem um botão geral de salvamento. Mudanças simples são aplicadas imediatamente ao estado aberto e entram em Undo/Redo; mudanças estruturais ou dimensionais possuem `Aplicar` próprio, validação e confirmação do impacto.
 - Aplicar uma configuração nunca persiste o arquivo automaticamente. O Projeto continua com alterações pendentes até o comando manual `Salvar`.
 - No Modo de edição, a ausência de seleção de Frame ou Foto troca esse conteúdo por `Design da Lâmina` no Painel contextual direito.
 - `Design da Lâmina` contém uma miniatura real da composição corrente: hover à esquerda ou à direita realça somente o respectivo lado; hover na região central realça ambos os lados; clicar fixa visualmente o escopo selecionado sem alterar a composição.
