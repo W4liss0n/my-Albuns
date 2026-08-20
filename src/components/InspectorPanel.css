@@ -73,19 +73,6 @@
   flex: none;
 }
 
-.inspector-section-action .ui-action-button--quiet:not(:disabled) {
-  color: var(--ui-accent);
-  font-size: var(--ui-font-size-action);
-  font-weight: 700;
-}
-
-.inspector-section-action .ui-action-button--quiet:hover:not(:disabled),
-.inspector-section-action .ui-action-button--quiet:focus-visible:not(:disabled) {
-  border-color: transparent;
-  color: var(--ui-accent-hover);
-  background: transparent;
-}
-
 .context-heading {
   padding: var(--ui-space-4) var(--ui-space-3);
   border-bottom: 1px solid var(--ui-border);
