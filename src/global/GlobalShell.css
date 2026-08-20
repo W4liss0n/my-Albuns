@@ -184,8 +184,8 @@ body,
 }
 
 .global-recent-list button:focus-visible {
-  border-color: #82b5d9;
-  box-shadow: 0 0 0 1px #82b5d9;
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
 }
 
 .global-recent-list button:disabled {

@@ -1153,13 +1153,13 @@ test("blocks locally unrepresentable text, then revalidates through the Core aft
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(width).toHaveFocus();
-  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
   expect(onValidate).not.toHaveBeenCalled();
 
   fireEvent.change(width, { target: { value: "600" } });
   await waitFor(() => expect(onValidate).toHaveBeenCalledOnce());
   await waitFor(() =>
-    expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument(),
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
   );
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
@@ -1189,25 +1189,43 @@ test("shows every Core error, focuses the first field and refreshes errors after
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  expect(await screen.findByText(/altura.*maior que zero/i)).toBeInTheDocument();
-  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
-  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/altura.*maior que zero/i);
+  expect(alert).toHaveTextContent(/DPI inteiro entre 1 e 1\.200/i);
+  expect(alert).toHaveTextContent(/pelo menos 2 Lâminas/i);
   const height = screen.getByRole("textbox", {
     name: "Altura da Lâmina fechada",
   });
-  const tooltip = height.getAttribute("title");
-  expect(tooltip).toContain("altura da Lâmina deve ser maior que zero");
-  expect(tooltip).toContain("DPI inteiro entre 1 e 1.200");
-  expect(tooltip).toContain("pelo menos 2 Lâminas");
+  const descriptionId = height.getAttribute("aria-describedby");
+  expect(descriptionId).toBe(alert.id);
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveAttribute(
-    "title",
-    tooltip,
+    "aria-describedby",
+    descriptionId,
   );
   expect(
     screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
-  ).toHaveAttribute("title", tooltip);
+  ).toHaveAttribute("aria-describedby", descriptionId);
+  expect(height).not.toHaveAttribute("title");
   expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "A altura da Lâmina deve ser maior que zero.",
+  );
   expect(height).toHaveFocus();
+
+  fireEvent.pointerDown(
+    screen.getByRole("heading", { name: "Configurações" }),
+  );
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(height).toHaveAttribute("aria-invalid", "true");
+
+  fireEvent.focus(screen.getByRole("textbox", { name: "DPI" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent(
+    "Informe um DPI inteiro entre 1 e 1.200.",
+  );
+  fireEvent.pointerDown(
+    screen.getByRole("heading", { name: "Configurações" }),
+  );
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
   fireEvent.change(
     screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
@@ -1215,12 +1233,37 @@ test("shows every Core error, focuses the first field and refreshes errors after
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
   await waitFor(() =>
-    expect(screen.queryByText(/altura.*maior que zero/i)).not.toBeInTheDocument(),
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument(),
   );
-  expect(screen.queryByText(/DPI inteiro entre/i)).not.toBeInTheDocument();
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
+});
+
+test("anchors validation to the first invalid field in visual order", async () => {
+  const user = userEvent.setup();
+  const onValidate = vi
+    .fn<() => Promise<ProjectConfigurationValidationOutcome>>()
+    .mockResolvedValue({
+      status: "invalid",
+      errors: ["dpiOutOfRange", "bleedNegative"],
+    });
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={onValidate}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const bleed = screen.getByRole("textbox", { name: "Sangria" });
+  const tooltip = await screen.findByRole("tooltip");
+  expect(bleed).toHaveFocus();
+  expect(tooltip).toHaveTextContent("A Sangria não pode ser negativa.");
+  const summary = tooltip.textContent ?? "";
+  expect(summary.indexOf("Sangria")).toBeLessThan(summary.indexOf("DPI"));
 });
 
 test("preserves errors from untouched fields during live validation", async () => {
@@ -1243,34 +1286,39 @@ test("preserves errors from untouched fields during live validation", async () =
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  expect(
-    await screen.findByText(/DPI inteiro entre 1 e 1\.200/i),
-  ).toBeInTheDocument();
-  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(/DPI inteiro entre 1 e 1\.200/i);
+  expect(alert).toHaveTextContent(/pelo menos 2 Lâminas/i);
 
   fireEvent.change(
     screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
     { target: { value: "250" } },
   );
   await waitFor(() => expect(onValidate).toHaveBeenCalledTimes(2));
-  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
-  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /DPI inteiro entre 1 e 1\.200/i,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
 
   fireEvent.change(
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "600.0001" } },
   );
-  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
-  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
-  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /DPI inteiro entre 1 e 1\.200/i,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
   expect(onValidate).toHaveBeenCalledTimes(2);
 
   await act(async () => {
     liveValidation.resolve({ status: "valid" });
   });
-  expect(screen.getByText(/micrômetros inteiros/i)).toBeInTheDocument();
-  expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
-  expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /DPI inteiro entre 1 e 1\.200/i,
+  );
+  expect(screen.getByRole("alert")).toHaveTextContent(/pelo menos 2 Lâminas/i);
 });
 
 test("ignores a late validation response after a newer edit", async () => {
@@ -1303,12 +1351,12 @@ test("ignores a late validation response after a newer edit", async () => {
       errors: ["sheetWidthNotEven"],
     });
   });
-  expect(screen.getByText(/micrômetros pares/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros pares/i);
 
   await act(async () => {
     first.resolve({ status: "valid" });
   });
-  expect(screen.getByText(/micrômetros pares/i)).toBeInTheDocument();
+  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros pares/i);
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();

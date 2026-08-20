@@ -50,10 +50,10 @@ export type DimensionsErrors = Partial<
 export const DIMENSIONS_FIELD_ORDER: readonly DimensionsFieldName[] = [
   "sheetWidth",
   "sheetHeight",
-  "dpi",
-  "sheetCount",
   "bleed",
   "safety",
+  "sheetCount",
+  "dpi",
 ];
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);

@@ -7,11 +7,15 @@ export { DialogWindowFrame } from "./DialogWindowFrame";
 export { EmptyState } from "./EmptyState";
 export { FailureNotice } from "./FailureNotice";
 export {
-  createFieldValidationTooltip,
+  FieldValidationAutoTooltip,
   FieldValidationTooltip,
   fieldValidationTooltipAttributes,
+  useFieldValidationTooltip,
 } from "./FieldValidationTooltip";
-export type { FieldValidationTooltipModel } from "./FieldValidationTooltip";
+export type {
+  FieldValidationEntry,
+  FieldValidationTooltipModel,
+} from "./FieldValidationTooltip";
 export { InlineNotice } from "./InlineNotice";
 export { MessageDialog } from "./MessageDialog";
 export { OwnedWindowShell } from "./OwnedWindowShell";

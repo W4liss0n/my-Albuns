@@ -57,9 +57,13 @@
 }
 
 .media-tabs button:hover,
+.media-tabs button:focus-visible,
 .media-toolbar-text-button:hover,
+.media-toolbar-text-button:focus-visible,
 .media-search button:hover,
+.media-search button:focus-visible,
 .media-options-button:hover,
+.media-options-button:focus-visible,
 .media-options-button.active {
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);

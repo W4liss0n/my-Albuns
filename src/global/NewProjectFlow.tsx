@@ -38,11 +38,12 @@ import {
 import {
   ActionButton,
   AppIcon,
-  createFieldValidationTooltip,
   FailureNotice,
+  FieldValidationAutoTooltip,
   FieldValidationTooltip,
   fieldValidationTooltipAttributes,
   type FieldValidationTooltipModel,
+  useFieldValidationTooltip,
 } from "../ui";
 import { DimensionsPreview } from "./DimensionsPreview";
 import { PersonalizationStep } from "./PersonalizationStep";
@@ -438,11 +439,12 @@ function ConfigurationStep({
   validationFailure: ProjectLaunchFailure | null;
 }) {
   const validationTooltipId = useId();
-  const validationTooltip = createFieldValidationTooltip(
+  const validationTooltip = useFieldValidationTooltip(
     `${validationTooltipId}-validation-summary`,
-    attempted
-      ? Object.values(errors).flatMap((messages) => messages ?? [])
-      : [],
+    DIMENSIONS_FIELD_ORDER.map((field) => ({
+      field,
+      messages: attempted ? errors[field] : undefined,
+    })),
   );
   const updatePhysical = (field: PhysicalFieldName, text: string) => {
     const validationField =
@@ -488,6 +490,7 @@ function ConfigurationStep({
             <NumericField
               attempted={attempted}
               error={errors.sheetWidth}
+              field="sheetWidth"
               hideLabel
               inputMode="decimal"
               label="Largura da Lâmina fechada"
@@ -503,6 +506,7 @@ function ConfigurationStep({
             <NumericField
               attempted={attempted}
               error={errors.sheetHeight}
+              field="sheetHeight"
               hideLabel
               inputMode="decimal"
               label="Altura da Lâmina fechada"
@@ -520,6 +524,7 @@ function ConfigurationStep({
             <NumericField
               attempted={attempted}
               error={errors.bleed}
+              field="bleed"
               inputMode="decimal"
               label="Sangria"
               onChange={(text) => updatePhysical("bleed", text)}
@@ -531,6 +536,7 @@ function ConfigurationStep({
             <NumericField
               attempted={attempted}
               error={errors.safety}
+              field="safety"
               inputMode="decimal"
               label="Área de segurança"
               onChange={(text) => updatePhysical("safety", text)}
@@ -564,6 +570,7 @@ function ConfigurationStep({
               </span>
             }
             error={errors.sheetCount}
+            field="sheetCount"
             hideLabel
             inputMode="numeric"
             label="Quantidade de Lâminas"
@@ -580,6 +587,7 @@ function ConfigurationStep({
           <NumericField
             attempted={attempted}
             error={errors.dpi}
+            field="dpi"
             hideLabel
             inputMode="numeric"
             label="DPI"
@@ -778,6 +786,7 @@ interface NumericFieldProps {
   attempted: boolean;
   controls?: React.ReactNode;
   error?: readonly string[];
+  field: DimensionsFieldName;
   hideLabel?: boolean;
   inputMode: "decimal" | "numeric";
   label: string;
@@ -793,6 +802,7 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
       attempted,
       controls,
       error,
+      field,
       hideLabel,
       inputMode,
       label,
@@ -825,6 +835,7 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
             type="text"
             value={value}
             {...fieldValidationTooltipAttributes(
+              field,
               visibleErrors?.[0],
               validationTooltip,
             )}
@@ -836,6 +847,10 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
           ) : null}
           {controls}
         </span>
+        <FieldValidationAutoTooltip
+          field={field}
+          tooltip={validationTooltip}
+        />
       </div>
     );
   },

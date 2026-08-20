@@ -29,7 +29,8 @@
   background: var(--ui-surface);
 }
 
-.inspector-section-header:has(.inspector-section-trigger:hover) {
+.inspector-section-header:has(.inspector-section-trigger:hover),
+.inspector-section-header:has(.inspector-section-trigger:focus-visible) {
   background: var(--ui-surface-muted);
 }
 
@@ -187,11 +188,25 @@
 }
 
 .album-information-field {
+  position: relative;
   display: grid;
   min-width: 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-caption);
   gap: var(--ui-space-1);
+}
+
+.inspector-readout-grid
+  > .album-information-field
+  > .ui-field-validation-auto-tooltip {
+  width: calc(200% + var(--ui-space-3));
+}
+
+.inspector-readout-grid
+  > .album-information-field:last-child
+  > .ui-field-validation-auto-tooltip {
+  right: 0;
+  left: auto;
 }
 
 .album-information-form__status {

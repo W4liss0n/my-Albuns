@@ -144,7 +144,7 @@ test("changing Unidade converts presentation without changing physical dimension
   );
 });
 
-test("collapses repeated measurement errors into one hover tooltip", () => {
+test("keeps one grouped validation tooltip open until correction or outside click", async () => {
   renderForm();
 
   fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
@@ -164,13 +164,49 @@ test("collapses repeated measurement errors into one hover tooltip", () => {
 
   const message =
     "Informe uma medida decimal que corresponda a micrômetros inteiros.";
-  expect(screen.getAllByText(message)).toHaveLength(1);
+  expect(screen.getByRole("tooltip")).toHaveTextContent(message);
   expect(screen.getAllByRole("alert")).toHaveLength(1);
+  const descriptionId = screen.getByRole("alert").id;
   for (const [name] of invalidMeasurements) {
-    expect(
-      screen.getByRole("textbox", { name }),
-    ).toHaveAttribute("title", message);
+    const input = screen.getByRole("textbox", { name });
+    expect(input).toHaveAttribute("aria-describedby", descriptionId);
+    expect(input).not.toHaveAttribute("title");
   }
+
+  fireEvent.pointerDown(screen.getByRole("textbox", { name: "Largura" }));
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  fireEvent.pointerDown(screen.getByRole("heading", { name: "Áreas técnicas" }));
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "Largura" })).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+
+  fireEvent.click(screen.getByRole("textbox", { name: "Largura" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent(message);
+  fireEvent.pointerDown(screen.getByRole("heading", { name: "Áreas técnicas" }));
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+  fireEvent.focus(screen.getByRole("textbox", { name: "Altura" }));
+  expect(screen.getByRole("tooltip")).toHaveTextContent(message);
+  fireEvent.pointerDown(screen.getByRole("heading", { name: "Áreas técnicas" }));
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), {
+    target: { value: "23.623" },
+  });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "mm" },
+  });
+  await waitFor(() =>
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument(),
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), {
+    target: { value: "600.0001" },
+  });
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(message);
 });
 
 test("keeps the calculated Page dimension visible when DPI is invalid", () => {

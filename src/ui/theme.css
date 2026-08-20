@@ -62,7 +62,6 @@
   --ui-font-size-control: 12.5px;
   --ui-font-size-heading: 13px;
   --ui-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  --ui-focus-ring-soft: #d9ebf7;
   --ui-panel-surface: #f7f6f2;
 }
 
@@ -97,12 +96,15 @@ select {
 }
 
 button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 0;
+}
+
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
-[tabindex]:focus-visible {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
+textarea:focus-visible {
+  outline: 0;
+  background: var(--ui-surface-muted);
 }
 
 ::selection {

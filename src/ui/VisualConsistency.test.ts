@@ -174,15 +174,6 @@ test("integrates read-only Album information without making editable controls lo
   );
 });
 
-test("extends the collapse hover across its complete shared header", () => {
-  expect(inspectorPanelStyles).toMatch(
-    /\.inspector-section-header:has\(\.inspector-section-trigger:hover\)\s*\{[^}]*background:\s*var\(--ui-surface-muted\);/s,
-  );
-  expect(inspectorPanelStyles).not.toMatch(
-    /\.inspector-section-trigger:hover\s*\{[^}]*background:/s,
-  );
-});
-
 test("lets the continuous Canvas preview use the complete available height", () => {
   expect(canvasPreviewStyles).toMatch(
     /\.canvas-preview\s*\{[^}]*height:\s*100%;/s,

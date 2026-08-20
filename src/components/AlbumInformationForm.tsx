@@ -21,10 +21,11 @@ import {
   type DimensionsErrors,
 } from "../global/application/newProjectDimensions";
 import {
-  createFieldValidationTooltip,
+  FieldValidationAutoTooltip,
   FieldValidationTooltip,
   fieldValidationTooltipAttributes,
   type FieldValidationTooltipModel,
+  useFieldValidationTooltip,
 } from "../ui";
 
 interface AlbumInformationFormProps {
@@ -127,9 +128,15 @@ export function AlbumInformationForm({
     local.errors,
     validationCurrent ? validated.errors : {},
   );
-  const validationTooltip = createFieldValidationTooltip(
+  const validationTooltip = useFieldValidationTooltip(
     `${formId}-validation-summary`,
-    Object.values(errors).flatMap((messages) => messages ?? []),
+    [
+      { field: "dpi", messages: errors.dpi },
+      { field: "sheetWidth", messages: errors.sheetWidth },
+      { field: "sheetHeight", messages: errors.sheetHeight },
+      { field: "bleed", messages: errors.bleed },
+      { field: "safety", messages: errors.safety },
+    ],
   );
   const ready = Boolean(
     candidate &&
@@ -250,6 +257,7 @@ export function AlbumInformationForm({
           />
           <TextField
             error={firstError(errors.dpi)}
+            field="dpi"
             inputMode="numeric"
             label="DPI"
             validationTooltip={validationTooltip}
@@ -262,6 +270,7 @@ export function AlbumInformationForm({
           <div className="inspector-readout-grid">
             <MeasurementField
               error={firstError(errors.sheetWidth)}
+              field="sheetWidth"
               label="Largura"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
@@ -270,6 +279,7 @@ export function AlbumInformationForm({
             />
             <MeasurementField
               error={firstError(errors.sheetHeight)}
+              field="sheetHeight"
               label="Altura"
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
@@ -306,6 +316,7 @@ export function AlbumInformationForm({
         <div className="inspector-readout-grid">
           <MeasurementField
             error={firstError(errors.bleed)}
+            field="bleed"
             label="Sangria"
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
@@ -314,6 +325,7 @@ export function AlbumInformationForm({
           />
           <MeasurementField
             error={firstError(errors.safety)}
+            field="safety"
             label="Área de segurança"
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
@@ -444,6 +456,7 @@ function SelectField({
 
 function TextField({
   error,
+  field,
   inputMode,
   label,
   validationTooltip,
@@ -451,6 +464,7 @@ function TextField({
   onChange,
 }: {
   error?: string;
+  field: string;
   inputMode: "decimal" | "numeric";
   label: string;
   validationTooltip: FieldValidationTooltipModel;
@@ -466,8 +480,16 @@ function TextField({
         inputMode={inputMode}
         type="text"
         value={value}
-        {...fieldValidationTooltipAttributes(error, validationTooltip)}
+        {...fieldValidationTooltipAttributes(
+          field,
+          error,
+          validationTooltip,
+        )}
         onChange={(event) => onChange(event.currentTarget.value)}
+      />
+      <FieldValidationAutoTooltip
+        field={field}
+        tooltip={validationTooltip}
       />
     </label>
   );
@@ -475,6 +497,7 @@ function TextField({
 
 function MeasurementField({
   error,
+  field,
   label,
   unit,
   validationTooltip,
@@ -482,6 +505,7 @@ function MeasurementField({
   onChange,
 }: {
   error?: string;
+  field: string;
   label: string;
   unit: DocumentSnapshot["displayUnit"];
   validationTooltip: FieldValidationTooltipModel;
@@ -498,11 +522,19 @@ function MeasurementField({
           inputMode="decimal"
           type="text"
           value={value}
-          {...fieldValidationTooltipAttributes(error, validationTooltip)}
+          {...fieldValidationTooltipAttributes(
+            field,
+            error,
+            validationTooltip,
+          )}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
         <span aria-hidden="true">{displayUnitLabel(unit)}</span>
       </span>
+      <FieldValidationAutoTooltip
+        field={field}
+        tooltip={validationTooltip}
+      />
     </label>
   );
 }

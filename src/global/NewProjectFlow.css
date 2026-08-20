@@ -244,20 +244,19 @@
 }
 
 .new-project-preset-row:focus-within {
-  border-color: var(--ui-accent);
+  background: var(--ui-surface-muted);
 }
 
 .new-project-preset-row > button:focus-visible {
   outline: 0;
-  background: var(--ui-accent-soft);
+  background: var(--ui-canvas);
 }
 
 .new-project-save-preset > input:focus-visible,
 .new-project-field input:focus-visible,
 .new-project-field select:focus-visible {
-  border-color: var(--ui-accent);
-  outline: 2px solid var(--ui-focus-ring-soft);
-  outline-offset: 0;
+  outline: 0;
+  background: var(--ui-surface-muted);
 }
 
 .new-project-save-preset {
@@ -319,8 +318,15 @@
 }
 
 .new-project-unit-selector button:focus-visible {
-  outline: 2px solid var(--ui-focus-ring-soft);
-  outline-offset: 0;
+  outline: 0;
+}
+
+.new-project-unit-selector button:focus-visible:not([aria-pressed="true"]) {
+  background: var(--ui-canvas);
+}
+
+.new-project-unit-selector button[aria-pressed="true"]:focus-visible {
+  background: var(--ui-surface-muted);
 }
 
 .new-project-size-fields {
@@ -349,6 +355,7 @@
 }
 
 .new-project-field {
+  position: relative;
   display: grid;
   min-width: 0;
   color: var(--ui-text-secondary);
@@ -358,6 +365,24 @@
 
 .new-project-field input[aria-invalid="true"] {
   border-color: var(--ui-danger);
+}
+
+.new-project-size-fields .ui-field-validation-auto-tooltip {
+  width: 222px;
+}
+
+.new-project-size-fields
+  > .new-project-field:last-child
+  > .ui-field-validation-auto-tooltip,
+.new-project-paired-fields
+  > .new-project-field:last-child
+  > .ui-field-validation-auto-tooltip {
+  right: 0;
+  left: auto;
+}
+
+.new-project-paired-fields .ui-field-validation-auto-tooltip {
+  width: calc(200% + 10px);
 }
 
 .new-project-input-shell {
@@ -407,8 +432,8 @@
 }
 
 .new-project-stepper-actions button:focus-visible {
-  outline: 2px solid var(--ui-focus-ring-soft);
-  outline-offset: -1px;
+  outline: 0;
+  background: #efece4;
 }
 
 .new-project-value-group dt,
@@ -501,8 +526,13 @@
 }
 
 .new-project-color-swatches > button[aria-pressed="true"] {
-  outline: 2px solid var(--ui-accent);
+  outline: 2px solid var(--ui-text-secondary);
   outline-offset: 2px;
+}
+
+.new-project-color-swatches > button:focus-visible,
+.new-project-color-picker:focus-within {
+  filter: brightness(0.88);
 }
 
 .new-project-color-picker input {
@@ -576,8 +606,8 @@
 }
 
 .new-project-frame-range-control input[type="range"]:focus-visible::-webkit-slider-thumb {
-  outline: 2px solid var(--ui-accent);
-  outline-offset: 2px;
+  border-color: var(--ui-text-muted);
+  background: var(--ui-surface-muted);
 }
 
 .new-project-frame-range-control input[type="range"]::-moz-range-track {
@@ -593,6 +623,11 @@
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 2px rgb(43 39 33 / 12%);
+}
+
+.new-project-frame-range-control input[type="range"]:focus-visible::-moz-range-thumb {
+  border-color: var(--ui-text-muted);
+  background: var(--ui-surface-muted);
 }
 
 .new-project-color-swatches--frames {

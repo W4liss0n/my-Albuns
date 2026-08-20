@@ -128,8 +128,13 @@
 }
 
 .safe-settings-tabs button[aria-selected="true"] {
-  border-bottom-color: var(--ui-accent);
+  border-bottom-color: var(--ui-text-secondary);
   color: var(--ui-text);
+}
+
+.safe-settings-tabs button:focus-visible {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
 }
 
 .safe-settings-panel {
@@ -208,7 +213,8 @@
   font-size: var(--ui-font-size-control);
 }
 
-.app-menu button:hover {
+.app-menu button:hover,
+.app-menu button:focus-visible {
   color: var(--ui-text);
   background: var(--ui-surface-muted);
 }
@@ -251,8 +257,8 @@
 
 .app-menu-popup button:hover:not(:disabled),
 .app-menu-popup button:focus-visible:not(:disabled) {
-  color: #fff;
-  background: var(--ui-accent);
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
   outline: 0;
 }
 
@@ -260,7 +266,7 @@
 .app-menu-popup button:focus-visible:not(:disabled) .app-menu-shortcut,
 .app-menu-popup button:hover:not(:disabled) .app-menu-cascade,
 .app-menu-popup button:focus-visible:not(:disabled) .app-menu-cascade {
-  color: rgb(255 255 255 / 72%);
+  color: var(--ui-text-muted);
 }
 
 .app-menu-popup button:disabled {
@@ -345,9 +351,12 @@
   transition: background 120ms ease;
 }
 
-.workspace-splitter:hover::after,
-.workspace-splitter:focus-visible::after {
+.workspace-splitter:hover::after {
   background: var(--ui-accent);
+}
+
+.workspace-splitter:focus-visible::after {
+  background: var(--ui-text-secondary);
 }
 
 .inspector-splitter {

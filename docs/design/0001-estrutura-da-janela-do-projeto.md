@@ -23,6 +23,8 @@ A WebView da Janela do Projeto funciona como uma superfície desktop e não exp�
 
 Essa política impede apenas o comportamento padrão da WebView: os eventos continuam chegando aos controles do produto. Assim, atalhos contextuais, menus próprios, Pan com botão do meio e importação por arraste podem usar as mesmas entradas quando forem implementados. Edição de texto, seleção, Clipboard, Undo/Redo e comportamentos da janela fornecidos pelo sistema operacional permanecem disponíveis.
 
+Campos, seletores e ações comuns preservam o foco de teclado por uma mudança neutra e discreta, sem usar o contorno azul como decoração genérica. Esse contorno fica reservado às seleções espaciais da prévia de `Personalização`, das Lâminas e Frames no Canvas, da Grade de Lâminas e das mídias no Painel de imagens.
+
 No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de navegador e o menu de contexto padrão; uma falha nessa configuração impede a abertura da Janela do Projeto. Zoom nativo e ferramentas de desenvolvimento também ficam desabilitados na configuração declarativa da janela. A política DOM cuida somente de navegação por link ou arquivo solto e das ações nativas dos botões auxiliares do mouse. Nenhuma dessas políticas executa comandos do produto ou substitui o registro contextual de comandos e atalhos.
 
 ## Estrutura-base
@@ -415,7 +417,7 @@ Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibi
 
 Dimensões e DPI são confirmados atomicamente em uma única ação de Undo/Redo. A transformação dimensional segue seus limites seguros; a parte de DPI altera a resolução em pixels das representações derivadas e da Exportação sem, por si só, mudar Frames, Pan ou enquadramentos. O resultado permanece não salvo até `Salvar`.
 
-Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. Seus valores também permanecem pendentes até o `Aplicar` de `Informações do Álbum`. Valor inválido permanece sem aplicação, mantém indicação no próprio controle, expõe o Tooltip compartilhado das entradas no hover e bloqueia a ação.
+Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. Seus valores também permanecem pendentes até o `Aplicar` de `Informações do Álbum`. Valor inválido permanece sem aplicação, mantém indicação no próprio controle e bloqueia a ação. Quando o formulário passa a ter erros, o Tooltip compartilhado abre automaticamente e permanece até a correção completa ou um clique fora da entrada que o ancora. Depois de dispensado, somente as bordas vermelhas permanecem. Clicar ou mover o foco do teclado para uma entrada ainda inválida reabre o resumo nessa entrada; hover sozinho não o reabre. Uma nova ocorrência após o formulário voltar a ficar válido também pode abrir outro Tooltip. Sua superfície usa os tons claros de erro da paleta compartilhada, sem inversão escura.
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 

@@ -22,8 +22,8 @@ A criação possui exatamente duas etapas dentro do aplicativo:
 área de conteúdo. A faixa superior compartilhada centraliza as duas etapas no
 espaço disponível à esquerda do controle `Modelo inicial` e mantém esse controle
 alinhado à direita durante todo o fluxo. Quando recebe foco, o controle composto
-usa somente um contorno externo compartilhado; o campo e a ação de salvar não
-desenham bordas de foco adicionais.
+usa somente uma mudança neutra de fundo; o campo e a ação de salvar não
+desenham contorno azul nem bordas de foco adicionais.
 
 ### Configurações
 
@@ -88,7 +88,7 @@ controles, sem repetir essas informações em um card de resumo.
 
 ### Validação
 
-`Continuar` valida todos os campos da etapa `Configurações` e só avança quando o conjunto estiver válido. O controle inválido mantém sua indicação visual e expõe o resumo deduplicado dos problemas em Tooltip no hover e como descrição acessível no foco, sem alterar o layout. O foco é transferido para o primeiro campo inválido.
+`Continuar` valida todos os campos da etapa `Configurações` e só avança quando o conjunto estiver válido. O controle inválido mantém sua indicação visual e o resumo deduplicado permanece como descrição acessível, sem alterar o layout. Quando o formulário passa a ter erros, o Tooltip abre automaticamente no primeiro campo inválido e permanece visível até a correção completa ou um clique fora desse campo. Dispensá-lo mantém as bordas vermelhas. Clicar ou mover o foco do teclado novamente para qualquer campo ainda inválido reabre o resumo ancorado nesse campo; hover sozinho não o reabre. Uma nova ocorrência após o formulário voltar a ficar válido também pode abri-lo. O Tooltip usa os tons claros de erro da paleta compartilhada, sem superfície escura invertida. O foco é transferido para o primeiro campo inválido na ordem visual.
 
 O fluxo não usa um modal genérico para listar erros de preenchimento. Corrigir um campo atualiza seu estado e a prévia imediatamente.
 
