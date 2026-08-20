@@ -167,7 +167,7 @@ export function InspectorPanel({
                   disabled={!informationDirty}
                   form={ALBUM_INFORMATION_FORM_ID}
                   type="submit"
-                  variant={informationDirty ? "secondary" : "quiet"}
+                  variant={informationDirty ? "primary" : "quiet"}
                 >
                   Aplicar
                 </ActionButton>
