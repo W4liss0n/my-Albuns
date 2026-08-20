@@ -26,6 +26,11 @@
   display: flex;
   min-width: 0;
   align-items: center;
+  background: var(--ui-surface);
+}
+
+.inspector-section-header:has(.inspector-section-trigger:hover) {
+  background: var(--ui-surface-muted);
 }
 
 .inspector-section-trigger {
@@ -37,16 +42,12 @@
   padding: 10px var(--inspector-gutter);
   border: 0;
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: transparent;
   font-size: var(--ui-font-size-control);
   font-weight: 600;
   flex: 1;
   gap: 9px;
   text-align: left;
-}
-
-.inspector-section-trigger:hover {
-  background: var(--ui-surface-muted);
 }
 
 .inspector-section-title {
