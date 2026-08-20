@@ -930,12 +930,14 @@ test("uses the current reference layout for the Album context", () => {
   const albumInformation = within(albumInformationSection);
   const albumDesign = within(albumDesignSection);
 
-  expect(albumInformation.getByLabelText("Nome do Projeto")).toHaveTextContent(
-    "Álbum Horizonte",
-  );
-  expect(albumInformation.getByLabelText("Nome do Projeto")).toHaveClass(
-    "inspector-readout--integrated",
-  );
+  expect(albumInformation.queryByText("Projeto")).not.toBeInTheDocument();
+  expect(albumInformation.queryByText("Verificação")).not.toBeInTheDocument();
+  expect(
+    albumInformation.queryByLabelText("Nome do Projeto"),
+  ).not.toBeInTheDocument();
+  expect(
+    albumInformation.queryByText("Frames placeholder"),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Design do Álbum" }),
   ).toHaveAttribute("aria-expanded", "true");
@@ -954,11 +956,11 @@ test("uses the current reference layout for the Album context", () => {
       '[data-placeholder-feature="album-technical-area-settings"]',
     ),
   ).toBeInTheDocument();
-  expect(
-    albumInformationSection.querySelector(
-      '[data-placeholder-feature="album-missing-originals-summary"]',
-    ),
-  ).toHaveTextContent("Não disponível");
+  const compactControls = albumInformationSection.querySelector(
+    ".document-compact-controls",
+  ) as HTMLElement;
+  expect(within(compactControls).getByLabelText("Unidade")).toBeInTheDocument();
+  expect(within(compactControls).getByLabelText("DPI")).toBeInTheDocument();
   expect(albumInformation.getByText("Estrutura")).toBeInTheDocument();
   expect(albumInformation.getByText("Documento")).toBeInTheDocument();
   expect(albumInformation.getByText("Áreas técnicas")).toBeInTheDocument();

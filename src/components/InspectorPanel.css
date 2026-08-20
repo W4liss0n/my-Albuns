@@ -111,10 +111,6 @@
   gap: var(--ui-space-3);
 }
 
-.inspector-readout-grid--summary {
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-}
-
 .inspector-readout-field {
   display: grid;
   min-width: 0;
@@ -145,15 +141,6 @@
   padding: 0;
   border: 0;
   background: transparent;
-}
-
-.inspector-readout--plain {
-  font-family: inherit;
-}
-
-.inspector-readout--blocking {
-  color: var(--ui-danger);
-  font-weight: 600;
 }
 
 .inspector-dimension,
@@ -204,6 +191,13 @@
   font-size: var(--ui-font-size-caption);
   line-height: 1.35;
   grid-column: 1 / -1;
+}
+
+.document-compact-controls {
+  display: grid;
+  align-items: end;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: var(--ui-space-3);
 }
 
 .inspector-subsection {

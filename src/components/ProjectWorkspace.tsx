@@ -211,7 +211,6 @@ export function ProjectWorkspace({
         />
 
         <InspectorPanel
-          projectName={projection.state.projectName}
           selectedFrame={selectedFrame}
           selectedComposedPhoto={selectedComposedPhoto}
           displayedPhotoZoom={displayedPhotoZoom}

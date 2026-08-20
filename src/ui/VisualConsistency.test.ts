@@ -167,7 +167,10 @@ test("integrates read-only Album information without making editable controls lo
     /\.inspector-readout--integrated\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
   );
   expect(inspectorPanelStyles).not.toMatch(
-    /\.album-information \.inspector-readout\s*\{[^}]*border:\s*0;/s,
+    /\.inspector-readout--field-placeholder\s*\{[^}]*border:\s*0;/s,
+  );
+  expect(inspectorPanelStyles).toMatch(
+    /\.document-compact-controls\s*\{[^}]*grid-template-columns:\s*72px minmax\(0, 1fr\);/s,
   );
 });
 

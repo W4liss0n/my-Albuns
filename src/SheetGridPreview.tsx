@@ -81,7 +81,6 @@ export function SheetGridPreview() {
         displayedPhotoZoom={1}
         document={representativeProjection.state.document}
         frameBorder={representativeProjection.composition.frameBorder}
-        projectName={representativeProjection.state.projectName}
         focusedSheetId={focusedSheetId}
         mediaPreviewUrls={previewUrl ? { "media-001": previewUrl } : {}}
         onApplyDpi={async () => undefined}

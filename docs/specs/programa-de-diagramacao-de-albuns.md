@@ -95,7 +95,7 @@ A saída final será uma Exportação JPEG, PNG ou PDF, `Por lâmina` ou `Por p�
 1. Como pessoa diagramadora, quero redimensionar o Painel contextual por um divisor vertical, para equilibrar ferramentas e área de composição.
 1. Como pessoa diagramadora, quero ocultar o Painel contextual, para dedicar toda a largura à composição quando não precisar das ferramentas.
 1. Como pessoa diagramadora, quero um único Painel contextual com seções recolhíveis, para reutilizar o espaço sem abrir janelas auxiliares.
-1. Como pessoa diagramadora, quero encontrar resumo e configurações não visuais em Informações do Álbum e escolhas visuais em Design do Álbum, para localizar cada responsabilidade em um local previsível.
+1. Como pessoa diagramadora, quero encontrar configurações não visuais em Informações do Álbum e escolhas visuais em Design do Álbum, para localizar cada responsabilidade em um local previsível.
 1. Como pessoa diagramadora, quero que selecionar um Frame ou Foto troque o Painel para preview, informações, Design e Ajustes e Efeitos, para editar o elemento no mesmo local.
 1. Como pessoa diagramadora, quero restaurar um slider com dois cliques, para voltar rapidamente ao valor padrão sem ocupar espaço com outro botão.
 
@@ -615,13 +615,10 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Na Grade, clique sem arraste centraliza a Lâmina. Arrastar além do limiar cria espaço reservado, fantasma e deslocamento das células intermediárias segundo a sequência, usando as mesmas validações, cancelamento e Undo/Redo do arraste pela Barra.
 - Durante esse arraste, aproximar o fantasma das bordas superior ou inferior rola verticalmente o contêiner visível da Grade, com velocidade progressiva e atualização contínua do espaço reservado.
 - Somente a superfície que iniciou o arraste mostra a prévia de reordenação. Canvas ou Grade oposto mantém a ordem confirmada e sincroniza de uma vez apenas depois da soltura válida.
-- `Informações do Álbum` reúne o resumo do Projeto e suas configurações globais não visuais: estrutura das extremidades, Unidade, dimensões da Lâmina, DPI, Sangria e segurança.
-- O resumo de consulta apresenta quantidade de Lâminas e Páginas, dimensão calculada da Página e contagens de Frames placeholder ou Arquivos originais ausentes, distinguindo os ausentes em uso.
-- Valores somente de consulta aparecem como texto integrado ao Painel, sem a aparência de campos editáveis. Controles editáveis e configurações ainda não implementadas mantêm a aparência de campo; estas últimas permanecem identificadas como placeholder no código.
+- `Informações do Álbum` reúne somente suas configurações globais não visuais: estrutura das extremidades, Unidade, dimensões da Lâmina e da Página, DPI, Sangria e segurança.
+- Valores calculados somente de consulta aparecem como texto integrado ao Painel, sem a aparência de campos editáveis. Controles editáveis e configurações ainda não implementadas mantêm a aparência de campo; estas últimas permanecem identificadas como placeholder no código.
 - `Dimensão da Lâmina` e `Dimensão da Página` apresentam `Largura` e `Altura` separadamente.
-- Placeholders e originais ausentes em uso são destacados como bloqueios de Exportação; ausentes não usados são apenas aviso.
-- Clicar em placeholders expande a Grade de Lâminas destacando as afetadas. Clicar em originais ausentes abre o Painel de imagens no filtro `Ausentes`, com badges de quantidade nas abas `Fotos` e `Decorativos`.
-- `Ausentes` aberto pelo aviso é uma visualização temporária: guarda aba e filtros anteriores, restaura-os ao ser encerrada e não é persistida como preferência entre sessões.
+- `Unidade` ocupa somente a largura necessária e compartilha a linha de controles compactos com DPI.
 - `Informações do Álbum` organiza configurações em `Estrutura` (configuração das extremidades), `Documento` (Unidade, dimensões da Lâmina e DPI) e `Áreas técnicas` (Sangria e segurança).
 - `Design do Álbum` contém somente `Padrões visuais` (Background e Overlay) e `Padrão dos Frames` (presença, cor e espessura da Borda).
 - `Quantidade de Lâminas` existe somente no diálogo de criação. Depois disso, a quantidade muda apenas como consequência dos comandos explícitos de adicionar ou excluir Lâminas, nunca por um campo global em `Informações do Álbum`.

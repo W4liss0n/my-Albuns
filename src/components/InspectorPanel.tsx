@@ -34,7 +34,6 @@ const PHOTO_ZOOM_KEYS = new Set([
 ]);
 
 export interface InspectorPanelProps {
-  projectName: string;
   selectedFrame: FrameSnapshot | null;
   selectedComposedPhoto: ComposedPhoto | null;
   displayedPhotoZoom: number;
@@ -55,7 +54,6 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
-  projectName,
   selectedFrame,
   selectedComposedPhoto,
   displayedPhotoZoom,
@@ -155,12 +153,13 @@ export function InspectorPanel({
               preferenceKey="album.information"
               defaultOpen
             >
-              <AlbumInformation
-                document={document}
-                onApplyDpi={onApplyDpi}
-                projectName={projectName}
-                sheetStates={sheetStates}
-              />
+              <div className="inspector-subsections">
+                <AlbumProjectSettings
+                  document={document}
+                  onApplyDpi={onApplyDpi}
+                  sheetStates={sheetStates}
+                />
+              </div>
             </InspectorSection>
             <InspectorSection
               accessibleTitle="Design do Álbum"
@@ -294,64 +293,6 @@ function InspectorSection({
   );
 }
 
-function AlbumInformation({
-  document,
-  onApplyDpi,
-  projectName,
-  sheetStates,
-}: {
-  document: DocumentSnapshot;
-  onApplyDpi(dpi: number): void | Promise<void>;
-  projectName: string;
-  sheetStates: readonly SheetSnapshot[];
-}) {
-  const frames = sheetStates.flatMap((sheet) => sheet.frames);
-  const placeholderCount = frames.filter((frame) => frame.photo === null).length;
-  const positionedPhotoCount = frames.length - placeholderCount;
-
-  return (
-    <div className="inspector-subsections album-information">
-      <section className="inspector-subsection">
-        <h3>Projeto</h3>
-        <InspectorReadout label="Nome do Projeto" value={projectName} plain />
-        <div className="inspector-readout-grid inspector-readout-grid--summary">
-          <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
-          <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
-          <InspectorReadout
-            label="Fotos posicionadas"
-            value={String(positionedPhotoCount)}
-          />
-        </div>
-      </section>
-
-      <AlbumProjectSettings
-        document={document}
-        onApplyDpi={onApplyDpi}
-        sheetStates={sheetStates}
-      />
-
-      <section
-        className="inspector-subsection"
-        data-placeholder-feature="album-verification-actions"
-      >
-        <h3>Verificação</h3>
-        <div className="inspector-readout-grid">
-          <InspectorReadout
-            label="Frames placeholder"
-            tone={placeholderCount > 0 ? "blocking" : undefined}
-            value={String(placeholderCount)}
-          />
-          <InspectorReadout
-            label="Originais ausentes"
-            placeholderFeature="album-missing-originals-summary"
-            value="Não disponível"
-          />
-        </div>
-      </section>
-    </div>
-  );
-}
-
 function InspectorDimensionReadout({
   fieldPlaceholder = false,
   heightUm,
@@ -387,23 +328,14 @@ function InspectorDimensionReadout({
 function InspectorReadout({
   fieldPlaceholder = false,
   label,
-  placeholderFeature,
-  plain = false,
-  tone,
   value,
 }: {
   fieldPlaceholder?: boolean;
   label: string;
-  placeholderFeature?: string;
-  plain?: boolean;
-  tone?: "blocking";
   value: string;
 }) {
   return (
-    <div
-      className="inspector-readout-field"
-      data-placeholder-feature={placeholderFeature}
-    >
+    <div className="inspector-readout-field">
       <span>{label}</span>
       <output
         aria-label={label}
@@ -413,8 +345,6 @@ function InspectorReadout({
           fieldPlaceholder
             ? "inspector-readout--field-placeholder"
             : "inspector-readout--integrated",
-          plain ? "inspector-readout--plain" : "",
-          tone ? `inspector-readout--${tone}` : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -457,15 +387,18 @@ function AlbumProjectSettings({
       </section>
       <section className="inspector-subsection">
         <h3>Documento</h3>
-        <div
-          className="inspector-field-stack"
-          data-placeholder-feature="album-document-dimensions"
-        >
+        <div className="document-compact-controls">
           <InspectorReadout
             fieldPlaceholder
             label="Unidade"
             value={document.displayUnit}
           />
+          <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
+        </div>
+        <div
+          className="inspector-field-stack"
+          data-placeholder-feature="album-document-dimensions"
+        >
           <InspectorDimensionReadout
             fieldPlaceholder
             heightUm={document.sheetHeightUm}
@@ -480,7 +413,6 @@ function AlbumProjectSettings({
           unit={document.displayUnit}
           widthUm={document.sheetWidthUm / 2}
         />
-        <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
       </section>
       <section
         className="inspector-subsection"
@@ -702,10 +634,6 @@ function formatMeasurement(
   return `${measurementFormatter.format(
     micrometersToDisplayUnits(micrometers, unit),
   )} ${unit}`;
-}
-
-function pageCount(sheets: readonly SheetSnapshot[]) {
-  return sheets.reduce((total, sheet) => total + sheet.pageNumbers.length, 0);
 }
 
 function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {
