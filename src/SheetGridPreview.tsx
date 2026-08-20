@@ -81,6 +81,7 @@ export function SheetGridPreview() {
         displayedPhotoZoom={1}
         document={representativeProjection.state.document}
         frameBorder={representativeProjection.composition.frameBorder}
+        projectName={representativeProjection.state.projectName}
         focusedSheetId={focusedSheetId}
         mediaPreviewUrls={previewUrl ? { "media-001": previewUrl } : {}}
         onApplyDpi={async () => undefined}
@@ -93,6 +94,7 @@ export function SheetGridPreview() {
         selectedFrame={null}
         sheetStates={sheetStates}
         sheets={sheets}
+        visualDefaults={representativeProjection.state.album.visualDefaults}
         zoomCommitting={false}
       />
     </main>

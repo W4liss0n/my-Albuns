@@ -212,6 +212,7 @@ export function ProjectWorkspace({
         />
 
         <InspectorPanel
+          projectName={projection.state.projectName}
           selectedFrame={selectedFrame}
           selectedComposedPhoto={selectedComposedPhoto}
           displayedPhotoZoom={displayedPhotoZoom}
@@ -222,6 +223,7 @@ export function ProjectWorkspace({
           sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
           frameBorder={projection.composition.frameBorder}
+          visualDefaults={projection.state.album.visualDefaults}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviewUrls={mediaPreviewUrls}
           onBeginPhotoZoom={controller.beginZoomGesture}

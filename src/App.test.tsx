@@ -211,7 +211,11 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     screen.getByRole("menubar", { name: "Menu principal" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
-  expect(screen.getByText("Álbum Horizonte")).toBeInTheDocument();
+  expect(
+    screen.getByText("Álbum Horizonte", {
+      selector: ".ui-application-header__identity strong",
+    }),
+  ).toBeInTheDocument();
   expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
   expect(logEvents).toEqual(
     expect.arrayContaining([

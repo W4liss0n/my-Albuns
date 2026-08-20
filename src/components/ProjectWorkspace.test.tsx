@@ -817,7 +817,11 @@ test("uses the reference chrome and collapsible contextual sections", () => {
   );
 
   expect(screen.getByLabelText("MyAlbuns")).toBeInTheDocument();
-  expect(screen.getByText("Álbum Horizonte")).toBeInTheDocument();
+  expect(
+    screen.getByText("Álbum Horizonte", {
+      selector: ".ui-application-header__identity strong",
+    }),
+  ).toBeInTheDocument();
   expect(screen.getByText("300×300 mm · 1 Lâmina")).toBeInTheDocument();
   expect(screen.queryByText("Intel(R) UHD Graphics")).not.toBeInTheDocument();
   expect(screen.queryByText("revisão 25")).not.toBeInTheDocument();
@@ -883,6 +887,32 @@ test("shows the physical configuration projected from the opened Project", () =>
   );
 });
 
+test("uses the current reference layout for the Album context", () => {
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(screen.getByLabelText("Nome do Projeto")).toHaveTextContent(
+    "Álbum Horizonte",
+  );
+  expect(screen.getByLabelText("Nome do Projeto")).toHaveClass(
+    "inspector-readout",
+  );
+  expect(
+    screen.getByRole("button", { name: "Design do Álbum" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(
+    view.container.querySelector(
+      '[data-placeholder-feature="album-design-visual-defaults"]',
+    ),
+  ).toBeInTheDocument();
+});
+
 test("applies one DPI change and renders the authoritative projection returned by the Project", async () => {
   const initialProjection: EditorProjection = {
     ...projection,
@@ -921,7 +951,12 @@ test("applies one DPI change and renders the authoritative projection returned b
     />,
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Design do Álbum" }));
+  const albumDesign = screen.getByRole("button", {
+    name: "Design do Álbum",
+  });
+  if (albumDesign.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(albumDesign);
+  }
   const input = screen.getByRole("textbox", { name: "DPI" });
   fireEvent.change(input, { target: { value: "600" } });
   expect(apply).not.toHaveBeenCalled();

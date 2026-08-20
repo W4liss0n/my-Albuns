@@ -8,6 +8,7 @@ import type {
   DocumentSnapshot,
   FrameSnapshot,
   ProjectedFrameBorder,
+  ProjectedVisualDefaults,
   SheetSnapshot,
 } from "../domain/project";
 import {
@@ -33,6 +34,7 @@ const PHOTO_ZOOM_KEYS = new Set([
 ]);
 
 export interface InspectorPanelProps {
+  projectName: string;
   selectedFrame: FrameSnapshot | null;
   selectedComposedPhoto: ComposedPhoto | null;
   displayedPhotoZoom: number;
@@ -43,6 +45,7 @@ export interface InspectorPanelProps {
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
   frameBorder: ProjectedFrameBorder;
+  visualDefaults: ProjectedVisualDefaults;
   focusedSheetId: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
   onBeginPhotoZoom(): void;
@@ -53,6 +56,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
+  projectName,
   selectedFrame,
   selectedComposedPhoto,
   displayedPhotoZoom,
@@ -63,6 +67,7 @@ export function InspectorPanel({
   sheetStates,
   sheets,
   frameBorder,
+  visualDefaults,
   focusedSheetId,
   mediaPreviewUrls = {},
   onBeginPhotoZoom,
@@ -152,57 +157,11 @@ export function InspectorPanel({
               preferenceKey="album.information"
               defaultOpen
             >
-              <PropertyRow label="Lâminas" value={String(sheetStates.length)} />
-              <PropertyRow
-                label="Páginas"
-                value={String(pageCount(sheetStates))}
-              />
-              <PropertyRow
-                label="Fotos posicionadas"
-                value={String(photoCount)}
-              />
-              <PropertyRow
-                label="Dimensão da Lâmina"
-                value={formatDimensions(
-                  document.sheetWidthUm,
-                  document.sheetHeightUm,
-                  document.displayUnit,
-                )}
-              />
-              <PropertyRow
-                label="Dimensão da Página"
-                value={formatDimensions(
-                  document.sheetWidthUm / 2,
-                  document.sheetHeightUm,
-                  document.displayUnit,
-                )}
-              />
-              <PropertyRow label="Unidade" value={document.displayUnit} />
-              <PropertyRow
-                label="Resolução"
-                value={`${document.dpi} DPI`}
-              />
-              <PropertyRow
-                label="Primeira Lâmina"
-                value={sheetFormat(sheetStates[0])}
-              />
-              <PropertyRow
-                label="Última Lâmina"
-                value={sheetFormat(sheetStates[sheetStates.length - 1])}
-              />
-              <PropertyRow
-                label="Sangria"
-                value={formatMeasurement(
-                  document.bleedUm,
-                  document.displayUnit,
-                )}
-              />
-              <PropertyRow
-                label="Área de segurança"
-                value={formatMeasurement(
-                  document.safetyUm,
-                  document.displayUnit,
-                )}
+              <AlbumInformation
+                document={document}
+                photoCount={photoCount}
+                projectName={projectName}
+                sheetStates={sheetStates}
               />
             </InspectorSection>
             <InspectorSection
@@ -210,12 +169,19 @@ export function InspectorPanel({
               key="album-design"
               title="Design do Álbum"
               preferenceKey="album.design"
+              defaultOpen
             >
-              <div className="document-settings-group">
-                <h3>Documento</h3>
-                <DocumentDpiControl
-                  dpi={document.dpi}
-                  onApplyDpi={onApplyDpi}
+              <div className="album-design-content">
+                <div className="document-settings-group">
+                  <h3>Documento</h3>
+                  <DocumentDpiControl
+                    dpi={document.dpi}
+                    onApplyDpi={onApplyDpi}
+                  />
+                </div>
+                <AlbumVisualDefaultsPlaceholder
+                  displayUnit={document.displayUnit}
+                  visualDefaults={visualDefaults}
                 />
               </div>
             </InspectorSection>
@@ -337,6 +303,249 @@ function InspectorSection({
       {open && <div className="inspector-section-content">{children}</div>}
     </section>
   );
+}
+
+function AlbumInformation({
+  document,
+  photoCount,
+  projectName,
+  sheetStates,
+}: {
+  document: DocumentSnapshot;
+  photoCount: number;
+  projectName: string;
+  sheetStates: readonly SheetSnapshot[];
+}) {
+  const firstSheet = sheetStates[0];
+  const lastSheet = sheetStates[sheetStates.length - 1];
+  const frames = sheetStates.flatMap((sheet) => sheet.frames);
+  const placeholderCount = frames.filter((frame) => frame.photo === null).length;
+  const positionedPhotoCount = frames.length - placeholderCount;
+
+  return (
+    <div className="inspector-readout-grid">
+      <InspectorReadout label="Nome do Projeto" value={projectName} wide />
+      <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
+      <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
+      <InspectorReadout
+        label="Fotos importadas"
+        value={String(photoCount)}
+      />
+      <InspectorReadout
+        label="Fotos posicionadas"
+        value={String(positionedPhotoCount)}
+      />
+      <InspectorReadout
+        label="Dimensão da Lâmina"
+        value={formatDimensions(
+          document.sheetWidthUm,
+          document.sheetHeightUm,
+          document.displayUnit,
+        )}
+        wide
+      />
+      <InspectorReadout
+        label="Dimensão da Página"
+        value={formatDimensions(
+          document.sheetWidthUm / 2,
+          document.sheetHeightUm,
+          document.displayUnit,
+        )}
+        wide
+      />
+      <InspectorReadout label="Unidade" value={document.displayUnit} />
+      <InspectorReadout label="Resolução" value={`${document.dpi} DPI`} />
+      <InspectorReadout
+        label="Primeira Lâmina"
+        value={sheetFormat(firstSheet)}
+      />
+      <InspectorReadout
+        label="Última Lâmina"
+        value={sheetFormat(lastSheet)}
+      />
+      <InspectorReadout
+        label="Sangria"
+        value={formatMeasurement(document.bleedUm, document.displayUnit)}
+      />
+      <InspectorReadout
+        label="Área de segurança"
+        value={formatMeasurement(document.safetyUm, document.displayUnit)}
+      />
+      <InspectorReadout
+        label="Frames placeholder"
+        value={String(placeholderCount)}
+        wide
+      />
+    </div>
+  );
+}
+
+function InspectorReadout({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string;
+  value: string;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className={
+        wide
+          ? "inspector-readout-field inspector-readout-field--wide"
+          : "inspector-readout-field"
+      }
+    >
+      <span>{label}</span>
+      <output
+        aria-label={label}
+        className="ui-field-control inspector-readout"
+        title={value}
+      >
+        {value}
+      </output>
+    </div>
+  );
+}
+
+function AlbumVisualDefaultsPlaceholder({
+  displayUnit,
+  visualDefaults,
+}: {
+  displayUnit: DocumentSnapshot["displayUnit"];
+  visualDefaults: ProjectedVisualDefaults;
+}) {
+  const hasOverlay =
+    visualDefaults.overlay.scope === "bothSides"
+      ? visualDefaults.overlay.both !== null
+      : visualDefaults.overlay.left !== null ||
+        visualDefaults.overlay.right !== null;
+  const frameBorderEnabled = visualDefaults.frameBorder.kind === "solid";
+
+  return (
+    <div
+      className="album-visual-defaults-placeholder"
+      data-placeholder-feature="album-design-visual-defaults"
+    >
+      <div className="album-design-group">
+        <h3>Padrões visuais</h3>
+        <VisualDefaultPlaceholder
+          currentLabel="atual"
+          label="Background"
+          previewClassName="visual-default-picker__preview--background"
+          previewStyle={backgroundPreviewStyle(visualDefaults.background)}
+          recentLabel="backgrounds recentes"
+        />
+        <VisualDefaultPlaceholder
+          currentLabel={hasOverlay ? "atual" : "sem"}
+          label="Overlay"
+          previewClassName={
+            hasOverlay
+              ? "visual-default-picker__preview--overlay"
+              : "visual-default-picker__preview--none"
+          }
+          recentLabel="overlays recentes"
+        />
+      </div>
+      <div className="album-design-group">
+        <h3>Padrão dos Frames</h3>
+        <span className="album-design-label">Borda padrão</span>
+        <div className="frame-border-placeholder" aria-hidden="true">
+          <span
+            className={
+              frameBorderEnabled
+                ? "frame-border-placeholder__option"
+                : "frame-border-placeholder__option is-current"
+            }
+          >
+            Sem borda
+          </span>
+          <span
+            className={
+              frameBorderEnabled
+                ? "frame-border-placeholder__option is-current"
+                : "frame-border-placeholder__option"
+            }
+          >
+            Com borda
+          </span>
+        </div>
+        {visualDefaults.frameBorder.kind === "solid" && (
+          <div className="frame-border-summary">
+            <span
+              aria-hidden="true"
+              className="frame-border-summary__swatch"
+              style={{ background: visualDefaults.frameBorder.rgb }}
+            />
+            <InspectorReadout
+              label="Espessura"
+              value={formatMeasurement(
+                visualDefaults.frameBorder.widthUm,
+                displayUnit,
+              )}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VisualDefaultPlaceholder({
+  currentLabel,
+  label,
+  previewClassName,
+  previewStyle,
+  recentLabel,
+}: {
+  currentLabel: string;
+  label: string;
+  previewClassName: string;
+  previewStyle?: CSSProperties;
+  recentLabel: string;
+}) {
+  return (
+    <div className="visual-default-field">
+      <span className="album-design-label">{label}</span>
+      <div className="visual-default-picker" aria-hidden="true">
+        <div className="visual-default-picker__current">
+          <span
+            className={`visual-default-picker__preview ${previewClassName}`}
+            style={previewStyle}
+          />
+          <span>{currentLabel}</span>
+        </div>
+        <span className="visual-default-picker__divider" />
+        <div className="visual-default-picker__recent">
+          <div className="visual-default-picker__tiles">
+            <span className="visual-default-picker__tile visual-default-picker__tile--one" />
+            <span className="visual-default-picker__tile visual-default-picker__tile--two" />
+            <span className="visual-default-picker__add">+</span>
+          </div>
+          <span>{recentLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function backgroundPreviewStyle(
+  background: ProjectedVisualDefaults["background"],
+): CSSProperties | undefined {
+  if (background.scope === "bothSides") {
+    return background.both.kind === "color"
+      ? { background: background.both.rgb }
+      : undefined;
+  }
+
+  if (background.left.kind !== "color" || background.right.kind !== "color") {
+    return undefined;
+  }
+
+  return {
+    background: `linear-gradient(90deg, ${background.left.rgb} 0 50%, ${background.right.rgb} 50% 100%)`,
+  };
 }
 
 function PropertyRow({ label, value }: { label: string; value: string }) {
