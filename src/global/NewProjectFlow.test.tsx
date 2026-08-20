@@ -1192,9 +1192,22 @@ test("shows every Core error, focuses the first field and refreshes errors after
   expect(await screen.findByText(/altura.*maior que zero/i)).toBeInTheDocument();
   expect(screen.getByText(/DPI inteiro entre 1 e 1\.200/i)).toBeInTheDocument();
   expect(screen.getByText(/pelo menos 2 Lâminas/i)).toBeInTheDocument();
+  const height = screen.getByRole("textbox", {
+    name: "Altura da Lâmina fechada",
+  });
+  const tooltip = height.getAttribute("title");
+  expect(tooltip).toContain("altura da Lâmina deve ser maior que zero");
+  expect(tooltip).toContain("DPI inteiro entre 1 e 1.200");
+  expect(tooltip).toContain("pelo menos 2 Lâminas");
+  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveAttribute(
+    "title",
+    tooltip,
+  );
   expect(
-    screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),
-  ).toHaveFocus();
+    screen.getByRole("textbox", { name: "Quantidade de Lâminas" }),
+  ).toHaveAttribute("title", tooltip);
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  expect(height).toHaveFocus();
 
   fireEvent.change(
     screen.getByRole("textbox", { name: "Altura da Lâmina fechada" }),

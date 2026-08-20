@@ -194,7 +194,6 @@
   gap: var(--ui-space-1);
 }
 
-.album-information-field__error,
 .album-information-form__status {
   margin: 0;
   color: var(--ui-danger);

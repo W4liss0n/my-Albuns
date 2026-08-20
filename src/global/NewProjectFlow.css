@@ -411,17 +411,6 @@
   outline-offset: -1px;
 }
 
-.new-project-field-error {
-  color: var(--ui-danger);
-  font-size: var(--ui-font-size-caption);
-  line-height: 1.35;
-}
-
-.new-project-field-errors {
-  display: grid;
-  gap: 3px;
-}
-
 .new-project-value-group dt,
 .new-project-native-note {
   color: var(--ui-text-muted);

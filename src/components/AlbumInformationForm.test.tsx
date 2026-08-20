@@ -144,6 +144,35 @@ test("changing Unidade converts presentation without changing physical dimension
   );
 });
 
+test("collapses repeated measurement errors into one hover tooltip", () => {
+  renderForm();
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "in" },
+  });
+  const invalidMeasurements = [
+    ["Largura", "23.621"],
+    ["Altura", "11.812"],
+    ["Sangria", "0.119"],
+    ["Área de segurança", "0.117"],
+  ] as const;
+  for (const [name, value] of invalidMeasurements) {
+    fireEvent.change(screen.getByRole("textbox", { name }), {
+      target: { value },
+    });
+  }
+
+  const message =
+    "Informe uma medida decimal que corresponda a micrômetros inteiros.";
+  expect(screen.getAllByText(message)).toHaveLength(1);
+  expect(screen.getAllByRole("alert")).toHaveLength(1);
+  for (const [name] of invalidMeasurements) {
+    expect(
+      screen.getByRole("textbox", { name }),
+    ).toHaveAttribute("title", message);
+  }
+});
+
 test("keeps the calculated Page dimension visible when DPI is invalid", () => {
   renderForm();
 

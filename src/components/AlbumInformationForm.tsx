@@ -20,6 +20,12 @@ import {
   presentConfigurationValidationErrors,
   type DimensionsErrors,
 } from "../global/application/newProjectDimensions";
+import {
+  createFieldValidationTooltip,
+  FieldValidationTooltip,
+  fieldValidationTooltipAttributes,
+  type FieldValidationTooltipModel,
+} from "../ui";
 
 interface AlbumInformationFormProps {
   document: DocumentSnapshot;
@@ -121,6 +127,10 @@ export function AlbumInformationForm({
     local.errors,
     validationCurrent ? validated.errors : {},
   );
+  const validationTooltip = createFieldValidationTooltip(
+    `${formId}-validation-summary`,
+    Object.values(errors).flatMap((messages) => messages ?? []),
+  );
   const ready = Boolean(
     candidate &&
       dirty &&
@@ -208,6 +218,7 @@ export function AlbumInformationForm({
         void submit();
       }}
     >
+      <FieldValidationTooltip tooltip={validationTooltip} />
       <section className="inspector-subsection">
         <h3>Estrutura</h3>
         <div className="inspector-readout-grid">
@@ -241,6 +252,7 @@ export function AlbumInformationForm({
             error={firstError(errors.dpi)}
             inputMode="numeric"
             label="DPI"
+            validationTooltip={validationTooltip}
             value={draft.dpi}
             onChange={(value) => setField("dpi", value)}
           />
@@ -252,6 +264,7 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetWidth)}
               label="Largura"
               unit={draft.displayUnit}
+              validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
               onChange={(value) => setMeasurement("sheetWidth", value)}
             />
@@ -259,6 +272,7 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetHeight)}
               label="Altura"
               unit={draft.displayUnit}
+              validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
               onChange={(value) => setMeasurement("sheetHeight", value)}
             />
@@ -294,6 +308,7 @@ export function AlbumInformationForm({
             error={firstError(errors.bleed)}
             label="Sangria"
             unit={draft.displayUnit}
+            validationTooltip={validationTooltip}
             value={draft.bleed.text}
             onChange={(value) => setMeasurement("bleed", value)}
           />
@@ -301,6 +316,7 @@ export function AlbumInformationForm({
             error={firstError(errors.safety)}
             label="Área de segurança"
             unit={draft.displayUnit}
+            validationTooltip={validationTooltip}
             value={draft.safety.text}
             onChange={(value) => setMeasurement("safety", value)}
           />
@@ -430,12 +446,14 @@ function TextField({
   error,
   inputMode,
   label,
+  validationTooltip,
   value,
   onChange,
 }: {
   error?: string;
   inputMode: "decimal" | "numeric";
   label: string;
+  validationTooltip: FieldValidationTooltipModel;
   value: string;
   onChange(value: string): void;
 }) {
@@ -443,15 +461,14 @@ function TextField({
     <label className="album-information-field">
       <span>{label}</span>
       <input
-        aria-invalid={Boolean(error)}
         aria-label={label}
         className="ui-field-control"
         inputMode={inputMode}
         type="text"
         value={value}
+        {...fieldValidationTooltipAttributes(error, validationTooltip)}
         onChange={(event) => onChange(event.currentTarget.value)}
       />
-      {error ? <span className="album-information-field__error" role="alert">{error}</span> : null}
     </label>
   );
 }
@@ -460,12 +477,14 @@ function MeasurementField({
   error,
   label,
   unit,
+  validationTooltip,
   value,
   onChange,
 }: {
   error?: string;
   label: string;
   unit: DocumentSnapshot["displayUnit"];
+  validationTooltip: FieldValidationTooltipModel;
   value: string;
   onChange(value: string): void;
 }) {
@@ -474,17 +493,16 @@ function MeasurementField({
       <span>{label}</span>
       <span className="album-measurement-control">
         <input
-          aria-invalid={Boolean(error)}
           aria-label={label}
           className="ui-field-control"
           inputMode="decimal"
           type="text"
           value={value}
+          {...fieldValidationTooltipAttributes(error, validationTooltip)}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
         <span aria-hidden="true">{displayUnitLabel(unit)}</span>
       </span>
-      {error ? <span className="album-information-field__error" role="alert">{error}</span> : null}
     </label>
   );
 }

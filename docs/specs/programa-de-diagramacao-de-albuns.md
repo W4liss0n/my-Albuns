@@ -510,7 +510,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A etapa não apresenta card de aviso sobre a abrangência ou a alteração posterior das medidas.
 - A Predefinição é apresentada como `Modelo inicial` e continua sendo um placeholder de interface enquanto não possuir contrato de aplicação e persistência. As opções incorporadas ou salvas guardam `Configurações` e `Personalização` somente durante a sessão atual e permanecem marcadas no código como `PLACEHOLDER UI`.
 - `Continuar` valida todos os campos de `Configurações` e só avança quando o conjunto estiver válido.
-- Erros aparecem junto aos respectivos campos e o foco vai para o primeiro inválido; o fluxo não abre um modal genérico de validação.
+- Toda entrada inválida mantém indicação visual no próprio controle e expõe sua mensagem em Tooltip no hover e como descrição acessível no foco, sem ocupar espaço no layout. Mensagens iguais simultâneas no mesmo formulário são deduplicadas em um único resumo compartilhado. Em `Novo Projeto`, o foco vai para o primeiro campo inválido e o fluxo não abre um modal genérico de validação.
 - `Personalização` contém Background padrão, Overlay padrão e Padrão dos Frames.
 - Background e Overlay permitem `Escolher imagem...` pelo seletor nativo do Windows. A seleção permanece provisória e só é vinculada à aba `Decorativos` depois que a criação for concluída com sucesso.
 - Cancelar o fluxo não importa ou copia imagens provisórias nem altera seus arquivos originais.
@@ -625,7 +625,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Estrutura` contém somente `Primeira Lâmina` e `Última Lâmina`, cada uma com as opções independentes `Lâmina dupla` e `Página única`. O `Aplicar` de `Informações do Álbum` apresenta o impacto antes de confirmar as conversões.
 - Em `Documento`, trocar Unidade converte imediatamente somente os valores exibidos. Largura, altura e DPI permanecem pendentes até o `Aplicar` de `Informações do Álbum`, que apresenta tamanho físico e resolução finais e confirma todas as alterações não visuais atomicamente em uma ação de Undo/Redo.
 - A transformação de largura e altura respeita os limites dimensionais seguros; a mudança de DPI recalcula a resolução em pixels das representações derivadas e da Exportação sem, isoladamente, alterar geometria, Pan ou enquadramentos.
-- `Áreas técnicas` apresenta Sangria e segurança na Unidade do Projeto. Os valores permanecem pendentes até o `Aplicar` de `Informações do Álbum`; valor inválido mostra erro inline e bloqueia a aplicação.
+- `Áreas técnicas` apresenta Sangria e segurança na Unidade do Projeto. Os valores permanecem pendentes até o `Aplicar` de `Informações do Álbum`; valor inválido segue o Tooltip compartilhado das entradas e bloqueia a aplicação.
 - `Padrões visuais` começa com uma miniatura do padrão global, não de uma Lâmina específica. Hover e clique selecionam esquerda, direita ou Ambos os lados pela região central; Background e Overlay abaixo atuam no escopo escolhido.
 - Clicar no preview de Background ou Overlay abre um seletor compacto com somente os Decorativos já importados no Projeto. Escolher um item altera somente o draft visual até o `Aplicar` de `Design do Álbum`.
 - Esse seletor não aceita arraste nem importa arquivos; novos Decorativos continuam sendo importados exclusivamente pelo Painel de imagens.

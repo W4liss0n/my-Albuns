@@ -35,7 +35,15 @@ import {
   createBuiltInProjectPresets,
   type NewProjectPreset,
 } from "./application/newProjectPresets";
-import { ActionButton, AppIcon, FailureNotice } from "../ui";
+import {
+  ActionButton,
+  AppIcon,
+  createFieldValidationTooltip,
+  FailureNotice,
+  FieldValidationTooltip,
+  fieldValidationTooltipAttributes,
+  type FieldValidationTooltipModel,
+} from "../ui";
 import { DimensionsPreview } from "./DimensionsPreview";
 import { PersonalizationStep } from "./PersonalizationStep";
 import "./NewProjectFlow.css";
@@ -429,6 +437,13 @@ function ConfigurationStep({
   ): void;
   validationFailure: ProjectLaunchFailure | null;
 }) {
+  const validationTooltipId = useId();
+  const validationTooltip = createFieldValidationTooltip(
+    `${validationTooltipId}-validation-summary`,
+    attempted
+      ? Object.values(errors).flatMap((messages) => messages ?? [])
+      : [],
+  );
   const updatePhysical = (field: PhysicalFieldName, text: string) => {
     const validationField =
       field === "closedSheetWidth" ? "sheetWidth" : field;
@@ -451,6 +466,7 @@ function ConfigurationStep({
 
   return (
     <div className="new-project-content new-project-dimensions">
+      <FieldValidationTooltip tooltip={validationTooltip} />
       <DimensionsPreview draft={draft} />
       <div className="new-project-dimensions-controls">
         <ControlSection title="Unidade">
@@ -478,6 +494,7 @@ function ConfigurationStep({
               onChange={(text) => updatePhysical("closedSheetWidth", text)}
               ref={registerField("sheetWidth")}
               suffix={displayUnitLabel(draft.displayUnit)}
+              validationTooltip={validationTooltip}
               value={draft.closedSheetWidth.text}
             />
             <span aria-hidden="true" className="new-project-size-separator">
@@ -492,6 +509,7 @@ function ConfigurationStep({
               onChange={(text) => updatePhysical("sheetHeight", text)}
               ref={registerField("sheetHeight")}
               suffix={displayUnitLabel(draft.displayUnit)}
+              validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
             />
           </div>
@@ -507,6 +525,7 @@ function ConfigurationStep({
               onChange={(text) => updatePhysical("bleed", text)}
               ref={registerField("bleed")}
               suffix={displayUnitLabel(draft.displayUnit)}
+              validationTooltip={validationTooltip}
               value={draft.bleed.text}
             />
             <NumericField
@@ -517,6 +536,7 @@ function ConfigurationStep({
               onChange={(text) => updatePhysical("safety", text)}
               ref={registerField("safety")}
               suffix={displayUnitLabel(draft.displayUnit)}
+              validationTooltip={validationTooltip}
               value={draft.safety.text}
             />
           </div>
@@ -551,6 +571,7 @@ function ConfigurationStep({
               onChange({ ...draft, sheetCountText }, ["sheetCount"])
             }
             ref={registerField("sheetCount")}
+            validationTooltip={validationTooltip}
             value={draft.sheetCountText}
           />
         </ControlSection>
@@ -567,6 +588,7 @@ function ConfigurationStep({
             }
             ref={registerField("dpi")}
             suffix="DPI"
+            validationTooltip={validationTooltip}
             value={draft.dpiText}
           />
         </ControlSection>
@@ -761,6 +783,7 @@ interface NumericFieldProps {
   label: string;
   onChange(value: string): void;
   suffix?: string;
+  validationTooltip: FieldValidationTooltipModel;
   value: string;
 }
 
@@ -775,12 +798,12 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
       label,
       onChange,
       suffix,
+      validationTooltip,
       value,
     },
     ref,
   ) {
     const inputId = useId();
-    const errorId = `${inputId}-error`;
     const visibleErrors = attempted ? error : undefined;
     const hasControls = Boolean(controls);
     return (
@@ -795,14 +818,16 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
           className={`new-project-input-shell${suffix ? " new-project-input-shell--suffix" : ""}${hasControls ? " new-project-input-shell--controlled" : ""}`}
         >
           <input
-            aria-describedby={visibleErrors?.length ? errorId : undefined}
-            aria-invalid={visibleErrors?.length ? true : undefined}
             inputMode={inputMode}
             id={inputId}
             onChange={(event) => onChange(event.target.value)}
             ref={ref}
             type="text"
             value={value}
+            {...fieldValidationTooltipAttributes(
+              visibleErrors?.[0],
+              validationTooltip,
+            )}
           />
           {suffix ? (
             <span aria-hidden="true" className="new-project-input-suffix">
@@ -811,18 +836,6 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
           ) : null}
           {controls}
         </span>
-        {visibleErrors?.length ? (
-          <span className="new-project-field-errors" id={errorId}>
-            {visibleErrors.map((message, index) => (
-              <small
-                className="new-project-field-error"
-                key={`${message}-${index}`}
-              >
-                {message}
-              </small>
-            ))}
-          </span>
-        ) : null}
       </div>
     );
   },

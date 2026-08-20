@@ -88,7 +88,7 @@ controles, sem repetir essas informações em um card de resumo.
 
 ### Validação
 
-`Continuar` valida todos os campos da etapa `Configurações` e só avança quando o conjunto estiver válido. Cada problema aparece em texto junto ao campo correspondente, e o foco é transferido para o primeiro campo inválido.
+`Continuar` valida todos os campos da etapa `Configurações` e só avança quando o conjunto estiver válido. O controle inválido mantém sua indicação visual e expõe o resumo deduplicado dos problemas em Tooltip no hover e como descrição acessível no foco, sem alterar o layout. O foco é transferido para o primeiro campo inválido.
 
 O fluxo não usa um modal genérico para listar erros de preenchimento. Corrigir um campo atualiza seu estado e a prévia imediatamente.
 

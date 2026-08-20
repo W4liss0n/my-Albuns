@@ -415,7 +415,7 @@ Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibi
 
 Dimensões e DPI são confirmados atomicamente em uma única ação de Undo/Redo. A transformação dimensional segue seus limites seguros; a parte de DPI altera a resolução em pixels das representações derivadas e da Exportação sem, por si só, mudar Frames, Pan ou enquadramentos. O resultado permanece não salvo até `Salvar`.
 
-Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. Seus valores também permanecem pendentes até o `Aplicar` de `Informações do Álbum`. Valor inválido permanece sem aplicação, apresenta o erro no próprio campo e bloqueia a ação.
+Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Projeto. Seus valores também permanecem pendentes até o `Aplicar` de `Informações do Álbum`. Valor inválido permanece sem aplicação, mantém indicação no próprio controle, expõe o Tooltip compartilhado das entradas no hover e bloqueia a ação.
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 
