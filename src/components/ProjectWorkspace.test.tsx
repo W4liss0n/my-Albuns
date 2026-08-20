@@ -921,14 +921,24 @@ test("uses the current reference layout for the Album context", () => {
     />,
   );
 
-  const albumInformationSection = screen
-    .getByRole("button", { name: "Informações do Álbum" })
+  const albumInformationTrigger = screen.getByRole("button", {
+    name: "Informações do Álbum",
+  });
+  const albumInformationSection = albumInformationTrigger
     .closest("section") as HTMLElement;
-  const albumDesignSection = screen
-    .getByRole("button", { name: "Design do Álbum" })
+  const albumDesignTrigger = screen.getByRole("button", {
+    name: "Design do Álbum",
+  });
+  const albumDesignSection = albumDesignTrigger
     .closest("section") as HTMLElement;
   const albumInformation = within(albumInformationSection);
   const albumDesign = within(albumDesignSection);
+  const albumInformationApply = albumInformation.getByRole("button", {
+    name: "Aplicar",
+  });
+  const albumDesignApply = albumDesign.getByRole("button", {
+    name: "Aplicar",
+  });
 
   expect(albumInformation.queryByText("Projeto")).not.toBeInTheDocument();
   expect(albumInformation.queryByText("Verificação")).not.toBeInTheDocument();
@@ -961,10 +971,14 @@ test("uses the current reference layout for the Album context", () => {
   ) as HTMLElement;
   expect(within(compactControls).getByLabelText("Unidade")).toBeInTheDocument();
   expect(within(compactControls).getByLabelText("DPI")).toBeInTheDocument();
-  expect(
-    albumInformation.getByRole("button", { name: "Aplicar" }),
-  ).toBeDisabled();
-  expect(albumDesign.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+  expect(albumInformationApply).toBeDisabled();
+  expect(albumDesignApply).toBeDisabled();
+  expect(albumInformationApply.closest(".inspector-section-header")).toContainElement(
+    albumInformationTrigger,
+  );
+  expect(albumDesignApply.closest(".inspector-section-header")).toContainElement(
+    albumDesignTrigger,
+  );
   expect(
     albumDesignSection.querySelector(
       '[data-placeholder-feature="album-design-apply"]',

@@ -632,7 +632,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - `Padrão dos Frames` mostra uma prévia simples, `Exibir borda`, cor e espessura na Unidade do Projeto. Suas alterações permanecem no mesmo draft visual.
 - Opacidade não integra o padrão global e permanece disponível somente no contexto individual do Frame.
 - Configurações globais futuras entram em `Informações do Álbum` quando alteram estrutura, documento ou áreas técnicas, e em `Design do Álbum` quando alteram a aparência. Ajustes exclusivos de uma Lâmina ou elemento permanecem fora de ambas.
-- `Informações do Álbum` e `Design do Álbum` terminam, cada um, com seu próprio botão `Aplicar`. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente o draft visual. Cada aplicação válida cria uma única ação de Undo/Redo.
+- `Informações do Álbum` e `Design do Álbum` possuem, cada um, seu próprio botão `Aplicar` integrado ao cabeçalho da seção, sem reservar um rodapé vazio. Sem alterações, a ação é discreta e desabilitada; somente um draft válido a destaca e habilita. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente o draft visual. Cada aplicação válida cria uma única ação de Undo/Redo.
 - O botão `Aplicar` não é um comando de salvamento. Mudanças estruturais ou dimensionais ainda exigem validação e confirmação do impacto antes da aplicação.
 - Aplicar uma configuração nunca persiste o arquivo automaticamente. O Projeto continua com alterações pendentes até o comando manual `Salvar`.
 - No Modo de edição, a ausência de seleção de Frame ou Foto troca esse conteúdo por `Design da Lâmina` no Painel contextual direito.

@@ -409,7 +409,7 @@ Novas configurações globais devem ser incorporadas a `Informações do Álbum`
 
 `Quantidade de Lâminas` é um campo exclusivo do diálogo de criação e não aparece como configuração editável em `Informações do Álbum`. Depois da criação, adicionar ou excluir Lâminas continua sendo uma ação estrutural explícita do editor, não a alteração de um valor global.
 
-`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` no fim de `Informações do Álbum` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
+`Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` de `Informações do Álbum` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
 
 Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibidos, sem alterar tamanho físico ou pixels. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
 
@@ -419,7 +419,7 @@ Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Proje
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 
-Clicar no preview de imagem de Background ou Overlay abre um seletor compacto contendo somente os Decorativos já importados no Projeto. Escolher um item atualiza somente o draft visual até o `Aplicar` no fim de `Design do Álbum`.
+Clicar no preview de imagem de Background ou Overlay abre um seletor compacto contendo somente os Decorativos já importados no Projeto. Escolher um item atualiza somente o draft visual até o `Aplicar` de `Design do Álbum`.
 
 O seletor não importa arquivos e não aceita arraste. A importação de novos Decorativos permanece exclusivamente no Painel de imagens.
 
@@ -427,7 +427,7 @@ O seletor não importa arquivos e não aceita arraste. A importação de novos D
 
 Opacidade não pertence ao padrão global e não aparece nesse grupo; ela permanece no contexto individual de Frame.
 
-`Informações do Álbum` e `Design do Álbum` possuem, cada um, um único botão `Aplicar` ao final do conteúdo. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente Background, Overlay e padrão dos Frames. Cada ação válida entra no Projeto como uma única operação de Undo/Redo.
+`Informações do Álbum` e `Design do Álbum` possuem, cada um, um único botão `Aplicar` integrado ao cabeçalho da seção. Assim, a ação não cria um rodapé com espaço vazio. Sem alterações, usa a variante discreta e permanece desabilitada; um draft válido a torna destacada e acionável. O primeiro confirma conjuntamente as alterações não visuais; o segundo confirma conjuntamente Background, Overlay e padrão dos Frames. Cada ação válida entra no Projeto como uma única operação de Undo/Redo.
 
 `Aplicar` não salva o arquivo. Mudanças estruturais ou dimensionais continuam sujeitas a pré-validação e confirmação do impacto antes de entrarem atomicamente no Projeto.
 

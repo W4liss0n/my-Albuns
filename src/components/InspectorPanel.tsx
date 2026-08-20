@@ -150,6 +150,17 @@ export function InspectorPanel({
         ) : (
           <>
             <InspectorSection
+              action={
+                <ActionButton
+                  density="compact"
+                  disabled={!informationDirty}
+                  form={ALBUM_INFORMATION_FORM_ID}
+                  type="submit"
+                  variant={informationDirty ? "primary" : "quiet"}
+                >
+                  Aplicar
+                </ActionButton>
+              }
               accessibleTitle="Informações do Álbum"
               key="album-information"
               title="Informações do Álbum"
@@ -164,20 +175,19 @@ export function InspectorPanel({
                   onDirtyChange={setInformationDirty}
                   sheetStates={sheetStates}
                 />
-                <div className="album-section-actions">
-                  <ActionButton
-                    density="compact"
-                    form={ALBUM_INFORMATION_FORM_ID}
-                    type="submit"
-                    variant="primary"
-                    disabled={!informationDirty}
-                  >
-                    Aplicar
-                  </ActionButton>
-                </div>
               </div>
             </InspectorSection>
             <InspectorSection
+              action={
+                <ActionButton
+                  data-placeholder-feature="album-design-apply"
+                  density="compact"
+                  disabled
+                  variant="quiet"
+                >
+                  Aplicar
+                </ActionButton>
+              }
               accessibleTitle="Design do Álbum"
               key="album-design"
               title="Design do Álbum"
@@ -261,6 +271,7 @@ export function InspectorPanel({
 }
 
 function InspectorSection({
+  action,
   accessibleTitle,
   title,
   preferenceKey,
@@ -268,6 +279,7 @@ function InspectorSection({
   defaultOpen = false,
   children,
 }: {
+  action?: ReactNode;
   accessibleTitle?: string;
   title: string;
   preferenceKey: string;
@@ -289,21 +301,24 @@ function InspectorSection({
 
   return (
     <section className="inspector-section">
-      <button
-        aria-label={accessibleTitle}
-        type="button"
-        className="inspector-section-trigger"
-        aria-expanded={open}
-        onClick={toggle}
-      >
-        <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
-        <span className="inspector-section-title">{title}</span>
-        {meta !== undefined && (
-          <span aria-hidden="true" className="inspector-section-meta">
-            {meta}
-          </span>
-        )}
-      </button>
+      <div className="inspector-section-header">
+        <button
+          aria-label={accessibleTitle}
+          type="button"
+          className="inspector-section-trigger"
+          aria-expanded={open}
+          onClick={toggle}
+        >
+          <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
+          <span className="inspector-section-title">{title}</span>
+          {meta !== undefined && (
+            <span aria-hidden="true" className="inspector-section-meta">
+              {meta}
+            </span>
+          )}
+        </button>
+        {action && <div className="inspector-section-action">{action}</div>}
+      </div>
       {open && <div className="inspector-section-content">{children}</div>}
     </section>
   );
@@ -532,14 +547,6 @@ function AlbumVisualDefaultsPlaceholder({
           </div>
         )}
       </section>
-      <div
-        className="album-section-actions"
-        data-placeholder-feature="album-design-apply"
-      >
-        <ActionButton density="compact" disabled variant="primary">
-          Aplicar
-        </ActionButton>
-      </div>
     </div>
   );
 }
