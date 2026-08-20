@@ -149,7 +149,7 @@ recalibrados por medições posteriores sem alterar o comportamento documental.
 
 Cada Lâmina possui uma barra própria sobreposta aos 40 px superiores de sua superfície, sem reservar espaço adicional nem alterar a escala automática do Canvas. Ela acompanha a largura visual da Lâmina, mantém altura e tipografia constantes na tela independentemente da escala e nunca aparece na Exportação.
 
-Fora do hover, a Barra permanece visualmente oculta. Ao entrar na Lâmina, ela aparece como uma superfície clara translúcida com opacidade de `0,55`, separador inferior discreto, Numeração de Página centralizada em cada lado ativo, ações compactas e o número da Lâmina alinhado à direita. Entrar na própria Barra eleva suavemente sua opacidade para `1`, e cada ação escurece individualmente sob o ponteiro; sair da Barra retorna a `0,55`, enquanto sair da Lâmina volta a ocultá-la sem alterar foco ou seleção.
+A transição de visibilidade da Barra segue a especificação canônica. Sua paleta usa fundo neutro quente mais escuro que as superfícies claras, divisor definido e texto e controles em tons escuros; assim, o estado translúcido continua legível sem perder a diferença para o hover direto. A Numeração de Página fica centralizada em cada lado ativo, com ações compactas e o número da Lâmina alinhado à direita.
 
 A Barra e o Painel de Layouts pertencem exclusivamente ao Canvas contínuo do modo normal. Ambos ficam ausentes e indisponíveis no Modo de edição da Lâmina.
 

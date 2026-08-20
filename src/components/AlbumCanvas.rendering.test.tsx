@@ -536,14 +536,14 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     "placeholder-sheet-bar-layout-sheet-001",
   );
   expect(swapAction).toMatchObject({
-    alpha: 0.45,
+    alpha: 0.8,
     eventMode: "static",
-    tint: 0x6d675d,
+    tint: 0x403b35,
   });
   expect(layoutAction).toMatchObject({
-    alpha: 0.45,
+    alpha: 0.8,
     eventMode: "static",
-    tint: 0x6d675d,
+    tint: 0x403b35,
   });
   expect(
     screen.getByRole("button", {
@@ -581,7 +581,7 @@ test("materializes the integrated Sheet Bar instead of a loose sheet label", asy
     action.emit("pointerenter", {});
     expect(action).toMatchObject({ alpha: 1, tint: 0x2c2924 });
     action.emit("pointerleave", {});
-    expect(action).toMatchObject({ alpha: 0.45, tint: 0x6d675d });
+    expect(action).toMatchObject({ alpha: 0.8, tint: 0x403b35 });
   }
 
   sheetBar.emit("pointerleave", {});
