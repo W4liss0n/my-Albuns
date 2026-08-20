@@ -326,13 +326,15 @@ function InspectorSection({
         aria-expanded={open}
         onClick={toggle}
       >
-        <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
         <span className="inspector-section-title">{title}</span>
         {meta !== undefined && (
           <span aria-hidden="true" className="inspector-section-meta">
             {meta}
           </span>
         )}
+        <span aria-hidden="true" className="inspector-section-chevron">
+          <AppIcon icon={open ? ChevronDown : ChevronRight} size={12} />
+        </span>
       </button>
       {open && <div className="inspector-section-content">{children}</div>}
     </section>

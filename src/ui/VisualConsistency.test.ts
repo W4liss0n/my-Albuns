@@ -137,7 +137,7 @@ test("matches the compact sheet grid instead of using generic cards", () => {
     "--ui-shadow-thumbnail: 0 1px 2px rgb(60 54 44 / 10%);",
   );
   expect(inspectorPanelStyles).toMatch(
-    /\.sheet-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s,
+    /\.sheet-grid\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fill, minmax\(80px, 1fr\)\);/s,
   );
   expect(inspectorPanelStyles).toMatch(
     /\.sheet-tile\s*\{[^}]*position:\s*relative;[^}]*padding:\s*0;[^}]*overflow:\s*hidden;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*aspect-ratio:\s*2;/s,
