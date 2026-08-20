@@ -635,14 +635,25 @@ function backgroundVisualState(
 function overlayVisualState(
   overlay: ProjectedVisualDefaults["overlay"],
 ): { label: string; previewClassName: string } {
-  if (overlay.scope === "bothSides" && overlay.both === null) {
+  if (overlay.scope === "bothSides") {
+    return overlay.both === null
+      ? {
+          label: "sem",
+          previewClassName: "visual-default-picker__preview--none",
+        }
+      : {
+          label: "imagem",
+          previewClassName: "visual-default-picker__preview--overlay",
+        };
+  }
+  if (overlay.left === null && overlay.right === null) {
     return {
       label: "sem",
       previewClassName: "visual-default-picker__preview--none",
     };
   }
   return {
-    label: overlay.scope === "bothSides" ? "imagem" : "por lado",
+    label: "por lado",
     previewClassName: "visual-default-picker__preview--overlay",
   };
 }

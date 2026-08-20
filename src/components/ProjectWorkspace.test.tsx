@@ -936,6 +936,41 @@ test("uses the current reference layout for the Album context", () => {
   expect(screen.getByText("cor")).toBeInTheDocument();
 });
 
+test("presents an empty per-side Overlay as absent", () => {
+  const projectionWithoutOverlay: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          overlay: { scope: "perSide", left: null, right: null },
+        },
+      },
+    },
+  };
+
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithoutOverlay}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => projectionWithoutOverlay,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const visualDefaults = view.container.querySelector(
+    '[data-placeholder-feature="album-design-visual-defaults"]',
+  ) as HTMLElement;
+  expect(within(visualDefaults).getByText("sem")).toBeInTheDocument();
+  expect(
+    visualDefaults.querySelector(".visual-default-picker__preview--none"),
+  ).toBeInTheDocument();
+});
+
 test("applies one DPI change and renders the authoritative projection returned by the Project", async () => {
   const initialProjection: EditorProjection = {
     ...projection,
