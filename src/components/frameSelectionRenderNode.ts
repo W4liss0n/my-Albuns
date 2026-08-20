@@ -34,10 +34,11 @@ export function createFrameSelectionRenderNode(
   const outline = new Graphics()
     .rect(0, 0, width, height)
     .stroke({
-      alignment: 0,
+      alignment: 0.5,
       color: pixiColor(style.outline),
       width: style.outlineWidthPx,
       alpha: style.outlineOpacity,
+      pixelLine: true,
     });
   outline.label = `frame-selection-${frameId}`;
   outline.eventMode = "none";

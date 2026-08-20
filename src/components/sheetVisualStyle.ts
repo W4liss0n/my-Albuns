@@ -77,7 +77,7 @@ export const SHEET_VISUAL_STYLE = {
   frameSelection: {
     outline: "#2f7fba",
     outlineOpacity: 1,
-    outlineWidthPx: 2,
+    outlineWidthPx: 1,
     handleFill: "#ffffff",
     handleOutline: "#2f7fba",
     handleOutlineWidthPx: 1,

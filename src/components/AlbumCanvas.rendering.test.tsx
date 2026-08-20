@@ -254,9 +254,10 @@ test("shows the selected Frame boundary and eight visual-only resize handles in 
     rectCommands: [{ height: 200, width: 300, x: 0, y: 0 }],
     strokeStyles: [
       expect.objectContaining({
-        alignment: 0,
+        alignment: 0.5,
         color: 0x2f7fba,
-        width: 2,
+        pixelLine: true,
+        width: 1,
       }),
     ],
     visible: true,

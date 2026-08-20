@@ -747,7 +747,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Undo/Redo remove da seleção qualquer Frame que deixe de existir, preserva os selecionados ainda válidos e nunca seleciona automaticamente um Frame restaurado.
 - Em uma sobreposição, clique simples e `Ctrl` + clique atingem somente o Frame mais acima na Pilha visual; não existe gesto adicional para percorrer Frames encobertos.
 - Um clique em área vazia limpa a Seleção de Frames. A primeira versão não possui Caixa de seleção de Frames.
-- Na seleção múltipla, os contornos individuais permanecem visíveis e uma Caixa delimitadora única envolve o conjunto.
+- Os contornos da Seleção de Frames são linhas técnicas azuis de `1 px` constante na tela, centralizadas exatamente na geometria de cada Frame; as alças permanecem centradas nessa mesma linha. Na seleção múltipla, os contornos individuais permanecem visíveis e uma Caixa delimitadora única envolve o conjunto.
 - Arrastar qualquer Frame selecionado move todos os selecionados como grupo e preserva suas distâncias relativas.
 - A Caixa delimitadora possui oito alças: laterais escalam somente um eixo; cantos escalam largura e altura independentemente.
 - O lado ou canto oposto à alça permanece como âncora, e posições e dimensões de todos os Frames são escaladas proporcionalmente dentro da Caixa.

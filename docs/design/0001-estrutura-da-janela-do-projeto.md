@@ -221,7 +221,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - Clicar em uma área vazia limpa a seleção. A primeira versão não oferece Caixa de seleção de Frames.
 - A Seleção de Frames é temporária da sessão de edição: não altera o Projeto, não participa de Undo/Redo e não é salva.
 - Depois de Undo ou Redo, Frames selecionados que deixaram de existir são retirados da seleção; restaurar um Frame não o seleciona novamente.
-- Na seleção múltipla, cada Frame mantém seu contorno de seleção e uma Caixa delimitadora única envolve o conjunto.
+- O contorno da Seleção de Frames usa uma linha técnica azul de `1 px` constante na tela, centralizada exatamente na geometria do Frame, com as alças centradas nessa mesma linha. Na seleção múltipla, cada Frame mantém seu contorno de seleção e uma Caixa delimitadora única envolve o conjunto.
 - Arrastar o corpo de qualquer Frame selecionado move todos os selecionados juntos, preservando suas distâncias relativas.
 - A Caixa delimitadora possui oito alças: quatro laterais, que escalam somente um eixo, e quatro nos cantos, que escalam largura e altura de forma independente.
 - Durante o redimensionamento, o lado ou canto oposto permanece como âncora e as posições e dimensões de todos os Frames são escaladas proporcionalmente dentro da Caixa.
