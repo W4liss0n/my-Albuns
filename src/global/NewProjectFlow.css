@@ -377,6 +377,9 @@
 .new-project-paired-fields
   > .new-project-field:last-child
   > .ui-field-validation-auto-tooltip {
+  --ui-field-validation-pointer-inline-start: auto;
+  --ui-field-validation-pointer-inline-end: 14px;
+
   right: 0;
   left: auto;
 }

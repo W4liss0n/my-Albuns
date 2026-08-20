@@ -11,15 +11,18 @@
 }
 
 .ui-field-validation-auto-tooltip {
+  --ui-field-validation-pointer-inline-start: 14px;
+  --ui-field-validation-pointer-inline-end: auto;
+
   position: absolute;
   z-index: 40;
   top: calc(100% + var(--ui-space-1));
   right: 0;
   left: 0;
   display: block;
-  padding: var(--ui-space-2);
+  padding: var(--ui-space-2) 10px;
   border: 1px solid var(--ui-danger-border);
-  border-radius: var(--ui-radius-small);
+  border-radius: var(--ui-radius);
   color: var(--ui-danger-text);
   background: var(--ui-danger-soft);
   box-shadow: var(--ui-shadow-toolbar);
@@ -27,6 +30,21 @@
   line-height: 1.35;
   pointer-events: none;
   white-space: pre-line;
+}
+
+.ui-field-validation-auto-tooltip::before {
+  position: absolute;
+  top: -5px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--ui-danger-border);
+  border-right: 0;
+  border-bottom: 0;
+  background: var(--ui-danger-soft);
+  content: "";
+  inset-inline-start: var(--ui-field-validation-pointer-inline-start);
+  inset-inline-end: var(--ui-field-validation-pointer-inline-end);
+  transform: rotate(45deg);
 }
 
 .ui-app-icon {
