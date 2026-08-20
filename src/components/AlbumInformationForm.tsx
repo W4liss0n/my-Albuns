@@ -220,6 +220,10 @@ export function AlbumInformationForm({
     }));
   }
 
+  function measurementResetAction(key: MeasurementDraftKey) {
+    return measurementChanged(key) ? () => resetMeasurement(key) : undefined;
+  }
+
   function changeUnit(unit: DocumentSnapshot["displayUnit"]) {
     setDraft((current) => {
       if (unit === current.displayUnit) return current;
@@ -307,11 +311,7 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
-              onReset={
-                measurementChanged("sheetWidth")
-                  ? () => resetMeasurement("sheetWidth")
-                  : undefined
-              }
+              onReset={measurementResetAction("sheetWidth")}
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
@@ -321,11 +321,7 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
-              onReset={
-                measurementChanged("sheetHeight")
-                  ? () => resetMeasurement("sheetHeight")
-                  : undefined
-              }
+              onReset={measurementResetAction("sheetHeight")}
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
@@ -363,11 +359,7 @@ export function AlbumInformationForm({
             error={firstError(errors.bleed)}
             field="bleed"
             label="Sangria"
-            onReset={
-              measurementChanged("bleed")
-                ? () => resetMeasurement("bleed")
-                : undefined
-            }
+            onReset={measurementResetAction("bleed")}
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
             value={draft.bleed.text}
@@ -377,11 +369,7 @@ export function AlbumInformationForm({
             error={firstError(errors.safety)}
             field="safety"
             label="Área de segurança"
-            onReset={
-              measurementChanged("safety")
-                ? () => resetMeasurement("safety")
-                : undefined
-            }
+            onReset={measurementResetAction("safety")}
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
             value={draft.safety.text}
