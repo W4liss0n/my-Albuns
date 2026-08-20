@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
 import type {
   AlbumInformation,
@@ -21,6 +22,7 @@ import {
   type DimensionsErrors,
 } from "../global/application/newProjectDimensions";
 import {
+  AppIcon,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
   fieldValidationTooltipAttributes,
@@ -53,6 +55,12 @@ interface AlbumInformationDraft {
   firstSheet: EndSheetFormat;
   lastSheet: EndSheetFormat;
 }
+
+type MeasurementDraftKey =
+  | "sheetWidth"
+  | "sheetHeight"
+  | "bleed"
+  | "safety";
 
 const UNIT_OPTIONS = [
   { value: "mm", label: "mm" },
@@ -177,7 +185,7 @@ export function AlbumInformationForm({
   }
 
   function setMeasurement(
-    key: "sheetWidth" | "sheetHeight" | "bleed" | "safety",
+    key: MeasurementDraftKey,
     text: string,
   ) {
     setDraft((current) => ({
@@ -185,6 +193,28 @@ export function AlbumInformationForm({
       [key]: editPhysicalFieldDraft(
         current[key],
         text,
+        current.displayUnit,
+      ),
+    }));
+  }
+
+  function measurementChanged(key: MeasurementDraftKey) {
+    const original = createPhysicalFieldDraft(
+      baseline[key].valueUm,
+      draft.displayUnit,
+    );
+    return (
+      draft[key].text !== original.text ||
+      draft[key].hasExactValue !== original.hasExactValue ||
+      draft[key].valueUm !== original.valueUm
+    );
+  }
+
+  function resetMeasurement(key: MeasurementDraftKey) {
+    setDraft((current) => ({
+      ...current,
+      [key]: createPhysicalFieldDraft(
+        baseline[key].valueUm,
         current.displayUnit,
       ),
     }));
@@ -260,6 +290,11 @@ export function AlbumInformationForm({
             field="dpi"
             inputMode="numeric"
             label="DPI"
+            onReset={
+              draft.dpi === baseline.dpi
+                ? undefined
+                : () => setField("dpi", baseline.dpi)
+            }
             validationTooltip={validationTooltip}
             value={draft.dpi}
             onChange={(value) => setField("dpi", value)}
@@ -272,6 +307,11 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetWidth)}
               field="sheetWidth"
               label="Largura"
+              onReset={
+                measurementChanged("sheetWidth")
+                  ? () => resetMeasurement("sheetWidth")
+                  : undefined
+              }
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetWidth.text}
@@ -281,6 +321,11 @@ export function AlbumInformationForm({
               error={firstError(errors.sheetHeight)}
               field="sheetHeight"
               label="Altura"
+              onReset={
+                measurementChanged("sheetHeight")
+                  ? () => resetMeasurement("sheetHeight")
+                  : undefined
+              }
               unit={draft.displayUnit}
               validationTooltip={validationTooltip}
               value={draft.sheetHeight.text}
@@ -318,6 +363,11 @@ export function AlbumInformationForm({
             error={firstError(errors.bleed)}
             field="bleed"
             label="Sangria"
+            onReset={
+              measurementChanged("bleed")
+                ? () => resetMeasurement("bleed")
+                : undefined
+            }
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
             value={draft.bleed.text}
@@ -327,6 +377,11 @@ export function AlbumInformationForm({
             error={firstError(errors.safety)}
             field="safety"
             label="Área de segurança"
+            onReset={
+              measurementChanged("safety")
+                ? () => resetMeasurement("safety")
+                : undefined
+            }
             unit={draft.displayUnit}
             validationTooltip={validationTooltip}
             value={draft.safety.text}
@@ -459,6 +514,7 @@ function TextField({
   field,
   inputMode,
   label,
+  onReset,
   validationTooltip,
   value,
   onChange,
@@ -467,31 +523,37 @@ function TextField({
   field: string;
   inputMode: "decimal" | "numeric";
   label: string;
+  onReset?: () => void;
   validationTooltip: FieldValidationTooltipModel;
   value: string;
   onChange(value: string): void;
 }) {
+  const inputId = `album-information-${field}`;
   return (
-    <label className="album-information-field">
-      <span>{label}</span>
-      <input
-        aria-label={label}
-        className="ui-field-control"
-        inputMode={inputMode}
-        type="text"
-        value={value}
-        {...fieldValidationTooltipAttributes(
-          field,
-          error,
-          validationTooltip,
-        )}
-        onChange={(event) => onChange(event.currentTarget.value)}
-      />
+    <div className="album-information-field">
+      <label htmlFor={inputId}>{label}</label>
+      <span className="album-entry-control">
+        <input
+          aria-label={label}
+          className="ui-field-control"
+          id={inputId}
+          inputMode={inputMode}
+          type="text"
+          value={value}
+          {...fieldValidationTooltipAttributes(
+            field,
+            error,
+            validationTooltip,
+          )}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+        {onReset ? <FieldResetButton label={label} onReset={onReset} /> : null}
+      </span>
       <FieldValidationAutoTooltip
         field={field}
         tooltip={validationTooltip}
       />
-    </label>
+    </div>
   );
 }
 
@@ -499,6 +561,7 @@ function MeasurementField({
   error,
   field,
   label,
+  onReset,
   unit,
   validationTooltip,
   value,
@@ -507,18 +570,21 @@ function MeasurementField({
   error?: string;
   field: string;
   label: string;
+  onReset?: () => void;
   unit: DocumentSnapshot["displayUnit"];
   validationTooltip: FieldValidationTooltipModel;
   value: string;
   onChange(value: string): void;
 }) {
+  const inputId = `album-information-${field}`;
   return (
-    <label className="album-information-field">
-      <span>{label}</span>
-      <span className="album-measurement-control">
+    <div className="album-information-field">
+      <label htmlFor={inputId}>{label}</label>
+      <span className="album-entry-control album-measurement-control">
         <input
           aria-label={label}
           className="ui-field-control"
+          id={inputId}
           inputMode="decimal"
           type="text"
           value={value}
@@ -529,13 +595,34 @@ function MeasurementField({
           )}
           onChange={(event) => onChange(event.currentTarget.value)}
         />
+        {onReset ? <FieldResetButton label={label} onReset={onReset} /> : null}
         <span aria-hidden="true">{displayUnitLabel(unit)}</span>
       </span>
       <FieldValidationAutoTooltip
         field={field}
         tooltip={validationTooltip}
       />
-    </label>
+    </div>
+  );
+}
+
+function FieldResetButton({
+  label,
+  onReset,
+}: {
+  label: string;
+  onReset(): void;
+}) {
+  return (
+    <button
+      aria-label={`Restaurar ${label}`}
+      className="album-entry-reset"
+      type="button"
+      onClick={onReset}
+      onPointerDown={(event) => event.preventDefault()}
+    >
+      <AppIcon icon={X} size={12} />
+    </button>
   );
 }
 

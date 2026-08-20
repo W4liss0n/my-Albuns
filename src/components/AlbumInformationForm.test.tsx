@@ -105,6 +105,50 @@ test("edits every Album information field and submits one complete candidate", a
   );
 });
 
+test("restores edited entries to their last applied values", () => {
+  renderForm();
+
+  expect(
+    screen.queryAllByRole("button", { name: /^Restaurar / }),
+  ).toHaveLength(0);
+
+  const dpi = screen.getByRole("textbox", { name: "DPI" });
+  fireEvent.change(dpi, { target: { value: "240" } });
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar DPI" }));
+  expect(dpi).toHaveValue("300");
+  expect(
+    screen.queryByRole("button", { name: "Restaurar DPI" }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "cm" },
+  });
+  const width = screen.getByRole("textbox", { name: "Largura" });
+  expect(width).toHaveValue("60");
+  expect(
+    screen.queryByRole("button", { name: "Restaurar Largura" }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.change(width, { target: { value: "70" } });
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar Largura" }));
+  expect(width).toHaveValue("60");
+  expect(
+    screen.queryByRole("button", { name: "Restaurar Largura" }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "in" },
+  });
+  expect(width).toHaveValue("23.622");
+  fireEvent.change(width, { target: { value: "23.621" } });
+  fireEvent.change(width, { target: { value: "23.622" } });
+  expect(
+    screen.getByRole("button", { name: "Restaurar Largura" }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Restaurar Largura" }));
+  expect(width).toHaveValue("23.622");
+});
+
 test("changing Unidade converts presentation without changing physical dimensions", async () => {
   const { onValidate } = renderForm();
 
