@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
@@ -870,19 +871,25 @@ test("shows the physical configuration projected from the opened Project", () =>
     />,
   );
 
-  expect(screen.getByText("Dimensão da Lâmina").parentElement).toHaveTextContent(
+  const albumInformation = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+
+  expect(albumInformation.getByText("Dimensão da Lâmina").parentElement).toHaveTextContent(
     "50,8 × 25,4 cm",
   );
-  expect(screen.getByText("Dimensão da Página").parentElement).toHaveTextContent(
+  expect(albumInformation.getByText("Dimensão da Página").parentElement).toHaveTextContent(
     "25,4 × 25,4 cm",
   );
-  expect(screen.getByText("Resolução").parentElement).toHaveTextContent(
+  expect(albumInformation.getByText("Resolução").parentElement).toHaveTextContent(
     "240 DPI",
   );
-  expect(screen.getByText("Sangria").parentElement).toHaveTextContent(
+  expect(albumInformation.getByText("Sangria").parentElement).toHaveTextContent(
     "0,25 cm",
   );
-  expect(screen.getByText("Área de segurança").parentElement).toHaveTextContent(
+  expect(albumInformation.getByText("Área de segurança").parentElement).toHaveTextContent(
     "0,5 cm",
   );
 });
@@ -911,6 +918,22 @@ test("uses the current reference layout for the Album context", () => {
       '[data-placeholder-feature="album-design-visual-defaults"]',
     ),
   ).toBeInTheDocument();
+  expect(
+    view.container.querySelector(
+      '[data-placeholder-feature="album-end-sheet-settings"]',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    view.container.querySelector(
+      '[data-placeholder-feature="album-technical-area-settings"]',
+    ),
+  ).toBeInTheDocument();
+  expect(
+    view.container.querySelector(
+      '[data-placeholder-feature="album-missing-originals-summary"]',
+    ),
+  ).toHaveTextContent("Não disponível");
+  expect(screen.getByText("cor")).toBeInTheDocument();
 });
 
 test("applies one DPI change and renders the authoritative projection returned by the Project", async () => {
@@ -979,7 +1002,12 @@ test("applies one DPI change and renders the authoritative projection returned b
     />,
   );
 
-  expect(screen.getByText("Resolução").parentElement).toHaveTextContent(
+  const albumInformation = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  expect(albumInformation.getByText("Resolução").parentElement).toHaveTextContent(
     "600 DPI",
   );
   expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");

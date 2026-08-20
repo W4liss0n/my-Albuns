@@ -134,8 +134,13 @@
   white-space: nowrap;
 }
 
-.inspector-readout-grid > :first-child .inspector-readout {
+.inspector-readout--plain {
   font-family: inherit;
+}
+
+.inspector-readout--blocking {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
 }
 
 .album-design-content {
@@ -143,12 +148,6 @@
   gap: var(--ui-space-4);
 }
 
-.document-settings-group {
-  display: grid;
-  gap: var(--ui-space-3);
-}
-
-.document-settings-group h3,
 .album-design-group h3 {
   margin: 0;
   color: var(--ui-text-secondary);
@@ -194,6 +193,11 @@
   gap: var(--ui-space-3);
 }
 
+.album-design-content > .album-design-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .album-design-label,
 .visual-default-field {
   min-width: 0;
@@ -210,6 +214,12 @@
 }
 
 .visual-default-picker {
+  --visual-default-light-hatch: repeating-linear-gradient(
+    45deg,
+    #e2ddd3 0 6px,
+    #d6d0c3 6px 12px
+  );
+
   display: flex;
   min-width: 0;
   align-items: stretch;
@@ -226,7 +236,7 @@
   flex: none;
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
-  font-size: 9px;
+  font-size: var(--ui-font-size-micro);
   gap: var(--ui-space-1);
   text-align: center;
 }
@@ -237,7 +247,7 @@
   display: block;
   min-width: 0;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 5px;
+  border-radius: var(--ui-radius-small);
   aspect-ratio: 1;
 }
 
@@ -246,11 +256,7 @@
 }
 
 .visual-default-picker__preview--background {
-  background: repeating-linear-gradient(
-    45deg,
-    #e2ddd3 0 6px,
-    #d6d0c3 6px 12px
-  );
+  background: var(--visual-default-light-hatch);
 }
 
 .visual-default-picker__preview--overlay {
@@ -279,7 +285,7 @@
   color: var(--ui-text-muted);
   flex: 1;
   font-family: var(--ui-font-mono);
-  font-size: 9px;
+  font-size: var(--ui-font-size-micro);
   gap: var(--ui-space-1);
 }
 
@@ -294,15 +300,11 @@
   flex: 1;
 }
 
-.visual-default-picker__tile--one {
-  background: repeating-linear-gradient(
-    45deg,
-    #e2ddd3 0 6px,
-    #d6d0c3 6px 12px
-  );
+.visual-default-picker__tile--light-hatch {
+  background: var(--visual-default-light-hatch);
 }
 
-.visual-default-picker__tile--two {
+.visual-default-picker__tile--dark-hatch {
   background: repeating-linear-gradient(
     135deg,
     #cfc9bd 0 6px,
@@ -315,7 +317,7 @@
   border-style: dashed;
   color: var(--ui-text-muted);
   background: var(--ui-surface-raised);
-  font-size: 16px;
+  font-size: var(--ui-font-size-heading);
   font-weight: 300;
   place-items: center;
 }

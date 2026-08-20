@@ -172,13 +172,11 @@ export function InspectorPanel({
               defaultOpen
             >
               <div className="album-design-content">
-                <div className="document-settings-group">
-                  <h3>Documento</h3>
-                  <DocumentDpiControl
-                    dpi={document.dpi}
-                    onApplyDpi={onApplyDpi}
-                  />
-                </div>
+                <AlbumProjectSettings
+                  document={document}
+                  onApplyDpi={onApplyDpi}
+                  sheetStates={sheetStates}
+                />
                 <AlbumVisualDefaultsPlaceholder
                   displayUnit={document.displayUnit}
                   visualDefaults={visualDefaults}
@@ -324,7 +322,7 @@ function AlbumInformation({
 
   return (
     <div className="inspector-readout-grid">
-      <InspectorReadout label="Nome do Projeto" value={projectName} wide />
+      <InspectorReadout label="Nome do Projeto" value={projectName} plain wide />
       <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
       <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
       <InspectorReadout
@@ -373,8 +371,13 @@ function AlbumInformation({
       />
       <InspectorReadout
         label="Frames placeholder"
+        tone={placeholderCount > 0 ? "blocking" : undefined}
         value={String(placeholderCount)}
-        wide
+      />
+      <InspectorReadout
+        label="Originais ausentes"
+        placeholderFeature="album-missing-originals-summary"
+        value="Não disponível"
       />
     </div>
   );
@@ -382,10 +385,16 @@ function AlbumInformation({
 
 function InspectorReadout({
   label,
+  placeholderFeature,
+  plain = false,
+  tone,
   value,
   wide = false,
 }: {
   label: string;
+  placeholderFeature?: string;
+  plain?: boolean;
+  tone?: "blocking";
   value: string;
   wide?: boolean;
 }) {
@@ -396,16 +405,89 @@ function InspectorReadout({
           ? "inspector-readout-field inspector-readout-field--wide"
           : "inspector-readout-field"
       }
+      data-placeholder-feature={placeholderFeature}
     >
       <span>{label}</span>
       <output
         aria-label={label}
-        className="ui-field-control inspector-readout"
+        className={[
+          "ui-field-control",
+          "inspector-readout",
+          plain ? "inspector-readout--plain" : "",
+          tone ? `inspector-readout--${tone}` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         title={value}
       >
         {value}
       </output>
     </div>
+  );
+}
+
+function AlbumProjectSettings({
+  document,
+  onApplyDpi,
+  sheetStates,
+}: {
+  document: DocumentSnapshot;
+  onApplyDpi(dpi: number): void | Promise<void>;
+  sheetStates: readonly SheetSnapshot[];
+}) {
+  return (
+    <>
+      <div
+        className="album-design-group"
+        data-placeholder-feature="album-end-sheet-settings"
+      >
+        <h3>Estrutura</h3>
+        <div className="inspector-readout-grid">
+          <InspectorReadout
+            label="Primeira Lâmina"
+            value={sheetFormat(sheetStates[0])}
+          />
+          <InspectorReadout
+            label="Última Lâmina"
+            value={sheetFormat(sheetStates[sheetStates.length - 1])}
+          />
+        </div>
+      </div>
+      <div className="album-design-group">
+        <h3>Documento</h3>
+        <div
+          className="inspector-readout-grid"
+          data-placeholder-feature="album-document-dimensions"
+        >
+          <InspectorReadout label="Unidade" value={document.displayUnit} />
+          <InspectorReadout
+            label="Dimensão da Lâmina"
+            value={formatDimensions(
+              document.sheetWidthUm,
+              document.sheetHeightUm,
+              document.displayUnit,
+            )}
+          />
+        </div>
+        <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
+      </div>
+      <div
+        className="album-design-group"
+        data-placeholder-feature="album-technical-area-settings"
+      >
+        <h3>Áreas técnicas</h3>
+        <div className="inspector-readout-grid">
+          <InspectorReadout
+            label="Sangria"
+            value={formatMeasurement(document.bleedUm, document.displayUnit)}
+          />
+          <InspectorReadout
+            label="Área de segurança"
+            value={formatMeasurement(document.safetyUm, document.displayUnit)}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -431,14 +513,14 @@ function AlbumVisualDefaultsPlaceholder({
       <div className="album-design-group">
         <h3>Padrões visuais</h3>
         <VisualDefaultPlaceholder
-          currentLabel="atual"
+          currentLabel={backgroundContentLabel(visualDefaults.background)}
           label="Background"
           previewClassName="visual-default-picker__preview--background"
           previewStyle={backgroundPreviewStyle(visualDefaults.background)}
           recentLabel="backgrounds recentes"
         />
         <VisualDefaultPlaceholder
-          currentLabel={hasOverlay ? "atual" : "sem"}
+          currentLabel={overlayContentLabel(visualDefaults.overlay)}
           label="Overlay"
           previewClassName={
             hasOverlay
@@ -519,8 +601,8 @@ function VisualDefaultPlaceholder({
         <span className="visual-default-picker__divider" />
         <div className="visual-default-picker__recent">
           <div className="visual-default-picker__tiles">
-            <span className="visual-default-picker__tile visual-default-picker__tile--one" />
-            <span className="visual-default-picker__tile visual-default-picker__tile--two" />
+            <span className="visual-default-picker__tile visual-default-picker__tile--light-hatch" />
+            <span className="visual-default-picker__tile visual-default-picker__tile--dark-hatch" />
             <span className="visual-default-picker__add">+</span>
           </div>
           <span>{recentLabel}</span>
@@ -546,6 +628,18 @@ function backgroundPreviewStyle(
   return {
     background: `linear-gradient(90deg, ${background.left.rgb} 0 50%, ${background.right.rgb} 50% 100%)`,
   };
+}
+
+function backgroundContentLabel(
+  background: ProjectedVisualDefaults["background"],
+) {
+  if (background.scope === "perSide") return "por lado";
+  return background.both.kind === "color" ? "cor" : "imagem";
+}
+
+function overlayContentLabel(overlay: ProjectedVisualDefaults["overlay"]) {
+  if (overlay.scope === "perSide") return "por lado";
+  return overlay.both === null ? "sem" : "imagem";
 }
 
 function PropertyRow({ label, value }: { label: string; value: string }) {
