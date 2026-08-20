@@ -64,13 +64,15 @@ export function useProjectEditorController({
     const editedSheetId =
       canvasMode.kind === "sheet-editing" ? canvasMode.sheetId : null;
     navigation.selectFrame(null);
-    setCanvasMode({ kind: "normal" });
     if (editedSheetId) {
-      navigation.centerSheetOnNextCanvasMetrics(editedSheetId);
+      navigation.focusSheet(editedSheetId);
+      navigation.centerSheet(editedSheetId);
     }
+    setCanvasMode({ kind: "normal" });
   }, [
     canvasMode,
-    navigation.centerSheetOnNextCanvasMetrics,
+    navigation.centerSheet,
+    navigation.focusSheet,
     navigation.selectFrame,
   ]);
 

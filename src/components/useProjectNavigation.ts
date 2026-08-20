@@ -93,19 +93,6 @@ export function useProjectNavigation(projection: EditorProjection) {
     [centerCanvasOnSheet, centerSheet],
   );
 
-  const centerSheetOnNextCanvasMetrics = useCallback(
-    (sheetId: string) => {
-      const sheetExists = projection.composition.sheets.some(
-        (sheet) => sheet.sheetId === sheetId,
-      );
-      if (!sheetExists) return;
-
-      pendingSheetNavigationRef.current = sheetId;
-      focusSheet(sheetId);
-    },
-    [focusSheet, projection.composition.sheets],
-  );
-
   const navigateToSheet = useCallback(
     (sheetId: string) => {
       const sheetExists = projection.composition.sheets.some(
@@ -151,6 +138,5 @@ export function useProjectNavigation(projection: EditorProjection) {
     setViewport,
     handleCanvasMetricsChange,
     navigateToSheet,
-    centerSheetOnNextCanvasMetrics,
   };
 }

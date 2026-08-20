@@ -135,7 +135,6 @@ export function CanvasPreview() {
     [],
   );
   const centeredOnce = useRef(false);
-  const pendingCenteredSheetId = useRef<string | null>(null);
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
   const [centeredSheetId, setCenteredSheetId] = useState("sheet-002");
@@ -169,8 +168,8 @@ export function CanvasPreview() {
   );
   const exitSheetEditing = useCallback(() => {
     if (mode.kind === "sheet-editing") {
-      pendingCenteredSheetId.current = mode.sheetId;
       setFocusedSheetId(mode.sheetId);
+      setCenteredSheetId(mode.sheetId);
     }
     setSelectedFrameId(null);
     setMode({ kind: "normal" });
@@ -203,13 +202,6 @@ export function CanvasPreview() {
         onTransformPreview={() => undefined}
         onTransformCommit={async () => true}
         onCanvasMetricsChange={(metrics) => {
-          const pendingSheetId = pendingCenteredSheetId.current;
-          if (pendingSheetId) {
-            pendingCenteredSheetId.current = null;
-            centeredOnce.current = true;
-            centerPreviewOnSheet(pendingSheetId, metrics);
-            return;
-          }
           if (centeredOnce.current) return;
           centeredOnce.current = true;
           centerPreviewOnSheet("sheet-002", metrics);

@@ -119,7 +119,7 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
   });
 });
 
-test("reports fresh Canvas metrics after leaving Sheet Edit Mode", async () => {
+test("centers the edited Sheet in the first normal Canvas update", async () => {
   const onCanvasMetricsChange = vi.fn();
   const layout = createContinuousCanvasLayout(
     threeSheetComposition.sheets,
@@ -137,6 +137,7 @@ test("reports fresh Canvas metrics after leaving Sheet Edit Mode", async () => {
     mode:
       | { kind: "normal" }
       | { kind: "sheet-editing"; sheetId: string },
+    centeredSheetId: string,
   ) => (
     <AlbumCanvas
       projectId="project-spike-001"
@@ -146,7 +147,7 @@ test("reports fresh Canvas metrics after leaving Sheet Edit Mode", async () => {
       continuousCanvasLayout={layout}
       selectedFrameId={null}
       focusedSheetId="sheet-002"
-      centeredSheetId="sheet-002"
+      centeredSheetId={centeredSheetId}
       viewport={{ offsetX: 42 }}
       onCanvasMetricsChange={onCanvasMetricsChange}
       {...callbacks}
@@ -154,13 +155,33 @@ test("reports fresh Canvas metrics after leaving Sheet Edit Mode", async () => {
   );
 
   const view = render(
-    canvas({ kind: "sheet-editing", sheetId: "sheet-002" }),
+    canvas({ kind: "sheet-editing", sheetId: "sheet-003" }, "sheet-002"),
   );
   await finishPixiInitialization();
   onCanvasMetricsChange.mockClear();
+  callbacks.onViewportChange.mockClear();
+  const host = document.querySelector(".canvas-host") as HTMLElement;
+  Object.defineProperty(host, "clientHeight", {
+    configurable: true,
+    value: 400,
+  });
 
-  view.rerender(canvas({ kind: "normal" }));
+  view.rerender(canvas({ kind: "normal" }, "sheet-003"));
 
+  const app = pixiLifecycle.instances[0];
+  const world = app.stage.children[0] as {
+    position: { x: number };
+  };
+  const expectedScale = continuousCanvasScale(400, 300);
+  const expectedOffset = layout.centeredOffset(
+    "sheet-003",
+    expectedScale,
+    app.screen.width,
+  );
+  expect(world.position.x).toBeCloseTo(expectedOffset ?? 0, 4);
+  expect(callbacks.onViewportChange).toHaveBeenLastCalledWith({
+    offsetX: expectedOffset,
+  });
   expect(onCanvasMetricsChange).toHaveBeenCalledOnce();
 });
 

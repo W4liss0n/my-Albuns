@@ -81,19 +81,11 @@ test("centers the edited Sheet when the preview returns to normal mode", () => {
 
   fireEvent.click(screen.getByTestId("report-canvas-metrics"));
   expect(canvas).toHaveAttribute("data-centered-sheet", "sheet-002");
-  const initialOffset = canvas.getAttribute("data-offset-x");
-  expect(initialOffset).not.toBeNull();
 
   fireEvent.keyDown(window, { key: "Escape" });
 
   expect(canvas).toHaveAttribute("data-mode", "normal");
-  expect(canvas).toHaveAttribute("data-centered-sheet", "sheet-002");
-  expect(canvas).toHaveAttribute("data-offset-x", initialOffset);
-
-  fireEvent.click(screen.getByTestId("report-canvas-metrics"));
-
   expect(canvas).toHaveAttribute("data-centered-sheet", "sheet-003");
-  expect(canvas.getAttribute("data-offset-x")).not.toBe(initialOffset);
 });
 
 test("keeps Frame selection state in the development preview", () => {

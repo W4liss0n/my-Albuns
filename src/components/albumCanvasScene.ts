@@ -81,11 +81,16 @@ export class AlbumCanvasScene {
   }
 
   update(input: AlbumCanvasProps, hostHeight: number) {
-    if (this.projectId !== input.projectId) {
+    const projectChanged = this.projectId !== input.projectId;
+    if (projectChanged) {
       this.resetProjectScene();
       this.projectId = input.projectId;
       this.projectGeneration += 1;
     }
+    const returnedToContinuousCanvas =
+      !projectChanged &&
+      this.input?.mode.kind === "sheet-editing" &&
+      input.mode.kind === "normal";
     const modeSignature = JSON.stringify(input.mode);
     if (
       this.modeSignature !== null &&
@@ -118,10 +123,20 @@ export class AlbumCanvasScene {
       sheetHeight,
     );
     this.canvasScale = scale;
+    const transitionOffsetX =
+      returnedToContinuousCanvas && input.centeredSheetId
+        ? layout.centeredOffset(
+            input.centeredSheetId,
+            scale,
+            this.app.screen.width,
+          )
+        : null;
+    const requestedOffsetX =
+      transitionOffsetX ?? input.viewport.offsetX;
     const boundedOffsetX =
       modePolicy.enablesContinuousNavigation
         ? layout.clampOffset(
-            input.viewport.offsetX,
+            requestedOffsetX,
             scale,
             this.app.screen.width,
           )

@@ -104,7 +104,7 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
   input.remove();
 });
 
-test("centers the edited Sheet when leaving Sheet Edit Mode", () => {
+test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   const projection = createTwoSheetProjection();
   const view = renderHook(() =>
     useProjectEditorController({
@@ -136,25 +136,8 @@ test("centers the edited Sheet when leaving Sheet Edit Mode", () => {
 
   expect(view.result.current.canvasProps.mode).toEqual({ kind: "normal" });
   expect(useEditorView.getState()).toMatchObject({
-    focusedSheetId: "sheet-002",
-    viewport: { offsetX: 0 },
-  });
-
-  act(() => {
-    view.result.current.canvasProps.onCanvasMetricsChange?.({
-      width: 1_000,
-      scale: 0.5,
-    });
-  });
-  const expectedOffset =
-    view.result.current.canvasProps.continuousCanvasLayout.centeredOffset(
-      "sheet-002",
-      0.5,
-      1_000,
-    );
-  expect(useEditorView.getState()).toMatchObject({
     centeredSheetId: "sheet-002",
     focusedSheetId: "sheet-002",
-    viewport: { offsetX: expectedOffset },
+    viewport: { offsetX: 0 },
   });
 });
