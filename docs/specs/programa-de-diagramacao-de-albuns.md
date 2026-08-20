@@ -616,6 +616,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - Durante esse arraste, aproximar o fantasma das bordas superior ou inferior rola verticalmente o contêiner visível da Grade, com velocidade progressiva e atualização contínua do espaço reservado.
 - Somente a superfície que iniciou o arraste mostra a prévia de reordenação. Canvas ou Grade oposto mantém a ordem confirmada e sincroniza de uma vez apenas depois da soltura válida.
 - `Informações do Álbum` é somente de leitura e resume quantidade de Lâminas e Páginas, dimensões da Lâmina e da Página, Unidade, DPI, formatos das extremidades, Sangria, segurança e contagens de Frames placeholder ou Arquivos originais ausentes, distinguindo os ausentes em uso.
+- Seus valores aparecem como texto integrado ao Painel, sem a aparência de campos editáveis. `Dimensão da Lâmina` e `Dimensão da Página` apresentam `Largura` e `Altura` separadamente.
 - Placeholders e originais ausentes em uso são destacados como bloqueios de Exportação; ausentes não usados são apenas aviso. Todas as alterações globais permanecem em `Design do Álbum`.
 - Clicar em placeholders expande a Grade de Lâminas destacando as afetadas. Clicar em originais ausentes abre o Painel de imagens no filtro `Ausentes`, com badges de quantidade nas abas `Fotos` e `Decorativos`.
 - `Ausentes` aberto pelo aviso é uma visualização temporária: guarda aba e filtros anteriores, restaura-os ao ser encerrada e não é persistida como preferência entre sessões.

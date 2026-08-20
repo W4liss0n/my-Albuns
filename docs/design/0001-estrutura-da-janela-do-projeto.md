@@ -398,6 +398,8 @@ Enquanto a Grade apresenta essa prévia, o Canvas mantém a última ordem confir
 - Sangria e Área de segurança;
 - quantidade de Frames placeholder e Arquivos originais ausentes, distinguindo quantos ausentes estão em uso.
 
+Como nenhum valor é editável nessa visão, os dados usam texto integrado à superfície do Painel em vez de caixas que sugiram campos de entrada. `Dimensão da Lâmina` e `Dimensão da Página` formam grupos distintos, cada um com `Largura` e `Altura` apresentadas separadamente.
+
 Frames placeholder e originais ausentes em uso são destacados como bloqueios de Exportação. Originais ausentes sem uso aparecem como aviso, sem impedir a saída. Nenhum valor é editado nessa seção.
 
 Clicar em `Frames placeholder` expande a `Grade de Lâminas` e destaca as Lâminas afetadas. Clicar em `Originais ausentes` abre o Painel de imagens no filtro `Ausentes`; badges nas abas `Fotos` e `Decorativos` mostram quantos itens ausentes existem em cada categoria.

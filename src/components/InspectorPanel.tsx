@@ -168,7 +168,7 @@ export function InspectorPanel({
               preferenceKey="album.design"
               defaultOpen
             >
-              <div className="album-design-content">
+              <div className="inspector-subsections">
                 <AlbumProjectSettings
                   document={document}
                   onApplyDpi={onApplyDpi}
@@ -316,60 +316,108 @@ function AlbumInformation({
   const positionedPhotoCount = frames.length - placeholderCount;
 
   return (
-    <div className="inspector-readout-grid">
-      <InspectorReadout label="Nome do Projeto" value={projectName} plain wide />
-      <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
-      <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
-      <InspectorReadout
-        label="Fotos posicionadas"
-        value={String(positionedPhotoCount)}
-      />
-      <InspectorReadout
-        label="Dimensão da Lâmina"
-        value={formatDimensions(
-          document.sheetWidthUm,
-          document.sheetHeightUm,
-          document.displayUnit,
-        )}
-        wide
-      />
-      <InspectorReadout
-        label="Dimensão da Página"
-        value={formatDimensions(
-          document.sheetWidthUm / 2,
-          document.sheetHeightUm,
-          document.displayUnit,
-        )}
-        wide
-      />
-      <InspectorReadout label="Unidade" value={document.displayUnit} />
-      <InspectorReadout label="Resolução" value={`${document.dpi} DPI`} />
-      <InspectorReadout
-        label="Primeira Lâmina"
-        value={sheetFormat(firstSheet)}
-      />
-      <InspectorReadout
-        label="Última Lâmina"
-        value={sheetFormat(lastSheet)}
-      />
-      <InspectorReadout
-        label="Sangria"
-        value={formatMeasurement(document.bleedUm, document.displayUnit)}
-      />
-      <InspectorReadout
-        label="Área de segurança"
-        value={formatMeasurement(document.safetyUm, document.displayUnit)}
-      />
-      <InspectorReadout
-        label="Frames placeholder"
-        tone={placeholderCount > 0 ? "blocking" : undefined}
-        value={String(placeholderCount)}
-      />
-      <InspectorReadout
-        label="Originais ausentes"
-        placeholderFeature="album-missing-originals-summary"
-        value="Não disponível"
-      />
+    <div className="inspector-subsections album-information">
+      <section className="inspector-subsection">
+        <h3>Projeto</h3>
+        <InspectorReadout label="Nome do Projeto" value={projectName} plain />
+        <div className="inspector-readout-grid inspector-readout-grid--summary">
+          <InspectorReadout label="Lâminas" value={String(sheetStates.length)} />
+          <InspectorReadout label="Páginas" value={String(pageCount(sheetStates))} />
+          <InspectorReadout
+            label="Fotos posicionadas"
+            value={String(positionedPhotoCount)}
+          />
+        </div>
+      </section>
+
+      <section className="inspector-subsection">
+        <h3>Documento</h3>
+        <InspectorDimensionReadout
+          heightUm={document.sheetHeightUm}
+          label="Dimensão da Lâmina"
+          unit={document.displayUnit}
+          widthUm={document.sheetWidthUm}
+        />
+        <InspectorDimensionReadout
+          heightUm={document.sheetHeightUm}
+          label="Dimensão da Página"
+          unit={document.displayUnit}
+          widthUm={document.sheetWidthUm / 2}
+        />
+        <div className="inspector-readout-grid">
+          <InspectorReadout label="Unidade" value={document.displayUnit} />
+          <InspectorReadout label="Resolução" value={`${document.dpi} DPI`} />
+        </div>
+      </section>
+
+      <section className="inspector-subsection">
+        <h3>Estrutura e acabamento</h3>
+        <div className="inspector-readout-grid">
+          <InspectorReadout
+            label="Primeira Lâmina"
+            value={sheetFormat(firstSheet)}
+          />
+          <InspectorReadout
+            label="Última Lâmina"
+            value={sheetFormat(lastSheet)}
+          />
+          <InspectorReadout
+            label="Sangria"
+            value={formatMeasurement(document.bleedUm, document.displayUnit)}
+          />
+          <InspectorReadout
+            label="Área de segurança"
+            value={formatMeasurement(document.safetyUm, document.displayUnit)}
+          />
+        </div>
+      </section>
+
+      <section
+        className="inspector-subsection"
+        data-placeholder-feature="album-verification-actions"
+      >
+        <h3>Verificação</h3>
+        <div className="inspector-readout-grid">
+          <InspectorReadout
+            label="Frames placeholder"
+            tone={placeholderCount > 0 ? "blocking" : undefined}
+            value={String(placeholderCount)}
+          />
+          <InspectorReadout
+            label="Originais ausentes"
+            placeholderFeature="album-missing-originals-summary"
+            value="Não disponível"
+          />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function InspectorDimensionReadout({
+  heightUm,
+  label,
+  unit,
+  widthUm,
+}: {
+  heightUm: number;
+  label: string;
+  unit: DocumentSnapshot["displayUnit"];
+  widthUm: number;
+}) {
+  return (
+    <div aria-label={label} className="inspector-dimension" role="group">
+      <span className="inspector-dimension__title">{label}</span>
+      <div className="inspector-readout-grid">
+        <InspectorReadout
+          label="Largura"
+          value={formatMeasurement(widthUm, unit)}
+        />
+        <InspectorReadout
+          label="Altura"
+          value={formatMeasurement(heightUm, unit)}
+        />
+      </div>
     </div>
   );
 }
@@ -380,22 +428,16 @@ function InspectorReadout({
   plain = false,
   tone,
   value,
-  wide = false,
 }: {
   label: string;
   placeholderFeature?: string;
   plain?: boolean;
   tone?: "blocking";
   value: string;
-  wide?: boolean;
 }) {
   return (
     <div
-      className={
-        wide
-          ? "inspector-readout-field inspector-readout-field--wide"
-          : "inspector-readout-field"
-      }
+      className="inspector-readout-field"
       data-placeholder-feature={placeholderFeature}
     >
       <span>{label}</span>
@@ -428,8 +470,8 @@ function AlbumProjectSettings({
 }) {
   return (
     <>
-      <div
-        className="album-design-group"
+      <section
+        className="inspector-subsection"
         data-placeholder-feature="album-end-sheet-settings"
       >
         <h3>Estrutura</h3>
@@ -443,27 +485,25 @@ function AlbumProjectSettings({
             value={sheetFormat(sheetStates[sheetStates.length - 1])}
           />
         </div>
-      </div>
-      <div className="album-design-group">
+      </section>
+      <section className="inspector-subsection">
         <h3>Documento</h3>
         <div
-          className="inspector-readout-grid"
+          className="inspector-field-stack"
           data-placeholder-feature="album-document-dimensions"
         >
           <InspectorReadout label="Unidade" value={document.displayUnit} />
-          <InspectorReadout
+          <InspectorDimensionReadout
+            heightUm={document.sheetHeightUm}
             label="Dimensão da Lâmina"
-            value={formatDimensions(
-              document.sheetWidthUm,
-              document.sheetHeightUm,
-              document.displayUnit,
-            )}
+            unit={document.displayUnit}
+            widthUm={document.sheetWidthUm}
           />
         </div>
         <DocumentDpiControl dpi={document.dpi} onApplyDpi={onApplyDpi} />
-      </div>
-      <div
-        className="album-design-group"
+      </section>
+      <section
+        className="inspector-subsection"
         data-placeholder-feature="album-technical-area-settings"
       >
         <h3>Áreas técnicas</h3>
@@ -477,7 +517,7 @@ function AlbumProjectSettings({
             value={formatMeasurement(document.safetyUm, document.displayUnit)}
           />
         </div>
-      </div>
+      </section>
     </>
   );
 }
@@ -496,7 +536,7 @@ function AlbumVisualDefaultsPlaceholder({
       className="album-visual-defaults-placeholder"
       data-placeholder-feature="album-design-visual-defaults"
     >
-      <div className="album-design-group">
+      <section className="inspector-subsection">
         <h3>Padrões visuais</h3>
         <VisualDefaultPlaceholder
           currentLabel={visualState.background.label}
@@ -511,8 +551,8 @@ function AlbumVisualDefaultsPlaceholder({
           previewClassName={visualState.overlay.previewClassName}
           recentLabel="overlays recentes"
         />
-      </div>
-      <div className="album-design-group">
+      </section>
+      <section className="inspector-subsection">
         <h3>Padrão dos Frames</h3>
         <span className="album-design-label">Borda padrão</span>
         <div className="frame-border-placeholder" aria-hidden="true">
@@ -551,7 +591,7 @@ function AlbumVisualDefaultsPlaceholder({
             />
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -679,20 +719,6 @@ function formatMeasurement(
   return `${measurementFormatter.format(
     micrometersToDisplayUnits(micrometers, unit),
   )} ${unit}`;
-}
-
-function formatDimensions(
-  widthUm: number,
-  heightUm: number,
-  unit: DocumentSnapshot["displayUnit"],
-) {
-  const width = measurementFormatter.format(
-    micrometersToDisplayUnits(widthUm, unit),
-  );
-  const height = measurementFormatter.format(
-    micrometersToDisplayUnits(heightUm, unit),
-  );
-  return `${width} × ${height} ${unit}`;
 }
 
 function pageCount(sheets: readonly SheetSnapshot[]) {

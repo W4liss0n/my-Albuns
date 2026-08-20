@@ -877,11 +877,24 @@ test("shows the physical configuration projected from the opened Project", () =>
       .closest("section") as HTMLElement,
   );
 
-  expect(albumInformation.getByText("Dimensão da Lâmina").parentElement).toHaveTextContent(
-    "50,8 × 25,4 cm",
+  const sheetDimensions = within(
+    albumInformation.getByRole("group", { name: "Dimensão da Lâmina" }),
   );
-  expect(albumInformation.getByText("Dimensão da Página").parentElement).toHaveTextContent(
-    "25,4 × 25,4 cm",
+  expect(sheetDimensions.getByLabelText("Largura")).toHaveTextContent(
+    "50,8 cm",
+  );
+  expect(sheetDimensions.getByLabelText("Altura")).toHaveTextContent(
+    "25,4 cm",
+  );
+
+  const pageDimensions = within(
+    albumInformation.getByRole("group", { name: "Dimensão da Página" }),
+  );
+  expect(pageDimensions.getByLabelText("Largura")).toHaveTextContent(
+    "25,4 cm",
+  );
+  expect(pageDimensions.getByLabelText("Altura")).toHaveTextContent(
+    "25,4 cm",
   );
   expect(albumInformation.getByText("Resolução").parentElement).toHaveTextContent(
     "240 DPI",

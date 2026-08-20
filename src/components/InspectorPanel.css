@@ -108,7 +108,11 @@
 .inspector-readout-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--ui-space-3) var(--ui-space-2);
+  gap: var(--ui-space-3);
+}
+
+.inspector-readout-grid--summary {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
 }
 
 .inspector-readout-field {
@@ -116,11 +120,11 @@
   min-width: 0;
   color: var(--ui-text-muted);
   font-size: var(--ui-font-size-support);
-  gap: 5px;
+  gap: var(--ui-space-1);
 }
 
-.inspector-readout-field--wide {
-  grid-column: 1 / -1;
+.inspector-readout-field > span {
+  line-height: 1.25;
 }
 
 .inspector-readout {
@@ -130,8 +134,17 @@
   color: var(--ui-text-secondary);
   font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-action);
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.album-information .inspector-readout {
+  height: auto;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .inspector-readout--plain {
@@ -139,16 +152,29 @@
 }
 
 .inspector-readout--blocking {
-  border-color: var(--ui-danger);
   color: var(--ui-danger);
+  font-weight: 600;
 }
 
-.album-design-content {
+.inspector-dimension,
+.inspector-field-stack {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
+.inspector-dimension__title {
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  font-weight: 600;
+}
+
+.inspector-subsections,
+.album-visual-defaults-placeholder {
   display: grid;
   gap: var(--ui-space-4);
 }
 
-.album-design-group h3 {
+.inspector-subsection h3 {
   margin: 0;
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-support);
@@ -181,19 +207,14 @@
   grid-column: 1 / -1;
 }
 
-.album-visual-defaults-placeholder {
-  display: grid;
-  gap: var(--ui-space-4);
-}
-
-.album-design-group {
+.inspector-subsection {
   display: grid;
   padding-top: var(--ui-space-3);
   border-top: 1px solid var(--ui-border);
   gap: var(--ui-space-3);
 }
 
-.album-design-content > .album-design-group:first-child {
+.inspector-subsections > .inspector-subsection:first-child {
   padding-top: 0;
   border-top: 0;
 }

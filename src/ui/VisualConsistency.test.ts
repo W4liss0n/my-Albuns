@@ -162,6 +162,15 @@ test("matches the compact sheet grid instead of using generic cards", () => {
   );
 });
 
+test("integrates read-only Album information without making editable controls look passive", () => {
+  expect(inspectorPanelStyles).toMatch(
+    /\.album-information \.inspector-readout\s*\{[^}]*border:\s*0;[^}]*background:\s*transparent;/s,
+  );
+  expect(inspectorPanelStyles).not.toMatch(
+    /\.inspector-subsections \.inspector-readout\s*\{[^}]*border:\s*0;/s,
+  );
+});
+
 test("lets the continuous Canvas preview use the complete available height", () => {
   expect(canvasPreviewStyles).toMatch(
     /\.canvas-preview\s*\{[^}]*height:\s*100%;/s,
