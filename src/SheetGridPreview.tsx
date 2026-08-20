@@ -5,7 +5,9 @@ import type {
   AlbumInformation,
   ComposedSheet,
   DocumentSnapshot,
+  MediaCatalogItem,
   ProjectedActiveSides,
+  ProjectedVisualDefaults,
   SheetRole,
   SheetSnapshot,
 } from "./domain/project";
@@ -72,6 +74,14 @@ const sheets: readonly ComposedSheet[] = initialSheetStates.map((state, index) =
 
 const previewUrl =
   mediaPanelPreviewFixture.mediaPreviews["test-media-001"]?.url;
+const decorativePreview: MediaCatalogItem = {
+  id: "decorative-preview-001",
+  kind: "decorative",
+  name: "Textura suave.svg",
+  sourceWidthPx: 6_000,
+  sourceHeightPx: 4_000,
+  palette: ["#D5CCBE", "#E9E3D9", "#FAF8F4"],
+};
 
 export function SheetGridPreview() {
   const [focusedSheetId, setFocusedSheetId] = useState("sheet-002");
@@ -79,6 +89,9 @@ export function SheetGridPreview() {
     representativeProjection.state.document,
   );
   const [sheetStates, setSheetStates] = useState(initialSheetStates);
+  const [visualDefaults, setVisualDefaults] = useState<ProjectedVisualDefaults>(
+    representativeProjection.state.album.visualDefaults,
+  );
 
   function applyInformation(information: AlbumInformation) {
     setDocument({
@@ -112,10 +125,22 @@ export function SheetGridPreview() {
         displayedPhotoPanX={0}
         displayedPhotoZoom={1}
         document={document}
-        frameBorder={representativeProjection.composition.frameBorder}
+        frameBorder={visualDefaults.frameBorder}
         focusedSheetId={focusedSheetId}
-        mediaPreviewUrls={previewUrl ? { "media-001": previewUrl } : {}}
+        mediaItems={[
+          ...representativeProjection.state.album.media,
+          decorativePreview,
+        ]}
+        mediaPreviewUrls={
+          previewUrl
+            ? {
+                "media-001": previewUrl,
+                [decorativePreview.id]: previewUrl,
+              }
+            : {}
+        }
         onApplyAlbumInformation={applyInformation}
+        onApplyAlbumDesign={setVisualDefaults}
         onBeginPhotoZoom={() => undefined}
         onFinishPhotoZoom={async () => undefined}
         onNavigateToSheet={setFocusedSheetId}
@@ -132,7 +157,7 @@ export function SheetGridPreview() {
         selectedFrame={null}
         sheetStates={sheetStates}
         sheets={sheets}
-        visualDefaults={representativeProjection.state.album.visualDefaults}
+        visualDefaults={visualDefaults}
         zoomCommitting={false}
       />
     </main>

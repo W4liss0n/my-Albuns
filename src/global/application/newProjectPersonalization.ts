@@ -215,7 +215,7 @@ function contentForScope<T>(
   return scope === "right" ? scoped.right : scoped.left;
 }
 
-function applyToScope<T>(
+export function applyToScope<T>(
   scoped: ScopedDraft<T>,
   scope: PersonalizationScope,
   content: T,

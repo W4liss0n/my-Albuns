@@ -76,6 +76,11 @@ impl PersistentProjectSession {
                 .project
                 .with_album_information(information)
                 .map_err(CoreError::InvalidAlbumInformation)?,
+            ProjectIntent::SetVisualDefaults { visual_defaults } => self
+                .current
+                .project
+                .with_visual_defaults(visual_defaults)
+                .map_err(|()| CoreError::InvalidVisualDefaults)?,
             ProjectIntent::SetDpi { dpi } => self
                 .current
                 .project

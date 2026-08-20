@@ -46,6 +46,9 @@ impl ProjectSession {
             ProjectIntent::SetAlbumInformation { .. } => {
                 return Err(CoreError::UnsupportedProjectIntent);
             }
+            ProjectIntent::SetVisualDefaults { .. } => {
+                return Err(CoreError::UnsupportedProjectIntent);
+            }
             ProjectIntent::SetDpi { .. } => {
                 return Err(CoreError::UnsupportedProjectIntent);
             }

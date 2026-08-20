@@ -180,6 +180,7 @@ export function useProjectEditorController({
     updateZoomGesture: photoGestures.updateZoomGesture,
     finishZoomGesture: photoGestures.finishZoomGesture,
     applyAlbumInformation: mutations.applyAlbumInformation,
+    applyAlbumDesign: mutations.applyAlbumDesign,
     save: mutations.save,
     undo: mutations.undo,
     redo: mutations.redo,

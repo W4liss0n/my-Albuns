@@ -4,6 +4,7 @@ import type {
   AlbumInformation,
   EditorProjection,
   ProjectIntent,
+  ProjectedVisualDefaults,
 } from "../domain/project";
 import type {
   ProjectMutationOperation,
@@ -130,6 +131,11 @@ export function useProjectMutations({
       commitInteraction({
         kind: "setAlbumInformation",
         information,
+      }),
+    applyAlbumDesign: (visualDefaults: ProjectedVisualDefaults) =>
+      commitInteraction({
+        kind: "setVisualDefaults",
+        visualDefaults,
       }),
     save: () => void saveVisibleRevision(),
     undo: () =>

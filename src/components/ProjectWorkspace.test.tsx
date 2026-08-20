@@ -957,9 +957,7 @@ test("uses the current reference layout for the Album context", () => {
     screen.getByRole("button", { name: "Design do Álbum" }),
   ).toHaveAttribute("aria-expanded", "true");
   expect(
-    albumDesignSection.querySelector(
-      '[data-placeholder-feature="album-design-visual-defaults"]',
-    ),
+    albumDesign.getByLabelText("Prévia do padrão visual do Álbum"),
   ).toBeInTheDocument();
   expect(
     albumInformationSection.querySelector(
@@ -984,11 +982,7 @@ test("uses the current reference layout for the Album context", () => {
   expect(albumDesignApply.closest(".inspector-section-header")).toContainElement(
     albumDesignTrigger,
   );
-  expect(
-    albumDesignSection.querySelector(
-      '[data-placeholder-feature="album-design-apply"]',
-    ),
-  ).toBeInTheDocument();
+  expect(albumDesignApply).not.toHaveAttribute("data-placeholder-feature");
   expect(albumInformation.getByText("Estrutura")).toBeInTheDocument();
   expect(albumInformation.getByText("Documento")).toBeInTheDocument();
   expect(albumInformation.getByText("Áreas técnicas")).toBeInTheDocument();
@@ -997,7 +991,117 @@ test("uses the current reference layout for the Album context", () => {
   expect(albumDesign.queryByText("Áreas técnicas")).not.toBeInTheDocument();
   expect(albumDesign.getByText("Padrões visuais")).toBeInTheDocument();
   expect(albumDesign.getByText("Padrão dos Frames")).toBeInTheDocument();
+  expect(
+    albumDesign.getByRole("img", { name: "Prévia da Borda dos Frames" }),
+  ).toBeInTheDocument();
   expect(albumDesign.getByText("cor")).toBeInTheDocument();
+});
+
+test("edits and applies the complete Album design draft as one intent", async () => {
+  const editableDesignProjection = {
+    ...decorativeProjection,
+    state: {
+      ...decorativeProjection.state,
+      album: {
+        ...decorativeProjection.state.album,
+        visualDefaults: {
+          ...decorativeProjection.state.album.visualDefaults,
+          overlay: { scope: "bothSides" as const, both: null },
+        },
+      },
+    },
+    composition: {
+      ...decorativeProjection.composition,
+      sheets: decorativeProjection.composition.sheets.map((sheet) => ({
+        ...sheet,
+        overlays: [],
+      })),
+    },
+  } satisfies EditorProjection;
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    editableDesignProjection,
+  );
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={editableDesignProjection}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const applyDesign = albumDesign.getByRole("button", { name: "Aplicar" });
+  expect(applyDesign).toBeDisabled();
+
+  const scopeControls = within(
+    albumDesign.getByLabelText("Prévia do padrão visual do Álbum"),
+  ).getByRole("group", { name: "Escopo da personalização" });
+  expect(within(scopeControls).getAllByRole("button")).toHaveLength(3);
+  expect(
+    within(scopeControls).getByRole("button", { name: "Ambos os lados" }),
+  ).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(albumDesign.getByRole("button", { name: "Lado esquerdo" }));
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(
+    albumDesign.getByRole("button", { name: "Escolher Overlay" }),
+  );
+  fireEvent.click(
+    albumDesign.getByRole("button", {
+      name: "Selecionar Overlay Overlay translúcido.png",
+    }),
+  );
+  const frame = albumDesign.getByLabelText("Frame demonstrativo esquerdo 1");
+  const overlay = albumDesign.getByLabelText("Overlay do lado esquerdo");
+  expect(
+    frame.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.click(albumDesign.getByRole("checkbox", { name: "Exibir borda" }));
+  fireEvent.change(albumDesign.getByLabelText("Cor da Borda"), {
+    target: { value: "#2c2924" },
+  });
+  fireEvent.change(albumDesign.getByRole("slider", { name: "Espessura da Borda" }), {
+    target: { value: "1250" },
+  });
+  expect(
+    albumDesign
+      .getByRole("img", { name: "Prévia da Borda dos Frames" })
+      .querySelectorAll("[data-border-segment]"),
+  ).toHaveLength(4);
+
+  expect(applyDesign).toBeEnabled();
+  fireEvent.click(applyDesign);
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setVisualDefaults",
+      visualDefaults: {
+        background: {
+          scope: "perSide",
+          left: { kind: "color", rgb: "#F7F5F0" },
+          right: { kind: "color", rgb: "#FFFFFF" },
+        },
+        overlay: {
+          scope: "perSide",
+          left: { kind: "media", mediaId: "decorative-overlay" },
+          right: null,
+        },
+        frameBorder: {
+          kind: "solid",
+          rgb: "#2C2924",
+          widthUm: 1_250,
+        },
+      },
+    }),
+  );
 });
 
 test("presents an empty per-side Overlay as absent", () => {
@@ -1015,7 +1119,7 @@ test("presents an empty per-side Overlay as absent", () => {
     },
   };
 
-  const view = render(
+  render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projectionWithoutOverlay}
@@ -1026,9 +1130,9 @@ test("presents an empty per-side Overlay as absent", () => {
     />,
   );
 
-  const visualDefaults = view.container.querySelector(
-    '[data-placeholder-feature="album-design-visual-defaults"]',
-  ) as HTMLElement;
+  const visualDefaults = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
   expect(within(visualDefaults).getByText("sem")).toBeInTheDocument();
   expect(
     visualDefaults.querySelector(".visual-default-picker__preview--none"),
@@ -1276,7 +1380,7 @@ test("shows the localized Project save failure", async () => {
 });
 
 test("renders each Grade item from its own composed sheet", () => {
-  render(
+  const view = render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={twoSheetProjection}
@@ -1291,7 +1395,8 @@ test("renders each Grade item from its own composed sheet", () => {
   expect(
     screen.getByRole("img", { name: "Prévia da Lâmina 02" }),
   ).toBeInTheDocument();
-  expect(screen.getAllByRole("img")).toHaveLength(2);
+  const sheetGrid = view.container.querySelector(".sheet-grid") as HTMLElement;
+  expect(within(sheetGrid).getAllByRole("img")).toHaveLength(2);
 });
 
 test("presents the Grade with reference metadata and navigation state", () => {
@@ -1484,6 +1589,49 @@ test("merges only Panel viewport and one-row preload margin with Canvas demand",
     expect(onMediaDemandChange).toHaveBeenLastCalledWith({
       visibleMediaIds: ["media-003", "media-001"],
       preloadMediaIds: ["decorative-not-in-panel", "media-002"],
+    }),
+  );
+});
+
+test("preloads imported Decoratives for Album design before they are used", async () => {
+  const onMediaDemandChange = vi.fn();
+  const projectionWithUnusedDecorative: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        media: [
+          ...projection.state.album.media,
+          {
+            id: "decorative-unused",
+            kind: "decorative",
+            name: "Textura ainda não usada.png",
+            palette: ["#E8E1D6", "#B8AA96", "#81705A"],
+            sourceHeightPx: 1_200,
+            sourceWidthPx: 1_600,
+          },
+        ],
+      },
+    },
+  };
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithUnusedDecorative}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => projectionWithUnusedDecorative,
+      )}
+      onMediaDemandChange={onMediaDemandChange}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(onMediaDemandChange).toHaveBeenCalledWith({
+      visibleMediaIds: [],
+      preloadMediaIds: ["decorative-unused"],
     }),
   );
 });

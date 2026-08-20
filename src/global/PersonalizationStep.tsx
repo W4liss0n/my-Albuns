@@ -25,7 +25,7 @@ import {
 } from "./application/newProjectPersonalization";
 import { ActionButton, AppIcon, FailureNotice } from "../ui";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
-import { PersonalizationPreview } from "./PersonalizationPreview";
+import { PersonalizationScopeSurface } from "./PersonalizationScopeSurface";
 
 interface PersonalizationStepProps {
   draft: NewProjectDimensionsDraft;
@@ -50,11 +50,6 @@ export function PersonalizationStep({
   const [hoveredScope, setHoveredScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
-  const previewedScope =
-    personalization.fixedScope === "both" ||
-    personalization.fixedScope === hoveredScope
-      ? null
-      : hoveredScope;
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
   // persistência; a medida física controla somente a reprodução desta etapa.
   const [frameGapUm, setFrameGapUm] = useState(6_000);
@@ -127,55 +122,18 @@ export function PersonalizationStep({
         surfaceLabel="Prévia do formato da Lâmina"
       >
         {(geometry) => (
-          <>
-            <PersonalizationPreview
-              frameGapUm={frameGapUm}
-              geometry={geometry}
-              hoveredScope={previewedScope}
-              personalization={personalization}
-              focusedScope={focusedScope}
-            />
-            <div
-              aria-hidden="true"
-              className={`new-project-fixed-selection new-project-fixed-selection--${personalization.fixedScope}`}
-            />
-            <div
-              aria-label="Escopo da personalização"
-              className="new-project-scope-controls"
-              role="group"
-            >
-              {(
-                [
-                  ["left", "Lado esquerdo"],
-                  ["right", "Lado direito"],
-                ] as const
-              ).map(([scope, label]) => (
-                <button
-                  aria-label={label}
-                  aria-pressed={personalization.fixedScope === scope}
-                  key={scope}
-                  onBlur={() => setFocusedScope(null)}
-                  onClick={() =>
-                    onChange(fixPersonalizationScope(personalization, scope))
-                  }
-                  onFocus={(event) =>
-                    setFocusedScope(
-                      event.currentTarget.matches(":focus-visible")
-                        ? scope
-                        : null,
-                    )
-                  }
-                  onPointerEnter={() => setHoveredScope(scope)}
-                  onPointerLeave={() =>
-                    setHoveredScope((currentScope) =>
-                      currentScope === scope ? null : currentScope,
-                    )
-                  }
-                  type="button"
-                />
-              ))}
-            </div>
-          </>
+          <PersonalizationScopeSurface
+            focusedScope={focusedScope}
+            frameGapUm={frameGapUm}
+            geometry={geometry}
+            hoveredScope={hoveredScope}
+            personalization={personalization}
+            onFocusedScopeChange={setFocusedScope}
+            onHoveredScopeChange={setHoveredScope}
+            onScopeChange={(scope) =>
+              onChange(fixPersonalizationScope(personalization, scope))
+            }
+          />
         )}
       </NewProjectPreviewPanel>
       <div className="new-project-visual-values">

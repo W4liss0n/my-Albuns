@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::model::MediaKind;
+use crate::model::{
+    MediaKind, ProjectedBackground, ProjectedBackgroundContent, ProjectedFrameBorder,
+    ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
+};
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
@@ -278,6 +281,16 @@ impl ProjectDocument {
         Ok(candidate)
     }
 
+    pub(crate) fn with_visual_defaults(
+        &self,
+        visual_defaults: ProjectedVisualDefaults,
+    ) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        candidate.visual_defaults = visual_defaults_from_projection(self, visual_defaults)?;
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
     pub(crate) fn validate_album_information(
         &self,
         information: &AlbumInformation,
@@ -349,6 +362,80 @@ impl ProjectDocument {
         validate_project_state(&candidate).map_err(|()| validation.errors)?;
         Ok(candidate)
     }
+}
+
+fn visual_defaults_from_projection(
+    project: &ProjectDocument,
+    defaults: ProjectedVisualDefaults,
+) -> Result<VisualDefaults, ()> {
+    let background = match defaults.background {
+        ProjectedBackground::BothSides { both } => Background::BothSides {
+            both: background_content_from_projection(project, both)?,
+        },
+        ProjectedBackground::PerSide { left, right } => Background::PerSide {
+            left: background_content_from_projection(project, left)?,
+            right: background_content_from_projection(project, right)?,
+        },
+    };
+    let overlay = match defaults.overlay {
+        ProjectedOverlay::BothSides { both } => Overlay::BothSides {
+            both: overlay_content_from_projection(project, both)?,
+        },
+        ProjectedOverlay::PerSide { left, right } => Overlay::PerSide {
+            left: overlay_content_from_projection(project, left)?,
+            right: overlay_content_from_projection(project, right)?,
+        },
+    };
+    let frame_border = match defaults.frame_border {
+        ProjectedFrameBorder::None => FrameBorder::None,
+        ProjectedFrameBorder::Solid { rgb, width_um } => {
+            if !frame_border_width_is_valid(width_um) {
+                return Err(());
+            }
+            FrameBorder::Solid {
+                rgb: Rgb::parse_canonical(&rgb).ok_or(())?,
+                width_um,
+            }
+        }
+    };
+    Ok(VisualDefaults::new(background, overlay, frame_border))
+}
+
+fn background_content_from_projection(
+    project: &ProjectDocument,
+    content: ProjectedBackgroundContent,
+) -> Result<BackgroundContent, ()> {
+    match content {
+        ProjectedBackgroundContent::Color { rgb } => Ok(BackgroundContent::Color {
+            rgb: Rgb::parse_canonical(&rgb).ok_or(())?,
+        }),
+        ProjectedBackgroundContent::Media { media_id } => Ok(BackgroundContent::Media {
+            media_id: decorative_media_id(project, &media_id)?,
+        }),
+    }
+}
+
+fn overlay_content_from_projection(
+    project: &ProjectDocument,
+    content: Option<ProjectedOverlayContent>,
+) -> Result<Option<OverlayContent>, ()> {
+    content
+        .map(|ProjectedOverlayContent::Media { media_id }| {
+            Ok(OverlayContent::Media {
+                media_id: decorative_media_id(project, &media_id)?,
+            })
+        })
+        .transpose()
+}
+
+fn decorative_media_id(project: &ProjectDocument, source: &str) -> Result<Uuid, ()> {
+    let media_id = Uuid::parse_str(source).map_err(|_| ())?;
+    project
+        .media
+        .iter()
+        .any(|media| media.id() == media_id && media.kind() == MediaKind::Decorative)
+        .then_some(media_id)
+        .ok_or(())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

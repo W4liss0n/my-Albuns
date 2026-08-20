@@ -7,6 +7,7 @@ import type {
 import { draftFrameBorderFillRects } from "./application/draftFrameBorderGeometry";
 import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
+import "./PersonalizationPreview.css";
 
 interface PersonalizationPreviewProps {
   focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
@@ -102,32 +103,6 @@ export function PersonalizationPreview({
           />
         </>
       )}
-      {personalization.overlay.scope === "bothSides" ? (
-        <OverlayContent
-          content={personalization.overlay.both}
-          height={heightUm}
-          label="Overlay de ambos os lados"
-          width={widthUm}
-          x={0}
-        />
-      ) : (
-        <>
-          <OverlayContent
-            content={personalization.overlay.left}
-            height={heightUm}
-            label="Overlay do lado esquerdo"
-            width={pageWidth}
-            x={0}
-          />
-          <OverlayContent
-            content={personalization.overlay.right}
-            height={heightUm}
-            label="Overlay do lado direito"
-            width={pageWidth}
-            x={pageWidth}
-          />
-        </>
-      )}
       {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
         const isSelected = scopeContainsPage(
           personalization.fixedScope,
@@ -197,6 +172,32 @@ export function PersonalizationPreview({
           </g>
         );
       })}
+      {personalization.overlay.scope === "bothSides" ? (
+        <OverlayContent
+          content={personalization.overlay.both}
+          height={heightUm}
+          label="Overlay de ambos os lados"
+          width={widthUm}
+          x={0}
+        />
+      ) : (
+        <>
+          <OverlayContent
+            content={personalization.overlay.left}
+            height={heightUm}
+            label="Overlay do lado esquerdo"
+            width={pageWidth}
+            x={0}
+          />
+          <OverlayContent
+            content={personalization.overlay.right}
+            height={heightUm}
+            label="Overlay do lado direito"
+            width={pageWidth}
+            x={pageWidth}
+          />
+        </>
+      )}
       {pageDescriptors.map(({ pageIndex, side, x: pageX }) => {
         const isSelected = scopeContainsPage(
           personalization.fixedScope,

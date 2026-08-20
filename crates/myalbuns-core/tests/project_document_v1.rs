@@ -8,8 +8,10 @@ use myalbuns_core::{
     InitialProjectConfiguration, InitialProjectPersonalization, LoadProjectError,
     LoadProjectRequest, LoadedProjectRevision, OpenProjectError, OpenProjectRequest, Overlay,
     OverlayContent, PathFailure, ProjectConfigurationValidationError as ValidationError,
-    ProjectCore, ProjectIntent, ProjectLocation, ProjectedActiveSides, ProjectedDisplayUnit, Rgb,
-    SaveProjectError, SaveProjectOutcome, SheetRole,
+    ProjectCore, ProjectIntent, ProjectLocation, ProjectedActiveSides, ProjectedBackground,
+    ProjectedBackgroundContent, ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay,
+    ProjectedOverlayContent, ProjectedVisualDefaults, Rgb, SaveProjectError, SaveProjectOutcome,
+    SheetRole,
 };
 use myalbuns_paths::{OperationPathContext, ProjectTransitionBarrier, project_data_namespace};
 
@@ -1902,6 +1904,75 @@ fn changing_album_information_is_one_atomic_authoritative_revision() {
         reopened.state.album.sheets[1].active_sides,
         ProjectedActiveSides::Left
     );
+}
+
+#[test]
+fn changing_visual_defaults_is_one_atomic_authoritative_revision() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let project_path = directory.path().join("Design editável.myalbuns");
+    fs::write(&project_path, PER_SIDE_PROJECT_V1.as_bytes()).expect("fixture is written");
+    let core = project_core_with_identity_storage(directory.path());
+    let mut project = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the Project with Decoratives opens");
+    let initial_defaults = project.projection().state.album.visual_defaults;
+    let visual_defaults = ProjectedVisualDefaults {
+        background: ProjectedBackground::PerSide {
+            left: ProjectedBackgroundContent::Color {
+                rgb: "#F7F5F0".into(),
+            },
+            right: ProjectedBackgroundContent::Media {
+                media_id: "00000000-0000-4000-8000-000000000010".into(),
+            },
+        },
+        overlay: ProjectedOverlay::BothSides {
+            both: Some(ProjectedOverlayContent::Media {
+                media_id: "00000000-0000-4000-8000-000000000011".into(),
+            }),
+        },
+        frame_border: ProjectedFrameBorder::Solid {
+            rgb: "#2C2924".into(),
+            width_um: 1_250,
+        },
+    };
+
+    let changed = project
+        .apply(ProjectIntent::SetVisualDefaults {
+            visual_defaults: visual_defaults.clone(),
+        })
+        .expect("the complete Album design is valid");
+    assert_eq!(changed.state.revision, 38);
+    assert_eq!(changed.state.saved_revision, 37);
+    assert_eq!(changed.state.album.visual_defaults, visual_defaults);
+    assert_eq!(
+        changed.composition.frame_border,
+        visual_defaults.frame_border
+    );
+
+    let undone = project
+        .undo()
+        .expect("the complete design is one Undo action");
+    assert_eq!(undone.state.revision, 37);
+    assert_eq!(undone.state.album.visual_defaults, initial_defaults);
+
+    let redone = project
+        .redo()
+        .expect("the complete design is one Redo action");
+    assert_eq!(redone.state.revision, 38);
+    assert_eq!(redone.state.album.visual_defaults, visual_defaults);
+
+    assert_eq!(
+        project
+            .save(38)
+            .expect("the complete Album design revision is persisted"),
+        SaveProjectOutcome::Saved { revision: 38 }
+    );
+    drop(project);
+    let reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("the saved Album design reopens")
+        .projection();
+    assert_eq!(reopened.state.album.visual_defaults, visual_defaults);
 }
 
 #[test]

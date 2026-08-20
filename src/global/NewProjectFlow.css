@@ -460,49 +460,6 @@
   margin-bottom: var(--ui-space-3);
 }
 
-.new-project-scope-controls {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-.new-project-fixed-selection {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  box-sizing: border-box;
-  outline: 2px solid var(--ui-accent);
-  pointer-events: none;
-}
-
-.new-project-fixed-selection--both {
-  right: 0;
-  left: 0;
-}
-
-.new-project-fixed-selection--left {
-  left: 0;
-  width: 50%;
-}
-
-.new-project-fixed-selection--right {
-  right: 0;
-  width: 50%;
-}
-
-.new-project-scope-controls button {
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-}
-
-.new-project-scope-controls button:focus-visible {
-  outline: 0;
-}
-
 .new-project-visual-values {
   display: grid;
   align-content: start;

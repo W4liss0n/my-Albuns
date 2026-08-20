@@ -41,17 +41,6 @@
   border-color: #6f9fbe;
 }
 
-.new-project-sheet {
-  display: block;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  box-sizing: border-box;
-  border: 1px solid #d7d2c8;
-  border-radius: 1px;
-  box-shadow: 0 10px 26px rgb(60 54 44 / 16%);
-}
-
 .new-project-preview-caption {
   width: 100%;
   margin: 12px 0 0;

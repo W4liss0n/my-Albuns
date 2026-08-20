@@ -505,6 +505,9 @@ pub enum ProjectIntent {
     SetAlbumInformation {
         information: AlbumInformation,
     },
+    SetVisualDefaults {
+        visual_defaults: ProjectedVisualDefaults,
+    },
     SetDpi {
         dpi: u32,
     },
@@ -528,6 +531,8 @@ pub enum CoreError {
     InvalidDpi(u32),
     #[error("As Informações do Álbum não são válidas")]
     InvalidAlbumInformation(Vec<ProjectConfigurationValidationError>),
+    #[error("O Design do Álbum não é válido")]
+    InvalidVisualDefaults,
     #[error("A Sessão do Projeto esgotou o intervalo seguro de Revisões")]
     RevisionSpaceExhausted,
     #[error("A intenção não é compatível com o Documento de Projeto v1")]

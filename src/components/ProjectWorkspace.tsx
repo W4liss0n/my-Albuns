@@ -85,6 +85,13 @@ export function ProjectWorkspace({
       ),
     [mediaPreviews],
   );
+  const albumDesignPreloadMediaIds = useMemo(
+    () =>
+      projection.state.album.media.flatMap((media) =>
+        media.kind === "decorative" ? [media.id] : [],
+      ),
+    [projection.state.album.media],
+  );
   useEffect(() => {
     if (!onMediaDemandChange) return;
     const visible = Array.from(
@@ -99,6 +106,7 @@ export function ProjectWorkspace({
         [
           ...canvasMediaDemand.preloadMediaIds,
           ...panelMediaDemand.preloadMediaIds,
+          ...albumDesignPreloadMediaIds,
         ].filter((mediaId) => !visibleSet.has(mediaId)),
       ),
     );
@@ -106,7 +114,12 @@ export function ProjectWorkspace({
       visibleMediaIds: visible,
       preloadMediaIds: preload,
     });
-  }, [canvasMediaDemand, onMediaDemandChange, panelMediaDemand]);
+  }, [
+    albumDesignPreloadMediaIds,
+    canvasMediaDemand,
+    onMediaDemandChange,
+    panelMediaDemand,
+  ]);
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
@@ -229,6 +242,7 @@ export function ProjectWorkspace({
           displayedPhotoPanX={displayedPhotoPanX}
           zoomCommitting={controller.zoomCommitting}
           document={projection.state.document}
+          mediaItems={projection.state.album.media}
           sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
           frameBorder={projection.composition.frameBorder}
@@ -239,6 +253,7 @@ export function ProjectWorkspace({
           onUpdatePhotoZoom={controller.updateZoomGesture}
           onFinishPhotoZoom={controller.finishZoomGesture}
           onApplyAlbumInformation={albumInformationApply.requestApply}
+          onApplyAlbumDesign={controller.applyAlbumDesign}
           onValidateAlbumInformation={validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
         />

@@ -39,6 +39,7 @@ pub(crate) fn apply_project_intent(
 ) -> Result<EditorProjection, String> {
     let intent_kind = match &intent {
         ProjectIntent::SetAlbumInformation { .. } => "set_album_information",
+        ProjectIntent::SetVisualDefaults { .. } => "set_visual_defaults",
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
         ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
