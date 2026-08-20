@@ -73,6 +73,18 @@
   flex: none;
 }
 
+.inspector-section-action .ui-action-button--secondary {
+  border-color: var(--ui-accent-soft);
+  color: var(--ui-accent-hover);
+  background: var(--ui-accent-soft);
+}
+
+.inspector-section-action .ui-action-button--secondary:hover:not(:disabled),
+.inspector-section-action .ui-action-button--secondary:focus-visible:not(:disabled) {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+
 .context-heading {
   padding: var(--ui-space-4) var(--ui-space-3);
   border-bottom: 1px solid var(--ui-border);
