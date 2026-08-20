@@ -4,8 +4,12 @@ use directories::BaseDirs;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    AppPathsError, CachePathPlan, PreparedCacheStorage,
-    cache::{clear_project_cache, discard_project_cache_temporaries, prepare_cache_storage},
+    AppPathsError, CachePathPlan, CacheWriterClaimStorage, PreparedCacheStorage,
+    cache::{
+        CacheNamespaceUsage, clear_project_cache, discard_abandoned_project_cache_temporaries,
+        discard_project_cache_temporaries, inspect_cache_namespace, list_cache_namespaces,
+        open_cache_writer_claim_storage, prepare_cache_storage, snapshot_active_cache_namespace,
+    },
 };
 
 /// Temporary namespace that keeps this development version's data separate
@@ -109,8 +113,37 @@ impl AppPaths {
         prepare_cache_storage(self, plan)
     }
 
+    pub fn open_cache_writer_claim_storage(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<CacheWriterClaimStorage>, AppPathsError> {
+        open_cache_writer_claim_storage(self, plan)
+    }
+
     pub fn clear_project_cache(&self, plan: &CachePathPlan) -> Result<bool, AppPathsError> {
         clear_project_cache(self, plan)
+    }
+
+    pub fn list_cache_namespaces(&self) -> Result<Vec<CachePathPlan>, AppPathsError> {
+        list_cache_namespaces(self)
+    }
+
+    pub fn inspect_cache_namespace(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
+        inspect_cache_namespace(self, plan)
+    }
+
+    /// Returns a non-authoritative occupied-byte snapshot for a namespace whose
+    /// external owner is still active. This value is display-only: callers must
+    /// acquire exclusive ownership and use `inspect_cache_namespace` before it
+    /// can authorize release or deletion.
+    pub fn snapshot_active_cache_namespace(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<Option<CacheNamespaceUsage>, AppPathsError> {
+        snapshot_active_cache_namespace(self, plan)
     }
 
     pub fn discard_project_cache_temporaries(
@@ -119,6 +152,13 @@ impl AppPaths {
         process_id: u32,
     ) -> Result<usize, AppPathsError> {
         discard_project_cache_temporaries(self, plan, process_id)
+    }
+
+    pub fn discard_abandoned_project_cache_temporaries(
+        &self,
+        plan: &CachePathPlan,
+    ) -> Result<usize, AppPathsError> {
+        discard_abandoned_project_cache_temporaries(self, plan)
     }
 
     pub fn recovery_dir(&self) -> PathBuf {

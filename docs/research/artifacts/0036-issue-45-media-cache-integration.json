@@ -1,0 +1,994 @@
+{
+    "schemaVersion":  1,
+    "gate":  "issue-45-media-cache-final-integration",
+    "issue":  45,
+    "collectedAtUtc":  "2026-08-20T02:00:54.5793881Z",
+    "fixedPoint":  "f6518d63b2c75656a58b6769e87abc318a913e23",
+    "gitCommit":  "0ea4fc76494322f217f6be879b120bad7f1bb736",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64"
+                 },
+    "counts":  {
+                   "topLevelChecks":  19,
+                   "contractBindings":  65,
+                   "frontendFiles":  27,
+                   "frontendTests":  218,
+                   "rustTests":  457,
+                   "rustSuiteResults":  29,
+                   "rustQualityCommands":  3,
+                   "imagingRecoveryChecks":  9,
+                   "windowsPathChecks":  11,
+                   "releaseArtifacts":  4,
+                   "ownedProcessesAfter":  0,
+                   "ownedListenersAfter":  0,
+                   "ownedProcessesStoppedAtFinalCleanup":  0,
+                   "ownedListenersObservedBeforeFinalCleanup":  0
+               },
+    "checks":  [
+                   {
+                       "name":  "fail-closed-preexisting-output-preflight",
+                       "passed":  true,
+                       "assertionCount":  7,
+                       "requiredOutputPathCount":  4,
+                       "sharedCargoTargetRequiredAbsent":  true,
+                       "ownedScratchRequiredAbsent":  true
+                   },
+                   {
+                       "name":  "fail-closed-named-proof-parser",
+                       "passed":  true,
+                       "assertionCount":  8
+                   },
+                   {
+                       "name":  "fail-closed-imaging-recovery-check-set",
+                       "passed":  true,
+                       "assertionCount":  16
+                   },
+                   {
+                       "name":  "fail-closed-windows-path-check-set",
+                       "passed":  true,
+                       "assertionCount":  18
+                   },
+                   {
+                       "name":  "fail-closed-post-proof-source-mutation",
+                       "passed":  true,
+                       "assertionCount":  1
+                   },
+                   {
+                       "name":  "owned-process-listener-cleanup-probe",
+                       "passed":  true,
+                       "assertionCount":  6,
+                       "stoppedProcessCount":  1,
+                       "observedListenerCount":  1,
+                       "independentSentinelSurvived":  true
+                   },
+                   {
+                       "name":  "clean-debug-sidecar-preparation",
+                       "passed":  true,
+                       "assertionCount":  2,
+                       "elapsedMs":  29782
+                   },
+                   {
+                       "name":  "rust-typescript-contracts",
+                       "passed":  true,
+                       "assertionCount":  65,
+                       "elapsedMs":  133294
+                   },
+                   {
+                       "name":  "frontend-tests",
+                       "passed":  true,
+                       "assertionCount":  218,
+                       "fileCount":  27,
+                       "elapsedMs":  30058
+                   },
+                   {
+                       "name":  "frontend-typecheck",
+                       "passed":  true,
+                       "assertionCount":  1,
+                       "elapsedMs":  8777
+                   },
+                   {
+                       "name":  "rust-tests",
+                       "passed":  true,
+                       "assertionCount":  457,
+                       "suiteResultCount":  29,
+                       "elapsedMs":  355713
+                   },
+                   {
+                       "name":  "rust-fmt-clippy-deny-warnings",
+                       "passed":  true,
+                       "assertionCount":  3,
+                       "elapsedMs":  433789
+                   },
+                   {
+                       "name":  "real-processor-cache-canvas-recovery",
+                       "passed":  true,
+                       "assertionCount":  9,
+                       "elapsedMs":  226147
+                   },
+                   {
+                       "name":  "windows-local-unc-mapped-long-paths",
+                       "passed":  true,
+                       "assertionCount":  11,
+                       "elapsedMs":  226529
+                   },
+                   {
+                       "name":  "release-build-and-nsis-package",
+                       "passed":  true,
+                       "assertionCount":  4,
+                       "elapsedMs":  593313
+                   },
+                   {
+                       "name":  "owned-process-lock-listener-cleanup",
+                       "passed":  true,
+                       "assertionCount":  4,
+                       "ownedProcessCount":  0,
+                       "ownedListenerCount":  0,
+                       "claimedPreexistingProcessIdentityCount":  0,
+                       "stoppedOwnedProcessCount":  0,
+                       "observedOwnedListenerCountBeforeCleanup":  0,
+                       "exclusiveArtifactLockFailures":  0
+                   },
+                   {
+                       "name":  "independent-windows-path-scratch-preservation",
+                       "passed":  true,
+                       "assertionCount":  2
+                   },
+                   {
+                       "name":  "isolated-cargo-target-cleanup",
+                       "passed":  true,
+                       "assertionCount":  5,
+                       "sharedCargoTargetUntouched":  true,
+                       "isolatedCargoTargetRemoved":  true,
+                       "runScratchRemoved":  true,
+                       "ownedScratchContainerRemoved":  true,
+                       "windowsPathScratchRemoved":  true
+                   },
+                   {
+                       "name":  "complete-fail-closed-design-0010-matrix",
+                       "passed":  true,
+                       "assertionCount":  15,
+                       "normativeRowCount":  14
+                   }
+               ],
+    "criteria":  [
+                     {
+                         "name":  "authorized-independent-empty-namespace",
+                         "passed":  true,
+                         "assertionCount":  2,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "authoritative-absent-unavailable-and-visual-context",
+                         "passed":  true,
+                         "assertionCount":  22,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "resolver_monitor_and_runtime_keep_observed_state_outside_media_refs",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "public_host_runtime_retry_reinspects_without_mutating_media_ref_or_project",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_rejects_a_missing_authoritative_observation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_rejects_an_occurrence_missing_from_the_authoritative_snapshot",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_rejects_available_occurrences_without_changing_runtime",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_rejects_absent_occurrences_without_changing_runtime",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_changes_unavailable_to_absent_after_authoritative_inspection",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_preserves_unavailable_when_the_new_context_still_cannot_access_the_root",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "explicit_retry_reacts_to_cache_before_committing_runtime",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "only_authoritative_media_availability_is_projected_to_the_product",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "registry_publication_failure_becomes_cache_unavailable_without_source_retry",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "offers retry only for an unavailable occurrence and keeps Relink exclusive to absent",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps recovery actions hidden until the first authoritative media observation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "retries an unavailable occurrence explicitly and refreshes it without Relink",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps retry actionable after an unavailable-media IPC failure without mutating Project",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "replaces unavailable retry with a cache-only failure after authoritative refresh",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "registers the media-change listener before the first preview demand",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "normalizes typed unavailable-media retry failures at the IPC adapter",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps the last known preview when linked media becomes unavailable",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "keeps the last representation only as visual context when the Original is absent",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "export_plan_rejects_missing_originals_at_the_typed_plan_stage",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "relink-occurrence-stable-change-and-reappearance",
+                         "passed":  true,
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "offers retry only for an unavailable occurrence and keeps Relink exclusive to absent",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "discardable-complete-index-and-candidate-validation",
+                         "passed":  true,
+                         "assertionCount":  6,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "duplicate_media_entries_make_the_discardable_cache_index_non_current",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_engine_publishes_index_last_reuses_and_invalidates_only_the_requested_media",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "failed_validation_discards_the_candidate_and_preserves_the_last_published_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_wrong_response_correlation_discards_the_unpublished_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_crashes_after_candidate_publication_leave_no_orphan_generation",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "request-fingerprint-variant-revalidation-and-obsolete-collection",
+                         "passed":  true,
+                         "assertionCount":  8,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "terminal_fingerprint_reopens_the_frozen_path_after_atomic_replacement",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "authoritative_demand_revision_rejects_queued_and_late_obsolete_work",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "failed_validation_discards_the_candidate_and_preserves_the_last_published_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "held_cache_storage_creates_and_drops_temporaries_in_the_physical_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "held_cache_storage_removes_only_the_physical_file_after_a_junction_swap",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "held_cache_storage_replaces_only_the_physical_file_after_a_junction_swap",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "recursive_cleanup_mutates_only_the_held_directory_after_a_junction_swap",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "processor-restart-once-then-nonblocking-suspension",
+                         "passed":  true,
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_processor_crashes_suspend_new_cache_work_after_one_restart",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "repeated_processor_failure_suspends_before_fallible_recovery_cleanup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "shows a non-blocking warning when repeated processor failures suspend Cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "registers the Cache warning listener before the first preview demand",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "tracer-44-host-death-and-real-recovery",
+                         "passed":  true,
+                         "assertionCount":  18,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "terminating_the_host_closes_its_job_and_terminates_the_active_processor",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "attach_rejects_a_recycled_pid_identity_without_containing_or_killing_the_observed_process",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "guarded_writer_claim_storage_publishes_reads_and_conditionally_removes_by_handle",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "writer_wait_finishes_in_the_held_namespace_and_preserves_external_claim_files",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "fragmented_handshake_preserves_the_exact_process_instance",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "processor_handshake_reports_the_exact_instance_seen_through_the_spawned_child_handle",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "free_closed_projects_after_host_death_waits_before_measuring_and_removing",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "clear_all_after_host_death_waits_before_measuring_and_removing",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "protocol",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "cache-temporary-cleanup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "imaging-sidecar-build",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "production-recovery-integration",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "cache-webview-canvas-export-journey",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "obsolete-cache-cancellation-integration",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "causal-cache-pause-integration",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "actual-tauri-webview2-build",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "imaging-recovery",
+                                            "name":  "actual-tauri-album-canvas-pixi-webview2",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "local-unc-mapped-and-long-paths",
+                         "passed":  true,
+                         "assertionCount":  4,
+                         "proofs":  [
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "path-contract",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "path-policy",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "real-mapped-unc",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "prepares_the_cache_only_as_directories_below_the_authorized_root",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "measure-free-reserve-and-safe-total-cleanup",
+                         "passed":  true,
+                         "assertionCount":  14,
+                         "proofs":  [
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "measures_and_frees_only_namespaces_without_an_active_owner",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "project_open_during_free_space_is_serialized_by_namespace_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "active_namespace_measurement_tolerates_real_writer_promotion_and_exclusive_files",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "scheduled_cleanup_keeps_the_runtime_responsive_until_the_exact_writer_exits",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "free_closed_projects_quiesces_writers_before_measuring_removed_bytes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "clear_all_quiesces_writers_before_measuring_removed_bytes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "free_closed_projects_after_host_death_waits_before_measuring_and_removing",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "clear_all_after_host_death_waits_before_measuring_and_removing",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reserved_namespace_recovery_discards_abandoned_files_and_preserves_indexed_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "active_namespace_with_different_windows_casing_is_never_releasable",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "active_cache_root_with_different_windows_casing_shares_every_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "scheduled_cleanup_never_reads_or_deletes_a_marker_through_a_state_junction",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "narrow-api-without-universal-coordinator",
+                         "passed":  true,
+                         "assertionCount":  7,
+                         "proofs":  [
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "cache_service_status",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "free_closed_project_cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "clear_all_cache",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "cache-service-source",
+                                            "name":  "no-bulk-cache-namespace-inspection",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "maps the Project and media ports to the desktop commands",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "frontend-tests",
+                                            "name":  "initializes the native dialog used by the productive relink command",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "global_cache_service_commands_are_explicitly_allowed_only_to_global_window",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     },
+                     {
+                         "name":  "complete-design-0010-producer-consumer-matrix",
+                         "passed":  true,
+                         "assertionCount":  25,
+                         "proofs":  [
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Projeto renomeado ou movido =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "`Salvar como` =\u003e a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Cópia externa gravável =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Cópia externa somente leitura =\u003e cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "original alterado =\u003e monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "original ausente =\u003e absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "origem de rede indisponível =\u003e absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "índice corrompido =\u003e corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "job obsoleto termina =\u003e obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "queda durante geração =\u003e reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Projeto abre durante `Liberar espaço` =\u003e project_open_during_free_space_is_serialized_by_namespace_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "limpeza total com Projeto ativo =\u003e schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Exportação =\u003e export_plan_rejects_missing_originals_at_the_typed_plan_stage",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "research-matrix",
+                                            "name":  "Projeto ou mídia em UNC =\u003e real-mapped-unc",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "cache_consumes_authoritative_identity_transitions_without_owning_them",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "a_new_authorized_identity_reserves_an_independent_empty_namespace",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "monitor_consolidates_rapid_observations_and_invalidates_only_stable_content_changes",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "absent_or_unavailable_media_preserves_the_last_known_preview_with_its_typed_state",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "corrupted_or_incompatible_index_is_discarded_and_rebuilt",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "obsolete_job_that_finishes_does_not_publish_and_discards_its_candidate_generation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "reopening_after_host_death_recovers_the_contained_processors_temporary",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "project_open_during_free_space_is_serialized_by_namespace_reservation",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "schedules_total_cleanup_while_a_project_is_active_and_runs_it_at_safe_startup",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "rust-tests",
+                                            "name":  "export_plan_rejects_missing_originals_at_the_typed_plan_stage",
+                                            "matchCount":  1
+                                        },
+                                        {
+                                            "source":  "windows-paths",
+                                            "name":  "real-mapped-unc",
+                                            "matchCount":  1
+                                        }
+                                    ]
+                     }
+                 ],
+    "nestedEvidence":  {
+                           "imaging":  {
+                                           "schemaVersion":  1,
+                                           "checks":  9,
+                                           "checkNames":  [
+                                                              "protocol",
+                                                              "cache-temporary-cleanup",
+                                                              "imaging-sidecar-build",
+                                                              "production-recovery-integration",
+                                                              "cache-webview-canvas-export-journey",
+                                                              "obsolete-cache-cancellation-integration",
+                                                              "causal-cache-pause-integration",
+                                                              "actual-tauri-webview2-build",
+                                                              "actual-tauri-album-canvas-pixi-webview2"
+                                                          ],
+                                           "cache":  {
+                                                         "failedProcessId":  37704,
+                                                         "foreignTemporarySurvivedCleanup":  true,
+                                                         "generatedCountAfterRestart":  1,
+                                                         "metadataExistedAfterFailure":  false,
+                                                         "metadataExistedAfterRestart":  true,
+                                                         "removedTemporaryCount":  1,
+                                                         "restartedProcessId":  16116,
+                                                         "temporaryExistedAfterCleanup":  false,
+                                                         "temporaryObservedAfterFailure":  true
+                                                     },
+                                           "canvas":  {
+                                                          "backgroundUrlOpaque":  true,
+                                                          "canvasReferencePixel":  [
+                                                                                       102,
+                                                                                       64,
+                                                                                       82
+                                                                                   ],
+                                                          "channelDelta":  [
+                                                                               0,
+                                                                               1,
+                                                                               0
+                                                                           ],
+                                                          "compositionMediaOrder":  [
+                                                                                        "be54e231-dad5-42ff-922c-da477281e193",
+                                                                                        "41dbab0d-77b0-40ce-8b08-2a5d756593dc"
+                                                                                    ],
+                                                          "equivalentBackgroundDemandCount":  2,
+                                                          "finalJpegPixel":  [
+                                                                                 102,
+                                                                                 63,
+                                                                                 82
+                                                                             ],
+                                                          "finalOutputSha256":  "9c337fd61b8c1e4362091722f2c75dedc08d020e543dfc88aa0d23e7573891dd",
+                                                          "finalSourceCount":  2,
+                                                          "originalBytesExposedToWebView":  false,
+                                                          "originalPathExposedToWebView":  false,
+                                                          "overlayUrlOpaque":  true,
+                                                          "processorIds":  [
+                                                                               36096,
+                                                                               33376,
+                                                                               13952
+                                                                           ],
+                                                          "singleFlightGenerationId":  "g-a419af3738444d59bad1f8d97235a067",
+                                                          "singleFlightProcessorCount":  1,
+                                                          "tauriProjectPath":  "C:\\Users\\Usuario\\.codex\\worktrees\\9de5\\my-Albuns\\.scratch\\ir-26748-0f1c29\\tauri-canvas-fixture\\CanvasJourney.myalbuns",
+                                                          "actualTauriApp":  true,
+                                                          "actualAlbumCanvas":  true,
+                                                          "actualPixiRuntime":  true,
+                                                          "browserProcess":  "Tauri WebView2 via tauri-driver",
+                                                          "tauriDriverVersion":  "2.0.6",
+                                                          "nativeDriverVersion":  "151.0.4129.93",
+                                                          "webView2RuntimeVersion":  "151.0.4129.93",
+                                                          "opaqueResourceCount":  2,
+                                                          "canvasScreenshotScope":  "canvas-element",
+                                                          "actualCanvasSamplePoint":  [
+                                                                                          574,
+                                                                                          309
+                                                                                      ],
+                                                          "actualCanvasPixel":  [
+                                                                                    103,
+                                                                                    65,
+                                                                                    83
+                                                                                ],
+                                                          "actualCanvasDelta":  [
+                                                                                    1,
+                                                                                    1,
+                                                                                    1
+                                                                                ]
+                                                      },
+                                           "pause":  {
+                                                         "cacheBlockedWhileExportLease":  true,
+                                                         "cacheIndexAfterCancellation":  false,
+                                                         "cancelledProcessId":  12296,
+                                                         "cancelledProcessReaped":  true,
+                                                         "cancelledStage":  "cancelled",
+                                                         "pauseReason":  "paused",
+                                                         "processorExclusiveWhileExportLease":  true,
+                                                         "resumedAfterExportTerminal":  true,
+                                                         "resumedGenerationPublished":  true,
+                                                         "resumedProcessId":  29180
+                                                     },
+                                           "obsolete":  {
+                                                            "cacheIndexAfterCancellation":  false,
+                                                            "cancellationReason":  "obsolete",
+                                                            "cancelledProcessId":  6436,
+                                                            "cancelledProcessReaped":  true,
+                                                            "cancelledStage":  "cancelled",
+                                                            "resumableAfterCancellation":  false,
+                                                            "singleFlightDemandCount":  2,
+                                                            "singleFlightProcessorCount":  1,
+                                                            "waiterObservedCancellation":  true
+                                                        }
+                                       },
+                           "windowsPaths":  {
+                                                "schemaVersion":  2,
+                                                "checks":  11,
+                                                "paths":  {
+                                                              "bindingReusedAfterRemapWithinAttempt":  true,
+                                                              "cacheUnderLocalAppData":  true,
+                                                              "explicitRetryRecaptured":  true,
+                                                              "firstPlanSha256":  "ff22e92d32a2af71e47a58780e8f2425bb7680fa8e8822bac637e6bf8b54dacc",
+                                                              "identityFailure":  "indeterminate",
+                                                              "lockReleasedAfterOwnerDrop":  true,
+                                                              "mappedAndLocalIdentity":  "same",
+                                                              "mappedAndUncIdentity":  "same",
+                                                              "mappedRootKind":  "disk",
+                                                              "operationalRootKind":  "unc",
+                                                              "physicalAliasLockConflict":  true,
+                                                              "planRoundTripLossless":  true,
+                                                              "plansDistinct":  true,
+                                                              "readOnlyBatchAllowedWhileLocked":  true,
+                                                              "retryPlanSha256":  "a816380a9821c757fda3ea87007fddeef1e5c0b1f55834086e785ddcbd3cf403",
+                                                              "stagingInsideDestination":  true,
+                                                              "unavailableBinding":  "unavailable",
+                                                              "uncExportPublished":  true,
+                                                              "verbatimMappedBindingFrozenAsUnc":  true
+                                                          },
+                                                "sidecar":  {
+                                                                "explicitRetryPublished":  true,
+                                                                "mappingRemovedBeforeDispatch":  true,
+                                                                "outputPublishedOnUnc":  true,
+                                                                "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
+                                                                "processorPid":  10188,
+                                                                "processorUsedFrozenOperationalPath":  true,
+                                                                "rootBindingPlanSha256":  "c7c707e318af18566848f2fbcacd3a95aa6bfb052fb1b93f71be75049ab3450d",
+                                                                "stagingRemoved":  true,
+                                                                "unavailableAttemptStartedProcessor":  false,
+                                                                "unavailableBindingFailedAtPrepare":  true
+                                                            },
+                                                "longPathAware":  {
+                                                                      "desktop":  true,
+                                                                      "imagingSidecar":  true
+                                                                  }
+                                            }
+                       },
+    "releaseArtifacts":  [
+                             {
+                                 "name":  "desktop-release",
+                                 "bytes":  17815552,
+                                 "sha256":  "09fce8269430d5a248d0375e12c255b9c7d5ac1c8e445783f4cc96d54939b62c"
+                             },
+                             {
+                                 "name":  "imaging-release",
+                                 "bytes":  3628032,
+                                 "sha256":  "d9798795932e59f2ff09c8e152e6f33fe801ed94e6beeef919039f860cc340b9"
+                             },
+                             {
+                                 "name":  "prepared-sidecar",
+                                 "bytes":  3628032,
+                                 "sha256":  "d9798795932e59f2ff09c8e152e6f33fe801ed94e6beeef919039f860cc340b9"
+                             },
+                             {
+                                 "name":  "nsis-installer",
+                                 "bytes":  5067796,
+                                 "sha256":  "7f4defeeff76052c9a8f49db7e2d39fe940d4c12c660a6d5db0edf2d6162afb6"
+                             }
+                         ],
+    "cleanup":  {
+                    "runScratchRemoved":  true,
+                    "ownedScratchContainerRemoved":  true,
+                    "windowsPathScratchRemoved":  true,
+                    "independentWindowsPathScratchPreserved":  true,
+                    "independentWindowsPathScratchProbeRemoved":  true,
+                    "isolatedCargoTargetRemoved":  true,
+                    "sharedCargoTargetUntouched":  true,
+                    "preparedSidecarRemoved":  true,
+                    "distRemoved":  true,
+                    "ownedProcesses":  0,
+                    "ownedListeners":  0,
+                    "claimedPreexistingProcessIdentities":  0,
+                    "stoppedOwnedProcesses":  0,
+                    "observedOwnedListenersBeforeCleanup":  0,
+                    "artifactLocks":  0
+                }
+}

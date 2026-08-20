@@ -3,7 +3,11 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(windows)]
-use std::time::{Duration, Instant};
+use std::{
+    ffi::c_void,
+    os::windows::io::AsRawHandle,
+    time::{Duration, Instant},
+};
 
 use image::{ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
 use myalbuns_core::{
@@ -16,11 +20,12 @@ use myalbuns_imaging_protocol::{
     CacheArtifact, CacheArtifactFormat, CacheArtifactProperties, CacheJob, CacheMediaSource,
     CacheRepresentationPolicy, CacheRequest, CacheReusableGeneration, IMAGING_PROTOCOL_VERSION,
     ImagingCommand, ImagingFailure, ImagingFailureCode, ImagingFailureStage, ImagingPathCode,
-    ImagingRequest, ImagingResponse, RenderSource, decode_event_stream, root_binding_plan_sha256,
+    ImagingRequest, ImagingResponse, PROCESSOR_HANDSHAKE_CHALLENGE_ENV, RenderSource,
+    decode_event_stream, decode_processor_handshake, root_binding_plan_sha256,
 };
 use myalbuns_paths::{
-    AppPaths, CachePathPlan, NativePathDto, OperationPathContext, RootBindingPlan,
-    project_data_namespace,
+    AppPaths, CachePathPlan, NativePathDto, OperationPathContext, ProcessInstanceId,
+    RootBindingPlan, project_data_namespace,
 };
 use sha2::{Digest, Sha256};
 #[cfg(windows)]
@@ -435,6 +440,38 @@ fn processor_advertises_the_protocol_version_used_by_external_runners() {
         IMAGING_PROTOCOL_VERSION.to_string()
     );
     assert!(output.stderr.is_empty());
+}
+
+#[cfg(windows)]
+#[test]
+fn processor_handshake_reports_the_exact_instance_seen_through_the_spawned_child_handle() {
+    let challenge = "cli_launch_exact_instance";
+    let child = Command::new(env!("CARGO_BIN_EXE_myalbuns-imaging"))
+        .env(PROCESSOR_HANDSHAKE_CHALLENGE_ENV, challenge)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("the Processor starts");
+    let expected =
+        ProcessInstanceId::from_process_handle(child.id(), child.as_raw_handle().cast::<c_void>())
+            .expect("the causal child handle exposes its exact identity");
+    let process_id = child.id();
+    let output = child
+        .wait_with_output()
+        .expect("the Processor exits after its empty input");
+    let line_end = output
+        .stdout
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .expect("the handshake line is present");
+
+    assert_eq!(
+        decode_processor_handshake(&output.stdout[..=line_end], challenge, process_id)
+            .expect("the handshake is bound to this launch"),
+        expected
+    );
+    assert_eq!(line_end + 1, output.stdout.len());
 }
 
 #[test]

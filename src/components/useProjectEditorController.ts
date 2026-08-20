@@ -89,6 +89,7 @@ export function useProjectEditorController({
     updateZoomGesture: photoGestures.updateZoomGesture,
     finishZoomGesture: photoGestures.finishZoomGesture,
     applyDpi: mutations.applyDpi,
+    relinkMedia: mutations.relinkMedia,
     save: mutations.save,
     undo: mutations.undo,
     redo: mutations.redo,

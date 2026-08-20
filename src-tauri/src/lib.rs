@@ -1,6 +1,7 @@
 mod cache_activity_gate;
 mod cache_engine;
 mod cache_previews;
+mod cache_service;
 mod desktop_webview_policy;
 #[cfg(debug_assertions)]
 mod dev_descendant_job;
@@ -22,11 +23,13 @@ pub mod ipc_contract;
 mod logging;
 mod media_preview_commands;
 mod media_runtime;
+mod named_mutex;
 mod native_project_dialog;
 mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
+mod processor_lifetime;
 mod product_runtime;
 mod project_bootstrap;
 mod project_close_commands;
@@ -218,6 +221,33 @@ mod tests {
         ] {
             assert!(global_commands.contains(command));
             assert!(!project_commands.contains(command));
+        }
+    }
+
+    #[test]
+    fn global_cache_service_commands_are_explicitly_allowed_only_to_global_window() {
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+        let project_commands = allowed_commands(&project_permission);
+        let global_commands = allowed_commands(&global_permission);
+
+        for command in [
+            "cache_service_status",
+            "free_closed_project_cache",
+            "clear_all_cache",
+        ] {
+            assert!(
+                global_commands.contains(command),
+                "the Global capability must explicitly allow {command}"
+            );
+            assert!(
+                !project_commands.contains(command),
+                "the Project capability must not inherit {command}"
+            );
         }
     }
 

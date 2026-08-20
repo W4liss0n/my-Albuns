@@ -29,6 +29,7 @@ interface ProjectWorkspaceProps {
   runProjectMutation: ProjectMutationRunner;
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
+  onRetryUnavailableMedia(mediaId: string): Promise<void>;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
 }
@@ -40,6 +41,7 @@ export function ProjectWorkspace({
   runProjectMutation,
   mediaPreviews = {},
   onMediaDemandChange,
+  onRetryUnavailableMedia,
   onProjectionChange,
   onGraphicsUnavailable,
 }: ProjectWorkspaceProps) {
@@ -276,6 +278,11 @@ export function ProjectWorkspace({
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
+          onRelinkMedia={controller.relinkMedia}
+          onRetryUnavailableMedia={onRetryUnavailableMedia}
+          relinkDisabled={
+            Boolean(busy) || exportActive || projectClose.interactionBlocked
+          }
         />
       </div>
 

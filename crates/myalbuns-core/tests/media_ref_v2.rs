@@ -4,7 +4,7 @@ use std::fs;
 
 use myalbuns_core::{
     DocumentFailure, LoadProjectError, MediaId, MediaKind, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, RenderSnapshotRef, SaveProjectOutcome,
+    ProjectIntent, ProjectLocation, RelinkMedia, RenderSnapshotRef, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -183,6 +183,49 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
     assert_eq!(persisted["schemaVersion"], 2);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
+}
+
+#[test]
+fn public_relink_command_updates_only_the_selected_occurrence_and_participates_in_history() {
+    let root = tempfile::tempdir().expect("temporary relink Project");
+    let project_path = root.path().join("Projeto religado.myalbuns");
+    fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
+        .expect("the v2 fixture is written");
+    let mut project = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the v2 Project is positively authorized");
+    let selected_id: MediaId = "00000000-0000-4000-8000-000000000010"
+        .parse()
+        .expect("the selected occurrence has a canonical identity");
+    let replacement = root.path().join("Foto religada.jpg");
+    let untouched_path = project.project().media()[1].path().to_path_buf();
+
+    let relinked = project
+        .relink_media(RelinkMedia::new(selected_id, replacement.clone()))
+        .expect("the public Session command relinks the selected occurrence");
+
+    assert_eq!(relinked.state.revision, 1);
+    assert!(relinked.state.dirty);
+    assert!(relinked.state.can_undo);
+    assert_eq!(project.project().media()[0].path(), replacement);
+    assert_eq!(project.project().media()[1].path(), untouched_path);
+
+    project.undo().expect("RelinkMedia participates in Undo");
+    assert_ne!(project.project().media()[0].path(), replacement);
+    project.redo().expect("RelinkMedia participates in Redo");
+    assert_eq!(project.project().media()[0].path(), replacement);
+    project
+        .save(project.revision())
+        .expect("RelinkMedia persists through the normal Save handshake");
+    drop(project);
+
+    let reopened = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"))
+        .open_editable(OpenProjectRequest::new(location(&project_path)))
+        .expect("the relinked Project reopens");
+    assert_eq!(reopened.project().media()[0].path(), replacement);
+    assert_eq!(reopened.project().media()[1].path(), untouched_path);
 }
 
 #[test]

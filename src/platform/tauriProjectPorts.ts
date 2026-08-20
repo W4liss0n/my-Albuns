@@ -17,6 +17,7 @@ import {
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
+import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./generated/CacheProcessorWarning";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
@@ -148,6 +149,8 @@ export const tauriProjectCorePort: ProjectCorePort = {
     invoke<EditorProjection>("project_state", { operationId }),
   apply: (intent: ProjectIntent) =>
     invoke<EditorProjection>("apply_project_intent", { intent }),
+  relink: (mediaId) =>
+    invoke<EditorProjection>("relink_media", { mediaId }),
   undo: () => invoke<EditorProjection>("undo_project"),
   redo: () => invoke<EditorProjection>("redo_project"),
   save: async (expectedRevision) => {
@@ -174,10 +177,21 @@ export const tauriMediaPreviewPort: MediaPreviewPort = {
         throw normalizeMediaPreviewError(error);
       },
     ),
+  retryUnavailableMedia: (mediaId) =>
+    invoke<IpcMediaPreview>("retry_unavailable_media", { mediaId }).catch(
+      (error: unknown) => {
+        throw normalizeMediaPreviewError(error);
+      },
+    ),
   onMediaChanged: (listener) =>
     listen<IpcLinkedMediaChanged>(
       "myalbuns://linked-media-changed",
       ({ payload }) => listener(payload.mediaIds),
+    ),
+  onCacheProcessorWarning: (listener) =>
+    listen<IpcCacheProcessorWarning>(
+      "myalbuns://cache-processor-warning",
+      ({ payload }) => listener(payload),
     ),
 };
 

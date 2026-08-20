@@ -117,6 +117,7 @@ pub enum MediaPreviewState {
     Ready,
     Absent,
     Unavailable,
+    CacheUnavailable,
 }
 
 #[derive(Deserialize, TS)]
@@ -141,11 +142,70 @@ pub struct LinkedMediaChanged {
     pub(crate) media_ids: Vec<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheProcessorState {
+    Suspended,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheProcessorWarning {
+    pub(crate) state: CacheProcessorState,
+    pub(crate) message: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheServiceStatus {
+    pub(crate) occupied_bytes: u64,
+    pub(crate) releasable_bytes: u64,
+    pub(crate) namespace_count: usize,
+    pub(crate) releasable_namespace_count: usize,
+    pub(crate) clear_all_scheduled: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheFreeResult {
+    pub(crate) measured_releasable_bytes: u64,
+    pub(crate) freed_bytes: u64,
+    pub(crate) removed_namespace_count: usize,
+    pub(crate) skipped_active_namespace_count: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum CacheClearAllOutcome {
+    Cleared { result: CacheFreeResult },
+    Scheduled,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheServiceCommandErrorCode {
+    Busy,
+    StorageUnavailable,
+    ReservationUnavailable,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheServiceCommandError {
+    pub(crate) code: CacheServiceCommandErrorCode,
+    pub(crate) message: String,
+}
+
 #[cfg(test)]
 mod media_change_contract_tests {
     use serde_json::json;
 
-    use super::LinkedMediaChanged;
+    use super::{CacheProcessorState, CacheProcessorWarning, LinkedMediaChanged};
 
     #[test]
     fn stable_media_change_event_exposes_only_opaque_media_identities() {
@@ -156,6 +216,22 @@ mod media_change_contract_tests {
         assert_eq!(
             serde_json::to_value(event).expect("the event serializes"),
             json!({ "mediaIds": ["photo-a", "overlay-a"] })
+        );
+    }
+
+    #[test]
+    fn cache_processor_warning_is_typed_and_does_not_block_project_commands() {
+        let warning = CacheProcessorWarning {
+            state: CacheProcessorState::Suspended,
+            message: "O Cache foi suspenso.".into(),
+        };
+
+        assert_eq!(
+            serde_json::to_value(warning).expect("the warning serializes"),
+            json!({
+                "state": "suspended",
+                "message": "O Cache foi suspenso."
+            })
         );
     }
 }

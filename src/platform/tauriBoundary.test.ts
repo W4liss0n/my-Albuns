@@ -3,6 +3,8 @@ import globalWindowCapability from "../../src-tauri/capabilities/global.json?raw
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
 import globalWindowPermission from "../../src-tauri/permissions/global-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
+import productRuntimeSource from "../../src-tauri/src/product_runtime.rs?raw";
+import projectCommandsSource from "../../src-tauri/src/project_commands.rs?raw";
 
 const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
   eager: true,
@@ -18,6 +20,11 @@ const tauriCommandSources = {
 
 const compositionRoots = new Set(["../main.tsx", "../global/main.tsx"]);
 const platformDirectories = ["../platform/", "../global/platform/"];
+const issue16GlobalCacheCommands = new Set([
+  "cache_service_status",
+  "free_closed_project_cache",
+  "clear_all_cache",
+]);
 
 function findOffenders(
   isOffender: (path: string, source: string) => boolean,
@@ -130,6 +137,10 @@ test("keeps the project-window capability aligned with the invoked commands", ()
 
 test("keeps the global-window capability isolated from project commands", () => {
   const globalCommands = extractInvokedCommands(tauriCommandSources.global);
+  const explicitGlobalSurface = new Set([
+    ...globalCommands,
+    ...issue16GlobalCacheCommands,
+  ]);
   const projectCommands = extractInvokedCommands([
     ...tauriCommandSources.shared,
     ...tauriCommandSources.project,
@@ -140,7 +151,9 @@ test("keeps the global-window capability isolated from project commands", () => 
   );
 
   expect(capability.windows).toEqual(["global"]);
-  expect([...allowedCommands].sort()).toEqual([...globalCommands].sort());
+  expect([...allowedCommands].sort()).toEqual(
+    [...explicitGlobalSurface].sort(),
+  );
   expect(
     [...allowedCommands].filter((command) => projectCommands.has(command)),
   ).toEqual([]);
@@ -160,5 +173,13 @@ test("uses only the minimal Tauri core and event bridges", () => {
     "@tauri-apps/api/core",
     "@tauri-apps/api/event",
   ]);
+  expect(projectWindowCapability).not.toContain("dialog:");
+});
+
+test("initializes the native dialog used by the productive relink command", () => {
+  expect(projectCommandsSource).toContain("app.dialog()");
+  expect(productRuntimeSource).toContain(
+    ".plugin(tauri_plugin_dialog::init())",
+  );
   expect(projectWindowCapability).not.toContain("dialog:");
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GraphicsDiagnostic,
@@ -11,6 +11,7 @@ import {
 } from "./application/logging";
 import type {
   ExportPipelinePort,
+  CacheProcessorWarning,
   MediaPreview,
   MediaPreviewDemand,
   MediaPreviewPort,
@@ -39,6 +40,11 @@ interface AppProps {
   logger: Logger;
 }
 
+interface MediaPreviewSubscription {
+  projectId: string;
+  port: MediaPreviewPort;
+}
+
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -63,8 +69,19 @@ function App({
     preloadMediaIds: [],
   });
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
+  const [cacheProcessorWarning, setCacheProcessorWarning] =
+    useState<CacheProcessorWarning | null>(null);
+  const [mediaChangeSubscription, setMediaChangeSubscription] =
+    useState<MediaPreviewSubscription | null>(null);
+  const [cacheWarningSubscription, setCacheWarningSubscription] =
+    useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
+  const loggerRef = useRef(logger);
+
+  useEffect(() => {
+    loggerRef.current = logger;
+  }, [logger]);
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -127,6 +144,43 @@ function App({
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId ?? "";
+  const retryUnavailableMedia = useCallback(
+    async (mediaId: string) => {
+      const operationId = createLogInstanceId("media-retry");
+      logger.write({
+        level: "info",
+        component: "media-preview",
+        event: "media_retry_started",
+        operationId,
+        projectId,
+      });
+      try {
+        const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
+        setMediaPreviews((current) => ({
+          ...current,
+          [mediaId]: preview,
+        }));
+        setMediaRefreshRevision((revision) => revision + 1);
+        logger.write({
+          level: "info",
+          component: "media-preview",
+          event: "media_retry_completed",
+          operationId,
+          projectId,
+        });
+      } catch (error: unknown) {
+        logger.write({
+          level: "warn",
+          component: "media-preview",
+          event: "media_retry_failed",
+          operationId,
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      }
+    },
+    [logger, mediaPreviewPort, projectId],
+  );
   useEffect(() => {
     if (!projectId || uiReadyProject.current === projectId) return;
     uiReadyProject.current = projectId;
@@ -160,6 +214,10 @@ function App({
       .then((dispose) => {
         if (active) {
           unlisten = dispose;
+          setMediaChangeSubscription({
+            projectId,
+            port: mediaPreviewPort,
+          });
         } else {
           dispose();
         }
@@ -177,15 +235,74 @@ function App({
     return () => {
       active = false;
       unlisten?.();
+      setMediaChangeSubscription((current) =>
+        current?.projectId === projectId && current.port === mediaPreviewPort
+          ? null
+          : current,
+      );
     };
   }, [logger, mediaPreviewPort, projectId]);
+
+  useEffect(() => {
+    setCacheProcessorWarning(null);
+    if (!projectId) return;
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void mediaPreviewPort
+      .onCacheProcessorWarning((warning) => {
+        if (active) setCacheProcessorWarning(warning);
+      })
+      .then((dispose) => {
+        if (active) {
+          unlisten = dispose;
+          setCacheWarningSubscription({
+            projectId,
+            port: mediaPreviewPort,
+          });
+        } else {
+          dispose();
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        loggerRef.current.write({
+          level: "warn",
+          component: "media-preview",
+          event: "cache_processor_warning_subscription_failed",
+          projectId,
+          reason: logReasonFromError(error),
+        });
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+      setCacheWarningSubscription((current) =>
+        current?.projectId === projectId && current.port === mediaPreviewPort
+          ? null
+          : current,
+      );
+    };
+  }, [mediaPreviewPort, projectId]);
 
   useEffect(() => {
     setMediaPreviews({});
   }, [projectId]);
 
+  const cacheWarningListenerReady =
+    cacheWarningSubscription?.projectId === projectId &&
+    cacheWarningSubscription.port === mediaPreviewPort;
+  const mediaChangeListenerReady =
+    mediaChangeSubscription?.projectId === projectId &&
+    mediaChangeSubscription.port === mediaPreviewPort;
+
   useEffect(() => {
-    if (!projectId) return;
+    if (
+      !projectId ||
+      !cacheWarningListenerReady ||
+      !mediaChangeListenerReady
+    ) {
+      return;
+    }
     if (mediaDemandSequence.current.projectId !== projectId) {
       mediaDemandSequence.current = { projectId, revision: 0 };
     }
@@ -244,9 +361,11 @@ function App({
       active = false;
     };
   }, [
+    cacheWarningListenerReady,
     editorGraphics.supported,
     logger,
     mediaDemand,
+    mediaChangeListenerReady,
     mediaRefreshRevision,
     mediaPreviewPort,
     projectId,
@@ -284,6 +403,17 @@ function App({
       <CanvasGraphicsDiagnosticProbeProvider
         probe={canvasGraphicsDiagnosticProbe}
       >
+        {cacheProcessorWarning && (
+          <aside
+            className="cache-runtime-warning"
+            role="status"
+            aria-label="Cache suspenso"
+          >
+            <strong>Cache suspenso</strong>
+            <span>{cacheProcessorWarning.message}</span>
+            <small>A edição e o Salvamento continuam disponíveis.</small>
+          </aside>
+        )}
         <ProjectWorkspace
           projection={projection}
           exportPipelinePort={exportPipelinePort}
@@ -291,6 +421,7 @@ function App({
           runProjectMutation={runProjectMutation}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setMediaDemand}
+          onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
         />

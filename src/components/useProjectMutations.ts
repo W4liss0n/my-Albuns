@@ -131,6 +131,10 @@ export function useProjectMutations({
         dpi,
       });
     },
+    relinkMedia: (mediaId: string) =>
+      void runWithGlobalFeedback("Religando arquivo", (port) =>
+        port.relink(mediaId),
+      ),
     save: () => void saveVisibleRevision(),
     undo: () =>
       void runWithGlobalFeedback("Desfazendo", (port) =>

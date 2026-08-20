@@ -196,6 +196,7 @@ function projectCorePortWithApply(
   return {
     load: async () => projection,
     apply,
+    relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
     save: async () => {
@@ -206,15 +207,17 @@ function projectCorePortWithApply(
 
 type TestProjectWorkspaceProps = Omit<
   ComponentProps<typeof ProjectWorkspaceView>,
-  "runProjectMutation" | "projectWindowPort"
+  "runProjectMutation" | "projectWindowPort" | "onRetryUnavailableMedia"
 > & {
   projectCorePort: ProjectCorePort;
   projectWindowPort?: ProjectWindowPort;
+  onRetryUnavailableMedia?: (mediaId: string) => Promise<void>;
 };
 
 function ProjectWorkspace({
   projectCorePort,
   projectWindowPort = inertProjectWindowPort,
+  onRetryUnavailableMedia = async () => undefined,
   projection,
   ...props
 }: TestProjectWorkspaceProps) {
@@ -228,6 +231,7 @@ function ProjectWorkspace({
       projection={projection}
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
+      onRetryUnavailableMedia={onRetryUnavailableMedia}
     />
   );
 }
@@ -898,6 +902,103 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
     mediaPreviewUrls,
   );
+});
+
+test("offers retry only for an unavailable occurrence and keeps Relink exclusive to absent", async () => {
+  const fourStateProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        media: [
+          ...projection.state.album.media,
+          {
+            ...projection.state.album.media[0],
+            id: "media-004",
+            name: "Floresta.jpg",
+          },
+        ],
+      },
+    },
+    mediaUsage: [
+      ...projection.mediaUsage,
+      { mediaId: "media-004", count: 0 },
+    ],
+  };
+  const relinkedProjection: EditorProjection = {
+    ...fourStateProjection,
+    state: {
+      ...fourStateProjection.state,
+      revision: fourStateProjection.state.revision + 1,
+      dirty: true,
+      canUndo: true,
+    },
+  };
+  const relink = vi.fn<ProjectCorePort["relink"]>(async () =>
+    relinkedProjection
+  );
+  const projectCorePort: ProjectCorePort = {
+    ...projectCorePortWithApply(async () => projection),
+    relink,
+  };
+  const onProjectionChange = vi.fn();
+  const onRetryUnavailableMedia = vi.fn(async () => undefined);
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={fourStateProjection}
+      projectCorePort={projectCorePort}
+      mediaPreviews={{
+        "media-001": {
+          mediaId: "media-001",
+          state: "absent",
+          url: "asset://localhost/cache/media-001-last.jpg",
+        },
+        "media-002": {
+          mediaId: "media-002",
+          state: "unavailable",
+          url: null,
+        },
+        "media-003": {
+          mediaId: "media-003",
+          state: "cache_unavailable",
+          url: "asset://localhost/cache/media-003-last.jpg",
+        },
+        "media-004": {
+          mediaId: "media-004",
+          state: "ready",
+          url: "asset://localhost/cache/media-004.jpg",
+        },
+      }}
+      onRetryUnavailableMedia={onRetryUnavailableMedia}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(
+    screen.getAllByRole("button", { name: /Religar arquivo de/i }),
+  ).toHaveLength(1);
+  expect(
+    screen.getAllByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  ).toHaveLength(1);
+  expect(screen.getByRole("status", { name: /Prévia indisponível/i }))
+    .toBeInTheDocument();
+  const availabilityStatuses = screen.getAllByRole("status");
+  expect(availabilityStatuses).toHaveLength(3);
+  for (const status of availabilityStatuses) {
+    expect(status).toHaveTextContent(status.getAttribute("aria-label") ?? "");
+  }
+  fireEvent.click(
+    screen.getByRole("button", { name: /Religar arquivo de/i }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: /Tentar novamente o arquivo de/i }),
+  );
+
+  await waitFor(() => expect(relink).toHaveBeenCalledWith("media-001"));
+  expect(onRetryUnavailableMedia).toHaveBeenCalledWith("media-002");
+  expect(onProjectionChange).toHaveBeenLastCalledWith(relinkedProjection);
 });
 
 test("merges only Panel viewport and one-row preload margin with Canvas demand", async () => {

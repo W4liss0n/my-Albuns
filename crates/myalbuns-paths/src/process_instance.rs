@@ -1,11 +1,17 @@
 #[cfg(windows)]
-use std::io;
+use std::{
+    io,
+    os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    time::Duration,
+};
 
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 
 #[cfg(windows)]
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, FILETIME, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT},
+    Foundation::{
+        ERROR_INVALID_PARAMETER, FILETIME, HANDLE, WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    },
     System::Threading::{
         GetCurrentProcess, GetProcessTimes, INFINITE, OpenProcess,
         PROCESS_QUERY_LIMITED_INFORMATION, WaitForSingleObject,
@@ -78,7 +84,8 @@ impl<'de> Deserialize<'de> for ProcessInstanceId {
 /// The handle keeps the process object alive, so its PID cannot be reassigned
 /// while callers inspect windows or coordinate lifecycle through this guard.
 #[cfg(windows)]
-pub struct ProcessInstanceHandle(HANDLE);
+#[derive(Debug)]
+pub struct ProcessInstanceHandle(OwnedHandle);
 
 #[cfg(windows)]
 impl ProcessInstanceHandle {
@@ -88,6 +95,24 @@ impl ProcessInstanceHandle {
     /// identity and liveness are part of this constructor's contract. Callers
     /// may add the native rights required by their concrete operation.
     pub fn open(expected: ProcessInstanceId, additional_access: u32) -> io::Result<Self> {
+        Self::open_if_running(expected, additional_access)?.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "the expected process instance is no longer running",
+            )
+        })
+    }
+
+    /// Opens the exact process instance when it is still running.
+    ///
+    /// `Ok(None)` is returned only after proving that the PID is absent, now
+    /// belongs to another creation time, or already reached its signaled exit
+    /// state. Access and query failures remain errors so lifecycle consumers
+    /// fail closed instead of mistaking an unobservable process for a dead one.
+    pub fn open_if_running(
+        expected: ProcessInstanceId,
+        additional_access: u32,
+    ) -> io::Result<Option<Self>> {
         // SAFETY: ProcessInstanceId guarantees a non-zero PID. The returned
         // non-inheritable handle is immediately wrapped by this owned guard.
         let handle = unsafe {
@@ -98,30 +123,35 @@ impl ProcessInstanceHandle {
             )
         };
         if handle.is_null() {
-            return Err(io::Error::last_os_error());
+            let error = io::Error::last_os_error();
+            return if error.raw_os_error() == Some(ERROR_INVALID_PARAMETER as i32) {
+                Ok(None)
+            } else {
+                Err(error)
+            };
         }
-        let process = Self(handle);
-        let observed = ProcessInstanceId::from_process_handle(expected.process_id(), process.0)?;
+        // SAFETY: OpenProcess returned a new owned handle which is transferred
+        // exactly once to OwnedHandle. Windows kernel handles are process-wide,
+        // so this guard can safely move with async work between Host threads.
+        let process = Self(unsafe { OwnedHandle::from_raw_handle(handle) });
+        let observed =
+            ProcessInstanceId::from_process_handle(expected.process_id(), process.as_raw_handle())?;
         if observed != expected {
-            return Err(io::Error::other(
-                "the PID belongs to another process instance",
-            ));
+            return Ok(None);
         }
         if !process.is_running()? {
-            return Err(io::Error::other(
-                "the process instance exited before handle validation",
-            ));
+            return Ok(None);
         }
-        Ok(process)
+        Ok(Some(process))
     }
 
     pub fn as_raw_handle(&self) -> HANDLE {
-        self.0
+        self.0.as_raw_handle().cast()
     }
 
     pub fn is_running(&self) -> io::Result<bool> {
         // SAFETY: self owns a process handle with synchronization rights.
-        match unsafe { WaitForSingleObject(self.0, 0) } {
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), 0) } {
             WAIT_TIMEOUT => Ok(true),
             WAIT_OBJECT_0 => Ok(false),
             WAIT_FAILED => Err(io::Error::last_os_error()),
@@ -133,7 +163,7 @@ impl ProcessInstanceHandle {
 
     pub fn wait_for_exit(&self) -> io::Result<()> {
         // SAFETY: self owns a process handle with synchronization rights.
-        match unsafe { WaitForSingleObject(self.0, INFINITE) } {
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), INFINITE) } {
             WAIT_OBJECT_0 => Ok(()),
             WAIT_FAILED => Err(io::Error::last_os_error()),
             wait => Err(io::Error::other(format!(
@@ -141,15 +171,19 @@ impl ProcessInstanceHandle {
             ))),
         }
     }
-}
 
-#[cfg(windows)]
-impl Drop for ProcessInstanceHandle {
-    fn drop(&mut self) {
-        if !self.0.is_null() {
-            // SAFETY: this guard exclusively owns the process handle.
-            unsafe { CloseHandle(self.0) };
-            self.0 = std::ptr::null_mut();
+    /// Waits for a bounded interval and reports whether the exact process
+    /// instance reached its terminal signaled state.
+    pub fn wait_for_exit_timeout(&self, timeout: Duration) -> io::Result<bool> {
+        let milliseconds = u32::try_from(timeout.as_millis()).unwrap_or(u32::MAX - 1);
+        // SAFETY: self owns a process handle with synchronization rights.
+        match unsafe { WaitForSingleObject(self.as_raw_handle(), milliseconds) } {
+            WAIT_OBJECT_0 => Ok(true),
+            WAIT_TIMEOUT => Ok(false),
+            WAIT_FAILED => Err(io::Error::last_os_error()),
+            wait => Err(io::Error::other(format!(
+                "unexpected result while waiting for a process instance: {wait}"
+            ))),
         }
     }
 }

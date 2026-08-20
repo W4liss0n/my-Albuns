@@ -1,12 +1,12 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIdentityAuthority,
-    ProjectIntent, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIntent, RelinkMedia,
+    RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
-use crate::media_runtime::MediaBinding;
+use crate::media_runtime::{MediaBinding, MediaRelinkProposal};
 
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
@@ -39,7 +39,6 @@ pub(crate) struct FrozenSheetExport {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AuthorizedMediaCatalog {
-    pub(crate) authority: ProjectIdentityAuthority,
     pub(crate) bindings: Vec<MediaBinding>,
 }
 
@@ -78,6 +77,32 @@ impl ProjectHost {
     pub(crate) fn apply(&self, intent: ProjectIntent) -> Result<EditorProjection, String> {
         self.project()?
             .apply(intent)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn relink_media(
+        &self,
+        proposal: MediaRelinkProposal,
+    ) -> Result<EditorProjection, String> {
+        let media_id: MediaId = proposal
+            .media_id()
+            .parse()
+            .map_err(|error| format!("A ocorrência de mídia é inválida: {error}"))?;
+        let mut project = self.project()?;
+        let current = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.id() == media_id.into_uuid())
+            .ok_or_else(|| format!("A ocorrência de mídia não existe: {media_id}"))?;
+        if current.kind() != proposal.kind() || current.path() != proposal.expected_logical_path() {
+            return Err("A referência de mídia mudou durante a Religação; tente novamente.".into());
+        }
+        project
+            .relink_media(RelinkMedia::new(
+                media_id,
+                proposal.replacement_path().to_path_buf(),
+            ))
             .map_err(|error| error.to_string())
     }
 
@@ -207,7 +232,6 @@ impl ProjectHost {
     pub(crate) fn authorized_media_catalog(&self) -> Result<AuthorizedMediaCatalog, String> {
         let project = self.project()?;
         Ok(AuthorizedMediaCatalog {
-            authority: project.identity_authority().clone(),
             bindings: project
                 .project()
                 .media()
@@ -219,6 +243,14 @@ impl ProjectHost {
                 })
                 .collect(),
         })
+    }
+
+    pub(crate) fn authorized_media_binding(&self, media_id: &str) -> Result<MediaBinding, String> {
+        self.authorized_media_catalog()?
+            .bindings
+            .into_iter()
+            .find(|binding| binding.media_id == media_id)
+            .ok_or_else(|| "A ocorrência de mídia não pertence ao Projeto atual.".into())
     }
 
     pub(crate) fn freeze_sheet_export(&self, sheet_id: &str) -> Result<FrozenSheetExport, String> {
@@ -301,8 +333,11 @@ mod tests {
 
     use super::{ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError};
     use crate::{
-        export_pipeline, imaging_processor::InvocationContext,
-        imaging_recovery_integration::RealProcessTransport, path_io,
+        export_pipeline,
+        imaging_processor::InvocationContext,
+        imaging_recovery_integration::RealProcessTransport,
+        media_runtime::{MediaMonitor, MediaResolver, MediaRuntime},
+        path_io,
     };
 
     const TEST_PROCESSOR_ENV: &str = "MYALBUNS_TEST_IMAGING_PROCESSOR";
@@ -940,10 +975,6 @@ mod tests {
             .expect("the Host can authorize its persisted media catalog");
         let projection = host.projection().expect("the Project remains available");
 
-        assert_eq!(
-            catalog.authority.project_id().hyphenated().to_string(),
-            projection.state.project_id
-        );
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,
@@ -953,5 +984,161 @@ mod tests {
         let frontend_projection =
             serde_json::to_string(&projection).expect("the editor projection serializes");
         assert!(!frontend_projection.contains(root.path().to_string_lossy().as_ref()));
+    }
+
+    #[test]
+    fn public_host_runtime_retry_reinspects_without_mutating_media_ref_or_project() {
+        let root = tempfile::tempdir().expect("temporary media retry Host fixture");
+        let media_path = root.path().join("Background.png");
+        std::fs::write(&media_path, b"linked Original")
+            .expect("the linked Original fixture is writable");
+        let initial =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::BothSides {
+                    both: InitialBackgroundContent::Media {
+                        path: media_path.clone(),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ));
+        let fixture = fixture_with_initial(initial);
+        let before = fixture
+            .host
+            .projection()
+            .expect("the Project is available before retry authorization");
+        let media_id = before.state.album.media[0].id.to_string();
+
+        let binding = fixture
+            .host
+            .authorized_media_binding(&media_id)
+            .expect("the Host authorizes the current occurrence binding");
+        let mut unavailable_sample = binding.clone();
+        unavailable_sample.logical_path = "relative-unavailable-source.png".into();
+        let runtime = MediaRuntime::default();
+        let resolver = MediaResolver;
+        runtime.apply(resolver.observe(1, std::slice::from_ref(&unavailable_sample)));
+        let retried = MediaMonitor::default()
+            .retry_unavailable(&runtime, &binding, |_| {})
+            .expect("the Runtime repeats the authoritative inspection through the Host binding");
+
+        let after = fixture
+            .host
+            .projection()
+            .expect("the Project remains available after retry authorization");
+        assert_eq!(binding.media_id, media_id);
+        assert_eq!(binding.logical_path, media_path);
+        assert_eq!(
+            retried.availability(),
+            crate::media_runtime::MediaAvailability::Candidate
+        );
+        assert_eq!(after.state.revision, before.state.revision);
+        assert_eq!(after.state.saved_revision, before.state.saved_revision);
+        assert_eq!(after.state.dirty, before.state.dirty);
+        assert_eq!(after.state.can_undo, before.state.can_undo);
+        assert_eq!(after.state.can_redo, before.state.can_redo);
+        assert_eq!(
+            fixture
+                .host
+                .authorized_media_catalog()
+                .expect("the authorized catalog is unchanged")
+                .bindings[0],
+            binding
+        );
+    }
+
+    #[test]
+    fn public_relink_flow_reinspects_and_invalidates_only_the_selected_occurrence() {
+        let media_root = tempfile::tempdir().expect("temporary relink media fixture");
+        let original_left = media_root.path().join("left.png");
+        let original_right = media_root.path().join("right.png");
+        let replacement = media_root.path().join("replacement.png");
+        RgbaImage::from_pixel(32, 24, Rgba([40, 80, 120, 255]))
+            .save_with_format(&original_left, ImageFormat::Png)
+            .expect("the first occurrence is writable");
+        std::fs::hard_link(&original_left, &original_right)
+            .expect("the second occurrence aliases the same physical file");
+        std::fs::hard_link(&original_left, &replacement)
+            .expect("the relink candidate aliases the same physical file");
+        let initial =
+            InitialProject::neutral().with_personalization(InitialProjectPersonalization::new(
+                InitialBackground::PerSide {
+                    left: InitialBackgroundContent::Media {
+                        path: original_left.clone(),
+                    },
+                    right: InitialBackgroundContent::Media {
+                        path: original_right.clone(),
+                    },
+                },
+                InitialOverlay::BothSides { both: None },
+                InitialFrameBorder::None,
+            ));
+        let fixture = fixture_with_initial(initial);
+        let before = fixture
+            .host
+            .authorized_media_catalog()
+            .expect("the persisted occurrences are authorized");
+        let selected = before
+            .bindings
+            .iter()
+            .find(|binding| binding.logical_path == original_left)
+            .expect("the selected occurrence is present")
+            .clone();
+        let untouched = before
+            .bindings
+            .iter()
+            .find(|binding| binding.logical_path == original_right)
+            .expect("the other occurrence is present")
+            .clone();
+        let resolver = MediaResolver;
+        let runtime = MediaRuntime::default();
+        let monitor = MediaMonitor::default();
+        assert!(monitor.poll(&runtime, &before.bindings).update().is_none());
+        assert!(monitor.poll(&runtime, &before.bindings).update().is_some());
+
+        let proposal = resolver
+            .propose_relink(&selected, replacement.clone())
+            .expect("MediaResolver authoritatively validates the selected candidate");
+        let projection = fixture
+            .host
+            .relink_media(proposal)
+            .expect("ProjectSession owns the RelinkMedia command");
+
+        assert_eq!(projection.state.revision, 1);
+        assert!(projection.state.dirty);
+        assert!(projection.state.can_undo);
+        let after = fixture
+            .host
+            .authorized_media_catalog()
+            .expect("the relinked catalog remains authorized");
+        assert_eq!(
+            after
+                .bindings
+                .iter()
+                .find(|binding| binding.media_id == selected.media_id)
+                .expect("the selected occurrence remains present")
+                .logical_path,
+            replacement
+        );
+        assert_eq!(
+            after
+                .bindings
+                .iter()
+                .find(|binding| binding.media_id == untouched.media_id)
+                .expect("the other occurrence remains present")
+                .logical_path,
+            original_right
+        );
+        assert!(monitor.poll(&runtime, &after.bindings).update().is_none());
+        let stable = monitor.poll(&runtime, &after.bindings);
+        assert_eq!(
+            stable.update().unwrap().changed_media_ids(),
+            std::slice::from_ref(&selected.media_id)
+        );
+        assert_eq!(
+            stable.update().unwrap().invalidated_media_ids(),
+            std::slice::from_ref(&selected.media_id),
+            "Cache reacts by occurrence even when every path aliases one physical file"
+        );
     }
 }

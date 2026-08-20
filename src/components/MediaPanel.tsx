@@ -18,6 +18,23 @@ export interface MediaPanelProps {
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
+  onRelinkMedia(mediaId: string): void;
+  onRetryUnavailableMedia(mediaId: string): Promise<void>;
+  relinkDisabled?: boolean;
+}
+
+function mediaAvailabilityLabel(preview: MediaPreview) {
+  const previous = preview.url ? " · prévia anterior" : "";
+  switch (preview.state) {
+    case "absent":
+      return `Arquivo ausente${previous}`;
+    case "unavailable":
+      return `Indisponível${previous}`;
+    case "cache_unavailable":
+      return `Prévia indisponível${previous}`;
+    case "ready":
+      return "";
+  }
 }
 
 export function MediaPanel({
@@ -26,6 +43,9 @@ export function MediaPanel({
   mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
+  onRelinkMedia,
+  onRetryUnavailableMedia,
+  relinkDisabled = false,
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
     useState<MediaKind>("photo");
@@ -117,59 +137,82 @@ export function MediaPanel({
         </label>
       </div>
       <div className="media-strip" ref={stripRef}>
-        {activeMediaItems.map((media) => (
-            <button
-              className="media-card"
-              type="button"
-              key={media.id}
-              data-media-id={media.id}
-              onDoubleClick={
-                media.kind === "photo"
-                  ? () => onFillPhoto(media.id)
-                  : undefined
-              }
-              title={
-                media.kind === "photo"
-                  ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
-                  : undefined
-              }
-            >
-              <span
-                className="media-thumb"
-                style={{
-                  background: mediaCardBackground(media),
-                }}
+        {activeMediaItems.map((media) => {
+          const preview = mediaPreviews[media.id];
+          const availabilityLabel =
+            preview && preview.state !== "ready"
+              ? mediaAvailabilityLabel(preview)
+              : null;
+          return (
+            <div className="media-card-shell" key={media.id}>
+              <button
+                className="media-card"
+                type="button"
+                data-media-id={media.id}
+                onDoubleClick={
+                  media.kind === "photo"
+                    ? () => onFillPhoto(media.id)
+                    : undefined
+                }
+                title={
+                  media.kind === "photo"
+                    ? "Duplo clique para preencher o placeholder mais à esquerda da Lâmina centralizada"
+                    : undefined
+                }
               >
-                {mediaPreviews[media.id]?.url && (
-                  <img
-                    alt=""
-                    draggable="false"
-                    loading="lazy"
-                    src={mediaPreviews[media.id].url ?? undefined}
-                  />
-                )}
-                {mediaPreviews[media.id]?.state === "unavailable" && (
-                  <span
-                    aria-label={
-                      mediaPreviews[media.id].url
-                        ? "Indisponível · prévia anterior"
-                        : "Indisponível"
-                    }
-                    className="media-availability"
-                    role="status"
-                  >
-                    {mediaPreviews[media.id].url
-                      ? "Indisponível · prévia anterior"
-                      : "Indisponível"}
-                  </span>
-                )}
-              </span>
-              <span className="media-meta">
-                <strong>{media.name}</strong>
-                <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
-              </span>
-            </button>
-          ))}
+                <span
+                  className="media-thumb"
+                  style={{
+                    background: mediaCardBackground(media),
+                  }}
+                >
+                  {preview?.url && (
+                    <img
+                      alt=""
+                      draggable="false"
+                      loading="lazy"
+                      src={preview.url}
+                    />
+                  )}
+                  {availabilityLabel && (
+                    <span
+                      aria-label={availabilityLabel}
+                      className="media-availability"
+                      role="status"
+                    >
+                      {availabilityLabel}
+                    </span>
+                  )}
+                </span>
+                <span className="media-meta">
+                  <strong>{media.name}</strong>
+                  <small>{mediaUsageById.get(media.id) ?? 0} usos</small>
+                </span>
+              </button>
+              {preview?.state === "absent" && (
+                <button
+                  aria-label={`Religar arquivo de ${media.name}`}
+                  className="media-recovery-action"
+                  disabled={relinkDisabled}
+                  type="button"
+                  onClick={() => onRelinkMedia(media.id)}
+                >
+                  Religar arquivo
+                </button>
+              )}
+              {preview?.state === "unavailable" && (
+                <button
+                  aria-label={`Tentar novamente o arquivo de ${media.name}`}
+                  className="media-recovery-action"
+                  type="button"
+                  onClick={() => void onRetryUnavailableMedia(media.id)}
+                >
+                  Tentar novamente
+                </button>
+              )}
+            </div>
+          );
+        })}
         {activeMediaKind === "photo" && (
           <div className="media-tip">
             <kbd>2×</kbd>

@@ -3,6 +3,7 @@
 mod app_paths;
 mod atomic_publish;
 mod cache;
+mod cache_schedule;
 mod error;
 mod export;
 mod guarded_fs;
@@ -19,9 +20,10 @@ mod windows_path;
 pub use app_paths::{AppPaths, project_data_namespace};
 pub use atomic_publish::{publish_new_file, replace_existing_file};
 pub use cache::{
-    CacheArtifactFormat, CachePathPlan, PendingCachePublication, PreparedCacheStorage,
-    SynchronizedCachePublication,
+    CacheArtifactFormat, CacheNamespaceUsage, CachePathPlan, CacheWriterClaimStorage,
+    PendingCachePublication, PreparedCacheStorage, SynchronizedCachePublication,
 };
+pub use cache_schedule::CacheClearScheduleStorage;
 pub use error::AppPathsError;
 pub use export::{ExportPathPlan, ExportWriteAuthorization, PreparedExportStorage};
 pub use native_path_serde::NativePathDto;

@@ -1,7 +1,8 @@
 param(
     [string] $OutputPath,
     [string] $UncRoot,
-    [string] $DriveLetter
+    [string] $DriveLetter,
+    [string] $ScratchRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,9 +46,27 @@ $sourceSnapshotBefore = Get-GateSourceSnapshot `
     -WorkspaceRoot $script:WorkspaceRoot `
     -EvidencePath $OutputPath
 
-$scratchRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $script:WorkspaceRoot '.scratch\windows-path-gate')
+$workspaceScratchRoot = [System.IO.Path]::GetFullPath(
+    (Join-Path $script:WorkspaceRoot '.scratch')
 )
+$scratchRoot = if ([string]::IsNullOrWhiteSpace($ScratchRoot)) {
+    Join-Path $workspaceScratchRoot 'windows-path-gate'
+}
+elseif ([System.IO.Path]::IsPathRooted($ScratchRoot)) {
+    $ScratchRoot
+}
+else {
+    Join-Path $script:WorkspaceRoot $ScratchRoot
+}
+$scratchRoot = [System.IO.Path]::GetFullPath($scratchRoot)
+if (-not $scratchRoot.StartsWith(
+        $workspaceScratchRoot.TrimEnd('\', '/') +
+            [System.IO.Path]::DirectorySeparatorChar,
+        [System.StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw 'The Windows path gate scratch root must be a child of the workspace .scratch directory.'
+}
+$scratchRootExisted = Test-Path -LiteralPath $scratchRoot
 $runRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $scratchRoot "run-$PID-$([DateTime]::UtcNow.Ticks)")
 )
@@ -88,7 +107,9 @@ $mappedDrive = "$DriveLetter`:"
 $preflightPath = Join-Path $UncRoot 'preflight.tmp'
 $evidencePath = Join-Path $runRoot 'path-evidence.json'
 $sidecarEvidencePath = Join-Path $runRoot 'sidecar-evidence.json'
-$targetDirectory = Join-Path $script:WorkspaceRoot 'target\windows-path-gate'
+$targetDirectory = Join-Path `
+    (Resolve-MyAlbunsCargoTargetDirectory) `
+    'windows-path-gate'
 $builtProcessorPath = Join-Path $targetDirectory 'debug\myalbuns-imaging.exe'
 $processorPath = Join-Path $runRoot 'bin\myalbuns-imaging.exe'
 $protocolSourcePath = Join-Path `
@@ -346,6 +367,11 @@ finally {
     Remove-GateScratchDirectory `
         -Path $runRoot `
         -AllowedParent $scratchRoot
+    if (-not $scratchRootExisted -and
+            (Test-Path -LiteralPath $scratchRoot) -and
+            @(Get-ChildItem -LiteralPath $scratchRoot -Force).Count -eq 0) {
+        [System.IO.Directory]::Delete($scratchRoot)
+    }
 }
 
 $sourceSnapshotAfter = Get-GateSourceSnapshot `

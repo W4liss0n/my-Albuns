@@ -1,10 +1,12 @@
 use std::{env, path::PathBuf};
 
 use myalbuns_desktop_lib::ipc_contract::{
-    CancelDisposition, ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent,
-    LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
-    MediaPreviewState, ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    CacheClearAllOutcome, CacheFreeResult, CacheProcessorState, CacheProcessorWarning,
+    CacheServiceCommandError, CacheServiceStatus, CancelDisposition, ExportCommandError,
+    ExportEvent, ExportResult, FrontendLogEvent, LinkedMediaChanged, MediaPreview,
+    MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState, ProjectCloseChoice,
+    ProjectCloseRequestOutcome, ProjectCloseResolution, SaveProjectCommandError,
+    SaveProjectOutcome, SaveProjectResult,
 };
 use ts_rs::{Config, TS};
 
@@ -19,6 +21,17 @@ fn main() {
 
     CancelDisposition::export_all(&config)
         .expect("cancel disposition bindings should be generated");
+    CacheClearAllOutcome::export_all(&config)
+        .expect("Cache clear outcome bindings should be generated");
+    CacheFreeResult::export_all(&config).expect("Cache free result bindings should be generated");
+    CacheProcessorState::export_all(&config)
+        .expect("Cache processor state bindings should be generated");
+    CacheProcessorWarning::export_all(&config)
+        .expect("Cache processor warning bindings should be generated");
+    CacheServiceCommandError::export_all(&config)
+        .expect("Cache service error bindings should be generated");
+    CacheServiceStatus::export_all(&config)
+        .expect("Cache service status bindings should be generated");
     ExportCommandError::export_all(&config).expect("export error bindings should be generated");
     ExportEvent::export_all(&config).expect("export event bindings should be generated");
     ExportResult::export_all(&config).expect("export result bindings should be generated");

@@ -225,8 +225,18 @@ test("maps the Project and media ports to the desktop commands", async () => {
 
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.apply(intent);
+  await tauriProjectCorePort.relink("media-a-001");
   await tauriProjectCorePort.undo();
   await tauriProjectCorePort.redo();
+  const retriedPreview = {
+    mediaId: "media-a-001",
+    state: "unavailable" as const,
+    url: "http://asset.localhost/last-cache-preview",
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(retriedPreview);
+  const retry = await tauriMediaPreviewPort.retryUnavailableMedia(
+    "media-a-001",
+  );
   vi.mocked(invoke).mockResolvedValueOnce([
     {
       mediaId: "media-a-001",
@@ -247,11 +257,18 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(invoke).toHaveBeenNthCalledWith(2, "apply_project_intent", {
     intent,
   });
-  expect(invoke).toHaveBeenNthCalledWith(3, "undo_project");
-  expect(invoke).toHaveBeenNthCalledWith(4, "redo_project");
-  expect(invoke).toHaveBeenNthCalledWith(5, "prepare_media_previews", {
+  expect(invoke).toHaveBeenNthCalledWith(3, "relink_media", {
+    mediaId: "media-a-001",
+  });
+  expect(invoke).toHaveBeenNthCalledWith(4, "undo_project");
+  expect(invoke).toHaveBeenNthCalledWith(5, "redo_project");
+  expect(invoke).toHaveBeenNthCalledWith(6, "retry_unavailable_media", {
+    mediaId: "media-a-001",
+  });
+  expect(invoke).toHaveBeenNthCalledWith(7, "prepare_media_previews", {
     demand,
   });
+  expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
 });
 
@@ -268,6 +285,28 @@ test("maps stable linked-media events to the reactive preview seam", async () =>
     expect.any(Function),
   );
   expect(listener).toHaveBeenCalledWith(["photo-a", "overlay-a"]);
+  expect(unlisten).toEqual(expect.any(Function));
+});
+
+test("maps the typed Cache processor warning without blocking Project commands", async () => {
+  const listener = vi.fn();
+
+  const unlisten = await tauriMediaPreviewPort.onCacheProcessorWarning(listener);
+  eventBoundary.listeners[0]({
+    payload: {
+      state: "suspended",
+      message: "O Cache foi suspenso após falhas repetidas.",
+    },
+  });
+
+  expect(listen).toHaveBeenCalledWith(
+    "myalbuns://cache-processor-warning",
+    expect.any(Function),
+  );
+  expect(listener).toHaveBeenCalledWith({
+    state: "suspended",
+    message: "O Cache foi suspenso após falhas repetidas.",
+  });
   expect(unlisten).toEqual(expect.any(Function));
 });
 
@@ -447,5 +486,20 @@ test("normalizes typed media preview failures without losing their code or messa
   await expect(failure).rejects.toMatchObject({
     code: "unavailable",
     message: "A Imagem decorativa vinculada não está disponível.",
+  });
+});
+
+test("normalizes typed unavailable-media retry failures at the IPC adapter", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "read_failed",
+    message: "A nova inspeção não pôde ser concluída.",
+  });
+
+  const failure = tauriMediaPreviewPort.retryUnavailableMedia("media-a-001");
+
+  await expect(failure).rejects.toBeInstanceOf(MediaPreviewError);
+  await expect(failure).rejects.toMatchObject({
+    code: "read_failed",
+    message: "A nova inspeção não pôde ser concluída.",
   });
 });

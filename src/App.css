@@ -236,6 +236,33 @@ button {
   background: #222a31;
 }
 
+.cache-runtime-warning {
+  position: fixed;
+  top: 102px;
+  right: 18px;
+  display: grid;
+  width: min(420px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid rgb(213 170 115 / 52%);
+  border-radius: 10px;
+  color: #f4e9da;
+  background: rgb(50 40 31 / 96%);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 28%);
+  gap: 3px;
+  z-index: 20;
+}
+
+.cache-runtime-warning strong {
+  color: #f0c994;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.cache-runtime-warning span,
+.cache-runtime-warning small {
+  line-height: 1.35;
+}
+
 .titlebar {
   display: flex;
   min-width: 0;

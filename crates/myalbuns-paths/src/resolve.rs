@@ -360,7 +360,9 @@ fn resolve_existing_operational(
 fn map_guarded_error(error: GuardedFsError) -> ResolveError {
     match error {
         GuardedFsError::OutsideRoot => ResolveError::InvalidPath,
-        GuardedFsError::Unavailable => ResolveError::IoFailure,
+        GuardedFsError::AlreadyExists | GuardedFsError::NotFound | GuardedFsError::Unavailable => {
+            ResolveError::IoFailure
+        }
     }
 }
 

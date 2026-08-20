@@ -42,7 +42,7 @@ tracing.workspace = true
 ts-rs.workspace = true
 uuid.workspace = true
 windows-sys.workspace = true
-image = { workspace = true, features = ["jpeg", "png"] }
+image = { workspace = true, features = ["jpeg", "png", "tiff"] }
 
 [target.'cfg(windows)'.dependencies]
 webview2-com = "0.38"

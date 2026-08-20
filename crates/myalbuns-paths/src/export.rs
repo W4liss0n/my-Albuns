@@ -226,6 +226,8 @@ fn open_export_file(
 fn export_storage_error(error: GuardedFsError) -> AppPathsError {
     match error {
         GuardedFsError::OutsideRoot => AppPathsError::ExportStorageOutsideDestination,
-        GuardedFsError::Unavailable => AppPathsError::ExportStorageUnavailable,
+        GuardedFsError::AlreadyExists | GuardedFsError::NotFound | GuardedFsError::Unavailable => {
+            AppPathsError::ExportStorageUnavailable
+        }
     }
 }

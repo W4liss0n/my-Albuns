@@ -3,7 +3,11 @@ import type {
   ProjectIntent,
 } from "../domain/project";
 
-export type MediaPreviewState = "ready" | "absent" | "unavailable";
+export type MediaPreviewState =
+  | "ready"
+  | "absent"
+  | "unavailable"
+  | "cache_unavailable";
 
 export interface MediaPreview {
   mediaId: string;
@@ -18,6 +22,11 @@ export interface MediaPreviewDemand {
 
 export interface MediaPreviewRequest extends MediaPreviewDemand {
   revision: number;
+}
+
+export interface CacheProcessorWarning {
+  state: "suspended";
+  message: string;
 }
 
 export type MediaPreviewErrorCode =
@@ -172,6 +181,7 @@ export interface ProjectStartupPort {
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
+  relink(mediaId: string): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;
@@ -181,8 +191,12 @@ export interface MediaPreviewPort {
   prepareMediaPreviews(
     demand: MediaPreviewRequest,
   ): Promise<readonly MediaPreview[] | null>;
+  retryUnavailableMedia(mediaId: string): Promise<MediaPreview>;
   onMediaChanged(
     listener: (mediaIds: readonly string[]) => void,
+  ): Promise<() => void>;
+  onCacheProcessorWarning(
+    listener: (warning: CacheProcessorWarning) => void,
   ): Promise<() => void>;
 }
 
