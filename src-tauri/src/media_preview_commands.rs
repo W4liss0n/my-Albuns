@@ -25,6 +25,7 @@ use crate::{
     path_io,
     product_runtime::{
         CACHE_PROCESSOR_WARNING_EVENT, LINKED_MEDIA_CHANGED_EVENT, PROJECT_WINDOW_LABEL,
+        refresh_project_photos_for_media_update,
     },
     project_host::ProjectHost,
 };
@@ -84,14 +85,21 @@ pub(crate) async fn retry_unavailable_media(
     let retry_app = app.clone();
     let retry_namespace = namespace_owner.namespace().clone();
     let retry_registry = registry.inner().clone();
+    let retry_host = project_host.inner().clone();
     let inspection = tauri::async_runtime::spawn_blocking(move || {
-        monitor.retry_unavailable(&runtime, &binding, |update| {
+        let inspection = monitor.retry_unavailable(&runtime, &binding, |update| {
             retry_app.state::<CacheEngine>().apply_monitor_media_update(
                 &retry_namespace,
                 &retry_registry,
                 update,
             );
-        })
+        })?;
+        refresh_project_photos_for_media_update(
+            &retry_host,
+            std::slice::from_ref(&binding),
+            inspection.update(),
+        );
+        Ok::<_, crate::media_runtime::MediaRetryError>(inspection)
     })
     .await
     .map_err(MediaPreviewCommandError::retry_failed)?
@@ -165,9 +173,16 @@ pub(crate) async fn prepare_media_previews(
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let bindings = catalog.bindings.clone();
-    let poll = tauri::async_runtime::spawn_blocking(move || monitor.poll(&runtime, &bindings))
-        .await
-        .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    let demand_host = project_host.inner().clone();
+    let poll = tauri::async_runtime::spawn_blocking(move || {
+        let poll = monitor.poll(&runtime, &bindings);
+        if let Some(update) = poll.update() {
+            refresh_project_photos_for_media_update(&demand_host, &bindings, update);
+        }
+        poll
+    })
+    .await
+    .map_err(|_| MediaPreviewCommandError::read_failed())?;
     let runtime_update = poll.update().cloned();
     let observations = poll
         .confirmed_observation()

@@ -355,6 +355,25 @@ fn refresh_changed_photo_sources(host: &ProjectHost, changed_photos: Vec<MediaBi
     refreshed
 }
 
+pub(crate) fn refresh_project_photos_for_media_update(
+    host: &ProjectHost,
+    bindings: &[MediaBinding],
+    update: &crate::media_runtime::MediaRuntimeUpdate,
+) -> usize {
+    let changed_photos = bindings
+        .iter()
+        .filter(|binding| {
+            binding.kind == MediaKind::Photo
+                && update
+                    .changed_media_ids()
+                    .iter()
+                    .any(|media_id| media_id == &binding.media_id)
+        })
+        .cloned()
+        .collect();
+    refresh_changed_photo_sources(host, changed_photos)
+}
+
 fn start_linked_media_monitor(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -391,19 +410,19 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     changed_media_count = changed.len(),
                     event = "linked_media_observation_applied",
                 );
-                let changed_photos = catalog
-                    .bindings
-                    .iter()
-                    .filter(|binding| {
-                        binding.kind == MediaKind::Photo
-                            && changed.iter().any(|media_id| media_id == &binding.media_id)
-                    })
-                    .cloned()
-                    .collect::<Vec<_>>();
-                if !changed_photos.is_empty() {
+                let photo_bindings = catalog.bindings.clone();
+                let photo_update = update.clone();
+                if photo_bindings.iter().any(|binding| {
+                    binding.kind == MediaKind::Photo
+                        && changed.iter().any(|media_id| media_id == &binding.media_id)
+                }) {
                     let host = app.state::<ProjectHost>().inner().clone();
                     match spawn_media_io(move || {
-                        refresh_changed_photo_sources(&host, changed_photos)
+                        refresh_project_photos_for_media_update(
+                            &host,
+                            &photo_bindings,
+                            &photo_update,
+                        )
                     })
                     .await
                     {
@@ -606,10 +625,12 @@ mod tests {
 
     use super::{
         PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
-        hydrate_project_from_recovered_cache, refresh_changed_photo_sources, spawn_media_io,
+        hydrate_project_from_recovered_cache, refresh_changed_photo_sources,
+        refresh_project_photos_for_media_update, spawn_media_io,
     };
     use crate::{
         cache_engine::{CacheSourceBinding, RecoveredCacheArtifact},
+        media_runtime::{MediaMonitor, MediaRuntime},
         project_host::ProjectHost,
     };
 
@@ -735,6 +756,154 @@ mod tests {
         assert_eq!(first_projection.source_height_px, Some(1));
         assert_eq!(second_projection.source_width_px, Some(17));
         assert_eq!(second_projection.source_height_px, Some(11));
+    }
+
+    #[test]
+    fn a_confirmation_consumed_by_preview_demand_refreshes_photo_geometry_without_history() {
+        let root = tempfile::tempdir().expect("temporary preview demand fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let photo_path = root.path().join("Foto.jpg");
+        RgbImage::from_pixel(19, 7, Rgb([20, 30, 40]))
+            .save_with_format(&photo_path, ImageFormat::Jpeg)
+            .expect("the demanded Original is a JPEG");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the Project root is captured");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the preview demand Project is created");
+        let imported = project
+            .import_photo(ImportPhoto::new(
+                photo_path,
+                PhotoSourceMetadata::new(
+                    1,
+                    1,
+                    ["#102030".into(), "#405060".into(), "#708090".into()],
+                )
+                .expect("the fallback metadata is valid"),
+            ))
+            .expect("the demanded Photo is imported");
+        let host = ProjectHost::new(project);
+        let catalog = host
+            .authorized_media_catalog()
+            .expect("the demand receives the authorized catalog");
+        let monitor = MediaMonitor::default();
+        let runtime = MediaRuntime::default();
+        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
+        let confirmed = monitor.poll(&runtime, &catalog.bindings);
+        let update = confirmed
+            .update()
+            .expect("the stable demand confirmation is adopted");
+        let before = host.projection().expect("the fallback is projected");
+
+        assert_eq!(
+            refresh_project_photos_for_media_update(&host, &catalog.bindings, update),
+            1
+        );
+
+        let after = host.projection().expect("the demand refresh is projected");
+        let photo = after
+            .state
+            .album
+            .media
+            .iter()
+            .find(|media| media.id == imported.media_id)
+            .expect("the demanded Photo remains projected");
+        assert_eq!(photo.source_width_px, Some(19));
+        assert_eq!(photo.source_height_px, Some(7));
+        assert_eq!(after.state.revision, before.state.revision);
+        assert_eq!(after.state.dirty, before.state.dirty);
+        assert_eq!(after.state.can_undo, before.state.can_undo);
+        assert_eq!(after.state.can_redo, before.state.can_redo);
+    }
+
+    #[test]
+    fn retrying_an_unavailable_photo_refreshes_changed_geometry_without_history() {
+        let root = tempfile::tempdir().expect("temporary retry fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let photo_path = root.path().join("Foto.jpg");
+        RgbImage::from_pixel(3, 2, Rgb([20, 30, 40]))
+            .save_with_format(&photo_path, ImageFormat::Jpeg)
+            .expect("the initial Original is a JPEG");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the Project root is captured");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the retry Project is created");
+        let imported = project
+            .import_photo(ImportPhoto::new(
+                photo_path.clone(),
+                PhotoSourceMetadata::new(
+                    1,
+                    1,
+                    ["#102030".into(), "#405060".into(), "#708090".into()],
+                )
+                .expect("the fallback metadata is valid"),
+            ))
+            .expect("the retry Photo is imported");
+        let host = ProjectHost::new(project);
+        let catalog = host
+            .authorized_media_catalog()
+            .expect("the retry receives the authorized catalog");
+        let binding = catalog.bindings[0].clone();
+        std::fs::remove_file(&photo_path).expect("the initial Original is removed");
+        std::fs::create_dir(&photo_path)
+            .expect("an unexpected object makes the binding unavailable");
+        let monitor = MediaMonitor::default();
+        let runtime = MediaRuntime::default();
+        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_none());
+        assert!(monitor.poll(&runtime, &catalog.bindings).update().is_some());
+        std::fs::remove_dir(&photo_path).expect("the unavailable object is removed");
+        RgbImage::from_pixel(23, 5, Rgb([50, 60, 70]))
+            .save_with_format(&photo_path, ImageFormat::Jpeg)
+            .expect("the replacement Original is a JPEG");
+        let before = host.projection().expect("the fallback is projected");
+        let inspection = monitor
+            .retry_unavailable(&runtime, &binding, |_| {})
+            .expect("the unavailable occurrence is retried");
+
+        assert_eq!(
+            refresh_project_photos_for_media_update(
+                &host,
+                std::slice::from_ref(&binding),
+                inspection.update(),
+            ),
+            1
+        );
+
+        let after = host.projection().expect("the retry refresh is projected");
+        let photo = after
+            .state
+            .album
+            .media
+            .iter()
+            .find(|media| media.id == imported.media_id)
+            .expect("the retried Photo remains projected");
+        assert_eq!(photo.source_width_px, Some(23));
+        assert_eq!(photo.source_height_px, Some(5));
+        assert_eq!(after.state.revision, before.state.revision);
+        assert_eq!(after.state.dirty, before.state.dirty);
+        assert_eq!(after.state.can_undo, before.state.can_undo);
+        assert_eq!(after.state.can_redo, before.state.can_redo);
     }
 
     #[test]
