@@ -115,12 +115,14 @@ cada correção: golden intermediário v2 ausente; referência de WebDriver perd
 quando o teardown falhava; reimportação duplicada; geometria 1×1 com Original
 ausente; tentativa adicional de Processador aceita pela prova; Cache de um
 vínculo relinkado recuperado após Undo/Discard; observação stale abortando o
-restante do lote do Monitor; e confirmação consumida por demanda/retry sem
-reidratar as dimensões no Projeto. Os respectivos testes falharam primeiro e
+restante do lote do Monitor; confirmação consumida por demanda/retry sem
+reidratar as dimensões no Projeto; e reidratação no Host sem atualização da
+Projeção já mantida pela WebView. Os respectivos testes falharam primeiro e
 passaram depois da restauração do golden, teardown confirmado, reutilização da
 ocorrência, binding opaco do Cache por `mediaId + path`, adoção independente por
-ocorrência e reidratação compartilhada entre Monitor, demanda e retry. As
-suítes integrais finais cobrem 232 testes de frontend e 474 testes Rust
+ocorrência, reidratação compartilhada entre Monitor, demanda e retry e evento
+causal que recarrega a Projeção sem criar revisão criativa. As suítes integrais
+finais cobrem 232 testes de frontend e 475 testes Rust
 aprovados, com 16 testes Rust explicitamente ignorados e roteados aos gates
 reais Windows/Processador.
 
