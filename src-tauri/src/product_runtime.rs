@@ -18,7 +18,7 @@ use crate::{
     imaging_processor::ImagingProcessor,
     ipc_contract::LinkedMediaChanged,
     logging,
-    media_runtime::{MediaBinding, MediaMonitor, MediaResolver, MediaRuntime},
+    media_runtime::{MediaBinding, MediaMonitor, MediaMonitorPoll, MediaResolver, MediaRuntime},
     operation_gate::OperationGate,
     project_bootstrap::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
@@ -397,15 +397,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
             let host = app.state::<ProjectHost>().inner().clone();
-            let poll = match tauri::async_runtime::spawn_blocking(move || {
-                let poll = monitor.poll(&runtime, &bindings);
-                if let Some(update) = poll.update() {
-                    refresh_project_photos_for_media_update(&host, &bindings, update);
-                }
-                poll
-            })
-            .await
-            {
+            let poll = match poll_linked_media_once(monitor, runtime, host, bindings).await {
                 Ok(poll) => poll,
                 Err(error) => {
                     tracing::warn!(
@@ -456,6 +448,22 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             }
         }
     });
+}
+
+async fn poll_linked_media_once(
+    monitor: MediaMonitor,
+    runtime: MediaRuntime,
+    host: ProjectHost,
+    bindings: Vec<MediaBinding>,
+) -> Result<MediaMonitorPoll, tauri::Error> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let poll = monitor.poll(&runtime, &bindings);
+        if let Some(update) = poll.update() {
+            refresh_project_photos_for_media_update(&host, &bindings, update);
+        }
+        poll
+    })
+    .await
 }
 
 struct PendingHostTerminal {
@@ -595,6 +603,8 @@ impl ProjectStartupHandshake {
 
 #[cfg(test)]
 mod tests {
+    use std::{sync::mpsc, thread, time::Duration};
+
     use image::{ImageFormat, Rgb, RgbImage};
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, OpenProjectRequest,
@@ -613,7 +623,7 @@ mod tests {
     };
     use crate::{
         cache_engine::{CacheSourceBinding, RecoveredCacheArtifact},
-        media_runtime::{MediaMonitor, MediaRuntime},
+        media_runtime::{MediaMonitor, MediaResolver, MediaRuntime},
         project_host::ProjectHost,
     };
 
@@ -645,6 +655,106 @@ mod tests {
                 1,
             );
         }
+    }
+
+    #[test]
+    fn linked_media_poll_keeps_the_async_runtime_responsive_while_inspection_blocks() {
+        let root = tempfile::tempdir().expect("temporary non-blocking Monitor fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let photo_path = root.path().join("Foto.jpg");
+        RgbImage::from_pixel(5, 7, Rgb([20, 30, 40]))
+            .save_with_format(&photo_path, ImageFormat::Jpeg)
+            .expect("the Original fixture is a JPEG");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the Project root is captured");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the non-blocking Monitor Project is created");
+        project
+            .import_photo(ImportPhoto::new(
+                photo_path.clone(),
+                PhotoSourceMetadata::new(
+                    5,
+                    7,
+                    ["#102030".into(), "#405060".into(), "#708090".into()],
+                )
+                .expect("the observed metadata is valid"),
+            ))
+            .expect("the non-blocking Monitor Photo is imported");
+        let host = ProjectHost::new(project);
+        let bindings = host
+            .authorized_media_catalog()
+            .expect("the Monitor receives the authorized catalog")
+            .bindings;
+        let binding = bindings[0].clone();
+        std::fs::remove_file(&photo_path).expect("the Original file is removed");
+        std::fs::create_dir(&photo_path)
+            .expect("an unexpected object keeps inspection deterministically unavailable");
+        let monitor = MediaMonitor::default();
+        let runtime = MediaRuntime::default();
+        runtime.apply(MediaResolver.observe(1, &bindings));
+
+        let (inspection_started_tx, inspection_started_rx) = mpsc::sync_channel(0);
+        let (release_inspection_tx, release_inspection_rx) = mpsc::sync_channel(0);
+        let blocking_monitor = monitor.clone();
+        let blocking_runtime = runtime.clone();
+        let blocking_inspection = thread::spawn(move || {
+            blocking_monitor
+                .retry_unavailable(&blocking_runtime, &binding, |_| {
+                    inspection_started_tx
+                        .send(())
+                        .expect("the caller observes the blocked real inspection");
+                    release_inspection_rx
+                        .recv()
+                        .expect("the real inspection is released");
+                })
+                .expect("the unavailable occurrence completes after release");
+        });
+        inspection_started_rx
+            .recv()
+            .expect("the real Monitor owns its transition before the caller starts");
+
+        let (runtime_progress_tx, runtime_progress_rx) = mpsc::channel();
+        let caller = thread::spawn(move || {
+            tauri::async_runtime::block_on(async move {
+                tokio::join!(
+                    super::poll_linked_media_once(monitor, runtime, host, bindings),
+                    async move {
+                        runtime_progress_tx
+                            .send(())
+                            .expect("the independent runtime operation is observed");
+                    }
+                )
+                .0
+            })
+        });
+
+        let progressed = runtime_progress_rx.recv_timeout(Duration::from_secs(5));
+        release_inspection_tx
+            .send(())
+            .expect("the blocked Monitor inspection can finish");
+        blocking_inspection
+            .join()
+            .expect("the blocking inspection thread does not panic");
+        let poll = caller
+            .join()
+            .expect("the product runtime caller does not panic")
+            .expect("the scheduled Monitor poll joins cleanly");
+
+        progressed.expect(
+            "another operation on the same async task must progress before inspection is released",
+        );
+        assert!(poll.update().is_none());
     }
 
     #[test]
