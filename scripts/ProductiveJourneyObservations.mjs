@@ -91,6 +91,25 @@ export function assertCorrelatedJourneyTerminals(
   };
 }
 
+export function assertReopenedHostExport({
+  savedHostProcessId,
+  reopenedHostProcessId,
+  exportHostProcessId,
+}) {
+  if (
+    !Number.isInteger(savedHostProcessId) ||
+    !Number.isInteger(reopenedHostProcessId) ||
+    !Number.isInteger(exportHostProcessId) ||
+    savedHostProcessId === reopenedHostProcessId ||
+    exportHostProcessId !== reopenedHostProcessId
+  ) {
+    throw new Error(
+      "The productive Export Processador did not belong to the reopened Host",
+    );
+  }
+  return true;
+}
+
 export function assertEmptyCacheExport(observation) {
   const {
     previewArtifactCountBeforePurge,

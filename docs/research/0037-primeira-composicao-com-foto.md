@@ -70,7 +70,11 @@ A jornada confirma primeiro uma representação JPEG real no namespace de Cache
 isolado do processo. Enquanto o diálogo nativo da primeira Exportação ainda está
 aberto, remove somente esse conteúdo derivado por uma travessia fail-closed e
 mede zero entradas e zero bytes. O aplicativo real exporta pelo Original; o
-namespace continua com zero entradas e zero bytes depois do Processador.
+namespace continua com zero entradas e zero bytes depois do Processador. Antes
+de remover qualquer entrada, o runner verifica por caminho real e atributos que
+o root e todos os seus ancestrais não são junctions/reparse points. Dois testes
+Windows criam junctions reais no root e em um ancestral e provam que uma
+sentinela externa permanece intacta.
 
 Em seguida, a textura já residente continua visível no Canvas, mas o runner
 remove o Original antes da segunda Exportação e exige mensagem com
@@ -78,6 +82,12 @@ remove o Original antes da segunda Exportação e exige mensagem com
 arquivo publicado. Portanto nem Cache em disco nem prévia residente produzem
 falso sucesso. O gate canônico não usa `cfg(test)`, variável de ambiente de teste
 ou Host in-process como evidência dessa propriedade.
+
+O mesmo gate exige `exportedAfterReopen=true`, registra os PIDs dos Hosts que
+salvaram e reabriram o Projeto e aceita o terminal do Processador somente quando
+ele está correlacionado ao segundo Host. A preparação também sincroniza o
+sidecar do perfil debug com o binário executado pelo Tauri e compara os hashes
+antes de abrir a GUI, impedindo que um build release anterior contamine a prova.
 
 O artefato canônico é
 `docs/research/artifacts/0037-issue-17-first-photo-composition.json`. O wrapper

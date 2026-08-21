@@ -140,4 +140,8 @@ Exportação sem o Original. Antes da primeira Exportação, o gate observa uma
 prévia real, esvazia somente o namespace de Cache isolado da própria jornada
 enquanto o diálogo nativo ainda está aberto e mede zero entradas e zero bytes
 antes e depois do Processador. A textura residente permanece no Canvas; sua
-presença não mascara a falta do Original na segunda tentativa.
+presença não mascara a falta do Original na segunda tentativa. O purge valida
+o root físico e cada ancestral imediatamente antes da remoção, recusando
+junctions/reparse points; testes Windows com sentinela externa cobrem o root e
+um ancestral. A tentativa produtiva registra que o Processador pertence ao Host
+reaberto, distinto daquele que salvou o Projeto.

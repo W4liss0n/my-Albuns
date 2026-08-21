@@ -3,11 +3,9 @@ import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
-  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -21,11 +19,13 @@ import {
   terminateProcessInstance,
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
+import { createOwnedCacheGuard } from "./ProductiveJourneyCacheSafety.mjs";
 import {
   assertEmptyCacheExport,
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertReopenedHostExport,
   eventCount,
 } from "./ProductiveJourneyObservations.mjs";
 import {
@@ -51,6 +51,10 @@ const scratch = path.resolve(scratchArgument);
 const applicationPath = path.resolve(applicationArgument);
 const nativeDriverPath = path.resolve(driverArgument);
 const processDataRoot = path.join(scratch, "process-data");
+const { purgeOwnedCache, summarizeOwnedCache } = createOwnedCacheGuard({
+  scratch,
+  processDataRoot,
+});
 const projectPath = path.join(scratch, "Jornada produtiva.myalbuns");
 const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
 const missingOriginalExportPath = path.join(
@@ -494,62 +498,6 @@ function directoryContainsJpeg(directory) {
   });
 }
 
-function assertOwnedCacheRoot(directory) {
-  const expected = path.resolve(
-    processDataRoot,
-    "Local",
-    "MyAlbuns2",
-    "Cache",
-  );
-  if (path.resolve(directory) !== expected) {
-    throw new Error("The Cache purge target is not the isolated productive root");
-  }
-  const relative = path.relative(scratch, expected);
-  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("The Cache purge target escaped the productive scratch root");
-  }
-}
-
-function summarizeOwnedCache(directory) {
-  assertOwnedCacheRoot(directory);
-  const summary = { entryCount: 0, byteCount: 0, jpegCount: 0 };
-  if (!existsSync(directory)) return summary;
-  const visit = (current) => {
-    for (const entry of readdirSync(current, { withFileTypes: true })) {
-      const entryPath = path.join(current, entry.name);
-      const metadata = lstatSync(entryPath);
-      summary.entryCount += 1;
-      if (metadata.isSymbolicLink()) {
-        throw new Error("The isolated Cache contains a redirected entry");
-      }
-      if (metadata.isDirectory()) {
-        visit(entryPath);
-        continue;
-      }
-      if (!metadata.isFile()) {
-        throw new Error("The isolated Cache contains a non-regular entry");
-      }
-      summary.byteCount += metadata.size;
-      if (/\.jpe?g$/i.test(entry.name)) summary.jpegCount += 1;
-    }
-  };
-  visit(directory);
-  return summary;
-}
-
-function purgeOwnedCache(directory) {
-  assertOwnedCacheRoot(directory);
-  if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (lstatSync(entryPath).isSymbolicLink()) {
-      throw new Error("The isolated Cache purge refused a redirected entry");
-    }
-    rmSync(entryPath, { recursive: true, force: false });
-  }
-  return summarizeOwnedCache(directory);
-}
-
 function jpegDimensions(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
     throw new Error("The exported file is not a JPEG stream");
@@ -616,7 +564,6 @@ const firstGlobal = await waitForProcessInstance(
 let globalDriver;
 let hostDriver;
 let secondGlobalDriver;
-let secondHostDriver;
 let firstHost;
 let secondGlobal;
 let secondHost;
@@ -877,6 +824,126 @@ try {
     throw new Error("Import and Save modified the linked Photo Original");
   }
 
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Arquivo']",
+    "saved File menu",
+  );
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Fechar Projeto']",
+    "saved Project close",
+  );
+  await hostDriver.dispose().catch(() => undefined);
+  hostDriver = undefined;
+  await waitForExit(firstHost, "first Project Host close after Save");
+  const canvasPreviewCountBeforeReopen = recordsFor(
+    "canvas_opaque_preview_texture_loaded",
+  ).length;
+
+  secondGlobal = await waitForNewApplication(
+    (instance) => !isHost(instance),
+    [firstGlobal],
+    "replacement Global",
+  );
+  secondGlobalDriver = await startAttachedWebDriver(
+    globalDebugPort,
+    "replacement Global",
+  );
+  await click(
+    secondGlobalDriver,
+    "css selector",
+    ".global-recent-list button",
+    "recent Project",
+  );
+  secondHost = await waitForNewApplication(
+    isHost,
+    [firstHost],
+    "reopened Project Host",
+  );
+  await waitForExit(secondGlobal, "replacement Global handoff");
+  await waitForLogEvent("project_ui_ready", 2, "reopened Project UI ready");
+  await secondGlobalDriver.dispose();
+  secondGlobalDriver = undefined;
+
+  hostDriver = await startAttachedWebDriver(
+    hostDebugPort,
+    "reopened Project Host",
+  );
+  const reopenedDpi = await findElement(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "reopened DPI",
+  );
+  if ((await elementAttribute(hostDriver, reopenedDpi, "value")) !== "300") {
+    throw new Error("The reopened Project did not restore the saved DPI");
+  }
+  await click(
+    hostDriver,
+    "css selector",
+    ".sheet-grid > button:nth-child(2)",
+    "reopened second sheet",
+  );
+  const reopenedActiveSheetNumber = Number(
+    await elementText(
+      hostDriver,
+      await findElement(
+        hostDriver,
+        "css selector",
+        ".sheet-grid > button.active > span",
+        "reopened active sheet number",
+      ),
+    ),
+  );
+  if (reopenedActiveSheetNumber !== activeSheetNumber) {
+    throw new Error("The reopened Host did not select the saved Photo sheet");
+  }
+  await findElement(
+    hostDriver,
+    "css selector",
+    ".media-card[data-media-id]",
+    "reopened linked Photo",
+  );
+  await findElement(
+    hostDriver,
+    "css selector",
+    "[data-preview-photo-id]",
+    "reopened persisted Frame Photo",
+  );
+  await waitForLogEvent(
+    "canvas_opaque_preview_texture_loaded",
+    canvasPreviewCountBeforeReopen + 1,
+    "reopened Canvas Photo preview",
+  );
+  const reopenedPageSource = await hostDriver.request(
+    "GET",
+    `/session/${hostDriver.sessionId}/source`,
+  );
+  sourcePathExposedToWebView ||= [
+    projectPath,
+    exportPath,
+    photoPath,
+    processDataRoot,
+  ].some((candidate) => sourceContainsNativePath(reopenedPageSource, candidate));
+  for (const label of ["Desfazer", "Refazer"]) {
+    const button = await findElement(
+      hostDriver,
+      "css selector",
+      `button[aria-label='${label}']`,
+      `${label} after reopen`,
+    );
+    const enabled = await hostDriver.request(
+      "GET",
+      `/session/${hostDriver.sessionId}/element/${encodeURIComponent(button)}/enabled`,
+    );
+    if (enabled) {
+      throw new Error(`The reopened Project retained ${label} history`);
+    }
+  }
+
   await doubleClick(
     hostDriver,
     "css selector",
@@ -915,7 +982,7 @@ try {
     "Export action",
   );
   const cancelledExport = driveNativeDialog(
-    firstHost,
+    secondHost,
     "cancel",
     "Exportar Lâmina como JPEG",
   );
@@ -942,7 +1009,7 @@ try {
   );
   const emptyCacheBeforeExport = purgeOwnedCache(cacheRoot);
   const selectedExport = driveNativeDialog(
-    firstHost,
+    secondHost,
     "select",
     "Exportar Lâmina como JPEG",
     exportPath,
@@ -1034,7 +1101,8 @@ try {
   }
 
   const residentCanvasPreviewBeforeMissingOriginal =
-    recordsFor("canvas_opaque_preview_texture_loaded").length >= 1;
+    recordsFor("canvas_opaque_preview_texture_loaded").length >
+    canvasPreviewCountBeforeReopen;
   let missingOriginalBlocked = false;
   let missingOriginalActionable = false;
   let cacheCouldNotProduceFalseSuccess = false;
@@ -1048,7 +1116,7 @@ try {
       "missing-Original Export action",
     );
     const selectedMissingExport = driveNativeDialog(
-      firstHost,
+      secondHost,
       "select",
       "Exportar Lâmina como JPEG",
       missingOriginalExportPath,
@@ -1114,102 +1182,6 @@ try {
   ).catch(() => undefined);
   await hostDriver.dispose();
   hostDriver = undefined;
-  await waitForExit(firstHost, "first Project Host close");
-
-  secondGlobal = await waitForNewApplication(
-    (instance) => !isHost(instance),
-    [firstGlobal],
-    "replacement Global",
-  );
-  secondGlobalDriver = await startAttachedWebDriver(
-    globalDebugPort,
-    "replacement Global",
-  );
-  await click(
-    secondGlobalDriver,
-    "css selector",
-    ".global-recent-list button",
-    "recent Project",
-  );
-  secondHost = await waitForNewApplication(
-    isHost,
-    [firstHost],
-    "reopened Project Host",
-  );
-  await waitForExit(secondGlobal, "replacement Global handoff");
-  await waitForLogEvent("project_ui_ready", 2, "reopened Project UI ready");
-  await secondGlobalDriver.dispose();
-  secondGlobalDriver = undefined;
-
-  secondHostDriver = await startAttachedWebDriver(
-    hostDebugPort,
-    "reopened Project Host",
-  );
-  const reopenedDpi = await findElement(
-    secondHostDriver,
-    "css selector",
-    ".document-dpi-control input",
-    "reopened DPI",
-  );
-  if ((await elementAttribute(secondHostDriver, reopenedDpi, "value")) !== "300") {
-    throw new Error("The reopened Project did not restore the saved DPI");
-  }
-  await findElement(
-    secondHostDriver,
-    "css selector",
-    ".media-card[data-media-id]",
-    "reopened linked Photo",
-  );
-  await findElement(
-    secondHostDriver,
-    "css selector",
-    "[data-preview-photo-id]",
-    "reopened persisted Frame Photo",
-  );
-  await waitForLogEvent(
-    "canvas_opaque_preview_texture_loaded",
-    2,
-    "reopened Canvas Photo preview",
-  );
-  const reopenedPageSource = await secondHostDriver.request(
-    "GET",
-    `/session/${secondHostDriver.sessionId}/source`,
-  );
-  sourcePathExposedToWebView ||= [
-    projectPath,
-    exportPath,
-    photoPath,
-    processDataRoot,
-  ].some((candidate) => sourceContainsNativePath(reopenedPageSource, candidate));
-  for (const label of ["Desfazer", "Refazer"]) {
-    const button = await findElement(
-      secondHostDriver,
-      "css selector",
-      `button[aria-label='${label}']`,
-      `${label} after reopen`,
-    );
-    const enabled = await secondHostDriver.request(
-      "GET",
-      `/session/${secondHostDriver.sessionId}/element/${encodeURIComponent(button)}/enabled`,
-    );
-    if (enabled) {
-      throw new Error(`The reopened Project retained ${label} history`);
-    }
-  }
-  await click(
-    secondHostDriver,
-    "xpath",
-    "//button[normalize-space()='Arquivo']",
-    "reopened File menu",
-  );
-  await click(
-    secondHostDriver,
-    "xpath",
-    "//button[normalize-space()='Fechar Projeto']",
-    "reopened Project close",
-  ).catch(() => undefined);
-  await secondHostDriver.dispose();
-  secondHostDriver = undefined;
   await waitForExit(secondHost, "reopened Project Host close");
 
   finalGlobal = await waitForNewApplication(
@@ -1224,7 +1196,7 @@ try {
   const spawn = records.find(
     (record) =>
       record.event === "imaging_process_spawned" &&
-      Number(record.process_id) === firstHost.processId &&
+      Number(record.process_id) === secondHost.processId &&
       record.operation === "export",
   );
   if (!spawn) {
@@ -1243,15 +1215,20 @@ try {
     ],
     imagingAttempts: [
       {
-        hostProcessId: firstHost.processId,
+        hostProcessId: secondHost.processId,
         imagingProcessId: Number(spawn.imaging_process_id),
       },
     ],
   });
+  const exportedAfterReopen = assertReopenedHostExport({
+    savedHostProcessId: firstHost.processId,
+    reopenedHostProcessId: secondHost.processId,
+    exportHostProcessId: Number(spawn.process_id),
+  });
   if (
     new Set([
-      firstGlobal.processId,
-      firstHost.processId,
+      secondGlobal.processId,
+      secondHost.processId,
       Number(spawn.imaging_process_id),
     ]).size !== 3
   ) {
@@ -1285,11 +1262,14 @@ try {
         sha256: createHash("sha256").update(exported).digest("hex"),
       },
       processIds: {
-        global: firstGlobal.processId,
-        host: firstHost.processId,
+        firstGlobal: firstGlobal.processId,
+        firstHost: firstHost.processId,
+        global: secondGlobal.processId,
+        host: secondHost.processId,
         imaging: Number(spawn.imaging_process_id),
       },
       correlations,
+      exportedAfterReopen,
       reopenedInIndependentHost: secondHost.processId !== firstHost.processId,
       reopenedHistoryEmpty: true,
       screenshotPath,
@@ -1311,7 +1291,6 @@ try {
     globalDriver,
     hostDriver,
     secondGlobalDriver,
-    secondHostDriver,
   ]) {
     if (driver) {
       try {

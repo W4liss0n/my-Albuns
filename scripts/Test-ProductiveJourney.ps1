@@ -106,6 +106,15 @@ try {
     }
 
     $applicationPath = Join-Path $workspaceRoot 'target\debug\myalbuns-desktop.exe'
+    $preparedSidecarPath = Join-Path `
+        $workspaceRoot `
+        'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
+    $runtimeSidecarPath = Join-Path $workspaceRoot 'target\debug\myalbuns-imaging.exe'
+    if (-not (Test-Path -LiteralPath $runtimeSidecarPath -PathType Leaf) -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $preparedSidecarPath).Hash -ne
+            (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeSidecarPath).Hash) {
+        throw 'The debug Tauri runtime does not own the prepared debug Processor.'
+    }
     $driver = & (Join-Path $PSScriptRoot 'Resolve-TauriWebDriver.ps1') |
         Select-Object -Last 1 |
         ConvertFrom-Json
@@ -160,6 +169,8 @@ try {
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
         $gate.correlations.bootstraps -ne 2 -or
         $gate.correlations.imagingAttempts -ne 1 -or
+        -not $gate.exportedAfterReopen -or
+        $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
         -not $gate.reopenedHistoryEmpty -or
         $gate.canvasPhotoSample.cssWidth -le 0 -or
@@ -376,6 +387,7 @@ try {
             jpeg = $jpegEvidence
             processIds = $gate.processIds
             correlations = $gate.correlations
+            exportedAfterReopen = [bool] $gate.exportedAfterReopen
             reopenedInIndependentHost = [bool] $gate.reopenedInIndependentHost
             reopenedHistoryEmpty = [bool] $gate.reopenedHistoryEmpty
             sourcePathExposedToWebView = [bool] $gate.sourcePathExposedToWebView
