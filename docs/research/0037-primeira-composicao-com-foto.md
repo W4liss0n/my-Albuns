@@ -100,9 +100,10 @@ ou Host in-process como evidência dessa propriedade.
 
 O mesmo gate exige `exportedAfterReopen=true`, registra os PIDs dos Hosts que
 salvaram e reabriram o Projeto e aceita o terminal do Processador somente quando
-ele está correlacionado ao segundo Host. A lista de tentativas de Exportação
-observada precisa ser exatamente igual à lista correlacionada; uma tentativa
-extra é falha mesmo que tenha seu próprio terminal de encerramento. A
+ele está correlacionado ao segundo Host. A lista observada precisa conter
+exatamente as duas tentativas esperadas — JPEG com Cache vazio e falha com
+Original ausente —, cada uma com seu terminal único; uma terceira tentativa é
+falha mesmo que tenha seu próprio terminal de encerramento. A
 preparação também sincroniza o sidecar do perfil debug com o binário executado
 pelo Tauri e compara os hashes antes de abrir a GUI, impedindo que um build
 release anterior contamine a prova.

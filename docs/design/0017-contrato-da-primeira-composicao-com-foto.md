@@ -158,5 +158,6 @@ o root físico e cada ancestral imediatamente antes da remoção, recusando
 junctions/reparse points; testes Windows com sentinela externa cobrem o root e
 um ancestral. A tentativa produtiva registra que o Processador pertence ao Host
 reaberto, distinto daquele que salvou o Projeto, e exige igualdade exata entre
-as tentativas de Exportação observadas e os terminais correlacionados, rejeitando
-qualquer Processador adicional mesmo que também tenha encerrado.
+as duas tentativas esperadas — sucesso com Cache vazio e falha com Original
+ausente — e seus terminais correlacionados. Qualquer Processador adicional é
+rejeitado mesmo que também tenha encerrado.

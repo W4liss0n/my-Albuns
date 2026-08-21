@@ -1241,12 +1241,12 @@ try {
       record.event === "imaging_process_spawned" &&
       record.operation === "export",
   );
-  if (exportSpawns.length !== 1) {
+  if (exportSpawns.length !== 2) {
     throw new Error(
-      `The productive Export expected exactly one Processador attempt and observed ${exportSpawns.length}`,
+      `The productive journey expected exactly two Processador Export attempts and observed ${exportSpawns.length}`,
     );
   }
-  const [spawn] = exportSpawns;
+  const [successfulSpawn, missingOriginalSpawn] = exportSpawns;
   const correlations = assertCorrelatedJourneyTerminals(records, {
     bootstraps: [
       {
@@ -1258,26 +1258,28 @@ try {
         hostProcessId: secondHost.processId,
       },
     ],
-    imagingAttempts: [
-      {
-        hostProcessId: secondHost.processId,
-        imagingProcessId: Number(spawn.imaging_process_id),
-      },
-    ],
+    imagingAttempts: exportSpawns.map((record) => ({
+      hostProcessId: secondHost.processId,
+      imagingProcessId: Number(record.imaging_process_id),
+    })),
   });
-  const exportedAfterReopen = assertReopenedHostExport({
-    savedHostProcessId: firstHost.processId,
-    reopenedHostProcessId: secondHost.processId,
-    exportHostProcessId: Number(spawn.process_id),
-  });
+  const exportedAfterReopen = exportSpawns.every((record) =>
+    assertReopenedHostExport({
+      savedHostProcessId: firstHost.processId,
+      reopenedHostProcessId: secondHost.processId,
+      exportHostProcessId: Number(record.process_id),
+    }),
+  );
   if (
     new Set([
       secondGlobal.processId,
       secondHost.processId,
-      Number(spawn.imaging_process_id),
-    ]).size !== 3
+      ...exportSpawns.map((record) => Number(record.imaging_process_id)),
+    ]).size !== 2 + exportSpawns.length
   ) {
-    throw new Error("Global, Host and Processador did not use distinct PIDs");
+    throw new Error(
+      "Global, Host and both Processadores did not use distinct PIDs",
+    );
   }
   if (applicationProcesses().length !== 0) {
     throw new Error("The productive journey left an application process alive");
@@ -1312,7 +1314,8 @@ try {
         firstHost: firstHost.processId,
         global: secondGlobal.processId,
         host: secondHost.processId,
-        imaging: Number(spawn.imaging_process_id),
+        imaging: Number(successfulSpawn.imaging_process_id),
+        missingOriginalImaging: Number(missingOriginalSpawn.imaging_process_id),
       },
       correlations,
       exportedAfterReopen,
@@ -1327,7 +1330,11 @@ try {
         imagingStopped: records.filter(
           (record) =>
             record.event === "imaging_process_stopped" &&
-            Number(record.process_id) === Number(spawn.imaging_process_id),
+            exportSpawns.some(
+              (spawned) =>
+                Number(record.process_id) ===
+                Number(spawned.imaging_process_id),
+            ),
         ).length,
       },
     }),

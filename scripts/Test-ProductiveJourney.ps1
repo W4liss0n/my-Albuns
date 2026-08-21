@@ -169,7 +169,7 @@ try {
         $gate.jpeg.byteCount -le 0 -or
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
         $gate.correlations.bootstraps -ne 2 -or
-        $gate.correlations.imagingAttempts -ne 1 -or
+        $gate.correlations.imagingAttempts -ne 2 -or
         -not $gate.exportedAfterReopen -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
@@ -179,7 +179,7 @@ try {
         $gate.sourcePathExposedToWebView -or
         $gate.terminalCounts.globalHandoffs -ne 2 -or
         $gate.terminalCounts.hostReady -ne 2 -or
-        $gate.terminalCounts.imagingStopped -ne 1
+        $gate.terminalCounts.imagingStopped -ne 2
     ) {
         throw 'The productive journey result did not satisfy its public contract.'
     }
