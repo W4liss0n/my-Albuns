@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-21T13:17:35.7792024Z",
-    "gitCommit":  "e196ba877107f6d57dd07288504522d78ad3719d",
+    "collectedAtUtc":  "2026-08-21T13:59:46.5400649Z",
+    "gitCommit":  "ca8c6a5cd32c32f47754647931afffa8f1e33b41",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -44,7 +44,7 @@
                        "passed":  true
                    },
                    {
-                       "name":  "real-processor-empty-cache-original-read",
+                       "name":  "real-application-empty-cache-original-read",
                        "passed":  true
                    },
                    {
@@ -69,7 +69,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "e1cd6a7f-06d8-45c1-a99b-cfe7e57a68ae",
+                     "selectedSheetId":  "961b4630-e97a-4abd-97f6-f657a1c11d73",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  360,
@@ -89,7 +89,12 @@
                      "originalUnchanged":  true,
                      "missingOriginalBlocked":  true,
                      "missingOriginalActionable":  true,
-                     "cacheArtifactPresentBeforeMissingOriginal":  true,
+                     "residentCanvasPreviewBeforeMissingOriginal":  true,
+                     "previewArtifactCountBeforePurge":  1,
+                     "cacheEntryCountBeforeExport":  0,
+                     "cacheByteCountBeforeExport":  0,
+                     "cacheEntryCountAfterExport":  0,
+                     "cacheByteCountAfterExport":  0,
                      "cacheCouldNotProduceFalseSuccess":  true,
                      "jpeg":  {
                                   "width":  720,
@@ -115,9 +120,9 @@
                                                   }
                               },
                      "processIds":  {
-                                        "global":  21452,
-                                        "host":  21164,
-                                        "imaging":  31148
+                                        "global":  25972,
+                                        "host":  27896,
+                                        "imaging":  13792
                                     },
                      "correlations":  {
                                           "bootstraps":  2,
