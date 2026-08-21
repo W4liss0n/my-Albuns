@@ -301,13 +301,13 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
   };
 
   await expect(
-    tauriProjectCorePort.applyWithOutcome?.(intent),
+    tauriProjectCorePort.applyWithOutcome(intent),
   ).resolves.toEqual(mutationOutcome);
-  await expect(tauriProjectCorePort.importPhoto?.()).resolves.toEqual(
+  await expect(tauriProjectCorePort.importPhoto()).resolves.toEqual(
     importOutcome,
   );
   await expect(
-    tauriProjectCorePort.resolvePhotoDropTarget?.(
+    tauriProjectCorePort.resolvePhotoDropTarget(
       "sheet-001",
       12_000,
       34_000,

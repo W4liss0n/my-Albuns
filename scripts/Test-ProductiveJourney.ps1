@@ -99,26 +99,6 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "The debug Processor build failed with exit code $LASTEXITCODE."
     }
-    $processorPath = Join-Path `
-        (Resolve-MyAlbunsCargoTargetDirectory) `
-        'sidecar-build\debug\myalbuns-imaging.exe'
-    $previousTestProcessor = $env:MYALBUNS_TEST_IMAGING_PROCESSOR
-    try {
-        $env:MYALBUNS_TEST_IMAGING_PROCESSOR = $processorPath
-        & $script:CargoExecutable test `
-            -p myalbuns-desktop `
-            'project_host::tests::reopened_project_exports_the_frozen_visible_sheet_through_the_real_processor' `
-            -- `
-            --ignored `
-            --exact `
-            --test-threads=1
-        if ($LASTEXITCODE -ne 0) {
-            throw "The real Original/Cache Processor proof failed with exit code $LASTEXITCODE."
-        }
-    }
-    finally {
-        $env:MYALBUNS_TEST_IMAGING_PROCESSOR = $previousTestProcessor
-    }
     $tauri = Join-Path $workspaceRoot 'node_modules\.bin\tauri.cmd'
     & $tauri build --debug --no-bundle
     if ($LASTEXITCODE -ne 0) {
@@ -167,7 +147,12 @@ try {
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
-        -not $gate.cacheArtifactPresentBeforeMissingOriginal -or
+        -not $gate.residentCanvasPreviewBeforeMissingOriginal -or
+        $gate.previewArtifactCountBeforePurge -le 0 -or
+        $gate.cacheEntryCountBeforeExport -ne 0 -or
+        $gate.cacheByteCountBeforeExport -ne 0 -or
+        $gate.cacheEntryCountAfterExport -ne 0 -or
+        $gate.cacheByteCountAfterExport -ne 0 -or
         -not $gate.cacheCouldNotProduceFalseSuccess -or
         $gate.jpeg.width -ne 720 -or
         $gate.jpeg.height -ne 360 -or
@@ -356,7 +341,7 @@ try {
             [ordered]@{ name = 'cancel-before-export-pipeline'; passed = $true },
             [ordered]@{ name = 'distinguishable-sheet-two-jpeg-export'; passed = $true },
             [ordered]@{ name = 'canvas-jpeg-photo-fidelity'; passed = $true },
-            [ordered]@{ name = 'real-processor-empty-cache-original-read'; passed = $true },
+            [ordered]@{ name = 'real-application-empty-cache-original-read'; passed = $true },
             [ordered]@{ name = 'missing-original-actionable-failure'; passed = $true },
             [ordered]@{ name = 'saved-project-unchanged-by-export'; passed = $true },
             [ordered]@{ name = 'independent-host-reopen-empty-history'; passed = $true },
@@ -381,7 +366,12 @@ try {
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
             missingOriginalActionable = [bool] $gate.missingOriginalActionable
-            cacheArtifactPresentBeforeMissingOriginal = [bool] $gate.cacheArtifactPresentBeforeMissingOriginal
+            residentCanvasPreviewBeforeMissingOriginal = [bool] $gate.residentCanvasPreviewBeforeMissingOriginal
+            previewArtifactCountBeforePurge = [int] $gate.previewArtifactCountBeforePurge
+            cacheEntryCountBeforeExport = [int] $gate.cacheEntryCountBeforeExport
+            cacheByteCountBeforeExport = [int64] $gate.cacheByteCountBeforeExport
+            cacheEntryCountAfterExport = [int] $gate.cacheEntryCountAfterExport
+            cacheByteCountAfterExport = [int64] $gate.cacheByteCountAfterExport
             cacheCouldNotProduceFalseSuccess = [bool] $gate.cacheCouldNotProduceFalseSuccess
             jpeg = $jpegEvidence
             processIds = $gate.processIds

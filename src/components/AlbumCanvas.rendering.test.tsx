@@ -88,6 +88,72 @@ test("shows only the resolved Photo target and drops only after a valid highligh
   expect(onPhotoDragCancel).toHaveBeenCalledOnce();
 });
 
+test("does not drop on a new point while its resolved highlight is still pending", async () => {
+  let resolveFirst!: (target: {
+    kind: "frame";
+    frameId: string;
+  }) => void;
+  let resolveSecond!: (target: {
+    kind: "frame";
+    frameId: string;
+  }) => void;
+  const onResolvePhotoDropTarget = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+    );
+  const onDropPhoto = vi.fn(async () => true);
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    draggedPhotoId: "media-002",
+    onResolvePhotoDropTarget,
+    onDropPhoto,
+  });
+  await finishPixiInitialization();
+  const canvas = pixiLifecycle.instances[0].canvas;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1_200,
+    height: 500,
+    right: 1_200,
+    bottom: 500,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  const host = view.container.querySelector(".canvas-host")!;
+  const dataTransfer = { dropEffect: "none" };
+
+  fireEvent.dragOver(host, { clientX: 560, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledOnce());
+  await act(async () => {
+    resolveFirst({ kind: "frame", frameId: "frame-001" });
+  });
+  await waitFor(() => {
+    expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
+  });
+
+  fireEvent.dragOver(host, { clientX: 680, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledTimes(2));
+  fireEvent.drop(host, { clientX: 680, clientY: 250, dataTransfer });
+
+  expect(onDropPhoto).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveSecond({ kind: "frame", frameId: "frame-001" });
+  });
+  expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(false);
+});
+
 test("Esc and an invalid Photo target cancel without a Project mutation", async () => {
   const onResolvePhotoDropTarget = vi.fn(async () => ({
     kind: "invalid" as const,

@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_core::{EditableProject, MediaId, MediaKind};
+use myalbuns_core::MediaKind;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
@@ -40,11 +40,10 @@ pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (request, mut project) = opened.into_parts();
+    let (request, project) = opened.into_parts();
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
-    hydrate_photo_sources(&mut project);
     let cache_service = CacheService::new(app_paths.clone());
     let cache_namespace_owner = cache_service
         .reserve_namespace(project.identity_authority())
@@ -171,43 +170,6 @@ pub(crate) fn run(
     Ok(())
 }
 
-fn hydrate_photo_sources(project: &mut EditableProject) {
-    let bindings = project
-        .project()
-        .media()
-        .iter()
-        .filter(|media| media.kind() == MediaKind::Photo)
-        .map(|media| crate::media_runtime::MediaBinding {
-            media_id: media.id().hyphenated().to_string(),
-            kind: media.kind(),
-            logical_path: media.path().to_path_buf(),
-        })
-        .collect::<Vec<_>>();
-    for binding in bindings {
-        let Ok(media_id) = binding.media_id.parse::<MediaId>() else {
-            continue;
-        };
-        match crate::media_runtime::MediaResolver.inspect_photo_binding(&binding) {
-            Ok(metadata) => {
-                if let Err(error) = project.observe_photo_source(media_id, metadata) {
-                    tracing::warn!(
-                        target: "myalbuns.desktop",
-                        media_id = safe_log_identifier(&binding.media_id),
-                        error = %error,
-                        event = "photo_source_hydration_rejected",
-                    );
-                }
-            }
-            Err(error) => tracing::info!(
-                target: "myalbuns.desktop",
-                media_id = safe_log_identifier(&binding.media_id),
-                error = %error,
-                event = "photo_source_hydration_deferred",
-            ),
-        }
-    }
-}
-
 fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
     let projection = app
         .state::<ProjectHost>()
@@ -246,7 +208,6 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
     app.manage(app_paths);
     let app_handle = app.handle().clone();
     let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
-    start_linked_media_monitor(app_handle.clone());
     tauri::async_runtime::spawn(async move {
         let startup = async {
             if let Some(policy_readiness) = policy_readiness {
@@ -281,6 +242,7 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
             return;
         }
 
+        start_linked_media_monitor(app_handle.clone());
         tracing::info!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -348,11 +310,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
-            let poll = match tauri::async_runtime::spawn_blocking(move || {
-                monitor.poll(&runtime, &bindings)
-            })
-            .await
-            {
+            let poll = match spawn_media_io(move || monitor.poll(&runtime, &bindings)).await {
                 Ok(poll) => poll,
                 Err(error) => {
                     tracing::warn!(
@@ -385,7 +343,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     .collect::<Vec<_>>();
                 if !changed_photos.is_empty() {
                     let host = app.state::<ProjectHost>().inner().clone();
-                    match tauri::async_runtime::spawn_blocking(move || {
+                    match spawn_media_io(move || {
                         for binding in changed_photos {
                             match crate::media_runtime::MediaResolver
                                 .inspect_photo_binding(&binding)
@@ -445,6 +403,14 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             }
         }
     });
+}
+
+fn spawn_media_io<F, R>(operation: F) -> tauri::async_runtime::JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(operation)
 }
 
 struct PendingHostTerminal {
@@ -584,7 +550,9 @@ impl ProjectStartupHandshake {
 
 #[cfg(test)]
 mod tests {
-    use super::{PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal};
+    use std::{sync::mpsc, time::Duration};
+
+    use super::{PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal, spawn_media_io};
 
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
@@ -607,5 +575,33 @@ mod tests {
             assert!(!duplicate.ready_emitted);
             assert!(!duplicate.newly_observed);
         }
+    }
+
+    #[test]
+    fn blocked_original_inspection_runs_outside_the_product_runtime_caller() {
+        let (inspection_started_tx, inspection_started_rx) = mpsc::sync_channel(0);
+        let (release_inspection_tx, release_inspection_rx) = mpsc::sync_channel(0);
+
+        let inspection = spawn_media_io(move || {
+            inspection_started_tx
+                .send(())
+                .expect("the caller observes the blocked Original inspection");
+            release_inspection_rx
+                .recv()
+                .expect("the blocked Original inspection is released");
+            17
+        });
+
+        inspection_started_rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("scheduling returned before the external Original I/O completed");
+        release_inspection_tx
+            .send(())
+            .expect("the Original inspection can finish");
+        assert_eq!(
+            tauri::async_runtime::block_on(inspection)
+                .expect("the scheduled Original inspection joins cleanly"),
+            17
+        );
     }
 }

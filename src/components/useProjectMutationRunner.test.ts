@@ -31,6 +31,15 @@ function projectCorePort(): ProjectCorePort {
   return {
     load: async () => representativeProjection,
     apply: async () => representativeProjection,
+    applyWithOutcome: async () => ({
+      projection: representativeProjection,
+      affectedFrameId: null,
+    }),
+    importPhoto: async () => ({
+      kind: "cancelled",
+      projection: representativeProjection,
+    }),
+    resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => representativeProjection,
     undo: async () => representativeProjection,
     redo: async () => representativeProjection,

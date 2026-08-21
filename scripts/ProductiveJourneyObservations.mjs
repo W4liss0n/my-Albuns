@@ -91,6 +91,31 @@ export function assertCorrelatedJourneyTerminals(
   };
 }
 
+export function assertEmptyCacheExport(observation) {
+  const {
+    previewArtifactCountBeforePurge,
+    cacheEntryCountBeforeExport,
+    cacheByteCountBeforeExport,
+    cacheEntryCountAfterExport,
+    cacheByteCountAfterExport,
+  } = observation;
+  if (
+    !Number.isInteger(previewArtifactCountBeforePurge) ||
+    previewArtifactCountBeforePurge <= 0
+  ) {
+    throw new Error(
+      "The productive journey observed no real preview artifact before purging Cache",
+    );
+  }
+  if (cacheEntryCountBeforeExport !== 0 || cacheByteCountBeforeExport !== 0) {
+    throw new Error("The real Cache namespace was not empty before Export");
+  }
+  if (cacheEntryCountAfterExport !== 0 || cacheByteCountAfterExport !== 0) {
+    throw new Error("Export wrote into the real Cache namespace");
+  }
+  return { ...observation };
+}
+
 const MICROMETERS_PER_INCH = 25_400;
 
 function rasterDimensions(document, sheet, dpi) {

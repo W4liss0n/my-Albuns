@@ -89,6 +89,12 @@ const projection = createEmptyProjection();
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   apply: async () => projection,
+  applyWithOutcome: async () => ({
+    projection,
+    affectedFrameId: null,
+  }),
+  importPhoto: async () => ({ kind: "cancelled", projection }),
+  resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
   relink: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
@@ -669,6 +675,84 @@ test("registers the media-change listener before the first preview demand", asyn
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledOnce());
   act(() => notifyMediaChanged?.(["media-001"]));
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+});
+
+test("keeps the newest media projection when equal-revision refreshes resolve out of order", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  let resolveOlder!: (projection: typeof representativeProjection) => void;
+  let resolveNewer!: (projection: typeof representativeProjection) => void;
+  const projectionNamed = (name: string) => ({
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media, index) =>
+          index === 0 ? { ...media, name } : media,
+        ),
+      },
+    },
+  });
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockImplementationOnce(
+      () =>
+        new Promise<typeof representativeProjection>((resolve) => {
+          resolveOlder = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<typeof representativeProjection>((resolve) => {
+          resolveNewer = resolve;
+        }),
+    );
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{ ...projectCorePort, load }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await screen.findByText("Serra ao amanhecer.jpg");
+  act(() => {
+    notifyMediaChanged?.(["media-001"]);
+    notifyMediaChanged?.(["media-001"]);
+  });
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
+  await act(async () => {
+    resolveNewer(projectionNamed("Observação nova.jpg"));
+  });
+  await screen.findByText("Observação nova.jpg");
+
+  await act(async () => {
+    resolveOlder(projectionNamed("Observação antiga.jpg"));
+  });
+  expect(screen.getByText("Observação nova.jpg")).toBeInTheDocument();
+  expect(screen.queryByText("Observação antiga.jpg")).not.toBeInTheDocument();
 });
 
 test("keeps recovery actions hidden until the first authoritative media observation", async () => {

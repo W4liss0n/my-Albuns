@@ -217,6 +217,8 @@ function projectCorePortWithApply(
       projection: await apply(intent),
       affectedFrameId: "frame-001",
     }),
+    importPhoto: async () => ({ kind: "cancelled", projection }),
+    resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
@@ -1573,6 +1575,7 @@ test("exposes only Photos as native drag sources and clears the active drag", ()
   const dataTransfer = {
     effectAllowed: "none",
     setData: vi.fn(),
+    setDragImage: vi.fn(),
   };
 
   fireEvent.dragStart(photo, { dataTransfer });
@@ -1580,6 +1583,15 @@ test("exposes only Photos as native drag sources and clears the active drag", ()
     "application/x-myalbuns-photo",
     "media-002",
   );
+  expect(dataTransfer.setDragImage).toHaveBeenCalledOnce();
+  expect(dataTransfer.setDragImage).toHaveBeenCalledWith(
+    expect.any(HTMLCanvasElement),
+    0,
+    0,
+  );
+  const dragImage = dataTransfer.setDragImage.mock.calls[0][0];
+  expect(dragImage).toHaveProperty("width", 1);
+  expect(dragImage).toHaveProperty("height", 1);
   expect(canvasHarness.props?.draggedPhotoId).toBe("media-002");
 
   fireEvent.dragEnd(photo, { dataTransfer });

@@ -69,9 +69,6 @@ export function useProjectMutations({
   async function applyPhotoWithStatus(intent: ProjectIntent) {
     let affectedFrameId: string | null = null;
     const completed = await runWithGlobalFeedback("Aplicando Foto", async (port) => {
-      if (!port.applyWithOutcome) {
-        throw new Error("A composição de Fotos não está disponível neste Host.");
-      }
       const result = await port.applyWithOutcome(intent);
       affectedFrameId = result.affectedFrameId;
       return result.projection;
@@ -143,18 +140,12 @@ export function useProjectMutations({
     applyPhotoWithStatus,
     importPhoto: () =>
       void runWithGlobalFeedback("Importando Foto", async (port) => {
-        if (!port.importPhoto) {
-          throw new Error("A importação de Foto não está disponível neste Host.");
-        }
         return (await port.importPhoto()).projection;
       }),
     dropPhoto: async (intent: ProjectIntent) => {
       setMessage(null);
       let affectedFrameId: string | null = null;
       const outcome = await runProjectMutation(async (port) => {
-        if (!port.applyWithOutcome) {
-          throw new Error("A composição de Fotos não está disponível neste Host.");
-        }
         const result = await port.applyWithOutcome(intent);
         affectedFrameId = result.affectedFrameId;
         return result.projection;

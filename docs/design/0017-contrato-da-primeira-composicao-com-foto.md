@@ -88,8 +88,11 @@ paralelo de Layouts.
 
 Durante o drag, o Canvas apresenta somente o contorno azul do Frame ou da
 Lâmina resolvida. `Esc`, alvo inválido, saída do Canvas ou drop externo limpam o
-estado transitório; mesmo se uma resposta assíncrona chegar atrasada, a revisão
-do Projeto não avança. Inserção, preenchimento ou substituição retornam
+estado transitório. O cartão configura uma imagem de arraste transparente, e
+cada nova consulta remove o destaque anterior até que mídia, coordenada,
+geração da consulta e alvo resolvido voltem a coincidir. Uma resposta atrasada
+ou um drop durante a consulta não avança a revisão do Projeto. Inserção,
+preenchimento ou substituição retornam
 `affectedFrameId`; a WebView seleciona somente esse Frame e atualiza o Painel
 contextual depois da Projeção autoritativa. Seleção e destaque não são estado
 criativo e não acrescentam Histórico.
@@ -105,8 +108,10 @@ são ignorados para que a geometria do Frame permaneça sob o modo proprietário
 
 Canvas e Exportação consomem a mesma Projeção composta. Frame, vínculo, Pan e
 Zoom sobrevivem a Salvamento e reabertura; o Host reidrata apenas os metadados
-transitórios do Original. Uma mudança externa estável atualiza esses metadados
-sem criar Histórico. Cada observação transitória fica associada ao par
+transitórios do Original. Essa inspeção começa pelo Monitor somente depois de
+`host_ready`, fora da thread que inicializa janela e logging; a resposta atualiza
+a Projeção pela geração de runtime mais nova, sem criar Histórico. Cada
+observação transitória fica associada ao par
 `mediaId + path` que a originou, de modo que Undo/Redo de uma Religação restaura
 imediatamente as dimensões corretas de cada vínculo.
 
@@ -131,5 +136,8 @@ placeholders, empilhamento, Histórico e round-trip. Testes da WebView cobrem
 diálogo/ports, destaque, cancelamentos, seleção e gestos. A jornada produtiva
 dirige Global → Host → diálogo nativo → WebView2/Canvas → Processador → Salvar
 e reabrir → Exportação, mede Canvas/JPEG com tolerância explícita e repete a
-Exportação sem o Original. O gate real do Host captura bindings antes da
-remoção para provar que nem um Cache vazio nem o Processador mascaram a falta.
+Exportação sem o Original. Antes da primeira Exportação, o gate observa uma
+prévia real, esvazia somente o namespace de Cache isolado da própria jornada
+enquanto o diálogo nativo ainda está aberto e mede zero entradas e zero bytes
+antes e depois do Processador. A textura residente permanece no Canvas; sua
+presença não mascara a falta do Original na segunda tentativa.

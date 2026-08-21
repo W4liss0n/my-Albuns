@@ -184,12 +184,12 @@ export interface ProjectStartupPort {
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
-  applyWithOutcome?(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
-  importPhoto?(): Promise<
+  applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
+  importPhoto(): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
     | { kind: "imported"; projection: EditorProjection; mediaId: string }
   >;
-  resolvePhotoDropTarget?(
+  resolvePhotoDropTarget(
     sheetId: string,
     xUm: number,
     yUm: number,

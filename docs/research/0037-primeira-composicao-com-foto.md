@@ -36,7 +36,8 @@ protocolo do Processador já pertenciam à árvore aceita.
 ## Corte adotado
 
 O menor seam persistente é `Frame + PhotoTransform`. Metadados do arquivo são
-reidratados pelo Host, e `baseFillZoom` é calculado pelo `CompositionEngine`.
+reidratados pelo Monitor depois de `host_ready`, em trabalho bloqueante fora da
+thread de inicialização, e `baseFillZoom` é calculado pelo `CompositionEngine`.
 Isso evita gravar propriedades derivadas e permite que uma mudança estável do
 Original atualize a composição sem revisão ou Histórico. O runtime indexa cada
 observação por `mediaId + path`; assim, Religação, Undo e Redo não reutilizam as
@@ -44,9 +45,10 @@ dimensões observadas para outro vínculo lógico.
 
 O targeting é uma consulta pura do `ProjectCore`: valida a superfície e varre
 Frames da frente para trás. O drop envia coordenadas, não uma decisão da
-WebView. A mesma função é usada para destaque e mutação; se a resposta visual
-ficar obsoleta, a mutação ainda revalida a coordenada atual e falha sem revisão
-quando inválida.
+WebView. A mesma função é usada para destaque e mutação; a WebView só aceita um
+drop quando mídia, ponto e geração coincidem com o destaque visível. Respostas
+de projeção do Monitor também têm geração monotônica, inclusive quando a revisão
+criativa não muda.
 
 O modo normal reutiliza um único primeiro Layout determinístico, enquanto o
 Modo de edição cria apenas o retângulo proporcional pedido. Não foi criado um
@@ -64,15 +66,18 @@ tolerância máxima explícita de 32 níveis por canal, cobrindo a recompressão
 JPEG. Uma amostra fora do Frame mantém tolerância 8 para o Background. O runner
 também verifica o hash e os bytes do Original antes e depois das operações.
 
-Há duas provas complementares de ausência:
+A jornada confirma primeiro uma representação JPEG real no namespace de Cache
+isolado do processo. Enquanto o diálogo nativo da primeira Exportação ainda está
+aberto, remove somente esse conteúdo derivado por uma travessia fail-closed e
+mede zero entradas e zero bytes. O aplicativo real exporta pelo Original; o
+namespace continua com zero entradas e zero bytes depois do Processador.
 
-1. a jornada confirma primeiro que existe uma representação JPEG no Cache,
-   remove o Original antes de uma segunda Exportação e exige mensagem com
-   `Religar`/`Religue`, terminal `export_failed` em `source_verification` e
-   nenhum arquivo publicado; assim, nem um Cache populado produz falso sucesso;
-2. o teste real do Host captura os bindings quando o Original ainda existe,
-   remove-o depois e exige `SourceUnavailable` do Processador, com Cache
-   explicitamente vazio e fora de todos os caminhos requeridos.
+Em seguida, a textura já residente continua visível no Canvas, mas o runner
+remove o Original antes da segunda Exportação e exige mensagem com
+`Religar`/`Religue`, terminal `export_failed` em `source_verification` e nenhum
+arquivo publicado. Portanto nem Cache em disco nem prévia residente produzem
+falso sucesso. O gate canônico não usa `cfg(test)`, variável de ambiente de teste
+ou Host in-process como evidência dessa propriedade.
 
 O artefato canônico é
 `docs/research/artifacts/0037-issue-17-first-photo-composition.json`. O wrapper

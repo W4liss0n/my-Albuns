@@ -2,10 +2,52 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  assertEmptyCacheExport,
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
 } from "./ProductiveJourneyObservations.mjs";
+
+test("accepts an export only when the real Cache namespace is empty before and after it", () => {
+  assert.deepEqual(
+    assertEmptyCacheExport({
+      previewArtifactCountBeforePurge: 2,
+      cacheEntryCountBeforeExport: 0,
+      cacheByteCountBeforeExport: 0,
+      cacheEntryCountAfterExport: 0,
+      cacheByteCountAfterExport: 0,
+    }),
+    {
+      previewArtifactCountBeforePurge: 2,
+      cacheEntryCountBeforeExport: 0,
+      cacheByteCountBeforeExport: 0,
+      cacheEntryCountAfterExport: 0,
+      cacheByteCountAfterExport: 0,
+    },
+  );
+  assert.throws(
+    () =>
+      assertEmptyCacheExport({
+        previewArtifactCountBeforePurge: 1,
+        cacheEntryCountBeforeExport: 1,
+        cacheByteCountBeforeExport: 42,
+        cacheEntryCountAfterExport: 1,
+        cacheByteCountAfterExport: 42,
+      }),
+    /Cache namespace was not empty before Export/,
+  );
+  assert.throws(
+    () =>
+      assertEmptyCacheExport({
+        previewArtifactCountBeforePurge: 0,
+        cacheEntryCountBeforeExport: 0,
+        cacheByteCountBeforeExport: 0,
+        cacheEntryCountAfterExport: 0,
+        cacheByteCountAfterExport: 0,
+      }),
+    /no real preview artifact/,
+  );
+});
 
 const completeJourney = [
   '{"event":"host_ready","process_id":101}',

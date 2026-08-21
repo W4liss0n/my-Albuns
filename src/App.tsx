@@ -205,15 +205,23 @@ function App({
   useEffect(() => {
     if (!projectId) return;
     let active = true;
+    let latestProjectionRefresh = 0;
     let unlisten: (() => void) | undefined;
     void mediaPreviewPort
       .onMediaChanged(() => {
         if (!active) return;
         setMediaRefreshRevision((revision) => revision + 1);
+        const refresh = ++latestProjectionRefresh;
         const operationId = createLogInstanceId("media-refresh");
         void projectCorePort.load(operationId).then(
           (refreshed) => {
-            if (!active || refreshed.state.projectId !== projectId) return;
+            if (
+              !active ||
+              refresh !== latestProjectionRefresh ||
+              refreshed.state.projectId !== projectId
+            ) {
+              return;
+            }
             setProjection((current) =>
               current?.state.projectId === projectId &&
               current.state.revision > refreshed.state.revision
@@ -222,7 +230,7 @@ function App({
             );
           },
           (error: unknown) => {
-            if (!active) return;
+            if (!active || refresh !== latestProjectionRefresh) return;
             logger.write({
               level: "warn",
               component: "media-preview",

@@ -6,8 +6,12 @@ import {
   logReasonFromError,
 } from "../application/logging";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import type { PhotoDropTarget } from "../domain/project";
 import { AlbumCanvasScene } from "./albumCanvasScene";
-import type { AlbumCanvasProps } from "./albumCanvasContract";
+import type {
+  AlbumCanvasProps,
+  CanvasPhotoDropPoint,
+} from "./albumCanvasContract";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -28,12 +32,15 @@ export type {
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
-  const [photoDropHighlight, setPhotoDropHighlight] = useState<
-    import("../domain/project").PhotoDropTarget | null
-  >(null);
+  const [resolvedPhotoDrop, setResolvedPhotoDrop] = useState<{
+    request: number;
+    mediaId: string;
+    point: CanvasPhotoDropPoint;
+    target: PhotoDropTarget;
+  } | null>(null);
   const renderedProps: AlbumCanvasProps = {
     ...props,
-    photoDropHighlight,
+    photoDropHighlight: resolvedPhotoDrop?.target ?? null,
   };
   const logger = useLogger();
   const canvasGraphicsDiagnosticProbe =
@@ -56,7 +63,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   useEffect(() => {
     if (!props.draggedPhotoId) {
       dragRequestRef.current += 1;
-      setPhotoDropHighlight(null);
+      setResolvedPhotoDrop(null);
     }
   }, [props.draggedPhotoId]);
 
@@ -65,7 +72,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       if (event.key !== "Escape") return;
       if (props.draggedPhotoId) {
         dragRequestRef.current += 1;
-        setPhotoDropHighlight(null);
+        setResolvedPhotoDrop(null);
         props.onPhotoDragCancel?.();
       } else if (props.editingSheetId) {
         props.onExitSheetEdit?.();
@@ -366,27 +373,31 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           event.clientY,
         );
         if (!mediaId || !point || !props.onResolvePhotoDropTarget) {
-          setPhotoDropHighlight(null);
+          dragRequestRef.current += 1;
+          setResolvedPhotoDrop(null);
           return;
         }
         event.preventDefault();
         event.dataTransfer.dropEffect = "copy";
         const request = dragRequestRef.current + 1;
         dragRequestRef.current = request;
+        setResolvedPhotoDrop(null);
         void props.onResolvePhotoDropTarget(mediaId, point).then(
           (target) => {
             if (
               dragRequestRef.current === request &&
               props.draggedPhotoId === mediaId
             ) {
-              setPhotoDropHighlight(
-                target.kind === "invalid" ? null : target,
+              setResolvedPhotoDrop(
+                target.kind === "invalid"
+                  ? null
+                  : { request, mediaId, point, target },
               );
             }
           },
           () => {
             if (dragRequestRef.current === request) {
-              setPhotoDropHighlight(null);
+              setResolvedPhotoDrop(null);
             }
           },
         );
@@ -394,7 +405,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
       onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           dragRequestRef.current += 1;
-          setPhotoDropHighlight(null);
+          setResolvedPhotoDrop(null);
         }
       }}
       onDrop={(event) => {
@@ -403,9 +414,15 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
           event.clientX,
           event.clientY,
         );
-        const validTarget = photoDropHighlight !== null;
+        const validTarget =
+          resolvedPhotoDrop !== null &&
+          resolvedPhotoDrop.request === dragRequestRef.current &&
+          resolvedPhotoDrop.mediaId === mediaId &&
+          resolvedPhotoDrop.point.sheetId === point?.sheetId &&
+          Object.is(resolvedPhotoDrop.point.xUm, point?.xUm) &&
+          Object.is(resolvedPhotoDrop.point.yUm, point?.yUm);
         dragRequestRef.current += 1;
-        setPhotoDropHighlight(null);
+        setResolvedPhotoDrop(null);
         props.onPhotoDragCancel?.();
         if (!mediaId || !point || !validTarget || !props.onDropPhoto) return;
         event.preventDefault();

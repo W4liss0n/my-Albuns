@@ -63,6 +63,7 @@ export function MediaPanel({
     [activeMediaKind, mediaItems],
   );
   const stripRef = useRef<HTMLDivElement>(null);
+  const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!onMediaDemandChange) return;
     const root = stripRef.current;
@@ -118,6 +119,20 @@ export function MediaPanel({
       className="media-panel"
       aria-label="Painel de imagens"
     >
+      <canvas
+        ref={transparentDragImageRef}
+        aria-hidden="true"
+        width={1}
+        height={1}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: "none",
+        }}
+      />
       <div className="media-panel-head">
         <div className="media-tabs">
           <button
@@ -170,6 +185,17 @@ export function MediaPanel({
                   media.kind === "photo"
                     ? (event) => {
                         event.dataTransfer.effectAllowed = "copy";
+                        const transparentDragImage = transparentDragImageRef.current;
+                        if (!transparentDragImage) {
+                          throw new Error(
+                            "A imagem transparente de arraste não está disponível.",
+                          );
+                        }
+                        event.dataTransfer.setDragImage(
+                          transparentDragImage,
+                          0,
+                          0,
+                        );
                         event.dataTransfer.setData(
                           "application/x-myalbuns-photo",
                           media.id,

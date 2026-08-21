@@ -3,9 +3,11 @@ import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -20,6 +22,7 @@ import {
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 import {
+  assertEmptyCacheExport,
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
@@ -491,6 +494,62 @@ function directoryContainsJpeg(directory) {
   });
 }
 
+function assertOwnedCacheRoot(directory) {
+  const expected = path.resolve(
+    processDataRoot,
+    "Local",
+    "MyAlbuns2",
+    "Cache",
+  );
+  if (path.resolve(directory) !== expected) {
+    throw new Error("The Cache purge target is not the isolated productive root");
+  }
+  const relative = path.relative(scratch, expected);
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("The Cache purge target escaped the productive scratch root");
+  }
+}
+
+function summarizeOwnedCache(directory) {
+  assertOwnedCacheRoot(directory);
+  const summary = { entryCount: 0, byteCount: 0, jpegCount: 0 };
+  if (!existsSync(directory)) return summary;
+  const visit = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const entryPath = path.join(current, entry.name);
+      const metadata = lstatSync(entryPath);
+      summary.entryCount += 1;
+      if (metadata.isSymbolicLink()) {
+        throw new Error("The isolated Cache contains a redirected entry");
+      }
+      if (metadata.isDirectory()) {
+        visit(entryPath);
+        continue;
+      }
+      if (!metadata.isFile()) {
+        throw new Error("The isolated Cache contains a non-regular entry");
+      }
+      summary.byteCount += metadata.size;
+      if (/\.jpe?g$/i.test(entry.name)) summary.jpegCount += 1;
+    }
+  };
+  visit(directory);
+  return summary;
+}
+
+function purgeOwnedCache(directory) {
+  assertOwnedCacheRoot(directory);
+  if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (lstatSync(entryPath).isSymbolicLink()) {
+      throw new Error("The isolated Cache purge refused a redirected entry");
+    }
+    rmSync(entryPath, { recursive: true, force: false });
+  }
+  return summarizeOwnedCache(directory);
+}
+
 function jpegDimensions(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
     throw new Error("The exported file is not a JPEG stream");
@@ -766,6 +825,13 @@ try {
     1,
     "Canvas Photo preview",
   );
+  const cacheRoot = path.join(processDataRoot, "Local", "MyAlbuns2", "Cache");
+  await waitFor(
+    "real cached Photo preview",
+    () => directoryContainsJpeg(cacheRoot),
+    timeoutMilliseconds,
+  );
+  const previewCacheBeforePurge = summarizeOwnedCache(cacheRoot);
   const importedPageSource = await hostDriver.request(
     "GET",
     `/session/${hostDriver.sessionId}/source`,
@@ -874,6 +940,7 @@ try {
     "native_save_dialog_opening",
     "Export retry action",
   );
+  const emptyCacheBeforeExport = purgeOwnedCache(cacheRoot);
   const selectedExport = driveNativeDialog(
     firstHost,
     "select",
@@ -887,6 +954,14 @@ try {
   await waitFor("exported JPEG", () => existsSync(exportPath), timeoutMilliseconds);
   await waitForLogEvent("imaging_process_stopped", 1, "Processador terminal");
   const exported = readFileSync(exportPath);
+  const emptyCacheAfterExport = summarizeOwnedCache(cacheRoot);
+  const emptyCacheEvidence = assertEmptyCacheExport({
+    previewArtifactCountBeforePurge: previewCacheBeforePurge.jpegCount,
+    cacheEntryCountBeforeExport: emptyCacheBeforeExport.entryCount,
+    cacheByteCountBeforeExport: emptyCacheBeforeExport.byteCount,
+    cacheEntryCountAfterExport: emptyCacheAfterExport.entryCount,
+    cacheByteCountAfterExport: emptyCacheAfterExport.byteCount,
+  });
   const dimensions = jpegDimensions(exported);
   const sheetEvidence = assertDistinguishableSheetExport({
     document: savedDocument.project.document,
@@ -958,13 +1033,8 @@ try {
     throw new Error("Export modified the linked Photo Original");
   }
 
-  const cacheRoot = path.join(processDataRoot, "Local", "MyAlbuns2", "Cache");
-  await waitFor(
-    "cached Photo preview",
-    () => directoryContainsJpeg(cacheRoot),
-    timeoutMilliseconds,
-  );
-  const cacheArtifactPresentBeforeMissingOriginal = true;
+  const residentCanvasPreviewBeforeMissingOriginal =
+    recordsFor("canvas_opaque_preview_texture_loaded").length >= 1;
   let missingOriginalBlocked = false;
   let missingOriginalActionable = false;
   let cacheCouldNotProduceFalseSuccess = false;
@@ -999,7 +1069,7 @@ try {
       failureText.includes("Religar") || failureText.includes("Religue");
     const missingOriginalFailure = recordsFor("export_failed").at(-1);
     cacheCouldNotProduceFalseSuccess =
-      cacheArtifactPresentBeforeMissingOriginal &&
+      residentCanvasPreviewBeforeMissingOriginal &&
       missingOriginalFailure?.stage === "source_verification" &&
       missingOriginalBlocked;
     if (
@@ -1206,7 +1276,8 @@ try {
       originalUnchanged: readFileSync(photoPath).equals(originalPhoto),
       missingOriginalBlocked,
       missingOriginalActionable,
-      cacheArtifactPresentBeforeMissingOriginal,
+      residentCanvasPreviewBeforeMissingOriginal,
+      ...emptyCacheEvidence,
       cacheCouldNotProduceFalseSuccess,
       jpeg: {
         ...dimensions,

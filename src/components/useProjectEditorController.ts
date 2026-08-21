@@ -73,16 +73,13 @@ export function useProjectEditorController({
     onViewportChange: navigation.setViewport,
     onTransformPreview: photoGestures.onTransformPreview,
     onTransformCommit: photoGestures.onTransformCommit,
-    onResolvePhotoDropTarget: async (_mediaId, point) => {
-      const resolver = projectCorePort.resolvePhotoDropTarget;
-      if (!resolver) return { kind: "invalid" };
-      return resolver(
+    onResolvePhotoDropTarget: async (_mediaId, point) =>
+      projectCorePort.resolvePhotoDropTarget(
         point.sheetId,
         point.xUm,
         point.yUm,
         navigation.editingSheetId ? "edit" : "normal",
-      );
-    },
+      ),
     onDropPhoto: (mediaId, point) =>
       mutations.dropPhoto({
         kind: "dropPhoto",
