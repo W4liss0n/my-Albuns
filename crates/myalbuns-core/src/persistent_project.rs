@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -10,8 +10,10 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        ComposedOutputUnit, CoreError, EditorProjection, MediaId, ProjectIntent, RelinkMedia,
-        RenderSnapshot, RenderSnapshotMetadata, RenderSnapshotRef,
+        ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoOutcome, MediaId,
+        PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata, ProjectIntent,
+        ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
+        RenderSnapshotRef,
     },
     persistent_projection,
     persistent_session::PersistentProjectSession,
@@ -244,6 +246,7 @@ pub struct EditableProject {
     store: ProjectStore,
     identity_lease: ProjectIdentityLease,
     identity_authority: ProjectIdentityAuthority,
+    photo_sources: HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
     session_valid: bool,
 }
 
@@ -359,10 +362,7 @@ impl EditableProject {
         self.session_valid && self.session.can_redo()
     }
 
-    /// Initial read-only editor view of the productive v1 document.
-    ///
-    /// Creative mutations are added by the following vertical slices; this
-    /// projection intentionally contains no content from the temporary demo.
+    /// Resolved editor view of the current productive Project document.
     pub fn projection(&self) -> EditorProjection {
         let project_name = self
             .project_path()
@@ -371,13 +371,10 @@ impl EditableProject {
             .filter(|name| !name.is_empty())
             .unwrap_or_else(|| "Projeto".into());
         persistent_projection::editor_projection(
-            self.project_id(),
-            self.revision(),
-            self.saved_revision(),
-            self.can_undo(),
-            self.can_redo(),
+            &self.session,
+            self.session_valid,
             &project_name,
-            self.project(),
+            &self.photo_sources,
         )
     }
 
@@ -413,12 +410,81 @@ impl EditableProject {
         }
     }
 
-    pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorProjection, CoreError> {
+    pub fn apply_with_outcome(
+        &mut self,
+        intent: ProjectIntent,
+    ) -> Result<ProjectMutationOutcome, CoreError> {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
-        self.session.apply(intent)?;
-        Ok(self.projection())
+        let affected_frame_id = self
+            .session
+            .apply(intent)?
+            .map(|frame_id| frame_id.hyphenated().to_string());
+        Ok(ProjectMutationOutcome {
+            projection: self.projection(),
+            affected_frame_id,
+        })
+    }
+
+    pub fn apply(&mut self, intent: ProjectIntent) -> Result<EditorProjection, CoreError> {
+        self.apply_with_outcome(intent)
+            .map(|outcome| outcome.projection)
+    }
+
+    pub fn import_photo(&mut self, command: ImportPhoto) -> Result<ImportPhotoOutcome, CoreError> {
+        if !self.session_valid {
+            return Err(CoreError::EditableSessionInvalidated);
+        }
+        let media_id = MediaId::from_uuid(Uuid::new_v4());
+        let source_path = command.path.clone();
+        self.session
+            .import_photo(media_id.into_uuid(), command.path)?;
+        self.photo_sources
+            .entry(media_id)
+            .or_default()
+            .insert(source_path, command.source_metadata);
+        Ok(ImportPhotoOutcome {
+            projection: self.projection(),
+            media_id,
+        })
+    }
+
+    pub fn observe_photo_source(
+        &mut self,
+        media_id: MediaId,
+        metadata: PhotoSourceMetadata,
+    ) -> Result<(), CoreError> {
+        let source_path = self
+            .project()
+            .media()
+            .iter()
+            .find(|media| {
+                media.id() == media_id.into_uuid() && media.kind() == crate::MediaKind::Photo
+            })
+            .map(|media| media.path().to_path_buf())
+            .ok_or_else(|| CoreError::MediaNotFound(media_id.to_string()))?;
+        self.photo_sources
+            .entry(media_id)
+            .or_default()
+            .insert(source_path, metadata);
+        Ok(())
+    }
+
+    pub fn photo_drop_target(
+        &self,
+        sheet_id: &str,
+        x_um: i64,
+        y_um: i64,
+        mode: PhotoPlacementMode,
+    ) -> Result<PhotoDropTarget, CoreError> {
+        let parsed = Uuid::parse_str(sheet_id)
+            .ok()
+            .filter(|parsed| parsed.hyphenated().to_string() == sheet_id)
+            .ok_or_else(|| CoreError::SheetNotFound(sheet_id.to_owned()))?;
+        self.project()
+            .photo_drop_target(parsed, x_um, y_um, mode)
+            .map_err(|()| CoreError::SheetNotFound(sheet_id.to_owned()))
     }
 
     pub fn relink_media(&mut self, command: RelinkMedia) -> Result<EditorProjection, CoreError> {
@@ -562,6 +628,7 @@ impl ProjectCore {
             store,
             identity_lease,
             identity_authority,
+            photo_sources: HashMap::new(),
             session_valid: true,
         })
     }
@@ -643,6 +710,7 @@ impl ProjectCore {
             store: opened.store,
             identity_lease,
             identity_authority,
+            photo_sources: HashMap::new(),
             session_valid: true,
         })
     }
@@ -926,6 +994,7 @@ impl ProjectCore {
             store,
             identity_lease,
             identity_authority,
+            photo_sources: HashMap::new(),
             session_valid: true,
         })
     }
@@ -976,6 +1045,7 @@ fn promote_external_copy(
         store: opened.store,
         identity_lease,
         identity_authority,
+        photo_sources: HashMap::new(),
         session_valid: true,
     })
 }

@@ -1,6 +1,6 @@
 {
   "documentType": "myalbuns.project",
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "projectId": "550e8400-e29b-41d4-a716-446655440000",
   "revision": 7,
   "project": {
@@ -65,11 +65,13 @@
     "sheets": [
       {
         "id": "00000000-0000-4000-8000-000000000001",
-        "activeSides": "both"
+        "activeSides": "both",
+        "frames": []
       },
       {
         "id": "00000000-0000-4000-8000-000000000002",
-        "activeSides": "both"
+        "activeSides": "both",
+        "frames": []
       }
     ]
   }

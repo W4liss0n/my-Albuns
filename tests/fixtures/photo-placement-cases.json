@@ -24,6 +24,7 @@
         }
       },
       "expectedPlan": {
+        "baseFillZoom": 66.66666666666667,
         "currentPan": { "x": -0.9, "y": 0 },
         "currentZoom": 1,
         "panRange": { "minimum": -1, "maximum": 1 },
@@ -91,6 +92,7 @@
         }
       },
       "expectedPlan": {
+        "baseFillZoom": 75,
         "currentPan": { "x": 1, "y": -1 },
         "currentZoom": 1.5,
         "panRange": { "minimum": -1, "maximum": 1 },

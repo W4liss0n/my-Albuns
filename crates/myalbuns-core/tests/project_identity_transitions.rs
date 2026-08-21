@@ -475,7 +475,7 @@ fn a_read_only_external_copy_can_be_saved_as_a_new_editable_project() {
         &std::fs::read(&destination_path).expect("the destination is readable"),
     )
     .expect("the destination is valid JSON");
-    assert_eq!(destination_json["schemaVersion"], 2);
+    assert_eq!(destination_json["schemaVersion"], 3);
     assert_eq!(destination_json["revision"], original_revision);
     assert_eq!(
         destination_json["projectId"],

@@ -6,7 +6,10 @@ use std::{
 use myalbuns_paths::validate_external_path;
 use uuid::Uuid;
 
-use crate::model::MediaKind;
+use crate::model::{
+    MediaKind, PHOTO_PAN_MAX, PHOTO_PAN_MIN, PHOTO_ZOOM_MAX, PHOTO_ZOOM_MIN, PhotoDropTarget,
+    PhotoPlacementMode,
+};
 
 pub(crate) const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
@@ -191,6 +194,153 @@ pub struct MediaRef {
     path: PathBuf,
 }
 
+const TRANSFORM_SCALE: f32 = 1_000_000.0;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProjectRect {
+    x: u64,
+    y: u64,
+    width: u64,
+    height: u64,
+}
+
+impl ProjectRect {
+    pub const fn x(&self) -> u64 {
+        self.x
+    }
+
+    pub const fn y(&self) -> u64 {
+        self.y
+    }
+
+    pub const fn width(&self) -> u64 {
+        self.width
+    }
+
+    pub const fn height(&self) -> u64 {
+        self.height
+    }
+
+    pub(crate) const fn new(x: u64, y: u64, width: u64, height: u64) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    fn contains(self, x: u64, y: u64) -> bool {
+        x >= self.x
+            && y >= self.y
+            && x < self.x.saturating_add(self.width)
+            && y < self.y.saturating_add(self.height)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProjectPhotoTransform {
+    pan_x_scaled: i32,
+    pan_y_scaled: i32,
+    user_zoom_scaled: u32,
+}
+
+impl Default for ProjectPhotoTransform {
+    fn default() -> Self {
+        Self::new(0.0, 0.0, 1.0).expect("the neutral Photo transform is valid")
+    }
+}
+
+impl ProjectPhotoTransform {
+    pub fn pan_x(&self) -> f32 {
+        self.pan_x_scaled as f32 / TRANSFORM_SCALE
+    }
+
+    pub fn pan_y(&self) -> f32 {
+        self.pan_y_scaled as f32 / TRANSFORM_SCALE
+    }
+
+    pub fn user_zoom(&self) -> f32 {
+        self.user_zoom_scaled as f32 / TRANSFORM_SCALE
+    }
+
+    pub(crate) fn new(pan_x: f32, pan_y: f32, user_zoom: f32) -> Result<Self, ()> {
+        if !pan_x.is_finite()
+            || !pan_y.is_finite()
+            || !user_zoom.is_finite()
+            || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&pan_x)
+            || !(PHOTO_PAN_MIN..=PHOTO_PAN_MAX).contains(&pan_y)
+            || !(PHOTO_ZOOM_MIN..=PHOTO_ZOOM_MAX).contains(&user_zoom)
+        {
+            return Err(());
+        }
+        Ok(Self {
+            pan_x_scaled: (pan_x * TRANSFORM_SCALE).round() as i32,
+            pan_y_scaled: (pan_y * TRANSFORM_SCALE).round() as i32,
+            user_zoom_scaled: (user_zoom * TRANSFORM_SCALE).round() as u32,
+        })
+    }
+
+    fn advanced(self, delta_pan_x: f32, delta_pan_y: f32, delta_zoom: f32) -> Result<Self, ()> {
+        if !delta_pan_x.is_finite() || !delta_pan_y.is_finite() || !delta_zoom.is_finite() {
+            return Err(());
+        }
+        Self::new(
+            (self.pan_x() + delta_pan_x).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
+            (self.pan_y() + delta_pan_y).clamp(PHOTO_PAN_MIN, PHOTO_PAN_MAX),
+            (self.user_zoom() + delta_zoom).clamp(PHOTO_ZOOM_MIN, PHOTO_ZOOM_MAX),
+        )
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectPhoto {
+    media_id: Uuid,
+    transform: ProjectPhotoTransform,
+}
+
+impl ProjectPhoto {
+    pub const fn media_id(&self) -> Uuid {
+        self.media_id
+    }
+
+    pub const fn transform(&self) -> ProjectPhotoTransform {
+        self.transform
+    }
+
+    pub(crate) const fn new(media_id: Uuid, transform: ProjectPhotoTransform) -> Self {
+        Self {
+            media_id,
+            transform,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProjectFrame {
+    id: Uuid,
+    rect: ProjectRect,
+    photo: Option<ProjectPhoto>,
+}
+
+impl ProjectFrame {
+    pub const fn id(&self) -> Uuid {
+        self.id
+    }
+
+    pub const fn rect(&self) -> ProjectRect {
+        self.rect
+    }
+
+    pub fn photo(&self) -> Option<&ProjectPhoto> {
+        self.photo.as_ref()
+    }
+
+    pub(crate) const fn new(id: Uuid, rect: ProjectRect, photo: Option<ProjectPhoto>) -> Self {
+        Self { id, rect, photo }
+    }
+}
+
 impl MediaRef {
     pub fn id(&self) -> Uuid {
         self.id
@@ -213,6 +363,7 @@ impl MediaRef {
 pub struct ProjectSheet {
     id: Uuid,
     active_sides: ActiveSides,
+    frames: Vec<ProjectFrame>,
 }
 
 impl ProjectSheet {
@@ -224,8 +375,28 @@ impl ProjectSheet {
         self.active_sides
     }
 
+    pub fn frames(&self) -> &[ProjectFrame] {
+        &self.frames
+    }
+
     pub(crate) fn new(id: Uuid, active_sides: ActiveSides) -> Self {
-        Self { id, active_sides }
+        Self {
+            id,
+            active_sides,
+            frames: Vec::new(),
+        }
+    }
+
+    pub(crate) fn with_frames(
+        id: Uuid,
+        active_sides: ActiveSides,
+        frames: Vec<ProjectFrame>,
+    ) -> Self {
+        Self {
+            id,
+            active_sides,
+            frames,
+        }
     }
 }
 
@@ -285,6 +456,321 @@ impl ProjectDocument {
         media.path = path;
         validate_project_state(&candidate)?;
         Ok(candidate)
+    }
+
+    pub(crate) fn with_imported_photo(&self, media_id: Uuid, path: PathBuf) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        candidate
+            .media
+            .push(MediaRef::new(media_id, MediaKind::Photo, path));
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
+    pub(crate) fn with_added_photo(
+        &self,
+        sheet_id: Uuid,
+        media_id: Uuid,
+        mode: PhotoPlacementMode,
+    ) -> Result<(Self, Uuid), ()> {
+        self.ensure_photo(media_id)?;
+        let mut candidate = self.clone();
+        let sheet_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let affected =
+            if let Some(frame_index) = leftmost_placeholder(&candidate.sheets[sheet_index]) {
+                fill_frame(
+                    &mut candidate.sheets[sheet_index].frames[frame_index],
+                    media_id,
+                )
+            } else {
+                add_frame(
+                    &mut candidate.sheets[sheet_index],
+                    candidate.document.sheet_width_um,
+                    candidate.document.sheet_height_um,
+                    media_id,
+                    mode,
+                    None,
+                )?
+            };
+        validate_project_state(&candidate)?;
+        Ok((candidate, affected))
+    }
+
+    pub(crate) fn with_dropped_photo(
+        &self,
+        sheet_id: Uuid,
+        media_id: Uuid,
+        x_um: i64,
+        y_um: i64,
+        mode: PhotoPlacementMode,
+    ) -> Result<(Self, Uuid), ()> {
+        self.ensure_photo(media_id)?;
+        let mut candidate = self.clone();
+        let sheet_index = candidate
+            .sheets
+            .iter()
+            .position(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        let target = photo_drop_target(
+            &candidate.sheets[sheet_index],
+            candidate.document.sheet_width_um,
+            candidate.document.sheet_height_um,
+            x_um,
+            y_um,
+            mode,
+        );
+        let affected = match target {
+            PhotoDropTarget::Frame { frame_id } => {
+                let frame_id = Uuid::parse_str(&frame_id).map_err(|_| ())?;
+                let frame = candidate.sheets[sheet_index]
+                    .frames
+                    .iter_mut()
+                    .find(|frame| frame.id == frame_id)
+                    .ok_or(())?;
+                fill_frame(frame, media_id)
+            }
+            PhotoDropTarget::Sheet { .. } => add_frame(
+                &mut candidate.sheets[sheet_index],
+                candidate.document.sheet_width_um,
+                candidate.document.sheet_height_um,
+                media_id,
+                mode,
+                Some((x_um, y_um)),
+            )?,
+            PhotoDropTarget::Invalid => return Err(()),
+        };
+        validate_project_state(&candidate)?;
+        Ok((candidate, affected))
+    }
+
+    pub(crate) fn with_transformed_photo(
+        &self,
+        frame_id: Uuid,
+        delta_pan_x: f32,
+        delta_pan_y: f32,
+        delta_zoom: f32,
+    ) -> Result<Self, ()> {
+        let mut candidate = self.clone();
+        let frame = candidate
+            .sheets
+            .iter_mut()
+            .flat_map(|sheet| &mut sheet.frames)
+            .find(|frame| frame.id == frame_id)
+            .ok_or(())?;
+        let photo = frame.photo.as_mut().ok_or(())?;
+        photo.transform = photo
+            .transform
+            .advanced(delta_pan_x, delta_pan_y, delta_zoom)?;
+        validate_project_state(&candidate)?;
+        Ok(candidate)
+    }
+
+    pub(crate) fn photo_drop_target(
+        &self,
+        sheet_id: Uuid,
+        x_um: i64,
+        y_um: i64,
+        mode: PhotoPlacementMode,
+    ) -> Result<PhotoDropTarget, ()> {
+        let sheet = self
+            .sheets
+            .iter()
+            .find(|sheet| sheet.id == sheet_id)
+            .ok_or(())?;
+        Ok(photo_drop_target(
+            sheet,
+            self.document.sheet_width_um,
+            self.document.sheet_height_um,
+            x_um,
+            y_um,
+            mode,
+        ))
+    }
+
+    fn ensure_photo(&self, media_id: Uuid) -> Result<(), ()> {
+        self.media
+            .iter()
+            .any(|media| media.id == media_id && media.kind == MediaKind::Photo)
+            .then_some(())
+            .ok_or(())
+    }
+}
+
+fn active_surface_width(sheet: &ProjectSheet, sheet_width_um: u64) -> u64 {
+    match sheet.active_sides {
+        ActiveSides::Both => sheet_width_um,
+        ActiveSides::Left | ActiveSides::Right => sheet_width_um / 2,
+    }
+}
+
+fn leftmost_placeholder(sheet: &ProjectSheet) -> Option<usize> {
+    sheet
+        .frames
+        .iter()
+        .enumerate()
+        .filter(|(_, frame)| frame.photo.is_none())
+        .min_by_key(|(_, frame)| (frame.rect.x, frame.rect.y))
+        .map(|(index, _)| index)
+}
+
+fn fill_frame(frame: &mut ProjectFrame, media_id: Uuid) -> Uuid {
+    frame.photo = Some(ProjectPhoto::new(
+        media_id,
+        ProjectPhotoTransform::default(),
+    ));
+    frame.id
+}
+
+fn add_frame(
+    sheet: &mut ProjectSheet,
+    sheet_width_um: u64,
+    sheet_height_um: u64,
+    media_id: Uuid,
+    mode: PhotoPlacementMode,
+    point: Option<(i64, i64)>,
+) -> Result<Uuid, ()> {
+    let id = Uuid::new_v4();
+    let rect = match mode {
+        PhotoPlacementMode::Normal => {
+            sheet.frames.push(ProjectFrame::new(
+                id,
+                ProjectRect::new(0, 0, 1, 1),
+                Some(ProjectPhoto::new(
+                    media_id,
+                    ProjectPhotoTransform::default(),
+                )),
+            ));
+            apply_first_compatible_layout(sheet, sheet_width_um, sheet_height_um)?;
+            return Ok(id);
+        }
+        PhotoPlacementMode::Edit => {
+            let width = active_surface_width(sheet, sheet_width_um);
+            let frame_width = (width.saturating_mul(2) / 5)
+                .min(sheet_height_um.saturating_mul(3) / 2)
+                .max(1);
+            let frame_height = (frame_width.saturating_mul(2) / 3).max(1);
+            let (center_x, center_y) = point.unwrap_or((
+                i64::try_from(width / 2).map_err(|_| ())?,
+                i64::try_from(sheet_height_um / 2).map_err(|_| ())?,
+            ));
+            centered_inside_rect(
+                width,
+                sheet_height_um,
+                frame_width,
+                frame_height,
+                center_x,
+                center_y,
+            )?
+        }
+    };
+    sheet.frames.push(ProjectFrame::new(
+        id,
+        rect,
+        Some(ProjectPhoto::new(
+            media_id,
+            ProjectPhotoTransform::default(),
+        )),
+    ));
+    Ok(id)
+}
+
+fn centered_inside_rect(
+    surface_width: u64,
+    surface_height: u64,
+    frame_width: u64,
+    frame_height: u64,
+    center_x: i64,
+    center_y: i64,
+) -> Result<ProjectRect, ()> {
+    if frame_width > surface_width || frame_height > surface_height {
+        return Err(());
+    }
+    let half_width = i64::try_from(frame_width / 2).map_err(|_| ())?;
+    let half_height = i64::try_from(frame_height / 2).map_err(|_| ())?;
+    let max_x = i64::try_from(surface_width - frame_width).map_err(|_| ())?;
+    let max_y = i64::try_from(surface_height - frame_height).map_err(|_| ())?;
+    let x = (center_x - half_width).clamp(0, max_x);
+    let y = (center_y - half_height).clamp(0, max_y);
+    Ok(ProjectRect::new(
+        u64::try_from(x).map_err(|_| ())?,
+        u64::try_from(y).map_err(|_| ())?,
+        frame_width,
+        frame_height,
+    ))
+}
+
+/// Deterministic candidate zero of the generated Layout catalog.
+fn apply_first_compatible_layout(
+    sheet: &mut ProjectSheet,
+    sheet_width_um: u64,
+    sheet_height_um: u64,
+) -> Result<(), ()> {
+    let count = sheet.frames.len();
+    if count == 0 {
+        return Ok(());
+    }
+    let width = active_surface_width(sheet, sheet_width_um);
+    let columns = (count as f64).sqrt().ceil() as usize;
+    let rows = count.div_ceil(columns);
+    let gap = (width.min(sheet_height_um) / 30).max(1);
+    let usable_width = width
+        .checked_sub(gap.saturating_mul(columns as u64 + 1))
+        .ok_or(())?;
+    let usable_height = sheet_height_um
+        .checked_sub(gap.saturating_mul(rows as u64 + 1))
+        .ok_or(())?;
+    let cell_width = usable_width / columns as u64;
+    let cell_height = usable_height / rows as u64;
+    if cell_width == 0 || cell_height == 0 {
+        return Err(());
+    }
+    for (index, frame) in sheet.frames.iter_mut().enumerate() {
+        let column = (index % columns) as u64;
+        let row = (index / columns) as u64;
+        frame.rect = ProjectRect::new(
+            gap + column * (cell_width + gap),
+            gap + row * (cell_height + gap),
+            cell_width,
+            cell_height,
+        );
+    }
+    Ok(())
+}
+
+fn photo_drop_target(
+    sheet: &ProjectSheet,
+    sheet_width_um: u64,
+    sheet_height_um: u64,
+    x_um: i64,
+    y_um: i64,
+    _mode: PhotoPlacementMode,
+) -> PhotoDropTarget {
+    let Ok(x) = u64::try_from(x_um) else {
+        return PhotoDropTarget::Invalid;
+    };
+    let Ok(y) = u64::try_from(y_um) else {
+        return PhotoDropTarget::Invalid;
+    };
+    let surface_width = active_surface_width(sheet, sheet_width_um);
+    if x >= surface_width || y >= sheet_height_um {
+        return PhotoDropTarget::Invalid;
+    }
+    if let Some(frame) = sheet
+        .frames
+        .iter()
+        .rev()
+        .find(|frame| frame.rect.contains(x, y))
+    {
+        return PhotoDropTarget::Frame {
+            frame_id: frame.id.hyphenated().to_string(),
+        };
+    }
+    PhotoDropTarget::Sheet {
+        sheet_id: sheet.id.hyphenated().to_string(),
     }
 }
 
@@ -658,6 +1144,7 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
     }
 
     let mut sheet_ids = HashSet::new();
+    let mut frame_ids = HashSet::new();
     for (index, sheet) in project.sheets().iter().enumerate() {
         if !sheet_ids.insert(sheet.id()) {
             return Err(());
@@ -672,6 +1159,27 @@ pub(crate) fn validate_project_state(project: &ProjectDocument) -> Result<(), ()
         };
         if !valid_sides {
             return Err(());
+        }
+        let surface_width = active_surface_width(sheet, settings.sheet_width_um());
+        for frame in sheet.frames() {
+            let rect = frame.rect();
+            if !frame_ids.insert(frame.id())
+                || rect.width() == 0
+                || rect.height() == 0
+                || rect
+                    .x()
+                    .checked_add(rect.width())
+                    .is_none_or(|far_x| far_x > surface_width)
+                || rect
+                    .y()
+                    .checked_add(rect.height())
+                    .is_none_or(|far_y| far_y > settings.sheet_height_um())
+                || frame.photo().is_some_and(|photo| {
+                    media_by_id.get(&photo.media_id()) != Some(&MediaKind::Photo)
+                })
+            {
+                return Err(());
+            }
         }
     }
     Ok(())

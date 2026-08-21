@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use myalbuns_core::{EditorProjection, ProjectIntent};
+use myalbuns_core::{EditorProjection, PhotoDropTarget, ProjectIntent, ProjectMutationOutcome};
 use ts_rs::{Config, TS};
 
 fn main() {
@@ -16,4 +16,7 @@ fn main() {
 
     EditorProjection::export_all(&config).expect("EditorProjection bindings should be generated");
     ProjectIntent::export_all(&config).expect("ProjectIntent bindings should be generated");
+    ProjectMutationOutcome::export_all(&config)
+        .expect("Project mutation outcome bindings should be generated");
+    PhotoDropTarget::export_all(&config).expect("Photo drop target bindings should be generated");
 }

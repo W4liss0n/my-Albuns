@@ -10,8 +10,8 @@ use myalbuns_paths::OperationPathContext;
 
 const PROJECT_V1_MIGRATION_INPUT: &[u8] =
     include_bytes!("fixtures/project_document_v1_migration_input.myalbuns");
-const PROJECT_V2_MIGRATION_EXPECTED: &[u8] =
-    include_bytes!("fixtures/project_document_v2_migration_expected.myalbuns");
+const PROJECT_V3_MIGRATION_EXPECTED: &[u8] =
+    include_bytes!("fixtures/project_document_v3_migration_expected.myalbuns");
 
 const PROJECT_WITH_PHOTO_AND_DECORATIVE_V2: &str = r##"{
   "documentType": "myalbuns.project",
@@ -152,7 +152,7 @@ fn v2_rejects_a_photo_as_background_or_overlay() {
 }
 
 #[test]
-fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_authority() {
+fn an_authorized_editable_v2_project_promotes_to_v3_and_keeps_opaque_identity_authority() {
     let root = tempfile::tempdir().expect("temporary editable v2 Project");
     let project_path = root.path().join("Projeto tracer.myalbuns");
     fs::write(&project_path, PROJECT_WITH_PHOTO_AND_DECORATIVE_V2)
@@ -180,7 +180,7 @@ fn an_authorized_editable_v2_project_keeps_its_schema_and_opaque_identity_author
     let persisted: serde_json::Value =
         serde_json::from_slice(&fs::read(&project_path).expect("the saved v2 Project is readable"))
             .expect("the saved v2 Project remains JSON");
-    assert_eq!(persisted["schemaVersion"], 2);
+    assert_eq!(persisted["schemaVersion"], 3);
     assert_eq!(persisted["project"]["media"][0]["kind"], "photo");
     assert_eq!(persisted["project"]["media"][1]["kind"], "decorative");
 }
@@ -315,7 +315,7 @@ fn v1_migrates_only_in_memory_and_read_only_loading_preserves_the_source_bytes()
 }
 
 #[test]
-fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v2_golden_result() {
+fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v3_golden_result() {
     let root = tempfile::tempdir().expect("temporary editable migration Project");
     let project_path = root.path().join("Projeto legado.myalbuns");
     fs::write(&project_path, PROJECT_V1_MIGRATION_INPUT).expect("the v1 fixture is written");
@@ -341,7 +341,7 @@ fn explicit_save_promotes_an_open_v1_project_to_the_versioned_v2_golden_result()
     assert!(!project.has_unsaved_changes());
     assert_eq!(
         fs::read(&project_path).expect("the migrated Project is readable"),
-        PROJECT_V2_MIGRATION_EXPECTED
+        PROJECT_V3_MIGRATION_EXPECTED
     );
 }
 

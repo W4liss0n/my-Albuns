@@ -64,15 +64,73 @@ impl PersistentProjectSession {
         !self.redo.is_empty()
     }
 
-    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<(), CoreError> {
-        self.commit_edit(move |project| match intent {
+    pub(crate) fn apply(&mut self, intent: ProjectIntent) -> Result<Option<Uuid>, CoreError> {
+        let mut affected_frame_id = None;
+        self.commit_edit(|project| match intent {
             ProjectIntent::SetDpi { dpi } => project
                 .with_dpi(dpi)
                 .map_err(|()| CoreError::InvalidDpi(dpi)),
-            ProjectIntent::TransformPhoto { .. }
-            | ProjectIntent::FillLeftmostPlaceholder { .. } => {
-                Err(CoreError::UnsupportedProjectIntent)
+            ProjectIntent::TransformPhoto {
+                frame_id,
+                delta_pan_x,
+                delta_pan_y,
+                delta_zoom,
+            } => {
+                let parsed = parse_uuid(&frame_id)
+                    .map_err(|()| CoreError::FrameNotFound(frame_id.clone()))?;
+                let next = project
+                    .with_transformed_photo(parsed, delta_pan_x, delta_pan_y, delta_zoom)
+                    .map_err(|()| CoreError::FrameNotFound(frame_id))?;
+                affected_frame_id = Some(parsed);
+                Ok(next)
             }
+            ProjectIntent::AddPhoto {
+                sheet_id,
+                media_id,
+                mode,
+            } => {
+                let parsed_sheet = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                let (next, frame_id) = project
+                    .with_added_photo(parsed_sheet, media_id.into_uuid(), mode)
+                    .map_err(|()| {
+                        CoreError::InvalidProject(
+                            "não foi possível adicionar a Foto à Lâmina".into(),
+                        )
+                    })?;
+                affected_frame_id = Some(frame_id);
+                Ok(next)
+            }
+            ProjectIntent::DropPhoto {
+                sheet_id,
+                media_id,
+                x_um,
+                y_um,
+                mode,
+            } => {
+                let parsed_sheet = parse_uuid(&sheet_id)
+                    .map_err(|()| CoreError::SheetNotFound(sheet_id.clone()))?;
+                let (next, frame_id) = project
+                    .with_dropped_photo(parsed_sheet, media_id.into_uuid(), x_um, y_um, mode)
+                    .map_err(|()| {
+                        CoreError::InvalidProject("o alvo da Foto não é válido".into())
+                    })?;
+                affected_frame_id = Some(frame_id);
+                Ok(next)
+            }
+        })?;
+        Ok(affected_frame_id)
+    }
+
+    pub(crate) fn import_photo(
+        &mut self,
+        media_id: Uuid,
+        path: std::path::PathBuf,
+    ) -> Result<(), CoreError> {
+        self.commit_edit(move |project| {
+            project.with_imported_photo(media_id, path).map_err(|()| {
+                CoreError::InvalidProject("o vínculo externo da Foto não é válido".into())
+            })
         })
     }
 
@@ -133,4 +191,11 @@ impl PersistentProjectSession {
         self.schema_upgrade_required = false;
         Ok(())
     }
+}
+
+fn parse_uuid(source: &str) -> Result<Uuid, ()> {
+    let parsed = Uuid::parse_str(source).map_err(|_| ())?;
+    (parsed.hyphenated().to_string() == source)
+        .then_some(parsed)
+        .ok_or(())
 }

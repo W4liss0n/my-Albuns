@@ -6,4 +6,8 @@ import type { PhotoPlacement } from "./PhotoPlacement";
 import type { SizeUm } from "./SizeUm";
 import type { VectorUm } from "./VectorUm";
 
-export type PhotoPlacementPlan = { currentPan: NormalizedPan, currentZoom: number, panRange: NumberRange, zoomRange: NumberRange, current: PhotoPlacement, panOrigin: VectorUm, panToCenter: Matrix2, panToCenterPerZoom: Matrix2, sizePerZoom: SizeUm, };
+/**
+ * A placement keeps the minimum Frame-filling scale separate from the
+ * user's relative Zoom (`current_zoom == 1.0` means no adjustment).
+ */
+export type PhotoPlacementPlan = { baseFillZoom: number, currentPan: NormalizedPan, currentZoom: number, panRange: NumberRange, zoomRange: NumberRange, current: PhotoPlacement, panOrigin: VectorUm, panToCenter: Matrix2, panToCenterPerZoom: Matrix2, sizePerZoom: SizeUm, };

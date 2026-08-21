@@ -137,7 +137,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<ProjectRevision, DecodeFailure> {
 pub(crate) fn decode_with_metadata(bytes: &[u8]) -> Result<DecodedStoredRevision, DecodeFailure> {
     versioned_codec::decode(bytes).map(|decoded| DecodedStoredRevision {
         revision: decoded.revision,
-        requires_schema_upgrade: decoded.source_schema_version < versioned_codec::SCHEMA_VERSION_V2,
+        requires_schema_upgrade: decoded.source_schema_version < versioned_codec::SCHEMA_VERSION_V3,
     })
 }
 
