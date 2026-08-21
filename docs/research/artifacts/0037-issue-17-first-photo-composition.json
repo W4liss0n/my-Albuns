@@ -1,157 +1,157 @@
 {
-  "schemaVersion": 1,
-  "gate": "productive-end-to-end-journey",
-  "collectedAtUtc": "2026-08-21T19:08:01.4028829Z",
-  "gitCommit": "58317b6d6e91593994240a1afb63685c6c24b253",
-  "sourceInputsDirty": false,
-  "platform": {
-    "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
-    "architecture": "X64",
-    "nativeDriverVersion": "151.0.4129.93",
-    "webView2RuntimeVersion": "151.0.4129.93"
-  },
-  "checks": [
-    {
-      "name": "cancel-before-project-core",
-      "passed": true
-    },
-    {
-      "name": "create-only-causal-handoff",
-      "passed": true
-    },
-    {
-      "name": "project-core-save-history",
-      "passed": true
-    },
-    {
-      "name": "native-jpeg-import-reselect-external-link-only",
-      "passed": true
-    },
-    {
-      "name": "double-click-frame-selection-canvas",
-      "passed": true
-    },
-    {
-      "name": "cancel-before-export-pipeline",
-      "passed": true
-    },
-    {
-      "name": "distinguishable-sheet-two-jpeg-export",
-      "passed": true
-    },
-    {
-      "name": "canvas-jpeg-photo-fidelity",
-      "passed": true
-    },
-    {
-      "name": "real-application-empty-cache-original-read",
-      "passed": true
-    },
-    {
-      "name": "missing-original-actionable-failure",
-      "passed": true
-    },
-    {
-      "name": "saved-project-unchanged-by-export",
-      "passed": true
-    },
-    {
-      "name": "independent-host-reopen-empty-history",
-      "passed": true
-    },
-    {
-      "name": "correlated-process-terminals-cleanup",
-      "passed": true
-    }
-  ],
-  "evidence": {
-    "cancelledCreationBeforeCore": true,
-    "cancelledExportBeforePipeline": true,
-    "createAuthorization": "createOnly",
-    "exportedSheetNumber": 2,
-    "selectedSheetId": "0a2535f3-482c-4953-92a3-33fb2719870c",
-    "selectedSheetActiveSides": "both",
-    "firstSheetDimensions": {
-      "width": 360,
-      "height": 360
-    },
-    "selectedSheetDimensions": {
-      "width": 720,
-      "height": 360
-    },
-    "expectedBackgroundRgb": "#204060",
-    "exportedDpi": 360,
-    "savedRevision": 3,
-    "savedDpi": 300,
-    "projectSchemaVersion": 3,
-    "photoFrameCount": 1,
-    "persistedPhotoLinkOnly": true,
-    "reimportedExistingPhotoWithoutRevision": true,
-    "originalUnchanged": true,
-    "missingOriginalBlocked": true,
-    "missingOriginalActionable": true,
-    "residentCanvasPreviewBeforeMissingOriginal": true,
-    "previewArtifactCountBeforePurge": 1,
-    "cacheEntryCountBeforeExport": 0,
-    "cacheByteCountBeforeExport": 0,
-    "cacheEntryCountAfterExport": 0,
-    "cacheByteCountAfterExport": 0,
-    "cacheCouldNotProduceFalseSuccess": true,
-    "jpeg": {
-      "width": 720,
-      "height": 360,
-      "byteCount": 53023,
-      "sha256": "0becd6a4e49f809973b52a4f78fa998d8d84b32293b8208af30024e676994a2d",
-      "backgroundSample": {
-        "x": 2,
-        "y": 180,
-        "red": 31,
-        "green": 64,
-        "blue": 95,
-        "maxChannelDelta": 1
-      },
-      "photoSample": {
-        "x": 360,
-        "y": 180,
-        "red": 119,
-        "green": 119,
-        "blue": 127,
-        "originalMaxChannelDelta": 8,
-        "tolerance": 32
-      }
-    },
-    "processIds": {
-      "firstGlobal": 32632,
-      "firstHost": 19468,
-      "global": 11376,
-      "host": 22556,
-      "imaging": 32180,
-      "missingOriginalImaging": 33020
-    },
-    "correlations": {
-      "bootstraps": 2,
-      "imagingAttempts": 2
-    },
-    "exportedAfterReopen": true,
-    "reopenedInIndependentHost": true,
-    "reopenedHistoryEmpty": true,
-    "sourcePathExposedToWebView": false,
-    "terminalCounts": {
-      "globalHandoffs": 2,
-      "hostReady": 2,
-      "imagingStopped": 2
-    },
-    "canvasNonWhiteSamples": 1271,
-    "canvasSampleCount": 1271,
-    "canvasPhotoSample": {
-      "x": 574,
-      "y": 447,
-      "red": 120,
-      "green": 120,
-      "blue": 127,
-      "jpegMaxChannelDelta": 1,
-      "tolerance": 32
-    },
-    "cleanupCompleted": true
-  }
+    "schemaVersion":  1,
+    "gate":  "productive-end-to-end-journey",
+    "collectedAtUtc":  "2026-08-21T23:03:00.0604600Z",
+    "gitCommit":  "6f4ebc7f5c989cf1048646e796d335ecf93bbd6e",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "nativeDriverVersion":  "151.0.4129.93",
+                     "webView2RuntimeVersion":  "151.0.4129.93"
+                 },
+    "checks":  [
+                   {
+                       "name":  "cancel-before-project-core",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "create-only-causal-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-core-save-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "native-jpeg-import-reselect-external-link-only",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "double-click-frame-selection-canvas",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "cancel-before-export-pipeline",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "distinguishable-sheet-two-jpeg-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "canvas-jpeg-photo-fidelity",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-application-empty-cache-original-read",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "missing-original-actionable-failure",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "saved-project-unchanged-by-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "independent-host-reopen-empty-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "correlated-process-terminals-cleanup",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "cancelledCreationBeforeCore":  true,
+                     "cancelledExportBeforePipeline":  true,
+                     "createAuthorization":  "createOnly",
+                     "exportedSheetNumber":  2,
+                     "selectedSheetId":  "ec181d1b-487a-4dda-91ee-e291fb1f5cb1",
+                     "selectedSheetActiveSides":  "both",
+                     "firstSheetDimensions":  {
+                                                  "width":  360,
+                                                  "height":  360
+                                              },
+                     "selectedSheetDimensions":  {
+                                                     "width":  720,
+                                                     "height":  360
+                                                 },
+                     "expectedBackgroundRgb":  "#204060",
+                     "exportedDpi":  360,
+                     "savedRevision":  3,
+                     "savedDpi":  300,
+                     "projectSchemaVersion":  3,
+                     "photoFrameCount":  1,
+                     "persistedPhotoLinkOnly":  true,
+                     "reimportedExistingPhotoWithoutRevision":  true,
+                     "originalUnchanged":  true,
+                     "missingOriginalBlocked":  true,
+                     "missingOriginalActionable":  true,
+                     "residentCanvasPreviewBeforeMissingOriginal":  true,
+                     "previewArtifactCountBeforePurge":  1,
+                     "cacheEntryCountBeforeExport":  0,
+                     "cacheByteCountBeforeExport":  0,
+                     "cacheEntryCountAfterExport":  0,
+                     "cacheByteCountAfterExport":  0,
+                     "cacheCouldNotProduceFalseSuccess":  true,
+                     "jpeg":  {
+                                  "width":  720,
+                                  "height":  360,
+                                  "byteCount":  53023,
+                                  "sha256":  "0becd6a4e49f809973b52a4f78fa998d8d84b32293b8208af30024e676994a2d",
+                                  "backgroundSample":  {
+                                                           "x":  2,
+                                                           "y":  180,
+                                                           "red":  31,
+                                                           "green":  64,
+                                                           "blue":  95,
+                                                           "maxChannelDelta":  1
+                                                       },
+                                  "photoSample":  {
+                                                      "x":  360,
+                                                      "y":  180,
+                                                      "red":  119,
+                                                      "green":  119,
+                                                      "blue":  127,
+                                                      "originalMaxChannelDelta":  8,
+                                                      "tolerance":  32
+                                                  }
+                              },
+                     "processIds":  {
+                                        "firstGlobal":  5792,
+                                        "firstHost":  21344,
+                                        "global":  26332,
+                                        "host":  24652,
+                                        "imaging":  28500,
+                                        "missingOriginalImaging":  31124
+                                    },
+                     "correlations":  {
+                                          "bootstraps":  2,
+                                          "imagingAttempts":  2
+                                      },
+                     "exportedAfterReopen":  true,
+                     "reopenedInIndependentHost":  true,
+                     "reopenedHistoryEmpty":  true,
+                     "sourcePathExposedToWebView":  false,
+                     "terminalCounts":  {
+                                            "globalHandoffs":  2,
+                                            "hostReady":  2,
+                                            "imagingStopped":  2
+                                        },
+                     "canvasNonWhiteSamples":  1271,
+                     "canvasSampleCount":  1271,
+                     "canvasPhotoSample":  {
+                                               "x":  574,
+                                               "y":  447,
+                                               "red":  120,
+                                               "green":  120,
+                                               "blue":  127,
+                                               "jpegMaxChannelDelta":  1,
+                                               "tolerance":  32
+                                           },
+                     "cleanupCompleted":  true
+                 }
 }
