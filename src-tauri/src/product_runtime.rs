@@ -331,12 +331,15 @@ fn project_ui_ready(
     }
 }
 
-fn refresh_changed_photo_sources(host: &ProjectHost, changed_photos: Vec<MediaBinding>) -> usize {
-    let mut refreshed = 0;
+fn refresh_changed_photo_sources(
+    host: &ProjectHost,
+    changed_photos: Vec<MediaBinding>,
+) -> Vec<String> {
+    let mut refreshed = Vec::new();
     for binding in changed_photos {
         match MediaResolver.inspect_photo_binding(&binding) {
             Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
-                Ok(()) => refreshed += 1,
+                Ok(()) => refreshed.push(binding.media_id.clone()),
                 Err(error) => tracing::warn!(
                     target: "myalbuns.desktop",
                     media_id = safe_log_identifier(&binding.media_id),
@@ -359,7 +362,7 @@ pub(crate) fn refresh_project_photos_for_media_update(
     host: &ProjectHost,
     bindings: &[MediaBinding],
     update: &crate::media_runtime::MediaRuntimeUpdate,
-) -> usize {
+) -> Vec<String> {
     let changed_photos = bindings
         .iter()
         .filter(|binding| {
@@ -734,7 +737,7 @@ mod tests {
 
         assert_eq!(
             refresh_changed_photo_sources(&host, vec![stale_first, catalog.bindings[1].clone()]),
-            1,
+            [catalog.bindings[1].media_id.clone()],
             "one stale occurrence cannot consume the valid observation that follows it"
         );
         let projection = host.projection().expect("the batch result is projected");
@@ -807,7 +810,7 @@ mod tests {
 
         assert_eq!(
             refresh_project_photos_for_media_update(&host, &catalog.bindings, update),
-            1
+            [catalog.bindings[0].media_id.clone()]
         );
 
         let after = host.projection().expect("the demand refresh is projected");
@@ -887,7 +890,7 @@ mod tests {
                 std::slice::from_ref(&binding),
                 inspection.update(),
             ),
-            1
+            std::slice::from_ref(&binding.media_id)
         );
 
         let after = host.projection().expect("the retry refresh is projected");

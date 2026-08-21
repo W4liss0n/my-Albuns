@@ -17,6 +17,7 @@ import type {
   ProjectWindowPort,
 } from "./application/projectPorts";
 import { MediaPreviewError } from "./application/projectPorts";
+import type { EditorProjection } from "./domain/project";
 import {
   createEmptyProjection,
   representativeProjection,
@@ -27,12 +28,14 @@ vi.mock("./components/AlbumCanvas", () => ({
     onMediaDemandChange,
     mediaPreviewUrls,
     onGraphicsUnavailable,
+    composition,
   }: {
     onMediaDemandChange?: (demand: {
       visibleMediaIds: readonly string[];
       preloadMediaIds: readonly string[];
     }) => void;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    composition?: EditorProjection["composition"];
     onGraphicsUnavailable?: (diagnostic: {
       supported: false;
       code: "webgl2_unavailable";
@@ -55,6 +58,9 @@ vi.mock("./components/AlbumCanvas", () => ({
           data-testid="album-canvas"
           data-demand-reported={demandReported}
           data-media-preview={mediaPreviewUrls?.["media-001"] ?? ""}
+          data-photo-draw-width={
+            composition?.sheets[0]?.frames[0]?.photo?.drawRect.width ?? ""
+          }
         />
         <button
           type="button"
@@ -804,6 +810,43 @@ test("keeps recovery actions hidden until the first authoritative media observat
 
 test("retries an unavailable occurrence explicitly and refreshes it without Relink", async () => {
   const recoveredUrl = "asset://localhost/cache/media-001-recovered.jpg";
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const refreshedProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media) =>
+          media.id === "media-001"
+            ? { ...media, sourceWidthPx: 23, sourceHeightPx: 5 }
+            : media,
+        ),
+      },
+    },
+    composition: {
+      ...representativeProjection.composition,
+      sheets: [
+        {
+          ...representativeProjection.composition.sheets[0],
+          frames: [
+            {
+              ...representativeProjection.composition.sheets[0].frames[0],
+              photo: {
+                ...representativeProjection.composition.sheets[0].frames[0]
+                  .photo!,
+                drawRect: {
+                  ...representativeProjection.composition.sheets[0].frames[0]
+                    .photo!.drawRect,
+                  width: 123_000,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
   const prepareMediaPreviews = vi
     .fn()
     .mockResolvedValueOnce([
@@ -812,11 +855,18 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
     .mockResolvedValueOnce([
       { mediaId: "media-001", state: "ready" as const, url: recoveredUrl },
     ]);
-  const retryUnavailableMedia = vi.fn(async () => ({
-    mediaId: "media-001",
-    state: "ready" as const,
-    url: null,
-  }));
+  const retryUnavailableMedia = vi.fn(async () => {
+    notifyMediaChanged?.(["media-001"]);
+    return {
+      mediaId: "media-001",
+      state: "ready" as const,
+      url: null,
+    };
+  });
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockResolvedValue(refreshedProjection);
   const relink = vi.fn(async () => representativeProjection);
   const apply = vi.fn(async () => representativeProjection);
 
@@ -829,12 +879,15 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
         ...mediaPreviewPort,
         prepareMediaPreviews,
         retryUnavailableMedia,
-        onMediaChanged: async () => () => undefined,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
         onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{
         ...projectCorePort,
-        load: async () => representativeProjection,
+        load,
         apply,
         relink,
       }}
@@ -856,15 +909,27 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   const retry = await screen.findByRole("button", {
     name: /Tentar novamente o arquivo de/i,
   });
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "400000",
+  );
   fireEvent.click(retry);
 
   await waitFor(() =>
     expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001"),
   );
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
+  );
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "123000",
+  );
+  expect(refreshedProjection.state.revision).toBe(
+    representativeProjection.state.revision,
   );
   expect(relink).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();

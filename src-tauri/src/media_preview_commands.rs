@@ -86,7 +86,7 @@ pub(crate) async fn retry_unavailable_media(
     let retry_namespace = namespace_owner.namespace().clone();
     let retry_registry = registry.inner().clone();
     let retry_host = project_host.inner().clone();
-    let inspection = tauri::async_runtime::spawn_blocking(move || {
+    let (inspection, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
         let inspection = monitor.retry_unavailable(&runtime, &binding, |update| {
             retry_app.state::<CacheEngine>().apply_monitor_media_update(
                 &retry_namespace,
@@ -94,12 +94,12 @@ pub(crate) async fn retry_unavailable_media(
                 update,
             );
         })?;
-        refresh_project_photos_for_media_update(
+        let refreshed_photo_ids = refresh_project_photos_for_media_update(
             &retry_host,
             std::slice::from_ref(&binding),
             inspection.update(),
         );
-        Ok::<_, crate::media_runtime::MediaRetryError>(inspection)
+        Ok::<_, crate::media_runtime::MediaRetryError>((inspection, refreshed_photo_ids))
     })
     .await
     .map_err(MediaPreviewCommandError::retry_failed)?
@@ -111,6 +111,13 @@ pub(crate) async fn retry_unavailable_media(
         invalidated = !inspection.update().invalidated_media_ids().is_empty(),
         event = "linked_media_retry_adopted",
     );
+    if let Some(change) =
+        linked_media_change_for_update(inspection.update(), &refreshed_photo_ids, true)
+    {
+        window
+            .emit(LINKED_MEDIA_CHANGED_EVENT, change)
+            .map_err(|_| MediaPreviewCommandError::read_failed())?;
+    }
     let state = preview_state(inspection.availability());
     let retained = (state != MediaPreviewState::Ready)
         .then(|| registry.retained_preview(&media_id, &source_path, state))
@@ -174,12 +181,13 @@ pub(crate) async fn prepare_media_previews(
     let runtime = media_runtime.inner().clone();
     let bindings = catalog.bindings.clone();
     let demand_host = project_host.inner().clone();
-    let poll = tauri::async_runtime::spawn_blocking(move || {
+    let (poll, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
         let poll = monitor.poll(&runtime, &bindings);
-        if let Some(update) = poll.update() {
-            refresh_project_photos_for_media_update(&demand_host, &bindings, update);
-        }
-        poll
+        let refreshed_photo_ids = poll
+            .update()
+            .map(|update| refresh_project_photos_for_media_update(&demand_host, &bindings, update))
+            .unwrap_or_default();
+        (poll, refreshed_photo_ids)
     })
     .await
     .map_err(|_| MediaPreviewCommandError::read_failed())?;
@@ -204,14 +212,13 @@ pub(crate) async fn prepare_media_previews(
             &mut demand_revision,
             runtime_update,
         );
-        if cache_update.retry_required() {
+        if let Some(change) = linked_media_change_for_update(
+            runtime_update,
+            &refreshed_photo_ids,
+            cache_update.retry_required(),
+        ) {
             window
-                .emit(
-                    LINKED_MEDIA_CHANGED_EVENT,
-                    LinkedMediaChanged {
-                        media_ids: runtime_update.changed_media_ids().to_vec(),
-                    },
-                )
+                .emit(LINKED_MEDIA_CHANGED_EVENT, change)
                 .map_err(|_| MediaPreviewCommandError::read_failed())?;
         }
         if !cache_update.demand_can_resume() {
@@ -390,6 +397,19 @@ fn preview_state(availability: MediaAvailability) -> MediaPreviewState {
     }
 }
 
+fn linked_media_change_for_update(
+    update: &crate::media_runtime::MediaRuntimeUpdate,
+    refreshed_photo_ids: &[String],
+    refresh_all_changed_media_ids: bool,
+) -> Option<LinkedMediaChanged> {
+    let media_ids = if refresh_all_changed_media_ids {
+        update.changed_media_ids().to_vec()
+    } else {
+        refreshed_photo_ids.to_vec()
+    };
+    (!media_ids.is_empty()).then_some(LinkedMediaChanged { media_ids })
+}
+
 fn projected_preview_state(availability: Option<MediaAvailability>) -> Option<MediaPreviewState> {
     availability.map(preview_state)
 }
@@ -532,11 +552,12 @@ mod tests {
     use crate::{
         cache_previews::CachePreviewError,
         ipc_contract::{MediaPreviewDemand, MediaPreviewState},
-        media_runtime::MediaAvailability,
+        media_runtime::{MediaAvailability, MediaRuntimeUpdate},
     };
 
     use super::{
-        cache_failure_state, cache_publication_or_context, ordered_demand, projected_preview_state,
+        cache_failure_state, cache_publication_or_context, linked_media_change_for_update,
+        ordered_demand, projected_preview_state,
     };
 
     #[test]
@@ -601,5 +622,34 @@ mod tests {
         assert_eq!(preview.state, MediaPreviewState::CacheUnavailable);
         assert_ne!(preview.state, MediaPreviewState::Unavailable);
         assert!(preview.url.is_none());
+    }
+
+    #[test]
+    fn adopted_photo_refreshes_projection_and_retry_refreshes_changed_media() {
+        let changed = MediaRuntimeUpdate::for_test_preserving_previews(
+            17,
+            vec!["photo-a".into(), "photo-b".into()],
+        );
+
+        assert_eq!(
+            linked_media_change_for_update(&changed, &["photo-a".into()], false)
+                .expect("an adopted change refreshes the WebView projection")
+                .media_ids,
+            ["photo-a"]
+        );
+        assert!(
+            linked_media_change_for_update(&changed, &[], false).is_none(),
+            "a change that did not rehydrate the Project does not reload its Projection"
+        );
+        assert_eq!(
+            linked_media_change_for_update(&changed, &[], true)
+                .expect("an explicit or causal retry refreshes every changed medium")
+                .media_ids,
+            ["photo-a", "photo-b"]
+        );
+        assert!(
+            linked_media_change_for_update(&MediaRuntimeUpdate::default(), &[], false).is_none(),
+            "an unchanged observation does not schedule redundant Project loads"
+        );
     }
 }

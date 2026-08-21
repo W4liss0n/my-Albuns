@@ -156,11 +156,12 @@ function App({
       });
       try {
         const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
-        setMediaPreviews((current) => ({
-          ...current,
-          [mediaId]: preview,
-        }));
-        setMediaRefreshRevision((revision) => revision + 1);
+        if (preview.state !== "ready") {
+          setMediaPreviews((current) => ({
+            ...current,
+            [mediaId]: preview,
+          }));
+        }
         logger.write({
           level: "info",
           component: "media-preview",
