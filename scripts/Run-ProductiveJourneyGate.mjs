@@ -835,7 +835,7 @@ try {
     "xpath",
     "//button[normalize-space()='Fechar Projeto']",
     "saved Project close",
-  );
+  ).catch(() => undefined);
   await hostDriver.dispose().catch(() => undefined);
   hostDriver = undefined;
   await waitForExit(firstHost, "first Project Host close after Save");
@@ -1173,7 +1173,7 @@ try {
     "xpath",
     "//button[normalize-space()='Fechar Projeto']",
     "Close Project action",
-  );
+  ).catch(() => undefined);
   await click(
     hostDriver,
     "xpath",
