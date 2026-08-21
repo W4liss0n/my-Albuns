@@ -188,6 +188,7 @@ export interface ProjectCorePort {
   importPhoto(): Promise<
     | { kind: "cancelled"; projection: EditorProjection }
     | { kind: "imported"; projection: EditorProjection; mediaId: string }
+    | { kind: "selected"; projection: EditorProjection; mediaId: string }
   >;
   resolvePhotoDropTarget(
     sheetId: string,

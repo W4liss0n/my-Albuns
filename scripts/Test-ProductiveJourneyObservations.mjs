@@ -201,6 +201,7 @@ test("correlates one terminal to each bootstrap and imaging attempt", () => {
       event: "imaging_process_spawned",
       process_id: 201,
       imaging_process_id: 204,
+      operation: "export",
     },
     { event: "imaging_process_stopped", process_id: 204 },
   ];
@@ -231,6 +232,32 @@ test("correlates one terminal to each bootstrap and imaging attempt", () => {
         },
       ),
     /project_ui_ready.*203.*2/,
+  );
+
+  assert.throws(
+    () =>
+      assertCorrelatedJourneyTerminals(
+        [
+          ...records,
+          {
+            event: "imaging_process_spawned",
+            process_id: 203,
+            imaging_process_id: 205,
+            operation: "export",
+          },
+          { event: "imaging_process_stopped", process_id: 205 },
+        ],
+        {
+          bootstraps: [
+            { globalProcessId: 200, hostProcessId: 201 },
+            { globalProcessId: 202, hostProcessId: 203 },
+          ],
+          imagingAttempts: [
+            { hostProcessId: 201, imagingProcessId: 204 },
+          ],
+        },
+      ),
+    /exact.*Processador.*unexpected/i,
   );
 });
 

@@ -153,6 +153,7 @@ try {
         $gate.savedDpi -ne 300 -or
         $gate.photoFrameCount -ne 1 -or
         -not $gate.persistedPhotoLinkOnly -or
+        -not $gate.reimportedExistingPhotoWithoutRevision -or
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
@@ -347,7 +348,7 @@ try {
             [ordered]@{ name = 'cancel-before-project-core'; passed = $true },
             [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
             [ordered]@{ name = 'project-core-save-history'; passed = $true },
-            [ordered]@{ name = 'native-jpeg-import-external-link-only'; passed = $true },
+            [ordered]@{ name = 'native-jpeg-import-reselect-external-link-only'; passed = $true },
             [ordered]@{ name = 'double-click-frame-selection-canvas'; passed = $true },
             [ordered]@{ name = 'cancel-before-export-pipeline'; passed = $true },
             [ordered]@{ name = 'distinguishable-sheet-two-jpeg-export'; passed = $true },
@@ -374,6 +375,7 @@ try {
             projectSchemaVersion = [int] $gate.schemaVersion
             photoFrameCount = [int] $gate.photoFrameCount
             persistedPhotoLinkOnly = [bool] $gate.persistedPhotoLinkOnly
+            reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
             missingOriginalActionable = [bool] $gate.missingOriginalActionable

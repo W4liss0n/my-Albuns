@@ -4,7 +4,8 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_core::MediaKind;
+use myalbuns_core::{EditableProject, MediaId, MediaKind, PhotoSourceMetadata};
+use myalbuns_imaging_protocol::CacheArtifact;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
@@ -40,7 +41,7 @@ pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (request, project) = opened.into_parts();
+    let (request, mut project) = opened.into_parts();
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
@@ -48,6 +49,7 @@ pub(crate) fn run(
     let cache_namespace_owner = cache_service
         .reserve_namespace(project.identity_authority())
         .map_err(io::Error::other)?;
+    hydrate_project_from_recovered_cache(&mut project, cache_namespace_owner.recovered_artifacts());
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
@@ -168,6 +170,28 @@ pub(crate) fn run(
         .run(context);
     run_result?;
     Ok(())
+}
+
+fn hydrate_project_from_recovered_cache(
+    project: &mut EditableProject,
+    artifacts: &[CacheArtifact],
+) -> usize {
+    artifacts
+        .iter()
+        .filter(|artifact| {
+            let Ok(media_id) = artifact.media_id.parse::<MediaId>() else {
+                return false;
+            };
+            let Ok(metadata) = PhotoSourceMetadata::new(
+                artifact.width_px,
+                artifact.height_px,
+                ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
+            ) else {
+                return false;
+            };
+            project.observe_photo_source(media_id, metadata).is_ok()
+        })
+        .count()
 }
 
 fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
@@ -552,7 +576,20 @@ impl ProjectStartupHandshake {
 mod tests {
     use std::{sync::mpsc, time::Duration};
 
-    use super::{PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal, spawn_media_io};
+    use myalbuns_core::{
+        CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, OpenProjectRequest,
+        PhotoPlacementMode, PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
+        SaveProjectOutcome,
+    };
+    use myalbuns_imaging_protocol::{
+        CacheArtifact, CacheArtifactFormat, CacheBasicColorProfile, CacheFingerprint,
+    };
+    use myalbuns_paths::OperationPathContext;
+
+    use super::{
+        PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
+        hydrate_project_from_recovered_cache, spawn_media_io,
+    };
 
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
@@ -603,5 +640,109 @@ mod tests {
                 .expect("the scheduled Original inspection joins cleanly"),
             17
         );
+    }
+
+    #[test]
+    fn reopening_with_a_missing_original_restores_oriented_geometry_from_verified_cache() {
+        let root = tempfile::tempdir().expect("temporary missing Original Project");
+        let project_path = root.path().join("Projeto com contexto de Cache.myalbuns");
+        let original_path = root.path().join("Foto orientada ausente.jpg");
+        std::fs::write(&original_path, b"linked Original")
+            .expect("the linked Original initially exists");
+        let mut create_context = OperationPathContext::new();
+        create_context
+            .capture(&project_path)
+            .expect("the Project root is captured");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path.clone(), create_context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the productive Project is created");
+        let source_metadata = PhotoSourceMetadata::new(
+            800,
+            1_200,
+            ["#102030".into(), "#405060".into(), "#708090".into()],
+        )
+        .expect("the oriented source metadata is valid");
+        let imported = project
+            .import_photo(ImportPhoto::new(original_path.clone(), source_metadata))
+            .expect("the linked Photo is imported");
+        let sheet_id = imported.projection.state.album.sheets[0].id.clone();
+        let placed = project
+            .apply_with_outcome(ProjectIntent::AddPhoto {
+                sheet_id,
+                media_id: imported.media_id,
+                mode: PhotoPlacementMode::Normal,
+            })
+            .expect("the linked Photo is placed");
+        let expected_base_fill_zoom = placed.projection.composition.sheets[0].frames[0]
+            .photo
+            .as_ref()
+            .expect("the placed Photo is composed")
+            .placement
+            .base_fill_zoom;
+        assert_eq!(
+            project.save(2).expect("the Photo composition is saved"),
+            SaveProjectOutcome::Saved { revision: 2 }
+        );
+        drop(project);
+        std::fs::remove_file(&original_path).expect("the Original becomes absent before reopening");
+
+        let mut open_context = OperationPathContext::new();
+        open_context
+            .capture(&project_path)
+            .expect("the reopened Project root is captured");
+        let mut reopened = core
+            .open_editable(OpenProjectRequest::new(ProjectLocation::new(
+                project_path,
+                open_context.freeze(),
+            )))
+            .expect("the Project reopens without reading the absent Original");
+        assert_eq!(
+            reopened.projection().state.album.media[0].source_width_px,
+            Some(1),
+            "without runtime context the Core has only its non-authoritative fallback"
+        );
+        let artifact = CacheArtifact {
+            media_id: imported.media_id.to_string(),
+            generation_id: "g-verified-context".into(),
+            width_px: 800,
+            height_px: 1_200,
+            preview_bytes: 1,
+            format: CacheArtifactFormat::Jpeg,
+            exif_orientation: Some(6),
+            source_page_count: None,
+            basic_color_profile: CacheBasicColorProfile::Srgb,
+            fingerprint: CacheFingerprint::sha256_full_file(1, "a".repeat(64))
+                .expect("the recovered fingerprint is valid"),
+        };
+
+        assert_eq!(
+            hydrate_project_from_recovered_cache(&mut reopened, &[artifact]),
+            1
+        );
+        let restored = reopened.projection();
+        assert_eq!(restored.state.album.media[0].source_width_px, Some(800));
+        assert_eq!(restored.state.album.media[0].source_height_px, Some(1_200));
+        assert_eq!(
+            restored.composition.sheets[0].frames[0]
+                .photo
+                .as_ref()
+                .expect("the cached Photo context remains composed")
+                .placement
+                .base_fill_zoom,
+            expected_base_fill_zoom,
+            "the Cache dimensions are already oriented and must not be swapped again"
+        );
+        assert_eq!(restored.state.revision, 2);
+        assert!(!restored.state.dirty);
+        assert!(!restored.state.can_undo);
+        assert_eq!(reopened.project().media()[0].path(), original_path);
     }
 }

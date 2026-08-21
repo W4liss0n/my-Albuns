@@ -51,6 +51,7 @@ export function ProjectWorkspace({
   const [exportActive, setExportActive] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
@@ -71,6 +72,16 @@ export function ProjectWorkspace({
       ),
     [mediaPreviews],
   );
+  useEffect(() => {
+    setSelectedMediaId(null);
+  }, [projection.state.projectId]);
+  useEffect(() => {
+    setSelectedMediaId((current) =>
+      current && projection.state.album.media.some((media) => media.id === current)
+        ? current
+        : null,
+    );
+  }, [projection.state.album.media]);
   useEffect(() => {
     if (!onMediaDemandChange) return;
     const visible = Array.from(
@@ -283,9 +294,15 @@ export function ProjectWorkspace({
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           mediaPreviews={mediaPreviews}
+          selectedMediaId={selectedMediaId}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
-          onImportPhoto={controller.importPhoto}
+          onImportPhoto={() => {
+            void controller.importPhoto().then((mediaId) => {
+              if (mediaId) setSelectedMediaId(mediaId);
+            });
+          }}
+          onSelectMedia={setSelectedMediaId}
           onPhotoDragStart={setDraggedPhotoId}
           onPhotoDragEnd={() => setDraggedPhotoId(null)}
           onRelinkMedia={controller.relinkMedia}

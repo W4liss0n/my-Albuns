@@ -640,6 +640,13 @@ pub struct ProjectMutationOutcome {
 pub struct ImportPhotoOutcome {
     pub projection: EditorProjection,
     pub media_id: MediaId,
+    pub disposition: ImportPhotoDisposition,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImportPhotoDisposition {
+    Imported,
+    Existing,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]

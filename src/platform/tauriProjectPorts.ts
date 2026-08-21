@@ -162,6 +162,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
     invoke<
       | { kind: "cancelled"; projection: EditorProjection }
       | { kind: "imported"; projection: EditorProjection; mediaId: string }
+      | { kind: "selected"; projection: EditorProjection; mediaId: string }
     >("import_photo"),
   resolvePhotoDropTarget: (
     sheetId: string,

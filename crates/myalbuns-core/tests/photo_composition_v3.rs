@@ -3,9 +3,9 @@
 use std::fs;
 
 use myalbuns_core::{
-    CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, MediaKind,
-    OpenProjectRequest, PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata, ProjectCore,
-    ProjectIntent, ProjectLocation, RelinkMedia, SaveProjectOutcome,
+    CreateAuthorization, CreateProjectRequest, ImportPhoto, ImportPhotoDisposition, InitialProject,
+    MediaKind, OpenProjectRequest, PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata,
+    ProjectCore, ProjectIntent, ProjectLocation, RelinkMedia, SaveProjectOutcome,
 };
 use myalbuns_paths::OperationPathContext;
 
@@ -155,6 +155,53 @@ fn imported_photo_adds_one_filled_frame_and_persists_only_the_external_link() {
     );
     assert!(!reopened_projection.state.dirty);
     assert!(!reopened_projection.state.can_undo);
+}
+
+#[test]
+fn reimporting_the_same_photo_reuses_its_occurrence_without_revision_or_history() {
+    let root = tempfile::tempdir().expect("temporary Photo reimport Project");
+    let project_path = root.path().join("Reimportação sem duplicata.myalbuns");
+    let original_path = root.path().join("Foto repetida.jpg");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = create_project(&core, &project_path);
+
+    let first = project
+        .import_photo(ImportPhoto::new(original_path.clone(), photo_metadata()))
+        .expect("the first Photo import creates its occurrence");
+    assert_eq!(first.disposition, ImportPhotoDisposition::Imported);
+    assert_eq!(first.projection.state.revision, 1);
+    assert_eq!(
+        project.save(1).expect("the first Photo link is saved"),
+        SaveProjectOutcome::Saved { revision: 1 }
+    );
+
+    let refreshed_metadata = PhotoSourceMetadata::new(
+        640,
+        480,
+        ["#102030".into(), "#405060".into(), "#708090".into()],
+    )
+    .expect("the refreshed observed metadata is valid");
+    let repeated = project
+        .import_photo(ImportPhoto::new(original_path, refreshed_metadata))
+        .expect("reimport selects the existing Photo occurrence");
+
+    assert_eq!(repeated.disposition, ImportPhotoDisposition::Existing);
+    assert_eq!(repeated.media_id, first.media_id);
+    assert_eq!(repeated.projection.state.revision, 1);
+    assert!(!repeated.projection.state.dirty);
+    assert_eq!(repeated.projection.state.album.media.len(), 1);
+    assert_eq!(
+        repeated.projection.state.album.media[0].source_width_px,
+        Some(640),
+        "reinspection may refresh runtime metadata without a creative edit"
+    );
+
+    let undone = project
+        .undo()
+        .expect("the only import history entry remains undoable");
+    assert!(undone.state.album.media.is_empty());
+    assert!(project.undo().is_none(), "reimport adds no History entry");
 }
 
 #[test]

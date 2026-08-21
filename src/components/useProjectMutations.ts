@@ -138,10 +138,18 @@ export function useProjectMutations({
     message,
     applyWithStatus,
     applyPhotoWithStatus,
-    importPhoto: () =>
-      void runWithGlobalFeedback("Importando Foto", async (port) => {
-        return (await port.importPhoto()).projection;
-      }),
+    importPhoto: async () => {
+      let selectedMediaId: string | null = null;
+      const completed = await runWithGlobalFeedback(
+        "Importando Foto",
+        async (port) => {
+          const result = await port.importPhoto();
+          if (result.kind !== "cancelled") selectedMediaId = result.mediaId;
+          return result.projection;
+        },
+      );
+      return completed ? selectedMediaId : null;
+    },
     dropPhoto: async (intent: ProjectIntent) => {
       setMessage(null);
       let affectedFrameId: string | null = null;

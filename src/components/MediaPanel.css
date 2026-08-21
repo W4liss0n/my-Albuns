@@ -140,6 +140,11 @@
   transform: translateY(-1px);
 }
 
+.media-card.selected {
+  border-color: #c99a5d;
+  box-shadow: 0 0 0 1px rgb(201 154 93 / 42%);
+}
+
 .media-thumb {
   position: relative;
   display: block;

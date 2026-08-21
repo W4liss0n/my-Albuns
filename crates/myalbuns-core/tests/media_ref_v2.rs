@@ -10,6 +10,8 @@ use myalbuns_paths::OperationPathContext;
 
 const PROJECT_V1_MIGRATION_INPUT: &[u8] =
     include_bytes!("fixtures/project_document_v1_migration_input.myalbuns");
+const PROJECT_V2_MIGRATION_EXPECTED: &[u8] =
+    include_bytes!("fixtures/project_document_v2_migration_expected.myalbuns");
 const PROJECT_V3_MIGRATION_EXPECTED: &[u8] =
     include_bytes!("fixtures/project_document_v3_migration_expected.myalbuns");
 
@@ -311,6 +313,38 @@ fn v1_migrates_only_in_memory_and_read_only_loading_preserves_the_source_bytes()
         fs::read(&project_path).expect("the v1 source remains readable"),
         PROJECT_V1_MIGRATION_INPUT,
         "read-only migration must preserve the source byte for byte"
+    );
+}
+
+#[test]
+fn the_v1_to_v2_golden_step_remains_exact_and_publicly_readable() {
+    let v1 =
+        std::str::from_utf8(PROJECT_V1_MIGRATION_INPUT).expect("the normative v1 fixture is UTF-8");
+    let expected_v2 = v1.replacen("\"schemaVersion\": 1", "\"schemaVersion\": 2", 1);
+    assert_eq!(
+        PROJECT_V2_MIGRATION_EXPECTED,
+        expected_v2.as_bytes(),
+        "the accepted v1 -> v2 step changes only schemaVersion"
+    );
+
+    let root = tempfile::tempdir().expect("temporary v2 golden Project");
+    let project_path = root.path().join("Projeto legado v2.myalbuns");
+    fs::write(&project_path, PROJECT_V2_MIGRATION_EXPECTED)
+        .expect("the normative v2 result is written");
+    let loaded = ProjectCore::new()
+        .load_persisted_revision(myalbuns_core::LoadProjectRequest::new(location(
+            &project_path,
+        )))
+        .expect("the preserved v2 result participates in the current public chain");
+
+    assert_eq!(loaded.revision(), 7);
+    assert_eq!(loaded.project().media()[0].kind(), MediaKind::Decorative);
+    assert!(
+        loaded
+            .project()
+            .sheets()
+            .iter()
+            .all(|sheet| sheet.frames().is_empty())
     );
 }
 

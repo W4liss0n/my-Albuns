@@ -4,8 +4,39 @@ import test from "node:test";
 
 import {
   createWebDriverClient,
+  disposeConfirmedWebDriver,
   findFreeTcpPort,
 } from "./GateWebDriver.mjs";
+
+test("clears an owned driver only after its teardown is confirmed", async () => {
+  const failedDriver = {
+    async dispose() {
+      throw new Error("driver process remained alive");
+    },
+  };
+  let retainedDriver = failedDriver;
+  await assert.rejects(
+    async () => {
+      retainedDriver = await disposeConfirmedWebDriver(retainedDriver);
+    },
+    /remained alive/,
+  );
+  assert.equal(
+    retainedDriver,
+    failedDriver,
+    "a rejected teardown must retain the owned process reference",
+  );
+
+  let disposeCount = 0;
+  let releasedDriver = {
+    async dispose() {
+      disposeCount += 1;
+    },
+  };
+  releasedDriver = await disposeConfirmedWebDriver(releasedDriver);
+  assert.equal(disposeCount, 1);
+  assert.equal(releasedDriver, undefined);
+});
 
 test("allocates a loopback port that the gate can bind", async () => {
   const port = await findFreeTcpPort();
@@ -44,13 +75,15 @@ test("uses the shared bounded W3C response contract", async () => {
 
   try {
     const request = createWebDriverClient(`http://127.0.0.1:${port}`, {
-      defaultTimeoutMilliseconds: 25,
+      defaultTimeoutMilliseconds: 2_000,
     });
     assert.deepEqual(await request("GET", "/status"), {
       sessionId: "session-01",
     });
     await assert.rejects(request("POST", "/error", {}), /invalid argument/);
-    await assert.rejects(request("GET", "/slow"), { name: "TimeoutError" });
+    await assert.rejects(request("GET", "/slow", undefined, 25), {
+      name: "TimeoutError",
+    });
   } finally {
     await new Promise((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

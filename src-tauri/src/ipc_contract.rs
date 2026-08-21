@@ -159,6 +159,11 @@ pub enum ImportPhotoResult {
         projection: EditorProjection,
         media_id: String,
     },
+    Selected {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+        media_id: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]

@@ -10,14 +10,14 @@ mod validation;
 pub use model::{
     AlbumSnapshot, ComposedBackground, ComposedColor, ComposedDecorative, ComposedFrame,
     ComposedOutputUnit, ComposedPhoto, ComposedSheet, CompositionPlan, CoreError, DocumentSnapshot,
-    EditorProjection, EditorState, FrameSnapshot, ImportPhoto, ImportPhotoOutcome, Matrix2,
-    MediaCatalogItem, MediaId, MediaKind, MediaTransform, MediaUsage, NormalizedPan, NumberRange,
-    ParseMediaIdError, PhotoDropTarget, PhotoPlacement, PhotoPlacementMode, PhotoPlacementPlan,
-    PhotoSnapshot, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome,
-    ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent, ProjectedDisplayUnit,
-    ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent, ProjectedVisualDefaults,
-    RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef, SheetRole, SheetSnapshot, SizeUm,
-    VectorUm,
+    EditorProjection, EditorState, FrameSnapshot, ImportPhoto, ImportPhotoDisposition,
+    ImportPhotoOutcome, Matrix2, MediaCatalogItem, MediaId, MediaKind, MediaTransform, MediaUsage,
+    NormalizedPan, NumberRange, ParseMediaIdError, PhotoDropTarget, PhotoPlacement,
+    PhotoPlacementMode, PhotoPlacementPlan, PhotoSnapshot, PhotoSourceMetadata, ProjectIntent,
+    ProjectMutationOutcome, ProjectedActiveSides, ProjectedBackground, ProjectedBackgroundContent,
+    ProjectedDisplayUnit, ProjectedFrameBorder, ProjectedOverlay, ProjectedOverlayContent,
+    ProjectedVisualDefaults, RectUm, RelinkMedia, RenderSnapshot, RenderSnapshotRef, SheetRole,
+    SheetSnapshot, SizeUm, VectorUm,
 };
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,

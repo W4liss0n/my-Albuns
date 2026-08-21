@@ -54,12 +54,27 @@ O modo normal reutiliza um único primeiro Layout determinístico, enquanto o
 Modo de edição cria apenas o retângulo proporcional pedido. Não foi criado um
 framework de Layouts, um store de seleção ou uma segunda pilha de Histórico.
 
+Selecionar novamente o mesmo JPEG é tratado no seam público de importação: o
+Core encontra a ocorrência pelo par `kind + path`, atualiza somente os
+metadados observados e devolve o `mediaId` existente. A WebView seleciona esse
+cartão sem revisão criativa ou entrada adicional de Undo/Redo.
+
+Na reabertura, o namespace de Cache reservado valida índice e artefatos reais
+antes de expor qualquer contexto. Somente uma geração cujo caminho, tamanho,
+codec, dimensões, perfil sRGB e decode foram confirmados pode reidratar as
+dimensões já orientadas da Foto antes da primeira Projeção. Isso evita o
+fallback geométrico 1×1 quando o Original já está ausente, sem transformar o
+Cache em autoridade para Exportação; índice ou geração corrompidos são
+descartados como estado derivado.
+
 ## Protocolo de fidelidade e ausência
 
 `scripts/Test-ProductiveJourney.ps1` usa uma Foto JPEG externa real, seleciona
-o arquivo em diálogo nativo e aciona o duplo clique pela WebView2. A rodada
-confirma schema v3 e vínculo externo sem metadados derivados, materializa a
-textura opaca no Canvas, salva, reabre em outro Host e exporta pelo Processador.
+o arquivo em diálogo nativo, seleciona novamente o mesmo arquivo e aciona o
+duplo clique pela WebView2. A rodada confirma que a segunda seleção reutiliza o
+cartão sem revisão, schema v3 e vínculo externo único sem metadados derivados,
+materializa a textura opaca no Canvas, salva, reabre em outro Host e exporta
+pelo Processador.
 
 A amostra central da Foto é comparada entre captura do Canvas e JPEG final com
 tolerância máxima explícita de 32 níveis por canal, cobrindo a recompressão
@@ -85,9 +100,24 @@ ou Host in-process como evidência dessa propriedade.
 
 O mesmo gate exige `exportedAfterReopen=true`, registra os PIDs dos Hosts que
 salvaram e reabriram o Projeto e aceita o terminal do Processador somente quando
-ele está correlacionado ao segundo Host. A preparação também sincroniza o
-sidecar do perfil debug com o binário executado pelo Tauri e compara os hashes
-antes de abrir a GUI, impedindo que um build release anterior contamine a prova.
+ele está correlacionado ao segundo Host. A lista de tentativas de Exportação
+observada precisa ser exatamente igual à lista correlacionada; uma tentativa
+extra é falha mesmo que tenha seu próprio terminal de encerramento. A
+preparação também sincroniza o sidecar do perfil debug com o binário executado
+pelo Tauri e compara os hashes antes de abrir a GUI, impedindo que um build
+release anterior contamine a prova.
+
+## Fechamento por RED → GREEN
+
+As revisões independentes foram convertidas em regressões públicas antes de
+cada correção: golden intermediário v2 ausente; referência de WebDriver perdida
+quando o teardown falhava; reimportação duplicada; geometria 1×1 com Original
+ausente; e tentativa adicional de Processador aceita pela prova. Os respectivos
+testes falharam primeiro e passaram depois da restauração do golden, teardown
+confirmado, reutilização da ocorrência, reidratação de Cache verificado e
+comparação exata das tentativas. As suítes integrais finais cobrem 231 testes de
+frontend e 469 testes Rust aprovados, com 16 testes Rust explicitamente
+ignorados e roteados aos gates reais Windows/Processador.
 
 O artefato canônico é
 `docs/research/artifacts/0037-issue-17-first-photo-composition.json`. O wrapper

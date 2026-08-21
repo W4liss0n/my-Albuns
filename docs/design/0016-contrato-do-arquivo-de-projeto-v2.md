@@ -88,22 +88,29 @@ autoridade inconclusiva falha fechada antes de montar Cache.
 
 ## Exemplos versionados normativos
 
-O par de migração está no controle de versão:
+O par aceito da etapa `v1 -> v2` permanece no controle de versão:
 
 - entrada:
   `crates/myalbuns-core/tests/fixtures/project_document_v1_migration_input.myalbuns`;
-- resultado atual da cadeia:
+- resultado da etapa v2:
+  `crates/myalbuns-core/tests/fixtures/project_document_v2_migration_expected.myalbuns`.
+
+O resultado atual da cadeia completa é provado separadamente por:
+
+- resultado final v3:
   `crates/myalbuns-core/tests/fixtures/project_document_v3_migration_expected.myalbuns`.
 
-O resultado esperado preserva Identidade, Revisão, ordem, Padrões e unidades
-UTF-16, promove `schemaVersion` e acrescenta somente o default `frames: []` de
-v3 a cada Lâmina. Os testes públicos provam:
+O golden intermediário preserva Identidade, Revisão, ordem, Padrões e unidades
+UTF-16 e altera somente `schemaVersion` para 2. O golden final preserva esse
+resultado, promove `schemaVersion` para 3 e acrescenta somente o default
+`frames: []` a cada Lâmina. Os testes públicos provam:
 
 | Caso | Resultado |
 |---|---|
 | abrir a entrada v1 editável | modelo atual v3 em memória, mesma Revisão, origem intacta |
 | abrir a entrada v1 somente leitura | leitura válida e zero escrita |
 | fechar a Sessão migrada sem Salvar | bytes v1 idênticos |
+| comparar a etapa pura `v1 -> v2` | bytes iguais ao golden v2, alterando somente `schemaVersion` |
 | Salvar explicitamente a Sessão migrada sem edição | bytes iguais ao golden v3, mesma Revisão |
 | abrir documento v2 fechado com Foto e Decorativo | ambos preservados como `MediaRef` persistente |
 | `kind` desconhecido em v1 ou v2 | `InvalidProjectDocument`, sem Sessão |

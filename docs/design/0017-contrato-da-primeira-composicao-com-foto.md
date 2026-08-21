@@ -37,6 +37,11 @@ orientação já aplicada, paleta, disponibilidade, fingerprint, prévia e Cache
 são observações de runtime. O Original nunca é regravado pela importação,
 composição, Salvamento ou Exportação.
 
+Selecionar novamente o mesmo par canônico `kind + path` não cria outra
+ocorrência nem outra revisão: o Core devolve o `mediaId` existente e a WebView
+seleciona o respectivo cartão. Essa seleção transitória também não acrescenta
+Undo/Redo.
+
 ## Modelo persistente v3
 
 `schemaVersion: 3` é a versão pública atual. O DTO fechado conserva o envelope,
@@ -115,6 +120,14 @@ observação transitória fica associada ao par
 `mediaId + path` que a originou, de modo que Undo/Redo de uma Religação restaura
 imediatamente as dimensões corretas de cada vínculo.
 
+Antes da primeira Projeção do Host reaberto, o namespace reservado recupera
+somente gerações de Cache cujo índice, caminho, tamanho, codec, dimensões e
+perfil sRGB tenham sido verificados fisicamente. As dimensões já orientadas
+dessas representações podem reidratar a geometria contextual quando o Original
+está ausente, sem nova revisão e sem dupla aplicação de EXIF. Qualquer geração
+indexada inválida descarta o índice e as gerações descartáveis do namespace;
+em nenhum caso essa reidratação autoriza Exportação.
+
 ## Exportação e falha do Original
 
 O Host congela a Lâmina e enumera as referências exatas. O plano público da
@@ -144,4 +157,6 @@ presença não mascara a falta do Original na segunda tentativa. O purge valida
 o root físico e cada ancestral imediatamente antes da remoção, recusando
 junctions/reparse points; testes Windows com sentinela externa cobrem o root e
 um ancestral. A tentativa produtiva registra que o Processador pertence ao Host
-reaberto, distinto daquele que salvou o Projeto.
+reaberto, distinto daquele que salvou o Projeto, e exige igualdade exata entre
+as tentativas de Exportação observadas e os terminais correlacionados, rejeitando
+qualquer Processador adicional mesmo que também tenha encerrado.

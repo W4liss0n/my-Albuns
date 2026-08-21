@@ -1,6 +1,7 @@
 use myalbuns_core::{
-    EditorProjection, PathFailure, PhotoDropTarget, PhotoPlacementMode, ProjectIntent,
-    ProjectMutationOutcome, SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
+    EditorProjection, ImportPhotoDisposition, PathFailure, PhotoDropTarget, PhotoPlacementMode,
+    ProjectIntent, ProjectMutationOutcome, SaveProjectError,
+    SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use tauri::{AppHandle, State, WebviewWindow};
@@ -105,18 +106,39 @@ pub(crate) async fn import_photo(
     })
     .await
     .map_err(|_| "Não foi possível concluir a importação da Foto.".to_string())??;
+    let (event, result) = match imported.disposition {
+        ImportPhotoDisposition::Imported => (
+            "photo_imported",
+            ImportPhotoResult::Imported {
+                projection: imported.projection,
+                media_id: imported.media_id.to_string(),
+            },
+        ),
+        ImportPhotoDisposition::Existing => (
+            "photo_import_existing_selected",
+            ImportPhotoResult::Selected {
+                projection: imported.projection,
+                media_id: imported.media_id.to_string(),
+            },
+        ),
+    };
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
-        media_id = safe_log_identifier(&imported.media_id.to_string()),
-        revision = imported.projection.state.revision,
-        event = "photo_imported",
+        media_id = safe_log_identifier(match &result {
+            ImportPhotoResult::Imported { media_id, .. }
+            | ImportPhotoResult::Selected { media_id, .. } => media_id,
+            ImportPhotoResult::Cancelled { .. } => unreachable!("the native selection exists"),
+        }),
+        revision = match &result {
+            ImportPhotoResult::Imported { projection, .. }
+            | ImportPhotoResult::Selected { projection, .. }
+            | ImportPhotoResult::Cancelled { projection } => projection.state.revision,
+        },
+        event,
     );
-    Ok(ImportPhotoResult::Imported {
-        projection: imported.projection,
-        media_id: imported.media_id.to_string(),
-    })
+    Ok(result)
 }
 
 #[tauri::command]

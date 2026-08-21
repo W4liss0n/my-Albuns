@@ -1,6 +1,7 @@
 use std::fmt;
 
 use myalbuns_core::ProjectIdentityAuthority;
+use myalbuns_imaging_protocol::CacheArtifact;
 use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan};
 
 use crate::{
@@ -39,6 +40,7 @@ pub(crate) struct CacheService {
 #[derive(Debug)]
 pub(crate) struct CacheNamespaceOwner {
     namespace: AuthorizedCacheNamespace,
+    recovered_artifacts: Vec<CacheArtifact>,
     _reservation: NamedMutexGrant,
 }
 
@@ -58,6 +60,10 @@ enum CacheNamespaceRemovalReservation {
 impl CacheNamespaceOwner {
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
+    }
+
+    pub(crate) fn recovered_artifacts(&self) -> &[CacheArtifact] {
+        &self.recovered_artifacts
     }
 }
 
@@ -102,6 +108,7 @@ impl CacheService {
         }
         Ok(CacheNamespaceOwner {
             namespace,
+            recovered_artifacts: recovery.verified_artifacts,
             _reservation: reservation,
         })
     }

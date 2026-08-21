@@ -16,9 +16,11 @@ export interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
+  selectedMediaId?: string | null;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
   onImportPhoto(): void;
+  onSelectMedia(mediaId: string): void;
   onPhotoDragStart(mediaId: string): void;
   onPhotoDragEnd(): void;
   onRelinkMedia(mediaId: string): void;
@@ -44,9 +46,11 @@ export function MediaPanel({
   mediaItems,
   mediaUsage,
   mediaPreviews = {},
+  selectedMediaId = null,
   onMediaDemandChange,
   onFillPhoto,
   onImportPhoto,
+  onSelectMedia,
   onPhotoDragStart,
   onPhotoDragEnd,
   onRelinkMedia,
@@ -177,10 +181,14 @@ export function MediaPanel({
           return (
             <div className="media-card-shell" key={media.id}>
               <button
-                className="media-card"
+                aria-pressed={selectedMediaId === media.id}
+                className={`media-card${
+                  selectedMediaId === media.id ? " selected" : ""
+                }`}
                 type="button"
                 data-media-id={media.id}
                 draggable={media.kind === "photo"}
+                onClick={() => onSelectMedia(media.id)}
                 onDragStart={
                   media.kind === "photo"
                     ? (event) => {

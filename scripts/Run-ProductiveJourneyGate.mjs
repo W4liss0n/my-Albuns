@@ -30,6 +30,7 @@ import {
 } from "./ProductiveJourneyObservations.mjs";
 import {
   createWebDriverClient,
+  disposeConfirmedWebDriver,
   findFreeTcpPort,
 } from "./GateWebDriver.mjs";
 
@@ -656,10 +657,8 @@ try {
     throw new Error("The CreateOnly destination was not confirmed");
   }
   firstHost = await waitForNewApplication(isHost, [], "first Project Host");
-  const globalDriverDisposal = globalDriver.dispose();
-  globalDriver = undefined;
+  globalDriver = await disposeConfirmedWebDriver(globalDriver);
   hostDriver = await startAttachedWebDriver(hostDebugPort, "first Project Host");
-  await globalDriverDisposal;
   await waitForExit(firstGlobal, "first Global exit after handoff");
   await waitFor("created Project file", () => existsSync(projectPath));
   await waitForLogEvent("project_ui_ready", 1, "first Project UI ready");
@@ -750,6 +749,52 @@ try {
     throw new Error("The native JPEG Photo selection was not confirmed");
   }
   await waitForLogEvent("photo_imported", 1, "Photo import terminal");
+  const firstImport = recordsFor("photo_imported").at(-1);
+  await clickWhenEnabled(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Importar JPEG…']",
+    "Reimport existing Photo action",
+  );
+  const reselectedPhoto = driveNativeDialog(
+    firstHost,
+    "select",
+    "Importar Foto JPEG",
+    photoPath,
+  );
+  if (reselectedPhoto.action !== "select") {
+    throw new Error("The native existing JPEG Photo selection was not confirmed");
+  }
+  await waitForLogEvent(
+    "photo_import_existing_selected",
+    1,
+    "existing Photo selection terminal",
+  );
+  const existingSelection = recordsFor(
+    "photo_import_existing_selected",
+  ).at(-1);
+  const selectedMediaCard = await findElement(
+    hostDriver,
+    "css selector",
+    ".media-card[data-media-id][aria-pressed='true']",
+    "reselected existing Photo card",
+  );
+  const selectedMediaId = await elementAttribute(
+    hostDriver,
+    selectedMediaCard,
+    "data-media-id",
+  );
+  const reimportedExistingPhotoWithoutRevision =
+    firstImport &&
+    existingSelection &&
+    Number(existingSelection.revision) === Number(firstImport.revision) &&
+    existingSelection.media_id === firstImport.media_id &&
+    selectedMediaId === firstImport.media_id;
+  if (!reimportedExistingPhotoWithoutRevision) {
+    throw new Error(
+      "Reimporting the same JPEG did not select its existing card without a revision",
+    );
+  }
   await doubleClick(
     hostDriver,
     "css selector",
@@ -805,6 +850,7 @@ try {
   const savedFrames = savedDocument.project.sheets[1].frames;
   const persistedPhotoLinkOnly =
     savedPhoto &&
+    savedDocument.project.media.length === 1 &&
     Object.keys(savedPhoto).sort().join(",") === "id,kind,path" &&
     savedFrames.length === 1 &&
     savedFrames[0].photo?.mediaId === savedPhoto.id &&
@@ -836,8 +882,7 @@ try {
     "//button[normalize-space()='Fechar Projeto']",
     "saved Project close",
   ).catch(() => undefined);
-  await hostDriver.dispose().catch(() => undefined);
-  hostDriver = undefined;
+  hostDriver = await disposeConfirmedWebDriver(hostDriver);
   await waitForExit(firstHost, "first Project Host close after Save");
   const canvasPreviewCountBeforeReopen = recordsFor(
     "canvas_opaque_preview_texture_loaded",
@@ -865,8 +910,7 @@ try {
   );
   await waitForExit(secondGlobal, "replacement Global handoff");
   await waitForLogEvent("project_ui_ready", 2, "reopened Project UI ready");
-  await secondGlobalDriver.dispose();
-  secondGlobalDriver = undefined;
+  secondGlobalDriver = await disposeConfirmedWebDriver(secondGlobalDriver);
 
   hostDriver = await startAttachedWebDriver(
     hostDebugPort,
@@ -1180,8 +1224,7 @@ try {
     "//button[normalize-space()='Descartar e fechar']",
     "Discard pending DPI action",
   ).catch(() => undefined);
-  await hostDriver.dispose();
-  hostDriver = undefined;
+  hostDriver = await disposeConfirmedWebDriver(hostDriver);
   await waitForExit(secondHost, "reopened Project Host close");
 
   finalGlobal = await waitForNewApplication(
@@ -1193,15 +1236,17 @@ try {
   await waitForExit(finalGlobal, "final Global cleanup");
 
   const records = logRecords();
-  const spawn = records.find(
+  const exportSpawns = records.filter(
     (record) =>
       record.event === "imaging_process_spawned" &&
-      Number(record.process_id) === secondHost.processId &&
       record.operation === "export",
   );
-  if (!spawn) {
-    throw new Error("The productive Export exposed no Processador correlation");
+  if (exportSpawns.length !== 1) {
+    throw new Error(
+      `The productive Export expected exactly one Processador attempt and observed ${exportSpawns.length}`,
+    );
   }
+  const [spawn] = exportSpawns;
   const correlations = assertCorrelatedJourneyTerminals(records, {
     bootstraps: [
       {
@@ -1250,6 +1295,7 @@ try {
       schemaVersion: savedDocument.schemaVersion,
       photoFrameCount: savedFrames.length,
       persistedPhotoLinkOnly,
+      reimportedExistingPhotoWithoutRevision,
       originalUnchanged: readFileSync(photoPath).equals(originalPhoto),
       missingOriginalBlocked,
       missingOriginalActionable,
@@ -1287,6 +1333,7 @@ try {
     }),
   );
 } finally {
+  let driverCleanupFailure;
   for (const driver of [
     globalDriver,
     hostDriver,
@@ -1294,13 +1341,16 @@ try {
   ]) {
     if (driver) {
       try {
-        await driver.dispose();
-      } catch {
-        // Exact application cleanup below remains fail-closed in the wrapper.
+        await disposeConfirmedWebDriver(driver);
+      } catch (error) {
+        driverCleanupFailure ??= error;
       }
     }
   }
   for (const instance of applicationProcesses()) {
     terminateProcessInstance(instance);
+  }
+  if (driverCleanupFailure) {
+    throw driverCleanupFailure;
   }
 }

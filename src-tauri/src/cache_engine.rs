@@ -208,11 +208,12 @@ pub(crate) struct CacheRecovery {
     pub(crate) removed_temporary_count: usize,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CacheNamespaceRecovery {
     pub(crate) removed_temporary_count: usize,
     pub(crate) removed_generation_count: usize,
     pub(crate) discarded_index: bool,
+    pub(crate) verified_artifacts: Vec<CacheArtifact>,
 }
 
 type FlightResult = Result<CacheExecution, CacheFailure>;
@@ -372,11 +373,25 @@ impl CacheEngine {
                 )
             })?
             .is_some();
-        let metadata = load_metadata(&storage, namespace.paths()).filter(|metadata| {
-            metadata_is_current(metadata, namespace.project_id(), namespace.paths())
-        });
-        let removed_generation_count = match metadata.as_ref() {
-            Some(metadata) => {
+        let recovered_metadata = load_metadata(&storage, namespace.paths())
+            .filter(|metadata| {
+                metadata_is_current(metadata, namespace.project_id(), namespace.paths())
+            })
+            .and_then(|metadata| {
+                let artifacts = metadata
+                    .entries
+                    .iter()
+                    .map(CacheMetadataEntry::artifact)
+                    .collect::<Vec<_>>();
+                artifacts
+                    .iter()
+                    .all(|artifact| {
+                        verify_cached_artifact(&storage, namespace.paths(), artifact).is_ok()
+                    })
+                    .then_some((metadata, artifacts))
+            });
+        let removed_generation_count = match recovered_metadata.as_ref() {
+            Some((metadata, _)) => {
                 sweep_unreferenced_generations(&storage, namespace.paths(), metadata)?
             }
             None => storage
@@ -388,7 +403,7 @@ impl CacheEngine {
                     )
                 })?,
         };
-        let discarded_index = metadata.is_none() && metadata_present;
+        let discarded_index = recovered_metadata.is_none() && metadata_present;
         if discarded_index {
             storage
                 .remove_existing_file(&metadata_path)
@@ -399,10 +414,14 @@ impl CacheEngine {
                     )
                 })?;
         }
+        let verified_artifacts = recovered_metadata
+            .map(|(_, artifacts)| artifacts)
+            .unwrap_or_default();
         Ok(CacheNamespaceRecovery {
             removed_temporary_count,
             removed_generation_count,
             discarded_index,
+            verified_artifacts,
         })
     }
 
@@ -3263,6 +3282,7 @@ mod tests {
             assert_eq!(recovered.removed_temporary_count, 2);
             assert_eq!(recovered.removed_generation_count, 1);
             assert!(!recovered.discarded_index);
+            assert_eq!(recovered.verified_artifacts, [published]);
             assert!(published_path.is_file());
             assert!(!orphan.exists());
             assert!(!preview_temporary.exists());
@@ -3272,6 +3292,38 @@ mod tests {
                     .expect("the published index remains readable"),
                 metadata_before
             );
+        });
+    }
+
+    #[test]
+    fn reserved_namespace_recovery_rejects_a_corrupted_indexed_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let published = verified_preview_artifact(&fixture, &engine).await;
+            let published_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(
+                    &published.media_id,
+                    &published.generation_id,
+                    published.format,
+                )
+                .expect("the indexed generation path is valid");
+            std::fs::write(&published_path, b"corrupted derived bytes")
+                .expect("the indexed generation is corrupted after publication");
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("corrupt disposable Cache is recovered without blocking the Project");
+
+            assert!(recovered.discarded_index);
+            assert!(recovered.verified_artifacts.is_empty());
+            assert!(!published_path.exists());
+            assert!(!fixture.work.namespace.paths().metadata_file().exists());
         });
     }
 

@@ -1506,6 +1506,38 @@ test("imports a JPEG through the Host boundary without inserting it automaticall
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
+test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
+  const port = projectCorePortWithApply(async () => projection);
+  const importPhoto = vi.fn(async () => ({
+    kind: "selected" as const,
+    projection,
+    mediaId: "media-002",
+  }));
+  port.importPhoto = importPhoto;
+  const applyWithOutcome = vi.fn(port.applyWithOutcome);
+  port.applyWithOutcome = applyWithOutcome;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Importar JPEG…" }));
+
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  const existingPhoto = screen.getByText("Campo.jpg").closest("button");
+  await waitFor(() =>
+    expect(existingPhoto).toHaveAttribute("aria-pressed", "true"),
+  );
+  expect(onProjectionChange).toHaveBeenCalledWith(projection);
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+});
+
 test("resolves and drops a dragged Photo in the current Canvas mode", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const resolvePhotoDropTarget = vi.fn(async () => ({

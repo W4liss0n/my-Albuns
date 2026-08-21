@@ -1,5 +1,10 @@
 import net from "node:net";
 
+export async function disposeConfirmedWebDriver(driver) {
+  await driver.dispose();
+  return undefined;
+}
+
 export async function findFreeTcpPort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();

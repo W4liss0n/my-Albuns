@@ -10,9 +10,9 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoOutcome, MediaId,
-        PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata, ProjectIntent,
-        ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
+        ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoDisposition,
+        ImportPhotoOutcome, MediaId, PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata,
+        ProjectIntent, ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
         RenderSnapshotRef,
     },
     persistent_projection,
@@ -436,6 +436,25 @@ impl EditableProject {
         if !self.session_valid {
             return Err(CoreError::EditableSessionInvalidated);
         }
+        let existing_media_id = self
+            .project()
+            .media()
+            .iter()
+            .find(|media| {
+                media.kind() == crate::MediaKind::Photo && media.path() == command.path.as_path()
+            })
+            .map(|media| MediaId::from_uuid(media.id()));
+        if let Some(media_id) = existing_media_id {
+            self.photo_sources
+                .entry(media_id)
+                .or_default()
+                .insert(command.path, command.source_metadata);
+            return Ok(ImportPhotoOutcome {
+                projection: self.projection(),
+                media_id,
+                disposition: ImportPhotoDisposition::Existing,
+            });
+        }
         let media_id = MediaId::from_uuid(Uuid::new_v4());
         let source_path = command.path.clone();
         self.session
@@ -447,6 +466,7 @@ impl EditableProject {
         Ok(ImportPhotoOutcome {
             projection: self.projection(),
             media_id,
+            disposition: ImportPhotoDisposition::Imported,
         })
     }
 
