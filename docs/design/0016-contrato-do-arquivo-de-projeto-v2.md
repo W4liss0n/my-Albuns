@@ -100,9 +100,9 @@ O resultado atual da cadeia completa é provado separadamente por:
 - resultado final v3:
   `crates/myalbuns-core/tests/fixtures/project_document_v3_migration_expected.myalbuns`.
 
-O golden intermediário preserva Identidade, Revisão, ordem, Padrões e unidades
-UTF-16 e altera somente `schemaVersion` para 2. O golden final preserva esse
-resultado, promove `schemaVersion` para 3 e acrescenta somente o default
+O arquivo dourado intermediário preserva Identidade, Revisão, ordem, Padrões e unidades
+UTF-16 e altera somente `schemaVersion` para 2. O arquivo dourado final preserva esse
+resultado, promove `schemaVersion` para 3 e acrescenta somente o valor padrão
 `frames: []` a cada Lâmina. Os testes públicos provam:
 
 | Caso | Resultado |
@@ -110,15 +110,15 @@ resultado, promove `schemaVersion` para 3 e acrescenta somente o default
 | abrir a entrada v1 editável | modelo atual v3 em memória, mesma Revisão, origem intacta |
 | abrir a entrada v1 somente leitura | leitura válida e zero escrita |
 | fechar a Sessão migrada sem Salvar | bytes v1 idênticos |
-| comparar a etapa pura `v1 -> v2` | bytes iguais ao golden v2, alterando somente `schemaVersion` |
-| Salvar explicitamente a Sessão migrada sem edição | bytes iguais ao golden v3, mesma Revisão |
+| comparar a etapa pura `v1 -> v2` | bytes iguais ao arquivo dourado v2, alterando somente `schemaVersion` |
+| Salvar explicitamente a Sessão migrada sem edição | bytes iguais ao arquivo dourado v3, mesma Revisão |
 | abrir documento v2 fechado com Foto e Decorativo | ambos preservados como `MediaRef` persistente |
 | `kind` desconhecido em v1 ou v2 | `InvalidProjectDocument`, sem Sessão |
 | campo adicional em qualquer DTO | `InvalidProjectDocument`, sem perda silenciosa |
 | versão maior que 3 | `UnsupportedFutureSchema`, sem escrita |
 
 Fixtures v1 anteriores permanecem normativas para o leitor v1. A forma pública
-do schema 3 pertence ao design 0017 e participa da cadeia; formatos de spikes
+do esquema 3 pertence ao design 0017 e participa da cadeia; formatos de protótipos
 que não correspondam ao DTO fechado continuam recusados.
 
 ## Fronteira modular

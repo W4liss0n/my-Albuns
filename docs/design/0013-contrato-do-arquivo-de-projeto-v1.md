@@ -230,15 +230,15 @@ Os exemplos acompanham versões públicas reais, e não versões inventadas para
 | Classe | Cobertura normativa atual |
 |---|---|
 | documento válido | o envelope neutro e a matriz abaixo permanecem exemplos v1; os contratos v2 e v3 conservam exemplos próprios |
-| migração | a cadeia é `[v1 -> v2 -> v3]`, com entrada v1, golden intermediário v2 preservado, resultado final v3, abertura sem escrita e promoção somente após `Salvar` |
+| migração | a cadeia é `[v1 -> v2 -> v3]`, com entrada v1, arquivo dourado intermediário v2 preservado, resultado final v3, abertura sem escrita e promoção somente após `Salvar` |
 | estados inválidos | a matriz abaixo preserva falhas v1; os contratos posteriores acrescentam seus próprios campos e falhas fechadas |
 
 Os exemplos normativos estão em
 `project_document_v1_migration_input.myalbuns`,
 `project_document_v2_migration_expected.myalbuns` e
 `project_document_v3_migration_expected.myalbuns`, sob
-`crates/myalbuns-core/tests/fixtures/`. O golden v2 conserva a etapa aceita
-`v1 -> v2`; o golden v3 prova separadamente o resultado atual após a cadeia
+`crates/myalbuns-core/tests/fixtures/`. O arquivo dourado v2 conserva a etapa aceita
+`v1 -> v2`; o arquivo dourado v3 prova separadamente o resultado atual após a cadeia
 completa. Não se preenche a cadeia com `v0` nem com versões demonstrativas.
 
 ## Salvamento

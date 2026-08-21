@@ -197,7 +197,7 @@ O `RootBindingPlan` e os contextos locais que reutilizam uma raiz durante Import
 - tamanho e datas do original;
 - fingerprint versionado.
 
-Identidade da mídia, caminho original, categoria e decisões do usuário pertencem ao Projeto. A marca opaca não serializa o pathname: ela apenas impede que uma geração produzida depois de Religação seja reutilizada quando Undo, Descartar ou Recuperação restaurarem outro vínculo para o mesmo `mediaId`. Ausência ou corrupção do índice exige reconstrução, nunca perda de conteúdo.
+Identidade da mídia, caminho original, categoria e decisões do usuário pertencem ao Projeto. A marca opaca não serializa o caminho textual: ela apenas impede que uma geração produzida depois de Religação seja reutilizada quando Undo, Descartar ou Recuperação restaurarem outro vínculo para o mesmo `mediaId`. Ausência ou corrupção do índice exige reconstrução, nunca perda de conteúdo.
 
 O fingerprint v1 é `sha256-full-file-v1`: SHA-256 dos bytes integrais abertos
 pelo Processador, acompanhado pelo tamanho e pelas datas de criação e

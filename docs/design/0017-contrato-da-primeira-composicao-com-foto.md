@@ -14,12 +14,12 @@ Este contrato materializa o Programa 09 sobre a composição única do
 `ProjectCore`. Ele acrescenta importação JPEG vinculada, Frames preenchidos,
 resolução determinística de alvo, enquadramento, persistência e Exportação a partir do
 Original. Preserva Identidade, `MediaRef`, resolução e monitoramento de mídia,
-Cache, caminhos autorizados, lifecycle multiprocesso e a `ExportPipeline`
+Cache, caminhos autorizados, ciclo de vida multiprocesso e a `ExportPipeline`
 pública já aceitos.
 
 Não cria `Salvar como`, nova Identidade, configurações globais, recuperação
-completa nem comportamento de programas posteriores. Em especial, a issue 18
-continua proprietária de `Salvar como` e bloqueada por este corte.
+completa nem comportamento de programas posteriores. Em especial, o ticket 18
+continua proprietário de `Salvar como` e bloqueado por este corte.
 
 ## Importação e autoridade da mídia
 
@@ -33,7 +33,7 @@ usada enquanto a prévia opaca não chega é apenas estado de apresentação do
 processo. Extensão ou nome não substituem a validação do fluxo de bytes.
 
 O Projeto persiste apenas `MediaRef { id, kind: photo, path }`. Dimensões,
-orientação já aplicada, paleta, disponibilidade, fingerprint, prévia e Cache
+orientação já aplicada, paleta, disponibilidade, impressão digital, prévia e Cache
 são observações transitórias. O Original nunca é regravado pela importação,
 composição, Salvamento ou Exportação.
 
@@ -66,7 +66,7 @@ usuário. O Zoom base mínimo que preenche o Frame é derivado das dimensões
 observadas e da geometria; não é persistido nem confundido com `userZoom`.
 
 O leitor executa a cadeia pura `v1 -> v2 -> v3`; as duas migrações apenas
-acrescentam os defaults definidos por suas versões. Abrir não regrava. Um
+acrescentam os valores padrão definidos por suas versões. Abrir não regrava. Um
 `Salvar` autorizado publica v3 pelo protocolo atômico existente, sem mudar a
 Identidade. Versões futuras, campos desconhecidos, Frames inválidos e
 referências quebradas falham fechados.
@@ -116,7 +116,7 @@ Zoom sobrevivem a Salvamento e reabertura; o Host reidrata apenas os metadados
 transitórios do Original. Essa inspeção começa pelo Monitor somente depois de
 `host_ready` e da WebView registrar o observador de `myalbuns://linked-media-changed`.
 A confirmação `project_ui_ready` forma a barreira causal e a transição conjunta
-concede uma única inicialização do Monitor, fora da thread que inicializa janela
+concede uma única inicialização do Monitor, fora do fluxo de execução que inicializa janela
 e registro operacional; a resposta atualiza a Projeção pela geração de execução
 mais nova, sem criar Histórico. Cada
 observação transitória fica associada ao par
@@ -149,17 +149,17 @@ Original ausente em sucesso.
 ## Provas públicas
 
 Os testes do `ProjectCore` cobrem v3, migrações, retângulos, ordem de
-placeholders, empilhamento, Histórico e round-trip. Testes da WebView cobrem
-diálogo/ports, destaque, cancelamentos, seleção e gestos. A jornada produtiva
+placeholders, empilhamento, Histórico e ciclo completo de persistência. Testes da WebView cobrem
+diálogo e portas, destaque, cancelamentos, seleção e gestos. A jornada produtiva
 dirige Global → Host → diálogo nativo → WebView2/Canvas → Processador → Salvar
 e reabrir → Exportação, mede Canvas/JPEG com tolerância explícita e repete a
 Exportação sem o Original. Antes da primeira Exportação, a verificação observa uma
 prévia real, esvazia somente o namespace de Cache isolado da própria jornada
 enquanto o diálogo nativo ainda está aberto e mede zero entradas e zero bytes
 antes e depois do Processador. A textura residente permanece no Canvas; sua
-presença não mascara a falta do Original na segunda tentativa. O purge valida
-o root físico e cada ancestral imediatamente antes da remoção, recusando
-junctions/reparse points; testes Windows com sentinela externa cobrem o root e
+presença não mascara a falta do Original na segunda tentativa. A limpeza segura valida
+a raiz física e cada ancestral imediatamente antes da remoção, recusando
+junções e pontos de nova análise; testes Windows com sentinela externa cobrem a raiz e
 um ancestral. A tentativa produtiva registra que o Processador pertence ao Host
 reaberto, distinto daquele que salvou o Projeto, e exige igualdade exata entre
 as duas tentativas esperadas — sucesso com Cache vazio e falha com Original

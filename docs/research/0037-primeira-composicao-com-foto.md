@@ -39,7 +39,7 @@ A menor fronteira persistente é `Frame + PhotoTransform`. Metadados do arquivo
 são reidratados pelo Monitor depois de `host_ready` e da inscrição da WebView
 em `myalbuns://linked-media-changed`. A confirmação `project_ui_ready` fecha
 essa barreira causal e concede uma única inicialização do Monitor. A inspeção
-ocorre no executor de trabalho bloqueante, fora da thread de inicialização, e
+ocorre no executor de trabalho bloqueante, fora do fluxo de execução da inicialização, e
 `baseFillZoom` é calculado pelo `CompositionEngine`.
 Isso evita gravar propriedades derivadas e permite que uma mudança estável do
 Original atualize a composição sem revisão ou Histórico. A execução indexa cada
@@ -54,7 +54,7 @@ de projeção do Monitor também têm geração monotônica, inclusive quando a 
 criativa não muda.
 
 O modo normal reutiliza um único primeiro Layout determinístico, enquanto o
-Modo de edição cria apenas o retângulo proporcional pedido. Não foi criado um
+Modo de edição cria apenas o retângulo proporcional pedido. Não foi criada uma
 infraestrutura de Layouts, um repositório de seleção ou uma segunda pilha de Histórico.
 
 Selecionar novamente o mesmo JPEG é tratado na fronteira pública de importação: o
@@ -75,13 +75,13 @@ descartados como estado derivado.
 `scripts/Test-ProductiveJourney.ps1` usa uma Foto JPEG externa real, seleciona
 o arquivo em diálogo nativo, seleciona novamente o mesmo arquivo e aciona o
 duplo clique pela WebView2. A rodada confirma que a segunda seleção reutiliza o
-cartão sem revisão, schema v3 e vínculo externo único sem metadados derivados,
+cartão sem revisão, esquema v3 e vínculo externo único sem metadados derivados,
 materializa a textura opaca no Canvas, salva, reabre em outro Host e exporta
 pelo Processador.
 
 A amostra central da Foto é comparada entre captura do Canvas e JPEG final com
 tolerância máxima explícita de 32 níveis por canal, cobrindo a recompressão
-JPEG. Uma amostra fora do Frame mantém tolerância 8 para o Background. O runner
+JPEG. Uma amostra fora do Frame mantém tolerância 8 para o Background. O executor
 também verifica o hash e os bytes do Original antes e depois das operações.
 
 A jornada confirma primeiro uma representação JPEG real no namespace de Cache
@@ -89,17 +89,17 @@ isolado do processo. Enquanto o diálogo nativo da primeira Exportação ainda e
 aberto, remove somente esse conteúdo derivado por uma travessia que falha fechada e
 mede zero entradas e zero bytes. O aplicativo real exporta pelo Original; o
 namespace continua com zero entradas e zero bytes depois do Processador. Antes
-de remover qualquer entrada, o runner verifica por caminho real e atributos que
-o root e todos os seus ancestrais não são junctions/reparse points. Dois testes
-Windows criam junctions reais no root e em um ancestral e provam que uma
+de remover qualquer entrada, o executor verifica por caminho real e atributos que
+a raiz e todos os seus ancestrais não são junções nem pontos de nova análise. Dois testes
+Windows criam junções reais na raiz e em um ancestral e provam que uma
 sentinela externa permanece intacta.
 
-Em seguida, a textura já residente continua visível no Canvas, mas o runner
+Em seguida, a textura já residente continua visível no Canvas, mas o executor
 remove o Original antes da segunda Exportação e exige mensagem com
 `Religar`/`Religue`, terminal `export_failed` em `source_verification` e nenhum
 arquivo publicado. Portanto nem Cache em disco nem prévia residente produzem
 falso sucesso. A verificação canônica não usa `cfg(test)`, variável de ambiente de teste
-ou Host in-process como evidência dessa propriedade.
+ou Host executado no mesmo processo como evidência dessa propriedade.
 
 A mesma verificação exige `exportedAfterReopen=true`, registra os PIDs dos Hosts que
 salvaram e reabriram o Projeto e aceita o terminal do Processador somente quando
@@ -133,8 +133,8 @@ pendente e comprova Canvas e Painel sincronizados sem Histórico. A consulta
 autoritativa de alvo deixou de transportar `PhotoPlacementMode`; somente a
 mutação conserva o modo necessário à geometria. O Monitor removeu o intermediário
 genérico e executa diretamente, no executor bloqueante, a observação e a
-reidratação do fluxo real. As suítes integrais finais cobrem 233 testes de
-frontend e 474 testes Rust aprovados, com 16 testes Rust explicitamente
+reidratação do fluxo real. As suítes integrais finais cobrem 233 testes da
+interface e 475 testes Rust aprovados, com 16 testes Rust explicitamente
 ignorados e roteados às verificações reais Windows/Processador.
 
 O artefato canônico é
