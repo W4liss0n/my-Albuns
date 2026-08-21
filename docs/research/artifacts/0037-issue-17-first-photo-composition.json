@@ -1,14 +1,14 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-21T23:03:00.0604600Z",
-    "gitCommit":  "6f4ebc7f5c989cf1048646e796d335ecf93bbd6e",
+    "collectedAtUtc":  "2026-08-21T23:54:48.2082078Z",
+    "gitCommit":  "27dceb7e3127d46b6ea4ee06751ee1c20d2485ce",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64",
-                     "nativeDriverVersion":  "151.0.4129.93",
-                     "webView2RuntimeVersion":  "151.0.4129.93"
+                     "nativeDriverVersion":  "151.0.4129.101",
+                     "webView2RuntimeVersion":  "151.0.4129.101"
                  },
     "checks":  [
                    {
@@ -69,7 +69,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "ec181d1b-487a-4dda-91ee-e291fb1f5cb1",
+                     "selectedSheetId":  "019786fb-d8cb-42a1-ae21-cc02cf4c004f",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  360,
@@ -121,12 +121,12 @@
                                                   }
                               },
                      "processIds":  {
-                                        "firstGlobal":  5792,
-                                        "firstHost":  21344,
-                                        "global":  26332,
-                                        "host":  24652,
-                                        "imaging":  28500,
-                                        "missingOriginalImaging":  31124
+                                        "firstGlobal":  23260,
+                                        "firstHost":  30228,
+                                        "global":  24056,
+                                        "host":  35128,
+                                        "imaging":  36308,
+                                        "missingOriginalImaging":  4448
                                     },
                      "correlations":  {
                                           "bootstraps":  2,
