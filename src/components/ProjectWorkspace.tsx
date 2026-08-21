@@ -5,6 +5,7 @@ import type {
   ExportPipelinePort,
   MediaPreview,
   MediaPreviewDemand,
+  ProjectCorePort,
   ProjectWindowPort,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
@@ -27,6 +28,7 @@ interface ProjectWorkspaceProps {
   exportPipelinePort: ExportPipelinePort;
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
+  projectCorePort: ProjectCorePort;
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
@@ -39,6 +41,7 @@ export function ProjectWorkspace({
   exportPipelinePort,
   projectWindowPort,
   runProjectMutation,
+  projectCorePort,
   mediaPreviews = {},
   onMediaDemandChange,
   onRetryUnavailableMedia,
@@ -47,6 +50,7 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
@@ -106,6 +110,7 @@ export function ProjectWorkspace({
     interactionBlocked: exportActive || projectClose.interactionBlocked,
     projection,
     runProjectMutation,
+    projectCorePort,
     onProjectionChange,
   });
   const workspacePanels = useWorkspacePanelLayout();
@@ -232,6 +237,8 @@ export function ProjectWorkspace({
         >
           <AlbumCanvas
             {...controller.canvasProps}
+            draggedPhotoId={draggedPhotoId}
+            onPhotoDragCancel={() => setDraggedPhotoId(null)}
             mediaPreviewUrls={mediaPreviewUrls}
             onMediaDemandChange={setCanvasMediaDemand}
             onGraphicsUnavailable={onGraphicsUnavailable}
@@ -278,6 +285,9 @@ export function ProjectWorkspace({
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
+          onImportPhoto={controller.importPhoto}
+          onPhotoDragStart={setDraggedPhotoId}
+          onPhotoDragEnd={() => setDraggedPhotoId(null)}
           onRelinkMedia={controller.relinkMedia}
           onRetryUnavailableMedia={onRetryUnavailableMedia}
           relinkDisabled={

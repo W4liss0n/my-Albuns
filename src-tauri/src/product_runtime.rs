@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use myalbuns_core::{EditableProject, MediaId, MediaKind};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
@@ -39,10 +40,11 @@ pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (request, project) = opened.into_parts();
+    let (request, mut project) = opened.into_parts();
     #[cfg(debug_assertions)]
     crate::dev_host_registration::register_from_environment(&request.launch_nonce)?;
 
+    hydrate_photo_sources(&mut project);
     let cache_service = CacheService::new(app_paths.clone());
     let cache_namespace_owner = cache_service
         .reserve_namespace(project.identity_authority())
@@ -151,6 +153,8 @@ pub(crate) fn run(
             project_ui_ready,
             crate::project_commands::project_state,
             crate::project_commands::apply_project_intent,
+            crate::project_commands::import_photo,
+            crate::project_commands::photo_drop_target,
             crate::project_commands::relink_media,
             crate::media_preview_commands::retry_unavailable_media,
             crate::project_commands::undo_project,
@@ -165,6 +169,43 @@ pub(crate) fn run(
         .run(context);
     run_result?;
     Ok(())
+}
+
+fn hydrate_photo_sources(project: &mut EditableProject) {
+    let bindings = project
+        .project()
+        .media()
+        .iter()
+        .filter(|media| media.kind() == MediaKind::Photo)
+        .map(|media| crate::media_runtime::MediaBinding {
+            media_id: media.id().hyphenated().to_string(),
+            kind: media.kind(),
+            logical_path: media.path().to_path_buf(),
+        })
+        .collect::<Vec<_>>();
+    for binding in bindings {
+        let Ok(media_id) = binding.media_id.parse::<MediaId>() else {
+            continue;
+        };
+        match crate::media_runtime::MediaResolver.inspect_photo_binding(&binding) {
+            Ok(metadata) => {
+                if let Err(error) = project.observe_photo_source(media_id, metadata) {
+                    tracing::warn!(
+                        target: "myalbuns.desktop",
+                        media_id = safe_log_identifier(&binding.media_id),
+                        error = %error,
+                        event = "photo_source_hydration_rejected",
+                    );
+                }
+            }
+            Err(error) => tracing::info!(
+                target: "myalbuns.desktop",
+                media_id = safe_log_identifier(&binding.media_id),
+                error = %error,
+                event = "photo_source_hydration_deferred",
+            ),
+        }
+    }
 }
 
 fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
@@ -325,15 +366,57 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let Some(update) = poll.update() else {
                 continue;
             };
-            let changed = update.changed_media_ids();
+            let changed = update.changed_media_ids().to_vec();
+            let invalidated = update.invalidated_media_ids().to_vec();
             if !changed.is_empty() {
                 tracing::info!(
                     target: "myalbuns.desktop",
                     changed_media_count = changed.len(),
                     event = "linked_media_observation_applied",
                 );
+                let changed_photos = catalog
+                    .bindings
+                    .iter()
+                    .filter(|binding| {
+                        binding.kind == MediaKind::Photo
+                            && changed.iter().any(|media_id| media_id == &binding.media_id)
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if !changed_photos.is_empty() {
+                    let host = app.state::<ProjectHost>().inner().clone();
+                    match tauri::async_runtime::spawn_blocking(move || {
+                        for binding in changed_photos {
+                            match crate::media_runtime::MediaResolver
+                                .inspect_photo_binding(&binding)
+                            {
+                                Ok(metadata) => host.observe_photo_source(&binding, metadata)?,
+                                Err(error) => tracing::info!(
+                                    target: "myalbuns.desktop",
+                                    media_id = safe_log_identifier(&binding.media_id),
+                                    error = %error,
+                                    event = "photo_source_refresh_deferred",
+                                ),
+                            }
+                        }
+                        Ok::<(), String>(())
+                    })
+                    .await
+                    {
+                        Ok(Ok(())) => {}
+                        Ok(Err(error)) => tracing::warn!(
+                            target: "myalbuns.desktop",
+                            error = %error,
+                            event = "photo_source_refresh_rejected",
+                        ),
+                        Err(error) => tracing::warn!(
+                            target: "myalbuns.desktop",
+                            error = %error,
+                            event = "photo_source_refresh_failed",
+                        ),
+                    }
+                }
             }
-            let invalidated = update.invalidated_media_ids();
             if !changed.is_empty() || !invalidated.is_empty() {
                 let namespace = app.state::<CacheNamespaceOwner>();
                 app.state::<CacheEngine>().apply_monitor_media_update(
@@ -351,9 +434,7 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 && let Some(window) = app.get_webview_window(PROJECT_WINDOW_LABEL)
                 && let Err(error) = window.emit(
                     LINKED_MEDIA_CHANGED_EVENT,
-                    LinkedMediaChanged {
-                        media_ids: changed.to_vec(),
-                    },
+                    LinkedMediaChanged { media_ids: changed },
                 )
             {
                 tracing::warn!(

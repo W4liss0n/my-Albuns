@@ -1,13 +1,15 @@
 use myalbuns_core::{
-    EditorProjection, PathFailure, ProjectIntent, SaveProjectError,
-    SaveProjectOutcome as CoreSaveProjectOutcome,
+    EditorProjection, PathFailure, PhotoDropTarget, PhotoPlacementMode, ProjectIntent,
+    ProjectMutationOutcome, SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use tauri::{AppHandle, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    ipc_contract::{SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult},
+    ipc_contract::{
+        ImportPhotoResult, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    },
     logging::validate_optional_identifier,
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     product_runtime::PROJECT_WINDOW_LABEL,
@@ -39,13 +41,14 @@ pub(crate) fn apply_project_intent(
     intent: ProjectIntent,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
-) -> Result<EditorProjection, String> {
+) -> Result<ProjectMutationOutcome, String> {
     let intent_kind = match &intent {
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
-        ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
+        ProjectIntent::AddPhoto { .. } => "add_photo",
+        ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
-    let projection = state.apply(intent).inspect_err(|_| {
+    let outcome = state.apply_with_outcome(intent).inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -58,12 +61,77 @@ pub(crate) fn apply_project_intent(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
-        project_id = safe_log_identifier(&projection.state.project_id),
-        revision = projection.state.revision,
+        project_id = safe_log_identifier(&outcome.projection.state.project_id),
+        revision = outcome.projection.state.revision,
         intent = intent_kind,
         event = "project_intent_applied",
     );
-    Ok(projection)
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub(crate) async fn import_photo(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<ImportPhotoResult, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
+    }
+    let host = state.inner().clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_parent(&window)
+        .set_title("Importar Foto JPEG")
+        .add_filter("Imagem JPEG", &["jpg", "jpeg"])
+        .pick_file(move |selection| {
+            let _ = sender.send(selection);
+        });
+    let selection = receiver
+        .await
+        .map_err(|_| "Não foi possível concluir o diálogo de importação de Foto.".to_string())?;
+    let Some(selection) = selection else {
+        return Ok(ImportPhotoResult::Cancelled {
+            projection: host.projection()?,
+        });
+    };
+    let FilePath::Path(path) = selection else {
+        return Err("O local escolhido não é um Arquivo do Windows válido.".into());
+    };
+    let imported = tauri::async_runtime::spawn_blocking(move || {
+        let proposal = MediaResolver.propose_photo_import(path)?;
+        host.import_photo(proposal)
+    })
+    .await
+    .map_err(|_| "Não foi possível concluir a importação da Foto.".to_string())??;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        window_label = window.label(),
+        media_id = safe_log_identifier(&imported.media_id.to_string()),
+        revision = imported.projection.state.revision,
+        event = "photo_imported",
+    );
+    Ok(ImportPhotoResult::Imported {
+        projection: imported.projection,
+        media_id: imported.media_id.to_string(),
+    })
+}
+
+#[tauri::command]
+pub(crate) fn photo_drop_target(
+    sheet_id: String,
+    x_um: i64,
+    y_um: i64,
+    mode: PhotoPlacementMode,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<PhotoDropTarget, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.project_photo_drop_target(&sheet_id, x_um, y_um, mode)
 }
 
 #[tauri::command]

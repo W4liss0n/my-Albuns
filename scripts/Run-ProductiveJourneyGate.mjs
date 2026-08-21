@@ -1,10 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
   readdirSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
@@ -48,6 +50,19 @@ const nativeDriverPath = path.resolve(driverArgument);
 const processDataRoot = path.join(scratch, "process-data");
 const projectPath = path.join(scratch, "Jornada produtiva.myalbuns");
 const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
+const missingOriginalExportPath = path.join(
+  scratch,
+  "Jornada produtiva_original-ausente.jpg",
+);
+const photoFixturePath = path.join(
+  workspace,
+  "crates",
+  "myalbuns-imaging",
+  "tests",
+  "fixtures",
+  "progressive-420-dri.jpg",
+);
+const photoPath = path.join(scratch, "Foto da jornada.jpg");
 const screenshotPath = path.join(scratch, "project-canvas.png");
 const personalizedBackgroundRgb = "#204060";
 const nativeDialogDriver = path.join(
@@ -65,6 +80,7 @@ for (const [label, candidate] of [
   ["application", applicationPath],
   ["native WebDriver", nativeDriverPath],
   ["native dialog driver", nativeDialogDriver],
+  ["JPEG Photo fixture", photoFixturePath],
 ]) {
   if (!existsSync(candidate)) {
     throw new Error(`${label} was not found`);
@@ -74,9 +90,16 @@ mkdirSync(scratch, { recursive: true });
 for (const knownFolder of ["Roaming", "Local", "Temporary"]) {
   mkdirSync(path.join(processDataRoot, knownFolder), { recursive: true });
 }
-if (existsSync(projectPath) || existsSync(exportPath)) {
+if (
+  existsSync(projectPath) ||
+  existsSync(exportPath) ||
+  existsSync(missingOriginalExportPath) ||
+  existsSync(photoPath)
+) {
   throw new Error("The productive journey requires absent CreateOnly targets");
 }
+copyFileSync(photoFixturePath, photoPath);
+const originalPhoto = readFileSync(photoPath);
 
 const delay = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -231,6 +254,45 @@ async function clickWhenEnabled(driver, using, value, label) {
   );
   await driver.request("POST", `${endpoint}/click`, {});
   return elementId;
+}
+
+async function doubleClick(driver, using, value, label) {
+  const elementId = await findElement(driver, using, value, label);
+  const endpoint = `/session/${driver.sessionId}`;
+  const element = {
+    "element-6066-11e4-a52e-4f735466cecf": elementId,
+  };
+  try {
+    await driver.request("POST", `${endpoint}/actions`, {
+      actions: [
+        {
+          type: "pointer",
+          id: "productive-mouse",
+          parameters: { pointerType: "mouse" },
+          actions: [
+            { type: "pointerMove", duration: 0, origin: element, x: 0, y: 0 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+            { type: "pause", duration: 60 },
+            { type: "pointerDown", button: 0 },
+            { type: "pointerUp", button: 0 },
+          ],
+        },
+      ],
+    });
+  } finally {
+    await driver.request("DELETE", `${endpoint}/actions`).catch(() => undefined);
+  }
+  return elementId;
+}
+
+async function sendEscape(driver) {
+  const body = await findElement(driver, "css selector", "body", "Project body");
+  await driver.request(
+    "POST",
+    `/session/${driver.sessionId}/element/${encodeURIComponent(body)}/value`,
+    { text: "\uE00C", value: ["\uE00C"] },
+  );
 }
 
 async function clickUntilLogEvent(driver, using, value, event, label) {
@@ -413,6 +475,22 @@ function recordsFor(event) {
   return logRecords().filter((record) => record.event === event);
 }
 
+function exportProcessorAttempts() {
+  return recordsFor("imaging_process_spawned").filter(
+    (record) => record.operation === "export",
+  );
+}
+
+function directoryContainsJpeg(directory) {
+  if (!existsSync(directory)) return false;
+  return readdirSync(directory, { withFileTypes: true }).some((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    return entry.isDirectory()
+      ? directoryContainsJpeg(entryPath)
+      : entry.isFile() && /\.jpe?g$/i.test(entry.name);
+  });
+}
+
 function jpegDimensions(bytes) {
   if (bytes[0] !== 0xff || bytes[1] !== 0xd8) {
     throw new Error("The exported file is not a JPEG stream");
@@ -585,9 +663,10 @@ try {
     "GET",
     `/session/${hostDriver.sessionId}/source`,
   );
-  const sourcePathExposedToWebView = [
+  let sourcePathExposedToWebView = [
     projectPath,
     exportPath,
+    photoPath,
     processDataRoot,
   ].some((candidate) => sourceContainsNativePath(projectPageSource, candidate));
   if (sourcePathExposedToWebView) {
@@ -620,7 +699,7 @@ try {
     "Album design inspector",
   );
 
-  const dpiInput = await replaceInput(
+  await replaceInput(
     hostDriver,
     "css selector",
     ".document-dpi-control input",
@@ -648,6 +727,56 @@ try {
     "Redo action",
   );
   await waitForLogEvent("project_redo_completed", 1, "Redo terminal");
+
+  await clickWhenEnabled(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Importar JPEG…']",
+    "Import Photo action",
+  );
+  const selectedPhoto = driveNativeDialog(
+    firstHost,
+    "select",
+    "Importar Foto JPEG",
+    photoPath,
+  );
+  if (selectedPhoto.action !== "select") {
+    throw new Error("The native JPEG Photo selection was not confirmed");
+  }
+  await waitForLogEvent("photo_imported", 1, "Photo import terminal");
+  await doubleClick(
+    hostDriver,
+    "css selector",
+    ".media-card[data-media-id]",
+    "imported Photo card",
+  );
+  await waitForLogEvent(
+    "project_intent_applied",
+    2,
+    "double-click Photo placement",
+  );
+  await findElement(
+    hostDriver,
+    "xpath",
+    "//*[normalize-space()='Frame selecionado']",
+    "affected Frame contextual selection",
+  );
+  await waitForLogEvent(
+    "canvas_opaque_preview_texture_loaded",
+    1,
+    "Canvas Photo preview",
+  );
+  const importedPageSource = await hostDriver.request(
+    "GET",
+    `/session/${hostDriver.sessionId}/source`,
+  );
+  sourcePathExposedToWebView ||= [
+    projectPath,
+    exportPath,
+    photoPath,
+    processDataRoot,
+  ].some((candidate) => sourceContainsNativePath(importedPageSource, candidate));
+
   await click(
     hostDriver,
     "css selector",
@@ -657,9 +786,44 @@ try {
   await waitForLogEvent("project_save_completed", 1, "Save terminal");
   const savedProject = readFileSync(projectPath);
   const savedDocument = JSON.parse(savedProject.toString("utf8"));
-  if (savedDocument.revision !== 1 || savedDocument.project.document.dpi !== 300) {
-    throw new Error("The productive save did not persist revision 1 at 300 DPI");
+  const savedPhoto = savedDocument.project.media.find(
+    (media) => media.kind === "photo",
+  );
+  const savedFrames = savedDocument.project.sheets[1].frames;
+  const persistedPhotoLinkOnly =
+    savedPhoto &&
+    Object.keys(savedPhoto).sort().join(",") === "id,kind,path" &&
+    savedFrames.length === 1 &&
+    savedFrames[0].photo?.mediaId === savedPhoto.id &&
+    Object.keys(savedFrames[0].photo.transform).sort().join(",") ===
+      "panX,panY,userZoom";
+  if (
+    savedDocument.schemaVersion !== 3 ||
+    savedDocument.revision !== 3 ||
+    savedDocument.project.document.dpi !== 300 ||
+    !persistedPhotoLinkOnly
+  ) {
+    throw new Error(
+      "The productive save did not persist the revision-3 external Photo composition",
+    );
   }
+  if (!readFileSync(photoPath).equals(originalPhoto)) {
+    throw new Error("Import and Save modified the linked Photo Original");
+  }
+
+  await doubleClick(
+    hostDriver,
+    "css selector",
+    "canvas.pixi-canvas",
+    "selected Photo Frame",
+  );
+  await sendEscape(hostDriver);
+  await findElement(
+    hostDriver,
+    "xpath",
+    "//button[.//span[normalize-space()='Design do Álbum']]",
+    "Album inspector after leaving edit mode",
+  );
 
   await replaceInput(
     hostDriver,
@@ -674,10 +838,10 @@ try {
     "//button[normalize-space()='Aplicar DPI']",
     "Apply unsaved DPI action",
   );
-  await waitForLogEvent("project_intent_applied", 2, "unsaved DPI application");
+  await waitForLogEvent("project_intent_applied", 3, "unsaved DPI application");
 
   const exportStartedBeforeCancel = recordsFor("export_started").length;
-  const processorBeforeCancel = recordsFor("imaging_process_spawned").length;
+  const processorBeforeCancel = exportProcessorAttempts().length;
   await clickWhenEnabled(
     hostDriver,
     "xpath",
@@ -693,9 +857,14 @@ try {
     cancelledExport.action !== "cancel" ||
     existsSync(exportPath) ||
     recordsFor("export_started").length !== exportStartedBeforeCancel ||
-    recordsFor("imaging_process_spawned").length !== processorBeforeCancel
+    exportProcessorAttempts().length !== processorBeforeCancel
   ) {
-    throw new Error("Cancelled Export crossed the ExportPipeline boundary");
+    throw new Error(
+      `Cancelled Export crossed the ExportPipeline boundary: action=${cancelledExport.action}, ` +
+        `targetExists=${existsSync(exportPath)}, ` +
+        `exportStarted=${exportStartedBeforeCancel}->${recordsFor("export_started").length}, ` +
+        `exportProcessorSpawned=${processorBeforeCancel}->${exportProcessorAttempts().length}`,
+    );
   }
 
   await clickUntilLogEvent(
@@ -731,7 +900,13 @@ try {
   if (!readFileSync(projectPath).equals(savedProject)) {
     throw new Error("Export mutated the saved Project document");
   }
-  if ((await elementAttribute(hostDriver, dpiInput, "value")) !== "360") {
+  const liveDpiInput = await findElement(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "live DPI input after Export",
+  );
+  if ((await elementAttribute(hostDriver, liveDpiInput, "value")) !== "360") {
     throw new Error("Export changed the pending DPI in the live Project");
   }
   const undoButton = await findElement(
@@ -757,6 +932,97 @@ try {
     `/session/${hostDriver.sessionId}/element/${encodeURIComponent(canvas)}/screenshot`,
   );
   writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
+  const canvasPhotoSample = await hostDriver.request(
+    "POST",
+    `/session/${hostDriver.sessionId}/execute/sync`,
+    {
+      script: `
+        const canvas = arguments[0];
+        const sheetHeightPx = arguments[1] / 1000;
+        const bounds = canvas.getBoundingClientRect();
+        const scale = (bounds.height - 48) / (sheetHeightPx + 24);
+        return {
+          cssWidth: bounds.width,
+          cssHeight: bounds.height,
+          x: bounds.width / 2,
+          y: 24 + (24 + sheetHeightPx / 2) * scale,
+        };
+      `,
+      args: [
+        { "element-6066-11e4-a52e-4f735466cecf": canvas },
+        savedDocument.project.document.sheetHeightUm,
+      ],
+    },
+  );
+  if (!readFileSync(photoPath).equals(originalPhoto)) {
+    throw new Error("Export modified the linked Photo Original");
+  }
+
+  const cacheRoot = path.join(processDataRoot, "Local", "MyAlbuns2", "Cache");
+  await waitFor(
+    "cached Photo preview",
+    () => directoryContainsJpeg(cacheRoot),
+    timeoutMilliseconds,
+  );
+  const cacheArtifactPresentBeforeMissingOriginal = true;
+  let missingOriginalBlocked = false;
+  let missingOriginalActionable = false;
+  let cacheCouldNotProduceFalseSuccess = false;
+  unlinkSync(photoPath);
+  try {
+    await clickUntilLogEvent(
+      hostDriver,
+      "xpath",
+      "//button[normalize-space()='Exportar Lâmina']",
+      "native_save_dialog_opening",
+      "missing-Original Export action",
+    );
+    const selectedMissingExport = driveNativeDialog(
+      firstHost,
+      "select",
+      "Exportar Lâmina como JPEG",
+      missingOriginalExportPath,
+    );
+    if (selectedMissingExport.action !== "select") {
+      throw new Error("The missing-Original Export destination was not confirmed");
+    }
+    await waitForLogEvent("export_failed", 1, "missing-Original failure");
+    const failureDialog = await findElement(
+      hostDriver,
+      "xpath",
+      "//*[@role='dialog' and @aria-label='Exportação não concluída']",
+      "actionable missing-Original message",
+    );
+    const failureText = await elementText(hostDriver, failureDialog);
+    missingOriginalBlocked = !existsSync(missingOriginalExportPath);
+    missingOriginalActionable =
+      failureText.includes("Religar") || failureText.includes("Religue");
+    const missingOriginalFailure = recordsFor("export_failed").at(-1);
+    cacheCouldNotProduceFalseSuccess =
+      cacheArtifactPresentBeforeMissingOriginal &&
+      missingOriginalFailure?.stage === "source_verification" &&
+      missingOriginalBlocked;
+    if (
+      !missingOriginalBlocked ||
+      !missingOriginalActionable ||
+      !cacheCouldNotProduceFalseSuccess
+    ) {
+      throw new Error(
+        `The missing Original was not blocked cleanly: ${failureText}`,
+      );
+    }
+    await click(
+      hostDriver,
+      "xpath",
+      "//*[@role='dialog' and @aria-label='Exportação não concluída']//button[normalize-space()='Fechar']",
+      "close missing-Original feedback",
+    );
+  } finally {
+    copyFileSync(photoFixturePath, photoPath);
+  }
+  if (!readFileSync(photoPath).equals(originalPhoto)) {
+    throw new Error("The restored proof Original differs from the imported bytes");
+  }
 
   await click(
     hostDriver,
@@ -818,6 +1084,33 @@ try {
   if ((await elementAttribute(secondHostDriver, reopenedDpi, "value")) !== "300") {
     throw new Error("The reopened Project did not restore the saved DPI");
   }
+  await findElement(
+    secondHostDriver,
+    "css selector",
+    ".media-card[data-media-id]",
+    "reopened linked Photo",
+  );
+  await findElement(
+    secondHostDriver,
+    "css selector",
+    "[data-preview-photo-id]",
+    "reopened persisted Frame Photo",
+  );
+  await waitForLogEvent(
+    "canvas_opaque_preview_texture_loaded",
+    2,
+    "reopened Canvas Photo preview",
+  );
+  const reopenedPageSource = await secondHostDriver.request(
+    "GET",
+    `/session/${secondHostDriver.sessionId}/source`,
+  );
+  sourcePathExposedToWebView ||= [
+    projectPath,
+    exportPath,
+    photoPath,
+    processDataRoot,
+  ].some((candidate) => sourceContainsNativePath(reopenedPageSource, candidate));
   for (const label of ["Desfazer", "Refazer"]) {
     const button = await findElement(
       secondHostDriver,
@@ -907,6 +1200,14 @@ try {
       exportedDpi: 360,
       savedRevision: savedDocument.revision,
       savedDpi: savedDocument.project.document.dpi,
+      schemaVersion: savedDocument.schemaVersion,
+      photoFrameCount: savedFrames.length,
+      persistedPhotoLinkOnly,
+      originalUnchanged: readFileSync(photoPath).equals(originalPhoto),
+      missingOriginalBlocked,
+      missingOriginalActionable,
+      cacheArtifactPresentBeforeMissingOriginal,
+      cacheCouldNotProduceFalseSuccess,
       jpeg: {
         ...dimensions,
         byteCount: exported.length,
@@ -921,11 +1222,16 @@ try {
       reopenedInIndependentHost: secondHost.processId !== firstHost.processId,
       reopenedHistoryEmpty: true,
       screenshotPath,
+      canvasPhotoSample,
       sourcePathExposedToWebView,
       terminalCounts: {
         globalHandoffs: eventCount(logText(), "global_exited_after_project_handoff"),
         hostReady: eventCount(logText(), "host_ready"),
-        imagingStopped: eventCount(logText(), "imaging_process_stopped"),
+        imagingStopped: records.filter(
+          (record) =>
+            record.event === "imaging_process_stopped" &&
+            Number(record.process_id) === Number(spawn.imaging_process_id),
+        ).length,
       },
     }),
   );

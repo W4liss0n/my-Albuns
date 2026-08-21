@@ -372,6 +372,7 @@ fn export_snapshot() -> (ProductiveExportFixture, RenderSnapshot, String) {
             name: "Recovery source.jpg".into(),
             draw_rect: draw_rect.clone(),
             placement: PhotoPlacementPlan {
+                base_fill_zoom: 1.0,
                 current_pan: NormalizedPan { x: 0.0, y: 0.0 },
                 current_zoom: 1.0,
                 pan_range: NumberRange {

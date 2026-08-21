@@ -54,6 +54,7 @@ export const threeSheetComposition: CompositionPlan = {
 };
 
 const horizontalPlacementPlan: PhotoPlacementPlan = {
+  baseFillZoom: 66.66666666666667,
   currentPan: { x: 0, y: 0 },
   currentZoom: 1,
   panRange: { minimum: -1, maximum: 1 },

@@ -18,6 +18,9 @@ export interface MediaPanelProps {
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
+  onImportPhoto(): void;
+  onPhotoDragStart(mediaId: string): void;
+  onPhotoDragEnd(): void;
   onRelinkMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
@@ -43,6 +46,9 @@ export function MediaPanel({
   mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
+  onImportPhoto,
+  onPhotoDragStart,
+  onPhotoDragEnd,
   onRelinkMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
@@ -131,6 +137,16 @@ export function MediaPanel({
             Decorativos
           </button>
         </div>
+        {activeMediaKind === "photo" && (
+          <button
+            className="media-import"
+            disabled={relinkDisabled}
+            type="button"
+            onClick={onImportPhoto}
+          >
+            Importar JPEG…
+          </button>
+        )}
         <label className="media-search">
           <span aria-hidden="true">⌕</span>
           <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
@@ -149,6 +165,22 @@ export function MediaPanel({
                 className="media-card"
                 type="button"
                 data-media-id={media.id}
+                draggable={media.kind === "photo"}
+                onDragStart={
+                  media.kind === "photo"
+                    ? (event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(
+                          "application/x-myalbuns-photo",
+                          media.id,
+                        );
+                        onPhotoDragStart(media.id);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  media.kind === "photo" ? onPhotoDragEnd : undefined
+                }
                 onDoubleClick={
                   media.kind === "photo"
                     ? () => onFillPhoto(media.id)

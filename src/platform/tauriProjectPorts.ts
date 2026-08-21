@@ -3,7 +3,10 @@ import { listen } from "@tauri-apps/api/event";
 
 import type {
   EditorProjection,
+  PhotoDropTarget,
+  PhotoPlacementMode,
   ProjectIntent,
+  ProjectMutationOutcome,
 } from "../domain/project";
 import {
   MediaPreviewError,
@@ -147,8 +150,31 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
 export const tauriProjectCorePort: ProjectCorePort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
-  apply: (intent: ProjectIntent) =>
-    invoke<EditorProjection>("apply_project_intent", { intent }),
+  apply: async (intent: ProjectIntent) =>
+    (
+      await invoke<ProjectMutationOutcome>("apply_project_intent", {
+        intent,
+      })
+    ).projection,
+  applyWithOutcome: (intent: ProjectIntent) =>
+    invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
+  importPhoto: () =>
+    invoke<
+      | { kind: "cancelled"; projection: EditorProjection }
+      | { kind: "imported"; projection: EditorProjection; mediaId: string }
+    >("import_photo"),
+  resolvePhotoDropTarget: (
+    sheetId: string,
+    xUm: number,
+    yUm: number,
+    mode: PhotoPlacementMode,
+  ) =>
+    invoke<PhotoDropTarget>("photo_drop_target", {
+      sheetId,
+      xUm,
+      yUm,
+      mode,
+    }),
   relink: (mediaId) =>
     invoke<EditorProjection>("relink_media", { mediaId }),
   undo: () => invoke<EditorProjection>("undo_project"),

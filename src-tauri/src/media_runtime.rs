@@ -6,8 +6,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use image::{ImageDecoder, ImageFormat, ImageReader};
-use myalbuns_core::MediaKind;
+use image::{ImageDecoder, ImageFormat, ImageReader, metadata::Orientation};
+use myalbuns_core::{ImportPhoto, MediaKind, PhotoSourceMetadata};
 use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity, ResolveError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -48,6 +48,19 @@ pub(crate) struct MediaRelinkProposal {
     kind: MediaKind,
     expected_logical_path: PathBuf,
     replacement_path: PathBuf,
+    source_metadata: Option<PhotoSourceMetadata>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PhotoImportProposal {
+    path: PathBuf,
+    source_metadata: PhotoSourceMetadata,
+}
+
+impl PhotoImportProposal {
+    pub(crate) fn into_command(self) -> ImportPhoto {
+        ImportPhoto::new(self.path, self.source_metadata)
+    }
 }
 
 impl MediaRelinkProposal {
@@ -65,6 +78,10 @@ impl MediaRelinkProposal {
 
     pub(crate) fn replacement_path(&self) -> &std::path::Path {
         &self.replacement_path
+    }
+
+    pub(crate) fn source_metadata(&self) -> Option<&PhotoSourceMetadata> {
+        self.source_metadata.as_ref()
     }
 }
 
@@ -186,46 +203,40 @@ impl std::error::Error for MediaRetryError {}
 pub(crate) struct MediaResolver;
 
 impl MediaResolver {
+    pub(crate) fn propose_photo_import(
+        &self,
+        path: PathBuf,
+    ) -> Result<PhotoImportProposal, String> {
+        let source_metadata = inspect_media_source(&path, true)?;
+        Ok(PhotoImportProposal {
+            path,
+            source_metadata,
+        })
+    }
+
+    pub(crate) fn inspect_photo_binding(
+        &self,
+        binding: &MediaBinding,
+    ) -> Result<PhotoSourceMetadata, String> {
+        if binding.kind != MediaKind::Photo {
+            return Err("A ocorrência escolhida não é uma Foto.".into());
+        }
+        inspect_media_source(&binding.logical_path, false)
+    }
+
     pub(crate) fn propose_relink(
         &self,
         binding: &MediaBinding,
         replacement_path: PathBuf,
     ) -> Result<MediaRelinkProposal, String> {
-        let mut context = OperationPathContext::new();
-        context
-            .capture(&replacement_path)
-            .map_err(|error| format!("O caminho escolhido para Religação é inválido: {error}"))?;
-        let plan = context.freeze();
-        let resolved = plan
-            .resolve_existing(&replacement_path, ExpectedObject::RegularFile)
-            .map_err(|error| {
-                format!("O Arquivo escolhido para Religação não está disponível: {error}")
-            })?;
-        let file = resolved.reopen_for_read().map_err(|error| {
-            format!("Não foi possível inspecionar o Arquivo escolhido: {error}")
-        })?;
-        let reader = ImageReader::new(BufReader::new(file))
-            .with_guessed_format()
-            .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
-        if !matches!(
-            reader.format(),
-            Some(ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::Tiff)
-        ) {
-            return Err("O Arquivo escolhido não usa um formato de mídia compatível.".into());
-        }
-        let decoder = reader
-            .into_decoder()
-            .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
-        let (width, height) = decoder.dimensions();
-        if width == 0 || height == 0 {
-            return Err("A mídia escolhida não possui dimensões válidas.".into());
-        }
+        let inspected = inspect_media_source(&replacement_path, false)?;
 
         Ok(MediaRelinkProposal {
             media_id: binding.media_id.clone(),
             kind: binding.kind,
             expected_logical_path: binding.logical_path.clone(),
             replacement_path,
+            source_metadata: (binding.kind == MediaKind::Photo).then_some(inspected),
         })
     }
 
@@ -299,6 +310,63 @@ impl MediaResolver {
             observations,
         }
     }
+}
+
+fn inspect_media_source(
+    path: &std::path::Path,
+    require_jpeg: bool,
+) -> Result<PhotoSourceMetadata, String> {
+    let mut context = OperationPathContext::new();
+    context
+        .capture(path)
+        .map_err(|error| format!("O caminho escolhido é inválido: {error}"))?;
+    let plan = context.freeze();
+    let resolved = plan
+        .resolve_existing(path, ExpectedObject::RegularFile)
+        .map_err(|error| format!("O Arquivo escolhido não está disponível: {error}"))?;
+    let file = resolved
+        .reopen_for_read()
+        .map_err(|error| format!("Não foi possível inspecionar o Arquivo escolhido: {error}"))?;
+    let reader = ImageReader::new(BufReader::new(file))
+        .with_guessed_format()
+        .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+    let compatible = if require_jpeg {
+        reader.format() == Some(ImageFormat::Jpeg)
+    } else {
+        matches!(
+            reader.format(),
+            Some(ImageFormat::Jpeg | ImageFormat::Png | ImageFormat::Tiff)
+        )
+    };
+    if !compatible {
+        return Err(if require_jpeg {
+            "Escolha um Arquivo JPEG válido (.jpg ou .jpeg).".into()
+        } else {
+            "O Arquivo escolhido não usa um formato de mídia compatível.".into()
+        });
+    }
+    let mut decoder = reader
+        .into_decoder()
+        .map_err(|error| format!("Não foi possível validar a mídia escolhida: {error}"))?;
+    let (mut width, mut height) = decoder.dimensions();
+    let orientation = decoder.orientation().map_err(|error| {
+        format!("Não foi possível ler a orientação da mídia escolhida: {error}")
+    })?;
+    if matches!(
+        orientation,
+        Orientation::Rotate90
+            | Orientation::Rotate270
+            | Orientation::Rotate90FlipH
+            | Orientation::Rotate270FlipH
+    ) {
+        std::mem::swap(&mut width, &mut height);
+    }
+    PhotoSourceMetadata::new(
+        width,
+        height,
+        ["#D8DEE2".into(), "#BBC4CA".into(), "#929EA6".into()],
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[derive(Clone, Debug, Default)]
@@ -554,12 +622,56 @@ fn file_time_millis(time: std::io::Result<SystemTime>) -> Option<u64> {
 mod tests {
     use std::{sync::mpsc, time::Duration};
 
+    use image::{ImageFormat, Rgb, RgbImage};
     use myalbuns_core::MediaKind;
 
     use super::{
         MediaAvailability, MediaBinding, MediaMonitor, MediaObservation, MediaResolutionProposal,
         MediaResolver, MediaRetryError, MediaRuntime,
     };
+
+    #[test]
+    fn photo_import_accepts_decodable_jpeg_bytes_and_never_rewrites_the_original() {
+        let root = tempfile::tempdir().expect("temporary JPEG import fixture");
+        let source = root.path().join("Foto externa.jpeg");
+        RgbImage::from_pixel(37, 23, Rgb([20, 80, 160]))
+            .save_with_format(&source, ImageFormat::Jpeg)
+            .expect("the external JPEG is writable");
+        let before = std::fs::read(&source).expect("the Original is readable before import");
+
+        let proposal = MediaResolver
+            .propose_photo_import(source.clone())
+            .expect("a decodable JPEG is accepted through the native import seam");
+
+        assert_eq!(proposal.path, source);
+        assert_eq!(proposal.source_metadata.source_width_px(), 37);
+        assert_eq!(proposal.source_metadata.source_height_px(), 23);
+        assert_eq!(
+            std::fs::read(&proposal.path).expect("the Original remains readable"),
+            before,
+            "import inspection never modifies the linked Original"
+        );
+    }
+
+    #[test]
+    fn photo_import_rejects_non_jpeg_content_even_with_a_jpg_extension() {
+        let root = tempfile::tempdir().expect("temporary invalid JPEG fixture");
+        let source = root.path().join("Nao e JPEG.jpg");
+        RgbImage::from_pixel(12, 8, Rgb([90, 30, 10]))
+            .save_with_format(&source, ImageFormat::Png)
+            .expect("the renamed PNG is writable");
+        let before = std::fs::read(&source).expect("the renamed Original is readable");
+
+        let error = MediaResolver
+            .propose_photo_import(source.clone())
+            .expect_err("codec inspection, not the extension, defines JPEG acceptance");
+
+        assert!(error.contains("JPEG válido"));
+        assert_eq!(
+            std::fs::read(source).expect("the rejected file remains"),
+            before
+        );
+    }
 
     #[test]
     fn explicit_retry_reinspects_only_the_unavailable_occurrence_with_a_fresh_path_context() {

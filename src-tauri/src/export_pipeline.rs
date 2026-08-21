@@ -616,7 +616,7 @@ fn processor_failure_message(code: ImagingFailureCode) -> &'static str {
             "A solicitação de Exportação não corresponde ao contrato do Processador."
         }
         ImagingFailureCode::SourceUnavailable => {
-            "Uma fonte original necessária não está disponível para a Exportação."
+            "Um Arquivo original necessário está ausente ou indisponível. Religue a mídia no Painel de imagens e tente a Exportação novamente."
         }
         ImagingFailureCode::UnsupportedSourceFormat => {
             "Uma fonte original não usa JPEG ou PNG estático aceito neste fluxo."

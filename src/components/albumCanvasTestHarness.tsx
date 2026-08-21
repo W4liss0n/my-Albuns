@@ -1,7 +1,10 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
-import type { CompositionPlan } from "../domain/project";
+import type {
+  CompositionPlan,
+  PhotoDropTarget,
+} from "../domain/project";
 import type { MediaPreviewDemand } from "../application/projectPorts";
 import {
   AlbumCanvas as ProductionAlbumCanvas,
@@ -331,6 +334,13 @@ export function renderCanvas({
   onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,
   ),
+  editingSheetId = null,
+  draggedPhotoId = null,
+  onEnterSheetEdit,
+  onExitSheetEdit,
+  onResolvePhotoDropTarget,
+  onDropPhoto,
+  onPhotoDragCancel,
   onMediaDemandChange,
   onGraphicsUnavailable,
   canvasGraphicsDiagnosticProbe,
@@ -349,6 +359,19 @@ export function renderCanvas({
   onTransformCommit?: (
     delta: PhotoTransformDelta,
   ) => Promise<boolean>;
+  editingSheetId?: string | null;
+  draggedPhotoId?: string | null;
+  onEnterSheetEdit?: (sheetId: string) => void;
+  onExitSheetEdit?: () => void;
+  onResolvePhotoDropTarget?: (
+    mediaId: string,
+    point: { sheetId: string; xUm: number; yUm: number },
+  ) => Promise<PhotoDropTarget>;
+  onDropPhoto?: (
+    mediaId: string,
+    point: { sheetId: string; xUm: number; yUm: number },
+  ) => Promise<boolean>;
+  onPhotoDragCancel?: () => void;
   onMediaDemandChange?: (demand: MediaPreviewDemand) => void;
   onGraphicsUnavailable?: (diagnostic: GraphicsDiagnostic) => void;
   canvasGraphicsDiagnosticProbe?: CanvasGraphicsDiagnosticProbe;
@@ -369,13 +392,20 @@ export function renderCanvas({
         selectedFrameId={null}
         focusedSheetId="sheet-001"
         centeredSheetId="sheet-001"
+        editingSheetId={editingSheetId}
         viewport={{ offsetX: 42 }}
+        draggedPhotoId={draggedPhotoId}
         onSelectFrame={() => undefined}
         onFocusSheet={onFocusSheet}
         onCenteredSheetChange={onCenteredSheetChange}
+        onEnterSheetEdit={onEnterSheetEdit}
+        onExitSheetEdit={onExitSheetEdit}
         onViewportChange={onViewportChange}
         onTransformPreview={onTransformPreview}
         onTransformCommit={onTransformCommit}
+        onResolvePhotoDropTarget={onResolvePhotoDropTarget}
+        onDropPhoto={onDropPhoto}
+        onPhotoDragCancel={onPhotoDragCancel}
         onCanvasMetricsChange={onCanvasMetricsChange}
         onMediaDemandChange={onMediaDemandChange}
         onGraphicsUnavailable={onGraphicsUnavailable}

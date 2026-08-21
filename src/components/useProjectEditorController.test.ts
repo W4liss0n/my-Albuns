@@ -26,6 +26,7 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
+    editingSheetId: null,
     viewport: { offsetX: 0 },
   });
 });
@@ -42,6 +43,7 @@ test("routes editor changes through the shared Project mutation runner", async (
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
+      projectCorePort: port,
       runProjectMutation,
       onProjectionChange: vi.fn(),
     }),

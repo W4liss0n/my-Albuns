@@ -210,6 +210,29 @@ function App({
       .onMediaChanged(() => {
         if (!active) return;
         setMediaRefreshRevision((revision) => revision + 1);
+        const operationId = createLogInstanceId("media-refresh");
+        void projectCorePort.load(operationId).then(
+          (refreshed) => {
+            if (!active || refreshed.state.projectId !== projectId) return;
+            setProjection((current) =>
+              current?.state.projectId === projectId &&
+              current.state.revision > refreshed.state.revision
+                ? current
+                : refreshed,
+            );
+          },
+          (error: unknown) => {
+            if (!active) return;
+            logger.write({
+              level: "warn",
+              component: "media-preview",
+              event: "media_projection_refresh_failed",
+              operationId,
+              projectId,
+              reason: logReasonFromError(error),
+            });
+          },
+        );
       })
       .then((dispose) => {
         if (active) {
@@ -241,7 +264,7 @@ function App({
           : current,
       );
     };
-  }, [logger, mediaPreviewPort, projectId]);
+  }, [logger, mediaPreviewPort, projectCorePort, projectId]);
 
   useEffect(() => {
     setCacheProcessorWarning(null);
@@ -419,6 +442,7 @@ function App({
           exportPipelinePort={exportPipelinePort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
+          projectCorePort={projectCorePort}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setMediaDemand}
           onRetryUnavailableMedia={retryUnavailableMedia}

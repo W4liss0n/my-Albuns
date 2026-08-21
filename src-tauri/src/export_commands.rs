@@ -385,7 +385,9 @@ pub(crate) async fn export_sheet(
                 "capture_root_bindings",
                 None,
             );
-            ExportCommandError::failed(error.to_string())
+            ExportCommandError::failed(format!(
+                "Não foi possível acessar um caminho necessário à Exportação (Destino ou Arquivo original). Verifique o Destino; se a mídia estiver ausente, use Religar no Painel de imagens e tente novamente. Detalhes: {error}"
+            ))
         })?,
         () = attempt.cancelled() => {
             let _ = root_bindings_completion.as_mut().await;

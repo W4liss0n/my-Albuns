@@ -5,6 +5,7 @@ import type { AlbumCanvasProps, CanvasMetrics } from "./albumCanvasContract";
 import {
   CANVAS_VERTICAL_MARGIN_PX,
   continuousCanvasScale,
+  createContinuousCanvasLayout,
   type ContinuousCanvasLayout,
   MICROMETER_TO_CANVAS_PIXEL,
   SHEET_LABEL_HEIGHT_PX,
@@ -76,13 +77,19 @@ export class AlbumCanvasScene {
     }
     this.input = input;
     const sheets = input.composition.sheets;
-    const firstSheet = sheets[0];
+    const editingSheet = input.editingSheetId
+      ? sheets.find((sheet) => sheet.sheetId === input.editingSheetId)
+      : null;
+    const renderedSheets = editingSheet ? [editingSheet] : sheets;
+    const firstSheet = renderedSheets[0];
     if (!firstSheet) {
       this.clearMaterializedSheets();
       this.previewTextures.sync([]);
       return;
     }
-    const layout = input.continuousCanvasLayout;
+    const layout = editingSheet
+      ? createContinuousCanvasLayout(renderedSheets)
+      : input.continuousCanvasLayout;
 
     const sheetHeight = firstSheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
     const scale = continuousCanvasScale(
@@ -90,19 +97,31 @@ export class AlbumCanvasScene {
       sheetHeight,
     );
     this.canvasScale = scale;
+    const requestedOffsetX = editingSheet
+      ? (layout.centeredOffset(
+          editingSheet.sheetId,
+          scale,
+          this.app.screen.width,
+        ) ?? 0)
+      : input.viewport.offsetX;
     const boundedOffsetX = layout.clampOffset(
-      input.viewport.offsetX,
+      requestedOffsetX,
       scale,
       this.app.screen.width,
     );
-    if (Math.abs(boundedOffsetX - input.viewport.offsetX) > 0.0001) {
+    if (
+      !editingSheet &&
+      Math.abs(boundedOffsetX - input.viewport.offsetX) > 0.0001
+    ) {
       input.onViewportChange({
         ...input.viewport,
         offsetX: boundedOffsetX,
       });
     }
 
-    this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
+    if (!editingSheet) {
+      this.synchronizeCenteredSheet(layout, boundedOffsetX, scale);
+    }
     this.reportCanvasMetrics(scale);
     this.world.position.set(
       boundedOffsetX,
@@ -116,7 +135,12 @@ export class AlbumCanvasScene {
       this.app.screen.height,
     );
 
-    this.reconcileMaterializedSheets(layout, boundedOffsetX, scale);
+    this.reconcileMaterializedSheets(
+      layout,
+      boundedOffsetX,
+      scale,
+      renderedSheets,
+    );
     this.updateDecorations();
     this.photoInteractions.applyExternalPreview();
   }
@@ -137,6 +161,40 @@ export class AlbumCanvasScene {
   suspendForContextLoss() {
     this.resetTransientInteractions();
     this.input?.onTransformPreview(null);
+  }
+
+  resolvePhotoDropPoint(
+    clientX: number,
+    clientY: number,
+  ): { sheetId: string; xUm: number; yUm: number } | null {
+    if (!this.input || this.canvasScale <= 0) return null;
+    const bounds = this.app.canvas.getBoundingClientRect();
+    if (bounds.width <= 0 || bounds.height <= 0) return null;
+    const canvasX =
+      (clientX - bounds.left) * (this.app.screen.width / bounds.width);
+    const canvasY =
+      (clientY - bounds.top) * (this.app.screen.height / bounds.height);
+    const worldX = (canvasX - this.world.position.x) / this.canvasScale;
+    const worldY = (canvasY - this.world.position.y) / this.canvasScale;
+    for (const [sheetId, node] of this.sheetNodes) {
+      const sheet = this.input.composition.sheets.find(
+        (candidate) => candidate.sheetId === sheetId,
+      );
+      if (!sheet) continue;
+      const localX = worldX - node.container.position.x;
+      const localY = worldY - node.container.position.y;
+      const width = sheet.widthUm * MICROMETER_TO_CANVAS_PIXEL;
+      const height = sheet.heightUm * MICROMETER_TO_CANVAS_PIXEL;
+      if (localX < 0 || localY < 0 || localX >= width || localY >= height) {
+        continue;
+      }
+      return {
+        sheetId,
+        xUm: Math.floor(localX / MICROMETER_TO_CANVAS_PIXEL),
+        yUm: Math.floor(localY / MICROMETER_TO_CANVAS_PIXEL),
+      };
+    }
+    return null;
   }
 
   private resetProjectScene() {
@@ -188,9 +246,9 @@ export class AlbumCanvasScene {
     layout: ContinuousCanvasLayout,
     boundedOffsetX: number,
     scale: number,
+    sheets: readonly ComposedSheet[] = this.input?.composition.sheets ?? [],
   ) {
     if (!this.input) return;
-    const sheets = this.input.composition.sheets;
     const viewportLeft = -boundedOffsetX / scale;
     const viewportRight = viewportLeft + this.app.screen.width / scale;
     const visibleIndexes = layout.entries
@@ -332,15 +390,20 @@ export class AlbumCanvasScene {
           this.input.onSelectFrame(null);
           this.input.onFocusSheet(sheetId);
         },
+        onSheetDoubleTap: (sheetId) => {
+          this.input?.onEnterSheetEdit?.(sheetId);
+        },
         onFrameTap: (sheetId, frameId) => {
           if (!this.input) return;
           this.input.onSelectFrame(frameId);
           this.input.onFocusSheet(sheetId);
         },
         onPhotoPanStart: (frameContainer, photoNode, event) => {
+          if (this.input?.editingSheetId) return;
           this.photoInteractions.startPan(frameContainer, photoNode, event);
         },
         onPhotoWheel: (photoNode, event) => {
+          if (this.input?.editingSheetId) return;
           this.photoInteractions.handleWheel(photoNode, event);
         },
       },
@@ -367,14 +430,22 @@ export class AlbumCanvasScene {
     if (!this.input) return;
     for (const [sheetId, node] of this.sheetNodes) {
       node.focusOutline.visible = sheetId === this.input.focusedSheetId;
+      node.sheetDropOutline.visible =
+        this.input.photoDropHighlight?.kind === "sheet" &&
+        this.input.photoDropHighlight.sheetId === sheetId;
       for (const [frameId, outline] of node.selectionOutlines) {
         outline.visible = frameId === this.input.selectedFrameId;
+      }
+      for (const [frameId, outline] of node.dropOutlines) {
+        outline.visible =
+          this.input.photoDropHighlight?.kind === "frame" &&
+          this.input.photoDropHighlight.frameId === frameId;
       }
     }
   }
 
   private readonly handleCanvasWheel = (event: WheelEvent) => {
-    if (!this.input || event.altKey) return;
+    if (!this.input || event.altKey || this.input.editingSheetId) return;
     event.preventDefault();
     if (event.ctrlKey) return;
     const layout = this.input.continuousCanvasLayout;

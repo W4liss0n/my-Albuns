@@ -142,6 +142,25 @@ pub struct LinkedMediaChanged {
     pub(crate) media_ids: Vec<String>,
 }
 
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ImportPhotoResult {
+    Cancelled {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+    },
+    Imported {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: EditorProjection,
+        media_id: String,
+    },
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum CacheProcessorState {

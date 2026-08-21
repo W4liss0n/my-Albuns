@@ -179,6 +179,10 @@ public static class MyAlbunsNativeDialogWindow
         var edit = FindDialogControl(dialog, processId, 1001, "Edit");
         if (edit == IntPtr.Zero)
         {
+            edit = FindDialogControl(dialog, processId, 1148, "Edit");
+        }
+        if (edit == IntPtr.Zero)
+        {
             return false;
         }
 
