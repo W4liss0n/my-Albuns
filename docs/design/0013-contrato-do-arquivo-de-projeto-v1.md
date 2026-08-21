@@ -2,7 +2,7 @@
 status: accepted
 document: design
 date: 2026-08-03
-updated: 2026-08-11
+updated: 2026-08-21
 ---
 
 # Contrato do Arquivo de Projeto v1
@@ -12,8 +12,8 @@ updated: 2026-08-11
 Definir o envelope público, a fronteira persistente e o ciclo de evolução do Arquivo de Projeto sem levar JSON, I/O ou versões antigas ao `ProjectDomain`. Este design detalha o [ADR 0009](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md) e incorpora o codec nativo comprovado para caminhos Windows.
 
 Este documento permanece o contrato fechado da v1. A versão pública atual é a
-[v2](0016-contrato-do-arquivo-de-projeto-v2.md); o leitor conserva v1 e a migra
-sequencialmente apenas em memória.
+[v3](0017-contrato-da-primeira-composicao-com-foto.md); o leitor conserva v1 e
+a migra sequencialmente apenas em memória.
 
 ## Documento público
 
@@ -229,15 +229,15 @@ Os exemplos acompanham versões públicas reais, e não versões inventadas para
 
 | Classe | Cobertura normativa atual |
 |---|---|
-| documento válido | o envelope neutro e a matriz abaixo permanecem exemplos v1; o contrato v2 conserva exemplos próprios |
-| migração | a cadeia é `[v1 -> v2]`, com entrada v1, resultado v2 esperado, abertura sem escrita e promoção somente após `Salvar` |
-| estados inválidos | a matriz abaixo preserva falhas v1; o contrato v2 acrescenta discriminadores e campos inválidos próprios do novo DTO fechado |
+| documento válido | o envelope neutro e a matriz abaixo permanecem exemplos v1; os contratos v2 e v3 conservam exemplos próprios |
+| migração | a cadeia é `[v1 -> v2 -> v3]`, com entrada v1, resultado v3 esperado, abertura sem escrita e promoção somente após `Salvar` |
+| estados inválidos | a matriz abaixo preserva falhas v1; os contratos posteriores acrescentam seus próprios campos e falhas fechadas |
 
 O par normativo está em
 `project_document_v1_migration_input.myalbuns` e
-`project_document_v2_migration_expected.myalbuns`, sob
+`project_document_v3_migration_expected.myalbuns`, sob
 `crates/myalbuns-core/tests/fixtures/`. Não se preenche a cadeia com `v0` nem
-com o schema demonstrativo 3.
+com versões demonstrativas.
 
 ## Salvamento
 
@@ -263,7 +263,7 @@ A implementação publica fixtures versionadas e testes para, no mínimo:
 | conteúdo inválido com extensão `.myalbuns`, encontrado pela descoberta em lote | candidato reportado como inválido, sem escrita |
 | abertura direta pelo Windows | somente `.myalbuns` é associado ao MyAlbuns |
 | extensão correta com `documentType` incorreto | `InvalidDocumentType` |
-| fixture do spike com `schemaVersion: 3` | recusada como formato não público |
+| fixture demonstrativa com `schemaVersion: 3` incompatível com o DTO v3 fechado | `InvalidProjectDocument`, sem criar Sessão |
 | versão pública futura | `UnsupportedFutureSchema`, sem escrita |
 | versão antiga sem cadeia suportada | `UnsupportedLegacySchema`, sem escrita |
 | campo desconhecido em uma versão conhecida | `InvalidProjectDocument`, sem perda silenciosa |
@@ -282,15 +282,19 @@ A implementação publica fixtures versionadas e testes para, no mínimo:
 | Cópia externa em abertura editável | recebe nova Identidade no mesmo schema antes da Sessão, sob as duas barreiras |
 | Cópia externa em entrada headless | `ExternalCopyRequiresInteractiveResolution`, sem escrita |
 
-Com `schemaVersion: 2` atual, os casos dourados incluem o mesmo documento v1
+Com `schemaVersion: 3` atual, os casos dourados incluem o mesmo documento v1
 seguido de `Salvar`, a abertura v1 sem escrita e a recusa de uma migração cujo
-resultado viole o DTO v2 ou as invariantes atuais. A correção de Identidade de
-uma Cópia externa continua pertencendo ao ticket próprio e não é absorvida pela
-migração. Não se cria uma versão antiga fictícia apenas para exercitar a
-infraestrutura.
+resultado viole qualquer DTO da cadeia ou as invariantes atuais. A correção de
+Identidade de uma Cópia externa continua pertencendo ao ticket próprio e não é
+absorvida pela migração. Não se cria uma versão antiga fictícia apenas para
+exercitar a infraestrutura.
 
 ## Fronteira modular
 
-`ProjectDocumentV1`, `ProjectDocumentV2`, leitores, escritores e migradores pertencem ao `ProjectStore`. `ProjectDomain` não deriva `Serialize` ou `Deserialize` para satisfazer o arquivo e não conhece JSON, extensão, esquema ou versões antigas. Mapeadores explícitos são a única passagem entre DTO persistente e domínio atual.
+`ProjectDocumentV1`, `ProjectDocumentV2`, `ProjectDocumentV3`, leitores,
+escritores e migradores pertencem ao `ProjectStore`. `ProjectDomain` não deriva
+`Serialize` ou `Deserialize` para satisfazer o arquivo e não conhece JSON,
+extensão, esquema ou versões antigas. Mapeadores explícitos são a única
+passagem entre DTO persistente e domínio atual.
 
 As representações de IPC e frontend continuam contratos separados. Compartilhar nomes ou pequenos valores não autoriza reutilizar o envelope persistente como mensagem entre processos.

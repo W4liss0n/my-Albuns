@@ -1,8 +1,8 @@
 ---
-status: accepted
+status: superseded
 document: design
 date: 2026-08-11
-updated: 2026-08-11
+updated: 2026-08-21
 ticket: 44-programa-03a-representacao-reduzida-e-pausa-causal-do-cache
 ---
 
@@ -18,7 +18,9 @@ a política do [ADR 0009](../adr/0009-adotar-arquivo-myalbuns-json-versionado.md
 
 ## Versão atual e delta fechado
 
-`schemaVersion: 2` é a versão pública atual e possui DTO próprio e fechado.
+`schemaVersion: 2` permanece uma versão pública legível, com DTO próprio e
+fechado. O escritor atual emite a
+[v3](0017-contrato-da-primeira-composicao-com-foto.md).
 Envelope, `projectId`, Revisão, documento físico, Padrões visuais, caminhos
 `windowsUtf16` e Lâminas mantêm as formas do v1. A ampliação é o discriminador
 de cada item de `project.media` e a chave de unicidade do pathname passa a
@@ -40,9 +42,8 @@ visuais quebradas continuam inválidas.
 Aceitar Foto na lista não persiste Frames ou posicionamentos de Foto. A v2
 permite que o Painel, `MediaResolver`, `MediaRuntime`, `MediaMonitor` e Cache
 atravessem uma Foto real; a composição persistente continua limitada ao
-contrato visual já publicado. Frames, aplicações locais, movimentação, Cópia
-externa e `Salvar como` exigem seus próprios tickets e, quando alterarem o
-payload, outra versão pública.
+contrato visual então publicado. A v3 acrescenta Frames e enquadramento; Cópia
+externa e `Salvar como` continuam em seus tickets proprietários.
 
 ## DTOs e migração sequencial
 
@@ -51,7 +52,7 @@ ambos com rejeição de campos desconhecidos. O leitor identifica primeiro a
 versão e desserializa somente o DTO correspondente. Não há um DTO compartilhado
 que aceite ambos os números nem migração por mapa JSON.
 
-A cadeia atual contém um único passo puro:
+A etapa pertencente a este contrato continua pura:
 
 ```text
 ProjectDocumentV1 --migrate_v1_to_v2--> ProjectDocumentV2
@@ -62,9 +63,9 @@ Lâminas sem alteração e converte cada Decorativo v1 no Decorativo v2
 equivalente. Ele não inventa Fotos, não muda a Revisão, não cria Histórico e
 não abre arquivos externos.
 
-Após a migração, somente o DTO v2 é convertido para o modelo atual do domínio.
-O escritor atual emite exclusivamente v2. Uma futura v3 deverá acrescentar um
-novo DTO e o passo `v2 -> v3`; não poderá editar estes tipos retroativamente.
+O leitor atual encadeia depois `v2 -> v3`, sem editar estes tipos
+retroativamente. Somente após a cadeia completa o DTO atual é convertido para
+o domínio; o escritor emite exclusivamente v3.
 
 ## Abertura e Salvamento
 
@@ -76,7 +77,7 @@ estado criativo:
 - abrir para lote ou leitura nunca regrava a origem;
 - a Sessão migrada começa com a mesma Revisão salva e não fica criativamente
   alterada apenas pela migração;
-- `Salvar` explícito publica v2 deterministicamente, na mesma Revisão quando
+- `Salvar` explícito publica v3 deterministicamente, na mesma Revisão quando
   não houve edição criativa;
 - conflito, falha física ou resultado inconclusivo não confirma a promoção.
 
@@ -91,25 +92,27 @@ O par de migração está no controle de versão:
 
 - entrada:
   `crates/myalbuns-core/tests/fixtures/project_document_v1_migration_input.myalbuns`;
-- resultado:
-  `crates/myalbuns-core/tests/fixtures/project_document_v2_migration_expected.myalbuns`.
+- resultado atual da cadeia:
+  `crates/myalbuns-core/tests/fixtures/project_document_v3_migration_expected.myalbuns`.
 
 O resultado esperado preserva Identidade, Revisão, ordem, Padrões e unidades
-UTF-16 e altera somente `schemaVersion`. Os testes públicos provam:
+UTF-16, promove `schemaVersion` e acrescenta somente o default `frames: []` de
+v3 a cada Lâmina. Os testes públicos provam:
 
 | Caso | Resultado |
 |---|---|
-| abrir a entrada v1 editável | modelo atual v2 em memória, mesma Revisão, origem intacta |
+| abrir a entrada v1 editável | modelo atual v3 em memória, mesma Revisão, origem intacta |
 | abrir a entrada v1 somente leitura | leitura válida e zero escrita |
 | fechar a Sessão migrada sem Salvar | bytes v1 idênticos |
-| Salvar explicitamente a Sessão migrada sem edição | bytes iguais ao golden v2, mesma Revisão |
+| Salvar explicitamente a Sessão migrada sem edição | bytes iguais ao golden v3, mesma Revisão |
 | abrir documento v2 fechado com Foto e Decorativo | ambos preservados como `MediaRef` persistente |
 | `kind` desconhecido em v1 ou v2 | `InvalidProjectDocument`, sem Sessão |
 | campo adicional em qualquer DTO | `InvalidProjectDocument`, sem perda silenciosa |
-| versão maior que 2 | `UnsupportedFutureSchema`, sem escrita |
+| versão maior que 3 | `UnsupportedFutureSchema`, sem escrita |
 
-Fixtures v1 anteriores permanecem normativas para o leitor v1. O schema 3 dos
-spikes continua não público e recusado; ele não participa da cadeia.
+Fixtures v1 anteriores permanecem normativas para o leitor v1. A forma pública
+do schema 3 pertence ao design 0017 e participa da cadeia; formatos de spikes
+que não correspondam ao DTO fechado continuam recusados.
 
 ## Fronteira modular
 
