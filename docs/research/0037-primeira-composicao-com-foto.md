@@ -113,12 +113,16 @@ release anterior contamine a prova.
 As revisões independentes foram convertidas em regressões públicas antes de
 cada correção: golden intermediário v2 ausente; referência de WebDriver perdida
 quando o teardown falhava; reimportação duplicada; geometria 1×1 com Original
-ausente; e tentativa adicional de Processador aceita pela prova. Os respectivos
-testes falharam primeiro e passaram depois da restauração do golden, teardown
-confirmado, reutilização da ocorrência, reidratação de Cache verificado e
-comparação exata das tentativas. As suítes integrais finais cobrem 231 testes de
-frontend e 469 testes Rust aprovados, com 16 testes Rust explicitamente
-ignorados e roteados aos gates reais Windows/Processador.
+ausente; tentativa adicional de Processador aceita pela prova; Cache de um
+vínculo relinkado recuperado após Undo/Discard; observação stale abortando o
+restante do lote do Monitor; e confirmação consumida por demanda/retry sem
+reidratar as dimensões no Projeto. Os respectivos testes falharam primeiro e
+passaram depois da restauração do golden, teardown confirmado, reutilização da
+ocorrência, binding opaco do Cache por `mediaId + path`, adoção independente por
+ocorrência e reidratação compartilhada entre Monitor, demanda e retry. As
+suítes integrais finais cobrem 232 testes de frontend e 474 testes Rust
+aprovados, com 16 testes Rust explicitamente ignorados e roteados aos gates
+reais Windows/Processador.
 
 O artefato canônico é
 `docs/research/artifacts/0037-issue-17-first-photo-composition.json`. O wrapper
