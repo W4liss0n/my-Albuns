@@ -24,6 +24,7 @@ import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./genera
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
+import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
@@ -158,12 +159,7 @@ export const tauriProjectCorePort: ProjectCorePort = {
     ).projection,
   applyWithOutcome: (intent: ProjectIntent) =>
     invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
-  importPhoto: () =>
-    invoke<
-      | { kind: "cancelled"; projection: EditorProjection }
-      | { kind: "imported"; projection: EditorProjection; mediaId: string }
-      | { kind: "selected"; projection: EditorProjection; mediaId: string }
-    >("import_photo"),
+  importPhoto: () => invoke<IpcImportPhotoResult>("import_photo"),
   resolvePhotoDropTarget: (
     sheetId: string,
     xUm: number,
