@@ -199,13 +199,22 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     write: (event) => logEvents.push(event),
   };
   const load = vi.fn(async (_operationId: string) => projection);
-  const confirmUiReady = vi.fn(async () => undefined);
+  let mediaChangedSubscribed = false;
+  const confirmUiReady = vi.fn(async () => {
+    expect(mediaChangedSubscribed).toBe(true);
+  });
   render(
     <App
       exportPipelinePort={exportPipelinePort}
       projectStartupPort={{ confirmUiReady }}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={mediaPreviewPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async () => {
+          mediaChangedSubscribed = true;
+          return () => undefined;
+        },
+      }}
       projectCorePort={{ ...projectCorePort, load }}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
@@ -249,6 +258,120 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     ({ event }) => event === "project_load_started",
   );
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
+});
+
+test("synchronizes a no-cache reopen while Monitor startup remains pending without adding History", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  let completeUiReady: (() => void) | undefined;
+  const refreshedProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media) =>
+          media.id === "media-001"
+            ? { ...media, name: "Foto confirmada sem Cache.jpg" }
+            : media,
+        ),
+      },
+    },
+    composition: {
+      ...representativeProjection.composition,
+      sheets: representativeProjection.composition.sheets.map((sheet) => ({
+        ...sheet,
+        frames: sheet.frames.map((frame) =>
+          frame.photo?.mediaId === "media-001"
+            ? {
+                ...frame,
+                photo: {
+                  ...frame.photo,
+                  name: "Foto confirmada sem Cache.jpg",
+                  drawRect: { ...frame.photo.drawRect, width: 123_000 },
+                },
+              }
+            : frame,
+        ),
+      })),
+    },
+  };
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockResolvedValue(refreshedProjection);
+  const apply = vi.fn(async () => representativeProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: representativeProjection,
+    affectedFrameId: null,
+  }));
+  const undo = vi.fn(async () => representativeProjection);
+  const redo = vi.fn(async () => representativeProjection);
+  const confirmUiReady = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        expect(notifyMediaChanged).toBeTypeOf("function");
+        completeUiReady = resolve;
+        notifyMediaChanged?.(["media-001"]);
+      }),
+  );
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={{ confirmUiReady }}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews: async () => [
+          {
+            mediaId: "media-001",
+            state: "cache_unavailable" as const,
+            url: null,
+          },
+        ],
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load,
+        apply,
+        applyWithOutcome,
+        undo,
+        redo,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "123000",
+  );
+  expect(screen.getByText("Foto confirmada sem Cache.jpg")).toBeInTheDocument();
+  expect(refreshedProjection.state.revision).toBe(
+    representativeProjection.state.revision,
+  );
+  expect(apply).not.toHaveBeenCalled();
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+  expect(undo).not.toHaveBeenCalled();
+  expect(redo).not.toHaveBeenCalled();
+  act(() => completeUiReady?.());
 });
 
 test("prepares real media previews after opening without blocking the Workspace", async () => {

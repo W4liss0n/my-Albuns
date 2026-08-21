@@ -2,8 +2,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
     ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoOutcome, MediaId,
-    PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata, ProjectIntent,
-    ProjectMutationOutcome, RelinkMedia, RenderSnapshot, SaveProjectError, SaveProjectOutcome,
+    PhotoDropTarget, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome, RelinkMedia,
+    RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -131,10 +131,9 @@ impl ProjectHost {
         sheet_id: &str,
         x_um: i64,
         y_um: i64,
-        mode: PhotoPlacementMode,
     ) -> Result<PhotoDropTarget, String> {
         self.project()?
-            .photo_drop_target(sheet_id, x_um, y_um, mode)
+            .photo_drop_target(sheet_id, x_um, y_um)
             .map_err(|error| error.to_string())
     }
 

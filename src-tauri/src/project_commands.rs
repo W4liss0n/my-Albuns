@@ -1,7 +1,6 @@
 use myalbuns_core::{
-    EditorProjection, ImportPhotoDisposition, PathFailure, PhotoDropTarget, PhotoPlacementMode,
-    ProjectIntent, ProjectMutationOutcome, SaveProjectError,
-    SaveProjectOutcome as CoreSaveProjectOutcome,
+    EditorProjection, ImportPhotoDisposition, PathFailure, PhotoDropTarget, ProjectIntent,
+    ProjectMutationOutcome, SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::AppPaths;
@@ -150,14 +149,13 @@ pub(crate) fn photo_drop_target(
     sheet_id: String,
     x_um: i64,
     y_um: i64,
-    mode: PhotoPlacementMode,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
 ) -> Result<PhotoDropTarget, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
     }
-    state.project_photo_drop_target(&sheet_id, x_um, y_um, mode)
+    state.project_photo_drop_target(&sheet_id, x_um, y_um)
 }
 
 #[tauri::command]

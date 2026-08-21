@@ -311,7 +311,6 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
       "sheet-001",
       12_000,
       34_000,
-      "edit",
     ),
   ).resolves.toEqual({ kind: "sheet", sheetId: "sheet-001" });
 
@@ -323,8 +322,8 @@ test("maps Photo import, target resolution, and affected Frame outcomes", async 
     sheetId: "sheet-001",
     xUm: 12_000,
     yUm: 34_000,
-    mode: "edit",
   });
+  expect(vi.mocked(invoke).mock.calls[2]?.[1]).not.toHaveProperty("mode");
 });
 
 test("maps stable linked-media events to the reactive preview seam", async () => {

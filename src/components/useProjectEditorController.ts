@@ -78,7 +78,6 @@ export function useProjectEditorController({
         point.sheetId,
         point.xUm,
         point.yUm,
-        navigation.editingSheetId ? "edit" : "normal",
       ),
     onDropPhoto: (mediaId, point) =>
       mutations.dropPhoto({

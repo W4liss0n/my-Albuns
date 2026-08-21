@@ -261,6 +261,9 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
                     event = "host_ready",
                 );
             }
+            if transition.startup_completed {
+                start_linked_media_monitor(app_handle.clone());
+            }
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
         .await;
@@ -277,7 +280,6 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
             return;
         }
 
-        start_linked_media_monitor(app_handle.clone());
         tracing::info!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -315,6 +317,9 @@ fn project_ui_ready(
                     window_label = PROJECT_WINDOW_LABEL,
                     event = "project_ui_ready",
                 );
+            }
+            if transition.startup_completed {
+                start_linked_media_monitor(window.app_handle().clone());
             }
             Ok(())
         }
@@ -391,7 +396,16 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
-            let poll = match spawn_media_io(move || monitor.poll(&runtime, &bindings)).await {
+            let host = app.state::<ProjectHost>().inner().clone();
+            let poll = match tauri::async_runtime::spawn_blocking(move || {
+                let poll = monitor.poll(&runtime, &bindings);
+                if let Some(update) = poll.update() {
+                    refresh_project_photos_for_media_update(&host, &bindings, update);
+                }
+                poll
+            })
+            .await
+            {
                 Ok(poll) => poll,
                 Err(error) => {
                     tracing::warn!(
@@ -413,30 +427,6 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                     changed_media_count = changed.len(),
                     event = "linked_media_observation_applied",
                 );
-                let photo_bindings = catalog.bindings.clone();
-                let photo_update = update.clone();
-                if photo_bindings.iter().any(|binding| {
-                    binding.kind == MediaKind::Photo
-                        && changed.iter().any(|media_id| media_id == &binding.media_id)
-                }) {
-                    let host = app.state::<ProjectHost>().inner().clone();
-                    match spawn_media_io(move || {
-                        refresh_project_photos_for_media_update(
-                            &host,
-                            &photo_bindings,
-                            &photo_update,
-                        )
-                    })
-                    .await
-                    {
-                        Ok(_) => {}
-                        Err(error) => tracing::warn!(
-                            target: "myalbuns.desktop",
-                            error = %error,
-                            event = "photo_source_refresh_failed",
-                        ),
-                    }
-                }
             }
             if !changed.is_empty() || !invalidated.is_empty() {
                 let namespace = app.state::<CacheNamespaceOwner>();
@@ -466,14 +456,6 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
             }
         }
     });
-}
-
-fn spawn_media_io<F, R>(operation: F) -> tauri::async_runtime::JoinHandle<R>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    tauri::async_runtime::spawn_blocking(operation)
 }
 
 struct PendingHostTerminal {
@@ -537,7 +519,7 @@ struct ProjectStartupState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct StartupTransition {
     newly_observed: bool,
-    ready_emitted: bool,
+    startup_completed: bool,
 }
 
 #[derive(Default)]
@@ -555,11 +537,11 @@ impl StartupReadiness {
         };
         let newly_observed = !*target;
         *target = true;
-        let ready_emitted = self.host_ready && self.ui_ready && !self.emitted;
-        self.emitted |= ready_emitted;
+        let startup_completed = self.host_ready && self.ui_ready && !self.emitted;
+        self.emitted |= startup_completed;
         StartupTransition {
             newly_observed,
-            ready_emitted,
+            startup_completed,
         }
     }
 }
@@ -596,7 +578,7 @@ impl ProjectStartupHandshake {
             .lock()
             .map_err(|_| io::Error::other("the startup handshake is unavailable"))?;
         let transition = state.readiness.observe(signal);
-        if transition.ready_emitted {
+        if transition.startup_completed {
             let project_id = state.project_id.clone();
             let revision = state.revision;
             state.terminal.emit_ready(&project_id, revision)?;
@@ -613,8 +595,6 @@ impl ProjectStartupHandshake {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc, time::Duration};
-
     use image::{ImageFormat, Rgb, RgbImage};
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, OpenProjectRequest,
@@ -629,7 +609,7 @@ mod tests {
     use super::{
         PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
         hydrate_project_from_recovered_cache, refresh_changed_photo_sources,
-        refresh_project_photos_for_media_update, spawn_media_io,
+        refresh_project_photos_for_media_update,
     };
     use crate::{
         cache_engine::{CacheSourceBinding, RecoveredCacheArtifact},
@@ -643,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn ready_is_emitted_once_only_after_native_and_ui_readiness() {
+    fn ready_and_monitor_ownership_are_emitted_once_after_native_and_ui_readiness() {
         for order in [
             [StartupSignal::HostReady, StartupSignal::UiReady],
             [StartupSignal::UiReady, StartupSignal::HostReady],
@@ -653,39 +633,18 @@ mod tests {
             let second = readiness.observe(order[1]);
             let duplicate = readiness.observe(order[1]);
 
-            assert!(!first.ready_emitted);
-            assert!(second.ready_emitted);
-            assert!(!duplicate.ready_emitted);
+            assert!(!first.startup_completed);
+            assert!(second.startup_completed);
+            assert!(!duplicate.startup_completed);
             assert!(!duplicate.newly_observed);
+            assert_eq!(
+                [first, second, duplicate]
+                    .into_iter()
+                    .filter(|transition| transition.startup_completed)
+                    .count(),
+                1,
+            );
         }
-    }
-
-    #[test]
-    fn blocked_original_inspection_runs_outside_the_product_runtime_caller() {
-        let (inspection_started_tx, inspection_started_rx) = mpsc::sync_channel(0);
-        let (release_inspection_tx, release_inspection_rx) = mpsc::sync_channel(0);
-
-        let inspection = spawn_media_io(move || {
-            inspection_started_tx
-                .send(())
-                .expect("the caller observes the blocked Original inspection");
-            release_inspection_rx
-                .recv()
-                .expect("the blocked Original inspection is released");
-            17
-        });
-
-        inspection_started_rx
-            .recv_timeout(Duration::from_secs(5))
-            .expect("scheduling returned before the external Original I/O completed");
-        release_inspection_tx
-            .send(())
-            .expect("the Original inspection can finish");
-        assert_eq!(
-            tauri::async_runtime::block_on(inspection)
-                .expect("the scheduled Original inspection joins cleanly"),
-            17
-        );
     }
 
     #[test]

@@ -1,7 +1,6 @@
 import type {
   EditorProjection,
   PhotoDropTarget,
-  PhotoPlacementMode,
   ProjectIntent,
   ProjectMutationOutcome,
 } from "../domain/project";
@@ -194,7 +193,6 @@ export interface ProjectCorePort {
     sheetId: string,
     xUm: number,
     yUm: number,
-    mode: PhotoPlacementMode,
   ): Promise<PhotoDropTarget>;
   relink(mediaId: string): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;

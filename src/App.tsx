@@ -182,23 +182,11 @@ function App({
     },
     [logger, mediaPreviewPort, projectId],
   );
-  useEffect(() => {
-    if (!projectId || uiReadyProject.current === projectId) return;
-    uiReadyProject.current = projectId;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
-      if (uiReadyProject.current === projectId) {
-        uiReadyProject.current = "";
-      }
-      logger.write({
-        level: "error",
-        component: "application",
-        event: "project_ui_ready_failed",
-        projectId,
-        reason: logReasonFromError(error),
-      });
-      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
-    });
-  }, [logger, projectId, projectStartupPort]);
+  const updateMediaDemand = useCallback((next: MediaPreviewDemand) => {
+    setMediaDemand((current) =>
+      sameMediaDemand(current, next) ? current : next,
+    );
+  }, []);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
     projectCorePort,
@@ -330,6 +318,30 @@ function App({
   useEffect(() => {
     if (
       !projectId ||
+      !mediaChangeListenerReady ||
+      uiReadyProject.current === projectId
+    ) {
+      return;
+    }
+    uiReadyProject.current = projectId;
+    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+      if (uiReadyProject.current === projectId) {
+        uiReadyProject.current = "";
+      }
+      logger.write({
+        level: "error",
+        component: "application",
+        event: "project_ui_ready_failed",
+        projectId,
+        reason: logReasonFromError(error),
+      });
+      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
+    });
+  }, [logger, mediaChangeListenerReady, projectId, projectStartupPort]);
+
+  useEffect(() => {
+    if (
+      !projectId ||
       !cacheWarningListenerReady ||
       !mediaChangeListenerReady
     ) {
@@ -453,13 +465,30 @@ function App({
           runProjectMutation={runProjectMutation}
           projectCorePort={projectCorePort}
           mediaPreviews={mediaPreviews}
-          onMediaDemandChange={setMediaDemand}
+          onMediaDemandChange={updateMediaDemand}
           onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
         />
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
+  );
+}
+
+function sameMediaDemand(
+  left: MediaPreviewDemand,
+  right: MediaPreviewDemand,
+) {
+  return (
+    sameStrings(left.visibleMediaIds, right.visibleMediaIds) &&
+    sameStrings(left.preloadMediaIds, right.preloadMediaIds)
+  );
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
   );
 }
 

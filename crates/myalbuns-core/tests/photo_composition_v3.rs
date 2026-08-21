@@ -262,7 +262,7 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
 
     assert_eq!(
         project
-            .photo_drop_target(&sheet_id, 200_000, 80_000, PhotoPlacementMode::Edit)
+            .photo_drop_target(&sheet_id, 200_000, 80_000)
             .unwrap(),
         PhotoDropTarget::Frame {
             frame_id: second_frame.clone(),
@@ -297,9 +297,7 @@ fn edit_drop_uses_topmost_rectangle_and_invalid_targets_leave_no_revision() {
 
     let revision_before_invalid = project.revision();
     assert_eq!(
-        project
-            .photo_drop_target(&sheet_id, -1, 50, PhotoPlacementMode::Edit)
-            .unwrap(),
+        project.photo_drop_target(&sheet_id, -1, 50).unwrap(),
         PhotoDropTarget::Invalid
     );
     assert!(

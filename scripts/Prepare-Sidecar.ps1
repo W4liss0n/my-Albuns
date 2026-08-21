@@ -47,13 +47,13 @@ try {
     $runtimeDestination = Join-Path $runtimeDirectory 'myalbuns-imaging.exe'
 
     if (-not $source.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Origem inesperada do sidecar: $source"
+        throw "Unexpected sidecar source: $source"
     }
     if (-not $destination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Destino inesperado do sidecar: $destination"
+        throw "Unexpected sidecar destination: $destination"
     }
     if (-not $runtimeDestination.StartsWith($script:WorkspaceRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Destino de runtime inesperado do sidecar: $runtimeDestination"
+        throw "Unexpected sidecar runtime destination: $runtimeDestination"
     }
 
     New-Item -ItemType Directory -Force -Path $binaryDirectory | Out-Null

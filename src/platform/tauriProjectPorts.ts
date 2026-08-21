@@ -4,7 +4,6 @@ import { listen } from "@tauri-apps/api/event";
 import type {
   EditorProjection,
   PhotoDropTarget,
-  PhotoPlacementMode,
   ProjectIntent,
   ProjectMutationOutcome,
 } from "../domain/project";
@@ -164,13 +163,11 @@ export const tauriProjectCorePort: ProjectCorePort = {
     sheetId: string,
     xUm: number,
     yUm: number,
-    mode: PhotoPlacementMode,
   ) =>
     invoke<PhotoDropTarget>("photo_drop_target", {
       sheetId,
       xUm,
       yUm,
-      mode,
     }),
   relink: (mediaId) =>
     invoke<EditorProjection>("relink_media", { mediaId }),

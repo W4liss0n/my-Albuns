@@ -11,8 +11,8 @@ use uuid::Uuid;
 use crate::{
     model::{
         ComposedOutputUnit, CoreError, EditorProjection, ImportPhoto, ImportPhotoDisposition,
-        ImportPhotoOutcome, MediaId, PhotoDropTarget, PhotoPlacementMode, PhotoSourceMetadata,
-        ProjectIntent, ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
+        ImportPhotoOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIntent,
+        ProjectMutationOutcome, RelinkMedia, RenderSnapshot, RenderSnapshotMetadata,
         RenderSnapshotRef,
     },
     persistent_projection,
@@ -496,14 +496,13 @@ impl EditableProject {
         sheet_id: &str,
         x_um: i64,
         y_um: i64,
-        mode: PhotoPlacementMode,
     ) -> Result<PhotoDropTarget, CoreError> {
         let parsed = Uuid::parse_str(sheet_id)
             .ok()
             .filter(|parsed| parsed.hyphenated().to_string() == sheet_id)
             .ok_or_else(|| CoreError::SheetNotFound(sheet_id.to_owned()))?;
         self.project()
-            .photo_drop_target(parsed, x_um, y_um, mode)
+            .photo_drop_target(parsed, x_um, y_um)
             .map_err(|()| CoreError::SheetNotFound(sheet_id.to_owned()))
     }
 

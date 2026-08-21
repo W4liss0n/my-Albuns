@@ -1538,7 +1538,7 @@ test("reimporting a JPEG selects its existing card without a creative mutation",
   expect(applyWithOutcome).not.toHaveBeenCalled();
 });
 
-test("resolves and drops a dragged Photo in the current Canvas mode", async () => {
+test("resolves a mode-free target while dropping a Photo in the current Canvas mode", async () => {
   const port = projectCorePortWithApply(async () => projection);
   const resolvePhotoDropTarget = vi.fn(async () => ({
     kind: "frame" as const,
@@ -1572,7 +1572,6 @@ test("resolves and drops a dragged Photo in the current Canvas mode", async () =
     "sheet-001",
     25_000,
     30_000,
-    "normal",
   );
   expect(applyWithOutcome).toHaveBeenCalledWith({
     kind: "dropPhoto",
@@ -1590,8 +1589,8 @@ test("resolves and drops a dragged Photo in the current Canvas mode", async () =
     "sheet-001",
     25_000,
     30_000,
-    "edit",
   );
+  expect(resolvePhotoDropTarget).toHaveBeenCalledTimes(2);
 });
 
 test("exposes only Photos as native drag sources and clears the active drag", () => {

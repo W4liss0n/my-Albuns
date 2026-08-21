@@ -12,7 +12,7 @@ ticket: 17-programa-09-primeira-composicao-com-foto
 
 Este contrato materializa o Programa 09 sobre a composição única do
 `ProjectCore`. Ele acrescenta importação JPEG vinculada, Frames preenchidos,
-targeting determinístico, enquadramento, persistência e Exportação a partir do
+resolução determinística de alvo, enquadramento, persistência e Exportação a partir do
 Original. Preserva Identidade, `MediaRef`, resolução e monitoramento de mídia,
 Cache, caminhos autorizados, lifecycle multiprocesso e a `ExportPipeline`
 pública já aceitos.
@@ -30,11 +30,11 @@ devolve a Projeção atual e não entra no `ProjectCore`. Uma seleção passa po
 novo `OperationPathContext` e pelo `MediaResolver`, que valida o conteúdo como
 JPEG e observa dimensões já ajustadas à orientação declarada. A paleta neutra
 usada enquanto a prévia opaca não chega é apenas estado de apresentação do
-runtime. Extensão ou nome não substituem a validação do stream.
+processo. Extensão ou nome não substituem a validação do fluxo de bytes.
 
 O Projeto persiste apenas `MediaRef { id, kind: photo, path }`. Dimensões,
 orientação já aplicada, paleta, disponibilidade, fingerprint, prévia e Cache
-são observações de runtime. O Original nunca é regravado pela importação,
+são observações transitórias. O Original nunca é regravado pela importação,
 composição, Salvamento ou Exportação.
 
 Selecionar novamente o mesmo par canônico `kind + path` não cria outra
@@ -71,7 +71,7 @@ acrescentam os defaults definidos por suas versões. Abrir não regrava. Um
 Identidade. Versões futuras, campos desconhecidos, Frames inválidos e
 referências quebradas falham fechados.
 
-## Inserção, targeting e ordem
+## Inserção, resolução de alvo e ordem
 
 `AddPhoto` implementa o duplo clique. Primeiro escolhe entre os placeholders da
 Lâmina centralizada aquele com menor esquerda e, no empate, menor topo. Se não
@@ -81,22 +81,22 @@ própria.
 
 Dentro da Lâmina, o alvo é o último Frame da ordem de empilhamento cujo
 retângulo contém o ponteiro. Conteúdo, transparência e Opacidade não participam
-do hit test. Assim, apenas um Frame superior é substituído. Fora de todos os
+do teste de acerto. Assim, apenas um Frame superior é substituído. Fora de todos os
 Frames, o alvo é a própria Lâmina; fora da superfície, é inválido.
 
-No Modo de edição, um drop sobre a Lâmina cria um Frame 3:2 com 40% da largura
+No Modo de edição, uma soltura sobre a Lâmina cria um Frame 3:2 com 40% da largura
 da superfície, limitado apenas pela altura disponível. O Frame é centralizado
 no ponteiro e deslocado integralmente para dentro quando toca uma borda, sem
 redução. No modo normal, o primeiro Layout compatível reorganiza a coleção em
 uma grade determinística com margem uniforme. O contrato não cria um catálogo
 paralelo de Layouts.
 
-Durante o drag, o Canvas apresenta somente o contorno azul do Frame ou da
-Lâmina resolvida. `Esc`, alvo inválido, saída do Canvas ou drop externo limpam o
+Durante o arraste, o Canvas apresenta somente o contorno azul do Frame ou da
+Lâmina resolvida. `Esc`, alvo inválido, saída do Canvas ou soltura externa limpam o
 estado transitório. O cartão configura uma imagem de arraste transparente, e
 cada nova consulta remove o destaque anterior até que mídia, coordenada,
 geração da consulta e alvo resolvido voltem a coincidir. Uma resposta atrasada
-ou um drop durante a consulta não avança a revisão do Projeto. Inserção,
+ou uma soltura durante a consulta não avança a revisão do Projeto. Inserção,
 preenchimento ou substituição retornam
 `affectedFrameId`; a WebView seleciona somente esse Frame e atualiza o Painel
 contextual depois da Projeção autoritativa. Seleção e destaque não são estado
@@ -114,8 +114,11 @@ são ignorados para que a geometria do Frame permaneça sob o modo proprietário
 Canvas e Exportação consomem a mesma Projeção composta. Frame, vínculo, Pan e
 Zoom sobrevivem a Salvamento e reabertura; o Host reidrata apenas os metadados
 transitórios do Original. Essa inspeção começa pelo Monitor somente depois de
-`host_ready`, fora da thread que inicializa janela e logging; a resposta atualiza
-a Projeção pela geração de runtime mais nova, sem criar Histórico. Cada
+`host_ready` e da WebView registrar o observador de `myalbuns://linked-media-changed`.
+A confirmação `project_ui_ready` forma a barreira causal e a transição conjunta
+concede uma única inicialização do Monitor, fora da thread que inicializa janela
+e registro operacional; a resposta atualiza a Projeção pela geração de execução
+mais nova, sem criar Histórico. Cada
 observação transitória fica associada ao par
 `mediaId + path` que a originou, de modo que Undo/Redo de uma Religação restaura
 imediatamente as dimensões corretas de cada vínculo.
@@ -150,7 +153,7 @@ placeholders, empilhamento, Histórico e round-trip. Testes da WebView cobrem
 diálogo/ports, destaque, cancelamentos, seleção e gestos. A jornada produtiva
 dirige Global → Host → diálogo nativo → WebView2/Canvas → Processador → Salvar
 e reabrir → Exportação, mede Canvas/JPEG com tolerância explícita e repete a
-Exportação sem o Original. Antes da primeira Exportação, o gate observa uma
+Exportação sem o Original. Antes da primeira Exportação, a verificação observa uma
 prévia real, esvazia somente o namespace de Cache isolado da própria jornada
 enquanto o diálogo nativo ainda está aberto e mede zero entradas e zero bytes
 antes e depois do Processador. A textura residente permanece no Canvas; sua

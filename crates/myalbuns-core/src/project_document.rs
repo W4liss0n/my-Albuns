@@ -521,7 +521,6 @@ impl ProjectDocument {
             candidate.document.sheet_height_um,
             x_um,
             y_um,
-            mode,
         );
         let affected = match target {
             PhotoDropTarget::Frame { frame_id } => {
@@ -574,7 +573,6 @@ impl ProjectDocument {
         sheet_id: Uuid,
         x_um: i64,
         y_um: i64,
-        mode: PhotoPlacementMode,
     ) -> Result<PhotoDropTarget, ()> {
         let sheet = self
             .sheets
@@ -587,7 +585,6 @@ impl ProjectDocument {
             self.document.sheet_height_um,
             x_um,
             y_um,
-            mode,
         ))
     }
 
@@ -747,7 +744,6 @@ fn photo_drop_target(
     sheet_height_um: u64,
     x_um: i64,
     y_um: i64,
-    _mode: PhotoPlacementMode,
 ) -> PhotoDropTarget {
     let Ok(x) = u64::try_from(x_um) else {
         return PhotoDropTarget::Invalid;
