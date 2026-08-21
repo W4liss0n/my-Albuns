@@ -769,6 +769,89 @@ impl CacheEngine {
         self.apply_media_update(namespace, registry, update, None);
     }
 
+    /// Retires the derived generation for one occurrence before its Project
+    /// binding can move to another Original. The caller holds a `CachePause`
+    /// across this invalidation and the creative relink, so no old-path job can
+    /// publish after the index stops referring to it.
+    pub(crate) fn invalidate_relinked_media(
+        &self,
+        _pause: &CachePause,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        media_id: &str,
+    ) -> Result<bool, CacheFailure> {
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let invalidated = HashSet::from([media_id.to_owned()]);
+        if let Some(demand) = self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_mut(namespace.project_id())
+        {
+            demand.invalidation_epoch = uuid::Uuid::new_v4();
+            demand.preview_publication_authorities.remove(media_id);
+        }
+        self.cancel_flights(namespace.project_id(), &invalidated);
+        registry.invalidate_media(std::iter::once(media_id));
+
+        let storage = app_paths
+            .prepare_cache_storage(namespace.paths())
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::PublishIndex,
+                    format!("Não foi possível preparar a invalidação da Religação: {error}"),
+                )
+            })?;
+        let metadata_path = namespace.paths().metadata_file();
+        let metadata_present = storage
+            .open_existing_file(&metadata_path)
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::PublishIndex,
+                    format!("Não foi possível inspecionar o índice antes da Religação: {error}"),
+                )
+            })?
+            .is_some();
+        let Some(mut metadata) = load_metadata(&storage, namespace.paths()).filter(|metadata| {
+            metadata_is_current(metadata, namespace.project_id(), namespace.paths())
+        }) else {
+            if metadata_present {
+                storage
+                    .remove_existing_file(&metadata_path)
+                    .map_err(|error| {
+                        CacheFailure::new(
+                            CacheFailureStage::PublishIndex,
+                            format!(
+                                "Não foi possível descartar o índice incompatível antes da Religação: {error}"
+                            ),
+                        )
+                    })?;
+            }
+            return Ok(false);
+        };
+        let entry_count = metadata.entries.len();
+        metadata.entries.retain(|entry| entry.media_id != media_id);
+        if metadata.entries.len() == entry_count {
+            return Ok(false);
+        }
+
+        let metadata = current_metadata(namespace.project_id(), metadata.entries)?;
+        publish_metadata(&storage, namespace.paths(), &metadata)?;
+        if let Err(error) = sweep_unreferenced_generations(&storage, namespace.paths(), &metadata) {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                media_id,
+                error = %error.message,
+                event = "cache_relinked_generation_cleanup_failed",
+            );
+        }
+        Ok(true)
+    }
+
     pub(crate) fn apply_demand_media_update(
         &self,
         namespace: &AuthorizedCacheNamespace,
@@ -3292,6 +3375,68 @@ mod tests {
                     .expect("the published index remains readable"),
                 metadata_before
             );
+        });
+    }
+
+    #[test]
+    fn relink_invalidation_removes_only_the_old_occurrence_before_reopening() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let photo_a = verified_preview_artifact(&fixture, &engine).await;
+            let photo_b_source = CacheMediaSource::new(
+                "photo-b",
+                MediaKind::Photo,
+                fixture.work.source.source_path().to_path_buf(),
+            )
+            .expect("Photo B is a valid Cache source");
+            let photo_b_work = CacheWork::new(
+                "cache-photo-b",
+                fixture.work.namespace.clone(),
+                photo_b_source,
+                fixture.work.root_bindings.clone(),
+            );
+            let photo_b = verified_preview_artifact_for_work(
+                &fixture,
+                &engine,
+                &photo_b_work,
+                &InvocationContext::new("cache-photo-b", Some(fixture.work.namespace.project_id())),
+            )
+            .await;
+            let photo_a_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&photo_a.media_id, &photo_a.generation_id, photo_a.format)
+                .expect("Photo A has a central Cache path");
+            let photo_b_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&photo_b.media_id, &photo_b.generation_id, photo_b.format)
+                .expect("Photo B has a central Cache path");
+
+            assert!(
+                engine
+                    .invalidate_relinked_media(
+                        &engine.pause().await,
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &registry,
+                        "photo-a",
+                    )
+                    .expect("relink invalidation is published before the Project mutates")
+            );
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("the relinked Project namespace reopens");
+            assert_eq!(recovered.verified_artifacts, [photo_b]);
+            assert!(!photo_a_path.exists());
+            assert!(photo_b_path.is_file());
         });
     }
 

@@ -4,10 +4,14 @@ use myalbuns_core::{
     SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use tauri::{AppHandle, State, WebviewWindow};
+use myalbuns_paths::AppPaths;
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
+    cache_engine::CacheEngine,
+    cache_previews::CachePreviewRegistry,
+    cache_service::CacheNamespaceOwner,
     ipc_contract::{
         ImportPhotoResult, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
     },
@@ -207,6 +211,8 @@ pub(crate) async fn relink_media(
     };
 
     let selected_media_id = binding.media_id.clone();
+    let cache_pause = app.state::<CacheEngine>().pause().await;
+    let relink_app = app.clone();
     let relinked = tauri::async_runtime::spawn_blocking(move || {
         if !occurrence_is_authoritatively_absent(&binding) {
             return Err(
@@ -215,10 +221,26 @@ pub(crate) async fn relink_media(
             );
         }
         let proposal = MediaResolver.propose_relink(&binding, path)?;
+        let engine = relink_app.state::<CacheEngine>();
+        let namespace = relink_app.state::<CacheNamespaceOwner>();
+        engine
+            .invalidate_relinked_media(
+                &cache_pause,
+                relink_app.state::<AppPaths>().inner(),
+                namespace.namespace(),
+                relink_app.state::<CachePreviewRegistry>().inner(),
+                &binding.media_id,
+            )
+            .map_err(|error| {
+                format!(
+                    "Não foi possível invalidar o Cache antes da Religação: {}",
+                    error.message
+                )
+            })?;
         host.relink_media(proposal)
     })
-    .await
-    .map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    .await;
+    let relinked = relinked.map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
