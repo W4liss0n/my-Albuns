@@ -5,13 +5,12 @@ use std::{
 };
 
 use myalbuns_core::{EditableProject, MediaId, MediaKind, PhotoSourceMetadata};
-use myalbuns_imaging_protocol::CacheArtifact;
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
-    cache_engine::CacheEngine,
+    cache_engine::{CacheEngine, RecoveredCacheArtifact},
     cache_previews::CachePreviewRegistry,
     cache_service::{CacheNamespaceOwner, CacheService},
     desktop_webview_policy,
@@ -19,7 +18,7 @@ use crate::{
     imaging_processor::ImagingProcessor,
     ipc_contract::LinkedMediaChanged,
     logging,
-    media_runtime::{MediaMonitor, MediaRuntime},
+    media_runtime::{MediaBinding, MediaMonitor, MediaResolver, MediaRuntime},
     operation_gate::OperationGate,
     project_bootstrap::{
         BootstrapRequest, BootstrappedHostProject, FailureCode, FailureStage, HostTerminal,
@@ -174,14 +173,26 @@ pub(crate) fn run(
 
 fn hydrate_project_from_recovered_cache(
     project: &mut EditableProject,
-    artifacts: &[CacheArtifact],
+    artifacts: &[RecoveredCacheArtifact],
 ) -> usize {
     artifacts
         .iter()
-        .filter(|artifact| {
+        .filter(|recovered| {
+            let artifact = recovered.artifact();
             let Ok(media_id) = artifact.media_id.parse::<MediaId>() else {
                 return false;
             };
+            let Some(media) = project
+                .project()
+                .media()
+                .iter()
+                .find(|media| media.id() == media_id.into_uuid())
+            else {
+                return false;
+            };
+            if media.kind() != MediaKind::Photo || !recovered.matches_source_path(media.path()) {
+                return false;
+            }
             let Ok(metadata) = PhotoSourceMetadata::new(
                 artifact.width_px,
                 artifact.height_px,
@@ -320,6 +331,30 @@ fn project_ui_ready(
     }
 }
 
+fn refresh_changed_photo_sources(host: &ProjectHost, changed_photos: Vec<MediaBinding>) -> usize {
+    let mut refreshed = 0;
+    for binding in changed_photos {
+        match MediaResolver.inspect_photo_binding(&binding) {
+            Ok(metadata) => match host.observe_photo_source(&binding, metadata) {
+                Ok(()) => refreshed += 1,
+                Err(error) => tracing::warn!(
+                    target: "myalbuns.desktop",
+                    media_id = safe_log_identifier(&binding.media_id),
+                    error = %error,
+                    event = "photo_source_refresh_rejected",
+                ),
+            },
+            Err(error) => tracing::info!(
+                target: "myalbuns.desktop",
+                media_id = safe_log_identifier(&binding.media_id),
+                error = %error,
+                event = "photo_source_refresh_deferred",
+            ),
+        }
+    }
+    refreshed
+}
+
 fn start_linked_media_monitor(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
@@ -368,29 +403,11 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 if !changed_photos.is_empty() {
                     let host = app.state::<ProjectHost>().inner().clone();
                     match spawn_media_io(move || {
-                        for binding in changed_photos {
-                            match crate::media_runtime::MediaResolver
-                                .inspect_photo_binding(&binding)
-                            {
-                                Ok(metadata) => host.observe_photo_source(&binding, metadata)?,
-                                Err(error) => tracing::info!(
-                                    target: "myalbuns.desktop",
-                                    media_id = safe_log_identifier(&binding.media_id),
-                                    error = %error,
-                                    event = "photo_source_refresh_deferred",
-                                ),
-                            }
-                        }
-                        Ok::<(), String>(())
+                        refresh_changed_photo_sources(&host, changed_photos)
                     })
                     .await
                     {
-                        Ok(Ok(())) => {}
-                        Ok(Err(error)) => tracing::warn!(
-                            target: "myalbuns.desktop",
-                            error = %error,
-                            event = "photo_source_refresh_rejected",
-                        ),
+                        Ok(_) => {}
                         Err(error) => tracing::warn!(
                             target: "myalbuns.desktop",
                             error = %error,
@@ -576,6 +593,7 @@ impl ProjectStartupHandshake {
 mod tests {
     use std::{sync::mpsc, time::Duration};
 
+    use image::{ImageFormat, Rgb, RgbImage};
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, ImportPhoto, InitialProject, OpenProjectRequest,
         PhotoPlacementMode, PhotoSourceMetadata, ProjectCore, ProjectIntent, ProjectLocation,
@@ -588,7 +606,11 @@ mod tests {
 
     use super::{
         PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
-        hydrate_project_from_recovered_cache, spawn_media_io,
+        hydrate_project_from_recovered_cache, refresh_changed_photo_sources, spawn_media_io,
+    };
+    use crate::{
+        cache_engine::{CacheSourceBinding, RecoveredCacheArtifact},
+        project_host::ProjectHost,
     };
 
     #[test]
@@ -640,6 +662,79 @@ mod tests {
                 .expect("the scheduled Original inspection joins cleanly"),
             17
         );
+    }
+
+    #[test]
+    fn a_stale_photo_observation_does_not_abort_the_rest_of_the_monitor_batch() {
+        let root = tempfile::tempdir().expect("temporary Monitor batch fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let first_path = root.path().join("Primeira.jpg");
+        let second_path = root.path().join("Segunda.jpg");
+        let stale_path = root.path().join("Vinculo-stale.jpg");
+        RgbImage::from_pixel(5, 7, Rgb([20, 30, 40]))
+            .save_with_format(&first_path, ImageFormat::Jpeg)
+            .expect("the first Original is a JPEG");
+        RgbImage::from_pixel(17, 11, Rgb([50, 60, 70]))
+            .save_with_format(&second_path, ImageFormat::Jpeg)
+            .expect("the second Original is a JPEG");
+        RgbImage::from_pixel(3, 2, Rgb([80, 90, 100]))
+            .save_with_format(&stale_path, ImageFormat::Jpeg)
+            .expect("the stale binding still points to an inspectable JPEG");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the Project root is captured");
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let mut project = core
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path, context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the Monitor batch Project is created");
+        let initial_metadata =
+            PhotoSourceMetadata::new(1, 1, ["#102030".into(), "#405060".into(), "#708090".into()])
+                .expect("the initial runtime metadata is valid");
+        let first = project
+            .import_photo(ImportPhoto::new(first_path, initial_metadata.clone()))
+            .expect("the first Photo is imported");
+        let second = project
+            .import_photo(ImportPhoto::new(second_path, initial_metadata))
+            .expect("the second Photo is imported");
+        let host = ProjectHost::new(project);
+        let catalog = host
+            .authorized_media_catalog()
+            .expect("the Monitor receives the authorized catalog");
+        let mut stale_first = catalog.bindings[0].clone();
+        stale_first.logical_path = stale_path;
+
+        assert_eq!(
+            refresh_changed_photo_sources(&host, vec![stale_first, catalog.bindings[1].clone()]),
+            1,
+            "one stale occurrence cannot consume the valid observation that follows it"
+        );
+        let projection = host.projection().expect("the batch result is projected");
+        let first_projection = projection
+            .state
+            .album
+            .media
+            .iter()
+            .find(|media| media.id == first.media_id)
+            .expect("the first occurrence remains present");
+        let second_projection = projection
+            .state
+            .album
+            .media
+            .iter()
+            .find(|media| media.id == second.media_id)
+            .expect("the second occurrence remains present");
+        assert_eq!(first_projection.source_width_px, Some(1));
+        assert_eq!(first_projection.source_height_px, Some(1));
+        assert_eq!(second_projection.source_width_px, Some(17));
+        assert_eq!(second_projection.source_height_px, Some(11));
     }
 
     #[test]
@@ -723,8 +818,25 @@ mod tests {
                 .expect("the recovered fingerprint is valid"),
         };
 
+        let stale_path = root.path().join("Outro vinculo.jpg");
+        let stale_recovery = RecoveredCacheArtifact::new(
+            artifact.clone(),
+            CacheSourceBinding::for_path(&stale_path),
+        );
         assert_eq!(
-            hydrate_project_from_recovered_cache(&mut reopened, &[artifact]),
+            hydrate_project_from_recovered_cache(&mut reopened, &[stale_recovery]),
+            0,
+            "a Cache generation from a relinked path cannot hydrate the restored binding"
+        );
+        assert_eq!(
+            reopened.projection().state.album.media[0].source_width_px,
+            Some(1)
+        );
+
+        let recovered =
+            RecoveredCacheArtifact::new(artifact, CacheSourceBinding::for_path(&original_path));
+        assert_eq!(
+            hydrate_project_from_recovered_cache(&mut reopened, &[recovered]),
             1
         );
         let restored = reopened.projection();

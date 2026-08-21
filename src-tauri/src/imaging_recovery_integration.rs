@@ -1250,10 +1250,20 @@ fn real_cache_webview_canvas_reference_matches_background_overlay_export() {
 
         let registry = CachePreviewRegistry::new("project");
         let background_preview = registry
-            .publish(&app_paths, &namespace, background_execution.artifact())
+            .publish(
+                &app_paths,
+                &namespace,
+                background_execution.artifact(),
+                background.source_path(),
+            )
             .expect("the Background crosses the opaque WebView boundary");
         let overlay_preview = registry
-            .publish(&app_paths, &namespace, overlay_execution.artifact())
+            .publish(
+                &app_paths,
+                &namespace,
+                overlay_execution.artifact(),
+                overlay.source_path(),
+            )
             .expect("the Overlay crosses the opaque WebView boundary");
         let background_url = background_preview
             .url

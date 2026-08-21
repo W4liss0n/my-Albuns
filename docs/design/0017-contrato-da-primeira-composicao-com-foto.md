@@ -121,8 +121,9 @@ observação transitória fica associada ao par
 imediatamente as dimensões corretas de cada vínculo.
 
 Antes da primeira Projeção do Host reaberto, o namespace reservado recupera
-somente gerações de Cache cujo índice, caminho, tamanho, codec, dimensões e
-perfil sRGB tenham sido verificados fisicamente. As dimensões já orientadas
+somente gerações de Cache cujo índice, vínculo opaco `mediaId + path`, caminho
+do artefato, tamanho, codec, dimensões e perfil sRGB tenham sido verificados.
+As dimensões já orientadas
 dessas representações podem reidratar a geometria contextual quando o Original
 está ausente, sem nova revisão e sem dupla aplicação de EXIF. Qualquer geração
 indexada inválida descarta o índice e as gerações descartáveis do namespace;

@@ -78,6 +78,7 @@ pub(crate) async fn retry_unavailable_media(
     let binding = project_host
         .authorized_media_binding(&media_id)
         .map_err(MediaPreviewCommandError::retry_failed)?;
+    let source_path = binding.logical_path.clone();
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let retry_app = app.clone();
@@ -104,7 +105,7 @@ pub(crate) async fn retry_unavailable_media(
     );
     let state = preview_state(inspection.availability());
     let retained = (state != MediaPreviewState::Ready)
-        .then(|| registry.retained_preview(&media_id, state))
+        .then(|| registry.retained_preview(&media_id, &source_path, state))
         .flatten();
     Ok(retained.unwrap_or(MediaPreview {
         media_id,
@@ -214,18 +215,6 @@ pub(crate) async fn prepare_media_previews(
         else {
             continue;
         };
-        if state != MediaPreviewState::Ready {
-            previews.push(contextual_preview(
-                &engine,
-                &registry,
-                &app_paths,
-                &namespace,
-                &demand_revision,
-                media_id,
-                state,
-            ));
-            continue;
-        }
         let binding = catalog_by_id
             .get(media_id.as_str())
             .expect("validated demand remains in the immutable catalog");
@@ -235,6 +224,18 @@ pub(crate) async fn prepare_media_previews(
             binding.logical_path.clone(),
         )
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
+        if state != MediaPreviewState::Ready {
+            previews.push(contextual_preview(
+                &engine,
+                &registry,
+                &app_paths,
+                &namespace,
+                &demand_revision,
+                &source,
+                state,
+            ));
+            continue;
+        }
         let root_bindings = match path_io::capture_root_bindings(vec![
             namespace.paths().root().to_path_buf(),
             source.source_path().to_path_buf(),
@@ -249,14 +250,19 @@ pub(crate) async fn prepare_media_previews(
                     &app_paths,
                     &namespace,
                     &demand_revision,
-                    media_id,
+                    &source,
                     cache_failure_state(),
                 ));
                 continue;
             }
         };
         let request_id = format!("cache-{}", uuid::Uuid::new_v4().simple());
-        let work = CacheWork::new(request_id.clone(), namespace.clone(), source, root_bindings);
+        let work = CacheWork::new(
+            request_id.clone(),
+            namespace.clone(),
+            source.clone(),
+            root_bindings,
+        );
         let Some(claim) = engine.claim_demanded(&demand_revision, &work) else {
             return Ok(Some(Vec::new()));
         };
@@ -295,7 +301,14 @@ pub(crate) async fn prepare_media_previews(
                 let Some(preview) = engine.commit_claimed_preview_if_demanded(
                     &demand_revision,
                     &preview_publication_authority,
-                    || registry.publish(&app_paths, &namespace, execution.artifact()),
+                    || {
+                        registry.publish(
+                            &app_paths,
+                            &namespace,
+                            execution.artifact(),
+                            source.source_path(),
+                        )
+                    },
                 ) else {
                     return Ok(Some(Vec::new()));
                 };
@@ -309,7 +322,7 @@ pub(crate) async fn prepare_media_previews(
                             &app_paths,
                             &namespace,
                             &demand_revision,
-                            media_id.clone(),
+                            &source,
                             cache_failure_state(),
                         )
                     },
@@ -345,7 +358,7 @@ pub(crate) async fn prepare_media_previews(
                     &app_paths,
                     &namespace,
                     &demand_revision,
-                    media_id,
+                    &source,
                     cache_failure_state(),
                 ));
             }
@@ -395,20 +408,13 @@ fn contextual_preview(
     app_paths: &AppPaths,
     namespace: &AuthorizedCacheNamespace,
     demand: &cache_engine::CacheDemandRevision,
-    media_id: String,
+    source: &CacheMediaSource,
     state: MediaPreviewState,
 ) -> MediaPreview {
     engine
-        .retain_last_known_preview(
-            app_paths,
-            namespace,
-            registry,
-            demand,
-            media_id.as_str(),
-            state,
-        )
+        .retain_last_known_preview(app_paths, namespace, registry, demand, source, state)
         .unwrap_or(MediaPreview {
-            media_id,
+            media_id: source.media_id().to_owned(),
             state,
             url: None,
         })
