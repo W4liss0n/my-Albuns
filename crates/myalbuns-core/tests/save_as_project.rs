@@ -76,6 +76,11 @@ fn save_as_moves_the_live_session_to_an_independent_project_and_preserves_histor
     assert_ne!(outcome.project_id, original_id);
     assert_eq!(outcome.revision, 2);
     assert_eq!(project.project_path(), copy_path);
+    assert_eq!(
+        project.projection().state.project_location_display,
+        copy_path.display().to_string(),
+        "the adopted projection exposes the new Location without using it as Identity",
+    );
     assert_eq!(project.saved_revision(), 2);
     assert!(!project.has_unsaved_changes());
     assert!(project.can_undo(), "Salvar como preserves the live History");

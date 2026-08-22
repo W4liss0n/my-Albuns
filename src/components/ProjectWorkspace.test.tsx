@@ -628,7 +628,12 @@ test("uses the documented compact chrome and collapsible contextual sections", (
   );
 
   expect(screen.queryByLabelText("MyAlbuns")).not.toBeInTheDocument();
-  expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    "Álbum Horizonte",
+  );
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    projection.state.projectLocationDisplay,
+  );
   expect(screen.queryByText("Intel(R) UHD Graphics")).not.toBeInTheDocument();
   expect(screen.queryByText("revisão 25")).not.toBeInTheDocument();
   expect(screen.queryByText("3 Fotos vinculadas")).not.toBeInTheDocument();
@@ -819,6 +824,8 @@ test("uses the native Salvar como flow and adopts the new Project projection", a
       ...projection.state,
       projectId: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
       projectName: "Versão independente",
+      projectLocationDisplay:
+        "C:\\Álbuns\\Versão independente.myalbuns",
       savedRevision: projection.state.revision,
       dirty: false,
       canUndo: true,
@@ -837,13 +844,20 @@ test("uses the native Salvar como flow and adopts the new Project projection", a
   projectCorePort.saveAs = saveAs;
   const onProjectionChange = vi.fn();
 
-  render(
+  const view = render(
     <ProjectWorkspace
       exportPipelinePort={exportPipelinePort}
       projection={projection}
       projectCorePort={projectCorePort}
       onProjectionChange={onProjectionChange}
     />,
+  );
+
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    "Álbum Horizonte",
+  );
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    projection.state.projectLocationDisplay,
   );
 
   fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
@@ -854,6 +868,21 @@ test("uses the native Salvar como flow and adopts the new Project projection", a
 
   expect(saveAs).toHaveBeenCalledWith(projection.state.revision);
   expect(onProjectionChange).toHaveBeenCalledWith(savedAsProjection);
+
+  view.rerender(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={savedAsProjection}
+      projectCorePort={projectCorePort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    "Versão independente",
+  );
+  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
+    savedAsProjection.state.projectLocationDisplay,
+  );
 });
 
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {

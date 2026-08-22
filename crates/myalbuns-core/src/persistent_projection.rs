@@ -20,6 +20,7 @@ pub(crate) fn editor_projection(
     session: &PersistentProjectSession,
     history_enabled: bool,
     project_name: &str,
+    project_location_display: &str,
     photo_sources: &HashMap<MediaId, HashMap<PathBuf, PhotoSourceMetadata>>,
 ) -> EditorProjection {
     let project = session.project();
@@ -112,6 +113,7 @@ pub(crate) fn editor_projection(
     let state = EditorState {
         project_id: session.project_id().hyphenated().to_string(),
         project_name: project_name.into(),
+        project_location_display: project_location_display.into(),
         document: DocumentSnapshot::from_settings(settings),
         revision: session.revision(),
         saved_revision: session.saved_revision(),
@@ -253,7 +255,13 @@ mod tests {
             ),
             false,
         );
-        let projection = editor_projection(&session, true, "Projeto", &HashMap::new());
+        let projection = editor_projection(
+            &session,
+            true,
+            "Projeto",
+            r"C:\Álbuns\Projeto.myalbuns",
+            &HashMap::new(),
+        );
         let value = serde_json::to_value(&projection).expect("projection serializes");
 
         assert_eq!(

@@ -444,6 +444,36 @@ test("rejects Salvar como when the adopted identity and projection disagree", as
   });
 });
 
+test("rejects Salvar como without a visible adopted Project location", async () => {
+  const copiedProjectId = "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5";
+  const {
+    projectLocationDisplay: _projectLocationDisplay,
+    ...stateWithoutLocation
+  } = representativeProjection.state;
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: representativeProjection.state.projectId,
+      projectId: copiedProjectId,
+      revision: 25,
+    },
+    projection: {
+      ...representativeProjection,
+      state: {
+        ...stateWithoutLocation,
+        projectId: copiedProjectId,
+        savedRevision: 25,
+        dirty: false,
+      },
+    },
+  });
+
+  await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
+    code: "invalid_response",
+    message: "Não foi possível confirmar o resultado de Salvar como.",
+  });
+});
+
 test("rejects Salvar como identities that are not canonical Project UUIDs", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({
     outcome: {

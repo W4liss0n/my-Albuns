@@ -8,6 +8,7 @@ export const representativeProjection: EditorProjection = {
   state: {
     projectId: "project-spike-001",
     projectName: "Álbum Horizonte",
+    projectLocationDisplay: "C:\\Álbuns\\Álbum Horizonte.myalbuns",
     document: {
       displayUnit: "mm",
       sheetWidthUm: 600_000,
