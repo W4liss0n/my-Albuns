@@ -1,9 +1,9 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-22T18:04:02.7040875Z",
-    "gitCommit":  "490364d4dbaadfa0058a370376816e885f753bf2",
-    "sourceInputsDirty":  true,
+    "collectedAtUtc":  "2026-08-22T18:39:53.1036861Z",
+    "gitCommit":  "a618767d9297149759b1bf98c54a8262b65a0898",
+    "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
                      "architecture":  "X64",
@@ -85,7 +85,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "05dea260-5831-41d0-b929-5b419e2183c0",
+                     "selectedSheetId":  "11c2f0f2-e931-4a40-88bd-f3799d62975c",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  360,
@@ -106,8 +106,8 @@
                      "saveAs":  {
                                     "cancelledBeforeCore":  true,
                                     "createAuthorization":  "createOnly",
-                                    "originalProjectId":  "0f249bfe-98a8-421f-b80c-c3a2c2f4007d",
-                                    "copiedProjectId":  "665034de-b8f2-4fac-b2a5-9bbf0722e9dc",
+                                    "originalProjectId":  "6b86a730-44a2-4b4d-810b-922e41a9c396",
+                                    "copiedProjectId":  "9660a300-ddd4-4278-ae79-4b13846014af",
                                     "savedAsRevision":  4,
                                     "contentPreserved":  true,
                                     "originalByteIdentical":  true,
@@ -124,7 +124,7 @@
                                     "localAuthorityTransitioned":  true,
                                     "webviewNamespaceTransitioned":  true,
                                     "nativeTitleUpdated":  true,
-                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\issue18\\my-Albuns\\.scratch\\j8-40160-038ccc\\Jornada produtiva - Cópia.myalbuns",
+                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\issue18\\my-Albuns\\.scratch\\j8-37084-7110ab\\Jornada produtiva - Cópia.myalbuns",
                                     "replacementWebviewReady":  true,
                                     "localStateStartedEmpty":  true
                                 },
@@ -162,14 +162,14 @@
                                                   }
                               },
                      "processIds":  {
-                                        "firstGlobal":  37092,
-                                        "firstHost":  33764,
-                                        "global":  19520,
-                                        "host":  24500,
-                                        "simultaneousOriginalGlobal":  34548,
-                                        "simultaneousOriginalHost":  38996,
-                                        "imaging":  31312,
-                                        "missingOriginalImaging":  25592
+                                        "firstGlobal":  39212,
+                                        "firstHost":  37024,
+                                        "global":  39024,
+                                        "host":  37952,
+                                        "simultaneousOriginalGlobal":  39012,
+                                        "simultaneousOriginalHost":  13972,
+                                        "imaging":  40532,
+                                        "missingOriginalImaging":  40364
                                     },
                      "correlations":  {
                                           "bootstraps":  3,
