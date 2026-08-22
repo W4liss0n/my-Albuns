@@ -1,7 +1,7 @@
 {
     "schemaVersion":  2,
-    "collectedAtUtc":  "2026-08-12T23:34:27.3906335Z",
-    "gitCommit":  "ca54eb995286e8a0b2f4735bb3f82764f638b352",
+    "collectedAtUtc":  "2026-08-22T19:45:35.3220800Z",
+    "gitCommit":  "dbe0ec9a2cd63e7a3b50c915d0c185d22763338a",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -12,27 +12,27 @@
                    {
                        "name":  "path-contract",
                        "passed":  true,
-                       "elapsedMs":  2386
+                       "elapsedMs":  1278
                    },
                    {
                        "name":  "path-policy",
                        "passed":  true,
-                       "elapsedMs":  810
+                       "elapsedMs":  696
                    },
                    {
                        "name":  "real-mapped-unc",
                        "passed":  true,
-                       "elapsedMs":  3825
+                       "elapsedMs":  889
                    },
                    {
                        "name":  "imaging-protocol",
                        "passed":  true,
-                       "elapsedMs":  547
+                       "elapsedMs":  5489
                    },
                    {
                        "name":  "imaging-sidecar-build",
                        "passed":  true,
-                       "elapsedMs":  56738
+                       "elapsedMs":  18068
                    },
                    {
                        "name":  "sidecar-protocol-preflight",
@@ -42,27 +42,27 @@
                    {
                        "name":  "desktop-host-build",
                        "passed":  true,
-                       "elapsedMs":  133806
+                       "elapsedMs":  69391
                    },
                    {
                        "name":  "path-io-thread",
                        "passed":  true,
-                       "elapsedMs":  1007
+                       "elapsedMs":  677
                    },
                    {
                        "name":  "real-sidecar-frozen-plan",
                        "passed":  true,
-                       "elapsedMs":  46445
+                       "elapsedMs":  28161
                    },
                    {
                        "name":  "desktop-long-path-manifest",
                        "passed":  true,
-                       "elapsedMs":  53
+                       "elapsedMs":  30
                    },
                    {
                        "name":  "sidecar-long-path-manifest",
                        "passed":  true,
-                       "elapsedMs":  21
+                       "elapsedMs":  26
                    }
                ],
     "evidence":  {
@@ -70,7 +70,7 @@
                                    "bindingReusedAfterRemapWithinAttempt":  true,
                                    "cacheUnderLocalAppData":  true,
                                    "explicitRetryRecaptured":  true,
-                                   "firstPlanSha256":  "0cd9fcddfcf15e91f1a5982ed685eca8c4c6259ee1c657f694878195e4644e26",
+                                   "firstPlanSha256":  "8bba012f24382877f0c74bf7f09d1f1cb1ef9d731246d58987c4102ced4f330a",
                                    "identityFailure":  "indeterminate",
                                    "lockReleasedAfterOwnerDrop":  true,
                                    "mappedAndLocalIdentity":  "same",
@@ -81,7 +81,7 @@
                                    "planRoundTripLossless":  true,
                                    "plansDistinct":  true,
                                    "readOnlyBatchAllowedWhileLocked":  true,
-                                   "retryPlanSha256":  "693d1c2565f6f02e001bf8489785ad0df2b7202300a1429795f32cf3999cb4ce",
+                                   "retryPlanSha256":  "f6ce931e42f7c1510ccba05e8e74bdd7c621d1b31fae83b26e301ce41e05abb2",
                                    "stagingInsideDestination":  true,
                                    "unavailableBinding":  "unavailable",
                                    "uncExportPublished":  true,
@@ -91,10 +91,10 @@
                                      "explicitRetryPublished":  true,
                                      "mappingRemovedBeforeDispatch":  true,
                                      "outputPublishedOnUnc":  true,
-                                     "outputSha256":  "9d29aa06810d45517e59fa6ef7531c5c959df4b11e2279da31f976ec3300c0c8",
-                                     "processorPid":  37848,
+                                     "outputSha256":  "22a3fe4bafca28f4ba336a6c44758f937d1c288db70795bcaeb210fb3b42b5d4",
+                                     "processorPid":  16456,
                                      "processorUsedFrozenOperationalPath":  true,
-                                     "rootBindingPlanSha256":  "7d1fa8c24022897abc71e343459312396b1c8f6d7d84b70da14c68cb401d17a5",
+                                     "rootBindingPlanSha256":  "526df17d29bfdb9e1e34d35f2346ad5403ff9bd01fa85800f41a7ec467182c14",
                                      "stagingRemoved":  true,
                                      "unavailableAttemptStartedProcessor":  false,
                                      "unavailableBindingFailedAtPrepare":  true
