@@ -528,3 +528,38 @@ test("cancels pending Pan and Zoom gestures when the Project changes", async () 
   expect(commitB).not.toHaveBeenCalled();
   expect(commitC).not.toHaveBeenCalled();
 });
+
+test("does not route Alt Pan or Zoom to a Photo while editing the sheet", async () => {
+  vi.useFakeTimers();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    editingSheetId: "sheet-001",
+    onTransformCommit,
+  });
+  await finishPixiInitialization();
+
+  displayWithHandler("wheel").emit("wheel", {
+    altKey: true,
+    deltaY: -100,
+    preventDefault: vi.fn(),
+  });
+  latestDisplayWithHandler("pointerdown").emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  pixiLifecycle.instances[0].stage.emit("pointerup", {
+    global: { x: 40, y: 0 },
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(600);
+  });
+
+  expect(onTransformCommit).not.toHaveBeenCalled();
+});

@@ -26,6 +26,19 @@ export function assertCausalHandoffObserved(observed) {
   }
 }
 
+export function isOwnedHostForestObserved({
+  hostProcessId,
+  hostForest,
+  developmentForest,
+}) {
+  return Boolean(
+    Number.isInteger(hostProcessId) &&
+      hostForest.includes(hostProcessId) &&
+      hostForest.some((processId) => processId !== hostProcessId) &&
+      hostForest.every((processId) => developmentForest.includes(processId)),
+  );
+}
+
 export function observesTypedCleanupTerminal(output) {
   return observesLogEvent([output], "dev_environment_cleanup_completed");
 }

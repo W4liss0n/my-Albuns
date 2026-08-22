@@ -11,6 +11,7 @@ import path from "node:path";
 import {
   assertCausalHandoffObserved,
   isCausalHandoffObserved,
+  isOwnedHostForestObserved,
   observesLogEvent,
   observesTypedCleanupTerminal,
 } from "./DevLifecycleGateObservations.mjs";
@@ -655,26 +656,42 @@ try {
   }
   writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 
-  const normalApplications = applicationProcesses();
-  const normalHostForestInstances = processForestInstances([hostInstance]);
-  const normalHostForest = normalHostForestInstances.map(
-    (instance) => instance.processId,
-  );
-  const normalTreeInstances = captureDevelopmentForest(
-    supervisorInstance,
-    normalApplications,
-    [globalInstance, hostInstance],
-  );
-  const normalTree = normalTreeInstances.map((instance) => instance.processId);
-  if (
-    !normalTree.includes(supervisorPid) ||
-    !normalTree.includes(hostPid) ||
-    !normalTreeInstances.some((entry) =>
-      sameProcessInstance(entry, viteInstance),
-    ) ||
-    normalHostForest.length < 2 ||
-    !normalHostForest.every((processId) => normalTree.includes(processId))
-  ) {
+  let normalTreeInstances = [];
+  let normalTree = [];
+  let normalHostForest = [];
+  let normalForestObserved = false;
+  const normalForestDeadline = Date.now() + 30_000;
+  while (Date.now() < normalForestDeadline) {
+    const normalApplications = applicationProcesses();
+    normalHostForest = processForestInstances([hostInstance]).map(
+      (instance) => instance.processId,
+    );
+    normalTreeInstances = captureDevelopmentForest(
+      supervisorInstance,
+      normalApplications,
+      [globalInstance, hostInstance],
+    );
+    normalTree = normalTreeInstances.map((instance) => instance.processId);
+    normalForestObserved =
+      normalTree.includes(supervisorPid) &&
+      normalTree.includes(hostPid) &&
+      normalTreeInstances.some((entry) =>
+        sameProcessInstance(entry, viteInstance),
+      ) &&
+      isOwnedHostForestObserved({
+        hostProcessId: hostPid,
+        hostForest: normalHostForest,
+        developmentForest: normalTree,
+      });
+    if (normalForestObserved) break;
+    if (
+      aliveProcessInstances([supervisorInstance, hostInstance]).length !== 2
+    ) {
+      break;
+    }
+    await delay(100);
+  }
+  if (!normalForestObserved) {
     throw new Error(
       `The normal lifecycle forest was incomplete before shutdown: ${JSON.stringify({ normalTree, normalHostForest, supervisorPid, globalPid, hostPid, vitePid })}`,
     );

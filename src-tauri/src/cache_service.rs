@@ -4,7 +4,7 @@ use myalbuns_core::ProjectIdentityAuthority;
 use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan};
 
 use crate::{
-    cache_engine::{AuthorizedCacheNamespace, CacheEngine},
+    cache_engine::{AuthorizedCacheNamespace, CacheEngine, RecoveredCacheArtifact},
     ipc_contract::{
         CacheClearAllOutcome, CacheFreeResult, CacheServiceCommandError,
         CacheServiceCommandErrorCode, CacheServiceStatus,
@@ -39,6 +39,7 @@ pub(crate) struct CacheService {
 #[derive(Debug)]
 pub(crate) struct CacheNamespaceOwner {
     namespace: AuthorizedCacheNamespace,
+    recovered_artifacts: Vec<RecoveredCacheArtifact>,
     _reservation: NamedMutexGrant,
 }
 
@@ -58,6 +59,10 @@ enum CacheNamespaceRemovalReservation {
 impl CacheNamespaceOwner {
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
+    }
+
+    pub(crate) fn recovered_artifacts(&self) -> &[RecoveredCacheArtifact] {
+        &self.recovered_artifacts
     }
 }
 
@@ -102,6 +107,7 @@ impl CacheService {
         }
         Ok(CacheNamespaceOwner {
             namespace,
+            recovered_artifacts: recovery.verified_artifacts,
             _reservation: reservation,
         })
     }
@@ -1082,7 +1088,7 @@ mod tests {
             .expect("the original authority reserves Cache");
         let original_cache = original_owner.namespace().paths().clone();
         let valid_cache_metadata = serde_json::to_vec_pretty(&serde_json::json!({
-            "schemaVersion": 5,
+            "schemaVersion": 6,
             "representationVersion": CACHE_REPRESENTATION_VERSION,
             "projectId": original_id.hyphenated().to_string(),
             "lastUsedUnixMs": 1,

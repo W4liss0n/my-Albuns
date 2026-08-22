@@ -59,10 +59,38 @@ function requireCorrelatedCount(records, event, processId, extra) {
   }
 }
 
+function imagingAttemptKey({ hostProcessId, imagingProcessId }) {
+  return `${hostProcessId}:${imagingProcessId}`;
+}
+
+function assertExactExportImagingAttempts(records, expectedAttempts) {
+  const observedAttempts = records
+    .filter(
+      (record) =>
+        record.event === "imaging_process_spawned" &&
+        record.operation === "export",
+    )
+    .map((record) => ({
+      hostProcessId: Number(record.process_id),
+      imagingProcessId: Number(record.imaging_process_id),
+    }));
+  const expectedKeys = expectedAttempts.map(imagingAttemptKey).sort();
+  const observedKeys = observedAttempts.map(imagingAttemptKey).sort();
+  if (
+    expectedKeys.length !== observedKeys.length ||
+    expectedKeys.some((key, index) => key !== observedKeys[index])
+  ) {
+    throw new Error(
+      `The productive journey requires an exact Processador Export attempt set; unexpected or missing attempts: expected [${expectedKeys.join(", ")}], observed [${observedKeys.join(", ")}]`,
+    );
+  }
+}
+
 export function assertCorrelatedJourneyTerminals(
   records,
   { bootstraps, imagingAttempts },
 ) {
+  assertExactExportImagingAttempts(records, imagingAttempts);
   for (const { globalProcessId, hostProcessId } of bootstraps) {
     requireCorrelatedCount(records, "host_ready", hostProcessId);
     requireCorrelatedCount(records, "project_ui_ready", hostProcessId);
@@ -89,6 +117,50 @@ export function assertCorrelatedJourneyTerminals(
     bootstraps: bootstraps.length,
     imagingAttempts: imagingAttempts.length,
   };
+}
+
+export function assertReopenedHostExport({
+  savedHostProcessId,
+  reopenedHostProcessId,
+  exportHostProcessId,
+}) {
+  if (
+    !Number.isInteger(savedHostProcessId) ||
+    !Number.isInteger(reopenedHostProcessId) ||
+    !Number.isInteger(exportHostProcessId) ||
+    savedHostProcessId === reopenedHostProcessId ||
+    exportHostProcessId !== reopenedHostProcessId
+  ) {
+    throw new Error(
+      "The productive Export Processador did not belong to the reopened Host",
+    );
+  }
+  return true;
+}
+
+export function assertEmptyCacheExport(observation) {
+  const {
+    previewArtifactCountBeforePurge,
+    cacheEntryCountBeforeExport,
+    cacheByteCountBeforeExport,
+    cacheEntryCountAfterExport,
+    cacheByteCountAfterExport,
+  } = observation;
+  if (
+    !Number.isInteger(previewArtifactCountBeforePurge) ||
+    previewArtifactCountBeforePurge <= 0
+  ) {
+    throw new Error(
+      "The productive journey observed no real preview artifact before purging Cache",
+    );
+  }
+  if (cacheEntryCountBeforeExport !== 0 || cacheByteCountBeforeExport !== 0) {
+    throw new Error("The real Cache namespace was not empty before Export");
+  }
+  if (cacheEntryCountAfterExport !== 0 || cacheByteCountAfterExport !== 0) {
+    throw new Error("Export wrote into the real Cache namespace");
+  }
+  return { ...observation };
 }
 
 const MICROMETERS_PER_INCH = 25_400;

@@ -49,12 +49,15 @@ export interface SheetRenderNode {
   signature: string;
   photoNodes: PhotoRenderNode[];
   selectionOutlines: Map<string, Graphics>;
+  dropOutlines: Map<string, Graphics>;
   focusOutline: Graphics;
+  sheetDropOutline: Graphics;
 }
 
 interface SheetRenderNodeCallbacks {
   previewTextureFor: (mediaId: string) => Texture | undefined;
   onSheetTap: (sheetId: string) => void;
+  onSheetDoubleTap: (sheetId: string) => void;
   onFrameTap: (sheetId: string, frameId: string) => void;
   onPhotoPanStart: (
     frameContainer: Container,
@@ -92,7 +95,8 @@ export function createSheetRenderNode(
   sheetContainer.cursor = "default";
   sheetContainer.on("pointertap", (event: FederatedPointerEvent) => {
     if (event.target === sheetContainer) {
-      callbacks.onSheetTap(sheet.sheetId);
+      if (event.detail >= 2) callbacks.onSheetDoubleTap(sheet.sheetId);
+      else callbacks.onSheetTap(sheet.sheetId);
     }
   });
 
@@ -176,6 +180,7 @@ export function createSheetRenderNode(
   }
 
   const selectionOutlines = new Map<string, Graphics>();
+  const dropOutlines = new Map<string, Graphics>();
   const photoNodes: PhotoRenderNode[] = [];
   for (const frame of sheet.frames) {
     const frameContainer = new Container();
@@ -278,15 +283,25 @@ export function createSheetRenderNode(
     selectionOutline.eventMode = "none";
     selectionOutline.visible = false;
     selectionOutlines.set(frame.frameId, selectionOutline);
+    const dropOutline = new Graphics()
+      .rect(0, 0, frameWidth, frameHeight)
+      .stroke({ color: 0x2f80ed, width: 4, alpha: 1 });
+    dropOutline.label = `frame-photo-drop-${frame.frameId}`;
+    dropOutline.eventMode = "none";
+    dropOutline.visible = false;
+    dropOutlines.set(frame.frameId, dropOutline);
     frameContainer.addChild(
       outline,
       ...(persistedBorder ? [persistedBorder] : []),
       selectionOutline,
+      dropOutline,
     );
 
     frameContainer.on("pointertap", (event: FederatedPointerEvent) => {
       event.stopPropagation();
-      if (!event.altKey) {
+      if (event.detail >= 2) {
+        callbacks.onSheetDoubleTap(sheet.sheetId);
+      } else if (!event.altKey) {
         callbacks.onFrameTap(sheet.sheetId, frame.frameId);
       }
     });
@@ -348,12 +363,22 @@ export function createSheetRenderNode(
   focusOutline.visible = false;
   sheetContainer.addChild(focusOutline);
 
+  const sheetDropOutline = new Graphics()
+    .roundRect(-5, -5, width + 10, height + 10, 7)
+    .stroke({ color: 0x2f80ed, width: 4, alpha: 1 });
+  sheetDropOutline.label = `sheet-photo-drop-${sheet.sheetId}`;
+  sheetDropOutline.eventMode = "none";
+  sheetDropOutline.visible = false;
+  sheetContainer.addChild(sheetDropOutline);
+
   return {
     container: sheetContainer,
     signature,
     photoNodes,
     selectionOutlines,
+    dropOutlines,
     focusOutline,
+    sheetDropOutline,
   };
 }
 

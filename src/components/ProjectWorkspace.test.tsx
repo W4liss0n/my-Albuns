@@ -22,7 +22,10 @@ import {
   SaveProjectError,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
-import type { EditorProjection } from "../domain/project";
+import type {
+  EditorProjection,
+  PhotoDropTarget,
+} from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import {
   createTwoSheetProjection,
@@ -30,6 +33,7 @@ import {
 } from "../test/projectFixtures";
 import type {
   CanvasMetrics,
+  CanvasPhotoDropPoint,
   PhotoTransformDelta,
   PhotoTransformPreview,
 } from "./AlbumCanvas";
@@ -44,6 +48,19 @@ const canvasHarness = vi.hoisted(() => ({
     onMediaDemandChange?(demand: MediaPreviewDemand): void;
     onCanvasMetricsChange?(metrics: CanvasMetrics): void;
     onCenteredSheetChange?(sheetId: string): void;
+    editingSheetId?: string | null;
+    draggedPhotoId?: string | null;
+    onEnterSheetEdit?(sheetId: string): void;
+    onExitSheetEdit?(): void;
+    onResolvePhotoDropTarget?(
+      mediaId: string,
+      point: CanvasPhotoDropPoint,
+    ): Promise<PhotoDropTarget>;
+    onDropPhoto?(
+      mediaId: string,
+      point: CanvasPhotoDropPoint,
+    ): Promise<boolean>;
+    onPhotoDragCancel?(): void;
     onTransformPreview?(
       preview: PhotoTransformPreview | null,
     ): void;
@@ -196,6 +213,12 @@ function projectCorePortWithApply(
   return {
     load: async () => projection,
     apply,
+    applyWithOutcome: async (intent) => ({
+      projection: await apply(intent),
+      affectedFrameId: "frame-001",
+    }),
+    importPhoto: async () => ({ kind: "cancelled", projection }),
+    resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
     relink: async () => projection,
     undo: async () => projection,
     redo: async () => projection,
@@ -229,6 +252,7 @@ function ProjectWorkspace({
     <ProjectWorkspaceView
       {...props}
       projection={projection}
+      projectCorePort={projectCorePort}
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
       onRetryUnavailableMedia={onRetryUnavailableMedia}
@@ -275,6 +299,7 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: "sheet-001",
     centeredSheetId: "sheet-001",
+    editingSheetId: null,
     viewport: { offsetX: 42 },
   });
 });
@@ -1425,10 +1450,183 @@ test("uses the Canvas-centered sheet for a media double click", () => {
   fireEvent.doubleClick(screen.getByText("Campo.jpg").closest("button")!);
 
   expect(apply).toHaveBeenCalledWith({
-    kind: "fillLeftmostPlaceholder",
+    kind: "addPhoto",
     sheetId: "sheet-002",
     mediaId: "media-002",
+    mode: "normal",
   });
+});
+
+test("imports a JPEG through the Host boundary without inserting it automatically", async () => {
+  const importedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: projection.state.revision + 1,
+      album: {
+        ...projection.state.album,
+        media: [
+          ...projection.state.album.media,
+          {
+            id: "media-imported",
+            kind: "photo",
+            name: "Importada.jpg",
+            sourceWidthPx: 3_000,
+            sourceHeightPx: 2_000,
+            palette: ["#111111", "#777777", "#EEEEEE"],
+          },
+        ],
+      },
+    },
+  };
+  const port = projectCorePortWithApply(async () => projection);
+  const importPhoto = vi.fn(async () => ({
+    kind: "imported" as const,
+    projection: importedProjection,
+    mediaId: "media-imported",
+  }));
+  port.importPhoto = importPhoto;
+  const applyWithOutcome = vi.fn(port.applyWithOutcome);
+  port.applyWithOutcome = applyWithOutcome;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Importar JPEG…" }));
+
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  expect(onProjectionChange).toHaveBeenCalledWith(importedProjection);
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+});
+
+test("reimporting a JPEG selects its existing card without a creative mutation", async () => {
+  const port = projectCorePortWithApply(async () => projection);
+  const importPhoto = vi.fn(async () => ({
+    kind: "selected" as const,
+    projection,
+    mediaId: "media-002",
+  }));
+  port.importPhoto = importPhoto;
+  const applyWithOutcome = vi.fn(port.applyWithOutcome);
+  port.applyWithOutcome = applyWithOutcome;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Importar JPEG…" }));
+
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+  const existingPhoto = screen.getByText("Campo.jpg").closest("button");
+  await waitFor(() =>
+    expect(existingPhoto).toHaveAttribute("aria-pressed", "true"),
+  );
+  expect(onProjectionChange).toHaveBeenCalledWith(projection);
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+});
+
+test("resolves a mode-free target while dropping a Photo in the current Canvas mode", async () => {
+  const port = projectCorePortWithApply(async () => projection);
+  const resolvePhotoDropTarget = vi.fn(async () => ({
+    kind: "frame" as const,
+    frameId: "frame-001",
+  }));
+  const applyWithOutcome = vi.fn(async () => ({
+    projection,
+    affectedFrameId: "frame-001",
+  }));
+  port.resolvePhotoDropTarget = resolvePhotoDropTarget;
+  port.applyWithOutcome = applyWithOutcome;
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const point = { sheetId: "sheet-001", xUm: 25_000, yUm: 30_000 };
+
+  await expect(
+    canvasHarness.props?.onResolvePhotoDropTarget?.("media-002", point),
+  ).resolves.toEqual({ kind: "frame", frameId: "frame-001" });
+  await act(async () => {
+    await canvasHarness.props?.onDropPhoto?.("media-002", point);
+  });
+
+  expect(resolvePhotoDropTarget).toHaveBeenCalledWith(
+    "sheet-001",
+    25_000,
+    30_000,
+  );
+  expect(applyWithOutcome).toHaveBeenCalledWith({
+    kind: "dropPhoto",
+    sheetId: "sheet-001",
+    mediaId: "media-002",
+    xUm: 25_000,
+    yUm: 30_000,
+    mode: "normal",
+  });
+  expect(useEditorView.getState().selectedFrameId).toBe("frame-001");
+
+  act(() => canvasHarness.props?.onEnterSheetEdit?.("sheet-001"));
+  await canvasHarness.props?.onResolvePhotoDropTarget?.("media-002", point);
+  expect(resolvePhotoDropTarget).toHaveBeenLastCalledWith(
+    "sheet-001",
+    25_000,
+    30_000,
+  );
+  expect(resolvePhotoDropTarget).toHaveBeenCalledTimes(2);
+});
+
+test("exposes only Photos as native drag sources and clears the active drag", () => {
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const photo = screen.getByText("Campo.jpg").closest("button")!;
+  const dataTransfer = {
+    effectAllowed: "none",
+    setData: vi.fn(),
+    setDragImage: vi.fn(),
+  };
+
+  fireEvent.dragStart(photo, { dataTransfer });
+  expect(dataTransfer.setData).toHaveBeenCalledWith(
+    "application/x-myalbuns-photo",
+    "media-002",
+  );
+  expect(dataTransfer.setDragImage).toHaveBeenCalledOnce();
+  expect(dataTransfer.setDragImage).toHaveBeenCalledWith(
+    expect.any(HTMLCanvasElement),
+    0,
+    0,
+  );
+  const dragImage = dataTransfer.setDragImage.mock.calls[0][0];
+  expect(dragImage).toHaveProperty("width", 1);
+  expect(dragImage).toHaveProperty("height", 1);
+  expect(canvasHarness.props?.draggedPhotoId).toBe("media-002");
+
+  fireEvent.dragEnd(photo, { dataTransfer });
+  expect(canvasHarness.props?.draggedPhotoId).toBeNull();
 });
 
 test("starts Exportação for the Canvas-centered Lâmina even while focus remains on another Lâmina", () => {

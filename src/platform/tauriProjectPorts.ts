@@ -3,7 +3,9 @@ import { listen } from "@tauri-apps/api/event";
 
 import type {
   EditorProjection,
+  PhotoDropTarget,
   ProjectIntent,
+  ProjectMutationOutcome,
 } from "../domain/project";
 import {
   MediaPreviewError,
@@ -21,6 +23,7 @@ import type { CacheProcessorWarning as IpcCacheProcessorWarning } from "./genera
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
+import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/ImportPhotoResult";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
@@ -147,8 +150,25 @@ function toSaveProjectResult(value: unknown): ApplicationSaveProjectResult {
 export const tauriProjectCorePort: ProjectCorePort = {
   load: (operationId) =>
     invoke<EditorProjection>("project_state", { operationId }),
-  apply: (intent: ProjectIntent) =>
-    invoke<EditorProjection>("apply_project_intent", { intent }),
+  apply: async (intent: ProjectIntent) =>
+    (
+      await invoke<ProjectMutationOutcome>("apply_project_intent", {
+        intent,
+      })
+    ).projection,
+  applyWithOutcome: (intent: ProjectIntent) =>
+    invoke<ProjectMutationOutcome>("apply_project_intent", { intent }),
+  importPhoto: () => invoke<IpcImportPhotoResult>("import_photo"),
+  resolvePhotoDropTarget: (
+    sheetId: string,
+    xUm: number,
+    yUm: number,
+  ) =>
+    invoke<PhotoDropTarget>("photo_drop_target", {
+      sheetId,
+      xUm,
+      yUm,
+    }),
   relink: (mediaId) =>
     invoke<EditorProjection>("relink_media", { mediaId }),
   undo: () => invoke<EditorProjection>("undo_project"),

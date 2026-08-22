@@ -1,11 +1,159 @@
 import assert from "node:assert/strict";
+import {
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
+import { createOwnedCacheGuard } from "./ProductiveJourneyCacheSafety.mjs";
 import {
+  assertEmptyCacheExport,
   assertCausalProjectHandoff,
   assertCorrelatedJourneyTerminals,
   assertDistinguishableSheetExport,
+  assertReopenedHostExport,
 } from "./ProductiveJourneyObservations.mjs";
+
+function withJunctionFixture(configure, assertion) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "myalbuns-cache-guard-"));
+  const scratch = path.join(root, "scratch");
+  const processDataRoot = path.join(scratch, "process-data");
+  const cacheRoot = path.join(processDataRoot, "Local", "MyAlbuns2", "Cache");
+  const external = path.join(root, "external");
+  const sentinel = path.join(external, "sentinel.txt");
+  mkdirSync(external, { recursive: true });
+  writeFileSync(sentinel, "must-survive");
+  let junction;
+  try {
+    junction = configure({ cacheRoot, external, processDataRoot });
+    assertion({
+      cacheRoot,
+      guard: createOwnedCacheGuard({ scratch, processDataRoot }),
+      sentinel,
+    });
+    assert.equal(readFileSync(sentinel, "utf8"), "must-survive");
+  } finally {
+    if (junction && lstatSync(junction, { throwIfNoEntry: false })?.isSymbolicLink()) {
+      unlinkSync(junction);
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test(
+  "refuses a junction at the owned Cache root without touching its external target",
+  { skip: process.platform !== "win32" },
+  () => {
+    withJunctionFixture(
+      ({ cacheRoot, external }) => {
+        mkdirSync(path.dirname(cacheRoot), { recursive: true });
+        symlinkSync(external, cacheRoot, "junction");
+        return cacheRoot;
+      },
+      ({ cacheRoot, guard }) => {
+        assert.throws(
+          () => guard.purgeOwnedCache(cacheRoot),
+          /redirected|reparse/i,
+        );
+      },
+    );
+  },
+);
+
+test(
+  "refuses a junction in a Cache ancestor without touching its external target",
+  { skip: process.platform !== "win32" },
+  () => {
+    withJunctionFixture(
+      ({ cacheRoot, external, processDataRoot }) => {
+        mkdirSync(path.join(external, "Cache"), { recursive: true });
+        const ancestor = path.join(processDataRoot, "Local", "MyAlbuns2");
+        mkdirSync(path.dirname(ancestor), { recursive: true });
+        symlinkSync(external, ancestor, "junction");
+        return ancestor;
+      },
+      ({ cacheRoot, guard }) => {
+        assert.throws(
+          () => guard.purgeOwnedCache(cacheRoot),
+          /redirected|reparse/i,
+        );
+      },
+    );
+  },
+);
+
+test("purges a regular Cache tree without recursive removal through redirects", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "myalbuns-cache-purge-"));
+  const scratch = path.join(root, "scratch");
+  const processDataRoot = path.join(scratch, "process-data");
+  const cacheRoot = path.join(processDataRoot, "Local", "MyAlbuns2", "Cache");
+  const media = path.join(cacheRoot, "project-proof", "Media");
+  const outsideSentinel = path.join(root, "outside.txt");
+  try {
+    mkdirSync(media, { recursive: true });
+    writeFileSync(path.join(media, "preview.jpg"), "derived");
+    writeFileSync(outsideSentinel, "must-survive");
+    const guard = createOwnedCacheGuard({ scratch, processDataRoot });
+
+    assert.deepEqual(guard.purgeOwnedCache(cacheRoot), {
+      entryCount: 0,
+      byteCount: 0,
+      jpegCount: 0,
+    });
+    assert.equal(readFileSync(outsideSentinel, "utf8"), "must-survive");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("accepts an export only when the real Cache namespace is empty before and after it", () => {
+  assert.deepEqual(
+    assertEmptyCacheExport({
+      previewArtifactCountBeforePurge: 2,
+      cacheEntryCountBeforeExport: 0,
+      cacheByteCountBeforeExport: 0,
+      cacheEntryCountAfterExport: 0,
+      cacheByteCountAfterExport: 0,
+    }),
+    {
+      previewArtifactCountBeforePurge: 2,
+      cacheEntryCountBeforeExport: 0,
+      cacheByteCountBeforeExport: 0,
+      cacheEntryCountAfterExport: 0,
+      cacheByteCountAfterExport: 0,
+    },
+  );
+  assert.throws(
+    () =>
+      assertEmptyCacheExport({
+        previewArtifactCountBeforePurge: 1,
+        cacheEntryCountBeforeExport: 1,
+        cacheByteCountBeforeExport: 42,
+        cacheEntryCountAfterExport: 1,
+        cacheByteCountAfterExport: 42,
+      }),
+    /Cache namespace was not empty before Export/,
+  );
+  assert.throws(
+    () =>
+      assertEmptyCacheExport({
+        previewArtifactCountBeforePurge: 0,
+        cacheEntryCountBeforeExport: 0,
+        cacheByteCountBeforeExport: 0,
+        cacheEntryCountAfterExport: 0,
+        cacheByteCountAfterExport: 0,
+      }),
+    /no real preview artifact/,
+  );
+});
 
 const completeJourney = [
   '{"event":"host_ready","process_id":101}',
@@ -53,6 +201,7 @@ test("correlates one terminal to each bootstrap and imaging attempt", () => {
       event: "imaging_process_spawned",
       process_id: 201,
       imaging_process_id: 204,
+      operation: "export",
     },
     { event: "imaging_process_stopped", process_id: 204 },
   ];
@@ -83,6 +232,52 @@ test("correlates one terminal to each bootstrap and imaging attempt", () => {
         },
       ),
     /project_ui_ready.*203.*2/,
+  );
+
+  assert.throws(
+    () =>
+      assertCorrelatedJourneyTerminals(
+        [
+          ...records,
+          {
+            event: "imaging_process_spawned",
+            process_id: 203,
+            imaging_process_id: 205,
+            operation: "export",
+          },
+          { event: "imaging_process_stopped", process_id: 205 },
+        ],
+        {
+          bootstraps: [
+            { globalProcessId: 200, hostProcessId: 201 },
+            { globalProcessId: 202, hostProcessId: 203 },
+          ],
+          imagingAttempts: [
+            { hostProcessId: 201, imagingProcessId: 204 },
+          ],
+        },
+      ),
+    /exact.*Processador.*unexpected/i,
+  );
+});
+
+test("accepts Export only when its Processador belongs to the reopened Host", () => {
+  assert.equal(
+    assertReopenedHostExport({
+      savedHostProcessId: 201,
+      reopenedHostProcessId: 203,
+      exportHostProcessId: 203,
+    }),
+    true,
+  );
+  assert.throws(
+    () =>
+      assertReopenedHostExport({
+        savedHostProcessId: 201,
+        reopenedHostProcessId: 203,
+        exportHostProcessId: 201,
+      }),
+    /reopened Host/,
   );
 });
 

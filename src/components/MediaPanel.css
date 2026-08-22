@@ -44,6 +44,21 @@
   content: "";
 }
 
+.media-import {
+  min-height: 27px;
+  padding: 0 10px;
+  border: 1px solid rgb(201 154 93 / 38%);
+  border-radius: 6px;
+  color: #f0d4ad;
+  background: rgb(74 52 31 / 76%);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.media-import:disabled {
+  opacity: 0.5;
+}
+
 .media-search {
   display: flex;
   width: 180px;
@@ -123,6 +138,11 @@
 .media-card:hover {
   border-color: rgb(201 154 93 / 40%);
   transform: translateY(-1px);
+}
+
+.media-card.selected {
+  border-color: #c99a5d;
+  box-shadow: 0 0 0 1px rgb(201 154 93 / 42%);
 }
 
 .media-thumb {

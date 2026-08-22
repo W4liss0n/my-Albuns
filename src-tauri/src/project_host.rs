@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, MediaId, ProjectIntent, RelinkMedia,
+    ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoOutcome, MediaId,
+    PhotoDropTarget, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome, RelinkMedia,
     RenderSnapshot, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
-use crate::media_runtime::{MediaBinding, MediaRelinkProposal};
+use crate::media_runtime::{MediaBinding, MediaRelinkProposal, PhotoImportProposal};
 
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
@@ -74,9 +75,21 @@ impl ProjectHost {
         }
     }
 
-    pub(crate) fn apply(&self, intent: ProjectIntent) -> Result<EditorProjection, String> {
+    pub(crate) fn apply_with_outcome(
+        &self,
+        intent: ProjectIntent,
+    ) -> Result<ProjectMutationOutcome, String> {
         self.project()?
-            .apply(intent)
+            .apply_with_outcome(intent)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn import_photo(
+        &self,
+        proposal: PhotoImportProposal,
+    ) -> Result<ImportPhotoOutcome, String> {
+        self.project()?
+            .import_photo(proposal.into_command())
             .map_err(|error| error.to_string())
     }
 
@@ -98,11 +111,56 @@ impl ProjectHost {
         if current.kind() != proposal.kind() || current.path() != proposal.expected_logical_path() {
             return Err("A referência de mídia mudou durante a Religação; tente novamente.".into());
         }
+        let source_metadata = proposal.source_metadata().cloned();
         project
             .relink_media(RelinkMedia::new(
                 media_id,
                 proposal.replacement_path().to_path_buf(),
             ))
+            .map_err(|error| error.to_string())?;
+        if let Some(source_metadata) = source_metadata {
+            project
+                .observe_photo_source(media_id, source_metadata)
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(project.projection())
+    }
+
+    pub(crate) fn project_photo_drop_target(
+        &self,
+        sheet_id: &str,
+        x_um: i64,
+        y_um: i64,
+    ) -> Result<PhotoDropTarget, String> {
+        self.project()?
+            .photo_drop_target(sheet_id, x_um, y_um)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn observe_photo_source(
+        &self,
+        binding: &MediaBinding,
+        metadata: PhotoSourceMetadata,
+    ) -> Result<(), String> {
+        if binding.kind != myalbuns_core::MediaKind::Photo {
+            return Err("A ocorrência observada não é uma Foto.".into());
+        }
+        let media_id: MediaId = binding
+            .media_id
+            .parse()
+            .map_err(|error| format!("A ocorrência de Foto é inválida: {error}"))?;
+        let mut project = self.project()?;
+        let current = project
+            .project()
+            .media()
+            .iter()
+            .find(|media| media.id() == media_id.into_uuid())
+            .ok_or_else(|| format!("A ocorrência de Foto não existe: {media_id}"))?;
+        if current.kind() != binding.kind || current.path() != binding.logical_path.as_path() {
+            return Err("O vínculo da Foto mudou durante a observação.".into());
+        }
+        project
+            .observe_photo_source(media_id, metadata)
             .map_err(|error| error.to_string())
     }
 
@@ -326,8 +384,9 @@ mod tests {
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
         InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
-        InitialProjectConfiguration, InitialProjectPersonalization, OpenProjectRequest,
-        ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError, SaveProjectOutcome,
+        InitialProjectConfiguration, InitialProjectPersonalization, MediaKind, OpenProjectRequest,
+        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
+        SaveProjectOutcome,
     };
     use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
 
@@ -398,7 +457,21 @@ mod tests {
                 context.freeze(),
             )))
             .expect("the saved Project reopens in a new editable Session");
-        ProjectHost::new(project)
+        let host = ProjectHost::new(project);
+        for binding in host
+            .authorized_media_catalog()
+            .expect("the reopened media catalog is available")
+            .bindings
+            .into_iter()
+            .filter(|binding| binding.kind == MediaKind::Photo)
+        {
+            let metadata = MediaResolver
+                .inspect_photo_binding(&binding)
+                .expect("the reopened Photo Original is inspected");
+            host.observe_photo_source(&binding, metadata)
+                .expect("the reopened Photo metadata is hydrated");
+        }
+        host
     }
 
     #[test]
@@ -470,8 +543,9 @@ mod tests {
         let fixture = fixture_with_initial(personalized);
         let dirty = fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the current unsaved DPI is applied");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the current unsaved DPI is applied")
+            .projection;
         let persisted_before =
             std::fs::read(&fixture.project_path).expect("the Projeto baseline is readable");
         let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
@@ -514,7 +588,7 @@ mod tests {
 
         fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 180 })
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 180 })
             .expect("the live Projeto may advance after freezing");
         assert_eq!(frozen.snapshot.dpi, 240);
         assert_eq!(frozen.snapshot.revision, dirty.state.revision);
@@ -536,12 +610,18 @@ mod tests {
             let media_root = tempfile::tempdir().expect("temporary E2E media fixture");
             let shared_path = media_root.path().join("shared-overlay.png");
             let right_path = media_root.path().join("right-background.jpg");
+            let photo_path = media_root.path().join("linked-photo.jpg");
             RgbaImage::from_pixel(48, 32, Rgba([240, 10, 10, 128]))
                 .save_with_format(&shared_path, ImageFormat::Png)
                 .expect("the transparent shared original is written");
             RgbImage::from_pixel(48, 32, Rgb([10, 20, 240]))
                 .save_with_format(&right_path, ImageFormat::Jpeg)
                 .expect("the right Background original is written");
+            RgbImage::from_pixel(300, 200, Rgb([30, 210, 70]))
+                .save_with_format(&photo_path, ImageFormat::Jpeg)
+                .expect("the linked Photo Original is written");
+            let original_photo_bytes =
+                std::fs::read(&photo_path).expect("the Photo Original is readable");
             let personalized = InitialProject::configured(InitialProjectConfiguration::new(
                 DisplayUnit::Mm,
                 600_000,
@@ -573,6 +653,40 @@ mod tests {
                 identity_lease_root,
                 host,
             } = fixture_with_initial(personalized);
+            let sheet_id = host
+                .projection()
+                .expect("the new Projeto projection is available")
+                .composition
+                .sheets[1]
+                .sheet_id
+                .clone();
+            let imported = host
+                .import_photo(
+                    MediaResolver
+                        .propose_photo_import(photo_path.clone())
+                        .expect("the JPEG is inspected through the native import seam"),
+                )
+                .expect("the Photo link is imported into the Projeto");
+            let placed = host
+                .apply_with_outcome(ProjectIntent::AddPhoto {
+                    sheet_id: sheet_id.clone(),
+                    media_id: imported.media_id,
+                    mode: PhotoPlacementMode::Normal,
+                })
+                .expect("the imported Photo receives the first compatible Layout");
+            let affected_frame_id = placed
+                .affected_frame_id
+                .expect("the added Frame is returned to the UI boundary");
+            let transformed = host
+                .apply_with_outcome(ProjectIntent::TransformPhoto {
+                    frame_id: affected_frame_id,
+                    delta_pan_x: 0.4,
+                    delta_pan_y: 0.2,
+                    delta_zoom: 0.5,
+                })
+                .expect("Pan and user Zoom are persisted through the public intent");
+            host.save(transformed.projection.state.revision)
+                .expect("the Photo composition is saved before reopening");
             assert_eq!(
                 host.begin_close(),
                 Ok(ProjectCloseRequestOutcome::CloseImmediately)
@@ -581,13 +695,27 @@ mod tests {
             let persisted_before =
                 std::fs::read(&project_path).expect("the reopened Projeto is readable");
             let dirty = host
-                .apply(ProjectIntent::SetDpi { dpi: 25 })
-                .expect("the current unsaved DPI is applied");
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 25 })
+                .expect("the current unsaved DPI is applied")
+                .projection;
             assert_ne!(
                 dirty.composition.sheets[0].active_sides, dirty.composition.sheets[1].active_sides,
                 "the initial and visible noninitial Lâminas must be semantically distinguishable"
             );
-            let sheet_id = dirty.composition.sheets[1].sheet_id.clone();
+            let reopened_frame = &dirty.composition.sheets[1].frames[0];
+            let reopened_photo = reopened_frame
+                .photo
+                .as_ref()
+                .expect("the saved Frame still contains its linked Photo");
+            assert_eq!(reopened_photo.media_id, imported.media_id);
+            assert!((reopened_photo.placement.current_pan.x - 0.4).abs() < 0.000_001);
+            assert!((reopened_photo.placement.current_pan.y - 0.2).abs() < 0.000_001);
+            assert!((reopened_photo.placement.current_zoom - 1.5).abs() < 0.000_001);
+            assert!(reopened_photo.placement.base_fill_zoom > 0.0);
+            assert_ne!(
+                reopened_photo.placement.base_fill_zoom, reopened_photo.placement.current_zoom,
+                "minimum fill scale and user Zoom remain separate values"
+            );
             let frozen = host
                 .freeze_sheet_export(&sheet_id)
                 .expect("the visible noninitial Lâmina is frozen by the Host");
@@ -601,11 +729,27 @@ mod tests {
                     request_id,
                     output_path.clone(),
                     ExportWriteAuthorization::CreateOnly,
-                    sheet_id,
+                    sheet_id.clone(),
                     frozen.sources,
                 ),
             )
             .expect("the Host snapshot owns the exact Exportação dependencies");
+            let empty_cache = project_root.path().join("empty-cache");
+            std::fs::create_dir(&empty_cache).expect("the empty Cache proof root exists");
+            assert!(
+                std::fs::read_dir(&empty_cache)
+                    .expect("the Cache proof root is readable")
+                    .next()
+                    .is_none(),
+                "the Exportação starts with an explicitly empty Cache root"
+            );
+            assert!(
+                planned
+                    .required_paths()
+                    .iter()
+                    .all(|path| !path.starts_with(&empty_cache)),
+                "the Exportação plan contains Originals and Destino, never Cache paths"
+            );
             let operation_paths = planned
                 .required_paths()
                 .into_iter()
@@ -629,7 +773,7 @@ mod tests {
             .expect("the real Processador completes Publicação of the frozen visible Lâmina");
 
             assert_eq!(published.completion.dpi, expected_dpi);
-            assert_eq!(published.completion.source_count, 2);
+            assert_eq!(published.completion.source_count, 3);
             assert_eq!(
                 (
                     published.completion.width_px,
@@ -649,8 +793,8 @@ mod tests {
                 )
             );
             let rendered = rendered.to_rgb8();
-            let left = rendered.get_pixel(rendered.width() / 4, rendered.height() / 2);
-            let right = rendered.get_pixel(rendered.width() * 3 / 4, rendered.height() / 2);
+            let left = rendered.get_pixel(2, rendered.height() / 2);
+            let right = rendered.get_pixel(rendered.width() - 3, rendered.height() / 2);
             assert!(
                 left[0] > left[2] * 2,
                 "the left Background and translucent Overlay remain visibly red"
@@ -658,6 +802,30 @@ mod tests {
             assert!(
                 right[0] > right[1] * 3 && right[2] > right[1] * 3,
                 "the red translucent Overlay is composed over the blue right Background"
+            );
+            let actual_photo = rendered.get_pixel(rendered.width() / 2, rendered.height() / 2);
+            let decoded_original = image::open(&photo_path)
+                .expect("the current linked Original decodes")
+                .to_rgb8();
+            let source_photo = decoded_original
+                .get_pixel(decoded_original.width() / 2, decoded_original.height() / 2);
+            let expected_photo = [
+                ((240_u16 * 128 + u16::from(source_photo[0]) * 127) / 255) as u8,
+                ((10_u16 * 128 + u16::from(source_photo[1]) * 127) / 255) as u8,
+                ((10_u16 * 128 + u16::from(source_photo[2]) * 127) / 255) as u8,
+            ];
+            let photo_max_channel_delta = (0..3)
+                .map(|channel| actual_photo[channel].abs_diff(expected_photo[channel]))
+                .max()
+                .expect("three RGB channels are compared");
+            assert!(
+                photo_max_channel_delta <= 12,
+                "Canvas-equivalent Photo composition and JPEG differ by {photo_max_channel_delta} channels at the sampled point"
+            );
+            assert_eq!(
+                std::fs::read(&photo_path).expect("the Original remains readable after Exportação"),
+                original_photo_bytes,
+                "import, composition, save, reopen and Exportação never modify the Original"
             );
             assert_eq!(
                 host.projection().expect("the Projeto remains available"),
@@ -668,6 +836,69 @@ mod tests {
                 persisted_before,
                 "Exportação does not save or mutate the Projeto"
             );
+
+            let missing_output_path = project_root.path().join("missing-original.jpg");
+            let missing_frozen = host
+                .freeze_sheet_export(&sheet_id)
+                .expect("the same visible state is frozen before the Original disappears");
+            let missing_plan = export_pipeline::plan(
+                missing_frozen.snapshot,
+                export_pipeline::ExportOptions::new(
+                    "host-pipeline-missing-original",
+                    missing_output_path.clone(),
+                    ExportWriteAuthorization::CreateOnly,
+                    sheet_id,
+                    missing_frozen.sources,
+                ),
+            )
+            .expect("the missing-Original attempt uses the same public plan");
+            let missing_paths = missing_plan
+                .required_paths()
+                .into_iter()
+                .map(Path::to_path_buf)
+                .collect();
+            let missing_bindings = path_io::capture_root_bindings(missing_paths)
+                .await
+                .expect("bindings are frozen while the Original still exists");
+            std::fs::remove_file(&photo_path)
+                .expect("the linked Original is removed after binding capture");
+            let missing_log_directory = project_root.path().join("missing-processor-logs");
+            std::fs::create_dir_all(&missing_log_directory)
+                .expect("the missing-Original Processador log directory exists");
+            let mut missing_transport = RealProcessTransport::stable(
+                PathBuf::from(
+                    std::env::var_os(TEST_PROCESSOR_ENV)
+                        .expect("the real Processador remains configured"),
+                ),
+                missing_log_directory,
+            );
+            let missing_failure = export_pipeline::execute(
+                &mut missing_transport,
+                missing_plan,
+                &missing_bindings,
+                &export_pipeline::ExportExecutionControl::default(),
+                &|_| {},
+                &InvocationContext::new(
+                    "host-pipeline-missing-original",
+                    Some(dirty.state.project_id.clone()),
+                ),
+            )
+            .await
+            .expect_err("Cache cannot turn a missing Original into a successful Exportação");
+            assert_eq!(
+                missing_failure
+                    .processor_failure
+                    .as_ref()
+                    .expect("the Processador reports the missing source")
+                    .code,
+                myalbuns_imaging_protocol::ImagingFailureCode::SourceUnavailable
+            );
+            assert!(
+                missing_failure.message.contains("Religue"),
+                "the missing-Original message tells the user how to recover: {}",
+                missing_failure.message
+            );
+            assert!(!missing_output_path.exists());
         });
     }
 
@@ -677,8 +908,9 @@ mod tests {
 
         let applied = fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the productive Host applies the DPI change");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the productive Host applies the DPI change")
+            .projection;
         assert_eq!(applied.state.document.dpi, 240);
         assert_eq!(applied.state.revision, 1);
         assert!(applied.state.dirty);
@@ -734,8 +966,9 @@ mod tests {
         let fixture = fixture();
         let dirty = fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing")
+            .projection;
 
         assert_eq!(
             fixture.host.begin_close(),
@@ -744,7 +977,7 @@ mod tests {
         assert!(
             fixture
                 .host
-                .apply(ProjectIntent::SetDpi { dpi: 180 })
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 180 })
                 .is_err()
         );
         assert!(fixture.host.undo().is_err());
@@ -767,8 +1000,9 @@ mod tests {
             std::fs::read(&fixture.project_path).expect("the persisted baseline is readable");
         let dirty = fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing")
+            .projection;
         assert_eq!(
             fixture.host.begin_close(),
             Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -800,7 +1034,7 @@ mod tests {
             identity_lease_root,
             host,
         } = fixture();
-        host.apply(ProjectIntent::SetDpi { dpi: 240 })
+        host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
             .expect("the Project becomes dirty before closing");
         assert_eq!(
             host.begin_close(),
@@ -832,8 +1066,9 @@ mod tests {
             host,
         } = fixture();
         let dirty = host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing")
+            .projection;
         assert_eq!(dirty.state.revision, 1);
         assert_eq!(
             host.begin_close(),
@@ -864,8 +1099,9 @@ mod tests {
         let fixture = fixture();
         let dirty = fixture
             .host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the Project becomes dirty before closing");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the Project becomes dirty before closing")
+            .projection;
         assert_eq!(
             fixture.host.begin_close(),
             Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -903,8 +1139,9 @@ mod tests {
             host,
         } = fixture();
         let applied = host
-            .apply(ProjectIntent::SetDpi { dpi: 240 })
-            .expect("the visible revision is created");
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the visible revision is created")
+            .projection;
 
         let saved = host
             .save(applied.state.revision)

@@ -17,6 +17,7 @@ import type {
   ProjectWindowPort,
 } from "./application/projectPorts";
 import { MediaPreviewError } from "./application/projectPorts";
+import type { EditorProjection } from "./domain/project";
 import {
   createEmptyProjection,
   representativeProjection,
@@ -27,12 +28,14 @@ vi.mock("./components/AlbumCanvas", () => ({
     onMediaDemandChange,
     mediaPreviewUrls,
     onGraphicsUnavailable,
+    composition,
   }: {
     onMediaDemandChange?: (demand: {
       visibleMediaIds: readonly string[];
       preloadMediaIds: readonly string[];
     }) => void;
     mediaPreviewUrls?: Readonly<Record<string, string>>;
+    composition?: EditorProjection["composition"];
     onGraphicsUnavailable?: (diagnostic: {
       supported: false;
       code: "webgl2_unavailable";
@@ -55,6 +58,9 @@ vi.mock("./components/AlbumCanvas", () => ({
           data-testid="album-canvas"
           data-demand-reported={demandReported}
           data-media-preview={mediaPreviewUrls?.["media-001"] ?? ""}
+          data-photo-draw-width={
+            composition?.sheets[0]?.frames[0]?.photo?.drawRect.width ?? ""
+          }
         />
         <button
           type="button"
@@ -89,6 +95,12 @@ const projection = createEmptyProjection();
 const projectCorePort: ProjectCorePort = {
   load: async () => projection,
   apply: async () => projection,
+  applyWithOutcome: async () => ({
+    projection,
+    affectedFrameId: null,
+  }),
+  importPhoto: async () => ({ kind: "cancelled", projection }),
+  resolvePhotoDropTarget: async () => ({ kind: "invalid" }),
   relink: async () => projection,
   undo: async () => projection,
   redo: async () => projection,
@@ -187,13 +199,22 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     write: (event) => logEvents.push(event),
   };
   const load = vi.fn(async (_operationId: string) => projection);
-  const confirmUiReady = vi.fn(async () => undefined);
+  let mediaChangedSubscribed = false;
+  const confirmUiReady = vi.fn(async () => {
+    expect(mediaChangedSubscribed).toBe(true);
+  });
   render(
     <App
       exportPipelinePort={exportPipelinePort}
       projectStartupPort={{ confirmUiReady }}
       projectWindowPort={projectWindowPort}
-      mediaPreviewPort={mediaPreviewPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async () => {
+          mediaChangedSubscribed = true;
+          return () => undefined;
+        },
+      }}
       projectCorePort={{ ...projectCorePort, load }}
       logger={logger}
       canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
@@ -237,6 +258,120 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     ({ event }) => event === "project_load_started",
   );
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
+});
+
+test("synchronizes a no-cache reopen while Monitor startup remains pending without adding History", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  let completeUiReady: (() => void) | undefined;
+  const refreshedProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media) =>
+          media.id === "media-001"
+            ? { ...media, name: "Foto confirmada sem Cache.jpg" }
+            : media,
+        ),
+      },
+    },
+    composition: {
+      ...representativeProjection.composition,
+      sheets: representativeProjection.composition.sheets.map((sheet) => ({
+        ...sheet,
+        frames: sheet.frames.map((frame) =>
+          frame.photo?.mediaId === "media-001"
+            ? {
+                ...frame,
+                photo: {
+                  ...frame.photo,
+                  name: "Foto confirmada sem Cache.jpg",
+                  drawRect: { ...frame.photo.drawRect, width: 123_000 },
+                },
+              }
+            : frame,
+        ),
+      })),
+    },
+  };
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockResolvedValue(refreshedProjection);
+  const apply = vi.fn(async () => representativeProjection);
+  const applyWithOutcome = vi.fn(async () => ({
+    projection: representativeProjection,
+    affectedFrameId: null,
+  }));
+  const undo = vi.fn(async () => representativeProjection);
+  const redo = vi.fn(async () => representativeProjection);
+  const confirmUiReady = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        expect(notifyMediaChanged).toBeTypeOf("function");
+        completeUiReady = resolve;
+        notifyMediaChanged?.(["media-001"]);
+      }),
+  );
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={{ confirmUiReady }}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        prepareMediaPreviews: async () => [
+          {
+            mediaId: "media-001",
+            state: "cache_unavailable" as const,
+            url: null,
+          },
+        ],
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{
+        ...projectCorePort,
+        load,
+        apply,
+        applyWithOutcome,
+        undo,
+        redo,
+      }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "123000",
+  );
+  expect(screen.getByText("Foto confirmada sem Cache.jpg")).toBeInTheDocument();
+  expect(refreshedProjection.state.revision).toBe(
+    representativeProjection.state.revision,
+  );
+  expect(apply).not.toHaveBeenCalled();
+  expect(applyWithOutcome).not.toHaveBeenCalled();
+  expect(undo).not.toHaveBeenCalled();
+  expect(redo).not.toHaveBeenCalled();
+  act(() => completeUiReady?.());
 });
 
 test("prepares real media previews after opening without blocking the Workspace", async () => {
@@ -671,6 +806,84 @@ test("registers the media-change listener before the first preview demand", asyn
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
 });
 
+test("keeps the newest media projection when equal-revision refreshes resolve out of order", async () => {
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  let resolveOlder!: (projection: typeof representativeProjection) => void;
+  let resolveNewer!: (projection: typeof representativeProjection) => void;
+  const projectionNamed = (name: string) => ({
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media, index) =>
+          index === 0 ? { ...media, name } : media,
+        ),
+      },
+    },
+  });
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockImplementationOnce(
+      () =>
+        new Promise<typeof representativeProjection>((resolve) => {
+          resolveOlder = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise<typeof representativeProjection>((resolve) => {
+          resolveNewer = resolve;
+        }),
+    );
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      projectStartupPort={projectStartupPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={{
+        ...mediaPreviewPort,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
+      }}
+      projectCorePort={{ ...projectCorePort, load }}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+    />,
+  );
+
+  await screen.findByText("Serra ao amanhecer.jpg");
+  act(() => {
+    notifyMediaChanged?.(["media-001"]);
+    notifyMediaChanged?.(["media-001"]);
+  });
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(3));
+  await act(async () => {
+    resolveNewer(projectionNamed("Observação nova.jpg"));
+  });
+  await screen.findByText("Observação nova.jpg");
+
+  await act(async () => {
+    resolveOlder(projectionNamed("Observação antiga.jpg"));
+  });
+  expect(screen.getByText("Observação nova.jpg")).toBeInTheDocument();
+  expect(screen.queryByText("Observação antiga.jpg")).not.toBeInTheDocument();
+});
+
 test("keeps recovery actions hidden until the first authoritative media observation", async () => {
   const prepareMediaPreviews = vi.fn().mockResolvedValue([]);
 
@@ -720,6 +933,43 @@ test("keeps recovery actions hidden until the first authoritative media observat
 
 test("retries an unavailable occurrence explicitly and refreshes it without Relink", async () => {
   const recoveredUrl = "asset://localhost/cache/media-001-recovered.jpg";
+  let notifyMediaChanged: ((mediaIds: readonly string[]) => void) | undefined;
+  const refreshedProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      album: {
+        ...representativeProjection.state.album,
+        media: representativeProjection.state.album.media.map((media) =>
+          media.id === "media-001"
+            ? { ...media, sourceWidthPx: 23, sourceHeightPx: 5 }
+            : media,
+        ),
+      },
+    },
+    composition: {
+      ...representativeProjection.composition,
+      sheets: [
+        {
+          ...representativeProjection.composition.sheets[0],
+          frames: [
+            {
+              ...representativeProjection.composition.sheets[0].frames[0],
+              photo: {
+                ...representativeProjection.composition.sheets[0].frames[0]
+                  .photo!,
+                drawRect: {
+                  ...representativeProjection.composition.sheets[0].frames[0]
+                    .photo!.drawRect,
+                  width: 123_000,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+  };
   const prepareMediaPreviews = vi
     .fn()
     .mockResolvedValueOnce([
@@ -728,11 +978,18 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
     .mockResolvedValueOnce([
       { mediaId: "media-001", state: "ready" as const, url: recoveredUrl },
     ]);
-  const retryUnavailableMedia = vi.fn(async () => ({
-    mediaId: "media-001",
-    state: "ready" as const,
-    url: null,
-  }));
+  const retryUnavailableMedia = vi.fn(async () => {
+    notifyMediaChanged?.(["media-001"]);
+    return {
+      mediaId: "media-001",
+      state: "ready" as const,
+      url: null,
+    };
+  });
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce(representativeProjection)
+    .mockResolvedValue(refreshedProjection);
   const relink = vi.fn(async () => representativeProjection);
   const apply = vi.fn(async () => representativeProjection);
 
@@ -745,12 +1002,15 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
         ...mediaPreviewPort,
         prepareMediaPreviews,
         retryUnavailableMedia,
-        onMediaChanged: async () => () => undefined,
+        onMediaChanged: async (listener) => {
+          notifyMediaChanged = listener;
+          return () => undefined;
+        },
         onCacheProcessorWarning: async () => () => undefined,
       }}
       projectCorePort={{
         ...projectCorePort,
-        load: async () => representativeProjection,
+        load,
         apply,
         relink,
       }}
@@ -772,15 +1032,27 @@ test("retries an unavailable occurrence explicitly and refreshes it without Reli
   const retry = await screen.findByRole("button", {
     name: /Tentar novamente o arquivo de/i,
   });
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "400000",
+  );
   fireEvent.click(retry);
 
   await waitFor(() =>
     expect(retryUnavailableMedia).toHaveBeenCalledWith("media-001"),
   );
   await waitFor(() => expect(prepareMediaPreviews).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
   expect(screen.getByTestId("album-canvas")).toHaveAttribute(
     "data-media-preview",
     recoveredUrl,
+  );
+  expect(screen.getByTestId("album-canvas")).toHaveAttribute(
+    "data-photo-draw-width",
+    "123000",
+  );
+  expect(refreshedProjection.state.revision).toBe(
+    representativeProjection.state.revision,
   );
   expect(relink).not.toHaveBeenCalled();
   expect(apply).not.toHaveBeenCalled();

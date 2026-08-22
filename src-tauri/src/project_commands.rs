@@ -1,13 +1,19 @@
 use myalbuns_core::{
-    EditorProjection, PathFailure, ProjectIntent, SaveProjectError,
-    SaveProjectOutcome as CoreSaveProjectOutcome,
+    EditorProjection, ImportPhotoDisposition, PathFailure, PhotoDropTarget, ProjectIntent,
+    ProjectMutationOutcome, SaveProjectError, SaveProjectOutcome as CoreSaveProjectOutcome,
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
-use tauri::{AppHandle, State, WebviewWindow};
+use myalbuns_paths::AppPaths;
+use tauri::{AppHandle, Manager, State, WebviewWindow};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
-    ipc_contract::{SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult},
+    cache_engine::CacheEngine,
+    cache_previews::CachePreviewRegistry,
+    cache_service::CacheNamespaceOwner,
+    ipc_contract::{
+        ImportPhotoResult, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    },
     logging::validate_optional_identifier,
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     product_runtime::PROJECT_WINDOW_LABEL,
@@ -39,13 +45,14 @@ pub(crate) fn apply_project_intent(
     intent: ProjectIntent,
     window: WebviewWindow,
     state: State<'_, ProjectHost>,
-) -> Result<EditorProjection, String> {
+) -> Result<ProjectMutationOutcome, String> {
     let intent_kind = match &intent {
         ProjectIntent::SetDpi { .. } => "set_dpi",
         ProjectIntent::TransformPhoto { .. } => "transform_photo",
-        ProjectIntent::FillLeftmostPlaceholder { .. } => "fill_leftmost_placeholder",
+        ProjectIntent::AddPhoto { .. } => "add_photo",
+        ProjectIntent::DropPhoto { .. } => "drop_photo",
     };
-    let projection = state.apply(intent).inspect_err(|_| {
+    let outcome = state.apply_with_outcome(intent).inspect_err(|_| {
         tracing::warn!(
             target: "myalbuns.desktop",
             process_role = ProcessRole::DesktopHost.as_str(),
@@ -58,12 +65,97 @@ pub(crate) fn apply_project_intent(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),
         window_label = window.label(),
-        project_id = safe_log_identifier(&projection.state.project_id),
-        revision = projection.state.revision,
+        project_id = safe_log_identifier(&outcome.projection.state.project_id),
+        revision = outcome.projection.state.revision,
         intent = intent_kind,
         event = "project_intent_applied",
     );
-    Ok(projection)
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub(crate) async fn import_photo(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<ImportPhotoResult, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A importação de Foto só está disponível na Janela do Projeto.".into());
+    }
+    let host = state.inner().clone();
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_parent(&window)
+        .set_title("Importar Foto JPEG")
+        .add_filter("Imagem JPEG", &["jpg", "jpeg"])
+        .pick_file(move |selection| {
+            let _ = sender.send(selection);
+        });
+    let selection = receiver
+        .await
+        .map_err(|_| "Não foi possível concluir o diálogo de importação de Foto.".to_string())?;
+    let Some(selection) = selection else {
+        return Ok(ImportPhotoResult::Cancelled {
+            projection: host.projection()?,
+        });
+    };
+    let FilePath::Path(path) = selection else {
+        return Err("O local escolhido não é um Arquivo do Windows válido.".into());
+    };
+    let imported = tauri::async_runtime::spawn_blocking(move || {
+        let proposal = MediaResolver.propose_photo_import(path)?;
+        host.import_photo(proposal)
+    })
+    .await
+    .map_err(|_| "Não foi possível concluir a importação da Foto.".to_string())??;
+    let (event, result) = match imported.disposition {
+        ImportPhotoDisposition::Imported => (
+            "photo_imported",
+            ImportPhotoResult::Imported {
+                projection: imported.projection,
+                media_id: imported.media_id.to_string(),
+            },
+        ),
+        ImportPhotoDisposition::Existing => (
+            "photo_import_existing_selected",
+            ImportPhotoResult::Selected {
+                projection: imported.projection,
+                media_id: imported.media_id.to_string(),
+            },
+        ),
+    };
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_role = ProcessRole::DesktopHost.as_str(),
+        window_label = window.label(),
+        media_id = safe_log_identifier(match &result {
+            ImportPhotoResult::Imported { media_id, .. }
+            | ImportPhotoResult::Selected { media_id, .. } => media_id,
+            ImportPhotoResult::Cancelled { .. } => unreachable!("the native selection exists"),
+        }),
+        revision = match &result {
+            ImportPhotoResult::Imported { projection, .. }
+            | ImportPhotoResult::Selected { projection, .. }
+            | ImportPhotoResult::Cancelled { projection } => projection.state.revision,
+        },
+        event,
+    );
+    Ok(result)
+}
+
+#[tauri::command]
+pub(crate) fn photo_drop_target(
+    sheet_id: String,
+    x_um: i64,
+    y_um: i64,
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<PhotoDropTarget, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("O alvo da Foto só pode ser consultado na Janela do Projeto.".into());
+    }
+    state.project_photo_drop_target(&sheet_id, x_um, y_um)
 }
 
 #[tauri::command]
@@ -117,6 +209,8 @@ pub(crate) async fn relink_media(
     };
 
     let selected_media_id = binding.media_id.clone();
+    let cache_pause = app.state::<CacheEngine>().pause().await;
+    let relink_app = app.clone();
     let relinked = tauri::async_runtime::spawn_blocking(move || {
         if !occurrence_is_authoritatively_absent(&binding) {
             return Err(
@@ -125,10 +219,26 @@ pub(crate) async fn relink_media(
             );
         }
         let proposal = MediaResolver.propose_relink(&binding, path)?;
+        let engine = relink_app.state::<CacheEngine>();
+        let namespace = relink_app.state::<CacheNamespaceOwner>();
+        engine
+            .invalidate_relinked_media(
+                &cache_pause,
+                relink_app.state::<AppPaths>().inner(),
+                namespace.namespace(),
+                relink_app.state::<CachePreviewRegistry>().inner(),
+                &binding.media_id,
+            )
+            .map_err(|error| {
+                format!(
+                    "Não foi possível invalidar o Cache antes da Religação: {}",
+                    error.message
+                )
+            })?;
         host.relink_media(proposal)
     })
-    .await
-    .map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
+    .await;
+    let relinked = relinked.map_err(|_| "Não foi possível concluir a Religação.".to_string())??;
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),

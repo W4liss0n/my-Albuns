@@ -7,7 +7,7 @@ use uuid::{Uuid, Version};
 
 use crate::project_document::{DisplayUnit, DocumentSettings};
 
-pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 5;
+pub(crate) const RENDER_SNAPSHOT_SCHEMA_VERSION: u32 = 6;
 pub(crate) const PHOTO_PAN_MIN: f32 = -1.0;
 pub(crate) const PHOTO_PAN_MAX: f32 = 1.0;
 pub(crate) const PHOTO_ZOOM_MIN: f32 = 1.0;
@@ -160,7 +160,10 @@ pub struct PhotoPlacement {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
+/// A placement keeps the minimum Frame-filling scale separate from the
+/// user's relative Zoom (`current_zoom == 1.0` means no adjustment).
 pub struct PhotoPlacementPlan {
+    pub base_fill_zoom: f64,
     pub current_pan: NormalizedPan,
     pub current_zoom: f64,
     pub pan_range: NumberRange,
@@ -549,6 +552,116 @@ pub struct EditorProjection {
     pub media_usage: Vec<MediaUsage>,
 }
 
+/// Runtime-only presentation facts observed or assigned for the linked
+/// Original while its opaque preview is resolved.
+///
+/// This type deliberately has no serde representation. It can enrich a
+/// projection, but can never become part of the Project document.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PhotoSourceMetadata {
+    source_width_px: u32,
+    source_height_px: u32,
+    palette: [String; 3],
+}
+
+impl PhotoSourceMetadata {
+    pub fn new(
+        source_width_px: u32,
+        source_height_px: u32,
+        palette: [String; 3],
+    ) -> Result<Self, CoreError> {
+        if source_width_px == 0
+            || source_height_px == 0
+            || palette.iter().any(|color| !is_canonical_rgb(color))
+        {
+            return Err(CoreError::InvalidPhotoSourceMetadata);
+        }
+        Ok(Self {
+            source_width_px,
+            source_height_px,
+            palette,
+        })
+    }
+
+    pub const fn source_width_px(&self) -> u32 {
+        self.source_width_px
+    }
+
+    pub const fn source_height_px(&self) -> u32 {
+        self.source_height_px
+    }
+
+    pub fn palette(&self) -> &[String; 3] {
+        &self.palette
+    }
+}
+
+fn is_canonical_rgb(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 7
+        && bytes[0] == b'#'
+        && bytes[1..]
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'A'..=b'F').contains(byte))
+}
+
+/// Trusted native import command. The Host constructs it only after the
+/// selected JPEG has passed path and codec inspection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImportPhoto {
+    pub(crate) path: PathBuf,
+    pub(crate) source_metadata: PhotoSourceMetadata,
+}
+
+impl ImportPhoto {
+    pub fn new(path: PathBuf, source_metadata: PhotoSourceMetadata) -> Self {
+        Self {
+            path,
+            source_metadata,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum PhotoPlacementMode {
+    Normal,
+    Edit,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectMutationOutcome {
+    pub projection: EditorProjection,
+    pub affected_frame_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ImportPhotoOutcome {
+    pub projection: EditorProjection,
+    pub media_id: MediaId,
+    pub disposition: ImportPhotoDisposition,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ImportPhotoDisposition {
+    Imported,
+    Existing,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum PhotoDropTarget {
+    Frame { frame_id: String },
+    Sheet { sheet_id: String },
+    Invalid,
+}
+
 /// Borrowed rendering envelope over one already resolved CompositionPlan.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderSnapshotRef<'a> {
@@ -661,10 +774,19 @@ pub enum ProjectIntent {
         delta_pan_y: f32,
         delta_zoom: f32,
     },
-    FillLeftmostPlaceholder {
+    AddPhoto {
         sheet_id: String,
         #[ts(type = "string")]
         media_id: MediaId,
+        mode: PhotoPlacementMode,
+    },
+    DropPhoto {
+        sheet_id: String,
+        #[ts(type = "string")]
+        media_id: MediaId,
+        x_um: i64,
+        y_um: i64,
+        mode: PhotoPlacementMode,
     },
 }
 
@@ -678,6 +800,8 @@ pub enum CoreError {
     RevisionSpaceExhausted,
     #[error("A intenção não é compatível com o Documento de Projeto v1")]
     UnsupportedProjectIntent,
+    #[error("Os metadados observados da Foto não são válidos")]
+    InvalidPhotoSourceMetadata,
     #[error("Frame não encontrado: {0}")]
     FrameNotFound(String),
     #[error("O Frame não contém uma Foto: {0}")]

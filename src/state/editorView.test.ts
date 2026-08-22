@@ -8,8 +8,33 @@ beforeEach(() => {
     selectedFrameId: null,
     focusedSheetId: null,
     centeredSheetId: null,
+    editingSheetId: null,
     viewport: { offsetX: 0 },
   });
+});
+
+test("keeps only a valid Frame selection while editing and clears it on exit", () => {
+  useEditorView.setState({
+    selectedFrameId: "frame-001",
+    focusedSheetId: "sheet-001",
+    centeredSheetId: "sheet-001",
+  });
+
+  useEditorView.getState().enterSheetEdit("sheet-001", true);
+  expect(useEditorView.getState()).toMatchObject({
+    editingSheetId: "sheet-001",
+    selectedFrameId: "frame-001",
+  });
+
+  useEditorView.getState().exitSheetEdit();
+  expect(useEditorView.getState()).toMatchObject({
+    editingSheetId: null,
+    selectedFrameId: null,
+  });
+
+  useEditorView.setState({ selectedFrameId: "frame-002" });
+  useEditorView.getState().enterSheetEdit("sheet-001", false);
+  expect(useEditorView.getState().selectedFrameId).toBeNull();
 });
 
 test("initializes transient navigation from the opened Project", () => {

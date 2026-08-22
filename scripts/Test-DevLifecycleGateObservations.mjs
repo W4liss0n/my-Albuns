@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   assertCausalHandoffObserved,
   isCausalHandoffObserved,
+  isOwnedHostForestObserved,
   observesLogEvent,
   observesTypedCleanupTerminal,
 } from "./DevLifecycleGateObservations.mjs";
@@ -50,5 +51,32 @@ test("a causal event remains observable from supervisor output when the process 
       "global_exited_after_project_handoff",
     ),
     true,
+  );
+});
+
+test("a rendered Host forest requires one observed descendant inside the development forest", () => {
+  assert.equal(
+    isOwnedHostForestObserved({
+      hostProcessId: 301,
+      hostForest: [301],
+      developmentForest: [300, 301, 302],
+    }),
+    false,
+  );
+  assert.equal(
+    isOwnedHostForestObserved({
+      hostProcessId: 301,
+      hostForest: [301, 302],
+      developmentForest: [300, 301, 302],
+    }),
+    true,
+  );
+  assert.equal(
+    isOwnedHostForestObserved({
+      hostProcessId: 301,
+      hostForest: [301, 302],
+      developmentForest: [300, 301],
+    }),
+    false,
   );
 });

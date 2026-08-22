@@ -1,4 +1,4 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import type { LogEvent, Logger } from "../application/logging";
@@ -12,8 +12,10 @@ import { createContinuousCanvasLayout } from "./canvasGeometry";
 import {
   AlbumCanvas,
   displayWithLabel,
+  displayWithHandler,
   finishPixiInitialization,
   getPixiLifecycle,
+  latestDisplayWithHandler,
   renderCanvas,
   setupAlbumCanvasTestHarness,
 } from "./albumCanvasTestHarness";
@@ -38,6 +40,201 @@ test("fits the complete sheet to the continuous Canvas at device resolution", as
     autoDensity: true,
     resolution: window.devicePixelRatio,
   });
+});
+
+test("shows only the resolved Photo target and drops only after a valid highlight", async () => {
+  const onResolvePhotoDropTarget = vi.fn(async () => ({
+    kind: "frame" as const,
+    frameId: "frame-001",
+  }));
+  const onDropPhoto = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    draggedPhotoId: "media-002",
+    onResolvePhotoDropTarget,
+    onDropPhoto,
+    onPhotoDragCancel,
+  });
+  await finishPixiInitialization();
+  const canvas = pixiLifecycle.instances[0].canvas;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1_200,
+    height: 500,
+    right: 1_200,
+    bottom: 500,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  const host = view.container.querySelector(".canvas-host")!;
+  const dataTransfer = { dropEffect: "none" };
+
+  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+  await waitFor(() => {
+    expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
+  });
+  expect(displayWithLabel("sheet-photo-drop-sheet-001").visible).toBe(false);
+  expect(dataTransfer.dropEffect).toBe("copy");
+
+  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onDropPhoto).toHaveBeenCalledOnce());
+  expect(onDropPhoto).toHaveBeenCalledWith(
+    "media-002",
+    expect.objectContaining({ sheetId: "sheet-001" }),
+  );
+  expect(onPhotoDragCancel).toHaveBeenCalledOnce();
+});
+
+test("does not drop on a new point while its resolved highlight is still pending", async () => {
+  let resolveFirst!: (target: {
+    kind: "frame";
+    frameId: string;
+  }) => void;
+  let resolveSecond!: (target: {
+    kind: "frame";
+    frameId: string;
+  }) => void;
+  const onResolvePhotoDropTarget = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    )
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSecond = resolve;
+        }),
+    );
+  const onDropPhoto = vi.fn(async () => true);
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    draggedPhotoId: "media-002",
+    onResolvePhotoDropTarget,
+    onDropPhoto,
+  });
+  await finishPixiInitialization();
+  const canvas = pixiLifecycle.instances[0].canvas;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1_200,
+    height: 500,
+    right: 1_200,
+    bottom: 500,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  const host = view.container.querySelector(".canvas-host")!;
+  const dataTransfer = { dropEffect: "none" };
+
+  fireEvent.dragOver(host, { clientX: 560, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledOnce());
+  await act(async () => {
+    resolveFirst({ kind: "frame", frameId: "frame-001" });
+  });
+  await waitFor(() => {
+    expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(true);
+  });
+
+  fireEvent.dragOver(host, { clientX: 680, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalledTimes(2));
+  fireEvent.drop(host, { clientX: 680, clientY: 250, dataTransfer });
+
+  expect(onDropPhoto).not.toHaveBeenCalled();
+  await act(async () => {
+    resolveSecond({ kind: "frame", frameId: "frame-001" });
+  });
+  expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(false);
+});
+
+test("Esc and an invalid Photo target cancel without a Project mutation", async () => {
+  const onResolvePhotoDropTarget = vi.fn(async () => ({
+    kind: "invalid" as const,
+  }));
+  const onDropPhoto = vi.fn(async () => true);
+  const onPhotoDragCancel = vi.fn();
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    draggedPhotoId: "media-002",
+    onResolvePhotoDropTarget,
+    onDropPhoto,
+    onPhotoDragCancel,
+  });
+  await finishPixiInitialization();
+  const canvas = pixiLifecycle.instances[0].canvas;
+  vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 1_200,
+    height: 500,
+    right: 1_200,
+    bottom: 500,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  });
+  const host = view.container.querySelector(".canvas-host")!;
+  const dataTransfer = { dropEffect: "none" };
+
+  fireEvent.dragOver(host, { clientX: 600, clientY: 250, dataTransfer });
+  await waitFor(() => expect(onResolvePhotoDropTarget).toHaveBeenCalled());
+  fireEvent.drop(host, { clientX: 600, clientY: 250, dataTransfer });
+  expect(onDropPhoto).not.toHaveBeenCalled();
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onPhotoDragCancel).toHaveBeenCalled();
+  expect(displayWithLabel("frame-photo-drop-frame-001").visible).toBe(false);
+  expect(displayWithLabel("sheet-photo-drop-sheet-001").visible).toBe(false);
+});
+
+test("enters sheet editing by a double click on either surface or Frame", async () => {
+  const onEnterSheetEdit = vi.fn();
+  renderCanvas({
+    compositionPlan: interactiveComposition,
+    onEnterSheetEdit,
+  });
+  await finishPixiInitialization();
+  const sheet = displayWithHandler("pointertap");
+
+  sheet.emit("pointertap", { target: sheet, detail: 2 });
+  expect(onEnterSheetEdit).toHaveBeenCalledWith("sheet-001");
+
+  latestDisplayWithHandler("pointertap").emit("pointertap", {
+    detail: 2,
+    stopPropagation: vi.fn(),
+  });
+  expect(onEnterSheetEdit).toHaveBeenCalledTimes(2);
+  expect(onEnterSheetEdit).toHaveBeenLastCalledWith("sheet-001");
+});
+
+test("editing mode materializes only its isolated sheet", async () => {
+  renderCanvas({
+    compositionPlan: threeSheetComposition,
+    editingSheetId: "sheet-002",
+  });
+  await finishPixiInitialization();
+  const world = pixiLifecycle.instances[0].stage.children[0] as {
+    children: unknown[];
+  };
+
+  expect(world.children).toHaveLength(1);
+  expect(
+    pixiLifecycle.displays.some(
+      (display) => display.label === "sheet-focus-sheet-002",
+    ),
+  ).toBe(true);
+  expect(
+    pixiLifecycle.displays.some(
+      (display) => display.label === "sheet-focus-sheet-001",
+    ),
+  ).toBe(false);
 });
 
 test("keeps the materialized Pixi scene stable across view-only updates", async () => {

@@ -21,11 +21,14 @@ export function useProjectNavigation(projection: EditorProjection) {
   const centeredSheetId = useEditorView(
     (state) => state.centeredSheetId,
   );
+  const editingSheetId = useEditorView((state) => state.editingSheetId);
   const viewport = useEditorView((state) => state.viewport);
   const selectFrame = useEditorView((state) => state.selectFrame);
   const focusSheet = useEditorView((state) => state.focusSheet);
   const centerSheet = useEditorView((state) => state.centerSheet);
   const setViewport = useEditorView((state) => state.setViewport);
+  const enterSheetEdit = useEditorView((state) => state.enterSheetEdit);
+  const exitSheetEdit = useEditorView((state) => state.exitSheetEdit);
   const synchronizeProject = useEditorView(
     (state) => state.synchronizeProject,
   );
@@ -99,16 +102,24 @@ export function useProjectNavigation(projection: EditorProjection) {
     centerCanvasOnSheet(sheetId, canvasMetrics);
   }
 
-  const implicitSheetId = projection.state.album.sheets.some(
+  function beginSheetEdit(sheetId: string) {
+    const selectedBelongsToSheet = projection.state.album.sheets
+      .find((sheet) => sheet.id === sheetId)
+      ?.frames.some((frame) => frame.id === selectedFrameId) ?? false;
+    enterSheetEdit(sheetId, selectedBelongsToSheet);
+  }
+
+  const implicitSheetId = editingSheetId ?? (projection.state.album.sheets.some(
     (sheet) => sheet.id === centeredSheetId,
   )
     ? centeredSheetId
-    : projection.state.album.sheets[0]?.id;
+    : projection.state.album.sheets[0]?.id);
 
   return {
     selectedFrameId,
     focusedSheetId,
     centeredSheetId,
+    editingSheetId,
     viewport,
     canvasLayout,
     implicitSheetId,
@@ -116,6 +127,8 @@ export function useProjectNavigation(projection: EditorProjection) {
     focusSheet,
     centerSheet,
     setViewport,
+    enterSheetEdit: beginSheetEdit,
+    exitSheetEdit,
     handleCanvasMetricsChange,
     navigateToSheet,
   };

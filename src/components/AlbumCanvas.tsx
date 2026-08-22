@@ -6,8 +6,12 @@ import {
   logReasonFromError,
 } from "../application/logging";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import type { PhotoDropTarget } from "../domain/project";
 import { AlbumCanvasScene } from "./albumCanvasScene";
-import type { AlbumCanvasProps } from "./albumCanvasContract";
+import type {
+  AlbumCanvasProps,
+  CanvasPhotoDropPoint,
+} from "./albumCanvasContract";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -20,6 +24,7 @@ const isOpaqueCachePreview = (url: string) =>
 
 export type {
   AlbumCanvasProps,
+  CanvasPhotoDropPoint,
   CanvasMetrics,
   PhotoTransformDelta,
   PhotoTransformPreview,
@@ -27,11 +32,21 @@ export type {
 } from "./albumCanvasContract";
 
 export function AlbumCanvas(props: AlbumCanvasProps) {
+  const [resolvedPhotoDrop, setResolvedPhotoDrop] = useState<{
+    request: number;
+    mediaId: string;
+    point: CanvasPhotoDropPoint;
+    target: PhotoDropTarget;
+  } | null>(null);
+  const renderedProps: AlbumCanvasProps = {
+    ...props,
+    photoDropHighlight: resolvedPhotoDrop?.target ?? null,
+  };
   const logger = useLogger();
   const canvasGraphicsDiagnosticProbe =
     useCanvasGraphicsDiagnosticProbe();
-  const latestPropsRef = useRef(props);
-  latestPropsRef.current = props;
+  const latestPropsRef = useRef(renderedProps);
+  latestPropsRef.current = renderedProps;
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
@@ -43,6 +58,29 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const ready = graphicsState === "ready";
   const [, setPreviewTextureRevision] = useState(0);
   const hasSheets = props.composition.sheets.length > 0;
+  const dragRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (!props.draggedPhotoId) {
+      dragRequestRef.current += 1;
+      setResolvedPhotoDrop(null);
+    }
+  }, [props.draggedPhotoId]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (props.draggedPhotoId) {
+        dragRequestRef.current += 1;
+        setResolvedPhotoDrop(null);
+        props.onPhotoDragCancel?.();
+      } else if (props.editingSheetId) {
+        props.onExitSheetEdit?.();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [props]);
 
   useEffect(() => {
     if (!hostRef.current || !hasSheets) return;
@@ -300,7 +338,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     const scene = sceneRef.current;
     const host = hostRef.current;
     if (!ready || !scene || !host) return;
-    scene.update(props, host.clientHeight);
+    scene.update(renderedProps, host.clientHeight);
     if (materializedSceneRef.current !== scene) {
       materializedSceneRef.current = scene;
       logger.write({
@@ -325,7 +363,81 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }
 
   return (
-    <div className="canvas-host" ref={hostRef}>
+    <div
+      className="canvas-host"
+      ref={hostRef}
+      onDragOver={(event) => {
+        const mediaId = props.draggedPhotoId;
+        const point = sceneRef.current?.resolvePhotoDropPoint(
+          event.clientX,
+          event.clientY,
+        );
+        if (!mediaId || !point || !props.onResolvePhotoDropTarget) {
+          dragRequestRef.current += 1;
+          setResolvedPhotoDrop(null);
+          return;
+        }
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+        const request = dragRequestRef.current + 1;
+        dragRequestRef.current = request;
+        setResolvedPhotoDrop(null);
+        void props.onResolvePhotoDropTarget(mediaId, point).then(
+          (target) => {
+            if (
+              dragRequestRef.current === request &&
+              props.draggedPhotoId === mediaId
+            ) {
+              setResolvedPhotoDrop(
+                target.kind === "invalid"
+                  ? null
+                  : { request, mediaId, point, target },
+              );
+            }
+          },
+          () => {
+            if (dragRequestRef.current === request) {
+              setResolvedPhotoDrop(null);
+            }
+          },
+        );
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          dragRequestRef.current += 1;
+          setResolvedPhotoDrop(null);
+        }
+      }}
+      onDrop={(event) => {
+        const mediaId = props.draggedPhotoId;
+        const point = sceneRef.current?.resolvePhotoDropPoint(
+          event.clientX,
+          event.clientY,
+        );
+        const validTarget =
+          resolvedPhotoDrop !== null &&
+          resolvedPhotoDrop.request === dragRequestRef.current &&
+          resolvedPhotoDrop.mediaId === mediaId &&
+          resolvedPhotoDrop.point.sheetId === point?.sheetId &&
+          Object.is(resolvedPhotoDrop.point.xUm, point?.xUm) &&
+          Object.is(resolvedPhotoDrop.point.yUm, point?.yUm);
+        dragRequestRef.current += 1;
+        setResolvedPhotoDrop(null);
+        props.onPhotoDragCancel?.();
+        if (!mediaId || !point || !validTarget || !props.onDropPhoto) return;
+        event.preventDefault();
+        void props.onDropPhoto(mediaId, point);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !props.editingSheetId) {
+          const sheetId = props.centeredSheetId;
+          if (sheetId) {
+            event.preventDefault();
+            props.onEnterSheetEdit?.(sheetId);
+          }
+        }
+      }}
+    >
       {graphicsState === "initializing" && (
         <span className="canvas-loading">Iniciando WebGL2…</span>
       )}

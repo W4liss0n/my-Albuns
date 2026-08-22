@@ -218,11 +218,18 @@ test("resolves a queued cancellation as not_found when completion fails before s
 
 test("maps the Project and media ports to the desktop commands", async () => {
   const intent: ProjectIntent = {
-    kind: "fillLeftmostPlaceholder",
+    kind: "addPhoto",
     sheetId: "sheet-002",
     mediaId: "media-campo",
+    mode: "normal",
   };
 
+  vi.mocked(invoke)
+    .mockResolvedValueOnce(representativeProjection)
+    .mockResolvedValueOnce({
+      projection: representativeProjection,
+      affectedFrameId: "frame-001",
+    });
   await tauriProjectCorePort.load("project-load-1");
   await tauriProjectCorePort.apply(intent);
   await tauriProjectCorePort.relink("media-a-001");
@@ -270,6 +277,53 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
+});
+
+test("maps Photo import, target resolution, and affected Frame outcomes", async () => {
+  const mutationOutcome = {
+    projection: representativeProjection,
+    affectedFrameId: "frame-001",
+  };
+  const importOutcome = {
+    kind: "imported" as const,
+    projection: representativeProjection,
+    mediaId: "media-imported",
+  };
+  vi.mocked(invoke)
+    .mockResolvedValueOnce(mutationOutcome)
+    .mockResolvedValueOnce(importOutcome)
+    .mockResolvedValueOnce({ kind: "sheet", sheetId: "sheet-001" });
+  const intent: ProjectIntent = {
+    kind: "addPhoto",
+    sheetId: "sheet-001",
+    mediaId: "media-imported",
+    mode: "normal",
+  };
+
+  await expect(
+    tauriProjectCorePort.applyWithOutcome(intent),
+  ).resolves.toEqual(mutationOutcome);
+  await expect(tauriProjectCorePort.importPhoto()).resolves.toEqual(
+    importOutcome,
+  );
+  await expect(
+    tauriProjectCorePort.resolvePhotoDropTarget(
+      "sheet-001",
+      12_000,
+      34_000,
+    ),
+  ).resolves.toEqual({ kind: "sheet", sheetId: "sheet-001" });
+
+  expect(invoke).toHaveBeenNthCalledWith(1, "apply_project_intent", {
+    intent,
+  });
+  expect(invoke).toHaveBeenNthCalledWith(2, "import_photo");
+  expect(invoke).toHaveBeenNthCalledWith(3, "photo_drop_target", {
+    sheetId: "sheet-001",
+    xUm: 12_000,
+    yUm: 34_000,
+  });
+  expect(vi.mocked(invoke).mock.calls[2]?.[1]).not.toHaveProperty("mode");
 });
 
 test("maps stable linked-media events to the reactive preview seam", async () => {

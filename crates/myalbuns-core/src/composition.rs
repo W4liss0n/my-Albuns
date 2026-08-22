@@ -309,6 +309,7 @@ fn compose_photo(frame: &RectUm, photo: &PhotoSnapshot, media: &MediaCatalogItem
     let horizontal_zoom_delta = scale_vector(&horizontal_direction, draw_width_at_fill / 2.0);
     let vertical_zoom_delta = scale_vector(&vertical_direction, draw_height_at_fill / 2.0);
     let placement = PhotoPlacementPlan {
+        base_fill_zoom: fill_scale,
         current_pan,
         current_zoom,
         pan_range: NumberRange {

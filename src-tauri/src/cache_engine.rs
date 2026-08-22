@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
@@ -22,6 +22,7 @@ use myalbuns_paths::{
     AppPaths, CachePathPlan, PreparedCacheStorage, RootBindingPlan, project_data_namespace,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::sync::Notify;
 
 use crate::{
@@ -35,7 +36,7 @@ use crate::{
     media_runtime::MediaRuntimeUpdate,
 };
 
-const CACHE_METADATA_SCHEMA_VERSION: u32 = 5;
+const CACHE_METADATA_SCHEMA_VERSION: u32 = 6;
 const SRGB_PROFILE: &[u8] = include_bytes!("../../crates/myalbuns-imaging/assets/sRGB2014.icc");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -53,6 +54,7 @@ struct CacheMetadata {
 #[serde(rename_all = "camelCase")]
 struct CacheMetadataEntry {
     media_id: String,
+    source_binding_sha256: String,
     generation_id: String,
     artifact_name: String,
     width_px: u32,
@@ -95,6 +97,87 @@ impl CacheMetadataEntry {
             basic_color_profile: self.basic_color_profile,
             fingerprint: self.fingerprint.clone(),
         }
+    }
+
+    fn source_binding(&self) -> Option<CacheSourceBinding> {
+        CacheSourceBinding::from_sha256(self.source_binding_sha256.clone())
+    }
+
+    fn matches_source_path(&self, source_path: &Path) -> bool {
+        self.source_binding()
+            .is_some_and(|binding| binding.matches_source_path(source_path))
+    }
+
+    fn recovered_artifact(&self) -> Option<RecoveredCacheArtifact> {
+        Some(RecoveredCacheArtifact::new(
+            self.artifact(),
+            self.source_binding()?,
+        ))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct CacheSourceBinding {
+    sha256: String,
+}
+
+impl CacheSourceBinding {
+    pub(crate) fn for_path(path: &Path) -> Self {
+        let mut digest = Sha256::new();
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStrExt;
+
+            digest.update(b"myalbuns-cache-source-binding-windows-utf16-v1\0");
+            for unit in path.as_os_str().encode_wide() {
+                digest.update(unit.to_le_bytes());
+            }
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+
+            digest.update(b"myalbuns-cache-source-binding-unix-bytes-v1\0");
+            digest.update(path.as_os_str().as_bytes());
+        }
+        Self {
+            sha256: format!("{:x}", digest.finalize()),
+        }
+    }
+
+    fn from_sha256(sha256: String) -> Option<Self> {
+        (sha256.len() == 64
+            && sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)))
+        .then_some(Self { sha256 })
+    }
+
+    pub(crate) fn matches_source_path(&self, source_path: &Path) -> bool {
+        self == &Self::for_path(source_path)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct RecoveredCacheArtifact {
+    artifact: CacheArtifact,
+    source_binding: CacheSourceBinding,
+}
+
+impl RecoveredCacheArtifact {
+    pub(crate) fn new(artifact: CacheArtifact, source_binding: CacheSourceBinding) -> Self {
+        Self {
+            artifact,
+            source_binding,
+        }
+    }
+
+    pub(crate) fn artifact(&self) -> &CacheArtifact {
+        &self.artifact
+    }
+
+    pub(crate) fn matches_source_path(&self, source_path: &Path) -> bool {
+        self.source_binding.matches_source_path(source_path)
     }
 }
 
@@ -208,11 +291,12 @@ pub(crate) struct CacheRecovery {
     pub(crate) removed_temporary_count: usize,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct CacheNamespaceRecovery {
     pub(crate) removed_temporary_count: usize,
     pub(crate) removed_generation_count: usize,
     pub(crate) discarded_index: bool,
+    pub(crate) verified_artifacts: Vec<RecoveredCacheArtifact>,
 }
 
 type FlightResult = Result<CacheExecution, CacheFailure>;
@@ -372,11 +456,26 @@ impl CacheEngine {
                 )
             })?
             .is_some();
-        let metadata = load_metadata(&storage, namespace.paths()).filter(|metadata| {
-            metadata_is_current(metadata, namespace.project_id(), namespace.paths())
-        });
-        let removed_generation_count = match metadata.as_ref() {
-            Some(metadata) => {
+        let recovered_metadata = load_metadata(&storage, namespace.paths())
+            .filter(|metadata| {
+                metadata_is_current(metadata, namespace.project_id(), namespace.paths())
+            })
+            .and_then(|metadata| {
+                let artifacts = metadata
+                    .entries
+                    .iter()
+                    .map(CacheMetadataEntry::recovered_artifact)
+                    .collect::<Option<Vec<_>>>()?;
+                artifacts
+                    .iter()
+                    .all(|recovered| {
+                        verify_cached_artifact(&storage, namespace.paths(), recovered.artifact())
+                            .is_ok()
+                    })
+                    .then_some((metadata, artifacts))
+            });
+        let removed_generation_count = match recovered_metadata.as_ref() {
+            Some((metadata, _)) => {
                 sweep_unreferenced_generations(&storage, namespace.paths(), metadata)?
             }
             None => storage
@@ -388,7 +487,7 @@ impl CacheEngine {
                     )
                 })?,
         };
-        let discarded_index = metadata.is_none() && metadata_present;
+        let discarded_index = recovered_metadata.is_none() && metadata_present;
         if discarded_index {
             storage
                 .remove_existing_file(&metadata_path)
@@ -399,10 +498,14 @@ impl CacheEngine {
                     )
                 })?;
         }
+        let verified_artifacts = recovered_metadata
+            .map(|(_, artifacts)| artifacts)
+            .unwrap_or_default();
         Ok(CacheNamespaceRecovery {
             removed_temporary_count,
             removed_generation_count,
             discarded_index,
+            verified_artifacts,
         })
     }
 
@@ -621,7 +724,7 @@ impl CacheEngine {
         namespace: &AuthorizedCacheNamespace,
         registry: &CachePreviewRegistry,
         demand: &CacheDemandRevision,
-        media_id: &str,
+        source: &CacheMediaSource,
         state: MediaPreviewState,
     ) -> Option<MediaPreview> {
         if state == MediaPreviewState::Ready {
@@ -640,11 +743,13 @@ impl CacheEngine {
             || demand.project_id != namespace.project_id()
             || current.revision != demand.revision
             || current.invalidation_epoch != demand.invalidation_epoch
-            || !current.media_ids.contains(media_id)
+            || !current.media_ids.contains(source.media_id())
         {
             return None;
         }
-        if let Some(preview) = registry.retained_preview(media_id, state) {
+        if let Some(preview) =
+            registry.retained_preview(source.media_id(), source.source_path(), state)
+        {
             return Some(preview);
         }
         let storage = app_paths.prepare_cache_storage(namespace.paths()).ok()?;
@@ -652,16 +757,17 @@ impl CacheEngine {
         if !metadata_is_current(&metadata, namespace.project_id(), namespace.paths()) {
             return None;
         }
-        let artifact = metadata
-            .entries
-            .iter()
-            .find(|entry| entry.media_id == media_id)?
-            .artifact();
+        let entry = metadata.entries.iter().find(|entry| {
+            entry.media_id == source.media_id() && entry.matches_source_path(source.source_path())
+        })?;
+        let artifact = entry.artifact();
         if verify_cached_artifact(&storage, namespace.paths(), &artifact).is_err() {
             return None;
         }
-        registry.publish(app_paths, namespace, &artifact).ok()?;
-        registry.retained_preview(media_id, state)
+        registry
+            .publish(app_paths, namespace, &artifact, source.source_path())
+            .ok()?;
+        registry.retained_preview(source.media_id(), source.source_path(), state)
     }
 
     pub(crate) fn claim_demanded(
@@ -748,6 +854,89 @@ impl CacheEngine {
         update: &MediaRuntimeUpdate,
     ) {
         self.apply_media_update(namespace, registry, update, None);
+    }
+
+    /// Retires the derived generation for one occurrence before its Project
+    /// binding can move to another Original. The caller holds a `CachePause`
+    /// across this invalidation and the creative relink, so no old-path job can
+    /// publish after the index stops referring to it.
+    pub(crate) fn invalidate_relinked_media(
+        &self,
+        _pause: &CachePause,
+        app_paths: &AppPaths,
+        namespace: &AuthorizedCacheNamespace,
+        registry: &CachePreviewRegistry,
+        media_id: &str,
+    ) -> Result<bool, CacheFailure> {
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let invalidated = HashSet::from([media_id.to_owned()]);
+        if let Some(demand) = self
+            .demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_mut(namespace.project_id())
+        {
+            demand.invalidation_epoch = uuid::Uuid::new_v4();
+            demand.preview_publication_authorities.remove(media_id);
+        }
+        self.cancel_flights(namespace.project_id(), &invalidated);
+        registry.invalidate_media(std::iter::once(media_id));
+
+        let storage = app_paths
+            .prepare_cache_storage(namespace.paths())
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::PublishIndex,
+                    format!("Não foi possível preparar a invalidação da Religação: {error}"),
+                )
+            })?;
+        let metadata_path = namespace.paths().metadata_file();
+        let metadata_present = storage
+            .open_existing_file(&metadata_path)
+            .map_err(|error| {
+                CacheFailure::new(
+                    CacheFailureStage::PublishIndex,
+                    format!("Não foi possível inspecionar o índice antes da Religação: {error}"),
+                )
+            })?
+            .is_some();
+        let Some(mut metadata) = load_metadata(&storage, namespace.paths()).filter(|metadata| {
+            metadata_is_current(metadata, namespace.project_id(), namespace.paths())
+        }) else {
+            if metadata_present {
+                storage
+                    .remove_existing_file(&metadata_path)
+                    .map_err(|error| {
+                        CacheFailure::new(
+                            CacheFailureStage::PublishIndex,
+                            format!(
+                                "Não foi possível descartar o índice incompatível antes da Religação: {error}"
+                            ),
+                        )
+                    })?;
+            }
+            return Ok(false);
+        };
+        let entry_count = metadata.entries.len();
+        metadata.entries.retain(|entry| entry.media_id != media_id);
+        if metadata.entries.len() == entry_count {
+            return Ok(false);
+        }
+
+        let metadata = current_metadata(namespace.project_id(), metadata.entries)?;
+        publish_metadata(&storage, namespace.paths(), &metadata)?;
+        if let Err(error) = sweep_unreferenced_generations(&storage, namespace.paths(), &metadata) {
+            tracing::warn!(
+                target: "myalbuns.desktop",
+                media_id,
+                error = %error.message,
+                event = "cache_relinked_generation_cleanup_failed",
+            );
+        }
+        Ok(true)
     }
 
     pub(crate) fn apply_demand_media_update(
@@ -1108,10 +1297,10 @@ fn plan_request(app_paths: &AppPaths, work: &CacheWork) -> Result<CacheRequest, 
             )
         })
         .and_then(|metadata| {
-            metadata
-                .entries
-                .into_iter()
-                .find(|entry| entry.media_id == work.source.media_id())
+            metadata.entries.into_iter().find(|entry| {
+                entry.media_id == work.source.media_id()
+                    && entry.matches_source_path(work.source.source_path())
+            })
         })
         .and_then(|entry| entry.reusable().ok());
     let candidate_generation_id = format!("g-{}", uuid::Uuid::new_v4().simple());
@@ -1410,6 +1599,8 @@ fn publish_cache_metadata(
     entries.retain(|entry| entry.media_id != artifact.media_id);
     entries.push(CacheMetadataEntry {
         media_id: artifact.media_id.clone(),
+        source_binding_sha256: CacheSourceBinding::for_path(request.jobs[0].source.source_path())
+            .sha256,
         generation_id: artifact.generation_id.clone(),
         artifact_name,
         width_px: artifact.width_px,
@@ -1561,6 +1752,7 @@ fn metadata_is_current(
     let mut media_ids = HashSet::new();
     metadata.entries.iter().all(|entry| {
         media_ids.insert(entry.media_id.as_str())
+            && entry.source_binding().is_some()
             && entry.reusable().is_ok()
             && cache_paths
                 .preview_file(&entry.media_id, &entry.generation_id, entry.format)
@@ -1616,6 +1808,7 @@ mod tests {
 
     use super::{
         AuthorizedCacheNamespace, CacheEngine, CacheFailureStage, CacheFlightClaim, CacheWork,
+        RecoveredCacheArtifact,
     };
     use crate::{
         cache_activity_gate::CacheCancellation,
@@ -2312,6 +2505,7 @@ mod tests {
             let old_registry = Arc::clone(&registry);
             let old_app_paths = fixture.app_paths.clone();
             let old_namespace = fixture.work.namespace.clone();
+            let old_source_path = fixture.work.source.source_path().to_path_buf();
             let media_id = fixture.work.source.media_id().to_owned();
             let old_commit = thread::spawn(move || {
                 old_engine.commit_preview_if_demanded(&demand, &media_id, || {
@@ -2321,7 +2515,12 @@ mod tests {
                     release_commit_rx
                         .recv()
                         .expect("the test releases the serialized preview commit");
-                    old_registry.publish(&old_app_paths, &old_namespace, &artifact)
+                    old_registry.publish(
+                        &old_app_paths,
+                        &old_namespace,
+                        &artifact,
+                        &old_source_path,
+                    )
                 })
             });
             commit_entered_rx
@@ -2405,6 +2604,7 @@ mod tests {
             let old_registry = Arc::clone(&registry);
             let old_app_paths = fixture.app_paths.clone();
             let old_namespace = fixture.work.namespace.clone();
+            let old_source_path = fixture.work.source.source_path().to_path_buf();
             let media_id = fixture.work.source.media_id().to_owned();
             let demand_for_commit = demand.clone();
             let old_commit = thread::spawn(move || {
@@ -2415,7 +2615,12 @@ mod tests {
                     release_commit_rx
                         .recv()
                         .expect("the test releases the serialized preview commit");
-                    old_registry.publish(&old_app_paths, &old_namespace, &artifact)
+                    old_registry.publish(
+                        &old_app_paths,
+                        &old_namespace,
+                        &artifact,
+                        &old_source_path,
+                    )
                 })
             });
             commit_entered_rx
@@ -2553,7 +2758,12 @@ mod tests {
             let artifact = verified_preview_artifact(&fixture, &engine).await;
             let preview = engine
                 .commit_preview_if_demanded(&old_demand, fixture.work.source.media_id(), || {
-                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                    registry.publish(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &artifact,
+                        fixture.work.source.source_path(),
+                    )
                 })
                 .expect("the original demand is current")
                 .expect("the original preview is resident");
@@ -2615,7 +2825,12 @@ mod tests {
             );
             let artifact = verified_preview_artifact(&fixture, &engine).await;
             let ready = registry
-                .publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                .publish(
+                    &fixture.app_paths,
+                    &fixture.work.namespace,
+                    &artifact,
+                    fixture.work.source.source_path(),
+                )
                 .expect("the last known preview is resident");
 
             engine.apply_demand_media_update(
@@ -2631,6 +2846,7 @@ mod tests {
             let unavailable = registry
                 .retained_preview(
                     fixture.work.source.media_id(),
+                    fixture.work.source.source_path(),
                     crate::ipc_contract::MediaPreviewState::Unavailable,
                 )
                 .expect("the unavailable state serves the last known representation");
@@ -2656,7 +2872,7 @@ mod tests {
                     &fixture.work.namespace,
                     &reopened_registry,
                     &demand,
-                    fixture.work.source.media_id(),
+                    &fixture.work.source,
                     crate::ipc_contract::MediaPreviewState::Unavailable,
                 )
                 .expect("a new Host process can hydrate the last published generation");
@@ -2682,7 +2898,7 @@ mod tests {
                     &fixture.work.namespace,
                     &CachePreviewRegistry::new("project"),
                     &demand,
-                    fixture.work.source.media_id(),
+                    &fixture.work.source,
                     crate::ipc_contract::MediaPreviewState::CacheUnavailable,
                 )
                 .expect("a Cache failure can retain G1 without classifying the Original");
@@ -2710,7 +2926,7 @@ mod tests {
                         &fixture.work.namespace,
                         &CachePreviewRegistry::new("project"),
                         &demand,
-                        fixture.work.source.media_id(),
+                        &fixture.work.source,
                         crate::ipc_contract::MediaPreviewState::Absent,
                     )
                     .is_none(),
@@ -2742,7 +2958,7 @@ mod tests {
                         &fixture.work.namespace,
                         &registry,
                         &old_demand,
-                        fixture.work.source.media_id(),
+                        &fixture.work.source,
                         crate::ipc_contract::MediaPreviewState::Unavailable,
                     )
                     .is_none(),
@@ -2784,13 +3000,23 @@ mod tests {
                 engine.reconcile_preview_demand(&registry, &project_id, 1, ["photo-a", "photo-b"]);
             let preview_a = engine
                 .commit_preview_if_demanded(&demand, "photo-a", || {
-                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact_a)
+                    registry.publish(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &artifact_a,
+                        fixture.work.source.source_path(),
+                    )
                 })
                 .expect("the demand authorizes photo-a")
                 .expect("photo-a is resident");
             let preview_b = engine
                 .commit_preview_if_demanded(&demand, "photo-b", || {
-                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact_b)
+                    registry.publish(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &artifact_b,
+                        work_b.source.source_path(),
+                    )
                 })
                 .expect("the demand authorizes photo-b")
                 .expect("photo-b is resident");
@@ -2836,7 +3062,12 @@ mod tests {
             let demand = engine.reconcile_preview_demand(&registry, &project_id, 1, ["photo-a"]);
             engine
                 .commit_preview_if_demanded(&demand, "photo-a", || {
-                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                    registry.publish(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &artifact,
+                        fixture.work.source.source_path(),
+                    )
                 })
                 .expect("the first demand is current")
                 .expect("the first preview is resident");
@@ -2849,7 +3080,12 @@ mod tests {
                 engine.reconcile_preview_demand(&registry, &project_id, 2, ["photo-a"]);
             let newer_preview = engine
                 .commit_preview_if_demanded(&newer_demand, "photo-a", || {
-                    registry.publish(&fixture.app_paths, &fixture.work.namespace, &artifact)
+                    registry.publish(
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &artifact,
+                        fixture.work.source.source_path(),
+                    )
                 })
                 .expect("the newer demand is current")
                 .expect("the newer preview is resident");
@@ -3154,18 +3390,28 @@ mod tests {
                 .expect("the disposable index is readable");
             let metadata: serde_json::Value = serde_json::from_slice(&metadata_bytes)
                 .expect("the disposable index is valid JSON");
-            assert_eq!(metadata["schemaVersion"], 5);
+            assert_eq!(metadata["schemaVersion"], 6);
             assert_eq!(metadata["representationVersion"], 1);
             assert_eq!(metadata["policy"]["maxEdgePx"], 1_600);
             assert_eq!(metadata["entries"].as_array().map(Vec::len), Some(2));
             assert_eq!(metadata["entries"][0]["mediaId"], "photo-a");
             assert_eq!(metadata["entries"][1]["mediaId"], "photo-b");
+            assert_eq!(
+                metadata["entries"][0]["sourceBindingSha256"]
+                    .as_str()
+                    .map(str::len),
+                Some(64)
+            );
             assert!(metadata["entries"][0].get("kind").is_none());
             assert!(metadata["entries"][0]["fingerprint"]["sourceCreatedUnixMs"].is_u64());
             assert!(metadata["entries"][0]["fingerprint"]["sourceModifiedUnixMs"].is_u64());
             assert!(metadata["entries"][0]["sourcePageCount"].is_null());
             assert_eq!(metadata["entries"][0]["basicColorProfile"], "srgb");
             let serialized = String::from_utf8(metadata_bytes).expect("the index uses UTF-8");
+            assert!(
+                !serialized.contains(fixture.work.source.source_path().to_string_lossy().as_ref()),
+                "the opaque source binding cannot serialize the Original pathname"
+            );
             for forbidden in [
                 "sourcePath",
                 "rootBindings",
@@ -3263,6 +3509,15 @@ mod tests {
             assert_eq!(recovered.removed_temporary_count, 2);
             assert_eq!(recovered.removed_generation_count, 1);
             assert!(!recovered.discarded_index);
+            assert_eq!(
+                recovered
+                    .verified_artifacts
+                    .iter()
+                    .map(RecoveredCacheArtifact::artifact)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                [published]
+            );
             assert!(published_path.is_file());
             assert!(!orphan.exists());
             assert!(!preview_temporary.exists());
@@ -3272,6 +3527,188 @@ mod tests {
                     .expect("the published index remains readable"),
                 metadata_before
             );
+        });
+    }
+
+    #[test]
+    fn relink_invalidation_removes_only_the_old_occurrence_before_reopening() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let photo_a = verified_preview_artifact(&fixture, &engine).await;
+            let photo_b_source = CacheMediaSource::new(
+                "photo-b",
+                MediaKind::Photo,
+                fixture.work.source.source_path().to_path_buf(),
+            )
+            .expect("Photo B is a valid Cache source");
+            let photo_b_work = CacheWork::new(
+                "cache-photo-b",
+                fixture.work.namespace.clone(),
+                photo_b_source,
+                fixture.work.root_bindings.clone(),
+            );
+            let photo_b = verified_preview_artifact_for_work(
+                &fixture,
+                &engine,
+                &photo_b_work,
+                &InvocationContext::new("cache-photo-b", Some(fixture.work.namespace.project_id())),
+            )
+            .await;
+            let photo_a_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&photo_a.media_id, &photo_a.generation_id, photo_a.format)
+                .expect("Photo A has a central Cache path");
+            let photo_b_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(&photo_b.media_id, &photo_b.generation_id, photo_b.format)
+                .expect("Photo B has a central Cache path");
+
+            assert!(
+                engine
+                    .invalidate_relinked_media(
+                        &engine.pause().await,
+                        &fixture.app_paths,
+                        &fixture.work.namespace,
+                        &registry,
+                        "photo-a",
+                    )
+                    .expect("relink invalidation is published before the Project mutates")
+            );
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("the relinked Project namespace reopens");
+            assert_eq!(
+                recovered
+                    .verified_artifacts
+                    .iter()
+                    .map(RecoveredCacheArtifact::artifact)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+                [photo_b]
+            );
+            assert!(!photo_a_path.exists());
+            assert!(photo_b_path.is_file());
+        });
+    }
+
+    #[test]
+    fn recovered_cache_is_bound_to_the_active_path_after_undo_or_discard() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let restored_path = fixture.work.source.source_path().to_path_buf();
+            let relinked_path = fixture._root.path().join("photo-a-relinked.jpg");
+            std::fs::write(&relinked_path, b"relinked-photo-a")
+                .expect("the relinked Original fixture is writable");
+            let relinked_work = CacheWork::new(
+                "cache-photo-a-relinked",
+                fixture.work.namespace.clone(),
+                CacheMediaSource::new("photo-a", MediaKind::Photo, relinked_path.clone())
+                    .expect("the relinked Cache source is valid"),
+                fixture.work.root_bindings.clone(),
+            );
+            let relinked = verified_preview_artifact_for_work(
+                &fixture,
+                &engine,
+                &relinked_work,
+                &InvocationContext::new(
+                    "cache-photo-a-relinked",
+                    Some(fixture.work.namespace.project_id()),
+                ),
+            )
+            .await;
+            let unrelated_path = fixture._root.path().join("photo-b.jpg");
+            std::fs::write(&unrelated_path, b"unrelated-photo-b")
+                .expect("the unrelated Original fixture is writable");
+            let unrelated_work = CacheWork::new(
+                "cache-photo-b",
+                fixture.work.namespace.clone(),
+                CacheMediaSource::new("photo-b", MediaKind::Photo, unrelated_path.clone())
+                    .expect("the unrelated Cache source is valid"),
+                fixture.work.root_bindings.clone(),
+            );
+            let unrelated = verified_preview_artifact_for_work(
+                &fixture,
+                &engine,
+                &unrelated_work,
+                &InvocationContext::new("cache-photo-b", Some(fixture.work.namespace.project_id())),
+            )
+            .await;
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("the restored Project namespace reopens");
+            assert_eq!(recovered.verified_artifacts.len(), 2);
+            let restored_matches = recovered
+                .verified_artifacts
+                .iter()
+                .filter(|candidate| match candidate.artifact().media_id.as_str() {
+                    "photo-a" => candidate.matches_source_path(&restored_path),
+                    "photo-b" => candidate.matches_source_path(&unrelated_path),
+                    _ => false,
+                })
+                .map(|candidate| candidate.artifact().clone())
+                .collect::<Vec<_>>();
+            assert_eq!(restored_matches, [unrelated]);
+            let stale = recovered
+                .verified_artifacts
+                .iter()
+                .find(|candidate| candidate.artifact().media_id == "photo-a")
+                .expect("the relinked generation remains physically verifiable");
+            assert_eq!(stale.artifact(), &relinked);
+            assert!(stale.matches_source_path(&relinked_path));
+            assert!(!stale.matches_source_path(&restored_path));
+            assert!(
+                super::plan_request(&fixture.app_paths, &fixture.work)
+                    .expect("the restored binding has a valid Cache plan")
+                    .jobs[0]
+                    .reusable
+                    .is_none(),
+                "the relinked generation cannot become reusable work for the restored path"
+            );
+        });
+    }
+
+    #[test]
+    fn reserved_namespace_recovery_rejects_a_corrupted_indexed_generation() {
+        tauri::async_runtime::block_on(async {
+            let fixture = fixture();
+            let engine = CacheEngine::default();
+            let published = verified_preview_artifact(&fixture, &engine).await;
+            let published_path = fixture
+                .work
+                .namespace
+                .paths()
+                .preview_file(
+                    &published.media_id,
+                    &published.generation_id,
+                    published.format,
+                )
+                .expect("the indexed generation path is valid");
+            std::fs::write(&published_path, b"corrupted derived bytes")
+                .expect("the indexed generation is corrupted after publication");
+
+            let recovered = CacheEngine::recover_reserved_namespace(
+                &fixture.app_paths,
+                &fixture.work.namespace,
+            )
+            .expect("corrupt disposable Cache is recovered without blocking the Project");
+
+            assert!(recovered.discarded_index);
+            assert!(recovered.verified_artifacts.is_empty());
+            assert!(!published_path.exists());
+            assert!(!fixture.work.namespace.paths().metadata_file().exists());
         });
     }
 

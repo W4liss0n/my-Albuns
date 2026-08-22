@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import type { EditorProjection } from "../domain/project";
+import type { ProjectCorePort } from "../application/projectPorts";
 import type { AlbumCanvasProps } from "./albumCanvasContract";
 import { usePhotoGestures } from "./usePhotoGestures";
 import { useProjectMutations } from "./useProjectMutations";
@@ -11,6 +12,7 @@ interface ProjectEditorControllerInput {
   interactionBlocked?: boolean;
   projection: EditorProjection;
   runProjectMutation: ProjectMutationRunner;
+  projectCorePort: ProjectCorePort;
   onProjectionChange(projection: EditorProjection): void;
 }
 
@@ -18,6 +20,7 @@ export function useProjectEditorController({
   interactionBlocked = false,
   projection,
   runProjectMutation,
+  projectCorePort,
   onProjectionChange,
 }: ProjectEditorControllerInput) {
   const navigation = useProjectNavigation(projection);
@@ -26,6 +29,7 @@ export function useProjectEditorController({
     projection,
     runProjectMutation,
     onProjectionChange,
+    onAffectedFrame: navigation.selectFrame,
   });
   const selectedFrame = useMemo(
     () =>
@@ -58,14 +62,32 @@ export function useProjectEditorController({
     selectedFrameId: navigation.selectedFrameId,
     focusedSheetId: navigation.focusedSheetId,
     centeredSheetId: navigation.centeredSheetId,
+    editingSheetId: navigation.editingSheetId,
     viewport: navigation.viewport,
     photoZoomPreview: photoGestures.photoZoomPreview,
     onSelectFrame: navigation.selectFrame,
     onFocusSheet: navigation.focusSheet,
     onCenteredSheetChange: navigation.centerSheet,
+    onEnterSheetEdit: navigation.enterSheetEdit,
+    onExitSheetEdit: navigation.exitSheetEdit,
     onViewportChange: navigation.setViewport,
     onTransformPreview: photoGestures.onTransformPreview,
     onTransformCommit: photoGestures.onTransformCommit,
+    onResolvePhotoDropTarget: async (_mediaId, point) =>
+      projectCorePort.resolvePhotoDropTarget(
+        point.sheetId,
+        point.xUm,
+        point.yUm,
+      ),
+    onDropPhoto: (mediaId, point) =>
+      mutations.dropPhoto({
+        kind: "dropPhoto",
+        sheetId: point.sheetId,
+        mediaId,
+        xUm: point.xUm,
+        yUm: point.yUm,
+        mode: navigation.editingSheetId ? "edit" : "normal",
+      }),
     onCanvasMetricsChange: navigation.handleCanvasMetricsChange,
   };
 
@@ -90,15 +112,17 @@ export function useProjectEditorController({
     finishZoomGesture: photoGestures.finishZoomGesture,
     applyDpi: mutations.applyDpi,
     relinkMedia: mutations.relinkMedia,
+    importPhoto: mutations.importPhoto,
     save: mutations.save,
     undo: mutations.undo,
     redo: mutations.redo,
     fillMedia: (mediaId: string) => {
       if (navigation.implicitSheetId) {
-        void mutations.applyWithStatus({
-          kind: "fillLeftmostPlaceholder",
+        void mutations.applyPhotoWithStatus({
+          kind: "addPhoto",
           sheetId: navigation.implicitSheetId,
           mediaId,
+          mode: navigation.editingSheetId ? "edit" : "normal",
         });
       }
     },

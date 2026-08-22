@@ -503,7 +503,7 @@ try {
             -or $savedCopy.namespace -eq $legacyOriginal.namespace `
             -or $savedCopy.dirty `
             -or $savedCopy.canUndo `
-            -or $savedDocument.schemaVersion -ne 2 `
+            -or $savedDocument.schemaVersion -ne 3 `
             -or $savedDocument.projectId -ne $savedCopy.projectId `
             -or (Get-FileSha256 -Path $readOnlySource) -ne $readOnlyHash) {
         throw 'Salvar cópia como... did not preserve source, Revision, current schema and isolation.'

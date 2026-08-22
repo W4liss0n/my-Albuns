@@ -3,10 +3,10 @@ use std::{env, path::PathBuf};
 use myalbuns_desktop_lib::ipc_contract::{
     CacheClearAllOutcome, CacheFreeResult, CacheProcessorState, CacheProcessorWarning,
     CacheServiceCommandError, CacheServiceStatus, CancelDisposition, ExportCommandError,
-    ExportEvent, ExportResult, FrontendLogEvent, LinkedMediaChanged, MediaPreview,
-    MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState, ProjectCloseChoice,
-    ProjectCloseRequestOutcome, ProjectCloseResolution, SaveProjectCommandError,
-    SaveProjectOutcome, SaveProjectResult,
+    ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult, LinkedMediaChanged,
+    MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
+    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
+    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
 };
 use ts_rs::{Config, TS};
 
@@ -38,6 +38,7 @@ fn main() {
     FrontendLogEvent::export_all(&config).expect("frontend log bindings should be generated");
     LinkedMediaChanged::export_all(&config)
         .expect("linked media change bindings should be generated");
+    ImportPhotoResult::export_all(&config).expect("Photo import bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)
         .expect("media preview demand bindings should be generated");

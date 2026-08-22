@@ -156,11 +156,12 @@ function App({
       });
       try {
         const preview = await mediaPreviewPort.retryUnavailableMedia(mediaId);
-        setMediaPreviews((current) => ({
-          ...current,
-          [mediaId]: preview,
-        }));
-        setMediaRefreshRevision((revision) => revision + 1);
+        if (preview.state !== "ready") {
+          setMediaPreviews((current) => ({
+            ...current,
+            [mediaId]: preview,
+          }));
+        }
         logger.write({
           level: "info",
           component: "media-preview",
@@ -181,23 +182,11 @@ function App({
     },
     [logger, mediaPreviewPort, projectId],
   );
-  useEffect(() => {
-    if (!projectId || uiReadyProject.current === projectId) return;
-    uiReadyProject.current = projectId;
-    projectStartupPort.confirmUiReady().catch((error: unknown) => {
-      if (uiReadyProject.current === projectId) {
-        uiReadyProject.current = "";
-      }
-      logger.write({
-        level: "error",
-        component: "application",
-        event: "project_ui_ready_failed",
-        projectId,
-        reason: logReasonFromError(error),
-      });
-      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
-    });
-  }, [logger, projectId, projectStartupPort]);
+  const updateMediaDemand = useCallback((next: MediaPreviewDemand) => {
+    setMediaDemand((current) =>
+      sameMediaDemand(current, next) ? current : next,
+    );
+  }, []);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
     projectCorePort,
@@ -205,11 +194,42 @@ function App({
   useEffect(() => {
     if (!projectId) return;
     let active = true;
+    let latestProjectionRefresh = 0;
     let unlisten: (() => void) | undefined;
     void mediaPreviewPort
       .onMediaChanged(() => {
         if (!active) return;
         setMediaRefreshRevision((revision) => revision + 1);
+        const refresh = ++latestProjectionRefresh;
+        const operationId = createLogInstanceId("media-refresh");
+        void projectCorePort.load(operationId).then(
+          (refreshed) => {
+            if (
+              !active ||
+              refresh !== latestProjectionRefresh ||
+              refreshed.state.projectId !== projectId
+            ) {
+              return;
+            }
+            setProjection((current) =>
+              current?.state.projectId === projectId &&
+              current.state.revision > refreshed.state.revision
+                ? current
+                : refreshed,
+            );
+          },
+          (error: unknown) => {
+            if (!active || refresh !== latestProjectionRefresh) return;
+            logger.write({
+              level: "warn",
+              component: "media-preview",
+              event: "media_projection_refresh_failed",
+              operationId,
+              projectId,
+              reason: logReasonFromError(error),
+            });
+          },
+        );
       })
       .then((dispose) => {
         if (active) {
@@ -241,7 +261,7 @@ function App({
           : current,
       );
     };
-  }, [logger, mediaPreviewPort, projectId]);
+  }, [logger, mediaPreviewPort, projectCorePort, projectId]);
 
   useEffect(() => {
     setCacheProcessorWarning(null);
@@ -294,6 +314,30 @@ function App({
   const mediaChangeListenerReady =
     mediaChangeSubscription?.projectId === projectId &&
     mediaChangeSubscription.port === mediaPreviewPort;
+
+  useEffect(() => {
+    if (
+      !projectId ||
+      !mediaChangeListenerReady ||
+      uiReadyProject.current === projectId
+    ) {
+      return;
+    }
+    uiReadyProject.current = projectId;
+    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+      if (uiReadyProject.current === projectId) {
+        uiReadyProject.current = "";
+      }
+      logger.write({
+        level: "error",
+        component: "application",
+        event: "project_ui_ready_failed",
+        projectId,
+        reason: logReasonFromError(error),
+      });
+      setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
+    });
+  }, [logger, mediaChangeListenerReady, projectId, projectStartupPort]);
 
   useEffect(() => {
     if (
@@ -419,14 +463,32 @@ function App({
           exportPipelinePort={exportPipelinePort}
           projectWindowPort={projectWindowPort}
           runProjectMutation={runProjectMutation}
+          projectCorePort={projectCorePort}
           mediaPreviews={mediaPreviews}
-          onMediaDemandChange={setMediaDemand}
+          onMediaDemandChange={updateMediaDemand}
           onRetryUnavailableMedia={retryUnavailableMedia}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
         />
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>
+  );
+}
+
+function sameMediaDemand(
+  left: MediaPreviewDemand,
+  right: MediaPreviewDemand,
+) {
+  return (
+    sameStrings(left.visibleMediaIds, right.visibleMediaIds) &&
+    sameStrings(left.preloadMediaIds, right.preloadMediaIds)
+  );
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
   );
 }
 

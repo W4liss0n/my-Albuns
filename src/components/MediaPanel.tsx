@@ -16,8 +16,13 @@ export interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
+  selectedMediaId?: string | null;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
+  onImportPhoto(): void;
+  onSelectMedia(mediaId: string): void;
+  onPhotoDragStart(mediaId: string): void;
+  onPhotoDragEnd(): void;
   onRelinkMedia(mediaId: string): void;
   onRetryUnavailableMedia(mediaId: string): Promise<void>;
   relinkDisabled?: boolean;
@@ -41,8 +46,13 @@ export function MediaPanel({
   mediaItems,
   mediaUsage,
   mediaPreviews = {},
+  selectedMediaId = null,
   onMediaDemandChange,
   onFillPhoto,
+  onImportPhoto,
+  onSelectMedia,
+  onPhotoDragStart,
+  onPhotoDragEnd,
   onRelinkMedia,
   onRetryUnavailableMedia,
   relinkDisabled = false,
@@ -57,6 +67,7 @@ export function MediaPanel({
     [activeMediaKind, mediaItems],
   );
   const stripRef = useRef<HTMLDivElement>(null);
+  const transparentDragImageRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!onMediaDemandChange) return;
     const root = stripRef.current;
@@ -112,6 +123,20 @@ export function MediaPanel({
       className="media-panel"
       aria-label="Painel de imagens"
     >
+      <canvas
+        ref={transparentDragImageRef}
+        aria-hidden="true"
+        width={1}
+        height={1}
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: 1,
+          height: 1,
+          pointerEvents: "none",
+        }}
+      />
       <div className="media-panel-head">
         <div className="media-tabs">
           <button
@@ -131,6 +156,16 @@ export function MediaPanel({
             Decorativos
           </button>
         </div>
+        {activeMediaKind === "photo" && (
+          <button
+            className="media-import"
+            disabled={relinkDisabled}
+            type="button"
+            onClick={onImportPhoto}
+          >
+            Importar JPEG…
+          </button>
+        )}
         <label className="media-search">
           <span aria-hidden="true">⌕</span>
           <input aria-label="Buscar imagens" placeholder="Buscar imagens" />
@@ -146,9 +181,40 @@ export function MediaPanel({
           return (
             <div className="media-card-shell" key={media.id}>
               <button
-                className="media-card"
+                aria-pressed={selectedMediaId === media.id}
+                className={`media-card${
+                  selectedMediaId === media.id ? " selected" : ""
+                }`}
                 type="button"
                 data-media-id={media.id}
+                draggable={media.kind === "photo"}
+                onClick={() => onSelectMedia(media.id)}
+                onDragStart={
+                  media.kind === "photo"
+                    ? (event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        const transparentDragImage = transparentDragImageRef.current;
+                        if (!transparentDragImage) {
+                          throw new Error(
+                            "A imagem transparente de arraste não está disponível.",
+                          );
+                        }
+                        event.dataTransfer.setDragImage(
+                          transparentDragImage,
+                          0,
+                          0,
+                        );
+                        event.dataTransfer.setData(
+                          "application/x-myalbuns-photo",
+                          media.id,
+                        );
+                        onPhotoDragStart(media.id);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  media.kind === "photo" ? onPhotoDragEnd : undefined
+                }
                 onDoubleClick={
                   media.kind === "photo"
                     ? () => onFillPhoto(media.id)

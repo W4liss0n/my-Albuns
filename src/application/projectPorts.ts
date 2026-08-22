@@ -1,6 +1,8 @@
 import type {
   EditorProjection,
+  PhotoDropTarget,
   ProjectIntent,
+  ProjectMutationOutcome,
 } from "../domain/project";
 
 export type MediaPreviewState =
@@ -181,6 +183,17 @@ export interface ProjectStartupPort {
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;
   apply(intent: ProjectIntent): Promise<EditorProjection>;
+  applyWithOutcome(intent: ProjectIntent): Promise<ProjectMutationOutcome>;
+  importPhoto(): Promise<
+    | { kind: "cancelled"; projection: EditorProjection }
+    | { kind: "imported"; projection: EditorProjection; mediaId: string }
+    | { kind: "selected"; projection: EditorProjection; mediaId: string }
+  >;
+  resolvePhotoDropTarget(
+    sheetId: string,
+    xUm: number,
+    yUm: number,
+  ): Promise<PhotoDropTarget>;
   relink(mediaId: string): Promise<EditorProjection>;
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
