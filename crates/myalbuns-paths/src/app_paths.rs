@@ -165,6 +165,19 @@ impl AppPaths {
         self.local_root.join("Recovery")
     }
 
+    pub fn project_recovery_checkpoint(
+        &self,
+        project_namespace: &str,
+    ) -> Result<PathBuf, AppPathsError> {
+        if !valid_namespace_component(project_namespace) {
+            return Err(AppPathsError::InvalidStateNamespace);
+        }
+        Ok(self
+            .recovery_dir()
+            .join("Projects")
+            .join(format!("{project_namespace}.json")))
+    }
+
     pub fn state_dir(&self) -> PathBuf {
         self.local_root.join("State")
     }

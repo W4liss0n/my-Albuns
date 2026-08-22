@@ -38,6 +38,7 @@ pub(crate) enum OpenStoreError {
 pub(crate) enum CreateStoreError {
     Path(PathFailure),
     Document(DocumentFailure),
+    SameTarget,
     DestinationConflict,
     ProjectInUse,
     IdentityIndeterminate,
@@ -141,6 +142,8 @@ pub(crate) struct PreparedReplacement {
     destination: PreparedFileDestination,
     replaced_project_id: Option<Uuid>,
     #[cfg(windows)]
+    forbidden_target: Option<PhysicalFileIdentity>,
+    #[cfg(windows)]
     replaced_lock: Option<ProjectFileLock>,
 }
 
@@ -177,6 +180,13 @@ impl PreparedReplacement {
         target_existed_before_publish: bool,
     ) -> Result<ProjectStore, CreateStoreError> {
         if !target_existed_before_publish && is_destination_conflict(&error) {
+            if let Some(current) = self
+                .destination
+                .resolve_existing()
+                .map_err(|error| CreateStoreError::Path(map_path_failure(error)))?
+            {
+                reject_forbidden_target(&current, self.forbidden_target)?;
+            }
             return Err(CreateStoreError::DestinationConflict);
         }
         if let Ok(store) = verify_created(
@@ -214,6 +224,7 @@ impl PreparedReplacement {
         else {
             return Ok(false);
         };
+        reject_forbidden_target(&current, self.forbidden_target)?;
         match expected_lock.compare_physical(&current) {
             PhysicalIdentityEvidence::Same => Ok(true),
             PhysicalIdentityEvidence::Different => Err(CreateStoreError::DestinationConflict),
@@ -329,6 +340,25 @@ pub(crate) fn create_only(
     revision: &ProjectRevision,
     transition_root: &Path,
 ) -> Result<ProjectStore, CreateStoreError> {
+    create_only_inner(location, revision, transition_root, None)
+}
+
+#[cfg(windows)]
+pub(crate) fn create_only_excluding(
+    location: ProjectLocation,
+    revision: &ProjectRevision,
+    transition_root: &Path,
+    forbidden_target: PhysicalFileIdentity,
+) -> Result<ProjectStore, CreateStoreError> {
+    create_only_inner(location, revision, transition_root, Some(forbidden_target))
+}
+
+fn create_only_inner(
+    location: ProjectLocation,
+    revision: &ProjectRevision,
+    transition_root: &Path,
+    forbidden_target: Option<PhysicalFileIdentity>,
+) -> Result<ProjectStore, CreateStoreError> {
     let destination = location
         .prepare_file_destination()
         .map_err(CreateStoreError::Path)?;
@@ -337,14 +367,25 @@ pub(crate) fn create_only(
     match publish_new(temporary.path(), destination.operational_path()) {
         Ok(()) => verify_created(&location, transition_root, &destination, &bytes, revision)
             .map_err(|_| CreateStoreError::StateIndeterminate),
-        Err(error) => reconcile_create_only_error(
-            error,
-            &location,
-            transition_root,
-            &destination,
-            &bytes,
-            revision,
-        ),
+        Err(error) => {
+            if is_destination_conflict(&error) {
+                if let Some(forbidden_target) = forbidden_target {
+                    let current = destination
+                        .resolve_existing()
+                        .map_err(|error| CreateStoreError::Path(map_path_failure(error)))?
+                        .ok_or(CreateStoreError::StateIndeterminate)?;
+                    reject_forbidden_target(&current, Some(forbidden_target))?;
+                }
+            }
+            reconcile_create_only_error(
+                error,
+                &location,
+                transition_root,
+                &destination,
+                &bytes,
+                revision,
+            )
+        }
     }
 }
 
@@ -394,6 +435,26 @@ pub(crate) fn prepare_replacement(
     revision: &ProjectRevision,
     transition_root: &Path,
 ) -> Result<PreparedReplacement, CreateStoreError> {
+    prepare_replacement_inner(location, revision, transition_root, None)
+}
+
+#[cfg(windows)]
+pub(crate) fn prepare_replacement_excluding(
+    location: ProjectLocation,
+    revision: &ProjectRevision,
+    transition_root: &Path,
+    forbidden_target: PhysicalFileIdentity,
+) -> Result<PreparedReplacement, CreateStoreError> {
+    prepare_replacement_inner(location, revision, transition_root, Some(forbidden_target))
+}
+
+#[cfg(windows)]
+fn prepare_replacement_inner(
+    location: ProjectLocation,
+    revision: &ProjectRevision,
+    transition_root: &Path,
+    forbidden_target: Option<PhysicalFileIdentity>,
+) -> Result<PreparedReplacement, CreateStoreError> {
     let destination = location
         .prepare_file_destination()
         .map_err(CreateStoreError::Path)?;
@@ -409,6 +470,7 @@ pub(crate) fn prepare_replacement(
     };
 
     let (replaced_lock, replaced_project_id) = if let Some(resolved) = resolved {
+        reject_forbidden_target(&resolved, forbidden_target)?;
         let lock =
             ProjectFileLock::try_acquire(resolved.operational_path()).map_err(
                 |error| match error {
@@ -441,8 +503,24 @@ pub(crate) fn prepare_replacement(
         temporary,
         destination,
         replaced_project_id,
+        forbidden_target,
         replaced_lock,
     })
+}
+
+#[cfg(windows)]
+fn reject_forbidden_target(
+    target: &ResolvedObject,
+    forbidden_target: Option<PhysicalFileIdentity>,
+) -> Result<(), CreateStoreError> {
+    let Some(forbidden_target) = forbidden_target else {
+        return Ok(());
+    };
+    match target.physical_identity() {
+        Some(identity) if identity == forbidden_target => Err(CreateStoreError::SameTarget),
+        Some(_) => Ok(()),
+        None => Err(CreateStoreError::IdentityIndeterminate),
+    }
 }
 
 #[cfg(not(windows))]

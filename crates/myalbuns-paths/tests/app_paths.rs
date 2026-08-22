@@ -44,6 +44,12 @@ fn exposes_each_data_category_under_its_approved_root() {
         paths.recovery_dir(),
         Path::new(r"C:\Local\MyAlbuns2\Recovery")
     );
+    assert_eq!(
+        paths
+            .project_recovery_checkpoint("project-safe")
+            .expect("the Project recovery namespace is valid"),
+        Path::new(r"C:\Local\MyAlbuns2\Recovery\Projects\project-safe.json")
+    );
     assert_eq!(paths.state_dir(), Path::new(r"C:\Local\MyAlbuns2\State"));
     assert_eq!(
         paths
