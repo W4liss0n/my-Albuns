@@ -70,11 +70,10 @@ mod tests {
         std::fs::write(&previous, b"previous recovery").expect("the previous checkpoint exists");
         std::fs::write(&next, b"next recovery").expect("the next checkpoint exists");
 
-        assert_eq!(
+        assert!(
             checkpoints
                 .finish_previous_checkpoint(previous_id)
-                .expect("the previous checkpoint is finished"),
-            true
+                .expect("the previous checkpoint is finished")
         );
         assert!(!previous.exists());
         assert_eq!(

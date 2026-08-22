@@ -57,7 +57,9 @@ fn parse_arguments(arguments: Vec<OsString>) -> HashMap<String, OsString> {
         "gate arguments are explicit flag/value pairs"
     );
     arguments
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let flag = pair[0]
                 .to_str()

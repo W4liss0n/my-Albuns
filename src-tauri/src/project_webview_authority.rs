@@ -140,16 +140,16 @@ impl ProjectWebviewAuthority {
 
 impl StagedProjectWebview {
     pub(crate) fn commit(self, app: &tauri::AppHandle) -> io::Result<CommittedProjectWebview> {
-        if !self.automation {
-            if let Err(error) = replace_project_webview(
+        if !self.automation
+            && let Err(error) = replace_project_webview(
                 app,
                 self.next_data_directory.clone(),
                 self.next_browser_arguments.as_deref(),
-            ) {
-                let _ = replace_project_webview(app, self.previous_data_directory.clone(), None);
-                self.owner.transitioning.store(false, Ordering::Release);
-                return Err(error);
-            }
+            )
+        {
+            let _ = replace_project_webview(app, self.previous_data_directory.clone(), None);
+            self.owner.transitioning.store(false, Ordering::Release);
+            return Err(error);
         }
         Ok(CommittedProjectWebview { staged: self })
     }

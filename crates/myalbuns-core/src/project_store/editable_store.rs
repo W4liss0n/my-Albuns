@@ -368,14 +368,14 @@ fn create_only_inner(
         Ok(()) => verify_created(&location, transition_root, &destination, &bytes, revision)
             .map_err(|_| CreateStoreError::StateIndeterminate),
         Err(error) => {
-            if is_destination_conflict(&error) {
-                if let Some(forbidden_target) = forbidden_target {
-                    let current = destination
-                        .resolve_existing()
-                        .map_err(|error| CreateStoreError::Path(map_path_failure(error)))?
-                        .ok_or(CreateStoreError::StateIndeterminate)?;
-                    reject_forbidden_target(&current, Some(forbidden_target))?;
-                }
+            if is_destination_conflict(&error)
+                && let Some(forbidden_target) = forbidden_target
+            {
+                let current = destination
+                    .resolve_existing()
+                    .map_err(|error| CreateStoreError::Path(map_path_failure(error)))?
+                    .ok_or(CreateStoreError::StateIndeterminate)?;
+                reject_forbidden_target(&current, Some(forbidden_target))?;
             }
             reconcile_create_only_error(
                 error,
