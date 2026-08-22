@@ -182,7 +182,7 @@ async function startAttachedWebDriver(debugPort, label) {
         },
       },
     },
-  });
+  }, 30_000);
   if (!session.sessionId) {
     throw new Error(`${label} WebDriver returned no session id`);
   }
