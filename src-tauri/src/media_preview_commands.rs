@@ -11,7 +11,7 @@ use crate::{
         CacheFailure, CacheFailureStage, CacheFlightClaim, CacheProcessorStatus, CacheWork,
     },
     cache_previews::{CachePreviewError, CachePreviewRegistry},
-    cache_service::CacheNamespaceOwner,
+    cache_service::ActiveCacheNamespace,
     imaging_processor::{
         ImagingProcessor, InvocationContext, InvocationFailureStage, TauriImagingTransport,
     },
@@ -71,7 +71,7 @@ pub(crate) async fn retry_unavailable_media(
     registry: State<'_, CachePreviewRegistry>,
     media_runtime: State<'_, MediaRuntime>,
     media_monitor: State<'_, MediaMonitor>,
-    namespace_owner: State<'_, CacheNamespaceOwner>,
+    namespace_owner: State<'_, ActiveCacheNamespace>,
 ) -> Result<MediaPreview, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
@@ -83,7 +83,7 @@ pub(crate) async fn retry_unavailable_media(
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let retry_app = app.clone();
-    let retry_namespace = namespace_owner.namespace().clone();
+    let retry_namespace = namespace_owner.namespace();
     let retry_registry = registry.inner().clone();
     let retry_host = project_host.inner().clone();
     let (inspection, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
@@ -143,7 +143,7 @@ pub(crate) async fn prepare_media_previews(
     processor: State<'_, ImagingProcessor>,
     logging: State<'_, LoggingState>,
     app_paths: State<'_, AppPaths>,
-    namespace_owner: State<'_, CacheNamespaceOwner>,
+    namespace_owner: State<'_, ActiveCacheNamespace>,
 ) -> Result<Option<Vec<MediaPreview>>, MediaPreviewCommandError> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
@@ -163,7 +163,7 @@ pub(crate) async fn prepare_media_previews(
     {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let namespace = namespace_owner.namespace().clone();
+    let namespace = namespace_owner.namespace();
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),

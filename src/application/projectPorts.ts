@@ -111,6 +111,20 @@ export interface SaveProjectResult {
   projection: EditorProjection;
 }
 
+export type SaveAsProjectOutcome =
+  | { kind: "cancelled" }
+  | {
+      kind: "savedAs";
+      previousProjectId: string;
+      projectId: string;
+      revision: number;
+    };
+
+export interface SaveAsProjectResult {
+  outcome: SaveAsProjectOutcome;
+  projection: EditorProjection;
+}
+
 export type SaveProjectFailureCode =
   | "stale_revision"
   | "persisted_baseline_conflict"
@@ -122,7 +136,13 @@ export type SaveProjectFailureCode =
   | "invalid_path"
   | "unexpected_object_type"
   | "conflict"
-  | "io_failure";
+  | "io_failure"
+  | "same_target"
+  | "destination_conflict"
+  | "project_in_use"
+  | "identity_indeterminate"
+  | "save_as_state_indeterminate"
+  | "dialog_unavailable";
 
 export type SaveProjectErrorCode =
   | SaveProjectFailureCode
@@ -198,6 +218,7 @@ export interface ProjectCorePort {
   undo(): Promise<EditorProjection>;
   redo(): Promise<EditorProjection>;
   save(expectedRevision: number): Promise<SaveProjectResult>;
+  saveAs(expectedRevision: number): Promise<SaveAsProjectResult>;
 }
 
 export interface MediaPreviewPort {

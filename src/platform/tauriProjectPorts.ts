@@ -15,6 +15,8 @@ import {
   type MediaPreviewPort,
   type ProjectStartupPort,
   type ProjectCorePort,
+  type SaveAsProjectOutcome as ApplicationSaveAsProjectOutcome,
+  type SaveAsProjectResult as ApplicationSaveAsProjectResult,
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
@@ -29,8 +31,11 @@ import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
+import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
+import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
 import { isIpcRecord, isIpcRevision } from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
+import { parseProjectSaveAsFailure } from "./projectSaveAsFailure";
 
 function isMediaPreviewCommandError(
   error: unknown,
@@ -94,6 +99,117 @@ function invalidSaveResponse() {
     "invalid_response",
     "Não foi possível confirmar o resultado do Salvamento.",
   );
+}
+
+function toSaveAsProjectError(error: unknown): SaveProjectError {
+  const failure = parseProjectSaveAsFailure(error);
+  if (!failure) {
+    return new SaveProjectError(
+      "save_unavailable",
+      "Não foi possível iniciar Salvar como.",
+    );
+  }
+  return new SaveProjectError(failure.code, failure.message, failure.context);
+}
+
+function invalidSaveAsResponse() {
+  return new SaveProjectError(
+    "invalid_response",
+    "Não foi possível confirmar o resultado de Salvar como.",
+  );
+}
+
+function isProjectionIdentity(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function isCanonicalProjectIdentity(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+      value,
+    )
+  );
+}
+
+function parseIpcSaveAsProjectResult(
+  value: unknown,
+  expectedRevision: number,
+): IpcSaveAsProjectResult {
+  if (!isIpcRecord(value) || !isIpcRecord(value.outcome)) {
+    throw invalidSaveAsResponse();
+  }
+
+  const { outcome, projection } = value;
+  if (
+    !isIpcRecord(projection) ||
+    !isIpcRecord(projection.state) ||
+    !isProjectionIdentity(projection.state.projectId) ||
+    !isIpcRevision(projection.state.revision) ||
+    !isIpcRevision(projection.state.savedRevision)
+  ) {
+    throw invalidSaveAsResponse();
+  }
+
+  if (outcome.kind === "cancelled") {
+    if (projection.state.revision !== expectedRevision) {
+      throw invalidSaveAsResponse();
+    }
+    return {
+      outcome: { kind: "cancelled" },
+      projection: projection as IpcSaveAsProjectResult["projection"],
+    };
+  }
+  if (
+    outcome.kind !== "savedAs" ||
+    !isProjectionIdentity(outcome.previousProjectId) ||
+    !isCanonicalProjectIdentity(outcome.projectId) ||
+    outcome.previousProjectId === outcome.projectId ||
+    !isIpcRevision(outcome.revision) ||
+    outcome.revision !== expectedRevision ||
+    projection.state.projectId !== outcome.projectId ||
+    projection.state.revision !== outcome.revision ||
+    projection.state.savedRevision !== outcome.revision ||
+    projection.state.dirty !== false ||
+    typeof projection.state.projectName !== "string" ||
+    projection.state.projectName.length === 0
+  ) {
+    throw invalidSaveAsResponse();
+  }
+
+  return {
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: outcome.previousProjectId,
+      projectId: outcome.projectId,
+      revision: outcome.revision,
+    },
+    projection: projection as IpcSaveAsProjectResult["projection"],
+  };
+}
+
+function toApplicationSaveAsProjectOutcome(
+  outcome: IpcSaveAsProjectOutcome,
+): ApplicationSaveAsProjectOutcome {
+  return outcome.kind === "cancelled"
+    ? { kind: "cancelled" }
+    : {
+        kind: "savedAs",
+        previousProjectId: outcome.previousProjectId,
+        projectId: outcome.projectId,
+        revision: outcome.revision,
+      };
+}
+
+function toSaveAsProjectResult(
+  value: unknown,
+  expectedRevision: number,
+): ApplicationSaveAsProjectResult {
+  const ipcResult = parseIpcSaveAsProjectResult(value, expectedRevision);
+  return {
+    outcome: toApplicationSaveAsProjectOutcome(ipcResult.outcome),
+    projection: ipcResult.projection,
+  };
 }
 
 function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
@@ -182,6 +298,18 @@ export const tauriProjectCorePort: ProjectCorePort = {
       throw error instanceof SaveProjectError
         ? error
         : toSaveProjectError(error);
+    }
+  },
+  saveAs: async (expectedRevision) => {
+    try {
+      return toSaveAsProjectResult(
+        await invoke<unknown>("save_project_as", { expectedRevision }),
+        expectedRevision,
+      );
+    } catch (error: unknown) {
+      throw error instanceof SaveProjectError
+        ? error
+        : toSaveAsProjectError(error);
     }
   },
 };

@@ -35,6 +35,8 @@ mod project_bootstrap;
 mod project_close_commands;
 mod project_commands;
 mod project_host;
+mod project_recovery;
+mod project_webview_authority;
 mod project_window_lifecycle;
 mod provisional_decoratives;
 mod recent_projects;

@@ -388,6 +388,124 @@ test("returns the authoritative projection from a confirmed Project save", async
   });
 });
 
+test("invokes the native Salvar como flow and validates the adopted Project", async () => {
+  const savedAsProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      projectId: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+      projectName: "Versão independente",
+      savedRevision: 25,
+      dirty: false,
+      canUndo: true,
+    },
+  };
+  const result = {
+    outcome: {
+      kind: "savedAs" as const,
+      previousProjectId: representativeProjection.state.projectId,
+      projectId: savedAsProjection.state.projectId,
+      revision: 25,
+    },
+    projection: savedAsProjection,
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(result);
+
+  await expect(tauriProjectCorePort.saveAs(25)).resolves.toEqual(result);
+  expect(invoke).toHaveBeenCalledWith("save_project_as", {
+    expectedRevision: 25,
+  });
+});
+
+test("accepts native Salvar como cancellation without changing the projection", async () => {
+  const result = {
+    outcome: { kind: "cancelled" as const },
+    projection: representativeProjection,
+  };
+  vi.mocked(invoke).mockResolvedValueOnce(result);
+
+  await expect(tauriProjectCorePort.saveAs(25)).resolves.toEqual(result);
+});
+
+test("rejects Salvar como when the adopted identity and projection disagree", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: representativeProjection.state.projectId,
+      projectId: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+      revision: 25,
+    },
+    projection: representativeProjection,
+  });
+
+  await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
+    code: "invalid_response",
+    message: "Não foi possível confirmar o resultado de Salvar como.",
+  });
+});
+
+test("rejects Salvar como identities that are not canonical Project UUIDs", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: representativeProjection.state.projectId,
+      projectId: "not-a-project-identity",
+      revision: 25,
+    },
+    projection: {
+      ...representativeProjection,
+      state: {
+        ...representativeProjection.state,
+        projectId: "not-a-project-identity",
+        savedRevision: 25,
+        dirty: false,
+      },
+    },
+  });
+
+  await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+});
+
+test("rejects a Salvar como revision different from the requested visible revision", async () => {
+  const copiedProjectId = "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5";
+  vi.mocked(invoke).mockResolvedValueOnce({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: representativeProjection.state.projectId,
+      projectId: copiedProjectId,
+      revision: 24,
+    },
+    projection: {
+      ...representativeProjection,
+      state: {
+        ...representativeProjection.state,
+        projectId: copiedProjectId,
+        revision: 24,
+        savedRevision: 24,
+        dirty: false,
+      },
+    },
+  });
+
+  await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
+    code: "invalid_response",
+  });
+});
+
+test("maps an indeterminate Salvar como terminal without hiding destination risk", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce({
+    code: "save_as_state_indeterminate",
+  });
+
+  await expect(tauriProjectCorePort.saveAs(25)).rejects.toMatchObject({
+    code: "save_as_state_indeterminate",
+    message:
+      "Não foi possível confirmar o destino de Salvar como. A Sessão anterior foi mantida; reinspecione o destino antes de reutilizá-lo.",
+  });
+});
+
 test("accepts an already-current Project save envelope", async () => {
   const currentProjection = {
     ...representativeProjection,

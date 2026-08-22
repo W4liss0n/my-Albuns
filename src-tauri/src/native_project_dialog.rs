@@ -3,6 +3,7 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use tauri::Manager;
 
+use myalbuns_core::CreateAuthorization;
 #[cfg(windows)]
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::ExportWriteAuthorization;
@@ -24,6 +25,15 @@ pub(crate) enum ExportSaveDialogOutcome {
     Selected {
         path: PathBuf,
         authorization: ExportWriteAuthorization,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SaveAsDialogOutcome {
+    Cancelled,
+    Selected {
+        path: PathBuf,
+        authorization: CreateAuthorization,
     },
 }
 
@@ -127,6 +137,30 @@ pub(crate) async fn choose_export_destination(
     }
 }
 
+pub(crate) async fn choose_save_as_destination(
+    window: &tauri::WebviewWindow,
+    suggested_filename: String,
+) -> Result<SaveAsDialogOutcome, NativeProjectDialogError> {
+    #[cfg(windows)]
+    {
+        let owner = window
+            .hwnd()
+            .map_err(NativeProjectDialogError::NativeWindowUnavailable)?
+            .0 as isize;
+        tauri::async_runtime::spawn_blocking(move || {
+            show_save_as_dialog(owner, &suggested_filename)
+        })
+        .await
+        .map_err(|error| NativeProjectDialogError::DialogThreadUnavailable(error.to_string()))?
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (window, suggested_filename);
+        Err(NativeProjectDialogError::UnsupportedPlatform)
+    }
+}
+
 #[cfg(windows)]
 mod windows_dialog {
     use std::{
@@ -161,12 +195,14 @@ mod windows_dialog {
     };
 
     use super::{
-        CreateWriteAuthorization, ExportSaveDialogOutcome, ExportWriteAuthorization,
-        NativeProjectDialogError, ProcessRole, ProjectSaveDialogOutcome,
+        CreateAuthorization, CreateWriteAuthorization, ExportSaveDialogOutcome,
+        ExportWriteAuthorization, NativeProjectDialogError, ProcessRole, ProjectSaveDialogOutcome,
+        SaveAsDialogOutcome,
     };
 
     enum SaveDialogKind<'a> {
         Project,
+        SaveAs { suggested_filename: &'a str },
         Export { suggested_filename: &'a str },
     }
 
@@ -174,6 +210,7 @@ mod windows_dialog {
         fn operation(&self) -> &'static str {
             match self {
                 Self::Project => "create_project",
+                Self::SaveAs { .. } => "save_project_as",
                 Self::Export { .. } => "export_sheet",
             }
         }
@@ -181,7 +218,7 @@ mod windows_dialog {
         fn process_role(&self) -> ProcessRole {
             match self {
                 Self::Project => ProcessRole::Global,
-                Self::Export { .. } => ProcessRole::DesktopHost,
+                Self::SaveAs { .. } | Self::Export { .. } => ProcessRole::DesktopHost,
             }
         }
     }
@@ -346,6 +383,28 @@ mod windows_dialog {
         )
     }
 
+    pub(super) fn show_save_as_dialog(
+        owner: isize,
+        suggested_filename: &str,
+    ) -> Result<SaveAsDialogOutcome, NativeProjectDialogError> {
+        Ok(
+            match show_save_dialog(owner, SaveDialogKind::SaveAs { suggested_filename })? {
+                SaveDialogOutcome::Cancelled => SaveAsDialogOutcome::Cancelled,
+                SaveDialogOutcome::Selected {
+                    path,
+                    replacement_confirmed,
+                } => SaveAsDialogOutcome::Selected {
+                    path,
+                    authorization: if replacement_confirmed {
+                        CreateAuthorization::ReplaceConfirmed
+                    } else {
+                        CreateAuthorization::CreateOnly
+                    },
+                },
+            },
+        )
+    }
+
     fn show_save_dialog(
         owner: isize,
         kind: SaveDialogKind<'_>,
@@ -380,6 +439,23 @@ mod windows_dialog {
                     dialog.SetFileName(w!("Novo Projeto.myalbuns"))?;
                     dialog.SetTitle(w!("Criar Projeto MyAlbuns"))?;
                     dialog.SetOkButtonLabel(w!("Criar"))?;
+                }
+                wide("Substituir Projeto MyAlbuns")
+            }
+            SaveDialogKind::SaveAs { suggested_filename } => {
+                let filters = [COMDLG_FILTERSPEC {
+                    pszName: w!("Projeto MyAlbuns (*.myalbuns)"),
+                    pszSpec: w!("*.myalbuns"),
+                }];
+                let suggested_filename = wide(suggested_filename);
+                // SAFETY: all UTF-16 buffers remain alive through these synchronous calls.
+                unsafe {
+                    dialog.SetFileTypes(&filters)?;
+                    dialog.SetFileTypeIndex(1)?;
+                    dialog.SetDefaultExtension(w!("myalbuns"))?;
+                    dialog.SetFileName(PCWSTR(suggested_filename.as_ptr()))?;
+                    dialog.SetTitle(w!("Salvar Projeto como"))?;
+                    dialog.SetOkButtonLabel(w!("Salvar"))?;
                 }
                 wide("Substituir Projeto MyAlbuns")
             }
@@ -516,4 +592,4 @@ mod windows_dialog {
 }
 
 #[cfg(windows)]
-use windows_dialog::{show_export_save_dialog, show_project_save_dialog};
+use windows_dialog::{show_export_save_dialog, show_project_save_dialog, show_save_as_dialog};

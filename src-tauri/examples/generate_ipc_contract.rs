@@ -6,7 +6,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult, LinkedMediaChanged,
     MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
     ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
+    SaveProjectOutcome, SaveProjectResult,
 };
 use ts_rs::{Config, TS};
 
@@ -58,4 +59,10 @@ fn main() {
         .expect("Save Project outcome bindings should be generated");
     SaveProjectResult::export_all(&config)
         .expect("Save Project result bindings should be generated");
+    SaveAsProjectCommandError::export_all(&config)
+        .expect("Save As Project error bindings should be generated");
+    SaveAsProjectOutcome::export_all(&config)
+        .expect("Save As Project outcome bindings should be generated");
+    SaveAsProjectResult::export_all(&config)
+        .expect("Save As Project result bindings should be generated");
 }

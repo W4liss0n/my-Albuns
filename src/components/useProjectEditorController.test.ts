@@ -26,6 +26,9 @@ function projectCorePort(): ProjectCorePort {
     save: async () => {
       throw new Error("Salvamento não configurado neste teste.");
     },
+    saveAs: async () => {
+      throw new Error("Salvar como não configurado neste teste.");
+    },
   };
 }
 
