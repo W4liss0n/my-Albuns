@@ -265,7 +265,7 @@ A implementação publica fixtures versionadas e testes para, no mínimo:
 | conteúdo inválido com extensão `.myalbuns`, encontrado pela descoberta em lote | candidato reportado como inválido, sem escrita |
 | abertura direta pelo Windows | somente `.myalbuns` é associado ao MyAlbuns |
 | extensão correta com `documentType` incorreto | `InvalidDocumentType` |
-| fixture demonstrativa com `schemaVersion: 3` incompatível com o DTO v3 fechado | `InvalidProjectDocument`, sem criar Sessão |
+| caso demonstrativo com `schemaVersion: 3` incompatível com o DTO v3 fechado | `InvalidProjectDocument`, sem criar Sessão |
 | versão pública futura | `UnsupportedFutureSchema`, sem escrita |
 | versão antiga sem cadeia suportada | `UnsupportedLegacySchema`, sem escrita |
 | campo desconhecido em uma versão conhecida | `InvalidProjectDocument`, sem perda silenciosa |

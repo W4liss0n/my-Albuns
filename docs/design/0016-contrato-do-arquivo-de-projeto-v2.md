@@ -117,7 +117,7 @@ resultado, promove `schemaVersion` para 3 e acrescenta somente o valor padrão
 | campo adicional em qualquer DTO | `InvalidProjectDocument`, sem perda silenciosa |
 | versão maior que 3 | `UnsupportedFutureSchema`, sem escrita |
 
-Fixtures v1 anteriores permanecem normativas para o leitor v1. A forma pública
+Casos v1 anteriores permanecem normativos para o leitor v1. A forma pública
 do esquema 3 pertence ao design 0017 e participa da cadeia; formatos de protótipos
 que não correspondam ao DTO fechado continuam recusados.
 
