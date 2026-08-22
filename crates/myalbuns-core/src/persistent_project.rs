@@ -411,8 +411,6 @@ impl EditableProject {
 
     /// Resolved editor view of the current productive Project document.
     pub fn projection(&self) -> EditorProjection {
-        // Human-readable only: path authority remains inside ProjectStore.
-        let project_location_display = self.project_path().display().to_string();
         let project_name = self
             .project_path()
             .file_stem()
@@ -423,7 +421,6 @@ impl EditableProject {
             &self.session,
             self.session_valid,
             &project_name,
-            &project_location_display,
             &self.photo_sources,
         )
     }

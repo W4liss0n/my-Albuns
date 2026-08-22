@@ -1231,7 +1231,7 @@ mod tests {
     }
 
     #[test]
-    fn save_as_serially_adopts_the_new_identity_and_projects_its_location() {
+    fn save_as_serially_adopts_the_new_identity_and_projects_its_name() {
         let fixture = fixture();
         let destination = fixture._root.path().join("Versão independente.myalbuns");
         let original_bytes = std::fs::read(&fixture.project_path)

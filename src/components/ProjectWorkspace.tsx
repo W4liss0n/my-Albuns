@@ -195,15 +195,6 @@ export function ProjectWorkspace({
           <button type="button">Ferramentas</button>
           <button type="button">Ajuda</button>
         </nav>
-        <div className="current-project" aria-label="Projeto atual">
-          <strong>{projection.state.projectName}</strong>
-          <span
-            className="current-project-location"
-            title={projection.state.projectLocationDisplay}
-          >
-            {projection.state.projectLocationDisplay}
-          </span>
-        </div>
       </header>
 
       <div className="commandbar">

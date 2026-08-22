@@ -417,7 +417,6 @@ impl DocumentSnapshot {
 pub struct EditorState {
     pub project_id: String,
     pub project_name: String,
-    pub project_location_display: String,
     pub document: DocumentSnapshot,
     pub album: AlbumSnapshot,
     pub revision: u64,

@@ -20,7 +20,7 @@ use crate::{
     logging::validate_optional_identifier,
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     native_project_dialog::{SaveAsDialogOutcome, choose_save_as_destination},
-    product_runtime::PROJECT_WINDOW_LABEL,
+    product_runtime::{PROJECT_WINDOW_LABEL, project_window_title},
     project_host::{ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError},
     project_recovery::ProjectRecoveryCheckpoints,
     project_webview_authority::ProjectWebviewAuthority,
@@ -407,7 +407,18 @@ pub(crate) async fn save_project_as(
         } => (path, authorization),
     };
 
-    let selected_path = path.clone();
+    let next_title = project_window_title(&path);
+    let previous_title = window.title().map_err(|error| {
+        tracing::error!(
+            target: "myalbuns.desktop",
+            process_role = ProcessRole::DesktopHost.as_str(),
+            window_label = window.label(),
+            error = %error,
+            event = "project_save_as_title_read_failed",
+        );
+        SaveAsProjectCommandError::IoFailure
+    })?;
+    let transition_window = window.clone();
     let window_label = window.label().to_owned();
     let cache_pause = window.state::<CacheEngine>().pause().await;
     let transition_app = window.app_handle().clone();
@@ -463,6 +474,24 @@ pub(crate) async fn save_project_as(
                             event = "project_save_as_webview_transition_failed",
                         );
                     })?;
+                    if let Err(error) = transition_window.set_title(&next_title) {
+                        tracing::error!(
+                            target: "myalbuns.desktop",
+                            process_role = ProcessRole::DesktopHost.as_str(),
+                            window_label = transition_window.label(),
+                            error = %error,
+                            event = "project_save_as_title_update_failed",
+                        );
+                        if let Err(rollback_error) = webview.rollback(&transition_app) {
+                            tracing::error!(
+                                target: "myalbuns.desktop",
+                                error = %rollback_error,
+                                event = "project_save_as_webview_rollback_failed",
+                            );
+                            transition_app.exit(1);
+                        }
+                        return Err(());
+                    }
                     if let Err(error) = transition_app
                         .state::<ProjectRecoveryCheckpoints>()
                         .finish_previous_checkpoint(outcome.previous_project_id)
@@ -472,12 +501,24 @@ pub(crate) async fn save_project_as(
                             error = %error,
                             event = "project_save_as_recovery_transition_failed",
                         );
+                        let mut rollback_failed = false;
+                        if let Err(rollback_error) = transition_window.set_title(&previous_title) {
+                            tracing::error!(
+                                target: "myalbuns.desktop",
+                                error = %rollback_error,
+                                event = "project_save_as_title_rollback_failed",
+                            );
+                            rollback_failed = true;
+                        }
                         if let Err(rollback_error) = webview.rollback(&transition_app) {
                             tracing::error!(
                                 target: "myalbuns.desktop",
                                 error = %rollback_error,
                                 event = "project_save_as_webview_rollback_failed",
                             );
+                            rollback_failed = true;
+                        }
+                        if rollback_failed {
                             transition_app.exit(1);
                         }
                         return Err(());
@@ -536,20 +577,6 @@ pub(crate) async fn save_project_as(
     drop(cache_pause);
 
     let outcome = map_save_as_project_outcome(saved.outcome);
-    let title = format!(
-        "{} — {}",
-        saved.projection.state.project_name,
-        selected_path.display()
-    );
-    if let Err(error) = window.set_title(&title) {
-        tracing::error!(
-            target: "myalbuns.desktop",
-            process_role = ProcessRole::DesktopHost.as_str(),
-            window_label = window.label(),
-            error = %error,
-            event = "project_save_as_title_update_failed",
-        );
-    }
     tracing::info!(
         target: "myalbuns.desktop",
         process_role = ProcessRole::DesktopHost.as_str(),

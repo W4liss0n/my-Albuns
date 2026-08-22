@@ -298,29 +298,6 @@ button {
   background: rgb(255 255 255 / 5%);
 }
 
-.current-project {
-  display: flex;
-  min-width: 0;
-  margin-left: auto;
-  align-items: baseline;
-  color: #dce2e7;
-  font-size: 0.72rem;
-  gap: 8px;
-}
-
-.current-project strong {
-  flex: none;
-  font-weight: 600;
-}
-
-.current-project-location {
-  overflow: hidden;
-  max-width: min(48vw, 640px);
-  color: #8f9ba5;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .app-menu-popup {
   position: absolute;
   top: calc(100% - 1px);

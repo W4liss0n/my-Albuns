@@ -146,9 +146,7 @@ function parseIpcSaveAsProjectResult(
     !isIpcRecord(projection.state) ||
     !isProjectionIdentity(projection.state.projectId) ||
     !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision) ||
-    typeof projection.state.projectLocationDisplay !== "string" ||
-    projection.state.projectLocationDisplay.length === 0
+    !isIpcRevision(projection.state.savedRevision)
   ) {
     throw invalidSaveAsResponse();
   }

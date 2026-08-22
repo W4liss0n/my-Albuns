@@ -265,12 +265,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     screen.getByRole("navigation", { name: "Menu principal" }),
   ).toBeInTheDocument();
   await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
-  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
-    "Álbum Horizonte",
-  );
-  expect(screen.getByLabelText("Projeto atual")).toHaveTextContent(
-    projection.state.projectLocationDisplay,
-  );
+  expect(screen.queryByText("Álbum Horizonte")).not.toBeInTheDocument();
   expect(screen.queryByText("NVIDIA GeForce RTX")).not.toBeInTheDocument();
   expect(logEvents).toEqual(
     expect.arrayContaining([

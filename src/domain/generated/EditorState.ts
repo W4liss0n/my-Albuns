@@ -2,4 +2,4 @@
 import type { AlbumSnapshot } from "./AlbumSnapshot";
 import type { DocumentSnapshot } from "./DocumentSnapshot";
 
-export type EditorState = { projectId: string, projectName: string, projectLocationDisplay: string, document: DocumentSnapshot, album: AlbumSnapshot, revision: number, savedRevision: number, dirty: boolean, canUndo: boolean, canRedo: boolean, };
+export type EditorState = { projectId: string, projectName: string, document: DocumentSnapshot, album: AlbumSnapshot, revision: number, savedRevision: number, dirty: boolean, canUndo: boolean, canRedo: boolean, };

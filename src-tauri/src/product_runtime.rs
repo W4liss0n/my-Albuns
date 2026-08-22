@@ -1,5 +1,6 @@
 use std::{
     io,
+    path::Path,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -39,6 +40,15 @@ pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
 pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
 pub(crate) const CACHE_PROCESSOR_WARNING_EVENT: &str = "myalbuns://cache-processor-warning";
 
+pub(crate) fn project_window_title(path: &Path) -> String {
+    let project_name = path
+        .file_stem()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Projeto".into());
+    format!("{project_name} — {}", path.display())
+}
+
 pub(crate) fn run(
     opened: BootstrappedHostProject,
     app_paths: AppPaths,
@@ -52,6 +62,7 @@ pub(crate) fn run(
         .reserve_namespace(project.identity_authority())
         .map_err(io::Error::other)?;
     hydrate_project_from_recovered_cache(&mut project, cache_namespace_owner.recovered_artifacts());
+    let initial_window_title = project_window_title(project.project_path());
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
@@ -153,7 +164,7 @@ pub(crate) fn run(
                 request_window_export_cancellation(window);
             }
         })
-        .setup(move |app| setup_host(app, setup_paths))
+        .setup(move |app| setup_host(app, setup_paths, initial_window_title))
         .invoke_handler(tauri::generate_handler![
             crate::logging::frontend_log,
             project_ui_ready,
@@ -212,7 +223,11 @@ fn hydrate_project_from_recovered_cache(
         .count()
 }
 
-fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_host(
+    app: &mut tauri::App,
+    app_paths: AppPaths,
+    initial_window_title: String,
+) -> Result<(), Box<dyn std::error::Error>> {
     let projection = app
         .state::<ProjectHost>()
         .projection()
@@ -249,6 +264,7 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
         desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
         (window, Some(policy_readiness))
     };
+    project_window.set_title(&initial_window_title)?;
     app.manage(app_paths);
     let app_handle = app.handle().clone();
     let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
@@ -637,7 +653,7 @@ mod tests {
 
     use super::{
         PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
-        hydrate_project_from_recovered_cache, refresh_changed_photo_sources,
+        hydrate_project_from_recovered_cache, project_window_title, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
     };
     use crate::{
@@ -649,6 +665,16 @@ mod tests {
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
         assert_eq!(PROJECT_WINDOW_LABEL, "project");
+    }
+
+    #[test]
+    fn native_project_title_exposes_the_current_name_and_location() {
+        let path = std::path::Path::new("Projetos").join("Familia.myalbuns");
+
+        assert_eq!(
+            project_window_title(&path),
+            format!("Familia — {}", path.display())
+        );
     }
 
     #[test]
