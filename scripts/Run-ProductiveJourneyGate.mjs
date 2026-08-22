@@ -14,6 +14,7 @@ import path from "node:path";
 import {
   aliveProcessInstances,
   assertNoPreexistingProcessInstances,
+  powershellJson,
   processInstancesByExecutable,
   sameProcessInstance,
   terminateProcessInstance,
@@ -57,6 +58,7 @@ const { purgeOwnedCache, summarizeOwnedCache } = createOwnedCacheGuard({
   processDataRoot,
 });
 const projectPath = path.join(scratch, "Jornada produtiva.myalbuns");
+const saveAsPath = path.join(scratch, "Jornada produtiva - Cópia.myalbuns");
 const exportPath = path.join(scratch, "Jornada produtiva_002.jpg");
 const missingOriginalExportPath = path.join(
   scratch,
@@ -100,6 +102,7 @@ for (const knownFolder of ["Roaming", "Local", "Temporary"]) {
 }
 if (
   existsSync(projectPath) ||
+  existsSync(saveAsPath) ||
   existsSync(exportPath) ||
   existsSync(missingOriginalExportPath) ||
   existsSync(photoPath)
@@ -127,7 +130,9 @@ async function waitForHttp(url, label, timeout = 30_000) {
     }
     await delay(50);
   }
-  throw lastError ?? new Error(`${label} did not become ready`);
+  throw new Error(`${label} did not become ready: ${lastError ?? "unknown error"}`, {
+    cause: lastError,
+  });
 }
 
 async function startAttachedWebDriver(debugPort, label) {
@@ -155,7 +160,17 @@ async function startAttachedWebDriver(debugPort, label) {
   const instance = await waitForProcessInstance(child.pid, `${label} WebDriver`);
   const baseUrl = `http://127.0.0.1:${driverPort}`;
   await waitForHttp(`${baseUrl}/status`, `${label} WebDriver`);
-  const request = createWebDriverClient(baseUrl);
+  const rawRequest = createWebDriverClient(baseUrl);
+  const request = async (method, endpoint, body, timeout) => {
+    try {
+      return await rawRequest(method, endpoint, body, timeout);
+    } catch (error) {
+      throw new Error(
+        `${label} WebDriver ${method} ${endpoint} failed; driverExitCode=${child.exitCode}; output=${output.slice(-1_000)}`,
+        { cause: error },
+      );
+    }
+  };
   const session = await request("POST", "/session", {
     capabilities: {
       alwaysMatch: {
@@ -455,6 +470,34 @@ function driveNativeDialog(instance, action, title, destination) {
   return JSON.parse(result.stdout.trim());
 }
 
+function nativeWindowTitle(instance) {
+  const encoded = powershellJson(
+    String.raw`
+$observed = Get-CimInstance Win32_Process -Filter "ProcessId = $env:MYALBUNS_GATE_WINDOW_PID" -ErrorAction Stop
+if ($null -eq $observed -or $observed.CreationDate.ToUniversalTime().ToString('O') -cne $env:MYALBUNS_GATE_WINDOW_CREATED) {
+    throw 'The native window no longer belongs to the expected process instance.'
+}
+$process = Get-Process -Id ([int]$env:MYALBUNS_GATE_WINDOW_PID) -ErrorAction Stop
+[void]$process.Handle
+if ($process.HasExited) {
+    throw 'The native window process exited before its title was observed.'
+}
+$titleBytes = [System.Text.Encoding]::UTF8.GetBytes([string]$process.MainWindowTitle)
+$titleBase64 = [System.Convert]::ToBase64String($titleBytes)
+[Console]::Out.Write((ConvertTo-Json -InputObject $titleBase64 -Compress))
+`,
+    {
+      MYALBUNS_GATE_WINDOW_PID: String(instance.processId),
+      MYALBUNS_GATE_WINDOW_CREATED: instance.creationTimeUtc,
+    },
+  );
+  return Buffer.from(encoded, "base64").toString("utf8");
+}
+
+function projectDataNamespace(projectId) {
+  return `project-${createHash("sha256").update(projectId).digest("hex")}`;
+}
+
 function logRecords() {
   const directory = path.join(processDataRoot, "Local", "MyAlbuns2", "Logs");
   if (!existsSync(directory)) return [];
@@ -543,11 +586,15 @@ async function waitForLogEvent(event, count, label) {
 
 const globalDebugPort = await findFreeTcpPort();
 const hostDebugPort = await findFreeTcpPort();
+const saveAsHostDebugPort = await findFreeTcpPort();
+const originalGlobalDebugPort = await findFreeTcpPort();
+const originalHostDebugPort = await findFreeTcpPort();
 const applicationEnvironment = {
   ...process.env,
   MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
   MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(globalDebugPort),
   MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(hostDebugPort),
+  MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT: String(saveAsHostDebugPort),
   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${globalDebugPort}`,
 };
 
@@ -564,10 +611,14 @@ const firstGlobal = await waitForProcessInstance(
 );
 let globalDriver;
 let hostDriver;
+let originalDriver;
 let secondGlobalDriver;
 let firstHost;
 let secondGlobal;
 let secondHost;
+let originalGlobal;
+let originalHost;
+let originalReplacementGlobal;
 let finalGlobal;
 
 try {
@@ -1017,6 +1068,589 @@ try {
   );
   await waitForLogEvent("project_intent_applied", 3, "unsaved DPI application");
 
+  const originalProjectId = savedDocument.projectId;
+  const originalNamespace = projectDataNamespace(originalProjectId);
+  const recoveryCheckpointPath = path.join(
+    processDataRoot,
+    "Local",
+    "MyAlbuns2",
+    "Recovery",
+    "Projects",
+    `${originalNamespace}.json`,
+  );
+  const recoveryCheckpointBytes = Buffer.from(
+    JSON.stringify({ projectId: originalProjectId, revision: 4 }),
+    "utf8",
+  );
+  mkdirSync(path.dirname(recoveryCheckpointPath), { recursive: true });
+  writeFileSync(recoveryCheckpointPath, recoveryCheckpointBytes);
+  const webviewStateRoot = path.join(
+    processDataRoot,
+    "Local",
+    "MyAlbuns2",
+    "State",
+    "WebView2",
+  );
+  const originalWebviewDataDirectory = path.join(
+    webviewStateRoot,
+    originalNamespace,
+  );
+  await waitFor(
+    "original identity WebView2 data directory",
+    () => existsSync(originalWebviewDataDirectory),
+    timeoutMilliseconds,
+  );
+  const saveAsCompletedBeforeCancel = recordsFor(
+    "project_save_as_completed",
+  ).length;
+  const cacheStageBeforeCancel = recordsFor(
+    "project_save_as_cache_staged_empty",
+  ).length;
+  const localTransitionBeforeCancel = recordsFor(
+    "project_save_as_local_authority_transitioned",
+  ).length;
+  const recoveryFinishBeforeCancel = recordsFor(
+    "project_save_as_previous_recovery_finished",
+  ).length;
+
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Arquivo']",
+    "Save As cancellation File menu",
+  );
+  await clickWhenEnabled(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Salvar como…']",
+    "Save As cancellation action",
+  );
+  const cancelledSaveAs = driveNativeDialog(
+    secondHost,
+    "cancel",
+    "Salvar Projeto como",
+  );
+  await waitFor(
+    "cancelled Save As frontend settlement",
+    async () => {
+      const dpi = await findElement(
+        hostDriver,
+        "css selector",
+        ".document-dpi-control input",
+        "DPI after cancelled Save As",
+      );
+      return (await elementAttribute(hostDriver, dpi, "value")) === "360";
+    },
+    timeoutMilliseconds,
+  );
+  const cancelledSaveAsBeforeCore =
+    cancelledSaveAs.action === "cancel" &&
+    !existsSync(saveAsPath) &&
+    readFileSync(projectPath).equals(savedProject) &&
+    existsSync(recoveryCheckpointPath) &&
+    readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes) &&
+    recordsFor("project_save_as_completed").length ===
+      saveAsCompletedBeforeCancel &&
+    recordsFor("project_save_as_cache_staged_empty").length ===
+      cacheStageBeforeCancel &&
+    recordsFor("project_save_as_local_authority_transitioned").length ===
+      localTransitionBeforeCancel &&
+    recordsFor("project_save_as_previous_recovery_finished").length ===
+      recoveryFinishBeforeCancel;
+  if (!cancelledSaveAsBeforeCore) {
+    throw new Error(
+      "Cancelled Save As crossed the ProjectCore or identity-scoped local transition boundary",
+    );
+  }
+
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Arquivo']",
+    "Save As File menu",
+  );
+  await clickWhenEnabled(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Salvar como…']",
+    "Save As action",
+  );
+  const selectedSaveAs = driveNativeDialog(
+    secondHost,
+    "select",
+    "Salvar Projeto como",
+    saveAsPath,
+  );
+  if (selectedSaveAs.action !== "select") {
+    throw new Error("The Save As CreateOnly destination was not confirmed");
+  }
+  await waitForLogEvent(
+    "project_save_as_completed",
+    saveAsCompletedBeforeCancel + 1,
+    "Save As completion",
+  );
+  hostDriver = await disposeConfirmedWebDriver(hostDriver);
+  await waitFor(
+    "Save As destination",
+    () => existsSync(saveAsPath),
+    timeoutMilliseconds,
+  );
+  const savedAsProject = readFileSync(saveAsPath);
+  const savedAsDocument = JSON.parse(savedAsProject.toString("utf8"));
+  const expectedSavedAsProject = JSON.parse(
+    JSON.stringify(savedDocument.project),
+  );
+  expectedSavedAsProject.document.dpi = 360;
+  const savedAsContentPreserved =
+    savedAsDocument.schemaVersion === 3 &&
+    savedAsDocument.projectId !== originalProjectId &&
+    savedAsDocument.revision === 4 &&
+    JSON.stringify(savedAsDocument.project) ===
+      JSON.stringify(expectedSavedAsProject);
+  const originalByteIdenticalAfterSaveAs =
+    readFileSync(projectPath).equals(savedProject);
+  if (!savedAsContentPreserved || !originalByteIdenticalAfterSaveAs) {
+    throw new Error(
+      "Save As did not preserve the complete visible Project while leaving the original byte-identical",
+    );
+  }
+  const copiedProjectId = savedAsDocument.projectId;
+  const copiedNamespace = projectDataNamespace(copiedProjectId);
+  const copiedWebviewDataDirectory = path.join(
+    webviewStateRoot,
+    copiedNamespace,
+  );
+  const originalCacheDirectory = path.join(cacheRoot, originalNamespace);
+  const copiedCacheDirectory = path.join(cacheRoot, copiedNamespace);
+  await waitFor(
+    "copied identity WebView2 data directory",
+    () => existsSync(copiedWebviewDataDirectory),
+    timeoutMilliseconds,
+  );
+  await waitFor(
+    "copied identity Cache namespace",
+    () => existsSync(copiedCacheDirectory),
+    timeoutMilliseconds,
+  );
+  const emptyCacheStage = recordsFor(
+    "project_save_as_cache_staged_empty",
+  ).find(
+    (record) =>
+      record.project_id === copiedProjectId &&
+      Number(record.cache_entry_count) === 0 &&
+      Number(record.cache_byte_count) === 0,
+  );
+  const localAuthorityTransitioned = recordsFor(
+    "project_save_as_local_authority_transitioned",
+  ).some((record) => record.project_id === copiedProjectId);
+  const recoveryFinished =
+    !existsSync(recoveryCheckpointPath) &&
+    recordsFor("project_save_as_previous_recovery_finished").some(
+      (record) => record.project_id === copiedProjectId,
+    );
+  const namespaceTransitioned =
+    originalNamespace !== copiedNamespace &&
+    existsSync(originalWebviewDataDirectory) &&
+    existsSync(copiedWebviewDataDirectory) &&
+    existsSync(originalCacheDirectory) &&
+    existsSync(copiedCacheDirectory) &&
+    Boolean(emptyCacheStage) &&
+    localAuthorityTransitioned;
+  if (!namespaceTransitioned || !recoveryFinished) {
+    throw new Error(
+      "Save As did not transition WebView2/Cache authority or finish the previous Recovery checkpoint",
+    );
+  }
+
+  const expectedSavedAsTitle = `${path.basename(
+    saveAsPath,
+    ".myalbuns",
+  )} — ${saveAsPath}`;
+  const observedSavedAsTitle = nativeWindowTitle(secondHost);
+  if (
+    !observedSavedAsTitle.includes(path.basename(saveAsPath, ".myalbuns")) ||
+    !observedSavedAsTitle.includes(saveAsPath)
+  ) {
+    throw new Error(
+      `Save As native title omitted its current Name or Location: observed=${JSON.stringify(observedSavedAsTitle)}, expected=${JSON.stringify(expectedSavedAsTitle)}`,
+    );
+  }
+  const nativeTitleUpdated = true;
+  await waitForLogEvent(
+    "project_webview_authority_ready",
+    1,
+    "Save As replacement WebView readiness",
+  );
+  const rebuiltWebviewReady = recordsFor(
+    "project_webview_authority_ready",
+  ).some((record) => Number(record.process_id) === secondHost.processId);
+  if (!rebuiltWebviewReady) {
+    throw new Error("The Save As Host did not make its replacement WebView ready");
+  }
+
+  hostDriver = await startAttachedWebDriver(
+    saveAsHostDebugPort,
+    "Save As Project Host",
+  );
+  await findElement(hostDriver, "css selector", ".app-shell", "Save As Project UI");
+  const copiedAlbumDesign = await findElement(
+    hostDriver,
+    "xpath",
+    "//button[.//span[normalize-space()='Design do Álbum']]",
+    "fresh Save As Album Design section",
+  );
+  const copiedAlbumDesignExpanded = await elementAttribute(
+    hostDriver,
+    copiedAlbumDesign,
+    "aria-expanded",
+  );
+  const localStateStartedEmpty = copiedAlbumDesignExpanded === "false";
+  if (!localStateStartedEmpty) {
+    throw new Error(
+      "The Save As WebView inherited the previous identity's inspector preference",
+    );
+  }
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[.//span[normalize-space()='Design do Álbum']]",
+    "fresh Save As Album Design section",
+  );
+  const freshActiveSheetNumber = Number(
+    await elementText(
+      hostDriver,
+      await findElement(
+        hostDriver,
+        "css selector",
+        ".sheet-grid > button.active > span",
+        "fresh Save As active sheet number",
+      ),
+    ),
+  );
+  if (freshActiveSheetNumber !== 1) {
+    throw new Error("The Save As WebView inherited the previous local sheet selection");
+  }
+  await click(
+    hostDriver,
+    "css selector",
+    ".sheet-grid > button:nth-child(2)",
+    "Save As second sheet",
+  );
+  await waitFor(
+    "Save As second sheet selection",
+    async () =>
+      Number(
+        await elementText(
+          hostDriver,
+          await findElement(
+            hostDriver,
+            "css selector",
+            ".sheet-grid > button.active > span",
+            "Save As selected sheet number",
+          ),
+        ),
+      ) === activeSheetNumber,
+    timeoutMilliseconds,
+  );
+  const copiedDpi = await findElement(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "Save As DPI",
+  );
+  if ((await elementAttribute(hostDriver, copiedDpi, "value")) !== "360") {
+    throw new Error("The rebuilt Save As WebView did not adopt the copied projection");
+  }
+  const copiedPageSource = await hostDriver.request(
+    "GET",
+    `/session/${hostDriver.sessionId}/source`,
+  );
+  sourcePathExposedToWebView ||= [
+    projectPath,
+    saveAsPath,
+    exportPath,
+    photoPath,
+    processDataRoot,
+  ].some((candidate) => sourceContainsNativePath(copiedPageSource, candidate));
+
+  const undoAfterSaveAsCount = recordsFor("project_undo_completed").length;
+  await clickWhenEnabled(
+    hostDriver,
+    "css selector",
+    "button[aria-label='Desfazer']",
+    "Undo after Save As",
+  );
+  await waitForLogEvent(
+    "project_undo_completed",
+    undoAfterSaveAsCount + 1,
+    "Undo after Save As terminal",
+  );
+  await waitFor(
+    "Save As Undo projection",
+    async () => {
+      const dpi = await findElement(
+        hostDriver,
+        "css selector",
+        ".document-dpi-control input",
+        "DPI after Save As Undo",
+      );
+      return (await elementAttribute(hostDriver, dpi, "value")) === "300";
+    },
+    timeoutMilliseconds,
+  );
+  const redoAfterSaveAsCount = recordsFor("project_redo_completed").length;
+  await clickWhenEnabled(
+    hostDriver,
+    "css selector",
+    "button[aria-label='Refazer']",
+    "Redo after Save As",
+  );
+  await waitForLogEvent(
+    "project_redo_completed",
+    redoAfterSaveAsCount + 1,
+    "Redo after Save As terminal",
+  );
+  await waitFor(
+    "Save As Redo projection",
+    async () => {
+      const dpi = await findElement(
+        hostDriver,
+        "css selector",
+        ".document-dpi-control input",
+        "DPI after Save As Redo",
+      );
+      return (await elementAttribute(hostDriver, dpi, "value")) === "360";
+    },
+    timeoutMilliseconds,
+  );
+  const historyPreservedAfterSaveAs = true;
+
+  const originalApplicationEnvironment = {
+    ...process.env,
+    MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
+    MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(originalGlobalDebugPort),
+    MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(originalHostDebugPort),
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${originalGlobalDebugPort}`,
+  };
+  const originalGlobalChild = spawn(applicationPath, [projectPath], {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: originalApplicationEnvironment,
+  });
+  originalGlobal = await waitForProcessInstance(
+    originalGlobalChild.pid,
+    "simultaneous original Global",
+  );
+  originalHost = await waitForNewApplication(
+    isHost,
+    [firstHost, secondHost],
+    "simultaneous original Project Host",
+  );
+  await waitForExit(
+    originalGlobal,
+    "simultaneous original Global handoff",
+  );
+  originalDriver = await startAttachedWebDriver(
+    originalHostDebugPort,
+    "simultaneous original Project Host",
+  );
+  await findElement(
+    originalDriver,
+    "css selector",
+    ".app-shell",
+    "simultaneous original Project UI",
+  );
+  const simultaneousOriginalDpi = await findElement(
+    originalDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "simultaneous original DPI",
+  );
+  if (
+    (await elementAttribute(originalDriver, simultaneousOriginalDpi, "value")) !==
+    "300"
+  ) {
+    throw new Error("The simultaneous original did not retain its saved content");
+  }
+  for (const label of ["Desfazer", "Refazer"]) {
+    const button = await findElement(
+      originalDriver,
+      "css selector",
+      `button[aria-label='${label}']`,
+      `${label} in simultaneous original`,
+    );
+    if (
+      await originalDriver.request(
+        "GET",
+        `/session/${originalDriver.sessionId}/element/${encodeURIComponent(button)}/enabled`,
+      )
+    ) {
+      throw new Error(`The simultaneous original retained ${label} history`);
+    }
+  }
+  const simultaneousOriginalHistoryEmpty = true;
+  const simultaneousHostsOpen =
+    applicationProcesses().filter(isHost).length === 2 &&
+    aliveProcessInstances([secondHost, originalHost]).length === 2;
+  if (!simultaneousHostsOpen) {
+    throw new Error("The original and Save As copy were not open simultaneously");
+  }
+
+  const copiedBytesBeforeOriginalSave = readFileSync(saveAsPath);
+  await replaceInput(
+    originalDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "320",
+    "independent original DPI input",
+  );
+  await click(
+    originalDriver,
+    "xpath",
+    "//button[normalize-space()='Aplicar DPI']",
+    "independent original DPI action",
+  );
+  await waitFor(
+    "independent original intent terminal",
+    () =>
+      recordsFor("project_intent_applied").some(
+        (record) =>
+          record.project_id === originalProjectId &&
+          Number(record.revision) === 4,
+      ),
+    timeoutMilliseconds,
+  );
+  await clickWhenEnabled(
+    originalDriver,
+    "css selector",
+    "button[aria-label='Salvar']",
+    "independent original Save",
+  );
+  await waitFor(
+    "independent original Save terminal",
+    () =>
+      recordsFor("project_save_completed").some(
+        (record) =>
+          record.project_id === originalProjectId &&
+          Number(record.revision) === 4,
+      ),
+    timeoutMilliseconds,
+  );
+  const independentlySavedOriginal = readFileSync(projectPath);
+  const independentlySavedOriginalDocument = JSON.parse(
+    independentlySavedOriginal.toString("utf8"),
+  );
+  if (
+    independentlySavedOriginalDocument.projectId !== originalProjectId ||
+    independentlySavedOriginalDocument.revision !== 4 ||
+    independentlySavedOriginalDocument.project.document.dpi !== 320 ||
+    !readFileSync(saveAsPath).equals(copiedBytesBeforeOriginalSave)
+  ) {
+    throw new Error("Saving the simultaneous original crossed into the Save As copy");
+  }
+
+  await replaceInput(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "420",
+    "independent copy DPI input",
+  );
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Aplicar DPI']",
+    "independent copy DPI action",
+  );
+  await waitFor(
+    "independent copy intent terminal",
+    () =>
+      recordsFor("project_intent_applied").some(
+        (record) =>
+          record.project_id === copiedProjectId &&
+          Number(record.revision) === 5,
+      ),
+    timeoutMilliseconds,
+  );
+  await clickWhenEnabled(
+    hostDriver,
+    "css selector",
+    "button[aria-label='Salvar']",
+    "independent copy Save",
+  );
+  await waitFor(
+    "independent copy Save terminal",
+    () =>
+      recordsFor("project_save_completed").some(
+        (record) =>
+          record.project_id === copiedProjectId &&
+          Number(record.revision) === 5,
+      ),
+    timeoutMilliseconds,
+  );
+  const independentlySavedCopy = readFileSync(saveAsPath);
+  const independentlySavedCopyDocument = JSON.parse(
+    independentlySavedCopy.toString("utf8"),
+  );
+  const isolatedIndependentSaves =
+    independentlySavedCopyDocument.projectId === copiedProjectId &&
+    independentlySavedCopyDocument.revision === 5 &&
+    independentlySavedCopyDocument.project.document.dpi === 420 &&
+    readFileSync(projectPath).equals(independentlySavedOriginal);
+  if (!isolatedIndependentSaves) {
+    throw new Error("Saving the Save As copy crossed into the original Project");
+  }
+
+  await click(
+    originalDriver,
+    "xpath",
+    "//button[normalize-space()='Arquivo']",
+    "simultaneous original File menu",
+  );
+  await click(
+    originalDriver,
+    "xpath",
+    "//button[normalize-space()='Fechar Projeto']",
+    "simultaneous original close",
+  ).catch(() => undefined);
+  originalDriver = await disposeConfirmedWebDriver(originalDriver);
+  await waitForExit(originalHost, "simultaneous original Project Host close");
+  originalReplacementGlobal = await waitForNewApplication(
+    (instance) => !isHost(instance),
+    [firstGlobal, secondGlobal, originalGlobal],
+    "simultaneous original replacement Global",
+  );
+  terminateProcessInstance(originalReplacementGlobal);
+  await waitForExit(
+    originalReplacementGlobal,
+    "simultaneous original replacement Global cleanup",
+  );
+
+  await replaceInput(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "360",
+    "pending export DPI input after Save As",
+  );
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Aplicar DPI']",
+    "pending export DPI action after Save As",
+  );
+  await waitFor(
+    "pending export DPI terminal after Save As",
+    () =>
+      recordsFor("project_intent_applied").some(
+        (record) =>
+          record.project_id === copiedProjectId &&
+          Number(record.revision) === 6,
+      ),
+    timeoutMilliseconds,
+  );
+
   const exportStartedBeforeCancel = recordsFor("export_started").length;
   const processorBeforeCancel = exportProcessorAttempts().length;
   await clickWhenEnabled(
@@ -1083,8 +1717,11 @@ try {
     exportedDpi: 360,
     jpegDimensions: dimensions,
   });
-  if (!readFileSync(projectPath).equals(savedProject)) {
-    throw new Error("Export mutated the saved Project document");
+  if (
+    !readFileSync(saveAsPath).equals(independentlySavedCopy) ||
+    !readFileSync(projectPath).equals(independentlySavedOriginal)
+  ) {
+    throw new Error("Export mutated either independently saved Project document");
   }
   const liveDpiInput = await findElement(
     hostDriver,
@@ -1229,7 +1866,7 @@ try {
 
   finalGlobal = await waitForNewApplication(
     (instance) => !isHost(instance),
-    [firstGlobal, secondGlobal],
+    [firstGlobal, secondGlobal, originalGlobal, originalReplacementGlobal],
     "final Global",
   );
   terminateProcessInstance(finalGlobal);
@@ -1257,6 +1894,10 @@ try {
         globalProcessId: secondGlobal.processId,
         hostProcessId: secondHost.processId,
       },
+      {
+        globalProcessId: originalGlobal.processId,
+        hostProcessId: originalHost.processId,
+      },
     ],
     imagingAttempts: exportSpawns.map((record) => ({
       hostProcessId: secondHost.processId,
@@ -1274,8 +1915,10 @@ try {
     new Set([
       secondGlobal.processId,
       secondHost.processId,
+      originalGlobal.processId,
+      originalHost.processId,
       ...exportSpawns.map((record) => Number(record.imaging_process_id)),
-    ]).size !== 2 + exportSpawns.length
+    ]).size !== 4 + exportSpawns.length
   ) {
     throw new Error(
       "Global, Host and both Processadores did not use distinct PIDs",
@@ -1298,6 +1941,32 @@ try {
       photoFrameCount: savedFrames.length,
       persistedPhotoLinkOnly,
       reimportedExistingPhotoWithoutRevision,
+      saveAs: {
+        cancelledBeforeCore: cancelledSaveAsBeforeCore,
+        createAuthorization: "createOnly",
+        originalProjectId,
+        copiedProjectId,
+        savedAsRevision: savedAsDocument.revision,
+        contentPreserved: savedAsContentPreserved,
+        originalByteIdentical: originalByteIdenticalAfterSaveAs,
+        historyPreserved: historyPreservedAfterSaveAs,
+        originalHistoryEmpty: simultaneousOriginalHistoryEmpty,
+        simultaneouslyOpen: simultaneousHostsOpen,
+        isolatedIndependentSaves,
+        originalSavedRevision: independentlySavedOriginalDocument.revision,
+        originalSavedDpi:
+          independentlySavedOriginalDocument.project.document.dpi,
+        copySavedRevision: independentlySavedCopyDocument.revision,
+        copySavedDpi: independentlySavedCopyDocument.project.document.dpi,
+        previousRecoveryFinished: recoveryFinished,
+        cacheStagedEmpty: Boolean(emptyCacheStage),
+        localAuthorityTransitioned,
+        webviewNamespaceTransitioned: namespaceTransitioned,
+        nativeTitleUpdated,
+        observedNativeTitle: observedSavedAsTitle,
+        replacementWebviewReady: rebuiltWebviewReady,
+        localStateStartedEmpty,
+      },
       originalUnchanged: readFileSync(photoPath).equals(originalPhoto),
       missingOriginalBlocked,
       missingOriginalActionable,
@@ -1314,6 +1983,8 @@ try {
         firstHost: firstHost.processId,
         global: secondGlobal.processId,
         host: secondHost.processId,
+        simultaneousOriginalGlobal: originalGlobal.processId,
+        simultaneousOriginalHost: originalHost.processId,
         imaging: Number(successfulSpawn.imaging_process_id),
         missingOriginalImaging: Number(missingOriginalSpawn.imaging_process_id),
       },
@@ -1344,6 +2015,7 @@ try {
   for (const driver of [
     globalDriver,
     hostDriver,
+    originalDriver,
     secondGlobalDriver,
   ]) {
     if (driver) {
