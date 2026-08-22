@@ -279,6 +279,22 @@ async function clickWhenEnabled(driver, using, value, label) {
   return elementId;
 }
 
+async function ensureAlbumDesignExpanded(driver, label) {
+  const section = await findElement(
+    driver,
+    "xpath",
+    "//button[.//span[normalize-space()='Design do Álbum']]",
+    label,
+  );
+  if ((await elementAttribute(driver, section, "aria-expanded")) !== "true") {
+    await driver.request(
+      "POST",
+      `/session/${driver.sessionId}/element/${encodeURIComponent(section)}/click`,
+      {},
+    );
+  }
+}
+
 async function doubleClick(driver, using, value, label) {
   const elementId = await findElement(driver, using, value, label);
   const endpoint = `/session/${driver.sessionId}`;
@@ -967,6 +983,7 @@ try {
     hostDebugPort,
     "reopened Project Host",
   );
+  await ensureAlbumDesignExpanded(hostDriver, "reopened Album Design section");
   const reopenedDpi = await findElement(
     hostDriver,
     "css selector",
@@ -1460,6 +1477,10 @@ try {
     "css selector",
     ".app-shell",
     "simultaneous original Project UI",
+  );
+  await ensureAlbumDesignExpanded(
+    originalDriver,
+    "simultaneous original Album Design section",
   );
   const simultaneousOriginalDpi = await findElement(
     originalDriver,
