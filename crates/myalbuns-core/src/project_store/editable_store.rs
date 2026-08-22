@@ -435,7 +435,7 @@ pub(crate) fn prepare_replacement(
     revision: &ProjectRevision,
     transition_root: &Path,
 ) -> Result<PreparedReplacement, CreateStoreError> {
-    prepare_replacement_inner(location, revision, transition_root, None)
+    prepare_replacement_inner(location, revision, transition_root, None, None)
 }
 
 #[cfg(windows)]
@@ -444,8 +444,15 @@ pub(crate) fn prepare_replacement_excluding(
     revision: &ProjectRevision,
     transition_root: &Path,
     forbidden_target: PhysicalFileIdentity,
+    confirmed_target: PhysicalFileIdentity,
 ) -> Result<PreparedReplacement, CreateStoreError> {
-    prepare_replacement_inner(location, revision, transition_root, Some(forbidden_target))
+    prepare_replacement_inner(
+        location,
+        revision,
+        transition_root,
+        Some(forbidden_target),
+        Some(confirmed_target),
+    )
 }
 
 #[cfg(windows)]
@@ -454,6 +461,7 @@ fn prepare_replacement_inner(
     revision: &ProjectRevision,
     transition_root: &Path,
     forbidden_target: Option<PhysicalFileIdentity>,
+    confirmed_target: Option<PhysicalFileIdentity>,
 ) -> Result<PreparedReplacement, CreateStoreError> {
     let destination = location
         .prepare_file_destination()
@@ -471,6 +479,7 @@ fn prepare_replacement_inner(
 
     let (replaced_lock, replaced_project_id) = if let Some(resolved) = resolved {
         reject_forbidden_target(&resolved, forbidden_target)?;
+        validate_confirmed_target(&resolved, confirmed_target)?;
         let lock =
             ProjectFileLock::try_acquire(resolved.operational_path()).map_err(
                 |error| match error {
@@ -491,6 +500,8 @@ fn prepare_replacement_inner(
             Err(error) => return Err(CreateStoreError::Path(map_io_path(error))),
         };
         (Some(lock), project_id)
+    } else if confirmed_target.is_some() {
+        return Err(CreateStoreError::DestinationConflict);
     } else {
         (None, None)
     };
@@ -506,6 +517,21 @@ fn prepare_replacement_inner(
         forbidden_target,
         replaced_lock,
     })
+}
+
+#[cfg(windows)]
+fn validate_confirmed_target(
+    target: &ResolvedObject,
+    confirmed_target: Option<PhysicalFileIdentity>,
+) -> Result<(), CreateStoreError> {
+    let Some(confirmed_target) = confirmed_target else {
+        return Ok(());
+    };
+    match target.physical_identity() {
+        Some(identity) if identity == confirmed_target => Ok(()),
+        Some(_) => Err(CreateStoreError::DestinationConflict),
+        None => Err(CreateStoreError::IdentityIndeterminate),
+    }
 }
 
 #[cfg(windows)]

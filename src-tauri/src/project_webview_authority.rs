@@ -17,6 +17,11 @@ use crate::{desktop_webview_policy, product_runtime::PROJECT_WINDOW_LABEL};
 
 const PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(15);
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProjectWebviewStartupTerminal {
+    SaveAsStateIndeterminate,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct ProjectWebviewAuthority {
     app_paths: AppPaths,
@@ -145,9 +150,22 @@ impl StagedProjectWebview {
                 app,
                 self.next_data_directory.clone(),
                 self.next_browser_arguments.as_deref(),
+                None,
             )
         {
-            let _ = replace_project_webview(app, self.previous_data_directory.clone(), None);
+            if let Err(restore_error) = replace_project_webview(
+                app,
+                self.previous_data_directory.clone(),
+                None,
+                Some(ProjectWebviewStartupTerminal::SaveAsStateIndeterminate),
+            ) {
+                tracing::error!(
+                    target: "myalbuns.desktop",
+                    error = %restore_error,
+                    event = "project_save_as_previous_webview_restore_failed",
+                );
+                app.exit(1);
+            }
             self.owner.transitioning.store(false, Ordering::Release);
             return Err(error);
         }
@@ -160,7 +178,12 @@ impl CommittedProjectWebview {
         let result = if self.staged.automation {
             Ok(())
         } else {
-            replace_project_webview(app, self.staged.previous_data_directory.clone(), None)
+            replace_project_webview(
+                app,
+                self.staged.previous_data_directory.clone(),
+                None,
+                Some(ProjectWebviewStartupTerminal::SaveAsStateIndeterminate),
+            )
         };
         self.staged
             .owner
@@ -193,36 +216,26 @@ fn preflight(
         .get_window(PROJECT_WINDOW_LABEL)
         .ok_or_else(|| io::Error::other("a janela nativa do Projeto não está disponível"))?;
     let label = format!("project-save-as-preflight-{}", Uuid::new_v4().simple());
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-    let mut builder = WebviewBuilder::new(label, WebviewUrl::App("index.html".into()))
+    let mut builder = WebviewBuilder::new(label, project_webview_url(None))
         .data_directory(data_directory)
         .focused(false);
     if let Some(arguments) = browser_arguments {
         builder = builder.additional_browser_args(arguments);
     }
-    let webview = window
-        .add_child(
-            builder.on_page_load(move |webview, payload| {
-                if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                    let _ = sender.send(desktop_webview_policy::enforce_webview(&webview));
-                }
-            }),
-            PhysicalPosition::new(0, 0),
-            PhysicalSize::new(1, 1),
-        )
-        .map_err(io::Error::other)?;
-    let ready = receiver
-        .recv_timeout(PREFLIGHT_TIMEOUT)
-        .map_err(|_| io::Error::other("o WebView do novo namespace não ficou pronto"));
-    let close = webview.close().map_err(io::Error::other);
-    ready??;
-    close
+    let webview = add_ready_webview(
+        &window,
+        builder,
+        PhysicalSize::new(1, 1),
+        "o WebView do novo namespace não ficou pronto",
+    )?;
+    webview.close().map_err(io::Error::other)
 }
 
 fn replace_project_webview(
     app: &tauri::AppHandle,
     data_directory: PathBuf,
     browser_arguments: Option<&str>,
+    startup_terminal: Option<ProjectWebviewStartupTerminal>,
 ) -> io::Result<()> {
     let window = app
         .get_window(PROJECT_WINDOW_LABEL)
@@ -231,14 +244,46 @@ fn replace_project_webview(
     if let Some(current) = app.get_webview(PROJECT_WINDOW_LABEL) {
         current.close().map_err(io::Error::other)?;
     }
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let mut builder =
-        WebviewBuilder::new(PROJECT_WINDOW_LABEL, WebviewUrl::App("index.html".into()))
+        WebviewBuilder::new(PROJECT_WINDOW_LABEL, project_webview_url(startup_terminal))
             .data_directory(data_directory)
             .auto_resize();
     if let Some(arguments) = browser_arguments {
         builder = builder.additional_browser_args(arguments);
     }
+    let webview = add_ready_webview(
+        &window,
+        builder,
+        size,
+        "o WebView da nova autoridade não ficou pronto",
+    )?;
+    webview.set_focus().map_err(io::Error::other)?;
+    tracing::info!(
+        target: "myalbuns.desktop",
+        process_id = std::process::id(),
+        window_label = PROJECT_WINDOW_LABEL,
+        event = "project_webview_authority_ready",
+    );
+    Ok(())
+}
+
+fn project_webview_url(startup_terminal: Option<ProjectWebviewStartupTerminal>) -> WebviewUrl {
+    let path = match startup_terminal {
+        Some(ProjectWebviewStartupTerminal::SaveAsStateIndeterminate) => {
+            "index.html#save-as-state-indeterminate"
+        }
+        None => "index.html",
+    };
+    WebviewUrl::App(path.into())
+}
+
+fn add_ready_webview(
+    window: &tauri::Window<tauri::Wry>,
+    builder: WebviewBuilder<tauri::Wry>,
+    size: PhysicalSize<u32>,
+    timeout_message: &'static str,
+) -> io::Result<tauri::Webview<tauri::Wry>> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let webview = window
         .add_child(
             builder.on_page_load(move |webview, payload| {
@@ -252,7 +297,7 @@ fn replace_project_webview(
         .map_err(io::Error::other)?;
     let ready = receiver
         .recv_timeout(PREFLIGHT_TIMEOUT)
-        .map_err(|_| io::Error::other("o WebView da nova autoridade não ficou pronto"))
+        .map_err(|_| io::Error::other(timeout_message))
         .and_then(|result| result);
     if let Err(error) = ready {
         if let Err(close_error) = webview.close() {
@@ -264,20 +309,14 @@ fn replace_project_webview(
         }
         return Err(error);
     }
-    webview.set_focus().map_err(io::Error::other)?;
-    tracing::info!(
-        target: "myalbuns.desktop",
-        process_id = std::process::id(),
-        window_label = PROJECT_WINDOW_LABEL,
-        event = "project_webview_authority_ready",
-    );
-    Ok(())
+    Ok(webview)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ProjectWebviewAuthority;
+    use super::{ProjectWebviewAuthority, ProjectWebviewStartupTerminal, project_webview_url};
     use myalbuns_paths::{AppPaths, project_data_namespace};
+    use tauri::WebviewUrl;
 
     #[test]
     fn tracked_namespace_is_an_opaque_project_key() {
@@ -291,5 +330,18 @@ mod tests {
             project_data_namespace(project_id)
         );
         assert!(!authority.current_namespace().contains(project_id));
+    }
+
+    #[test]
+    fn restored_previous_webview_bootstraps_with_the_indeterminate_terminal() {
+        let WebviewUrl::App(path) = project_webview_url(Some(
+            ProjectWebviewStartupTerminal::SaveAsStateIndeterminate,
+        )) else {
+            panic!("the restored Project remains on the bundled application URL");
+        };
+        assert_eq!(
+            path,
+            std::path::PathBuf::from("index.html#save-as-state-indeterminate")
+        );
     }
 }

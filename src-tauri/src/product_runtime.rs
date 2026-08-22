@@ -409,6 +409,10 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 Ok(catalog) => catalog,
                 Err(_) => break,
             };
+            let namespace = app.state::<ActiveCacheNamespace>().namespace();
+            if catalog.project_id != namespace.project_id() {
+                continue;
+            }
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
@@ -437,7 +441,6 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 );
             }
             if !changed.is_empty() || !invalidated.is_empty() {
-                let namespace = app.state::<ActiveCacheNamespace>().namespace();
                 app.state::<CacheEngine>().apply_monitor_media_update(
                     &namespace,
                     app.state::<CachePreviewRegistry>().inner(),

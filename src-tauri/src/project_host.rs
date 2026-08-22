@@ -46,6 +46,7 @@ pub(crate) struct FrozenSheetExport {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AuthorizedMediaCatalog {
+    pub(crate) project_id: String,
     pub(crate) bindings: Vec<MediaBinding>,
 }
 
@@ -341,6 +342,7 @@ impl ProjectHost {
     pub(crate) fn authorized_media_catalog(&self) -> Result<AuthorizedMediaCatalog, String> {
         let project = self.project()?;
         Ok(AuthorizedMediaCatalog {
+            project_id: project.project_id().hyphenated().to_string(),
             bindings: project
                 .project()
                 .media()
@@ -354,6 +356,7 @@ impl ProjectHost {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn authorized_media_binding(&self, media_id: &str) -> Result<MediaBinding, String> {
         self.authorized_media_catalog()?
             .bindings
@@ -436,8 +439,8 @@ mod tests {
         CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
         InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
         InitialProjectConfiguration, InitialProjectPersonalization, MediaKind, OpenProjectRequest,
-        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsProjectRequest,
-        SaveProjectError, SaveProjectOutcome,
+        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsAuthorization,
+        SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
     };
     use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
 
@@ -1248,7 +1251,7 @@ mod tests {
             .save_as(SaveAsProjectRequest::new(
                 dirty.state.revision,
                 ProjectLocation::new(destination.clone(), context.freeze()),
-                CreateAuthorization::CreateOnly,
+                SaveAsAuthorization::CreateOnly,
             ))
             .expect("the Host serializes and adopts Save As");
 
@@ -1309,6 +1312,7 @@ mod tests {
             .expect("the Host can authorize its persisted media catalog");
         let projection = host.projection().expect("the Project remains available");
 
+        assert_eq!(catalog.project_id, projection.state.project_id);
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,

@@ -4,7 +4,8 @@ use std::{
 };
 
 use myalbuns_paths::{
-    ExpectedObject, OperationPathContext, PhysicalIdentityEvidence, ProcessInstanceId,
+    ExpectedObject, OperationPathContext, PhysicalFileIdentity, PhysicalIdentityEvidence,
+    ProcessInstanceId,
 };
 use uuid::Uuid;
 
@@ -211,14 +212,20 @@ pub enum SaveCopyAsError {
 pub struct SaveAsProjectRequest {
     expected_revision: u64,
     destination: ProjectLocation,
-    authorization: CreateAuthorization,
+    authorization: SaveAsAuthorization,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveAsAuthorization {
+    CreateOnly,
+    ReplaceConfirmed(PhysicalFileIdentity),
 }
 
 impl SaveAsProjectRequest {
     pub fn new(
         expected_revision: u64,
         destination: ProjectLocation,
-        authorization: CreateAuthorization,
+        authorization: SaveAsAuthorization,
     ) -> Self {
         Self {
             expected_revision,
@@ -648,14 +655,27 @@ impl EditableProject {
             .prepare_file_destination()
             .map_err(SaveAsProjectError::Path)?;
         match prepared_destination.resolve_existing() {
-            Ok(Some(target)) => match self.store.compare_physical(&target) {
-                PhysicalIdentityEvidence::Same => return Err(SaveAsProjectError::SameTarget),
-                PhysicalIdentityEvidence::Different => {}
-                PhysicalIdentityEvidence::Indeterminate => {
-                    return Err(SaveAsProjectError::IdentityIndeterminate);
+            Ok(Some(target)) => {
+                match self.store.compare_physical(&target) {
+                    PhysicalIdentityEvidence::Same => return Err(SaveAsProjectError::SameTarget),
+                    PhysicalIdentityEvidence::Different => {}
+                    PhysicalIdentityEvidence::Indeterminate => {
+                        return Err(SaveAsProjectError::IdentityIndeterminate);
+                    }
                 }
-            },
-            Ok(None) => {}
+                if let SaveAsAuthorization::ReplaceConfirmed(confirmed) = authorization {
+                    match target.physical_identity() {
+                        Some(current) if current == confirmed => {}
+                        Some(_) => return Err(SaveAsProjectError::DestinationConflict),
+                        None => return Err(SaveAsProjectError::IdentityIndeterminate),
+                    }
+                }
+            }
+            Ok(None) => {
+                if matches!(authorization, SaveAsAuthorization::ReplaceConfirmed(_)) {
+                    return Err(SaveAsProjectError::DestinationConflict);
+                }
+            }
             Err(error) => {
                 return Err(SaveAsProjectError::Path(project_store::map_path_failure(
                     error,
@@ -682,28 +702,31 @@ impl EditableProject {
             current_revision.project,
         );
         let store_result = match authorization {
-            CreateAuthorization::CreateOnly => project_store::create_only_excluding(
+            SaveAsAuthorization::CreateOnly => project_store::create_only_excluding(
                 destination,
                 &candidate,
                 lease_root,
                 source_physical_identity,
             )
             .map_err(map_save_as_store_error),
-            CreateAuthorization::ReplaceConfirmed => project_store::prepare_replacement_excluding(
-                destination,
-                &candidate,
-                lease_root,
-                source_physical_identity,
-            )
-            .map_err(map_save_as_store_error)
-            .and_then(|prepared| {
-                let _replaced_identity_lease = prepared
-                    .replaced_project_id()
-                    .map(|replaced_id| ProjectIdentityLease::acquire(lease_root, replaced_id))
-                    .transpose()
-                    .map_err(map_save_as_replaced_lease_error)?;
-                prepared.publish().map_err(map_save_as_store_error)
-            }),
+            SaveAsAuthorization::ReplaceConfirmed(confirmed_target) => {
+                project_store::prepare_replacement_excluding(
+                    destination,
+                    &candidate,
+                    lease_root,
+                    source_physical_identity,
+                    confirmed_target,
+                )
+                .map_err(map_save_as_store_error)
+                .and_then(|prepared| {
+                    let _replaced_identity_lease = prepared
+                        .replaced_project_id()
+                        .map(|replaced_id| ProjectIdentityLease::acquire(lease_root, replaced_id))
+                        .transpose()
+                        .map_err(map_save_as_replaced_lease_error)?;
+                    prepared.publish().map_err(map_save_as_store_error)
+                })
+            }
         };
         let store = match store_result {
             Ok(store) => store,

@@ -20,6 +20,7 @@ import type {
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { EditorProjection } from "./domain/project";
+import { projectSaveAsStartupFailure } from "./application/projectSaveAsStartup";
 import { LoggingProvider } from "./components/loggingContext";
 import {
   CanvasGraphicsDiagnosticProbeProvider,
@@ -71,6 +72,9 @@ function App({
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const [cacheProcessorWarning, setCacheProcessorWarning] =
     useState<CacheProcessorWarning | null>(null);
+  const [saveAsStartupFailure, setSaveAsStartupFailure] = useState(() =>
+    projectSaveAsStartupFailure(window.location.hash),
+  );
   const [mediaChangeSubscription, setMediaChangeSubscription] =
     useState<MediaPreviewSubscription | null>(null);
   const [cacheWarningSubscription, setCacheWarningSubscription] =
@@ -456,6 +460,31 @@ function App({
             <strong>Cache suspenso</strong>
             <span>{cacheProcessorWarning.message}</span>
             <small>A edição e o Salvamento continuam disponíveis.</small>
+          </aside>
+        )}
+        {saveAsStartupFailure && (
+          <aside
+            className="operation-toast error save-as-startup-terminal"
+            role="alert"
+          >
+            <div>
+              <strong>Não foi possível concluir Salvar como</strong>
+              <span>{saveAsStartupFailure}</span>
+            </div>
+            <button
+              type="button"
+              aria-label="Fechar mensagem"
+              onClick={() => {
+                setSaveAsStartupFailure(null);
+                window.history.replaceState(
+                  window.history.state,
+                  "",
+                  `${window.location.pathname}${window.location.search}`,
+                );
+              }}
+            >
+              ×
+            </button>
           </aside>
         )}
         <ProjectWorkspace

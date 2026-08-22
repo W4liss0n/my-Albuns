@@ -6,6 +6,7 @@ use std::{ffi::OsString, io};
 use tauri::{WebviewWindow, webview::PageLoadEvent};
 
 const TAURI_WEBVIEW_AUTOMATION_ENV: &str = "TAURI_WEBVIEW_AUTOMATION";
+#[cfg(debug_assertions)]
 pub(crate) const SAVE_AS_WEBVIEW_DEBUG_PORT_ENV: &str = "MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT";
 
 #[cfg(debug_assertions)]

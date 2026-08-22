@@ -1,15 +1,10 @@
-import type {
-  SaveProjectErrorContext,
-  SaveProjectFailureCode,
-} from "../application/projectPorts";
 import type { SaveProjectCommandError as IpcSaveProjectCommandError } from "./generated/SaveProjectCommandError";
-import { isIpcRecord, isIpcRevision } from "./ipcGuards";
+import {
+  parseProjectPersistenceFailure,
+  type ProjectPersistenceFailure,
+} from "./projectPersistenceFailure";
 
-export interface ProjectSaveFailure {
-  code: SaveProjectFailureCode;
-  message: string;
-  context?: SaveProjectErrorContext;
-}
+export type ProjectSaveFailure = ProjectPersistenceFailure;
 
 const failureMessages: Readonly<
   Record<IpcSaveProjectCommandError["code"], string>
@@ -38,34 +33,5 @@ const failureMessages: Readonly<
 export function parseProjectSaveFailure(
   error: unknown,
 ): ProjectSaveFailure | null {
-  if (!isIpcRecord(error) || typeof error.code !== "string") {
-    return null;
-  }
-
-  const code = error.code as IpcSaveProjectCommandError["code"];
-  if (!(code in failureMessages)) {
-    return null;
-  }
-
-  if (code === "stale_revision") {
-    if (
-      !isIpcRevision(error.expectedRevision) ||
-      !isIpcRevision(error.currentRevision)
-    ) {
-      return null;
-    }
-    return {
-      code,
-      message: failureMessages[code],
-      context: {
-        expected: error.expectedRevision,
-        current: error.currentRevision,
-      },
-    };
-  }
-
-  return {
-    code,
-    message: failureMessages[code],
-  };
+  return parseProjectPersistenceFailure(error, failureMessages);
 }

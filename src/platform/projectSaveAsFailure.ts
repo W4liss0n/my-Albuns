@@ -1,15 +1,11 @@
-import type {
-  SaveProjectErrorContext,
-  SaveProjectFailureCode,
-} from "../application/projectPorts";
 import type { SaveAsProjectCommandError as IpcSaveAsProjectCommandError } from "./generated/SaveAsProjectCommandError";
-import { isIpcRecord, isIpcRevision } from "./ipcGuards";
+import { SAVE_AS_STATE_INDETERMINATE_MESSAGE } from "../application/projectSaveAsStartup";
+import {
+  parseProjectPersistenceFailure,
+  type ProjectPersistenceFailure,
+} from "./projectPersistenceFailure";
 
-export interface ProjectSaveAsFailure {
-  code: SaveProjectFailureCode;
-  message: string;
-  context?: SaveProjectErrorContext;
-}
+export type ProjectSaveAsFailure = ProjectPersistenceFailure;
 
 const failureMessages: Readonly<
   Record<IpcSaveAsProjectCommandError["code"], string>
@@ -25,7 +21,7 @@ const failureMessages: Readonly<
   identity_indeterminate:
     "Não foi possível comprovar a Identidade física do Projeto ou do destino.",
   save_as_state_indeterminate:
-    "Não foi possível confirmar o destino de Salvar como. A Sessão anterior foi mantida; reinspecione o destino antes de reutilizá-lo.",
+    SAVE_AS_STATE_INDETERMINATE_MESSAGE,
   session_unavailable:
     "A Sessão do Projeto não está mais disponível. Reabra o Projeto para continuar.",
   dialog_unavailable:
@@ -45,31 +41,5 @@ const failureMessages: Readonly<
 export function parseProjectSaveAsFailure(
   error: unknown,
 ): ProjectSaveAsFailure | null {
-  if (!isIpcRecord(error) || typeof error.code !== "string") {
-    return null;
-  }
-
-  const code = error.code as IpcSaveAsProjectCommandError["code"];
-  if (!(code in failureMessages)) {
-    return null;
-  }
-
-  if (code === "stale_revision") {
-    if (
-      !isIpcRevision(error.expectedRevision) ||
-      !isIpcRevision(error.currentRevision)
-    ) {
-      return null;
-    }
-    return {
-      code,
-      message: failureMessages[code],
-      context: {
-        expected: error.expectedRevision,
-        current: error.currentRevision,
-      },
-    };
-  }
-
-  return { code, message: failureMessages[code] };
+  return parseProjectPersistenceFailure(error, failureMessages);
 }

@@ -68,6 +68,7 @@ pub(crate) async fn retry_unavailable_media(
     window: WebviewWindow,
     app: AppHandle,
     project_host: State<'_, ProjectHost>,
+    engine: State<'_, CacheEngine>,
     registry: State<'_, CachePreviewRegistry>,
     media_runtime: State<'_, MediaRuntime>,
     media_monitor: State<'_, MediaMonitor>,
@@ -76,14 +77,25 @@ pub(crate) async fn retry_unavailable_media(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }
-    let binding = project_host
-        .authorized_media_binding(&media_id)
+    let _causal_cache_permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
+    let catalog = project_host
+        .authorized_media_catalog()
         .map_err(MediaPreviewCommandError::retry_failed)?;
+    let retry_namespace = namespace_owner.namespace();
+    if catalog.project_id != retry_namespace.project_id() {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
+    let binding = catalog
+        .bindings
+        .into_iter()
+        .find(|binding| binding.media_id == media_id)
+        .ok_or_else(MediaPreviewCommandError::read_failed)?;
     let source_path = binding.logical_path.clone();
     let monitor = media_monitor.inner().clone();
     let runtime = media_runtime.inner().clone();
     let retry_app = app.clone();
-    let retry_namespace = namespace_owner.namespace();
     let retry_registry = registry.inner().clone();
     let retry_host = project_host.inner().clone();
     let (inspection, refreshed_photo_ids) = tauri::async_runtime::spawn_blocking(move || {
@@ -148,6 +160,9 @@ pub(crate) async fn prepare_media_previews(
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err(MediaPreviewCommandError::read_failed());
     }
+    let causal_cache_permit = engine
+        .begin_cancellable_work(CacheCancellation::default())
+        .await;
     let catalog = project_host
         .authorized_media_catalog()
         .map_err(|_| MediaPreviewCommandError::read_failed())?;
@@ -164,6 +179,9 @@ pub(crate) async fn prepare_media_previews(
         return Err(MediaPreviewCommandError::read_failed());
     }
     let namespace = namespace_owner.namespace();
+    if catalog.project_id != namespace.project_id() {
+        return Err(MediaPreviewCommandError::read_failed());
+    }
     let mut demand_revision = engine.reconcile_preview_demand(
         registry.inner(),
         namespace.project_id(),
@@ -228,6 +246,7 @@ pub(crate) async fn prepare_media_previews(
     if !engine.demand_is_current(&demand_revision) {
         return Ok(Some(Vec::new()));
     }
+    drop(causal_cache_permit);
     let mut previews = Vec::with_capacity(ordered_demand.len());
     for media_id in ordered_demand {
         if !engine.demand_is_current(&demand_revision) {

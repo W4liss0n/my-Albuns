@@ -4,9 +4,9 @@ use std::{fs, path::Path};
 
 use myalbuns_core::{
     CreateAuthorization, CreateProjectRequest, InitialProject, OpenProjectRequest, ProjectCore,
-    ProjectIntent, ProjectLocation, SaveAsProjectError, SaveAsProjectRequest,
+    ProjectIntent, ProjectLocation, SaveAsAuthorization, SaveAsProjectError, SaveAsProjectRequest,
 };
-use myalbuns_paths::OperationPathContext;
+use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity};
 
 fn project_location(path: &Path) -> ProjectLocation {
     let mut context = OperationPathContext::new();
@@ -18,6 +18,19 @@ fn project_location(path: &Path) -> ProjectLocation {
 
 fn project_core(root: &Path) -> ProjectCore {
     ProjectCore::new().with_identity_storage_roots(root.join("leases"), root.join("identities"))
+}
+
+fn physical_identity(path: &Path) -> PhysicalFileIdentity {
+    let mut context = OperationPathContext::new();
+    context
+        .capture(path)
+        .expect("the public path seam captures the existing file");
+    context
+        .freeze()
+        .resolve_existing(path, ExpectedObject::RegularFile)
+        .expect("the existing file resolves")
+        .physical_identity()
+        .expect("the local fixture exposes a physical identity")
 }
 
 #[test]
@@ -54,7 +67,7 @@ fn save_as_moves_the_live_session_to_an_independent_project_and_preserves_histor
         .save_as(SaveAsProjectRequest::new(
             2,
             project_location(&copy_path),
-            CreateAuthorization::CreateOnly,
+            SaveAsAuthorization::CreateOnly,
         ))
         .expect("Salvar como publishes and adopts an independent Project");
 
@@ -154,7 +167,7 @@ fn replace_confirmed_overwrites_only_the_distinct_destination_and_adopts_it() {
         .save_as(SaveAsProjectRequest::new(
             1,
             project_location(&destination_path),
-            CreateAuthorization::ReplaceConfirmed,
+            SaveAsAuthorization::ReplaceConfirmed(physical_identity(&destination_path)),
         ))
         .expect("the explicitly confirmed distinct destination is replaced");
 
@@ -169,6 +182,57 @@ fn replace_confirmed_overwrites_only_the_distinct_destination_and_adopts_it() {
     assert_ne!(
         fs::read(&destination_path).expect("the replacement is readable"),
         b"replace-confirmed destination"
+    );
+}
+
+#[test]
+fn replace_confirmed_rejects_a_different_file_that_arrives_after_confirmation() {
+    let root = tempfile::tempdir().expect("temporary replacement race fixture");
+    let original_path = root.path().join("Original.myalbuns");
+    let destination_path = root.path().join("Destino confirmado.myalbuns");
+    let displaced_path = root.path().join("Destino confirmado anterior.myalbuns");
+    let core = project_core(root.path());
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&original_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the original Project is created");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 360 })
+        .expect("the visible state advances");
+    let original_bytes = fs::read(&original_path).expect("the original baseline is readable");
+    fs::write(&destination_path, b"confirmed physical destination")
+        .expect("the user confirms an existing destination");
+    let confirmed_identity = physical_identity(&destination_path);
+    fs::rename(&destination_path, &displaced_path)
+        .expect("the confirmed file is displaced after confirmation");
+    fs::write(&destination_path, b"unexpected replacement")
+        .expect("a different file arrives at the selected pathname");
+
+    assert_eq!(
+        project.save_as(SaveAsProjectRequest::new(
+            1,
+            project_location(&destination_path),
+            SaveAsAuthorization::ReplaceConfirmed(confirmed_identity),
+        )),
+        Err(SaveAsProjectError::DestinationConflict)
+    );
+    assert_eq!(project.project_path(), original_path);
+    assert_eq!(project.project().document().dpi(), 360);
+    assert!(project.has_unsaved_changes());
+    assert_eq!(
+        fs::read(&original_path).expect("the original remains readable"),
+        original_bytes
+    );
+    assert_eq!(
+        fs::read(&destination_path).expect("the unexpected replacement remains readable"),
+        b"unexpected replacement"
+    );
+    assert_eq!(
+        fs::read(&displaced_path).expect("the confirmed destination remains readable"),
+        b"confirmed physical destination"
     );
 }
 
@@ -196,7 +260,7 @@ fn save_as_rejects_the_current_file_and_its_physical_alias_without_touching_the_
             project.save_as(SaveAsProjectRequest::new(
                 1,
                 project_location(destination),
-                CreateAuthorization::ReplaceConfirmed,
+                SaveAsAuthorization::ReplaceConfirmed(physical_identity(destination)),
             )),
             Err(SaveAsProjectError::SameTarget)
         );
@@ -235,7 +299,7 @@ fn a_conclusive_destination_conflict_keeps_the_original_session_and_bytes() {
         project.save_as(SaveAsProjectRequest::new(
             1,
             project_location(&occupied_path),
-            CreateAuthorization::CreateOnly,
+            SaveAsAuthorization::CreateOnly,
         )),
         Err(SaveAsProjectError::DestinationConflict)
     );
@@ -276,7 +340,7 @@ fn an_indeterminate_local_transition_keeps_the_previous_session_and_authority() 
             SaveAsProjectRequest::new(
                 1,
                 project_location(&destination_path),
-                CreateAuthorization::CreateOnly,
+                SaveAsAuthorization::CreateOnly,
             ),
             |authority, outcome| {
                 assert_eq!(authority.project_id(), outcome.project_id);

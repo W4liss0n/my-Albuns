@@ -391,15 +391,20 @@ pub(crate) async fn save_project_as(
             );
             SaveAsProjectCommandError::DialogUnavailable
         })?;
-    let SaveAsDialogOutcome::Selected {
-        path,
-        authorization,
-    } = selection
-    else {
-        return Ok(SaveAsProjectResult {
-            outcome: SaveAsProjectOutcome::Cancelled,
-            projection: before,
-        });
+    let (path, authorization) = match selection {
+        SaveAsDialogOutcome::Cancelled => {
+            return Ok(SaveAsProjectResult {
+                outcome: SaveAsProjectOutcome::Cancelled,
+                projection: before,
+            });
+        }
+        SaveAsDialogOutcome::ReplacementIdentityIndeterminate => {
+            return Err(SaveAsProjectCommandError::IdentityIndeterminate);
+        }
+        SaveAsDialogOutcome::Selected {
+            path,
+            authorization,
+        } => (path, authorization),
     };
 
     let selected_path = path.clone();
