@@ -5,7 +5,9 @@ use std::{
     time::Duration,
 };
 
-use myalbuns_core::{EditableProject, MediaId, MediaKind, PhotoSourceMetadata};
+use myalbuns_core::{
+    EditableProject, MediaId, MediaKind, PhotoSourceMetadata, project_name_from_path,
+};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
@@ -41,11 +43,7 @@ pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-cha
 pub(crate) const CACHE_PROCESSOR_WARNING_EVENT: &str = "myalbuns://cache-processor-warning";
 
 pub(crate) fn project_window_title(path: &Path) -> String {
-    let project_name = path
-        .file_stem()
-        .map(|name| name.to_string_lossy().into_owned())
-        .filter(|name| !name.is_empty())
-        .unwrap_or_else(|| "Projeto".into());
+    let project_name = project_name_from_path(path);
     format!("{project_name} — {}", path.display())
 }
 

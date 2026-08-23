@@ -5,6 +5,7 @@ use std::{fs, path::Path};
 use myalbuns_core::{
     CreateAuthorization, CreateProjectRequest, InitialProject, OpenProjectRequest, ProjectCore,
     ProjectIntent, ProjectLocation, SaveAsAuthorization, SaveAsProjectError, SaveAsProjectRequest,
+    project_name_from_path,
 };
 use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity};
 
@@ -76,6 +77,10 @@ fn save_as_moves_the_live_session_to_an_independent_project_and_preserves_histor
     assert_ne!(outcome.project_id, original_id);
     assert_eq!(outcome.revision, 2);
     assert_eq!(project.project_path(), copy_path);
+    assert_eq!(
+        project_name_from_path(project.project_path()),
+        "Versão independente"
+    );
     let projected = serde_json::to_value(project.projection())
         .expect("the adopted Project projection serializes");
     assert!(

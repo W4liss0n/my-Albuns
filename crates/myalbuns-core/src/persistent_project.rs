@@ -38,6 +38,14 @@ pub struct ProjectCore {
     identity_registry_root: Option<PathBuf>,
 }
 
+/// Derives the human-facing Project name from its native pathname.
+pub fn project_name_from_path(path: &Path) -> String {
+    path.file_stem()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Projeto".into())
+}
+
 impl ProjectCore {
     pub fn new() -> Self {
         Self::default()
@@ -411,12 +419,7 @@ impl EditableProject {
 
     /// Resolved editor view of the current productive Project document.
     pub fn projection(&self) -> EditorProjection {
-        let project_name = self
-            .project_path()
-            .file_stem()
-            .map(|name| name.to_string_lossy().into_owned())
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| "Projeto".into());
+        let project_name = project_name_from_path(self.project_path());
         persistent_projection::editor_projection(
             &self.session,
             self.session_valid,

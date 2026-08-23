@@ -25,6 +25,7 @@ pub use persistent_project::{
     OpenProjectError, OpenProjectRequest, ProjectCore, ProjectIdentityAuthority,
     SaveAsAuthorization, SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest,
     SaveCopyAsError, SaveCopyAsRequest, SaveProjectError, SaveProjectOutcome,
+    project_name_from_path,
 };
 pub use project_document::{
     ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat,
