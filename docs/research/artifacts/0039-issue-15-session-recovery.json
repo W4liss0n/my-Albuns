@@ -1,0 +1,238 @@
+{
+    "schemaVersion":  1,
+    "gate":  "productive-end-to-end-journey",
+    "collectedAtUtc":  "2026-08-23T17:30:01.1512269Z",
+    "gitCommit":  "80a882b77b5c362fc8dc55e9b974fb64441a1840",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64",
+                     "nativeDriverVersion":  "151.0.4129.101",
+                     "webView2RuntimeVersion":  "151.0.4129.101"
+                 },
+    "checks":  [
+                   {
+                       "name":  "cancel-before-project-core",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "create-only-causal-handoff",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "project-core-save-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "crash-recovery-distinct-host",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "interrupted-gesture-keeps-previous-checkpoint",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "recovered-project-unsaved-empty-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "native-save-as-cancel-before-core",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "save-as-copy-content-and-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "save-as-webview-cache-recovery-transition",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "simultaneous-original-copy-isolated-saves",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "native-jpeg-import-reselect-external-link-only",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "double-click-frame-selection-canvas",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "cancel-before-export-pipeline",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "distinguishable-sheet-two-jpeg-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "canvas-jpeg-photo-fidelity",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-application-empty-cache-original-read",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "missing-original-actionable-failure",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "saved-project-unchanged-by-export",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "independent-host-reopen-empty-history",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "correlated-process-terminals-cleanup",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "cancelledCreationBeforeCore":  true,
+                     "cancelledExportBeforePipeline":  true,
+                     "createAuthorization":  "createOnly",
+                     "exportedSheetNumber":  2,
+                     "selectedSheetId":  "efd09126-ae32-4ee4-8b94-4838c2cab015",
+                     "selectedSheetActiveSides":  "both",
+                     "firstSheetDimensions":  {
+                                                  "width":  360,
+                                                  "height":  360
+                                              },
+                     "selectedSheetDimensions":  {
+                                                     "width":  720,
+                                                     "height":  360
+                                                 },
+                     "expectedBackgroundRgb":  "#204060",
+                     "exportedDpi":  360,
+                     "savedRevision":  3,
+                     "savedDpi":  300,
+                     "projectSchemaVersion":  3,
+                     "photoFrameCount":  1,
+                     "persistedPhotoLinkOnly":  true,
+                     "reimportedExistingPhotoWithoutRevision":  true,
+                     "sessionRecovery":  {
+                                             "schemaVersion":  1,
+                                             "baseSavedRevision":  3,
+                                             "creativeRevision":  4,
+                                             "recoveredDpi":  360,
+                                             "promptChoices":  [
+                                                                   "Reabrir e recuperar",
+                                                                   "Abrir última versão salva",
+                                                                   "Agora não"
+                                                               ],
+                                             "opaqueProjectKey":  true,
+                                             "completedActionCheckpointed":  true,
+                                             "midGesturePreservedPreviousCheckpoint":  true,
+                                             "projectFileUnchangedThroughRecovery":  true,
+                                             "checkpointPreservedAfterRecovery":  true,
+                                             "recoveredUnsaved":  true,
+                                             "recoveredHistoryEmpty":  true,
+                                             "postRecoveryActionsCheckpointed":  true,
+                                             "checkpointPreservedByCancelledSaveAs":  true,
+                                             "checkpointFinishedBySuccessfulSaveAs":  true,
+                                             "crashedHostProcessId":  10368,
+                                             "recoveredHostProcessId":  31180,
+                                             "lockReleasedToDistinctHost":  true
+                                         },
+                     "saveAs":  {
+                                    "cancelledBeforeCore":  true,
+                                    "createAuthorization":  "createOnly",
+                                    "originalProjectId":  "baac6410-768a-4769-afc4-fdea96861bc6",
+                                    "copiedProjectId":  "36ec9055-4889-4558-b0b7-2b9b7dbb503c",
+                                    "savedAsRevision":  6,
+                                    "contentPreserved":  true,
+                                    "originalByteIdentical":  true,
+                                    "historyPreserved":  true,
+                                    "originalHistoryEmpty":  true,
+                                    "simultaneouslyOpen":  true,
+                                    "isolatedIndependentSaves":  true,
+                                    "originalSavedRevision":  4,
+                                    "originalSavedDpi":  320,
+                                    "copySavedRevision":  7,
+                                    "copySavedDpi":  420,
+                                    "previousRecoveryFinished":  true,
+                                    "cacheStagedEmpty":  true,
+                                    "localAuthorityTransitioned":  true,
+                                    "webviewNamespaceTransitioned":  true,
+                                    "nativeTitleUpdated":  true,
+                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\ba38\\my-Albuns\\.scratch\\j8-14928-d679bc\\Jornada produtiva - Cópia.myalbuns",
+                                    "replacementWebviewReady":  true,
+                                    "localStateStartedEmpty":  true
+                                },
+                     "originalUnchanged":  true,
+                     "missingOriginalBlocked":  true,
+                     "missingOriginalActionable":  true,
+                     "residentCanvasPreviewBeforeMissingOriginal":  true,
+                     "previewArtifactCountBeforePurge":  1,
+                     "cacheEntryCountBeforeExport":  0,
+                     "cacheByteCountBeforeExport":  0,
+                     "cacheEntryCountAfterExport":  0,
+                     "cacheByteCountAfterExport":  0,
+                     "cacheCouldNotProduceFalseSuccess":  true,
+                     "jpeg":  {
+                                  "width":  720,
+                                  "height":  360,
+                                  "byteCount":  53023,
+                                  "sha256":  "0becd6a4e49f809973b52a4f78fa998d8d84b32293b8208af30024e676994a2d",
+                                  "backgroundSample":  {
+                                                           "x":  2,
+                                                           "y":  180,
+                                                           "red":  31,
+                                                           "green":  64,
+                                                           "blue":  95,
+                                                           "maxChannelDelta":  1
+                                                       },
+                                  "photoSample":  {
+                                                      "x":  360,
+                                                      "y":  180,
+                                                      "red":  119,
+                                                      "green":  119,
+                                                      "blue":  127,
+                                                      "originalMaxChannelDelta":  8,
+                                                      "tolerance":  32
+                                                  }
+                              },
+                     "processIds":  {
+                                        "firstGlobal":  13272,
+                                        "firstHost":  9624,
+                                        "global":  10616,
+                                        "crashedHost":  10368,
+                                        "recoveryGlobal":  29508,
+                                        "host":  31180,
+                                        "simultaneousOriginalGlobal":  3048,
+                                        "simultaneousOriginalHost":  13564,
+                                        "imaging":  30468,
+                                        "missingOriginalImaging":  11676
+                                    },
+                     "correlations":  {
+                                          "bootstraps":  4,
+                                          "imagingAttempts":  2
+                                      },
+                     "exportedAfterReopen":  true,
+                     "reopenedInIndependentHost":  true,
+                     "reopenedHistoryEmpty":  true,
+                     "sourcePathExposedToWebView":  false,
+                     "terminalCounts":  {
+                                            "globalHandoffs":  4,
+                                            "hostReady":  4,
+                                            "imagingStopped":  2
+                                        },
+                     "canvasNonWhiteSamples":  1271,
+                     "canvasSampleCount":  1271,
+                     "canvasPhotoSample":  {
+                                               "x":  574,
+                                               "y":  447,
+                                               "red":  120,
+                                               "green":  120,
+                                               "blue":  127,
+                                               "jpegMaxChannelDelta":  1,
+                                               "tolerance":  32
+                                           },
+                     "cleanupCompleted":  true
+                 }
+}
