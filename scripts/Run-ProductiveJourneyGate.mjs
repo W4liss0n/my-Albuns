@@ -1314,7 +1314,7 @@ try {
     [300, 5],
     [360, 6],
   ]) {
-    await replaceInput(
+    await changeFormControl(
       hostDriver,
       "css selector",
       ".document-dpi-control input",

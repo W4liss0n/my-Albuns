@@ -237,7 +237,8 @@ try {
         $gate.terminalCounts.hostReady -ne 4 -or
         $gate.terminalCounts.imagingStopped -ne 2
     ) {
-        throw 'The productive journey result did not satisfy its public contract.'
+        $observed = $gate | ConvertTo-Json -Depth 8 -Compress
+        throw "The productive journey result did not satisfy its public contract: $observed"
     }
     Add-Type -AssemblyName System.Drawing
     $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
