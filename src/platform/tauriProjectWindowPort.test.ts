@@ -79,6 +79,26 @@ test("rejects malformed close responses instead of guessing native state", async
   });
 });
 
+test("rejects a cancelled close with an incomplete Project projection", async () => {
+  vi.mocked(invoke).mockResolvedValue({
+    kind: "cancelled",
+    projection: {
+      ...representativeProjection,
+      state: {
+        projectId: representativeProjection.state.projectId,
+        revision: representativeProjection.state.revision,
+      },
+    },
+  });
+
+  await expect(
+    tauriProjectWindowPort.resolveClose("cancel"),
+  ).rejects.toMatchObject({
+    name: "ProjectCloseError",
+    code: "invalid_response",
+  });
+});
+
 test("localizes a conclusive save-and-close conflict without losing its code", async () => {
   vi.mocked(invoke).mockRejectedValue({
     code: "persisted_baseline_conflict",

@@ -6,24 +6,18 @@ import {
   type ProjectCloseChoice,
   type ProjectWindowPort,
 } from "../application/projectPorts";
-import type { EditorProjection } from "../domain/project";
 import type { ProjectCloseChoice as IpcProjectCloseChoice } from "./generated/ProjectCloseChoice";
 import type { ProjectCloseRequestOutcome as IpcProjectCloseRequestOutcome } from "./generated/ProjectCloseRequestOutcome";
 import type { ProjectCloseResolution as IpcProjectCloseResolution } from "./generated/ProjectCloseResolution";
-import { hasOnlyIpcKeys, isIpcRecord } from "./ipcGuards";
+import {
+  hasOnlyIpcKeys,
+  isIpcEditorProjection,
+  isIpcRecord,
+} from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
 
 export const PROJECT_CLOSE_CONFIRMATION_EVENT =
   "myalbuns://project-close-confirmation-requested";
-
-function isProjection(value: unknown): value is EditorProjection {
-  return (
-    isIpcRecord(value) &&
-    isIpcRecord(value.state) &&
-    typeof value.state.projectId === "string" &&
-    Number.isSafeInteger(value.state.revision)
-  );
-}
 
 function invalidCloseResponse() {
   return new ProjectCloseError(
@@ -53,7 +47,7 @@ function parseCloseResolution(value: unknown): IpcProjectCloseResolution {
   if (
     value.kind === "cancelled" &&
     hasOnlyIpcKeys(value, ["kind", "projection"]) &&
-    isProjection(value.projection)
+    isIpcEditorProjection(value.projection)
   ) {
     return { kind: "cancelled", projection: value.projection };
   }

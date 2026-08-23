@@ -1,3 +1,5 @@
+import type { EditorProjection } from "../domain/project";
+
 export function isIpcRecord(
   value: unknown,
 ): value is Record<string, unknown> {
@@ -6,6 +8,19 @@ export function isIpcRecord(
 
 export function isIpcRevision(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+export function isIpcEditorProjection(
+  value: unknown,
+): value is EditorProjection {
+  return (
+    isIpcRecord(value) &&
+    isIpcRecord(value.state) &&
+    typeof value.state.projectId === "string" &&
+    value.state.projectId.length > 0 &&
+    isIpcRevision(value.state.revision) &&
+    isIpcRevision(value.state.savedRevision)
+  );
 }
 
 export function hasOnlyIpcKeys(

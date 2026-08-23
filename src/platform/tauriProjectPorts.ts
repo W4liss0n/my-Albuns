@@ -38,6 +38,7 @@ import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generate
 import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
 import {
   hasOnlyIpcKeys,
+  isIpcEditorProjection,
   isIpcRecord,
   isIpcRevision,
 } from "./ipcGuards";
@@ -124,17 +125,13 @@ function parseProjectRecoveryResolution(
   if (
     (value.kind !== "recovered" && value.kind !== "openedLastSaved") ||
     !hasOnlyIpcKeys(value, ["kind", "projection"]) ||
-    !isIpcRecord(value.projection) ||
-    !isIpcRecord(value.projection.state) ||
-    typeof value.projection.state.projectId !== "string" ||
-    !isIpcRevision(value.projection.state.revision) ||
-    !isIpcRevision(value.projection.state.savedRevision)
+    !isIpcEditorProjection(value.projection)
   ) {
     throw new Error("Não foi possível confirmar a escolha de Recuperação.");
   }
   return {
     kind: value.kind,
-    projection: value.projection as EditorProjection,
+    projection: value.projection,
   };
 }
 
@@ -186,11 +183,7 @@ function parseIpcSaveAsProjectResult(
 
   const { outcome, projection } = value;
   if (
-    !isIpcRecord(projection) ||
-    !isIpcRecord(projection.state) ||
-    !isProjectionIdentity(projection.state.projectId) ||
-    !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision)
+    !isIpcEditorProjection(projection)
   ) {
     throw invalidSaveAsResponse();
   }
@@ -266,11 +259,7 @@ function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
     (outcome.kind !== "saved" &&
       outcome.kind !== "alreadyCurrent") ||
     !isIpcRevision(outcome.revision) ||
-    !isIpcRecord(projection) ||
-    !isIpcRecord(projection.state) ||
-    typeof projection.state.projectId !== "string" ||
-    !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision) ||
+    !isIpcEditorProjection(projection) ||
     projection.state.revision !== outcome.revision ||
     projection.state.savedRevision !== outcome.revision
   ) {
