@@ -168,6 +168,24 @@ try {
         $gate.photoFrameCount -ne 1 -or
         -not $gate.persistedPhotoLinkOnly -or
         -not $gate.reimportedExistingPhotoWithoutRevision -or
+        $gate.sessionRecovery.schemaVersion -ne 1 -or
+        $gate.sessionRecovery.baseSavedRevision -ne 3 -or
+        $gate.sessionRecovery.creativeRevision -ne 4 -or
+        $gate.sessionRecovery.recoveredDpi -ne 360 -or
+        $gate.sessionRecovery.promptChoices.Count -ne 3 -or
+        $gate.sessionRecovery.promptChoices[0] -cne 'Reabrir e recuperar' -or
+        $gate.sessionRecovery.promptChoices[1] -cne 'Abrir última versão salva' -or
+        $gate.sessionRecovery.promptChoices[2] -cne 'Agora não' -or
+        -not $gate.sessionRecovery.opaqueProjectKey -or
+        -not $gate.sessionRecovery.completedActionCheckpointed -or
+        -not $gate.sessionRecovery.midGesturePreservedPreviousCheckpoint -or
+        -not $gate.sessionRecovery.projectFileUnchangedThroughRecovery -or
+        -not $gate.sessionRecovery.checkpointPreservedAfterRecovery -or
+        -not $gate.sessionRecovery.recoveredUnsaved -or
+        -not $gate.sessionRecovery.recoveredHistoryEmpty -or
+        -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
+        -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
+        -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
         -not $gate.saveAs.cancelledBeforeCore -or
         $gate.saveAs.createAuthorization -ne 'createOnly' -or
         $gate.saveAs.originalProjectId -notmatch '^[0-9a-f-]{36}$' -or
@@ -205,7 +223,7 @@ try {
         $gate.jpeg.height -ne 360 -or
         $gate.jpeg.byteCount -le 0 -or
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
-        $gate.correlations.bootstraps -ne 3 -or
+        $gate.correlations.bootstraps -ne 4 -or
         $gate.correlations.imagingAttempts -ne 2 -or
         -not $gate.exportedAfterReopen -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
@@ -214,8 +232,8 @@ try {
         $gate.canvasPhotoSample.cssWidth -le 0 -or
         $gate.canvasPhotoSample.cssHeight -le 0 -or
         $gate.sourcePathExposedToWebView -or
-        $gate.terminalCounts.globalHandoffs -ne 3 -or
-        $gate.terminalCounts.hostReady -ne 3 -or
+        $gate.terminalCounts.globalHandoffs -ne 4 -or
+        $gate.terminalCounts.hostReady -ne 4 -or
         $gate.terminalCounts.imagingStopped -ne 2
     ) {
         throw 'The productive journey result did not satisfy its public contract.'
@@ -385,6 +403,9 @@ try {
             [ordered]@{ name = 'cancel-before-project-core'; passed = $true },
             [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
             [ordered]@{ name = 'project-core-save-history'; passed = $true },
+            [ordered]@{ name = 'crash-recovery-distinct-host'; passed = $true },
+            [ordered]@{ name = 'interrupted-gesture-keeps-previous-checkpoint'; passed = $true },
+            [ordered]@{ name = 'recovered-project-unsaved-empty-history'; passed = $true },
             [ordered]@{ name = 'native-save-as-cancel-before-core'; passed = $true },
             [ordered]@{ name = 'save-as-copy-content-and-history'; passed = $true },
             [ordered]@{ name = 'save-as-webview-cache-recovery-transition'; passed = $true },
@@ -417,6 +438,7 @@ try {
             photoFrameCount = [int] $gate.photoFrameCount
             persistedPhotoLinkOnly = [bool] $gate.persistedPhotoLinkOnly
             reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
+            sessionRecovery = $gate.sessionRecovery
             saveAs = $gate.saveAs
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked

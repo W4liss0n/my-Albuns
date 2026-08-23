@@ -16,6 +16,7 @@ import type {
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
+  ProjectRecoveryChoice,
   ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -46,6 +47,15 @@ interface MediaPreviewSubscription {
   port: MediaPreviewPort;
 }
 
+type RecoveryStartupState =
+  | "checking"
+  | "none"
+  | "available"
+  | "confirmDiscard"
+  | "resolving"
+  | "resolved"
+  | "deferred";
+
 function App({
   exportPipelinePort,
   mediaPreviewPort,
@@ -62,6 +72,9 @@ function App({
   const editorGraphics = runtimeGraphicsDiagnostic ?? graphics;
   const [projection, setProjection] = useState<EditorProjection | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [recoveryStartup, setRecoveryStartup] =
+    useState<RecoveryStartupState>("checking");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [mediaPreviews, setMediaPreviews] = useState<
     Readonly<Record<string, MediaPreview>>
   >({});
@@ -81,6 +94,7 @@ function App({
     useState<MediaPreviewSubscription | null>(null);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
+  const recoveryUiReady = useRef(false);
   const loggerRef = useRef(logger);
 
   useEffect(() => {
@@ -89,6 +103,28 @@ function App({
 
   useEffect(() => {
     if (!graphics.supported) return;
+    let active = true;
+    projectStartupPort.recoveryStatus().then(
+      (status) => {
+        if (!active) return;
+        setRecoveryStartup(status.kind === "available" ? "available" : "none");
+      },
+      (error: unknown) => {
+        if (!active) return;
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível verificar a Recuperação do Projeto.",
+        );
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [graphics.supported, projectStartupPort]);
+
+  useEffect(() => {
+    if (!graphics.supported || recoveryStartup !== "none") return;
     let active = true;
     const operationId = createLogInstanceId("project-load");
     logger.write({
@@ -132,7 +168,60 @@ function App({
     return () => {
       active = false;
     };
-  }, [graphics.supported, logger, projectCorePort]);
+  }, [graphics.supported, logger, projectCorePort, recoveryStartup]);
+
+  useEffect(() => {
+    if (
+      recoveryUiReady.current ||
+      !["available", "confirmDiscard", "resolving"].includes(recoveryStartup)
+    ) {
+      return;
+    }
+    recoveryUiReady.current = true;
+    projectStartupPort.confirmUiReady().catch((error: unknown) => {
+      recoveryUiReady.current = false;
+      logger.write({
+        level: "error",
+        component: "application",
+        event: "project_recovery_ui_ready_failed",
+        reason: logReasonFromError(error),
+      });
+      setLoadError("Não foi possível confirmar a interface de Recuperação.");
+    });
+  }, [logger, projectStartupPort, recoveryStartup]);
+
+  const resolveRecovery = useCallback(
+    async (
+      choice: ProjectRecoveryChoice,
+      checkpointDiscardConfirmed: boolean,
+    ) => {
+      setRecoveryError(null);
+      setRecoveryStartup("resolving");
+      try {
+        const resolution = await projectStartupPort.resolveRecovery(
+          choice,
+          checkpointDiscardConfirmed,
+        );
+        if (resolution.kind === "deferred") {
+          setRecoveryStartup("deferred");
+          return;
+        }
+        setMediaDemand({ visibleMediaIds: [], preloadMediaIds: [] });
+        setProjection(resolution.projection);
+        setRecoveryStartup("resolved");
+      } catch (error: unknown) {
+        setRecoveryError(
+          error instanceof Error
+            ? error.message
+            : "Não foi possível concluir a escolha de Recuperação.",
+        );
+        setRecoveryStartup(
+          choice === "openLastSaved" ? "confirmDiscard" : "available",
+        );
+      }
+    },
+    [projectStartupPort],
+  );
 
   useEffect(() => {
     logger.write({
@@ -430,6 +519,93 @@ function App({
           <p className="eyebrow">MyAlbuns</p>
           <h1>Não foi possível abrir o Projeto</h1>
           <p>{loadError}</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (recoveryStartup === "deferred") {
+    return (
+      <main className="startup-surface" aria-busy="true">
+        <section className="startup-card">
+          <span className="loading-mark" aria-hidden="true" />
+          <p>Fechando o Projeto…</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (recoveryStartup === "confirmDiscard") {
+    return (
+      <main className="startup-surface">
+        <section className="startup-card">
+          <p className="eyebrow">Recuperação de sessão</p>
+          <h1>Descartar o trabalho recuperável?</h1>
+          <p>
+            A última versão salva será aberta e o trabalho recuperável será
+            removido definitivamente.
+          </p>
+          {recoveryError && <p role="alert">{recoveryError}</p>}
+          <div className="recovery-actions">
+            <button
+              className="recovery-primary"
+              type="button"
+              onClick={() => void resolveRecovery("openLastSaved", true)}
+            >
+              Descartar recuperação e abrir
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRecoveryError(null);
+                setRecoveryStartup("available");
+              }}
+            >
+              Voltar
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (recoveryStartup === "available" || recoveryStartup === "resolving") {
+    const busy = recoveryStartup === "resolving";
+    return (
+      <main className="startup-surface">
+        <section className="startup-card">
+          <p className="eyebrow">Recuperação de sessão</p>
+          <h1>Recuperar trabalho não salvo?</h1>
+          <p>
+            O MyAlbuns encontrou trabalho concluído depois da última versão
+            salva deste Projeto.
+          </p>
+          {recoveryError && <p role="alert">{recoveryError}</p>}
+          <div className="recovery-actions">
+            <button
+              className="recovery-primary"
+              disabled={busy}
+              type="button"
+              onClick={() => void resolveRecovery("reopenAndRecover", false)}
+            >
+              Reabrir e recuperar
+            </button>
+            <button
+              disabled={busy}
+              type="button"
+              onClick={() => setRecoveryStartup("confirmDiscard")}
+            >
+              Abrir última versão salva
+            </button>
+            <button
+              disabled={busy}
+              type="button"
+              onClick={() => void resolveRecovery("nowNot", false)}
+            >
+              Agora não
+            </button>
+          </div>
+          {busy && <p aria-live="polite">Concluindo…</p>}
         </section>
       </main>
     );

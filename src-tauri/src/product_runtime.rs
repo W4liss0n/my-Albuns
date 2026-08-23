@@ -30,7 +30,7 @@ use crate::{
     },
     project_host::ProjectCloseRequestOutcome,
     project_host::ProjectHost,
-    project_recovery::ProjectRecoveryCheckpoints,
+    project_recovery::{RecoveryCoordinator, RecoveryStore},
     project_webview_authority::ProjectWebviewAuthority,
     project_window_lifecycle::{
         PROJECT_CLOSE_CONFIRMATION_EVENT, complete_project_close,
@@ -61,7 +61,8 @@ pub(crate) fn run(
         .map_err(io::Error::other)?;
     hydrate_project_from_recovered_cache(&mut project, cache_namespace_owner.recovered_artifacts());
     let initial_window_title = project_window_title(project.project_path());
-    let project_host = ProjectHost::new(project);
+    let recovery = RecoveryCoordinator::new(RecoveryStore::new(app_paths.clone()));
+    let project_host = ProjectHost::with_recovery(project, recovery.clone())?;
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
@@ -105,7 +106,7 @@ pub(crate) fn run(
         .manage(cache_previews)
         .manage(ActiveCacheNamespace::new(cache_namespace_owner))
         .manage(cache_service)
-        .manage(ProjectRecoveryCheckpoints::new(app_paths.clone()))
+        .manage(recovery)
         .manage(webview_authority)
         .manage(CacheEngine::default())
         .manage(MediaRuntime::default())
@@ -166,6 +167,8 @@ pub(crate) fn run(
         .invoke_handler(tauri::generate_handler![
             crate::logging::frontend_log,
             project_ui_ready,
+            crate::project_commands::project_recovery_status,
+            crate::project_commands::resolve_project_recovery,
             crate::project_commands::project_state,
             crate::project_commands::apply_project_intent,
             crate::project_commands::import_photo,
@@ -228,7 +231,7 @@ fn setup_host(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let projection = app
         .state::<ProjectHost>()
-        .projection()
+        .startup_projection()
         .map_err(io::Error::other)?;
     logging::initialize(app, &app_paths, ProcessRole::DesktopHost);
     app.manage(OperationGate::new(&app_paths));
@@ -285,7 +288,7 @@ fn setup_host(
                 );
             }
             if transition.startup_completed {
-                start_linked_media_monitor(app_handle.clone());
+                start_linked_media_monitor_if_active(app_handle.clone());
             }
             Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
         }
@@ -317,7 +320,9 @@ fn setup_host(
 }
 
 fn projection_identity(project_host: &ProjectHost) -> Result<(String, u64), io::Error> {
-    let projection = project_host.projection().map_err(io::Error::other)?;
+    let projection = project_host
+        .startup_projection()
+        .map_err(io::Error::other)?;
     Ok((projection.state.project_id, projection.state.revision))
 }
 
@@ -342,7 +347,7 @@ fn project_ui_ready(
                 );
             }
             if transition.startup_completed {
-                start_linked_media_monitor(window.app_handle().clone());
+                start_linked_media_monitor_if_active(window.app_handle().clone());
             }
             Ok(())
         }
@@ -403,6 +408,16 @@ pub(crate) fn refresh_project_photos_for_media_update(
         .cloned()
         .collect();
     refresh_changed_photo_sources(host, changed_photos)
+}
+
+pub(crate) fn start_linked_media_monitor_if_active(app: tauri::AppHandle) {
+    if !matches!(
+        app.state::<ProjectHost>().recovery_status(),
+        Ok(crate::project_host::ProjectRecoveryStatus::None)
+    ) {
+        return;
+    }
+    start_linked_media_monitor(app);
 }
 
 fn start_linked_media_monitor(app: tauri::AppHandle) {

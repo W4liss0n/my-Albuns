@@ -143,7 +143,7 @@ pub(crate) fn decode_with_metadata(bytes: &[u8]) -> Result<DecodedStoredRevision
     })
 }
 
-fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
+pub(crate) fn encode(revision: &ProjectRevision) -> Result<Vec<u8>, DecodeFailure> {
     versioned_codec::encode(revision)
 }
 

@@ -139,6 +139,10 @@ const projectWindowPort: ProjectWindowPort = {
   resolveClose: async () => ({ kind: "closed" }),
 };
 const projectStartupPort: ProjectStartupPort = {
+  recoveryStatus: async () => ({ kind: "none" }),
+  resolveRecovery: async () => {
+    throw new Error("Recuperação não configurada neste teste.");
+  },
   confirmUiReady: async () => undefined,
 };
 const canvasGraphicsDiagnosticProbe = () =>
@@ -152,6 +156,141 @@ const canvasGraphicsDiagnosticProbe = () =>
       maxTextureImageUnits: 16,
     },
   }) as const;
+
+test("offers exactly the three Recovery choices before reading editor state", async () => {
+  const load = vi.fn(async () => projection);
+  const recoveryStatus = vi.fn(async () => ({ kind: "available" }) as const);
+  const recoveredProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+      canUndo: false,
+      canRedo: false,
+      document: { ...projection.state.document, dpi: 360 },
+    },
+  };
+  const resolveRecovery = vi.fn(async () => ({
+    kind: "recovered" as const,
+    projection: recoveredProjection,
+  }));
+  const confirmUiReady = vi.fn(async () => undefined);
+
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectStartupPort={{
+        recoveryStatus,
+        resolveRecovery,
+        confirmUiReady,
+      }}
+      projectCorePort={{ ...projectCorePort, load }}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+
+  expect(
+    await screen.findByRole("heading", { name: "Recuperar trabalho não salvo?" }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+    "Reabrir e recuperar",
+    "Abrir última versão salva",
+    "Agora não",
+  ]);
+  expect(load).not.toHaveBeenCalled();
+  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Reabrir e recuperar" }),
+  );
+  await waitFor(() =>
+    expect(resolveRecovery).toHaveBeenCalledWith("reopenAndRecover", false),
+  );
+  expect(
+    await screen.findByRole("button", { name: "Exportar Lâmina" }),
+  ).toBeInTheDocument();
+  expect(load).not.toHaveBeenCalled();
+});
+
+test("requires a separate confirmation before discarding Recovery for the saved version", async () => {
+  const load = vi.fn(async () => projection);
+  const resolveRecovery = vi.fn(async () => ({
+    kind: "openedLastSaved" as const,
+    projection,
+  }));
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectStartupPort={{
+        ...projectStartupPort,
+        recoveryStatus: async () => ({ kind: "available" }),
+        resolveRecovery,
+      }}
+      projectCorePort={{ ...projectCorePort, load }}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Abrir última versão salva" }),
+  );
+  expect(resolveRecovery).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("heading", { name: "Descartar o trabalho recuperável?" }),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
+  expect(
+    screen.getByRole("button", { name: "Abrir última versão salva" }),
+  ).toBeInTheDocument();
+  expect(resolveRecovery).not.toHaveBeenCalled();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Abrir última versão salva" }),
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Descartar recuperação e abrir" }),
+  );
+  await waitFor(() =>
+    expect(resolveRecovery).toHaveBeenCalledWith("openLastSaved", true),
+  );
+  expect(load).not.toHaveBeenCalled();
+});
+
+test("defers opening without loading or discarding the Recovery checkpoint", async () => {
+  const load = vi.fn(async () => projection);
+  const resolveRecovery = vi.fn(async () => ({ kind: "deferred" as const }));
+  render(
+    <App
+      exportPipelinePort={exportPipelinePort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectStartupPort={{
+        ...projectStartupPort,
+        recoveryStatus: async () => ({ kind: "available" }),
+        resolveRecovery,
+      }}
+      projectCorePort={{ ...projectCorePort, load }}
+      projectWindowPort={projectWindowPort}
+      graphicsProbe={canvasGraphicsDiagnosticProbe}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      logger={silentLogger}
+    />,
+  );
+
+  fireEvent.click(await screen.findByRole("button", { name: "Agora não" }));
+  await waitFor(() =>
+    expect(resolveRecovery).toHaveBeenCalledWith("nowNot", false),
+  );
+  expect(load).not.toHaveBeenCalled();
+  expect(screen.getByText("Fechando o Projeto…")).toBeInTheDocument();
+});
 
 test("surfaces the durable Save As terminal when the previous WebView is restored", async () => {
   window.location.hash = "#save-as-state-indeterminate";
@@ -233,7 +372,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   render(
     <App
       exportPipelinePort={exportPipelinePort}
-      projectStartupPort={{ confirmUiReady }}
+      projectStartupPort={{ ...projectStartupPort, confirmUiReady }}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         ...mediaPreviewPort,
@@ -345,7 +484,7 @@ test("synchronizes a no-cache reopen while Monitor startup remains pending witho
   render(
     <App
       exportPipelinePort={exportPipelinePort}
-      projectStartupPort={{ confirmUiReady }}
+      projectStartupPort={{ ...projectStartupPort, confirmUiReady }}
       projectWindowPort={projectWindowPort}
       mediaPreviewPort={{
         ...mediaPreviewPort,

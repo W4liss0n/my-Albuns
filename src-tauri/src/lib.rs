@@ -254,6 +254,29 @@ mod tests {
     }
 
     #[test]
+    fn recovery_commands_are_explicitly_allowed_only_to_project_window() {
+        let project_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/project-window.json"))
+                .expect("valid project permission");
+        let global_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/global-window.json"))
+                .expect("valid global permission");
+        let project_commands = allowed_commands(&project_permission);
+        let global_commands = allowed_commands(&global_permission);
+
+        for command in ["project_recovery_status", "resolve_project_recovery"] {
+            assert!(
+                project_commands.contains(command),
+                "the Project capability must explicitly allow {command}"
+            );
+            assert!(
+                !global_commands.contains(command),
+                "the Global capability must not inherit {command}"
+            );
+        }
+    }
+
+    #[test]
     fn windows_bundle_uses_current_user_nsis_and_evergreen_webview2() {
         let config = config();
         let bundle = &config["bundle"];

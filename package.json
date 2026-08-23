@@ -21,6 +21,7 @@
     "test:imaging-recovery": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ImagingRecovery.ps1",
     "test:dev-lifecycle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-DevLifecycle.ps1",
     "test:productive-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-ProductiveJourney.ps1",
+    "test:session-recovery-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SessionRecoveryJourney.ps1",
     "test:save-as-journey": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-SaveAsJourney.ps1",
     "test:windows-path": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-WindowsPathGate.ps1",
     "preview": "vite preview",

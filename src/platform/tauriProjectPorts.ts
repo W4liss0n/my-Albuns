@@ -29,6 +29,9 @@ import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/Impo
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { ProjectRecoveryChoice as IpcProjectRecoveryChoice } from "./generated/ProjectRecoveryChoice";
+import type { ProjectRecoveryResolution as IpcProjectRecoveryResolution } from "./generated/ProjectRecoveryResolution";
+import type { ProjectRecoveryStatus as IpcProjectRecoveryStatus } from "./generated/ProjectRecoveryStatus";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
@@ -92,6 +95,52 @@ function toSaveProjectError(error: unknown): SaveProjectError {
     failure.message,
     failure.context,
   );
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, expected: readonly string[]) {
+  const keys = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    keys.length === sortedExpected.length &&
+    keys.every((key, index) => key === sortedExpected[index])
+  );
+}
+
+function parseProjectRecoveryStatus(value: unknown): IpcProjectRecoveryStatus {
+  if (
+    !isIpcRecord(value) ||
+    !hasOnlyKeys(value, ["kind"]) ||
+    (value.kind !== "none" && value.kind !== "available")
+  ) {
+    throw new Error("Não foi possível verificar a Recuperação do Projeto.");
+  }
+  return { kind: value.kind };
+}
+
+function parseProjectRecoveryResolution(
+  value: unknown,
+): IpcProjectRecoveryResolution {
+  if (!isIpcRecord(value)) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  if (value.kind === "deferred" && hasOnlyKeys(value, ["kind"])) {
+    return { kind: "deferred" };
+  }
+  if (
+    (value.kind !== "recovered" && value.kind !== "openedLastSaved") ||
+    !hasOnlyKeys(value, ["kind", "projection"]) ||
+    !isIpcRecord(value.projection) ||
+    !isIpcRecord(value.projection.state) ||
+    typeof value.projection.state.projectId !== "string" ||
+    !isIpcRevision(value.projection.state.revision) ||
+    !isIpcRevision(value.projection.state.savedRevision)
+  ) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  return {
+    kind: value.kind,
+    projection: value.projection as EditorProjection,
+  };
 }
 
 function invalidSaveResponse() {
@@ -315,6 +364,17 @@ export const tauriProjectCorePort: ProjectCorePort = {
 };
 
 export const tauriProjectStartupPort: ProjectStartupPort = {
+  recoveryStatus: async () =>
+    parseProjectRecoveryStatus(
+      await invoke<unknown>("project_recovery_status"),
+    ),
+  resolveRecovery: async (choice, checkpointDiscardConfirmed) =>
+    parseProjectRecoveryResolution(
+      await invoke<unknown>("resolve_project_recovery", {
+        choice: choice satisfies IpcProjectRecoveryChoice,
+        checkpointDiscardConfirmed,
+      }),
+    ),
   confirmUiReady: () => invoke<void>("project_ui_ready"),
 };
 

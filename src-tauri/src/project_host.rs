@@ -1,14 +1,20 @@
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::{
+    io,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 use myalbuns_core::{
     ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoOutcome, MediaId,
     PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority, ProjectIntent,
-    ProjectMutationOutcome, RelinkMedia, RenderSnapshot, SaveAsProjectError, SaveAsProjectOutcome,
-    SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
+    ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot, SaveAsProjectError,
+    SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
-use crate::media_runtime::{MediaBinding, MediaRelinkProposal, PhotoImportProposal};
+use crate::{
+    media_runtime::{MediaBinding, MediaRelinkProposal, PhotoImportProposal},
+    project_recovery::RecoveryCoordinator,
+};
 
 const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponível.";
 
@@ -19,10 +25,15 @@ const SESSION_UNAVAILABLE_MESSAGE: &str = "A Sessão do Projeto ficou indisponí
 #[derive(Clone)]
 pub(crate) struct ProjectHost {
     state: Arc<Mutex<ProjectHostState>>,
+    recovery: Option<RecoveryCoordinator>,
 }
 
 enum ProjectHostState {
     Active(EditableProject),
+    RecoveryPending {
+        project: EditableProject,
+        checkpoint: Box<RecoveryCheckpoint>,
+    },
     ClosePending(EditableProject),
     Consumed,
 }
@@ -56,6 +67,26 @@ pub(crate) enum ProjectCloseRequestOutcome {
     ConfirmationRequired,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProjectRecoveryStatus {
+    None,
+    Available,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProjectRecoveryChoice {
+    ReopenAndRecover,
+    OpenLastSaved,
+    NowNot,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum ProjectRecoveryResolution {
+    Recovered(EditorProjection),
+    OpenedLastSaved(EditorProjection),
+    Deferred,
+}
+
 #[derive(Debug)]
 pub(crate) enum ProjectHostSaveError {
     Project(SaveProjectError),
@@ -69,9 +100,133 @@ pub(crate) enum ProjectHostSaveAsError {
 }
 
 impl ProjectHost {
+    #[cfg(test)]
     pub(crate) fn new(project: EditableProject) -> Self {
         Self {
             state: Arc::new(Mutex::new(ProjectHostState::Active(project))),
+            recovery: None,
+        }
+    }
+
+    pub(crate) fn with_recovery(
+        project: EditableProject,
+        recovery: RecoveryCoordinator,
+    ) -> io::Result<Self> {
+        let authority = project.identity_authority().clone();
+        let state = match recovery.load(&authority)? {
+            Some(checkpoint) => ProjectHostState::RecoveryPending {
+                project,
+                checkpoint: Box::new(checkpoint),
+            },
+            None => ProjectHostState::Active(project),
+        };
+        Ok(Self {
+            state: Arc::new(Mutex::new(state)),
+            recovery: Some(recovery),
+        })
+    }
+
+    pub(crate) fn startup_projection(&self) -> Result<EditorProjection, String> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        match &*state {
+            ProjectHostState::Active(project)
+            | ProjectHostState::RecoveryPending { project, .. }
+            | ProjectHostState::ClosePending(project) => Ok(project.projection()),
+            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
+        }
+    }
+
+    pub(crate) fn recovery_status(&self) -> Result<ProjectRecoveryStatus, String> {
+        let state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        match &*state {
+            ProjectHostState::RecoveryPending { .. } => Ok(ProjectRecoveryStatus::Available),
+            ProjectHostState::Active(_) | ProjectHostState::ClosePending(_) => {
+                Ok(ProjectRecoveryStatus::None)
+            }
+            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
+        }
+    }
+
+    pub(crate) fn resolve_recovery(
+        &self,
+        choice: ProjectRecoveryChoice,
+        checkpoint_discard_confirmed: bool,
+    ) -> Result<ProjectRecoveryResolution, String> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
+        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
+        let ProjectHostState::RecoveryPending {
+            mut project,
+            checkpoint,
+        } = current
+        else {
+            *state = current;
+            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
+        };
+        match choice {
+            ProjectRecoveryChoice::ReopenAndRecover => {
+                if checkpoint_discard_confirmed {
+                    *state = ProjectHostState::RecoveryPending {
+                        project,
+                        checkpoint,
+                    };
+                    return Err("A confirmação de descarte não pertence a esta escolha.".into());
+                }
+                match project.restore_recovery(checkpoint.as_ref().clone()) {
+                    Ok(projection) => {
+                        *state = ProjectHostState::Active(project);
+                        Ok(ProjectRecoveryResolution::Recovered(projection))
+                    }
+                    Err(error) => {
+                        *state = ProjectHostState::RecoveryPending {
+                            project,
+                            checkpoint,
+                        };
+                        Err(error.to_string())
+                    }
+                }
+            }
+            ProjectRecoveryChoice::OpenLastSaved => {
+                if !checkpoint_discard_confirmed {
+                    *state = ProjectHostState::RecoveryPending {
+                        project,
+                        checkpoint,
+                    };
+                    return Err(
+                        "Confirme o descarte da Recuperação antes de abrir a última versão salva."
+                            .into(),
+                    );
+                }
+                if let Err(error) = self.finish_recovery(&project) {
+                    *state = ProjectHostState::RecoveryPending {
+                        project,
+                        checkpoint,
+                    };
+                    return Err(error.to_string());
+                }
+                let projection = project.projection();
+                *state = ProjectHostState::Active(project);
+                Ok(ProjectRecoveryResolution::OpenedLastSaved(projection))
+            }
+            ProjectRecoveryChoice::NowNot => {
+                if checkpoint_discard_confirmed {
+                    *state = ProjectHostState::RecoveryPending {
+                        project,
+                        checkpoint,
+                    };
+                    return Err("A confirmação de descarte não pertence a esta escolha.".into());
+                }
+                drop((project, checkpoint));
+                Ok(ProjectRecoveryResolution::Deferred)
+            }
         }
     }
 
@@ -84,7 +239,9 @@ impl ProjectHost {
             ProjectHostState::Active(project) | ProjectHostState::ClosePending(project) => {
                 Ok(project.projection())
             }
-            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
+            ProjectHostState::RecoveryPending { .. } | ProjectHostState::Consumed => {
+                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+            }
         }
     }
 
@@ -92,18 +249,24 @@ impl ProjectHost {
         &self,
         intent: ProjectIntent,
     ) -> Result<ProjectMutationOutcome, String> {
-        self.project()?
+        let mut project = self.project()?;
+        let outcome = project
             .apply_with_outcome(intent)
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string())?;
+        self.schedule_recovery(&project);
+        Ok(outcome)
     }
 
     pub(crate) fn import_photo(
         &self,
         proposal: PhotoImportProposal,
     ) -> Result<ImportPhotoOutcome, String> {
-        self.project()?
+        let mut project = self.project()?;
+        let outcome = project
             .import_photo(proposal.into_command())
-            .map_err(|error| error.to_string())
+            .map_err(|error| error.to_string())?;
+        self.schedule_recovery(&project);
+        Ok(outcome)
     }
 
     pub(crate) fn relink_media(
@@ -136,7 +299,9 @@ impl ProjectHost {
                 .observe_photo_source(media_id, source_metadata)
                 .map_err(|error| error.to_string())?;
         }
-        Ok(project.projection())
+        let projection = project.projection();
+        self.schedule_recovery(&project);
+        Ok(projection)
     }
 
     pub(crate) fn project_photo_drop_target(
@@ -178,15 +343,21 @@ impl ProjectHost {
     }
 
     pub(crate) fn undo(&self) -> Result<EditorProjection, String> {
-        self.project()?
+        let mut project = self.project()?;
+        let projection = project
             .undo()
-            .ok_or_else(|| "Não há uma ação produtiva para desfazer neste corte.".into())
+            .ok_or_else(|| "Não há uma ação produtiva para desfazer neste corte.".to_string())?;
+        self.schedule_recovery(&project);
+        Ok(projection)
     }
 
     pub(crate) fn redo(&self) -> Result<EditorProjection, String> {
-        self.project()?
+        let mut project = self.project()?;
+        let projection = project
             .redo()
-            .ok_or_else(|| "Não há uma ação produtiva para refazer neste corte.".into())
+            .ok_or_else(|| "Não há uma ação produtiva para refazer neste corte.".to_string())?;
+        self.schedule_recovery(&project);
+        Ok(projection)
     }
 
     pub(crate) fn save(
@@ -199,7 +370,9 @@ impl ProjectHost {
             .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
         let result = match &mut *state {
             ProjectHostState::Active(project) => project.save(expected_revision),
-            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+            ProjectHostState::RecoveryPending { .. }
+            | ProjectHostState::ClosePending(_)
+            | ProjectHostState::Consumed => {
                 return Err(ProjectHostSaveError::SessionUnavailable);
             }
         };
@@ -208,6 +381,13 @@ impl ProjectHost {
                 let ProjectHostState::Active(project) = &*state else {
                     unreachable!("saving an active Project preserves its state")
                 };
+                if let Err(error) = self.finish_recovery(project) {
+                    tracing::error!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "project_recovery_checkpoint_finish_after_save_failed",
+                    );
+                }
                 Ok(ProjectHostSaveResult {
                     outcome,
                     projection: project.projection(),
@@ -228,13 +408,24 @@ impl ProjectHost {
         &self,
         request: SaveAsProjectRequest,
     ) -> Result<ProjectHostSaveAsResult, ProjectHostSaveAsError> {
-        self.save_as_with_transition(request, |_, _| Ok(()))
+        let recovery = self.recovery.clone();
+        self.save_as_with_transition(request, move |previous, _, _| {
+            recovery
+                .as_ref()
+                .map_or(Ok(false), |recovery| recovery.finish(previous))
+                .map(|_| ())
+                .map_err(|_| ())
+        })
     }
 
     pub(crate) fn save_as_with_transition(
         &self,
         request: SaveAsProjectRequest,
-        transition: impl FnOnce(&ProjectIdentityAuthority, SaveAsProjectOutcome) -> Result<(), ()>,
+        transition: impl FnOnce(
+            &ProjectIdentityAuthority,
+            &ProjectIdentityAuthority,
+            SaveAsProjectOutcome,
+        ) -> Result<(), ()>,
     ) -> Result<ProjectHostSaveAsResult, ProjectHostSaveAsError> {
         let mut state = self
             .state
@@ -242,9 +433,14 @@ impl ProjectHost {
             .map_err(|_| ProjectHostSaveAsError::SessionUnavailable)?;
         let result = match &mut *state {
             ProjectHostState::Active(project) => {
-                project.save_as_with_transition(request, transition)
+                let previous_authority = project.identity_authority().clone();
+                project.save_as_with_transition(request, move |authority, outcome| {
+                    transition(&previous_authority, authority, outcome)
+                })
             }
-            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+            ProjectHostState::RecoveryPending { .. }
+            | ProjectHostState::ClosePending(_)
+            | ProjectHostState::Consumed => {
                 return Err(ProjectHostSaveAsError::SessionUnavailable);
             }
         };
@@ -273,7 +469,16 @@ impl ProjectHost {
                 *state = ProjectHostState::ClosePending(project);
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
             }
-            ProjectHostState::Active(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
+            ProjectHostState::Active(project) => match self.finish_recovery(&project) {
+                Ok(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
+                Err(error) => {
+                    *state = ProjectHostState::Active(project);
+                    Err(error.to_string())
+                }
+            },
+            ProjectHostState::RecoveryPending { .. } => {
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            }
             ProjectHostState::ClosePending(project) => {
                 *state = ProjectHostState::ClosePending(project);
                 Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
@@ -308,7 +513,13 @@ impl ProjectHost {
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
         let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
         match current {
-            ProjectHostState::ClosePending(_) => Ok(()),
+            ProjectHostState::ClosePending(project) => match self.finish_recovery(&project) {
+                Ok(_) => Ok(()),
+                Err(error) => {
+                    *state = ProjectHostState::ClosePending(project);
+                    Err(error.to_string())
+                }
+            },
             other => {
                 *state = other;
                 Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
@@ -328,7 +539,13 @@ impl ProjectHost {
         };
         let revision = project.revision();
         match project.save(revision) {
-            Ok(outcome) => Ok(outcome),
+            Ok(outcome) => match self.finish_recovery(&project) {
+                Ok(_) => Ok(outcome),
+                Err(_) => {
+                    *state = ProjectHostState::Active(project);
+                    Err(ProjectHostSaveError::SessionUnavailable)
+                }
+            },
             Err(SaveProjectError::SaveStateIndeterminate) => Err(ProjectHostSaveError::Project(
                 SaveProjectError::SaveStateIndeterminate,
             )),
@@ -354,6 +571,11 @@ impl ProjectHost {
                 })
                 .collect(),
         })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn identity_authority(&self) -> Result<ProjectIdentityAuthority, String> {
+        Ok(self.project()?.identity_authority().clone())
     }
 
     #[cfg(test)]
@@ -400,6 +622,38 @@ impl ProjectHost {
         }
         Ok(ActiveProject { guard })
     }
+
+    fn schedule_recovery(&self, project: &EditableProject) {
+        let Some(recovery) = &self.recovery else {
+            return;
+        };
+        match project.recovery_checkpoint() {
+            Ok(checkpoint) => {
+                if let Err(error) =
+                    recovery.schedule(project.identity_authority().clone(), checkpoint)
+                {
+                    tracing::error!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "project_recovery_checkpoint_schedule_failed",
+                    );
+                }
+            }
+            Err(error) => {
+                tracing::error!(
+                    target: "myalbuns.desktop",
+                    error = %error,
+                    event = "project_recovery_checkpoint_build_failed",
+                );
+            }
+        }
+    }
+
+    fn finish_recovery(&self, project: &EditableProject) -> io::Result<bool> {
+        self.recovery.as_ref().map_or(Ok(false), |recovery| {
+            recovery.finish(project.identity_authority())
+        })
+    }
 }
 
 struct ActiveProject<'a> {
@@ -412,7 +666,9 @@ impl std::ops::Deref for ActiveProject<'_> {
     fn deref(&self) -> &Self::Target {
         match &*self.guard {
             ProjectHostState::Active(project) => project,
-            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+            ProjectHostState::RecoveryPending { .. }
+            | ProjectHostState::ClosePending(_)
+            | ProjectHostState::Consumed => {
                 unreachable!("an ActiveProject guard always contains an active Project")
             }
         }
@@ -423,7 +679,9 @@ impl std::ops::DerefMut for ActiveProject<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match &mut *self.guard {
             ProjectHostState::Active(project) => project,
-            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+            ProjectHostState::RecoveryPending { .. }
+            | ProjectHostState::ClosePending(_)
+            | ProjectHostState::Consumed => {
                 unreachable!("an ActiveProject guard always contains an active Project")
             }
         }
@@ -432,7 +690,10 @@ impl std::ops::DerefMut for ActiveProject<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::{Path, PathBuf};
+    use std::{
+        path::{Path, PathBuf},
+        time::Duration,
+    };
 
     use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
@@ -442,15 +703,19 @@ mod tests {
         PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsAuthorization,
         SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
     };
-    use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
+    use myalbuns_paths::{AppPaths, ExportWriteAuthorization, OperationPathContext};
 
-    use super::{ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError};
+    use super::{
+        ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError, ProjectRecoveryChoice,
+        ProjectRecoveryResolution, ProjectRecoveryStatus,
+    };
     use crate::{
         export_pipeline,
         imaging_processor::InvocationContext,
         imaging_recovery_integration::RealProcessTransport,
         media_runtime::{MediaMonitor, MediaResolver, MediaRuntime},
         path_io,
+        project_recovery::{RecoveryCoordinator, RecoveryStore},
     };
 
     const TEST_PROCESSOR_ENV: &str = "MYALBUNS_TEST_IMAGING_PROCESSOR";
@@ -494,11 +759,68 @@ mod tests {
     }
 
     fn open_project(project_path: &Path, identity_lease_root: &Path) -> ProjectHost {
+        let host = ProjectHost::new(open_editable_project(project_path, identity_lease_root));
+        hydrate_reopened_photos(&host);
+        host
+    }
+
+    struct RecoveryFixture {
+        _root: tempfile::TempDir,
+        project_path: PathBuf,
+        identity_lease_root: PathBuf,
+        authority: myalbuns_core::ProjectIdentityAuthority,
+        store: RecoveryStore,
+        coordinator: RecoveryCoordinator,
+        host: ProjectHost,
+    }
+
+    fn recovery_fixture() -> RecoveryFixture {
+        let root = tempfile::tempdir().expect("temporary Recovery Host fixture");
+        let project_path = root.path().join("Projeto.myalbuns");
+        let identity_lease_root = root.path().join("leases");
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&project_path)
+            .expect("the Recovery fixture root is captured");
+        let project = ProjectCore::new()
+            .with_identity_storage_roots(
+                identity_lease_root.clone(),
+                root.path().join("identities"),
+            )
+            .create_editable(CreateProjectRequest::new(
+                ProjectLocation::new(project_path.clone(), context.freeze()),
+                InitialProject::neutral(),
+                CreateAuthorization::CreateOnly,
+            ))
+            .expect("the productive Recovery Project is created");
+        let authority = project.identity_authority().clone();
+        let store = RecoveryStore::new(AppPaths::from_roots(
+            &root.path().join("roaming"),
+            &root.path().join("local"),
+        ));
+        let coordinator = RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(50));
+        let host = ProjectHost::with_recovery(project, coordinator.clone())
+            .expect("the Host starts without a prior checkpoint");
+        RecoveryFixture {
+            _root: root,
+            project_path,
+            identity_lease_root,
+            authority,
+            store,
+            coordinator,
+            host,
+        }
+    }
+
+    fn open_editable_project(
+        project_path: &Path,
+        identity_lease_root: &Path,
+    ) -> myalbuns_core::EditableProject {
         let mut context = OperationPathContext::new();
         context
             .capture(project_path)
             .expect("the reopened fixture root is captured");
-        let project = ProjectCore::new()
+        ProjectCore::new()
             .with_identity_storage_roots(
                 identity_lease_root.to_path_buf(),
                 identity_lease_root
@@ -510,8 +832,10 @@ mod tests {
                 project_path.to_path_buf(),
                 context.freeze(),
             )))
-            .expect("the saved Project reopens in a new editable Session");
-        let host = ProjectHost::new(project);
+            .expect("the saved Project reopens in a new editable Session")
+    }
+
+    fn hydrate_reopened_photos(host: &ProjectHost) {
         for binding in host
             .authorized_media_catalog()
             .expect("the reopened media catalog is available")
@@ -525,7 +849,6 @@ mod tests {
             host.observe_photo_source(&binding, metadata)
                 .expect("the reopened Photo metadata is hydrated");
         }
-        host
     }
 
     #[test]
@@ -548,6 +871,361 @@ mod tests {
                 .iter()
                 .all(|sheet| sheet.frames.is_empty())
         );
+    }
+
+    #[test]
+    fn completed_host_actions_publish_the_latest_checkpoint_and_save_finishes_it() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+                .expect("the first completed Host action is accepted");
+            let latest = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 180 })
+                .expect("the nearby Host action is accepted")
+                .projection;
+
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            assert!(
+                fixture
+                    .store
+                    .load(&fixture.authority)
+                    .expect("the namespace is readable before publication")
+                    .is_none()
+            );
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            let bytes = fixture
+                .store
+                .load(&fixture.authority)
+                .expect("the Host checkpoint is readable")
+                .expect("the Host checkpoint is published")
+                .to_bytes()
+                .expect("the Host checkpoint serializes");
+            let checkpoint: serde_json::Value =
+                serde_json::from_slice(&bytes).expect("the Host checkpoint is valid JSON");
+            assert_eq!(
+                checkpoint["creativeState"]["project"]["document"]["dpi"],
+                180
+            );
+
+            fixture
+                .host
+                .save(latest.state.revision)
+                .expect("Save completes the current checkpoint");
+            assert!(
+                fixture
+                    .store
+                    .load(&fixture.authority)
+                    .expect("the namespace is readable after Save")
+                    .is_none()
+            );
+        });
+    }
+
+    #[test]
+    fn a_new_host_blocks_the_editor_until_reopening_and_recovering() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            drop(fixture.host);
+
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host detects the prior checkpoint");
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+            assert!(host.projection().is_err());
+            assert!(host.undo().is_err());
+
+            let ProjectRecoveryResolution::Recovered(recovered) = host
+                .resolve_recovery(ProjectRecoveryChoice::ReopenAndRecover, false)
+                .expect("the user reopens and recovers")
+            else {
+                panic!("the recovered choice must activate the recovered Session");
+            };
+            assert_eq!(recovered.state.document.dpi, 360);
+            assert!(recovered.state.dirty);
+            assert!(!recovered.state.can_undo);
+            assert!(!recovered.state.can_redo);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+        });
+    }
+
+    #[test]
+    fn opening_the_last_saved_version_requires_confirmation_before_discarding_recovery() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            drop(fixture.host);
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host detects the prior checkpoint");
+
+            assert!(
+                host.resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, false)
+                    .is_err()
+            );
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+
+            let ProjectRecoveryResolution::OpenedLastSaved(saved) = host
+                .resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, true)
+                .expect("the confirmed choice opens the persisted baseline")
+            else {
+                panic!("the saved choice must activate the persisted Session");
+            };
+            assert_eq!(saved.state.document.dpi, 300);
+            assert!(!saved.state.dirty);
+            assert!(!saved.state.can_undo);
+            assert!(!saved.state.can_redo);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+        });
+    }
+
+    #[test]
+    fn a_checkpoint_from_an_older_saved_base_is_never_discarded_implicitly() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let changed = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the older-base action becomes recoverable")
+                .projection;
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            let older_checkpoint = fixture
+                .store
+                .load(&fixture.authority)
+                .expect("the older checkpoint is readable")
+                .expect("the older checkpoint exists");
+            fixture
+                .host
+                .save(changed.state.revision)
+                .expect("the persisted baseline advances after the checkpoint");
+            drop(fixture.host);
+            fixture
+                .store
+                .publish(&fixture.authority, &older_checkpoint)
+                .expect("the interrupted older checkpoint is restored as evidence");
+
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the Host preserves the older-base checkpoint");
+
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+            assert!(
+                host.resolve_recovery(ProjectRecoveryChoice::ReopenAndRecover, false)
+                    .is_err()
+            );
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+            assert!(
+                host.resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, false)
+                    .is_err()
+            );
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+
+            let ProjectRecoveryResolution::OpenedLastSaved(saved) = host
+                .resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, true)
+                .expect("explicit confirmation discards the older checkpoint")
+            else {
+                panic!("the saved baseline must become active after confirmation");
+            };
+            assert_eq!(saved.state.document.dpi, 360);
+            assert!(!saved.state.dirty);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+        });
+    }
+
+    #[test]
+    fn now_not_preserves_recovery_and_releases_the_project_for_another_host() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            drop(fixture.host);
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host detects the prior checkpoint");
+
+            assert_eq!(
+                host.resolve_recovery(ProjectRecoveryChoice::NowNot, false),
+                Ok(ProjectRecoveryResolution::Deferred)
+            );
+            assert!(host.projection().is_err());
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+
+            let reopened = open_project(&fixture.project_path, &fixture.identity_lease_root);
+            assert_eq!(
+                reopened
+                    .projection()
+                    .expect("another Host acquires the released Project")
+                    .state
+                    .document
+                    .dpi,
+                300
+            );
+        });
+    }
+
+    #[test]
+    fn save_as_failure_preserves_the_prior_recovery_and_success_changes_its_authority() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the prior Session becomes recoverable")
+                .projection;
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            let destination = fixture._root.path().join("Cópia independente.myalbuns");
+            let mut context = OperationPathContext::new();
+            context
+                .capture(&destination)
+                .expect("the Save As destination root is captured");
+            let location = ProjectLocation::new(destination.clone(), context.freeze());
+
+            assert!(matches!(
+                fixture.host.save_as(SaveAsProjectRequest::new(
+                    dirty.state.revision + 1,
+                    location.clone(),
+                    SaveAsAuthorization::CreateOnly,
+                )),
+                Err(super::ProjectHostSaveAsError::Project(
+                    myalbuns_core::SaveAsProjectError::StaleRevision { .. }
+                ))
+            ));
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+            assert_eq!(
+                fixture.host.identity_authority().unwrap(),
+                fixture.authority
+            );
+
+            let saved_as = fixture
+                .host
+                .save_as(SaveAsProjectRequest::new(
+                    dirty.state.revision,
+                    location,
+                    SaveAsAuthorization::CreateOnly,
+                ))
+                .expect("successful Save As adopts the independent identity");
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+            let next_authority = fixture.host.identity_authority().unwrap();
+            assert_ne!(next_authority, fixture.authority);
+            assert_eq!(next_authority.project_id(), saved_as.outcome.project_id);
+
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
+                .expect("new changes belong to the adopted identity");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+            assert!(fixture.store.load(&next_authority).unwrap().is_some());
+            assert!(destination.is_file());
+        });
+    }
+
+    #[test]
+    fn confirmed_clean_close_discard_and_save_close_finish_the_checkpoint() {
+        tauri::async_runtime::block_on(async {
+            let clean = recovery_fixture();
+            clean
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the action is completed before Undo");
+            clean.host.undo().expect("Undo returns to the saved state");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            assert!(clean.store.load(&clean.authority).unwrap().is_some());
+            assert_eq!(
+                clean.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            );
+            assert!(clean.store.load(&clean.authority).unwrap().is_none());
+
+            let discarded = recovery_fixture();
+            discarded
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the discarded action is completed");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            assert_eq!(
+                discarded.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+            discarded
+                .host
+                .discard_close()
+                .expect("explicit discard confirms checkpoint removal");
+            assert!(
+                discarded
+                    .store
+                    .load(&discarded.authority)
+                    .unwrap()
+                    .is_none()
+            );
+
+            let saved = recovery_fixture();
+            saved
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the saved action is completed");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            assert_eq!(
+                saved.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+            saved
+                .host
+                .save_and_close()
+                .expect("Save and close finishes the checkpoint");
+            assert!(saved.store.load(&saved.authority).unwrap().is_none());
+        });
+    }
+
+    #[test]
+    fn a_conclusive_close_save_failure_preserves_the_checkpoint_and_session() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the action is completed before the failed Save")
+                .projection;
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+            std::fs::write(&fixture.project_path, b"externally replaced")
+                .expect("an external writer changes the persisted baseline");
+
+            assert!(matches!(
+                fixture.host.save_and_close(),
+                Err(ProjectHostSaveError::Project(
+                    SaveProjectError::PersistedBaselineConflict
+                ))
+            ));
+            assert_eq!(fixture.host.projection().unwrap(), dirty);
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
+        });
     }
 
     #[test]

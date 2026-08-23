@@ -62,6 +62,33 @@ input {
   line-height: 1.65;
 }
 
+.recovery-actions {
+  display: grid;
+  margin-top: 28px;
+  gap: 10px;
+}
+
+.recovery-actions button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #d1ccc4;
+  border-radius: 10px;
+  color: #28343e;
+  background: #f7f5f1;
+  cursor: pointer;
+}
+
+.recovery-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.recovery-actions .recovery-primary {
+  border-color: #17212b;
+  color: #fff;
+  background: #17212b;
+}
+
 .brand-lockup {
   display: flex;
   align-items: center;

@@ -325,6 +325,27 @@ async function doubleClick(driver, using, value, label) {
   return elementId;
 }
 
+async function beginUncommittedPointerGesture(driver, using, value, label) {
+  const elementId = await findElement(driver, using, value, label);
+  const element = {
+    "element-6066-11e4-a52e-4f735466cecf": elementId,
+  };
+  await driver.request("POST", `/session/${driver.sessionId}/actions`, {
+    actions: [
+      {
+        type: "pointer",
+        id: "interrupted-recovery-mouse",
+        parameters: { pointerType: "mouse" },
+        actions: [
+          { type: "pointerMove", duration: 0, origin: element, x: 0, y: 0 },
+          { type: "pointerDown", button: 0 },
+          { type: "pointerMove", duration: 120, origin: element, x: 24, y: 12 },
+        ],
+      },
+    ],
+  });
+}
+
 async function sendEscape(driver) {
   const body = await findElement(driver, "css selector", "body", "Project body");
   await driver.request(
@@ -603,6 +624,8 @@ async function waitForLogEvent(event, count, label) {
 const globalDebugPort = await findFreeTcpPort();
 const hostDebugPort = await findFreeTcpPort();
 const saveAsHostDebugPort = await findFreeTcpPort();
+const recoveryGlobalDebugPort = await findFreeTcpPort();
+const recoveryHostDebugPort = await findFreeTcpPort();
 const originalGlobalDebugPort = await findFreeTcpPort();
 const originalHostDebugPort = await findFreeTcpPort();
 const applicationEnvironment = {
@@ -632,6 +655,8 @@ let secondGlobalDriver;
 let firstHost;
 let secondGlobal;
 let secondHost;
+let recoveryGlobal;
+let crashedHost;
 let originalGlobal;
 let originalHost;
 let originalReplacementGlobal;
@@ -1095,12 +1120,192 @@ try {
     "Projects",
     `${originalNamespace}.json`,
   );
-  const recoveryCheckpointBytes = Buffer.from(
-    JSON.stringify({ projectId: originalProjectId, revision: 4 }),
-    "utf8",
+  const recoveryCheckpoint = await waitFor(
+    "debounced recovery checkpoint after completed action",
+    () => {
+      if (!existsSync(recoveryCheckpointPath)) return undefined;
+      try {
+        const checkpoint = JSON.parse(
+          readFileSync(recoveryCheckpointPath, "utf8"),
+        );
+        const envelopeKeys = Object.keys(checkpoint).sort().join(",");
+        const baseKeys = Object.keys(checkpoint.baseRevision ?? {})
+          .sort()
+          .join(",");
+        const creativeKeys = Object.keys(checkpoint.creativeState ?? {})
+          .sort()
+          .join(",");
+        return checkpoint.schemaVersion === 1 &&
+          checkpoint.projectId === originalProjectId &&
+          checkpoint.baseRevision?.projectId === originalProjectId &&
+          checkpoint.baseRevision?.revision === 3 &&
+          checkpoint.creativeState?.projectId === originalProjectId &&
+          checkpoint.creativeState?.revision === 4 &&
+          checkpoint.creativeState?.project?.document?.dpi === 360 &&
+          envelopeKeys ===
+            "baseRevision,creativeState,projectId,schemaVersion" &&
+          baseKeys === "projectId,revision" &&
+          creativeKeys === "project,projectId,revision,schemaVersion"
+          ? checkpoint
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    timeoutMilliseconds,
   );
-  mkdirSync(path.dirname(recoveryCheckpointPath), { recursive: true });
-  writeFileSync(recoveryCheckpointPath, recoveryCheckpointBytes);
+  const recoveryCheckpointBytes = readFileSync(recoveryCheckpointPath);
+  const projectBytesBeforeCrash = readFileSync(projectPath);
+  if (!projectBytesBeforeCrash.equals(savedProject)) {
+    throw new Error("The recovery checkpoint behaved as an autosave");
+  }
+
+  await doubleClick(
+    hostDriver,
+    "css selector",
+    "canvas.pixi-canvas",
+    "Photo Frame before interrupted gesture",
+  );
+  await beginUncommittedPointerGesture(
+    hostDriver,
+    "css selector",
+    "canvas.pixi-canvas",
+    "continuous Photo gesture",
+  );
+  await delay(500);
+  const midGesturePreservedPreviousCheckpoint =
+    readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes) &&
+    readFileSync(projectPath).equals(projectBytesBeforeCrash);
+  if (!midGesturePreservedPreviousCheckpoint) {
+    throw new Error(
+      "An unfinished continuous gesture replaced the previous checkpoint or saved Project",
+    );
+  }
+
+  crashedHost = secondHost;
+  terminateProcessInstance(crashedHost);
+  await waitForExit(crashedHost, "crashed Project Host");
+  hostDriver = await disposeConfirmedWebDriver(hostDriver);
+  if (
+    !existsSync(recoveryCheckpointPath) ||
+    !readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes) ||
+    !readFileSync(projectPath).equals(projectBytesBeforeCrash)
+  ) {
+    throw new Error("The abrupt Host exit changed durable Project state");
+  }
+
+  const recoveryApplicationEnvironment = {
+    ...process.env,
+    MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
+    MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(recoveryGlobalDebugPort),
+    MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(recoveryHostDebugPort),
+    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${recoveryGlobalDebugPort}`,
+  };
+  const recoveryGlobalChild = spawn(applicationPath, [projectPath], {
+    cwd: workspace,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: recoveryApplicationEnvironment,
+  });
+  recoveryGlobal = await waitForProcessInstance(
+    recoveryGlobalChild.pid,
+    "recovery Global",
+  );
+  secondHost = await waitForNewApplication(
+    isHost,
+    [firstHost, crashedHost],
+    "recovery Project Host",
+  );
+  await waitForExit(recoveryGlobal, "recovery Global handoff");
+  await waitForLogEvent("project_ui_ready", 3, "recovery choice UI ready");
+  hostDriver = await startAttachedWebDriver(
+    recoveryHostDebugPort,
+    "recovery Project Host",
+  );
+  const recoveryChoices = await hostDriver.request(
+    "POST",
+    `/session/${hostDriver.sessionId}/execute/sync`,
+    {
+      script: `return Array.from(document.querySelectorAll('.recovery-actions button')).map((button) => button.textContent.trim());`,
+      args: [],
+    },
+  );
+  if (
+    JSON.stringify(recoveryChoices) !==
+    JSON.stringify([
+      "Reabrir e recuperar",
+      "Abrir última versão salva",
+      "Agora não",
+    ])
+  ) {
+    throw new Error(
+      `The recovery prompt exposed unexpected choices: ${JSON.stringify(recoveryChoices)}`,
+    );
+  }
+  await click(
+    hostDriver,
+    "xpath",
+    "//button[normalize-space()='Reabrir e recuperar']",
+    "Reopen and recover choice",
+  );
+  await findElement(
+    hostDriver,
+    "css selector",
+    ".app-shell",
+    "recovered Project UI",
+  );
+  await ensureAlbumDesignExpanded(hostDriver, "recovered Album Design section");
+  const recoveredDpi = await findElement(
+    hostDriver,
+    "css selector",
+    ".document-dpi-control input",
+    "recovered DPI",
+  );
+  if ((await elementAttribute(hostDriver, recoveredDpi, "value")) !== "360") {
+    throw new Error("The recovered Project did not restore the checkpoint state");
+  }
+  let recoveredHistoryEmpty = true;
+  for (const label of ["Desfazer", "Refazer"]) {
+    const button = await findElement(
+      hostDriver,
+      "css selector",
+      `button[aria-label='${label}']`,
+      `${label} after recovery`,
+    );
+    if (
+      await hostDriver.request(
+        "GET",
+        `/session/${hostDriver.sessionId}/element/${encodeURIComponent(button)}/enabled`,
+      )
+    ) {
+      recoveredHistoryEmpty = false;
+    }
+  }
+  const recoveredSaveButton = await findElement(
+    hostDriver,
+    "css selector",
+    "button[aria-label='Salvar']",
+    "Save after recovery",
+  );
+  const recoveredUnsaved = await hostDriver.request(
+    "GET",
+    `/session/${hostDriver.sessionId}/element/${encodeURIComponent(recoveredSaveButton)}/enabled`,
+  );
+  const checkpointPreservedAfterRecovery =
+    existsSync(recoveryCheckpointPath) &&
+    readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes);
+  const projectFileUnchangedThroughRecovery =
+    readFileSync(projectPath).equals(projectBytesBeforeCrash);
+  if (
+    !recoveredHistoryEmpty ||
+    !recoveredUnsaved ||
+    !checkpointPreservedAfterRecovery ||
+    !projectFileUnchangedThroughRecovery
+  ) {
+    throw new Error(
+      "Recovered state was not unsaved with empty History and an intact checkpoint",
+    );
+  }
   const webviewStateRoot = path.join(
     processDataRoot,
     "Local",
@@ -1887,7 +2092,13 @@ try {
 
   finalGlobal = await waitForNewApplication(
     (instance) => !isHost(instance),
-    [firstGlobal, secondGlobal, originalGlobal, originalReplacementGlobal],
+    [
+      firstGlobal,
+      secondGlobal,
+      recoveryGlobal,
+      originalGlobal,
+      originalReplacementGlobal,
+    ],
     "final Global",
   );
   terminateProcessInstance(finalGlobal);
@@ -1913,6 +2124,10 @@ try {
       },
       {
         globalProcessId: secondGlobal.processId,
+        hostProcessId: crashedHost.processId,
+      },
+      {
+        globalProcessId: recoveryGlobal.processId,
         hostProcessId: secondHost.processId,
       },
       {
@@ -1935,11 +2150,13 @@ try {
   if (
     new Set([
       secondGlobal.processId,
+      crashedHost.processId,
+      recoveryGlobal.processId,
       secondHost.processId,
       originalGlobal.processId,
       originalHost.processId,
       ...exportSpawns.map((record) => Number(record.imaging_process_id)),
-    ]).size !== 4 + exportSpawns.length
+    ]).size !== 6 + exportSpawns.length
   ) {
     throw new Error(
       "Global, Host and both Processadores did not use distinct PIDs",
@@ -1962,6 +2179,28 @@ try {
       photoFrameCount: savedFrames.length,
       persistedPhotoLinkOnly,
       reimportedExistingPhotoWithoutRevision,
+      sessionRecovery: {
+        schemaVersion: recoveryCheckpoint.schemaVersion,
+        baseSavedRevision: recoveryCheckpoint.baseRevision.revision,
+        creativeRevision: recoveryCheckpoint.creativeState.revision,
+        recoveredDpi: recoveryCheckpoint.creativeState.project.document.dpi,
+        promptChoices: recoveryChoices,
+        opaqueProjectKey:
+          path.basename(recoveryCheckpointPath) === `${originalNamespace}.json` &&
+          !path.basename(recoveryCheckpointPath).includes(originalProjectId),
+        completedActionCheckpointed: true,
+        midGesturePreservedPreviousCheckpoint,
+        projectFileUnchangedThroughRecovery,
+        checkpointPreservedAfterRecovery,
+        recoveredUnsaved,
+        recoveredHistoryEmpty,
+        checkpointPreservedByCancelledSaveAs: cancelledSaveAsBeforeCore,
+        checkpointFinishedBySuccessfulSaveAs: recoveryFinished,
+        crashedHostProcessId: crashedHost.processId,
+        recoveredHostProcessId: secondHost.processId,
+        lockReleasedToDistinctHost:
+          crashedHost.processId !== secondHost.processId,
+      },
       saveAs: {
         cancelledBeforeCore: cancelledSaveAsBeforeCore,
         createAuthorization: "createOnly",
@@ -2003,6 +2242,8 @@ try {
         firstGlobal: firstGlobal.processId,
         firstHost: firstHost.processId,
         global: secondGlobal.processId,
+        crashedHost: crashedHost.processId,
+        recoveryGlobal: recoveryGlobal.processId,
         host: secondHost.processId,
         simultaneousOriginalGlobal: originalGlobal.processId,
         simultaneousOriginalHost: originalHost.processId,

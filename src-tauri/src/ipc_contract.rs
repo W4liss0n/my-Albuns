@@ -521,6 +521,72 @@ mod close_contract_tests {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind")]
+pub enum ProjectRecoveryStatus {
+    None,
+    Available,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectRecoveryChoice {
+    ReopenAndRecover,
+    OpenLastSaved,
+    NowNot,
+}
+
+#[derive(Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectRecoveryResolution {
+    Recovered {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: Box<EditorProjection>,
+    },
+    OpenedLastSaved {
+        #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+        projection: Box<EditorProjection>,
+    },
+    Deferred,
+}
+
+#[cfg(test)]
+mod recovery_contract_tests {
+    use serde_json::json;
+
+    use super::{ProjectRecoveryChoice, ProjectRecoveryResolution, ProjectRecoveryStatus};
+
+    #[test]
+    fn recovery_status_and_choices_are_closed_and_stable() {
+        assert_eq!(
+            serde_json::to_value(ProjectRecoveryStatus::Available)
+                .expect("the available status serializes"),
+            json!({ "kind": "available" })
+        );
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryChoice>(json!("reopenAndRecover"))
+                .expect("the recover choice deserializes"),
+            ProjectRecoveryChoice::ReopenAndRecover
+        );
+        assert!(serde_json::from_value::<ProjectRecoveryChoice>(json!("unknownChoice")).is_err());
+    }
+
+    #[test]
+    fn deferred_recovery_has_no_creative_payload() {
+        assert_eq!(
+            serde_json::to_value(ProjectRecoveryResolution::Deferred)
+                .expect("the deferred resolution serializes"),
+            json!({ "kind": "deferred" })
+        );
+    }
+}
+
 #[derive(Clone, Copy, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum FrontendLogLevel {
