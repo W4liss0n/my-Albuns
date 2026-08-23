@@ -584,6 +584,15 @@ kbd {
   font-size: 1.1rem;
 }
 
+.save-as-startup-terminal {
+  grid-template-columns: 1fr auto;
+}
+
+.save-as-startup-terminal span {
+  overflow: visible;
+  white-space: normal;
+}
+
 .project-close-backdrop {
   position: fixed;
   inset: 0;

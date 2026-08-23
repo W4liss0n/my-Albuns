@@ -114,6 +114,7 @@ export function useProjectEditorController({
     relinkMedia: mutations.relinkMedia,
     importPhoto: mutations.importPhoto,
     save: mutations.save,
+    saveAs: mutations.saveAs,
     undo: mutations.undo,
     redo: mutations.redo,
     fillMedia: (mediaId: string) => {

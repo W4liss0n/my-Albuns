@@ -157,6 +157,17 @@ impl CachePreviewRegistry {
         removed
     }
 
+    pub(crate) fn revoke_all(&self) -> usize {
+        let mut publication = self
+            .publication
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let removed = publication.previews_by_token.len();
+        publication.tokens_by_media.clear();
+        publication.previews_by_token.clear();
+        removed
+    }
+
     pub(crate) fn retained_preview(
         &self,
         media_id: &str,

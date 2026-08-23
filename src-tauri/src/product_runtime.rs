@@ -1,18 +1,22 @@
 use std::{
     io,
+    path::Path,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
-use myalbuns_core::{EditableProject, MediaId, MediaKind, PhotoSourceMetadata};
+use myalbuns_core::{
+    EditableProject, MediaId, MediaKind, PhotoSourceMetadata, project_name_from_path,
+};
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, project_data_namespace};
 use tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::{
+    cache_activity_gate::CacheCancellation,
     cache_engine::{CacheEngine, RecoveredCacheArtifact},
     cache_previews::CachePreviewRegistry,
-    cache_service::{CacheNamespaceOwner, CacheService},
+    cache_service::{ActiveCacheNamespace, CacheService},
     desktop_webview_policy,
     export_attempts::ExportAttempts,
     imaging_processor::ImagingProcessor,
@@ -26,6 +30,8 @@ use crate::{
     },
     project_host::ProjectCloseRequestOutcome,
     project_host::ProjectHost,
+    project_recovery::ProjectRecoveryCheckpoints,
+    project_webview_authority::ProjectWebviewAuthority,
     project_window_lifecycle::{
         PROJECT_CLOSE_CONFIRMATION_EVENT, complete_project_close,
         request_window_export_cancellation,
@@ -35,6 +41,11 @@ use crate::{
 pub(crate) const PROJECT_WINDOW_LABEL: &str = "project";
 pub(crate) const LINKED_MEDIA_CHANGED_EVENT: &str = "myalbuns://linked-media-changed";
 pub(crate) const CACHE_PROCESSOR_WARNING_EVENT: &str = "myalbuns://cache-processor-warning";
+
+pub(crate) fn project_window_title(path: &Path) -> String {
+    let project_name = project_name_from_path(path);
+    format!("{project_name} — {}", path.display())
+}
 
 pub(crate) fn run(
     opened: BootstrappedHostProject,
@@ -49,14 +60,15 @@ pub(crate) fn run(
         .reserve_namespace(project.identity_authority())
         .map_err(io::Error::other)?;
     hydrate_project_from_recovered_cache(&mut project, cache_namespace_owner.recovered_artifacts());
+    let initial_window_title = project_window_title(project.project_path());
     let project_host = ProjectHost::new(project);
     let cache_previews = CachePreviewRegistry::new(PROJECT_WINDOW_LABEL);
     let media_protocol_registry = cache_previews.clone();
     let setup_paths = app_paths.clone();
-    let startup_handshake = ProjectStartupHandshake::new(
-        PendingHostTerminal::new(request),
-        projection_identity(&project_host)?,
-    );
+    let initial_identity = projection_identity(&project_host)?;
+    let webview_authority = ProjectWebviewAuthority::new(app_paths.clone(), &initial_identity.0);
+    let startup_handshake =
+        ProjectStartupHandshake::new(PendingHostTerminal::new(request), initial_identity);
     let mut context = tauri::generate_context!();
 
     // EdgeDriver's supported launch flow needs the single WebView2 instance to
@@ -91,7 +103,10 @@ pub(crate) fn run(
         .manage(project_host)
         .manage(startup_handshake)
         .manage(cache_previews)
-        .manage(cache_namespace_owner)
+        .manage(ActiveCacheNamespace::new(cache_namespace_owner))
+        .manage(cache_service)
+        .manage(ProjectRecoveryCheckpoints::new(app_paths.clone()))
+        .manage(webview_authority)
         .manage(CacheEngine::default())
         .manage(MediaRuntime::default())
         .manage(MediaMonitor::default())
@@ -147,7 +162,7 @@ pub(crate) fn run(
                 request_window_export_cancellation(window);
             }
         })
-        .setup(move |app| setup_host(app, setup_paths))
+        .setup(move |app| setup_host(app, setup_paths, initial_window_title))
         .invoke_handler(tauri::generate_handler![
             crate::logging::frontend_log,
             project_ui_ready,
@@ -160,6 +175,7 @@ pub(crate) fn run(
             crate::project_commands::undo_project,
             crate::project_commands::redo_project,
             crate::project_commands::save_project,
+            crate::project_commands::save_project_as,
             crate::project_close_commands::request_project_close,
             crate::project_close_commands::resolve_project_close,
             crate::media_preview_commands::prepare_media_previews,
@@ -205,7 +221,11 @@ fn hydrate_project_from_recovered_cache(
         .count()
 }
 
-fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_host(
+    app: &mut tauri::App,
+    app_paths: AppPaths,
+    initial_window_title: String,
+) -> Result<(), Box<dyn std::error::Error>> {
     let projection = app
         .state::<ProjectHost>()
         .projection()
@@ -238,8 +258,11 @@ fn setup_host(app: &mut tauri::App, app_paths: AppPaths) -> Result<(), Box<dyn s
                 policy_signal.observe(&window, payload.event());
             })
             .build()?;
+        #[cfg(debug_assertions)]
+        desktop_webview_policy::retire_inherited_debug_arguments_before_replacement()?;
         (window, Some(policy_readiness))
     };
+    project_window.set_title(&initial_window_title)?;
     app.manage(app_paths);
     let app_handle = app.handle().clone();
     let startup_handshake = app.state::<ProjectStartupHandshake>().inner().clone();
@@ -387,12 +410,23 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
         loop {
             tokio::time::sleep(Duration::from_millis(250)).await;
             if app.get_webview_window(PROJECT_WINDOW_LABEL).is_none() {
+                if app.state::<ProjectWebviewAuthority>().is_transitioning() {
+                    continue;
+                }
                 break;
             }
+            let _causal_cache_permit = app
+                .state::<CacheEngine>()
+                .begin_cancellable_work(CacheCancellation::default())
+                .await;
             let catalog = match app.state::<ProjectHost>().authorized_media_catalog() {
                 Ok(catalog) => catalog,
                 Err(_) => break,
             };
+            let namespace = app.state::<ActiveCacheNamespace>().namespace();
+            if catalog.project_id != namespace.project_id() {
+                continue;
+            }
             let monitor = app.state::<MediaMonitor>().inner().clone();
             let runtime = app.state::<MediaRuntime>().inner().clone();
             let bindings = catalog.bindings.clone();
@@ -421,9 +455,8 @@ fn start_linked_media_monitor(app: tauri::AppHandle) {
                 );
             }
             if !changed.is_empty() || !invalidated.is_empty() {
-                let namespace = app.state::<CacheNamespaceOwner>();
                 app.state::<CacheEngine>().apply_monitor_media_update(
-                    namespace.namespace(),
+                    &namespace,
                     app.state::<CachePreviewRegistry>().inner(),
                     update,
                 );
@@ -618,7 +651,7 @@ mod tests {
 
     use super::{
         PROJECT_WINDOW_LABEL, StartupReadiness, StartupSignal,
-        hydrate_project_from_recovered_cache, refresh_changed_photo_sources,
+        hydrate_project_from_recovered_cache, project_window_title, refresh_changed_photo_sources,
         refresh_project_photos_for_media_update,
     };
     use crate::{
@@ -630,6 +663,16 @@ mod tests {
     #[test]
     fn productive_host_has_one_stable_project_window_label() {
         assert_eq!(PROJECT_WINDOW_LABEL, "project");
+    }
+
+    #[test]
+    fn native_project_title_exposes_the_current_name_and_location() {
+        let path = std::path::Path::new("Projetos").join("Familia.myalbuns");
+
+        assert_eq!(
+            project_window_title(&path),
+            format!("Familia — {}", path.display())
+        );
     }
 
     #[test]

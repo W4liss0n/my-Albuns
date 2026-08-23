@@ -22,8 +22,10 @@ pub use model::{
 pub use persistent_project::{
     CreateAuthorization, CreateProjectError, CreateProjectRequest, EditableProject,
     ExternalCopySource, FrozenProjectRendering, FrozenSheetRendering, LoadedProjectRevision,
-    OpenProjectError, OpenProjectRequest, ProjectCore, ProjectIdentityAuthority, SaveCopyAsError,
-    SaveCopyAsRequest, SaveProjectError, SaveProjectOutcome,
+    OpenProjectError, OpenProjectRequest, ProjectCore, ProjectIdentityAuthority,
+    SaveAsAuthorization, SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest,
+    SaveCopyAsError, SaveCopyAsRequest, SaveProjectError, SaveProjectOutcome,
+    project_name_from_path,
 };
 pub use project_document::{
     ActiveSides, Background, BackgroundContent, DisplayUnit, DocumentSettings, EndSheetFormat,

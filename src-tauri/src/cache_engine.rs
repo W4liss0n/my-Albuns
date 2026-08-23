@@ -534,6 +534,40 @@ impl CacheEngine {
         self.activity.pause().await
     }
 
+    /// Revokes every in-memory authority keyed by a Project identity while a
+    /// causal pause prevents old work from reaching publication.
+    pub(crate) fn retire_project_identity(
+        &self,
+        _pause: &CachePause,
+        registry: &CachePreviewRegistry,
+        project_id: &str,
+    ) {
+        let _transition_and_publication_guard = self
+            .transition_and_publication_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.demands
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(project_id);
+        self.applied_observation_generations
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|(observed_project_id, _), _| observed_project_id != project_id);
+        self.flights
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .retain(|_, flight| {
+                if flight.project_id == project_id {
+                    flight.cancellation.cancel_obsolete();
+                    false
+                } else {
+                    true
+                }
+            });
+        registry.revoke_all();
+    }
+
     pub(crate) async fn execute<T: ImagingTransport>(
         &self,
         transport: &mut T,
@@ -2302,6 +2336,26 @@ mod tests {
                 .flag()
                 .load(std::sync::atomic::Ordering::Acquire)
         );
+    }
+
+    #[test]
+    fn identity_transition_retires_all_old_demands_before_new_cache_work_can_resume() {
+        tauri::async_runtime::block_on(async {
+            let engine = CacheEngine::default();
+            let registry = CachePreviewRegistry::new("project");
+            let old = engine.reconcile_demand("old-project", 9, ["photo-a", "photo-b"]);
+            assert!(engine.demand_is_current(&old));
+            let pause = engine.pause().await;
+
+            engine.retire_project_identity(&pause, &registry, "old-project");
+
+            assert!(!engine.demand_is_current(&old));
+            let restarted = engine.reconcile_demand("old-project", 0, ["photo-a"]);
+            assert!(
+                restarted.accepted,
+                "retiring an identity removes its revision and publication authority"
+            );
+        });
     }
 
     #[test]

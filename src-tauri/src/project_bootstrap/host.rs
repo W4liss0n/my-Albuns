@@ -25,6 +25,7 @@ pub(crate) struct PendingExternalCopyHost {
     source: myalbuns_core::ExternalCopySource,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum HostBootstrap {
     Ready(BootstrappedHostProject),
     ExternalCopyNotWritable(PendingExternalCopyHost),

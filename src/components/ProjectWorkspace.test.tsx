@@ -225,6 +225,9 @@ function projectCorePortWithApply(
     save: async () => {
       throw new Error("Salvamento não configurado neste teste.");
     },
+    saveAs: async () => {
+      throw new Error("Salvar como não configurado neste teste.");
+    },
   };
 }
 
@@ -807,6 +810,50 @@ test("saves the visible revision and applies the authoritative saved projection"
     />,
   );
   expect(screen.getByRole("button", { name: "Desfazer" })).toBeEnabled();
+});
+
+test("uses the native Salvar como flow and adopts the new Project projection", async () => {
+  const savedAsProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      projectId: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+      projectName: "Versão independente",
+      savedRevision: projection.state.revision,
+      dirty: false,
+      canUndo: true,
+    },
+  };
+  const saveAs = vi.fn<ProjectCorePort["saveAs"]>(async () => ({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: projection.state.projectId,
+      projectId: savedAsProjection.state.projectId,
+      revision: savedAsProjection.state.revision,
+    },
+    projection: savedAsProjection,
+  }));
+  const projectCorePort = projectCorePortWithApply(async () => projection);
+  projectCorePort.saveAs = saveAs;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Arquivo" }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole("menuitem", { name: "Salvar como…" }));
+    await Promise.resolve();
+  });
+
+  expect(saveAs).toHaveBeenCalledWith(projection.state.revision);
+  expect(onProjectionChange).toHaveBeenCalledWith(savedAsProjection);
 });
 
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {

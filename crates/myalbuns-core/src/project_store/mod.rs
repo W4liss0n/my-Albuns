@@ -17,6 +17,8 @@ pub(crate) use editable_store::{
     CreateStoreError, OpenStoreError, OpenedProject, ProjectStore, SaveStoreError, SaveStoreResult,
     create_only, open_editable, prepare_replacement,
 };
+#[cfg(windows)]
+pub(crate) use editable_store::{create_only_excluding, prepare_replacement_excluding};
 pub(crate) use identity_lease::{
     IdentityLeaseError, IdentityLeaseObservation, IdentityTargetBinder,
     PendingProjectIdentityLease, ProjectIdentityLease,

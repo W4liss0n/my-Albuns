@@ -4,7 +4,7 @@ use crate::{
 };
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct PersistentProjectSession {
     current: ProjectRevision,
     latest_revision: u64,
@@ -186,6 +186,20 @@ impl PersistentProjectSession {
     pub(crate) fn confirm_saved(&mut self, candidate: &ProjectRevision) -> Result<(), ()> {
         if self.current != *candidate {
             return Err(());
+        }
+        self.saved_revision = candidate.revision;
+        self.schema_upgrade_required = false;
+        Ok(())
+    }
+
+    pub(crate) fn adopt_saved_as(&mut self, candidate: &ProjectRevision) -> Result<(), ()> {
+        if self.current.revision != candidate.revision || self.current.project != candidate.project
+        {
+            return Err(());
+        }
+        self.current.project_id = candidate.project_id;
+        for revision in self.undo.iter_mut().chain(self.redo.iter_mut()) {
+            revision.project_id = candidate.project_id;
         }
         self.saved_revision = candidate.revision;
         self.schema_upgrade_required = false;

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, sync::Mutex};
 
 use myalbuns_core::ProjectIdentityAuthority;
 use myalbuns_paths::{AppPaths, CacheNamespaceUsage, CachePathPlan};
@@ -44,6 +44,11 @@ pub(crate) struct CacheNamespaceOwner {
 }
 
 #[derive(Debug)]
+pub(crate) struct ActiveCacheNamespace {
+    owner: Mutex<CacheNamespaceOwner>,
+}
+
+#[derive(Debug)]
 struct ReservedCacheNamespace {
     usage: CacheNamespaceUsage,
     _reservation: NamedMutexGrant,
@@ -57,12 +62,39 @@ enum CacheNamespaceRemovalReservation {
 }
 
 impl CacheNamespaceOwner {
+    #[cfg(test)]
     pub(crate) fn namespace(&self) -> &AuthorizedCacheNamespace {
         &self.namespace
     }
 
     pub(crate) fn recovered_artifacts(&self) -> &[RecoveredCacheArtifact] {
         &self.recovered_artifacts
+    }
+}
+
+impl ActiveCacheNamespace {
+    pub(crate) fn new(owner: CacheNamespaceOwner) -> Self {
+        Self {
+            owner: Mutex::new(owner),
+        }
+    }
+
+    pub(crate) fn namespace(&self) -> AuthorizedCacheNamespace {
+        self.owner
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .namespace
+            .clone()
+    }
+
+    pub(crate) fn transition_to(&self, owner: CacheNamespaceOwner) -> CacheNamespaceOwner {
+        std::mem::replace(
+            &mut *self
+                .owner
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner),
+            owner,
+        )
     }
 }
 
@@ -110,6 +142,25 @@ impl CacheService {
             recovered_artifacts: recovery.verified_artifacts,
             _reservation: reservation,
         })
+    }
+
+    pub(crate) fn reserve_fresh_namespace(
+        &self,
+        authority: &ProjectIdentityAuthority,
+    ) -> Result<CacheNamespaceOwner, CacheServiceError> {
+        let owner = self.reserve_namespace(authority)?;
+        let occupied_bytes = self
+            .app_paths
+            .inspect_cache_namespace(owner.namespace.paths())
+            .map_err(|error| CacheServiceError::Storage(error.to_string()))?
+            .map(|usage| usage.bytes())
+            .unwrap_or(0);
+        if occupied_bytes != 0 || !owner.recovered_artifacts.is_empty() {
+            return Err(CacheServiceError::Storage(
+                "o novo namespace de Cache não começou vazio".into(),
+            ));
+        }
+        Ok(owner)
     }
 
     pub(crate) fn measure(&self) -> Result<CacheServiceStatus, CacheServiceError> {
@@ -532,8 +583,8 @@ mod tests {
     use crate::processor_lifetime::ProcessorChildLifetime;
 
     use super::{
-        CacheScheduledCleanupOutcome, CacheService, CacheServiceError, namespace_mutex,
-        run_cache_service_operation,
+        ActiveCacheNamespace, CacheScheduledCleanupOutcome, CacheService, CacheServiceError,
+        namespace_mutex, run_cache_service_operation,
     };
 
     const NAMESPACE_OWNER_ROOT_ENV: &str = "MYALBUNS_CACHE_NAMESPACE_OWNER_ROOT";
@@ -587,6 +638,41 @@ mod tests {
             CreateAuthorization::CreateOnly,
         ))
         .expect("the Project identity is authorized")
+    }
+
+    #[test]
+    fn save_as_cache_transition_adopts_a_reserved_empty_namespace() {
+        let root = tempfile::tempdir().expect("temporary Cache transition fixture");
+        let paths = app_paths(root.path());
+        let core = ProjectCore::new().with_identity_storage_roots(
+            root.path().join("leases"),
+            root.path().join("identities"),
+        );
+        let first = create_project(&core, root.path().join("Primeiro.myalbuns"));
+        let second = create_project(&core, root.path().join("Segundo.myalbuns"));
+        let service = CacheService::new(paths.clone());
+        let old_owner = service
+            .reserve_namespace(first.identity_authority())
+            .expect("the old Cache namespace is reserved");
+        let old_root = old_owner.namespace().paths().root().to_path_buf();
+        let active = ActiveCacheNamespace::new(old_owner);
+        let fresh_owner = service
+            .reserve_fresh_namespace(second.identity_authority())
+            .expect("the new identity reserves an empty Cache namespace");
+        let fresh_root = fresh_owner.namespace().paths().root().to_path_buf();
+
+        let retired = active.transition_to(fresh_owner);
+
+        assert_eq!(retired.namespace().paths().root(), old_root);
+        assert_eq!(active.namespace().paths().root(), fresh_root);
+        assert_ne!(old_root, fresh_root);
+        assert_eq!(
+            paths
+                .inspect_cache_namespace(active.namespace().paths())
+                .expect("the new namespace is measurable")
+                .map(|usage| usage.bytes()),
+            Some(0)
+        );
     }
 
     fn closed_cache_with_stale_writer_claim(

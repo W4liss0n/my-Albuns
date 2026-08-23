@@ -161,6 +161,21 @@ export function ProjectWorkspace({
             {fileMenuOpen && (
               <div className="app-menu-popup" role="menu">
                 <button
+                  disabled={
+                    Boolean(busy) ||
+                    exportActive ||
+                    projectClose.interactionBlocked
+                  }
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setFileMenuOpen(false);
+                    controller.saveAs();
+                  }}
+                >
+                  Salvar como…
+                </button>
+                <button
                   disabled={projectClose.interactionBlocked}
                   role="menuitem"
                   type="button"

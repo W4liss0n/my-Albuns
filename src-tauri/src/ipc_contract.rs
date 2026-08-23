@@ -295,6 +295,58 @@ pub struct SaveProjectResult {
     pub(crate) projection: EditorProjection,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum SaveAsProjectOutcome {
+    Cancelled,
+    SavedAs {
+        previous_project_id: String,
+        project_id: String,
+        revision: u64,
+    },
+}
+
+#[derive(Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveAsProjectResult {
+    pub(crate) outcome: SaveAsProjectOutcome,
+    #[ts(type = "import(\"../../domain/project\").EditorProjection")]
+    pub(crate) projection: EditorProjection,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "code",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "code")]
+pub enum SaveAsProjectCommandError {
+    StaleRevision {
+        expected_revision: u64,
+        current_revision: u64,
+    },
+    SameTarget,
+    DestinationConflict,
+    ProjectInUse,
+    IdentityIndeterminate,
+    NotFound,
+    Unavailable,
+    AccessDenied,
+    InvalidPath,
+    UnexpectedObjectType,
+    Conflict,
+    IoFailure,
+    SaveAsStateIndeterminate,
+    SessionUnavailable,
+    DialogUnavailable,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(
     tag = "code",
@@ -373,6 +425,55 @@ mod save_contract_tests {
     #[test]
     fn save_errors_carry_stable_codes_and_context_without_a_localized_message() {
         let serialized = serde_json::to_value(SaveProjectCommandError::StaleRevision {
+            expected_revision: 3,
+            current_revision: 4,
+        })
+        .expect("the stale-revision error serializes");
+
+        assert_eq!(
+            serialized,
+            json!({
+                "code": "stale_revision",
+                "expectedRevision": 3,
+                "currentRevision": 4
+            })
+        );
+        assert!(serialized.get("message").is_none());
+    }
+}
+
+#[cfg(test)]
+mod save_as_contract_tests {
+    use serde_json::json;
+
+    use super::{SaveAsProjectCommandError, SaveAsProjectOutcome};
+
+    #[test]
+    fn save_as_outcomes_keep_cancellation_and_adopted_identity_explicit() {
+        assert_eq!(
+            serde_json::to_value(SaveAsProjectOutcome::Cancelled)
+                .expect("the cancelled outcome serializes"),
+            json!({ "kind": "cancelled" })
+        );
+        assert_eq!(
+            serde_json::to_value(SaveAsProjectOutcome::SavedAs {
+                previous_project_id: "4b594571-6b51-4cad-a37c-8fd8cedb7dd2".into(),
+                project_id: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5".into(),
+                revision: 7,
+            })
+            .expect("the SavedAs outcome serializes"),
+            json!({
+                "kind": "savedAs",
+                "previousProjectId": "4b594571-6b51-4cad-a37c-8fd8cedb7dd2",
+                "projectId": "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+                "revision": 7
+            })
+        );
+    }
+
+    #[test]
+    fn save_as_errors_are_stable_structured_data_without_messages() {
+        let serialized = serde_json::to_value(SaveAsProjectCommandError::StaleRevision {
             expected_revision: 3,
             current_revision: 4,
         })

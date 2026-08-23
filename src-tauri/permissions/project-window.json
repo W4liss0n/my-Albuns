@@ -16,6 +16,7 @@
           "undo_project",
           "redo_project",
           "save_project",
+          "save_project_as",
           "request_project_close",
           "resolve_project_close",
           "prepare_media_previews",

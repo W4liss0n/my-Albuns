@@ -107,6 +107,9 @@ const projectCorePort: ProjectCorePort = {
   save: async () => {
     throw new Error("Salvamento não configurado neste teste.");
   },
+  saveAs: async () => {
+    throw new Error("Salvar como não configurado neste teste.");
+  },
 };
 const mediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: async () => null,
@@ -149,6 +152,30 @@ const canvasGraphicsDiagnosticProbe = () =>
       maxTextureImageUnits: 16,
     },
   }) as const;
+
+test("surfaces the durable Save As terminal when the previous WebView is restored", async () => {
+  window.location.hash = "#save-as-state-indeterminate";
+  try {
+    render(
+      <App
+        exportPipelinePort={exportPipelinePort}
+        mediaPreviewPort={mediaPreviewPort}
+        projectStartupPort={projectStartupPort}
+        projectCorePort={projectCorePort}
+        projectWindowPort={projectWindowPort}
+        graphicsProbe={canvasGraphicsDiagnosticProbe}
+        canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+        logger={silentLogger}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "A Sessão anterior foi mantida; reinspecione o destino antes de reutilizá-lo.",
+    );
+  } finally {
+    window.location.hash = "";
+  }
+});
 
 test("reports a defensive Project Canvas failure without claiming that no Session exists", async () => {
   const load = vi.fn(async () => projection);

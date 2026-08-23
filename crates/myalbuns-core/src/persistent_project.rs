@@ -4,7 +4,8 @@ use std::{
 };
 
 use myalbuns_paths::{
-    ExpectedObject, OperationPathContext, PhysicalIdentityEvidence, ProcessInstanceId,
+    ExpectedObject, OperationPathContext, PhysicalFileIdentity, PhysicalIdentityEvidence,
+    ProcessInstanceId,
 };
 use uuid::Uuid;
 
@@ -35,6 +36,14 @@ use crate::{
 pub struct ProjectCore {
     identity_lease_root: Option<PathBuf>,
     identity_registry_root: Option<PathBuf>,
+}
+
+/// Derives the human-facing Project name from its native pathname.
+pub fn project_name_from_path(path: &Path) -> String {
+    path.file_stem()
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Projeto".into())
 }
 
 impl ProjectCore {
@@ -207,6 +216,51 @@ pub enum SaveCopyAsError {
     SaveCopyStateIndeterminate,
 }
 
+#[derive(Clone, Debug)]
+pub struct SaveAsProjectRequest {
+    expected_revision: u64,
+    destination: ProjectLocation,
+    authorization: SaveAsAuthorization,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveAsAuthorization {
+    CreateOnly,
+    ReplaceConfirmed(PhysicalFileIdentity),
+}
+
+impl SaveAsProjectRequest {
+    pub fn new(
+        expected_revision: u64,
+        destination: ProjectLocation,
+        authorization: SaveAsAuthorization,
+    ) -> Self {
+        Self {
+            expected_revision,
+            destination,
+            authorization,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SaveAsProjectOutcome {
+    pub previous_project_id: Uuid,
+    pub project_id: Uuid,
+    pub revision: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SaveAsProjectError {
+    StaleRevision { expected: u64, current: u64 },
+    SameTarget,
+    Path(PathFailure),
+    DestinationConflict,
+    ProjectInUse,
+    IdentityIndeterminate,
+    SaveAsStateIndeterminate,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SaveProjectOutcome {
     Saved { revision: u64 },
@@ -242,6 +296,7 @@ impl ProjectIdentityAuthority {
 
 #[derive(Debug)]
 pub struct EditableProject {
+    core: ProjectCore,
     session: PersistentProjectSession,
     store: ProjectStore,
     identity_lease: ProjectIdentityLease,
@@ -364,12 +419,7 @@ impl EditableProject {
 
     /// Resolved editor view of the current productive Project document.
     pub fn projection(&self) -> EditorProjection {
-        let project_name = self
-            .project_path()
-            .file_stem()
-            .map(|name| name.to_string_lossy().into_owned())
-            .filter(|name| !name.is_empty())
-            .unwrap_or_else(|| "Projeto".into());
+        let project_name = project_name_from_path(self.project_path());
         persistent_projection::editor_projection(
             &self.session,
             self.session_valid,
@@ -568,6 +618,165 @@ impl EditableProject {
         }
     }
 
+    pub fn save_as(
+        &mut self,
+        request: SaveAsProjectRequest,
+    ) -> Result<SaveAsProjectOutcome, SaveAsProjectError> {
+        self.save_as_with_transition(request, |_, _| Ok(()))
+    }
+
+    /// Publishes a Save As candidate, then lets the Host stage identity-scoped
+    /// local authority before this editable Session adopts it.
+    ///
+    /// A failed transition keeps the previous Session, store, lease and
+    /// authority. Because the destination publication may already be complete,
+    /// callers receive the fail-closed indeterminate terminal.
+    pub fn save_as_with_transition(
+        &mut self,
+        request: SaveAsProjectRequest,
+        transition: impl FnOnce(&ProjectIdentityAuthority, SaveAsProjectOutcome) -> Result<(), ()>,
+    ) -> Result<SaveAsProjectOutcome, SaveAsProjectError> {
+        if !self.session_valid {
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+        let SaveAsProjectRequest {
+            expected_revision,
+            destination,
+            authorization,
+        } = request;
+        let current = self.revision();
+        if expected_revision != current {
+            return Err(SaveAsProjectError::StaleRevision {
+                expected: expected_revision,
+                current,
+            });
+        }
+        if !self.store.location_still_matches_baseline() {
+            return Err(SaveAsProjectError::IdentityIndeterminate);
+        }
+        let prepared_destination = destination
+            .prepare_file_destination()
+            .map_err(SaveAsProjectError::Path)?;
+        match prepared_destination.resolve_existing() {
+            Ok(Some(target)) => {
+                match self.store.compare_physical(&target) {
+                    PhysicalIdentityEvidence::Same => return Err(SaveAsProjectError::SameTarget),
+                    PhysicalIdentityEvidence::Different => {}
+                    PhysicalIdentityEvidence::Indeterminate => {
+                        return Err(SaveAsProjectError::IdentityIndeterminate);
+                    }
+                }
+                if let SaveAsAuthorization::ReplaceConfirmed(confirmed) = authorization {
+                    match target.physical_identity() {
+                        Some(current) if current == confirmed => {}
+                        Some(_) => return Err(SaveAsProjectError::DestinationConflict),
+                        None => return Err(SaveAsProjectError::IdentityIndeterminate),
+                    }
+                }
+            }
+            Ok(None) => {
+                if matches!(authorization, SaveAsAuthorization::ReplaceConfirmed(_)) {
+                    return Err(SaveAsProjectError::DestinationConflict);
+                }
+            }
+            Err(error) => {
+                return Err(SaveAsProjectError::Path(project_store::map_path_failure(
+                    error,
+                )));
+            }
+        }
+
+        let lease_root = self
+            .core
+            .identity_lease_root()
+            .ok_or(SaveAsProjectError::Path(PathFailure::IoFailure))?;
+        let source_physical_identity = self
+            .store
+            .physical_identity()
+            .ok_or(SaveAsProjectError::IdentityIndeterminate)?;
+        let previous_project_id = self.project_id();
+        let project_id = Uuid::new_v4();
+        let identity_lease = ProjectIdentityLease::acquire(lease_root, project_id)
+            .map_err(map_save_as_identity_lease_error)?;
+        let current_revision = self.session.current_revision();
+        let candidate = ProjectRevision::new(
+            project_id,
+            current_revision.revision,
+            current_revision.project,
+        );
+        let store_result = match authorization {
+            SaveAsAuthorization::CreateOnly => project_store::create_only_excluding(
+                destination,
+                &candidate,
+                lease_root,
+                source_physical_identity,
+            )
+            .map_err(map_save_as_store_error),
+            SaveAsAuthorization::ReplaceConfirmed(confirmed_target) => {
+                project_store::prepare_replacement_excluding(
+                    destination,
+                    &candidate,
+                    lease_root,
+                    source_physical_identity,
+                    confirmed_target,
+                )
+                .map_err(map_save_as_store_error)
+                .and_then(|prepared| {
+                    let _replaced_identity_lease = prepared
+                        .replaced_project_id()
+                        .map(|replaced_id| ProjectIdentityLease::acquire(lease_root, replaced_id))
+                        .transpose()
+                        .map_err(map_save_as_replaced_lease_error)?;
+                    prepared.publish().map_err(map_save_as_store_error)
+                })
+            }
+        };
+        let store = match store_result {
+            Ok(store) => store,
+            Err(error) => {
+                identity_lease.discard_unpublished();
+                return Err(error);
+            }
+        };
+        if !store.location_still_matches_baseline() {
+            identity_lease.discard_unpublished();
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+        if !self.store.location_still_matches_baseline() {
+            identity_lease.discard_unpublished();
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+        if publish_identity_location(&self.core, project_id, &store).is_err() {
+            identity_lease.discard_unpublished();
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+        let identity_lease = bind_identity_target(identity_lease, &store)
+            .map_err(|_| SaveAsProjectError::SaveAsStateIndeterminate)?;
+        let previous_session = self.session.clone();
+        if self.session.adopt_saved_as(&candidate).is_err() {
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+
+        let outcome = SaveAsProjectOutcome {
+            previous_project_id,
+            project_id,
+            revision: current,
+        };
+        let identity_authority = ProjectIdentityAuthority::authorized(project_id);
+        if transition(&identity_authority, outcome).is_err() {
+            self.session = previous_session;
+            return Err(SaveAsProjectError::SaveAsStateIndeterminate);
+        }
+
+        let previous_store = std::mem::replace(&mut self.store, store);
+        let previous_lease = std::mem::replace(&mut self.identity_lease, identity_lease);
+        let previous_authority =
+            std::mem::replace(&mut self.identity_authority, identity_authority);
+        drop((previous_store, previous_lease, previous_authority));
+
+        Ok(outcome)
+    }
+
     fn invalidate_session(&mut self) {
         self.session_valid = false;
         self.store.invalidate();
@@ -643,6 +852,7 @@ impl ProjectCore {
 
         let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
+            core: self.clone(),
             session: PersistentProjectSession::from_persisted(revision, false),
             store,
             identity_lease,
@@ -722,6 +932,7 @@ impl ProjectCore {
             .map_err(|_| OpenProjectError::IdentityIndeterminate)?;
         let identity_authority = ProjectIdentityAuthority::authorized(identity_lease.project_id());
         Ok(EditableProject {
+            core: self.clone(),
             session: PersistentProjectSession::from_persisted(
                 opened.revision,
                 opened.requires_schema_upgrade,
@@ -904,7 +1115,9 @@ fn map_create_store_error(error: CreateStoreError) -> CreateProjectError {
     match error {
         CreateStoreError::Path(error) => CreateProjectError::Path(error),
         CreateStoreError::Document(_) => CreateProjectError::InvalidInitialProject,
-        CreateStoreError::DestinationConflict => CreateProjectError::DestinationConflict,
+        CreateStoreError::SameTarget | CreateStoreError::DestinationConflict => {
+            CreateProjectError::DestinationConflict
+        }
         CreateStoreError::ProjectInUse => CreateProjectError::ProjectInUse,
         CreateStoreError::IdentityIndeterminate => CreateProjectError::IdentityIndeterminate,
         CreateStoreError::StateIndeterminate => CreateProjectError::CreateStateIndeterminate,
@@ -926,7 +1139,9 @@ fn map_save_copy_store_error(error: CreateStoreError) -> SaveCopyAsError {
         CreateStoreError::Document(_) | CreateStoreError::IdentityIndeterminate => {
             SaveCopyAsError::IdentityIndeterminate
         }
-        CreateStoreError::DestinationConflict => SaveCopyAsError::DestinationConflict,
+        CreateStoreError::SameTarget | CreateStoreError::DestinationConflict => {
+            SaveCopyAsError::DestinationConflict
+        }
         CreateStoreError::ProjectInUse => SaveCopyAsError::ProjectInUse,
         CreateStoreError::StateIndeterminate => SaveCopyAsError::SaveCopyStateIndeterminate,
     }
@@ -943,6 +1158,33 @@ fn map_save_copy_replaced_lease_error(error: IdentityLeaseError) -> SaveCopyAsEr
     match error {
         IdentityLeaseError::Conflict => SaveCopyAsError::ProjectInUse,
         IdentityLeaseError::Unavailable => SaveCopyAsError::Path(PathFailure::IoFailure),
+    }
+}
+
+fn map_save_as_store_error(error: CreateStoreError) -> SaveAsProjectError {
+    match error {
+        CreateStoreError::Path(error) => SaveAsProjectError::Path(error),
+        CreateStoreError::Document(_) | CreateStoreError::IdentityIndeterminate => {
+            SaveAsProjectError::IdentityIndeterminate
+        }
+        CreateStoreError::SameTarget => SaveAsProjectError::SameTarget,
+        CreateStoreError::DestinationConflict => SaveAsProjectError::DestinationConflict,
+        CreateStoreError::ProjectInUse => SaveAsProjectError::ProjectInUse,
+        CreateStoreError::StateIndeterminate => SaveAsProjectError::SaveAsStateIndeterminate,
+    }
+}
+
+fn map_save_as_identity_lease_error(error: IdentityLeaseError) -> SaveAsProjectError {
+    match error {
+        IdentityLeaseError::Conflict => SaveAsProjectError::IdentityIndeterminate,
+        IdentityLeaseError::Unavailable => SaveAsProjectError::Path(PathFailure::IoFailure),
+    }
+}
+
+fn map_save_as_replaced_lease_error(error: IdentityLeaseError) -> SaveAsProjectError {
+    match error {
+        IdentityLeaseError::Conflict => SaveAsProjectError::ProjectInUse,
+        IdentityLeaseError::Unavailable => SaveAsProjectError::Path(PathFailure::IoFailure),
     }
 }
 
@@ -1009,6 +1251,7 @@ impl ProjectCore {
             .map_err(|_| SaveCopyAsError::SaveCopyStateIndeterminate)?;
         let identity_authority = ProjectIdentityAuthority::authorized(project_id);
         Ok(EditableProject {
+            core: self.clone(),
             session: PersistentProjectSession::from_persisted(revision, false),
             store,
             identity_lease,
@@ -1060,6 +1303,7 @@ fn promote_external_copy(
     // file, lease, registry and authority have all reached their terminal.
     drop(source_identity_guard);
     Ok(EditableProject {
+        core: core.clone(),
         session: PersistentProjectSession::from_persisted(revision, opened.requires_schema_upgrade),
         store: opened.store,
         identity_lease,

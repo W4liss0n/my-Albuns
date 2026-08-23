@@ -84,6 +84,14 @@ export function useProjectMutations({
     });
   }
 
+  function saveVisibleRevisionAs() {
+    const expectedRevision = projection.state.revision;
+    return runWithGlobalFeedback("Salvando como", async (port) => {
+      const result = await port.saveAs(expectedRevision);
+      return result.projection;
+    });
+  }
+
   async function commitInteraction(intent: ProjectIntent) {
     setMessage(null);
     const outcome = await runProjectMutation((port) =>
@@ -178,6 +186,7 @@ export function useProjectMutations({
         port.relink(mediaId),
       ),
     save: () => void saveVisibleRevision(),
+    saveAs: () => void saveVisibleRevisionAs(),
     undo: () =>
       void runWithGlobalFeedback("Desfazendo", (port) =>
         port.undo(),

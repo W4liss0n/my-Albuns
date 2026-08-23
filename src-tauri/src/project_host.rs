@@ -2,8 +2,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use myalbuns_core::{
     ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoOutcome, MediaId,
-    PhotoDropTarget, PhotoSourceMetadata, ProjectIntent, ProjectMutationOutcome, RelinkMedia,
-    RenderSnapshot, SaveProjectError, SaveProjectOutcome,
+    PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority, ProjectIntent,
+    ProjectMutationOutcome, RelinkMedia, RenderSnapshot, SaveAsProjectError, SaveAsProjectOutcome,
+    SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -31,6 +32,11 @@ pub(crate) struct ProjectHostSaveResult {
     pub(crate) projection: EditorProjection,
 }
 
+pub(crate) struct ProjectHostSaveAsResult {
+    pub(crate) outcome: SaveAsProjectOutcome,
+    pub(crate) projection: EditorProjection,
+}
+
 #[derive(Debug)]
 pub(crate) struct FrozenSheetExport {
     pub(crate) snapshot: RenderSnapshot,
@@ -40,6 +46,7 @@ pub(crate) struct FrozenSheetExport {
 
 #[derive(Clone, Debug)]
 pub(crate) struct AuthorizedMediaCatalog {
+    pub(crate) project_id: String,
     pub(crate) bindings: Vec<MediaBinding>,
 }
 
@@ -52,6 +59,12 @@ pub(crate) enum ProjectCloseRequestOutcome {
 #[derive(Debug)]
 pub(crate) enum ProjectHostSaveError {
     Project(SaveProjectError),
+    SessionUnavailable,
+}
+
+#[derive(Debug)]
+pub(crate) enum ProjectHostSaveAsError {
+    Project(SaveAsProjectError),
     SessionUnavailable,
 }
 
@@ -210,6 +223,45 @@ impl ProjectHost {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn save_as(
+        &self,
+        request: SaveAsProjectRequest,
+    ) -> Result<ProjectHostSaveAsResult, ProjectHostSaveAsError> {
+        self.save_as_with_transition(request, |_, _| Ok(()))
+    }
+
+    pub(crate) fn save_as_with_transition(
+        &self,
+        request: SaveAsProjectRequest,
+        transition: impl FnOnce(&ProjectIdentityAuthority, SaveAsProjectOutcome) -> Result<(), ()>,
+    ) -> Result<ProjectHostSaveAsResult, ProjectHostSaveAsError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| ProjectHostSaveAsError::SessionUnavailable)?;
+        let result = match &mut *state {
+            ProjectHostState::Active(project) => {
+                project.save_as_with_transition(request, transition)
+            }
+            ProjectHostState::ClosePending(_) | ProjectHostState::Consumed => {
+                return Err(ProjectHostSaveAsError::SessionUnavailable);
+            }
+        };
+        match result {
+            Ok(outcome) => {
+                let ProjectHostState::Active(project) = &*state else {
+                    unreachable!("saving an active Project as preserves its Host state")
+                };
+                Ok(ProjectHostSaveAsResult {
+                    outcome,
+                    projection: project.projection(),
+                })
+            }
+            Err(error) => Err(ProjectHostSaveAsError::Project(error)),
+        }
+    }
+
     pub(crate) fn begin_close(&self) -> Result<ProjectCloseRequestOutcome, String> {
         let mut state = self
             .state
@@ -290,6 +342,7 @@ impl ProjectHost {
     pub(crate) fn authorized_media_catalog(&self) -> Result<AuthorizedMediaCatalog, String> {
         let project = self.project()?;
         Ok(AuthorizedMediaCatalog {
+            project_id: project.project_id().hyphenated().to_string(),
             bindings: project
                 .project()
                 .media()
@@ -303,6 +356,7 @@ impl ProjectHost {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn authorized_media_binding(&self, media_id: &str) -> Result<MediaBinding, String> {
         self.authorized_media_catalog()?
             .bindings
@@ -385,8 +439,8 @@ mod tests {
         CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
         InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
         InitialProjectConfiguration, InitialProjectPersonalization, MediaKind, OpenProjectRequest,
-        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveProjectError,
-        SaveProjectOutcome,
+        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsAuthorization,
+        SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
     };
     use myalbuns_paths::{ExportWriteAuthorization, OperationPathContext};
 
@@ -1177,6 +1231,52 @@ mod tests {
     }
 
     #[test]
+    fn save_as_serially_adopts_the_new_identity_and_projects_its_name() {
+        let fixture = fixture();
+        let destination = fixture._root.path().join("Versão independente.myalbuns");
+        let original_bytes = std::fs::read(&fixture.project_path)
+            .expect("the original Project baseline is readable");
+        let dirty = fixture
+            .host
+            .apply_with_outcome(ProjectIntent::SetDpi { dpi: 240 })
+            .expect("the visible revision becomes dirty")
+            .projection;
+        let mut context = OperationPathContext::new();
+        context
+            .capture(&destination)
+            .expect("the Save As destination root is captured");
+
+        let saved_as = fixture
+            .host
+            .save_as(SaveAsProjectRequest::new(
+                dirty.state.revision,
+                ProjectLocation::new(destination.clone(), context.freeze()),
+                SaveAsAuthorization::CreateOnly,
+            ))
+            .expect("the Host serializes and adopts Save As");
+
+        assert_eq!(
+            saved_as.projection.state.project_id,
+            saved_as.outcome.project_id.to_string()
+        );
+        assert_eq!(
+            saved_as.projection.state.project_name,
+            "Versão independente"
+        );
+        assert_eq!(
+            saved_as.projection.state.saved_revision,
+            dirty.state.revision
+        );
+        assert!(!saved_as.projection.state.dirty);
+        assert!(saved_as.projection.state.can_undo);
+        assert_eq!(
+            std::fs::read(&fixture.project_path).expect("the original remains readable"),
+            original_bytes
+        );
+        assert!(destination.is_file());
+    }
+
+    #[test]
     fn exposes_persisted_linked_media_to_the_host_without_projecting_pathnames() {
         let root = tempfile::tempdir().expect("temporary linked-media Host fixture");
         let project_path = root.path().join("Projeto.myalbuns");
@@ -1212,6 +1312,7 @@ mod tests {
             .expect("the Host can authorize its persisted media catalog");
         let projection = host.projection().expect("the Project remains available");
 
+        assert_eq!(catalog.project_id, projection.state.project_id);
         assert_eq!(catalog.bindings.len(), 1);
         assert_eq!(
             catalog.bindings[0].media_id,

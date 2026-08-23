@@ -76,6 +76,20 @@ function Get-ExactExecutableProcesses([string] $ExecutablePath) {
     )
 }
 
+function Get-Sha256([string] $Path) {
+    $stream = [System.IO.File]::OpenRead($Path)
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return [System.BitConverter]::ToString(
+            $algorithm.ComputeHash($stream)
+        ).Replace('-', '')
+    }
+    finally {
+        $algorithm.Dispose()
+        $stream.Dispose()
+    }
+}
+
 try {
     New-Item -ItemType Directory -Force -Path $runRoot | Out-Null
     $node = (Get-Command node.exe -ErrorAction Stop).Source
@@ -111,8 +125,8 @@ try {
         'src-tauri\binaries\myalbuns-imaging-x86_64-pc-windows-msvc.exe'
     $runtimeSidecarPath = Join-Path $workspaceRoot 'target\debug\myalbuns-imaging.exe'
     if (-not (Test-Path -LiteralPath $runtimeSidecarPath -PathType Leaf) -or
-        (Get-FileHash -Algorithm SHA256 -LiteralPath $preparedSidecarPath).Hash -ne
-            (Get-FileHash -Algorithm SHA256 -LiteralPath $runtimeSidecarPath).Hash) {
+        (Get-Sha256 $preparedSidecarPath) -ne
+            (Get-Sha256 $runtimeSidecarPath)) {
         throw 'The debug Tauri runtime does not own the prepared debug Processor.'
     }
     $driver = & (Join-Path $PSScriptRoot 'Resolve-TauriWebDriver.ps1') |
@@ -154,6 +168,29 @@ try {
         $gate.photoFrameCount -ne 1 -or
         -not $gate.persistedPhotoLinkOnly -or
         -not $gate.reimportedExistingPhotoWithoutRevision -or
+        -not $gate.saveAs.cancelledBeforeCore -or
+        $gate.saveAs.createAuthorization -ne 'createOnly' -or
+        $gate.saveAs.originalProjectId -notmatch '^[0-9a-f-]{36}$' -or
+        $gate.saveAs.copiedProjectId -notmatch '^[0-9a-f-]{36}$' -or
+        $gate.saveAs.originalProjectId -eq $gate.saveAs.copiedProjectId -or
+        $gate.saveAs.savedAsRevision -ne 4 -or
+        -not $gate.saveAs.contentPreserved -or
+        -not $gate.saveAs.originalByteIdentical -or
+        -not $gate.saveAs.historyPreserved -or
+        -not $gate.saveAs.originalHistoryEmpty -or
+        -not $gate.saveAs.simultaneouslyOpen -or
+        -not $gate.saveAs.isolatedIndependentSaves -or
+        $gate.saveAs.originalSavedRevision -ne 4 -or
+        $gate.saveAs.originalSavedDpi -ne 320 -or
+        $gate.saveAs.copySavedRevision -ne 5 -or
+        $gate.saveAs.copySavedDpi -ne 420 -or
+        -not $gate.saveAs.previousRecoveryFinished -or
+        -not $gate.saveAs.cacheStagedEmpty -or
+        -not $gate.saveAs.localAuthorityTransitioned -or
+        -not $gate.saveAs.webviewNamespaceTransitioned -or
+        -not $gate.saveAs.replacementWebviewReady -or
+        -not $gate.saveAs.localStateStartedEmpty -or
+        -not $gate.saveAs.nativeTitleUpdated -or
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
@@ -168,7 +205,7 @@ try {
         $gate.jpeg.height -ne 360 -or
         $gate.jpeg.byteCount -le 0 -or
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
-        $gate.correlations.bootstraps -ne 2 -or
+        $gate.correlations.bootstraps -ne 3 -or
         $gate.correlations.imagingAttempts -ne 2 -or
         -not $gate.exportedAfterReopen -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
@@ -177,8 +214,8 @@ try {
         $gate.canvasPhotoSample.cssWidth -le 0 -or
         $gate.canvasPhotoSample.cssHeight -le 0 -or
         $gate.sourcePathExposedToWebView -or
-        $gate.terminalCounts.globalHandoffs -ne 2 -or
-        $gate.terminalCounts.hostReady -ne 2 -or
+        $gate.terminalCounts.globalHandoffs -ne 3 -or
+        $gate.terminalCounts.hostReady -ne 3 -or
         $gate.terminalCounts.imagingStopped -ne 2
     ) {
         throw 'The productive journey result did not satisfy its public contract.'
@@ -348,6 +385,10 @@ try {
             [ordered]@{ name = 'cancel-before-project-core'; passed = $true },
             [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
             [ordered]@{ name = 'project-core-save-history'; passed = $true },
+            [ordered]@{ name = 'native-save-as-cancel-before-core'; passed = $true },
+            [ordered]@{ name = 'save-as-copy-content-and-history'; passed = $true },
+            [ordered]@{ name = 'save-as-webview-cache-recovery-transition'; passed = $true },
+            [ordered]@{ name = 'simultaneous-original-copy-isolated-saves'; passed = $true },
             [ordered]@{ name = 'native-jpeg-import-reselect-external-link-only'; passed = $true },
             [ordered]@{ name = 'double-click-frame-selection-canvas'; passed = $true },
             [ordered]@{ name = 'cancel-before-export-pipeline'; passed = $true },
@@ -376,6 +417,7 @@ try {
             photoFrameCount = [int] $gate.photoFrameCount
             persistedPhotoLinkOnly = [bool] $gate.persistedPhotoLinkOnly
             reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
+            saveAs = $gate.saveAs
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
             missingOriginalActionable = [bool] $gate.missingOriginalActionable

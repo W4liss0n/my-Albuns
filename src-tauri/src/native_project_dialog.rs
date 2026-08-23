@@ -3,6 +3,7 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use tauri::Manager;
 
+use myalbuns_core::SaveAsAuthorization;
 #[cfg(windows)]
 use myalbuns_logging::ProcessRole;
 use myalbuns_paths::ExportWriteAuthorization;
@@ -24,6 +25,16 @@ pub(crate) enum ExportSaveDialogOutcome {
     Selected {
         path: PathBuf,
         authorization: ExportWriteAuthorization,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SaveAsDialogOutcome {
+    Cancelled,
+    ReplacementIdentityIndeterminate,
+    Selected {
+        path: PathBuf,
+        authorization: SaveAsAuthorization,
     },
 }
 
@@ -127,6 +138,30 @@ pub(crate) async fn choose_export_destination(
     }
 }
 
+pub(crate) async fn choose_save_as_destination(
+    window: &tauri::WebviewWindow,
+    suggested_filename: String,
+) -> Result<SaveAsDialogOutcome, NativeProjectDialogError> {
+    #[cfg(windows)]
+    {
+        let owner = window
+            .hwnd()
+            .map_err(NativeProjectDialogError::NativeWindowUnavailable)?
+            .0 as isize;
+        tauri::async_runtime::spawn_blocking(move || {
+            show_save_as_dialog(owner, &suggested_filename)
+        })
+        .await
+        .map_err(|error| NativeProjectDialogError::DialogThreadUnavailable(error.to_string()))?
+    }
+
+    #[cfg(not(windows))]
+    {
+        let _ = (window, suggested_filename);
+        Err(NativeProjectDialogError::UnsupportedPlatform)
+    }
+}
+
 #[cfg(windows)]
 mod windows_dialog {
     use std::{
@@ -162,11 +197,14 @@ mod windows_dialog {
 
     use super::{
         CreateWriteAuthorization, ExportSaveDialogOutcome, ExportWriteAuthorization,
-        NativeProjectDialogError, ProcessRole, ProjectSaveDialogOutcome,
+        NativeProjectDialogError, ProcessRole, ProjectSaveDialogOutcome, SaveAsAuthorization,
+        SaveAsDialogOutcome,
     };
+    use myalbuns_paths::{ExpectedObject, OperationPathContext, PhysicalFileIdentity};
 
     enum SaveDialogKind<'a> {
         Project,
+        SaveAs { suggested_filename: &'a str },
         Export { suggested_filename: &'a str },
     }
 
@@ -174,6 +212,7 @@ mod windows_dialog {
         fn operation(&self) -> &'static str {
             match self {
                 Self::Project => "create_project",
+                Self::SaveAs { .. } => "save_project_as",
                 Self::Export { .. } => "export_sheet",
             }
         }
@@ -181,7 +220,7 @@ mod windows_dialog {
         fn process_role(&self) -> ProcessRole {
             match self {
                 Self::Project => ProcessRole::Global,
-                Self::Export { .. } => ProcessRole::DesktopHost,
+                Self::SaveAs { .. } | Self::Export { .. } => ProcessRole::DesktopHost,
             }
         }
     }
@@ -190,8 +229,27 @@ mod windows_dialog {
         Cancelled,
         Selected {
             path: PathBuf,
-            replacement_confirmed: bool,
+            replacement: ReplacementConfirmation,
         },
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum ReplacementConfirmation {
+        NotConfirmed,
+        Confirmed(PhysicalFileIdentity),
+        IdentityIndeterminate,
+    }
+
+    impl ReplacementConfirmation {
+        fn was_confirmed(self) -> bool {
+            !matches!(self, Self::NotConfirmed)
+        }
+    }
+
+    #[derive(Clone)]
+    struct ConfirmedReplacement {
+        item: IShellItem,
+        identity: Option<PhysicalFileIdentity>,
     }
 
     struct ComApartment;
@@ -216,14 +274,14 @@ mod windows_dialog {
     struct SaveDialogEvents {
         owner: isize,
         overwrite_title: Vec<u16>,
-        confirmed_replacement: Rc<RefCell<Option<IShellItem>>>,
+        confirmed_replacement: Rc<RefCell<Option<ConfirmedReplacement>>>,
     }
 
     impl SaveDialogEvents {
         fn new(
             owner: isize,
             overwrite_title: Vec<u16>,
-            confirmed_replacement: Rc<RefCell<Option<IShellItem>>>,
+            confirmed_replacement: Rc<RefCell<Option<ConfirmedReplacement>>>,
         ) -> Self {
             Self {
                 owner,
@@ -232,7 +290,7 @@ mod windows_dialog {
             }
         }
 
-        fn remember_confirmed_replacement(&self, item: Option<IShellItem>) {
+        fn remember_confirmed_replacement(&self, item: Option<ConfirmedReplacement>) {
             *self.confirmed_replacement.borrow_mut() = item;
         }
     }
@@ -287,7 +345,11 @@ mod windows_dialog {
             };
             let confirmed = response == IDYES;
             let confirmed_item = if confirmed {
-                Some(item.ok()?.clone())
+                let item = item.ok()?.clone();
+                Some(ConfirmedReplacement {
+                    identity: shell_item_physical_identity(&item),
+                    item,
+                })
             } else {
                 None
             };
@@ -310,17 +372,16 @@ mod windows_dialog {
     ) -> Result<ProjectSaveDialogOutcome, NativeProjectDialogError> {
         Ok(match show_save_dialog(owner, SaveDialogKind::Project)? {
             SaveDialogOutcome::Cancelled => ProjectSaveDialogOutcome::Cancelled,
-            SaveDialogOutcome::Selected {
-                path,
-                replacement_confirmed,
-            } => ProjectSaveDialogOutcome::Selected {
-                path,
-                authorization: if replacement_confirmed {
-                    CreateWriteAuthorization::ReplaceConfirmed
-                } else {
-                    CreateWriteAuthorization::CreateOnly
-                },
-            },
+            SaveDialogOutcome::Selected { path, replacement } => {
+                ProjectSaveDialogOutcome::Selected {
+                    path,
+                    authorization: if replacement.was_confirmed() {
+                        CreateWriteAuthorization::ReplaceConfirmed
+                    } else {
+                        CreateWriteAuthorization::CreateOnly
+                    },
+                }
+            }
         })
     }
 
@@ -331,16 +392,39 @@ mod windows_dialog {
         Ok(
             match show_save_dialog(owner, SaveDialogKind::Export { suggested_filename })? {
                 SaveDialogOutcome::Cancelled => ExportSaveDialogOutcome::Cancelled,
-                SaveDialogOutcome::Selected {
-                    path,
-                    replacement_confirmed,
-                } => ExportSaveDialogOutcome::Selected {
-                    path,
-                    authorization: if replacement_confirmed {
-                        ExportWriteAuthorization::ReplaceConfirmed
-                    } else {
-                        ExportWriteAuthorization::CreateOnly
+                SaveDialogOutcome::Selected { path, replacement } => {
+                    ExportSaveDialogOutcome::Selected {
+                        path,
+                        authorization: if replacement.was_confirmed() {
+                            ExportWriteAuthorization::ReplaceConfirmed
+                        } else {
+                            ExportWriteAuthorization::CreateOnly
+                        },
+                    }
+                }
+            },
+        )
+    }
+
+    pub(super) fn show_save_as_dialog(
+        owner: isize,
+        suggested_filename: &str,
+    ) -> Result<SaveAsDialogOutcome, NativeProjectDialogError> {
+        Ok(
+            match show_save_dialog(owner, SaveDialogKind::SaveAs { suggested_filename })? {
+                SaveDialogOutcome::Cancelled => SaveAsDialogOutcome::Cancelled,
+                SaveDialogOutcome::Selected { path, replacement } => match replacement {
+                    ReplacementConfirmation::NotConfirmed => SaveAsDialogOutcome::Selected {
+                        path,
+                        authorization: SaveAsAuthorization::CreateOnly,
                     },
+                    ReplacementConfirmation::Confirmed(identity) => SaveAsDialogOutcome::Selected {
+                        path,
+                        authorization: SaveAsAuthorization::ReplaceConfirmed(identity),
+                    },
+                    ReplacementConfirmation::IdentityIndeterminate => {
+                        SaveAsDialogOutcome::ReplacementIdentityIndeterminate
+                    }
                 },
             },
         )
@@ -380,6 +464,23 @@ mod windows_dialog {
                     dialog.SetFileName(w!("Novo Projeto.myalbuns"))?;
                     dialog.SetTitle(w!("Criar Projeto MyAlbuns"))?;
                     dialog.SetOkButtonLabel(w!("Criar"))?;
+                }
+                wide("Substituir Projeto MyAlbuns")
+            }
+            SaveDialogKind::SaveAs { suggested_filename } => {
+                let filters = [COMDLG_FILTERSPEC {
+                    pszName: w!("Projeto MyAlbuns (*.myalbuns)"),
+                    pszSpec: w!("*.myalbuns"),
+                }];
+                let suggested_filename = wide(suggested_filename);
+                // SAFETY: all UTF-16 buffers remain alive through these synchronous calls.
+                unsafe {
+                    dialog.SetFileTypes(&filters)?;
+                    dialog.SetFileTypeIndex(1)?;
+                    dialog.SetDefaultExtension(w!("myalbuns"))?;
+                    dialog.SetFileName(PCWSTR(suggested_filename.as_ptr()))?;
+                    dialog.SetTitle(w!("Salvar Projeto como"))?;
+                    dialog.SetOkButtonLabel(w!("Salvar"))?;
                 }
                 wide("Substituir Projeto MyAlbuns")
             }
@@ -450,14 +551,24 @@ mod windows_dialog {
         // SAFETY: the successful modal result remains owned by this STA until it is converted.
         let result = unsafe { dialog.GetResult()? };
         let confirmed_item = confirmed_replacement.borrow().clone();
-        let replacement_confirmed = match confirmed_item {
+        let replacement = match confirmed_item {
             Some(confirmed_item) => {
                 // SAFETY: both shell items are live COM interfaces on this STA.
-                let comparison =
-                    unsafe { confirmed_item.Compare(&result, SICHINT_CANONICAL.0 as u32)? };
-                comparison == 0
+                let comparison = unsafe {
+                    confirmed_item
+                        .item
+                        .Compare(&result, SICHINT_CANONICAL.0 as u32)?
+                };
+                if comparison == 0 {
+                    confirmed_item.identity.map_or(
+                        ReplacementConfirmation::IdentityIndeterminate,
+                        ReplacementConfirmation::Confirmed,
+                    )
+                } else {
+                    ReplacementConfirmation::NotConfirmed
+                }
             }
-            None => false,
+            None => ReplacementConfirmation::NotConfirmed,
         };
         let path = shell_item_path(&result)?;
 
@@ -469,10 +580,7 @@ mod windows_dialog {
             outcome = "selected",
             event = "native_save_dialog_closed",
         );
-        Ok(SaveDialogOutcome::Selected {
-            path,
-            replacement_confirmed,
-        })
+        Ok(SaveDialogOutcome::Selected { path, replacement })
     }
 
     fn wide(value: &str) -> Vec<u16> {
@@ -487,6 +595,17 @@ mod windows_dialog {
         // SAFETY: the pointer was allocated by the shell for the caller.
         unsafe { CoTaskMemFree(Some(native_path.as_ptr().cast())) };
         Ok(path)
+    }
+
+    fn shell_item_physical_identity(item: &IShellItem) -> Option<PhysicalFileIdentity> {
+        let path = shell_item_path(item).ok()?;
+        let mut context = OperationPathContext::new();
+        context.capture(&path).ok()?;
+        context
+            .freeze()
+            .resolve_existing(&path, ExpectedObject::RegularFile)
+            .ok()?
+            .physical_identity()
     }
 
     fn is_cancelled(error: &windows::core::Error) -> bool {
@@ -516,4 +635,4 @@ mod windows_dialog {
 }
 
 #[cfg(windows)]
-use windows_dialog::{show_export_save_dialog, show_project_save_dialog};
+use windows_dialog::{show_export_save_dialog, show_project_save_dialog, show_save_as_dialog};
