@@ -1201,6 +1201,7 @@ try {
     MYALBUNS_PROCESS_GATE_DATA_ROOT: processDataRoot,
     MYALBUNS_DEV_GLOBAL_WEBVIEW_DEBUG_PORT: String(recoveryGlobalDebugPort),
     MYALBUNS_DEV_HOST_WEBVIEW_DEBUG_PORT: String(recoveryHostDebugPort),
+    MYALBUNS_DEV_SAVE_AS_WEBVIEW_DEBUG_PORT: String(saveAsHostDebugPort),
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${recoveryGlobalDebugPort}`,
   };
   const recoveryGlobalChild = spawn(applicationPath, [projectPath], {
