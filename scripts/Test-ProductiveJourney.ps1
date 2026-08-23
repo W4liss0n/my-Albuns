@@ -183,6 +183,7 @@ try {
         -not $gate.sessionRecovery.checkpointPreservedAfterRecovery -or
         -not $gate.sessionRecovery.recoveredUnsaved -or
         -not $gate.sessionRecovery.recoveredHistoryEmpty -or
+        -not $gate.sessionRecovery.postRecoveryActionsCheckpointed -or
         -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
         -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
         -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
@@ -191,7 +192,7 @@ try {
         $gate.saveAs.originalProjectId -notmatch '^[0-9a-f-]{36}$' -or
         $gate.saveAs.copiedProjectId -notmatch '^[0-9a-f-]{36}$' -or
         $gate.saveAs.originalProjectId -eq $gate.saveAs.copiedProjectId -or
-        $gate.saveAs.savedAsRevision -ne 4 -or
+        $gate.saveAs.savedAsRevision -ne 6 -or
         -not $gate.saveAs.contentPreserved -or
         -not $gate.saveAs.originalByteIdentical -or
         -not $gate.saveAs.historyPreserved -or
@@ -200,7 +201,7 @@ try {
         -not $gate.saveAs.isolatedIndependentSaves -or
         $gate.saveAs.originalSavedRevision -ne 4 -or
         $gate.saveAs.originalSavedDpi -ne 320 -or
-        $gate.saveAs.copySavedRevision -ne 5 -or
+        $gate.saveAs.copySavedRevision -ne 7 -or
         $gate.saveAs.copySavedDpi -ne 420 -or
         -not $gate.saveAs.previousRecoveryFinished -or
         -not $gate.saveAs.cacheStagedEmpty -or

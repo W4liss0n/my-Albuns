@@ -1309,6 +1309,58 @@ try {
       "Recovered state was not unsaved with empty History and an intact checkpoint",
     );
   }
+
+  for (const [dpi, revision] of [
+    [300, 5],
+    [360, 6],
+  ]) {
+    await replaceInput(
+      hostDriver,
+      "css selector",
+      ".document-dpi-control input",
+      String(dpi),
+      `post-recovery DPI ${dpi}`,
+    );
+    await click(
+      hostDriver,
+      "xpath",
+      "//button[normalize-space()='Aplicar DPI']",
+      `Apply post-recovery DPI ${dpi}`,
+    );
+    await waitFor(
+      `post-recovery revision ${revision}`,
+      () =>
+        recordsFor("project_intent_applied").some(
+          (record) =>
+            record.project_id === originalProjectId &&
+            Number(record.revision) === revision,
+        ),
+      timeoutMilliseconds,
+    );
+  }
+  const postRecoveryCheckpoint = await waitFor(
+    "checkpoint after post-recovery actions",
+    () => {
+      if (!existsSync(recoveryCheckpointPath)) return undefined;
+      try {
+        const checkpoint = JSON.parse(
+          readFileSync(recoveryCheckpointPath, "utf8"),
+        );
+        return checkpoint.projectId === originalProjectId &&
+          checkpoint.baseRevision?.revision === 3 &&
+          checkpoint.creativeState?.revision === 6 &&
+          checkpoint.creativeState?.project?.document?.dpi === 360
+          ? checkpoint
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    timeoutMilliseconds,
+  );
+  const preSaveAsRecoveryCheckpointBytes = readFileSync(
+    recoveryCheckpointPath,
+  );
   const webviewStateRoot = path.join(
     processDataRoot,
     "Local",
@@ -1373,7 +1425,9 @@ try {
     !existsSync(saveAsPath) &&
     readFileSync(projectPath).equals(savedProject) &&
     existsSync(recoveryCheckpointPath) &&
-    readFileSync(recoveryCheckpointPath).equals(recoveryCheckpointBytes) &&
+    readFileSync(recoveryCheckpointPath).equals(
+      preSaveAsRecoveryCheckpointBytes,
+    ) &&
     recordsFor("project_save_as_completed").length ===
       saveAsCompletedBeforeCancel &&
     recordsFor("project_save_as_cache_staged_empty").length ===
@@ -1429,7 +1483,7 @@ try {
   const savedAsContentPreserved =
     savedAsDocument.schemaVersion === 3 &&
     savedAsDocument.projectId !== originalProjectId &&
-    savedAsDocument.revision === 4 &&
+    savedAsDocument.revision === 6 &&
     JSON.stringify(savedAsDocument.project) ===
       JSON.stringify(expectedSavedAsProject);
   const originalByteIdenticalAfterSaveAs =
@@ -1798,7 +1852,7 @@ try {
       recordsFor("project_intent_applied").some(
         (record) =>
           record.project_id === copiedProjectId &&
-          Number(record.revision) === 5,
+          Number(record.revision) === 7,
       ),
     timeoutMilliseconds,
   );
@@ -1814,7 +1868,7 @@ try {
       recordsFor("project_save_completed").some(
         (record) =>
           record.project_id === copiedProjectId &&
-          Number(record.revision) === 5,
+          Number(record.revision) === 7,
       ),
     timeoutMilliseconds,
   );
@@ -1824,7 +1878,7 @@ try {
   );
   const isolatedIndependentSaves =
     independentlySavedCopyDocument.projectId === copiedProjectId &&
-    independentlySavedCopyDocument.revision === 5 &&
+    independentlySavedCopyDocument.revision === 7 &&
     independentlySavedCopyDocument.project.document.dpi === 420 &&
     readFileSync(projectPath).equals(independentlySavedOriginal);
   if (!isolatedIndependentSaves) {
@@ -1875,7 +1929,7 @@ try {
       recordsFor("project_intent_applied").some(
         (record) =>
           record.project_id === copiedProjectId &&
-          Number(record.revision) === 6,
+          Number(record.revision) === 8,
       ),
     timeoutMilliseconds,
   );
@@ -2197,6 +2251,8 @@ try {
         checkpointPreservedAfterRecovery,
         recoveredUnsaved,
         recoveredHistoryEmpty,
+        postRecoveryActionsCheckpointed:
+          postRecoveryCheckpoint.creativeState.revision === 6,
         checkpointPreservedByCancelledSaveAs: cancelledSaveAsBeforeCore,
         checkpointFinishedBySuccessfulSaveAs: recoveryFinished,
         crashedHostProcessId: crashedHost.processId,
