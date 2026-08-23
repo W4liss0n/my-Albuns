@@ -149,6 +149,11 @@ try {
         throw "The productive journey failed with exit code $LASTEXITCODE."
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
+    $expectedRecoveryChoices = @(
+        'Reabrir e recuperar',
+        "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
+        "Agora n$([char]0x00E3)o"
+    )
     $contractViolations = @()
     if (
         -not $gate.cancelledCreationBeforeCore -or
@@ -178,9 +183,9 @@ try {
         $gate.sessionRecovery.creativeRevision -ne 4 -or
         $gate.sessionRecovery.recoveredDpi -ne 360 -or
         $gate.sessionRecovery.promptChoices.Count -ne 3 -or
-        $gate.sessionRecovery.promptChoices[0] -cne 'Reabrir e recuperar' -or
-        $gate.sessionRecovery.promptChoices[1] -cne 'Abrir última versão salva' -or
-        $gate.sessionRecovery.promptChoices[2] -cne 'Agora não' -or
+        $gate.sessionRecovery.promptChoices[0] -cne $expectedRecoveryChoices[0] -or
+        $gate.sessionRecovery.promptChoices[1] -cne $expectedRecoveryChoices[1] -or
+        $gate.sessionRecovery.promptChoices[2] -cne $expectedRecoveryChoices[2] -or
         -not $gate.sessionRecovery.opaqueProjectKey -or
         -not $gate.sessionRecovery.completedActionCheckpointed -or
         -not $gate.sessionRecovery.midGesturePreservedPreviousCheckpoint -or
