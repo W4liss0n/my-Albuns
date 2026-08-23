@@ -368,6 +368,7 @@ pub enum SaveProjectCommandError {
     Conflict,
     IoFailure,
     SaveStateIndeterminate,
+    RecoveryCleanupFailed,
     SessionUnavailable,
 }
 

@@ -746,6 +746,9 @@ pub(crate) fn map_save_project_error(error: ProjectHostSaveError) -> SaveProject
         ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate) => {
             SaveProjectCommandError::SaveStateIndeterminate
         }
+        ProjectHostSaveError::RecoveryCleanupFailed => {
+            SaveProjectCommandError::RecoveryCleanupFailed
+        }
         ProjectHostSaveError::SessionUnavailable => SaveProjectCommandError::SessionUnavailable,
     }
 }
@@ -899,6 +902,10 @@ mod tests {
             (
                 ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate),
                 "save_state_indeterminate",
+            ),
+            (
+                ProjectHostSaveError::RecoveryCleanupFailed,
+                "recovery_cleanup_failed",
             ),
             (
                 ProjectHostSaveError::SessionUnavailable,

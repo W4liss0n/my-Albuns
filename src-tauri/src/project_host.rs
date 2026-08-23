@@ -91,6 +91,7 @@ pub(crate) enum ProjectRecoveryResolution {
 #[derive(Debug)]
 pub(crate) enum ProjectHostSaveError {
     Project(SaveProjectError),
+    RecoveryCleanupFailed,
     SessionUnavailable,
 }
 
@@ -390,6 +391,7 @@ impl ProjectHost {
                         error = %error,
                         event = "project_recovery_checkpoint_finish_after_save_failed",
                     );
+                    return Err(ProjectHostSaveError::RecoveryCleanupFailed);
                 }
                 Ok(ProjectHostSaveResult {
                     outcome,
@@ -544,9 +546,14 @@ impl ProjectHost {
         match project.save(revision) {
             Ok(outcome) => match self.finish_recovery(&project) {
                 Ok(_) => Ok(outcome),
-                Err(_) => {
+                Err(error) => {
+                    tracing::error!(
+                        target: "myalbuns.desktop",
+                        error = %error,
+                        event = "project_recovery_checkpoint_finish_after_close_save_failed",
+                    );
                     *state = ProjectHostState::Active(project);
-                    Err(ProjectHostSaveError::SessionUnavailable)
+                    Err(ProjectHostSaveError::RecoveryCleanupFailed)
                 }
             },
             Err(SaveProjectError::SaveStateIndeterminate) => Err(ProjectHostSaveError::Project(
@@ -700,11 +707,12 @@ mod tests {
 
     use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
-        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
-        ImportPhotoDisposition, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
-        InitialProject, InitialProjectConfiguration, InitialProjectPersonalization, MediaKind,
-        OpenProjectRequest, PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation,
-        SaveAsAuthorization, SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
+        CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat,
+        ImportPhotoDisposition, InitialBackground, InitialBackgroundContent, InitialFrameBorder,
+        InitialOverlay, InitialProject, InitialProjectConfiguration, InitialProjectPersonalization,
+        MediaKind, OpenProjectRequest, PhotoPlacementMode, ProjectCore, ProjectIntent,
+        ProjectLocation, SaveAsAuthorization, SaveAsProjectRequest, SaveProjectError,
+        SaveProjectOutcome,
     };
     use myalbuns_paths::{AppPaths, ExportWriteAuthorization, OperationPathContext};
 
@@ -924,6 +932,94 @@ mod tests {
                     .expect("the namespace is readable after Save")
                     .is_none()
             );
+        });
+    }
+
+    #[test]
+    fn save_reports_failed_recovery_cleanup_until_a_later_save_finishes_it() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable")
+                .projection;
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            let checkpoint = fixture
+                .store
+                .checkpoint_path(&fixture.authority)
+                .expect("the checkpoint path is valid");
+            std::fs::remove_file(&checkpoint).expect("the published checkpoint is replaceable");
+            std::fs::create_dir(&checkpoint)
+                .expect("a directory temporarily blocks Recovery cleanup");
+
+            assert!(matches!(
+                fixture.host.save(dirty.state.revision),
+                Err(ProjectHostSaveError::RecoveryCleanupFailed)
+            ));
+            let persisted = fixture
+                .host
+                .projection()
+                .expect("the conclusively saved Session remains available");
+            assert_eq!(persisted.state.saved_revision, dirty.state.revision);
+            assert!(!persisted.state.dirty);
+            assert!(checkpoint.is_dir(), "failed cleanup preserves its evidence");
+
+            std::fs::remove_dir(&checkpoint).expect("the local obstruction is released");
+            let retried = fixture
+                .host
+                .save(dirty.state.revision)
+                .expect("a later Save completes the pending cleanup");
+            assert_eq!(
+                retried.outcome,
+                SaveProjectOutcome::AlreadyCurrent {
+                    revision: dirty.state.revision
+                }
+            );
+            assert!(!checkpoint.exists());
+        });
+    }
+
+    #[test]
+    fn failed_cleanup_after_save_and_close_keeps_the_saved_session_open() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let dirty = fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable")
+                .projection;
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            let checkpoint = fixture
+                .store
+                .checkpoint_path(&fixture.authority)
+                .expect("the checkpoint path is valid");
+            std::fs::remove_file(&checkpoint).expect("the published checkpoint is replaceable");
+            std::fs::create_dir(&checkpoint)
+                .expect("a directory temporarily blocks Recovery cleanup");
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+            );
+
+            assert!(matches!(
+                fixture.host.save_and_close(),
+                Err(ProjectHostSaveError::RecoveryCleanupFailed)
+            ));
+            let persisted = fixture
+                .host
+                .projection()
+                .expect("the saved Session remains open after cleanup failure");
+            assert_eq!(persisted.state.saved_revision, dirty.state.revision);
+            assert!(!persisted.state.dirty);
+            assert!(checkpoint.is_dir());
+
+            std::fs::remove_dir(&checkpoint).expect("the local obstruction is released");
+            assert_eq!(
+                fixture.host.begin_close(),
+                Ok(ProjectCloseRequestOutcome::CloseImmediately)
+            );
+            assert!(!checkpoint.exists());
         });
     }
 

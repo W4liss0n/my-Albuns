@@ -629,6 +629,12 @@ test.each([
       "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
   },
   {
+    wire: { code: "recovery_cleanup_failed" },
+    code: "recovery_cleanup_failed",
+    message:
+      "O arquivo do Projeto foi salvo, mas não foi possível encerrar a Recuperação. Tente salvar novamente.",
+  },
+  {
     wire: { code: "session_unavailable" },
     code: "session_unavailable",
     message:

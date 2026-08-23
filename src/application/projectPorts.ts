@@ -129,6 +129,7 @@ export type SaveProjectFailureCode =
   | "stale_revision"
   | "persisted_baseline_conflict"
   | "save_state_indeterminate"
+  | "recovery_cleanup_failed"
   | "session_unavailable"
   | "not_found"
   | "unavailable"

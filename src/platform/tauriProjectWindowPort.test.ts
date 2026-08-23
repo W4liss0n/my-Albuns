@@ -92,3 +92,18 @@ test("localizes a conclusive save-and-close conflict without losing its code", a
     message: expect.stringContaining("fora do MyAlbuns"),
   });
 });
+
+test("reports a saved file whose Recovery cleanup still needs a retry", async () => {
+  vi.mocked(invoke).mockRejectedValue({
+    code: "recovery_cleanup_failed",
+  });
+
+  await expect(
+    tauriProjectWindowPort.resolveClose("saveAndClose"),
+  ).rejects.toMatchObject({
+    name: "ProjectCloseError",
+    code: "recovery_cleanup_failed",
+    message:
+      "O arquivo do Projeto foi salvo, mas não foi possível encerrar a Recuperação. Tente salvar novamente.",
+  });
+});
