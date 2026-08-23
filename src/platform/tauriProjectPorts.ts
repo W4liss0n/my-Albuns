@@ -36,7 +36,11 @@ import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/Sa
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
 import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
-import { isIpcRecord, isIpcRevision } from "./ipcGuards";
+import {
+  hasOnlyIpcKeys,
+  isIpcRecord,
+  isIpcRevision,
+} from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
 import { parseProjectSaveAsFailure } from "./projectSaveAsFailure";
 
@@ -97,19 +101,10 @@ function toSaveProjectError(error: unknown): SaveProjectError {
   );
 }
 
-function hasOnlyKeys(value: Record<string, unknown>, expected: readonly string[]) {
-  const keys = Object.keys(value).sort();
-  const sortedExpected = [...expected].sort();
-  return (
-    keys.length === sortedExpected.length &&
-    keys.every((key, index) => key === sortedExpected[index])
-  );
-}
-
 function parseProjectRecoveryStatus(value: unknown): IpcProjectRecoveryStatus {
   if (
     !isIpcRecord(value) ||
-    !hasOnlyKeys(value, ["kind"]) ||
+    !hasOnlyIpcKeys(value, ["kind"]) ||
     (value.kind !== "none" && value.kind !== "available")
   ) {
     throw new Error("Não foi possível verificar a Recuperação do Projeto.");
@@ -123,12 +118,12 @@ function parseProjectRecoveryResolution(
   if (!isIpcRecord(value)) {
     throw new Error("Não foi possível confirmar a escolha de Recuperação.");
   }
-  if (value.kind === "deferred" && hasOnlyKeys(value, ["kind"])) {
+  if (value.kind === "deferred" && hasOnlyIpcKeys(value, ["kind"])) {
     return { kind: "deferred" };
   }
   if (
     (value.kind !== "recovered" && value.kind !== "openedLastSaved") ||
-    !hasOnlyKeys(value, ["kind", "projection"]) ||
+    !hasOnlyIpcKeys(value, ["kind", "projection"]) ||
     !isIpcRecord(value.projection) ||
     !isIpcRecord(value.projection.state) ||
     typeof value.projection.state.projectId !== "string" ||
