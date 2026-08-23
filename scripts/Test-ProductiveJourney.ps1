@@ -149,6 +149,7 @@ try {
         throw "The productive journey failed with exit code $LASTEXITCODE."
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
+    $contractViolations = @()
     if (
         -not $gate.cancelledCreationBeforeCore -or
         -not $gate.cancelledExportBeforePipeline -or
@@ -167,7 +168,11 @@ try {
         $gate.savedDpi -ne 300 -or
         $gate.photoFrameCount -ne 1 -or
         -not $gate.persistedPhotoLinkOnly -or
-        -not $gate.reimportedExistingPhotoWithoutRevision -or
+        -not $gate.reimportedExistingPhotoWithoutRevision
+    ) {
+        $contractViolations += 'base'
+    }
+    if (
         $gate.sessionRecovery.schemaVersion -ne 1 -or
         $gate.sessionRecovery.baseSavedRevision -ne 3 -or
         $gate.sessionRecovery.creativeRevision -ne 4 -or
@@ -186,7 +191,11 @@ try {
         -not $gate.sessionRecovery.postRecoveryActionsCheckpointed -or
         -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
         -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
-        -not $gate.sessionRecovery.lockReleasedToDistinctHost -or
+        -not $gate.sessionRecovery.lockReleasedToDistinctHost
+    ) {
+        $contractViolations += 'sessionRecovery'
+    }
+    if (
         -not $gate.saveAs.cancelledBeforeCore -or
         $gate.saveAs.createAuthorization -ne 'createOnly' -or
         $gate.saveAs.originalProjectId -notmatch '^[0-9a-f-]{36}$' -or
@@ -209,7 +218,11 @@ try {
         -not $gate.saveAs.webviewNamespaceTransitioned -or
         -not $gate.saveAs.replacementWebviewReady -or
         -not $gate.saveAs.localStateStartedEmpty -or
-        -not $gate.saveAs.nativeTitleUpdated -or
+        -not $gate.saveAs.nativeTitleUpdated
+    ) {
+        $contractViolations += 'saveAs'
+    }
+    if (
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
@@ -224,21 +237,29 @@ try {
         $gate.jpeg.height -ne 360 -or
         $gate.jpeg.byteCount -le 0 -or
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
+        -not $gate.exportedAfterReopen -or
+        $gate.canvasPhotoSample.cssWidth -le 0 -or
+        $gate.canvasPhotoSample.cssHeight -le 0 -or
+        $gate.sourcePathExposedToWebView
+    ) {
+        $contractViolations += 'output'
+    }
+    if (
         $gate.correlations.bootstraps -ne 4 -or
         $gate.correlations.imagingAttempts -ne 2 -or
-        -not $gate.exportedAfterReopen -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
         -not $gate.reopenedHistoryEmpty -or
-        $gate.canvasPhotoSample.cssWidth -le 0 -or
-        $gate.canvasPhotoSample.cssHeight -le 0 -or
-        $gate.sourcePathExposedToWebView -or
         $gate.terminalCounts.globalHandoffs -ne 4 -or
         $gate.terminalCounts.hostReady -ne 4 -or
         $gate.terminalCounts.imagingStopped -ne 2
     ) {
+        $contractViolations += 'processes'
+    }
+    if ($contractViolations.Count -ne 0) {
         $observed = $gate | ConvertTo-Json -Depth 8 -Compress
-        throw "The productive journey result did not satisfy its public contract: $observed"
+        $violationSummary = $contractViolations -join ', '
+        throw "The productive journey result violated contract groups ($violationSummary): $observed"
     }
     Add-Type -AssemblyName System.Drawing
     $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
