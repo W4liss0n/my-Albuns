@@ -1321,7 +1321,7 @@ try {
       String(dpi),
       `post-recovery DPI ${dpi}`,
     );
-    await click(
+    await clickWhenEnabled(
       hostDriver,
       "xpath",
       "//button[normalize-space()='Aplicar DPI']",
