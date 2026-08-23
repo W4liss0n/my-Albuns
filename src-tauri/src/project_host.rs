@@ -4,10 +4,11 @@ use std::{
 };
 
 use myalbuns_core::{
-    ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoOutcome, MediaId,
-    PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority, ProjectIntent,
-    ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot, SaveAsProjectError,
-    SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
+    ComposedOutputUnit, EditableProject, EditorProjection, ImportPhotoDisposition,
+    ImportPhotoOutcome, MediaId, PhotoDropTarget, PhotoSourceMetadata, ProjectIdentityAuthority,
+    ProjectIntent, ProjectMutationOutcome, RecoveryCheckpoint, RelinkMedia, RenderSnapshot,
+    SaveAsProjectError, SaveAsProjectOutcome, SaveAsProjectRequest, SaveProjectError,
+    SaveProjectOutcome,
 };
 use myalbuns_imaging_protocol::RenderSource;
 
@@ -265,7 +266,9 @@ impl ProjectHost {
         let outcome = project
             .import_photo(proposal.into_command())
             .map_err(|error| error.to_string())?;
-        self.schedule_recovery(&project);
+        if outcome.disposition == ImportPhotoDisposition::Imported {
+            self.schedule_recovery(&project);
+        }
         Ok(outcome)
     }
 
@@ -698,10 +701,10 @@ mod tests {
     use image::{GenericImageView, ImageFormat, Rgb, RgbImage, Rgba, RgbaImage};
     use myalbuns_core::{
         CreateAuthorization, CreateProjectRequest, DisplayUnit, EndSheetFormat, InitialBackground,
-        InitialBackgroundContent, InitialFrameBorder, InitialOverlay, InitialProject,
-        InitialProjectConfiguration, InitialProjectPersonalization, MediaKind, OpenProjectRequest,
-        PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation, SaveAsAuthorization,
-        SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
+        ImportPhotoDisposition, InitialBackgroundContent, InitialFrameBorder, InitialOverlay,
+        InitialProject, InitialProjectConfiguration, InitialProjectPersonalization, MediaKind,
+        OpenProjectRequest, PhotoPlacementMode, ProjectCore, ProjectIntent, ProjectLocation,
+        SaveAsAuthorization, SaveAsProjectRequest, SaveProjectError, SaveProjectOutcome,
     };
     use myalbuns_paths::{AppPaths, ExportWriteAuthorization, OperationPathContext};
 
@@ -920,6 +923,48 @@ mod tests {
                     .load(&fixture.authority)
                     .expect("the namespace is readable after Save")
                     .is_none()
+            );
+        });
+    }
+
+    #[test]
+    fn reimporting_an_existing_photo_does_not_create_a_checkpoint() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            let photo_path = fixture._root.path().join("Foto existente.jpg");
+            RgbImage::from_pixel(48, 32, Rgb([20, 120, 220]))
+                .save_with_format(&photo_path, ImageFormat::Jpeg)
+                .expect("the Photo Original is written");
+            let imported = fixture
+                .host
+                .import_photo(
+                    MediaResolver
+                        .propose_photo_import(photo_path.clone())
+                        .expect("the first import is inspected"),
+                )
+                .expect("the Photo is imported");
+            assert_eq!(imported.disposition, ImportPhotoDisposition::Imported);
+            fixture
+                .host
+                .save(imported.projection.state.revision)
+                .expect("the imported Photo is saved and its checkpoint is finished");
+            assert!(fixture.store.load(&fixture.authority).unwrap().is_none());
+
+            let selected = fixture
+                .host
+                .import_photo(
+                    MediaResolver
+                        .propose_photo_import(photo_path)
+                        .expect("the repeated import is inspected"),
+                )
+                .expect("the existing Photo is selected");
+            assert_eq!(selected.disposition, ImportPhotoDisposition::Existing);
+            assert!(!selected.projection.state.dirty);
+            tokio::time::sleep(Duration::from_millis(90)).await;
+
+            assert!(
+                fixture.store.load(&fixture.authority).unwrap().is_none(),
+                "selecting existing media is not a completed creative action"
             );
         });
     }
