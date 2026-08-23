@@ -256,12 +256,14 @@ impl RecoveryCoordinator {
             .state
             .lock()
             .map_err(|_| io::Error::other("o agendador de Recuperação ficou indisponível"))?;
-        state.generation = state
+        let next_generation = state
             .generation
             .checked_add(1)
             .ok_or_else(|| io::Error::other("o agendador de Recuperação se esgotou"))?;
+        let removed = self.store.finish(authority)?;
+        state.generation = next_generation;
         state.pending = None;
-        self.store.finish(authority)
+        Ok(removed)
     }
 
     fn publish_if_current(&self, generation: u64) -> io::Result<()> {
@@ -585,6 +587,43 @@ mod tests {
                     .load(&authority)
                     .expect("the namespace remains readable")
                     .is_none()
+            );
+        });
+    }
+
+    #[test]
+    fn failed_finish_preserves_the_pending_publication() {
+        tauri::async_runtime::block_on(async {
+            let root = tempfile::tempdir().expect("temporary failed Recovery finish fixture");
+            let project = create_project(root.path(), "Projeto").project;
+            let authority = authority(&project);
+            let store = store(root.path());
+            let coordinator =
+                RecoveryCoordinator::with_delay(store.clone(), Duration::from_millis(50));
+            coordinator
+                .schedule(
+                    authority.clone(),
+                    project
+                        .recovery_checkpoint()
+                        .expect("the completed action is consolidated"),
+                )
+                .expect("the action is scheduled");
+            let checkpoint = store
+                .checkpoint_path(&authority)
+                .expect("the checkpoint path is valid");
+            std::fs::create_dir_all(&checkpoint)
+                .expect("a directory temporarily blocks checkpoint removal");
+
+            assert!(coordinator.finish(&authority).is_err());
+            std::fs::remove_dir(&checkpoint).expect("the local obstruction is released");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            assert!(
+                store
+                    .load(&authority)
+                    .expect("the namespace is readable after the obstruction")
+                    .is_some(),
+                "a failed terminal operation must not discard the pending checkpoint"
             );
         });
     }
