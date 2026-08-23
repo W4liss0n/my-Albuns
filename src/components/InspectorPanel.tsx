@@ -8,6 +8,7 @@ import type {
   AlbumInformationValidation,
   ComposedPhoto,
   ComposedSheet,
+  DisplayUnit,
   DocumentSnapshot,
   FrameSnapshot,
   MediaCatalogItem,
@@ -47,6 +48,7 @@ export interface InspectorPanelProps {
   displayedPhotoPanX: number;
   zoomCommitting: boolean;
   document: DocumentSnapshot;
+  presentationUnit: DisplayUnit;
   mediaItems: readonly MediaCatalogItem[];
   sheetStates: readonly SheetSnapshot[];
   sheets: readonly ComposedSheet[];
@@ -68,6 +70,7 @@ export interface InspectorPanelProps {
   onValidateAlbumInformation(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;
+  onPresentationUnitChange(unit: DisplayUnit | null): void;
   onNavigateToSheet(sheetId: string): void;
 }
 
@@ -78,6 +81,7 @@ export function InspectorPanel({
   displayedPhotoPanX,
   zoomCommitting,
   document,
+  presentationUnit,
   mediaItems,
   sheetStates,
   sheets,
@@ -90,6 +94,7 @@ export function InspectorPanel({
   onFinishPhotoZoom,
   onApplyAlbumInformation,
   onApplyAlbumDesign,
+  onPresentationUnitChange,
   onValidateAlbumInformation,
   onNavigateToSheet,
 }: InspectorPanelProps) {
@@ -133,6 +138,7 @@ export function InspectorPanel({
                     <output>{Math.round(displayedPhotoZoom * 100)}%</output>
                   </span>
                   <input
+                    className="ui-range"
                     type="range"
                     aria-label="Zoom da Foto"
                     min={
@@ -192,6 +198,7 @@ export function InspectorPanel({
                   document={document}
                   formId={ALBUM_INFORMATION_FORM_ID}
                   onApply={onApplyAlbumInformation}
+                  onPresentationUnitChange={onPresentationUnitChange}
                   onReadyChange={setInformationDirty}
                   onValidate={onValidateAlbumInformation}
                   sheetStates={sheetStates}
@@ -218,6 +225,7 @@ export function InspectorPanel({
             >
               <AlbumDesignForm
                 document={document}
+                presentationUnit={presentationUnit}
                 formId={ALBUM_DESIGN_FORM_ID}
                 mediaItems={mediaItems}
                 mediaPreviewUrls={mediaPreviewUrls}

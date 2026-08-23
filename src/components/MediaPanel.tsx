@@ -24,6 +24,7 @@ import {
 } from "../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
+import { MediaThumbnail } from "./MediaThumbnail";
 import "./MediaPanel.css";
 
 export interface MediaPanelProps {
@@ -64,9 +65,6 @@ export function MediaPanel({
   const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(
     null,
   );
-  const [intrinsicPreviewSizes, setIntrinsicPreviewSizes] = useState<
-    Readonly<Record<string, IntrinsicPreviewSize>>
-  >({});
   const mediaUsageById = useMemo(
     () => new Map(mediaUsage.map((usage) => [usage.mediaId, usage.count])),
     [mediaUsage],
@@ -250,33 +248,6 @@ export function MediaPanel({
     event.currentTarget.focus({ preventScroll: true });
   }
 
-  function captureIntrinsicPreviewSize(
-    mediaId: string,
-    previewUrl: string,
-    image: HTMLImageElement,
-  ) {
-    const { naturalHeight, naturalWidth } = image;
-    if (naturalWidth <= 0 || naturalHeight <= 0) return;
-    setIntrinsicPreviewSizes((current) => {
-      const previous = current[mediaId];
-      if (
-        previous?.previewUrl === previewUrl &&
-        previous.width === naturalWidth &&
-        previous.height === naturalHeight
-      ) {
-        return current;
-      }
-      return {
-        ...current,
-        [mediaId]: {
-          height: naturalHeight,
-          previewUrl,
-          width: naturalWidth,
-        },
-      };
-    });
-  }
-
   return (
     <section
       id="media-panel"
@@ -327,13 +298,6 @@ export function MediaPanel({
             const isUsed = usageCount > 0;
             const isSelected = selectedMediaIds.has(media.id);
             const preview = mediaPreviews[media.id];
-            const intrinsicPreviewSize = intrinsicPreviewSizes[media.id];
-            const previewGeometry = mediaPreviewGeometry(
-              media,
-              intrinsicPreviewSize?.previewUrl === preview?.url
-                ? intrinsicPreviewSize
-                : undefined,
-            );
             const availabilityLabel =
               preview?.state !== "unavailable"
                 ? null
@@ -351,7 +315,7 @@ export function MediaPanel({
               <button
                 aria-label={accessibleLabel}
                 aria-pressed={isSelected}
-                className="media-card"
+                className="media-preview-card media-card"
                 type="button"
                 key={media.id}
                 data-media-id={media.id}
@@ -370,32 +334,11 @@ export function MediaPanel({
                     : undefined
                 }
               >
-                <span
+                <MediaThumbnail
                   className="media-thumb"
-                  data-has-preview={String(Boolean(preview?.url))}
-                  data-portrait={String(previewGeometry.isPortrait)}
-                  style={
-                    {
-                      "--media-aspect-ratio": previewGeometry.aspectRatio,
-                    } as CSSProperties
-                  }
+                  media={media}
+                  previewUrl={preview?.url ?? undefined}
                 >
-                  {preview?.url && (
-                    <img
-                      alt=""
-                      draggable="false"
-                      loading="lazy"
-                      onLoad={(event) => {
-                        if (!preview.url || hasSourceDimensions(media)) return;
-                        captureIntrinsicPreviewSize(
-                          media.id,
-                          preview.url,
-                          event.currentTarget,
-                        );
-                      }}
-                      src={preview.url}
-                    />
-                  )}
                   {preview?.state === "unavailable" && (
                     <span
                       aria-label={availabilityLabel ?? undefined}
@@ -407,56 +350,13 @@ export function MediaPanel({
                         : "Indisponível"}
                     </span>
                   )}
-                </span>
+                </MediaThumbnail>
               </button>
             );
           })
         )}
       </div>
     </section>
-  );
-}
-
-interface MediaPreviewGeometry {
-  aspectRatio: string;
-  isPortrait: boolean;
-}
-
-interface IntrinsicPreviewSize {
-  height: number;
-  previewUrl: string;
-  width: number;
-}
-
-function mediaPreviewGeometry(
-  media: MediaCatalogItem,
-  intrinsicSize?: IntrinsicPreviewSize,
-): MediaPreviewGeometry {
-  const { sourceHeightPx, sourceWidthPx } = media;
-  const width = hasSourceDimensions(media)
-    ? sourceWidthPx
-    : intrinsicSize?.width;
-  const height = hasSourceDimensions(media)
-    ? sourceHeightPx
-    : intrinsicSize?.height;
-  if (!width || !height) return { aspectRatio: "1 / 1", isPortrait: false };
-  return {
-    aspectRatio: `${width} / ${height}`,
-    isPortrait: height > width,
-  };
-}
-
-function hasSourceDimensions(
-  media: MediaCatalogItem,
-): media is MediaCatalogItem & {
-  sourceHeightPx: number;
-  sourceWidthPx: number;
-} {
-  return (
-    media.sourceWidthPx !== null &&
-    media.sourceHeightPx !== null &&
-    media.sourceWidthPx > 0 &&
-    media.sourceHeightPx > 0
   );
 }
 

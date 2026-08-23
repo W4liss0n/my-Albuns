@@ -8,9 +8,13 @@ import type {
   ProjectWindowPort,
   ProjectSessionPort,
 } from "../application/projectPorts";
+import {
+  displayUnitLabel,
+  formatMicrometers,
+} from "../application/physicalMeasurements";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
-import type { EditorProjection } from "../domain/project";
+import type { DisplayUnit, EditorProjection } from "../domain/project";
 import {
   ActionButton,
   AppIcon,
@@ -24,7 +28,6 @@ import {
   type ExportPreviewControlHandle,
 } from "./ExportPreviewControl";
 import { InspectorPanel } from "./InspectorPanel";
-import { micrometersToDisplayUnits } from "./measurementFormatting";
 import { MediaPanel } from "./MediaPanel";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCloseController } from "./useProjectCloseController";
@@ -65,6 +68,10 @@ export function ProjectWorkspace({
 }: ProjectWorkspaceProps) {
   const [exportActive, setExportActive] = useState(false);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
+  const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
+    projectId: string;
+    unit: DisplayUnit;
+  } | null>(null);
   const exportControlRef = useRef<ExportPreviewControlHandle>(null);
   const [canvasMediaDemand, setCanvasMediaDemand] =
     useState<MediaPreviewDemand>({
@@ -141,6 +148,20 @@ export function ProjectWorkspace({
     onError: setCloseMessage,
   });
   const workspacePanels = useWorkspacePanelLayout();
+  const projectId = projection.state.projectId;
+  const presentationUnit =
+    presentationUnitOverride?.projectId === projectId
+      ? presentationUnitOverride.unit
+      : projection.state.document.displayUnit;
+  const changePresentationUnit = useCallback(
+    (unit: DisplayUnit | null) => {
+      setPresentationUnitOverride((current) => {
+        if (unit !== null) return { projectId, unit };
+        return current?.projectId === projectId ? null : current;
+      });
+    },
+    [projectId],
+  );
   const sheetEditing = controller.canvasProps.mode.kind === "sheet-editing";
   const mediaPanelHeight = sheetEditing
     ? SHEET_EDITING_MEDIA_PANEL_HEIGHT
@@ -157,7 +178,7 @@ export function ProjectWorkspace({
     displayedPhotoZoom,
     displayedPhotoPanX,
   } = controller;
-  const projectMetadata = projectAlbumMetadata(projection);
+  const projectMetadata = projectAlbumMetadata(projection, presentationUnit);
   const commandsBlocked =
     Boolean(busy) ||
     exportActive ||
@@ -236,12 +257,14 @@ export function ProjectWorkspace({
         />
 
         <InspectorPanel
+          key={projectId}
           selectedFrame={selectedFrame}
           selectedComposedPhoto={selectedComposedPhoto}
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}
           zoomCommitting={controller.zoomCommitting}
           document={projection.state.document}
+          presentationUnit={presentationUnit}
           mediaItems={projection.state.album.media}
           sheetStates={projection.state.album.sheets}
           sheets={projection.composition.sheets}
@@ -254,6 +277,7 @@ export function ProjectWorkspace({
           onFinishPhotoZoom={controller.finishZoomGesture}
           onApplyAlbumInformation={albumInformationApply.requestApply}
           onApplyAlbumDesign={controller.applyAlbumDesign}
+          onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
         />
@@ -304,25 +328,13 @@ export function ProjectWorkspace({
   );
 }
 
-const projectMetadataFormatter = new Intl.NumberFormat("pt-BR", {
-  maximumFractionDigits: 2,
-  useGrouping: false,
-});
-
-function projectAlbumMetadata(projection: EditorProjection) {
+function projectAlbumMetadata(
+  projection: EditorProjection,
+  presentationUnit: DisplayUnit,
+) {
   const { album, document } = projection.state;
-  const width = projectMetadataFormatter.format(
-    micrometersToDisplayUnits(
-      document.sheetWidthUm / 2,
-      document.displayUnit,
-    ),
-  );
-  const height = projectMetadataFormatter.format(
-    micrometersToDisplayUnits(
-      document.sheetHeightUm,
-      document.displayUnit,
-    ),
-  );
+  const width = formatMicrometers(document.sheetWidthUm / 2, presentationUnit);
+  const height = formatMicrometers(document.sheetHeightUm, presentationUnit);
   const sheetLabel = album.sheets.length === 1 ? "Lâmina" : "Lâminas";
-  return `${width}×${height} ${document.displayUnit} · ${album.sheets.length} ${sheetLabel}`;
+  return `${width}×${height} ${displayUnitLabel(presentationUnit)} · ${album.sheets.length} ${sheetLabel}`;
 }

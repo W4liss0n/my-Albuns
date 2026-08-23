@@ -307,16 +307,6 @@
   border-top: 0;
 }
 
-.album-design-label,
-.visual-default-field {
-  min-width: 0;
-}
-
-.album-design-label {
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-support);
-}
-
 .album-design-preview {
   height: 132px;
   border: 1px solid var(--ui-border);
@@ -334,47 +324,68 @@
 }
 
 .visual-default-field {
-  display: grid;
-  gap: 6px;
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ui-space-2);
 }
 
+/* Sem overflow: a faixa tem duas opções fixas, e um container rolável
+   recortaria o seletor flutuante ancorado no quadrado de Decorativo. */
 .visual-default-picker {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
-  overflow-x: auto;
-  padding: 6px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-surface-muted);
+  align-items: center;
+  padding: 4px 2px;
   gap: var(--ui-space-2);
-  scrollbar-width: thin;
 }
 
 .visual-default-picker__option {
   position: relative;
   display: grid;
-  width: 58px;
-  min-width: 58px;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   flex: none;
+  place-items: center;
   color: var(--ui-text-muted);
   background: transparent;
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-  gap: var(--ui-space-1);
-  text-align: center;
 }
 
 .visual-default-picker__tile {
   display: block;
-  width: 52px;
-  height: 52px;
-  margin: 0 auto;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
+  border-radius: 5px;
   background: var(--ui-surface-raised);
+}
+
+.visual-default-label {
+  flex: none;
+  width: 62px;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-support);
+}
+
+.visual-default-picker__divider {
+  width: 1px;
+  height: 26px;
+  flex: none;
+  background: var(--ui-border);
+}
+
+.visual-default-picker__tile--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--ui-text-muted);
+  border-style: dashed;
+  color: var(--ui-text-muted);
+  background: transparent;
 }
 
 .visual-default-picker__preview--none {
@@ -392,24 +403,26 @@
 }
 
 .visual-default-picker__option:hover .visual-default-picker__tile,
+.visual-default-picker__color:hover .visual-default-picker__tile {
+  border-color: var(--ui-text-muted);
+}
+
+.visual-default-picker__option:focus-visible {
+  outline: 0;
+}
+
 .visual-default-picker__option:focus-visible .visual-default-picker__tile,
 .visual-default-picker__color:has(input:focus-visible)
   .visual-default-picker__tile {
-  border-color: var(--ui-text-muted);
+  outline: 1px solid var(--ui-text-muted);
+  outline-offset: 2px;
 }
 
 .visual-default-picker__option[aria-pressed="true"]
   .visual-default-picker__tile,
 .visual-default-picker__option[data-selected="true"]
   .visual-default-picker__tile {
-  border-color: var(--ui-text);
-  box-shadow: 0 0 0 1px var(--ui-border-strong);
-}
-
-.visual-default-picker__option > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-color: var(--ui-accent);
 }
 
 .visual-default-picker__color {
@@ -419,19 +432,12 @@
 .visual-default-picker__color input {
   position: absolute;
   top: 0;
-  left: 3px;
-  width: 52px;
-  height: 52px;
+  left: 0;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   opacity: 0;
-}
-
-.visual-default-picker__empty {
-  align-self: center;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-caption);
-  white-space: nowrap;
 }
 
 .album-frame-border-color-picker input {
@@ -448,77 +454,20 @@
   box-shadow: 0 0 0 1px var(--ui-border-strong);
 }
 
-.album-frame-border-toggle {
-  display: grid;
+/* Cor e espessura dividem a mesma linha: o seletor sozinho não justifica uma
+   faixa inteira do painel. */
+.album-frame-border-row {
+  display: flex;
   min-width: 0;
   align-items: center;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-caption);
-  grid-template-columns: 28px minmax(0, 1fr) auto;
-  gap: var(--ui-space-2);
+  gap: var(--ui-space-3);
 }
 
-.album-frame-border-toggle input {
-  position: absolute;
-  opacity: 0;
+.album-frame-border-row > .ui-range-control {
+  min-width: 0;
+  flex: 1;
 }
 
-.album-frame-border-toggle__track {
-  position: relative;
-  width: 28px;
-  height: 14px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 8px;
-  background: var(--ui-surface-muted);
-}
-
-.album-frame-border-toggle__track::after {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ui-text-muted);
-  content: "";
-  transition: transform 120ms ease;
-}
-
-.album-frame-border-toggle input:checked + .album-frame-border-toggle__track {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.album-frame-border-toggle input:focus-visible + .album-frame-border-toggle__track {
-  border-color: var(--ui-text-muted);
-  box-shadow: 0 0 0 1px var(--ui-border-strong);
-}
-
-.album-frame-border-toggle input:checked + .album-frame-border-toggle__track::after {
-  background: var(--ui-accent);
-  transform: translateX(14px);
-}
-
-.album-frame-border-toggle output {
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-}
-
-.album-frame-border-preview {
-  display: block;
-  width: 100%;
-  height: 70px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface-muted);
-}
-
-.album-frame-border-colors {
-  display: flex;
-  gap: var(--ui-space-2);
-}
-
-.album-frame-border-colors > button,
 .album-frame-border-color-picker {
   position: relative;
   width: 24px;
@@ -529,42 +478,8 @@
   border-radius: var(--ui-radius-small);
 }
 
-.album-frame-border-colors > button[aria-pressed="true"] {
-  border-color: var(--ui-text);
-  box-shadow: 0 0 0 1px var(--ui-border-strong);
-}
-
-.album-frame-border-colors > button:hover,
-.album-frame-border-colors > button:focus-visible {
+.album-frame-border-color-picker:hover {
   border-color: var(--ui-text-muted);
-}
-
-.album-frame-border-range {
-  display: grid;
-  gap: var(--ui-space-2);
-}
-
-.album-frame-border-range > span {
-  display: flex;
-  justify-content: space-between;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-caption);
-}
-
-.album-frame-border-range output {
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-}
-
-.album-frame-border-range input {
-  width: 100%;
-  margin: 0;
-  accent-color: var(--ui-accent);
-}
-
-.album-frame-border-range input:focus-visible {
-  filter: brightness(0.9);
 }
 
 .photo-zoom-control {
@@ -589,8 +504,6 @@
 }
 
 .photo-zoom-control input {
-  width: 100%;
-  accent-color: var(--ui-accent);
   cursor: ew-resize;
 }
 

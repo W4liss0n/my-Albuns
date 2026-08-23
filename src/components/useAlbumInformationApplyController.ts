@@ -8,10 +8,7 @@ import type {
   AlbumInformation,
   AlbumInformationImpact,
 } from "../domain/project";
-import {
-  displayUnitLabel,
-  formatMicrometers,
-} from "../application/physicalMeasurements";
+import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
 
 interface AlbumInformationApplyControllerOptions {
   projectDialogPort: ProjectDialogPort;
@@ -129,9 +126,8 @@ export function albumInformationDetails(
   baseline: AlbumInformation,
   impact: AlbumInformationImpact,
 ) {
-  const unit = displayUnitLabel(information.displayUnit);
   const measurement = (valueUm: number) =>
-    `${formatMicrometers(valueUm, information.displayUnit)} ${unit}`;
+    formatPhysicalMeasurement(valueUm, information.displayUnit);
   const formatEnd = (value: AlbumInformation["firstSheet"]) =>
     value === "double" ? "Lâmina dupla" : "Página única";
   const details = [

@@ -321,10 +321,10 @@ function FrameRangeControl({
 }) {
   return (
     <div
-      className="new-project-frame-range-control"
+      className="ui-range-control"
       data-placeholder-feature={dataPlaceholderFeature}
     >
-      <div className="new-project-frame-range-heading">
+      <div className="ui-range-control__heading">
         <span>{visibleLabel}</span>
         <output>{valueText}</output>
       </div>
@@ -333,6 +333,7 @@ function FrameRangeControl({
         max={max}
         min={min}
         onChange={(event) => onChange(Number(event.target.value))}
+        className="ui-range"
         step={step}
         type="range"
         value={value}

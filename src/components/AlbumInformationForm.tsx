@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 
 import type {
@@ -6,6 +6,7 @@ import type {
   AlbumInformationImpact,
   AlbumInformationValidation,
   DocumentSnapshot,
+  DisplayUnit,
   EndSheetFormat,
   SheetSnapshot,
 } from "../domain/project";
@@ -13,7 +14,7 @@ import {
   createPhysicalFieldDraft,
   displayUnitLabel,
   editPhysicalFieldDraft,
-  formatMicrometers,
+  formatPhysicalMeasurement,
   type PhysicalFieldDraft,
 } from "../application/physicalMeasurements";
 import {
@@ -40,6 +41,7 @@ interface AlbumInformationFormProps {
     impact: AlbumInformationImpact,
   ): void | Promise<unknown>;
   onReadyChange(ready: boolean): void;
+  onPresentationUnitChange(unit: DisplayUnit | null): void;
   onValidate(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;
@@ -78,6 +80,7 @@ export function AlbumInformationForm({
   formId,
   sheetStates,
   onApply,
+  onPresentationUnitChange,
   onReadyChange,
   onValidate,
 }: AlbumInformationFormProps) {
@@ -156,9 +159,21 @@ export function AlbumInformationForm({
       !applying,
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     onReadyChange(ready);
   }, [onReadyChange, ready]);
+
+  useLayoutEffect(() => {
+    onPresentationUnitChange(draft.displayUnit);
+  }, [draft.displayUnit, onPresentationUnitChange]);
+
+  useLayoutEffect(
+    () => () => {
+      onPresentationUnitChange(null);
+      onReadyChange(false);
+    },
+    [onPresentationUnitChange, onReadyChange],
+  );
 
   async function submit() {
     if (
@@ -336,7 +351,10 @@ export function AlbumInformationForm({
               label="Largura"
               value={
                 pageDimensionValid
-                  ? `${formatMicrometers(pageWidth / 2, draft.displayUnit)} ${displayUnitLabel(draft.displayUnit)}`
+                  ? formatPhysicalMeasurement(
+                      pageWidth / 2,
+                      draft.displayUnit,
+                    )
                   : "—"
               }
             />
@@ -344,7 +362,7 @@ export function AlbumInformationForm({
               label="Altura"
               value={
                 pageHeight !== undefined && pageHeight > 0
-                  ? `${formatMicrometers(pageHeight, draft.displayUnit)} ${displayUnitLabel(draft.displayUnit)}`
+                  ? formatPhysicalMeasurement(pageHeight, draft.displayUnit)
                   : "—"
               }
             />

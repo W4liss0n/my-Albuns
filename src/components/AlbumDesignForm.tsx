@@ -1,12 +1,14 @@
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 
+import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
 import type {
+  DisplayUnit,
   DocumentSnapshot,
   MediaCatalogItem,
   ProjectedBackgroundContent,
@@ -17,20 +19,19 @@ import type { NewProjectPersonalizationDraft } from "../global/application/newPr
 import type { NewProjectPreviewGeometry } from "../global/newProjectPreviewGeometry";
 import { PersonalizationScopeSurface } from "../global/PersonalizationScopeSurface";
 import { ProportionalPreviewViewport } from "../global/ProportionalPreviewViewport";
-import { AlbumFrameBorderPreview } from "./AlbumFrameBorderPreview";
 import {
   setAlbumBackground,
   setAlbumFrameBorder,
   setAlbumOverlay,
   type AlbumDesignScope,
 } from "./albumDesignDraft";
-import { micrometersToDisplayUnits } from "./measurementFormatting";
+import { DecorativeMediaPicker } from "./DecorativeMediaPicker";
 
-const FRAME_BORDER_COLORS = ["#FFFFFF", "#2C2924", "#C5A46D"] as const;
 const DEFAULT_FRAME_BORDER = { rgb: "#2C2924", widthUm: 1_000 };
 
 interface AlbumDesignFormProps {
   document: DocumentSnapshot;
+  presentationUnit: DisplayUnit;
   formId: string;
   mediaItems: readonly MediaCatalogItem[];
   mediaPreviewUrls: Readonly<Record<string, string>>;
@@ -41,6 +42,7 @@ interface AlbumDesignFormProps {
 
 export function AlbumDesignForm({
   document,
+  presentationUnit,
   formId,
   mediaItems,
   mediaPreviewUrls,
@@ -66,6 +68,17 @@ export function AlbumDesignForm({
     () => mediaItems.filter((media) => media.kind === "decorative"),
     [mediaItems],
   );
+  // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
+  // persistência; a medida física controla somente a prévia desta seção.
+  const [frameGapUm, setFrameGapUm] = useState(6_000);
+  /**
+   * Um seletor de Decorativo por vez. O estado vive aqui, e não em cada
+   * controle, para que abrir um feche o outro por construção — inclusive
+   * quando a abertura vem do teclado, que não emite `pointerdown`.
+   */
+  const [openPicker, setOpenPicker] = useState<
+    "Background" | "Overlay" | null
+  >(null);
   const dirty = JSON.stringify(draft) !== baselineSignature;
   const background = backgroundAtScope(draft, scope);
   const overlay = overlayAtScope(draft, scope);
@@ -92,7 +105,14 @@ export function AlbumDesignForm({
     );
   }, [baselineSignature, value]);
 
-  useEffect(() => onReadyChange(dirty), [dirty, onReadyChange]);
+  useLayoutEffect(() => onReadyChange(dirty), [dirty, onReadyChange]);
+
+  useLayoutEffect(
+    () => () => {
+      onReadyChange(false);
+    },
+    [onReadyChange],
+  );
 
   function chooseBackground(content: ProjectedBackgroundContent) {
     setDraft((current) => setAlbumBackground(current, scope, content));
@@ -109,6 +129,26 @@ export function AlbumDesignForm({
         setAlbumFrameBorder(current, { kind: "solid", ...next }),
       );
     }
+  }
+
+  /**
+   * Espessura zero é a ausência de Borda, como na criação de novo Projeto: o
+   * controle é o próprio slider, sem alternador separado.
+   */
+  function changeBorderWidth(widthUm: number) {
+    if (widthUm <= 0) {
+      setDraft((current) => setAlbumFrameBorder(current, { kind: "none" }));
+      return;
+    }
+
+    setBorderEditor((current) => ({ ...current, widthUm }));
+    setDraft((current) =>
+      setAlbumFrameBorder(current, {
+        kind: "solid",
+        rgb: borderEditor.rgb,
+        widthUm,
+      }),
+    );
   }
 
   return (
@@ -131,7 +171,7 @@ export function AlbumDesignForm({
             <PersonalizationScopeSurface
               includeBothSidesControl
               focusedScope={focusedScope}
-              frameGapUm={6_000}
+              frameGapUm={frameGapUm}
               geometry={previewGeometry}
               hoveredScope={hoveredScope}
               personalization={previewPersonalization}
@@ -148,12 +188,12 @@ export function AlbumDesignForm({
           decorativeMedia={decorativeMedia}
           label="Background"
           mediaPreviewUrls={mediaPreviewUrls}
+          open={openPicker === "Background"}
           selectedMediaId={
             background?.kind === "media" ? background.mediaId : null
           }
-          onSelect={(mediaId) =>
-            chooseBackground({ kind: "media", mediaId })
-          }
+          onOpenChange={(open) => setOpenPicker(open ? "Background" : null)}
+          onSelect={(mediaId) => chooseBackground({ kind: "media", mediaId })}
         >
           <label
             className="visual-default-picker__option visual-default-picker__color"
@@ -164,7 +204,6 @@ export function AlbumDesignForm({
               className="visual-default-picker__tile"
               style={{ background: backgroundColor(background) }}
             />
-            <span>cor</span>
             <input
               aria-label="Cor do Background"
               type="color"
@@ -183,91 +222,80 @@ export function AlbumDesignForm({
           label="Overlay"
           mediaPreviewUrls={mediaPreviewUrls}
           noneSelected={overlay === null}
+          open={openPicker === "Overlay"}
           selectedMediaId={overlay?.mediaId ?? null}
+          onOpenChange={(open) => setOpenPicker(open ? "Overlay" : null)}
           onSelect={(mediaId) => chooseOverlay({ kind: "media", mediaId })}
           onClear={() => chooseOverlay(null)}
         />
       </section>
       <section className="inspector-subsection">
         <h3>Padrão dos Frames</h3>
-        <AlbumFrameBorderPreview frameBorder={draft.frameBorder} />
-        <label className="album-frame-border-toggle">
+        <div className="album-frame-border-row">
+          <label className="album-frame-border-color-picker">
+            <span className="ui-visually-hidden">Cor da Borda</span>
+            <input
+              aria-label="Cor da Borda"
+              type="color"
+              value={borderEditor.rgb}
+              onChange={(event) =>
+                updateBorder({
+                  ...borderEditor,
+                  rgb: event.currentTarget.value.toUpperCase(),
+                })
+              }
+            />
+          </label>
+          <label className="ui-range-control">
+            <span className="ui-range-control__heading">
+              <span>Borda padrão</span>
+              <output>
+                {borderEnabled
+                  ? formatPhysicalMeasurement(
+                      borderEditor.widthUm,
+                      presentationUnit,
+                    )
+                  : "sem borda"}
+              </output>
+            </span>
+            <input
+              aria-label="Espessura da Borda"
+              className="ui-range"
+              max={Math.max(5_000, borderEditor.widthUm)}
+              min="0"
+              step="250"
+              type="range"
+              value={borderEnabled ? borderEditor.widthUm : 0}
+              onChange={(event) =>
+                changeBorderWidth(Number(event.currentTarget.value))
+              }
+            />
+          </label>
+        </div>
+        {/* PLACEHOLDER UI: frame gap awaits its persistence contract. */}
+        <label
+          className="ui-range-control"
+          data-placeholder-feature="album-design-frame-gap"
+        >
+          <span className="ui-range-control__heading">
+            <span>Espaço entre Frames</span>
+            <output>
+              {formatPhysicalMeasurement(frameGapUm, presentationUnit)}
+            </output>
+          </span>
           <input
-            aria-label="Exibir borda"
-            checked={borderEnabled}
-            type="checkbox"
-            onChange={(event) => {
-              const enabled = event.currentTarget.checked;
-              setDraft((current) =>
-                setAlbumFrameBorder(
-                  current,
-                  enabled
-                    ? { kind: "solid", ...borderEditor }
-                    : { kind: "none" },
-                ),
-              );
-            }}
+            aria-label="Espaço entre Frames"
+            className="ui-range"
+            max="24000"
+            min="0"
+            step="1000"
+            type="range"
+            value={frameGapUm}
+            onChange={(event) =>
+              setFrameGapUm(Number(event.currentTarget.value))
+            }
           />
-          <span aria-hidden="true" className="album-frame-border-toggle__track" />
-          <span>Exibir borda</span>
-          <output>{borderEnabled ? "com borda" : "sem borda"}</output>
         </label>
-        {borderEnabled ? (
-          <>
-            <div
-              aria-label="Cores da Borda"
-              className="album-frame-border-colors"
-              role="group"
-            >
-              {FRAME_BORDER_COLORS.map((color) => (
-                <button
-                  aria-label={`Usar cor da Borda ${color}`}
-                  aria-pressed={borderEditor.rgb === color}
-                  key={color}
-                  style={{ background: color }}
-                  type="button"
-                  onClick={() => updateBorder({ ...borderEditor, rgb: color })}
-                />
-              ))}
-              <label className="album-frame-border-color-picker">
-                <span className="ui-visually-hidden">Cor da Borda</span>
-                <input
-                  aria-label="Cor da Borda"
-                  type="color"
-                  value={borderEditor.rgb}
-                  onChange={(event) =>
-                    updateBorder({
-                      ...borderEditor,
-                      rgb: event.currentTarget.value.toUpperCase(),
-                    })
-                  }
-                />
-              </label>
-            </div>
-            <label className="album-frame-border-range">
-              <span>
-                <span>Espessura da Borda</span>
-                <output>
-                  {formatMeasurement(borderEditor.widthUm, document.displayUnit)}
-                </output>
-              </span>
-              <input
-                aria-label="Espessura da Borda"
-                max={Math.max(5_000, borderEditor.widthUm)}
-                min="250"
-                step="250"
-                type="range"
-                value={borderEditor.widthUm}
-                onChange={(event) =>
-                  updateBorder({
-                    ...borderEditor,
-                    widthUm: Number(event.currentTarget.value),
-                  })
-                }
-              />
-            </label>
-          </>
-        ) : null}
       </section>
     </form>
   );
@@ -279,7 +307,9 @@ function VisualDefaultControl({
   label,
   mediaPreviewUrls,
   noneSelected = false,
+  open,
   onClear,
+  onOpenChange,
   onSelect,
   selectedMediaId,
 }: {
@@ -287,14 +317,20 @@ function VisualDefaultControl({
   decorativeMedia: readonly MediaCatalogItem[];
   label: "Background" | "Overlay";
   mediaPreviewUrls: Readonly<Record<string, string>>;
+  /**
+   * Verdadeiro apenas quando o escopo inteiro está sem Overlay. Escopo com
+   * lados divergentes não é ausência, e não deve marcar `Sem Overlay`.
+   */
   noneSelected?: boolean;
+  open: boolean;
   onClear?: () => void;
+  onOpenChange(open: boolean): void;
   onSelect(mediaId: string): void;
   selectedMediaId: string | null;
 }) {
   return (
     <div className="visual-default-field">
-      <span className="album-design-label">{label}</span>
+      <span className="visual-default-label">{label}</span>
       <div
         aria-label={`Opções de ${label}`}
         className="visual-default-picker"
@@ -306,6 +342,7 @@ function VisualDefaultControl({
             aria-label="Sem Overlay"
             aria-pressed={noneSelected}
             className="visual-default-picker__option"
+            title="Sem Overlay"
             type="button"
             onClick={onClear}
           >
@@ -313,30 +350,18 @@ function VisualDefaultControl({
               aria-hidden="true"
               className="visual-default-picker__tile visual-default-picker__preview--none"
             />
-            <span>sem</span>
           </button>
         ) : null}
-        {decorativeMedia.map((media) => (
-          <button
-            aria-label={`Usar ${label} ${media.name}`}
-            aria-pressed={selectedMediaId === media.id}
-            className="visual-default-picker__option"
-            key={media.id}
-            title={media.name}
-            type="button"
-            onClick={() => onSelect(media.id)}
-          >
-            <span
-              aria-hidden="true"
-              className="visual-default-picker__tile"
-              style={decorativePreview(media, mediaPreviewUrls)}
-            />
-            <span>{media.name}</span>
-          </button>
-        ))}
-        {decorativeMedia.length === 0 ? (
-          <span className="visual-default-picker__empty">Sem Decorativos</span>
-        ) : null}
+        <span aria-hidden="true" className="visual-default-picker__divider" />
+        <DecorativeMediaPicker
+          decorativeMedia={decorativeMedia}
+          label={label}
+          mediaPreviewUrls={mediaPreviewUrls}
+          open={open}
+          selectedMediaId={selectedMediaId}
+          onOpenChange={onOpenChange}
+          onSelect={onSelect}
+        />
       </div>
     </div>
   );
@@ -439,41 +464,8 @@ function backgroundColor(content: ProjectedBackgroundContent | null) {
   return content?.kind === "color" ? content.rgb : "#FFFFFF";
 }
 
-function decorativePreview(
-  media: MediaCatalogItem,
-  mediaPreviewUrls: Readonly<Record<string, string>>,
-): CSSProperties {
-  return mediaPreviewUrls[media.id]
-    ? mediaPreview(media.id, mediaPreviewUrls)
-    : { background: media.palette?.[1] ?? "var(--ui-surface-muted)" };
-}
-
-function mediaPreview(
-  mediaId: string,
-  mediaPreviewUrls: Readonly<Record<string, string>>,
-): CSSProperties {
-  const url = mediaPreviewUrls[mediaId];
-  return url
-    ? { backgroundImage: `url("${url}")`, backgroundPosition: "center", backgroundSize: "cover" }
-    : {};
-}
-
 function scopeLabel(scope: AlbumDesignScope) {
   if (scope === "left") return "Página esquerda";
   if (scope === "right") return "Página direita";
   return "Ambos os lados";
-}
-
-const measurementFormatter = new Intl.NumberFormat("pt-BR", {
-  maximumFractionDigits: 6,
-  useGrouping: false,
-});
-
-function formatMeasurement(
-  micrometers: number,
-  unit: DocumentSnapshot["displayUnit"],
-) {
-  return `${measurementFormatter.format(
-    micrometersToDisplayUnits(micrometers, unit),
-  )} ${unit}`;
 }

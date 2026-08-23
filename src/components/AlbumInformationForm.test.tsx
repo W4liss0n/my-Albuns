@@ -28,6 +28,7 @@ function renderForm({
     information: AlbumInformation,
   ) => Promise<AlbumInformationValidation>;
 } = {}) {
+  const onPresentationUnitChange = vi.fn();
   function Harness() {
     const [ready, setReady] = useState(false);
     return (
@@ -37,6 +38,7 @@ function renderForm({
           formId="album-information-test"
           sheetStates={representativeProjection.state.album.sheets}
           onApply={onApply}
+          onPresentationUnitChange={onPresentationUnitChange}
           onReadyChange={setReady}
           onValidate={onValidate}
         />
@@ -49,7 +51,7 @@ function renderForm({
   const view = render(
     <Harness />,
   );
-  return { ...view, onApply, onValidate };
+  return { ...view, onApply, onPresentationUnitChange, onValidate };
 }
 
 test("edits every Album information field and submits one complete candidate", async () => {
@@ -103,6 +105,19 @@ test("edits every Album information field and submits one complete candidate", a
       validImpact,
     ),
   );
+});
+
+test("publishes the pending display Unit and clears it on unmount", () => {
+  const { onPresentationUnitChange, unmount } = renderForm();
+
+  expect(onPresentationUnitChange).toHaveBeenLastCalledWith("mm");
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "in" },
+  });
+  expect(onPresentationUnitChange).toHaveBeenLastCalledWith("in");
+
+  unmount();
+  expect(onPresentationUnitChange).toHaveBeenLastCalledWith(null);
 });
 
 test("restores edited entries to their last applied values", () => {

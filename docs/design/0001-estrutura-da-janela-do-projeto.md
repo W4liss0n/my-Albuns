@@ -413,7 +413,9 @@ Novas configurações globais devem ser incorporadas a `Informações do Álbum`
 
 `Estrutura` contém somente os controles independentes `Primeira Lâmina` e `Última Lâmina`. Cada um permite escolher `Lâmina dupla` ou `Página única`. O `Aplicar` de `Informações do Álbum` apresenta o impacto das conversões antes de executar atomicamente as alterações confirmadas.
 
-Em `Documento`, trocar a Unidade converte imediatamente somente os valores exibidos, sem alterar tamanho físico ou pixels. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
+Em `Documento`, trocar a Unidade converte imediatamente somente a apresentação dos valores, sem alterar tamanho físico ou pixels. A Unidade pendente passa a representar toda medida física visível na Janela do Projeto enquanto o draft de `Informações do Álbum` existir, inclusive medidas apresentadas no cabeçalho e em `Design do Álbum`; nenhuma dessas conversões persiste antes de `Aplicar`.
+
+O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
 
 As entradas numéricas de `Informações do Álbum` mostram um `X` dentro do controle somente enquanto o próprio draft diverge do último valor aplicado. Essa ação restaura apenas a entrada correspondente. Para medidas físicas, o valor restaurado é apresentado na Unidade corrente; trocar somente a Unidade não marca as medidas como editadas nem cria ações de restauração falsas.
 
@@ -423,11 +425,19 @@ Em `Áreas técnicas`, os campos de Sangria e segurança usam a Unidade do Proje
 
 No topo de `Padrões visuais`, uma miniatura mostra somente a composição do padrão global do Álbum, sem representar uma Lâmina específica. Ela reutiliza a interação espacial de `Design da Lâmina`: hover e clique escolhem lado esquerdo, lado direito ou Ambos os lados pela região central. Background e Overlay aparecem abaixo e operam sobre o escopo selecionado.
 
-Background e Overlay usam faixas compactas sempre visíveis. A primeira reúne a cor e todos os Decorativos já importados no Projeto; a segunda reúne `Sem Overlay` e esses mesmos Decorativos. Clicar diretamente numa opção atualiza somente o draft visual até o `Aplicar` de `Design do Álbum`, sem abrir seletor adicional abaixo da faixa.
+Background e Overlay ocupam uma linha cada: o rótulo à esquerda e, à direita, exatamente duas opções do tamanho das amostras de cor da criação de novo Projeto, separadas por um divisor. A faixa não cresce com o acervo. O Background tem a amostra de cor e o quadrado de Decorativo; o Overlay tem `Sem Overlay` — que também é como se limpa a escolha — e o quadrado de Decorativo. Não há botão, nome de arquivo nem texto de estado ao redor da faixa; o nome do Decorativo aplicado aparece no Tooltip do quadrado. Selecionado usa a cor de acento na borda, o mesmo indicador da Lâmina ativa e do card de mídia.
 
-As faixas não importam arquivos e não aceitam arraste. A importação de novos Decorativos permanece exclusivamente no Painel de imagens.
+O quadrado de Decorativo mostra o Decorativo aplicado no escopo; vazio, aparece com contorno tracejado. Clicar nele abre um seletor flutuante, ancorado na linha inteira para não vazar pela borda direita da janela. O seletor repete a grade da aba `Decorativos` do Painel de imagens: mesma miniatura com moldura branca e sombra, mídia inteira sem corte, e xadrez quando não há prévia. Escolher um Decorativo aplica ao draft e fecha. O seletor encerra como os demais popups do programa — ponteiro fora ou `Esc`, devolvendo o foco ao quadrado que o abriu.
 
-`Padrão dos Frames` apresenta uma prévia simples de Frame e os controles `Exibir borda`, cor e espessura na Unidade do Projeto. Cada alteração permanece no mesmo draft visual.
+A última célula da grade é `Importar Decorativo`, com contorno tracejado e sem o xadrez das miniaturas. Ela permanece desabilitada enquanto os comandos de importação não tiverem porta de aplicação, seguindo a mesma marcação de funcionalidade indisponível usada no Painel de imagens.
+
+`Design do Álbum` define o padrão do Projeto, não a composição de uma Lâmina. Por isso a escolha acontece dentro do próprio formulário: o seletor flutuante é a superfície secundária admitida aqui, e `Design do Álbum` não lê a seleção do Painel de imagens nem depende de um alvo aguardando escolha. O duplo clique em Decorativo no Painel segue reservado para a Lâmina centralizada, sem disputa com este controle. As faixas continuam sem importar arquivos e sem aceitar arraste.
+
+`Padrão dos Frames` não repete uma prévia própria: a miniatura de `Padrões visuais`, logo acima, já mostra o efeito da Borda. O grupo traz o seletor de cor e a espessura na mesma linha, com o seletor à esquerda e o slider ocupando o restante — um seletor sozinho não justifica uma faixa inteira do painel. Não há amostras de cor sugeridas: quando elas dividiam a linha com o seletor, nada distinguia a amostra que aplica uma cor do controle que abre o diálogo do sistema.
+
+A espessura dispensa alternador. O slider começa em zero, e zero significa ausência de Borda — a mesma regra da criação de novo Projeto —, com a leitura mostrando `sem borda` nessa posição. Cada alteração permanece no mesmo draft visual até o `Aplicar`.
+
+`Espaço entre Frames` fecha o grupo e ainda não possui contrato de persistência: ele altera somente a miniatura desta seção, sem entrar no draft nem habilitar o `Aplicar`. Fica marcado como funcionalidade indisponível até o campo existir no núcleo.
 
 Opacidade não pertence ao padrão global e não aparece nesse grupo; ela permanece no contexto individual de Frame.
 

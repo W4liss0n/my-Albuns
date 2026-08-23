@@ -64,6 +64,13 @@ export function displayUnitLabel(unit: DisplayUnit): string {
   return unit === "in" ? "pol" : unit;
 }
 
+export function formatPhysicalMeasurement(
+  valueUm: number,
+  unit: DisplayUnit,
+): string {
+  return `${formatMicrometers(valueUm, unit)} ${displayUnitLabel(unit)}`;
+}
+
 export function parsePhysicalText(
   text: string,
   unit: DisplayUnit,

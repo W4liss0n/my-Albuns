@@ -1,0 +1,227 @@
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { Plus } from "lucide-react";
+
+import type { MediaCatalogItem } from "../domain/project";
+import { AppIcon } from "../ui";
+import { MediaThumbnail } from "./MediaThumbnail";
+import "./DecorativeMediaPicker.css";
+
+const IMPORT_PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
+
+interface DecorativeMediaPickerProps {
+  decorativeMedia: readonly MediaCatalogItem[];
+  label: "Background" | "Overlay";
+  mediaPreviewUrls: Readonly<Record<string, string>>;
+  open: boolean;
+  onOpenChange(open: boolean): void;
+  onSelect(mediaId: string): void;
+  selectedMediaId: string | null;
+}
+
+export function DecorativeMediaPicker({
+  decorativeMedia,
+  label,
+  mediaPreviewUrls,
+  open,
+  onOpenChange,
+  onSelect,
+  selectedMediaId,
+}: DecorativeMediaPickerProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const applied =
+    decorativeMedia.find((media) => media.id === selectedMediaId) ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const selected = menu?.querySelector<HTMLElement>(
+      '[role="menuitem"][data-selected="true"]',
+    );
+    const first = menu?.querySelector<HTMLElement>(
+      '[role="menuitem"]:not(:disabled)',
+    );
+    (selected ?? first ?? menu)?.focus({ preventScroll: true });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const restoreTrigger = () => {
+      triggerRef.current?.focus({ preventScroll: true });
+    };
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        onOpenChange(false);
+        const openingAnotherPicker =
+          event.target instanceof Element &&
+          event.target.closest("[data-decorative-picker-trigger]");
+        if (!openingAnotherPicker) window.setTimeout(restoreTrigger, 0);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onOpenChange(false);
+      restoreTrigger();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onOpenChange, open]);
+
+  function closeAndRestoreFocus() {
+    onOpenChange(false);
+    triggerRef.current?.focus({ preventScroll: true });
+  }
+
+  function navigateMenu(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const menuItems = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not(:disabled)',
+      ),
+    );
+    if (menuItems.length === 0) return;
+    const currentIndex = menuItems.indexOf(
+      document.activeElement as HTMLElement,
+    );
+    let nextIndex: number | null = null;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = menuItems.length - 1;
+    if (["ArrowDown", "ArrowRight"].includes(event.key)) {
+      nextIndex = (currentIndex + 1) % menuItems.length;
+    }
+    if (["ArrowUp", "ArrowLeft"].includes(event.key)) {
+      nextIndex =
+        (currentIndex <= 0 ? menuItems.length : currentIndex) - 1;
+    }
+    if (event.key === "Tab") {
+      onOpenChange(false);
+      return;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    menuItems[nextIndex]?.focus({ preventScroll: true });
+  }
+
+  return (
+    <div className="visual-default-decorative" ref={rootRef}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={
+          applied
+            ? `Decorativo do ${label}: ${applied.name}. Escolher outro`
+            : `Escolher Decorativo para ${label}`
+        }
+        className="visual-default-picker__option"
+        data-decorative-picker-trigger="true"
+        data-selected={applied ? true : undefined}
+        ref={triggerRef}
+        title={applied ? applied.name : "Escolher Decorativo"}
+        type="button"
+        onClick={() => onOpenChange(!open)}
+      >
+        {applied ? (
+          <span
+            aria-hidden="true"
+            className="visual-default-picker__tile"
+            style={decorativePreview(applied, mediaPreviewUrls)}
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="visual-default-picker__tile visual-default-picker__tile--add"
+          >
+            <AppIcon icon={Plus} size={12} />
+          </span>
+        )}
+      </button>
+      {open ? (
+        <div
+          aria-label={`Decorativos para ${label}`}
+          className="visual-default-popup"
+          ref={menuRef}
+          role="menu"
+          tabIndex={-1}
+          onKeyDown={navigateMenu}
+        >
+          <div className="visual-default-popup__grid" role="none">
+            {decorativeMedia.map((media) => {
+              const selected = selectedMediaId === media.id;
+              return (
+                <button
+                  aria-label={`Usar ${label} ${media.name}${
+                    selected ? ". Selecionado" : ""
+                  }`}
+                  className="media-preview-card visual-default-card"
+                  data-selected={String(selected)}
+                  key={media.id}
+                  role="menuitem"
+                  title={media.name}
+                  type="button"
+                  onClick={() => {
+                    onSelect(media.id);
+                    closeAndRestoreFocus();
+                  }}
+                >
+                  <MediaThumbnail
+                    className="visual-default-card__thumb"
+                    loading="eager"
+                    media={media}
+                    previewUrl={mediaPreviewUrls[media.id]}
+                  />
+                </button>
+              );
+            })}
+            {/* PLACEHOLDER UI: import commands await their application port. */}
+            <button
+              aria-label="Importar Decorativo"
+              className="visual-default-card visual-default-card--import"
+              data-placeholder-feature="import-decorative-files"
+              disabled
+              role="menuitem"
+              title={IMPORT_PLACEHOLDER_TITLE}
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                className="visual-default-card__thumb visual-default-card__thumb--import"
+              >
+                <AppIcon icon={Plus} size={16} />
+              </span>
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function decorativePreview(
+  media: MediaCatalogItem,
+  mediaPreviewUrls: Readonly<Record<string, string>>,
+): CSSProperties {
+  const url = mediaPreviewUrls[media.id];
+  return url
+    ? {
+        backgroundImage: `url("${url}")`,
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "contain",
+      }
+    : { background: media.palette?.[1] ?? "var(--ui-surface-muted)" };
+}

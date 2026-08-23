@@ -64,6 +64,13 @@ interface. Enquanto capa, fixação e metadados não existirem nesse contrato, e
 trechos do cartão são placeholders de reprodução e permanecem marcados no código
 com `PLACEHOLDER UI` e `data-placeholder-feature`.
 
+Uma capa real não possui contrato nesta versão. Conforme o ADR 0005, previews
+persistidos de Lâmina só podem ser introduzidos se medições demonstrarem que o
+baseline não atende. Até que essa evidência exista e a decisão arquitetural seja
+reavaliada, este desenho não define geração, persistência, transporte, esquema
+nem momento de atualização para uma capa; o cartão conserva exclusivamente o
+placeholder descrito acima.
+
 A lista usa a abertura mais recente como ordenação decrescente. A entrada passa
 para o topo somente depois que o Host independente confirma `Ready`; cancelamento
 ou falha anterior não cria nem reordena o item.

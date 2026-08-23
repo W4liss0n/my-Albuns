@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { InspectorPanel } from "./components/InspectorPanel";
 import type {
   AlbumInformation,
   ComposedSheet,
+  DisplayUnit,
   DocumentSnapshot,
   MediaCatalogItem,
   ProjectedActiveSides,
@@ -92,6 +93,12 @@ export function SheetGridPreview() {
   const [visualDefaults, setVisualDefaults] = useState<ProjectedVisualDefaults>(
     representativeProjection.state.album.visualDefaults,
   );
+  const [presentationUnitOverride, setPresentationUnitOverride] =
+    useState<DisplayUnit | null>(null);
+  const changePresentationUnit = useCallback((unit: DisplayUnit | null) => {
+    setPresentationUnitOverride(unit);
+  }, []);
+  const presentationUnit = presentationUnitOverride ?? document.displayUnit;
 
   function applyInformation(information: AlbumInformation) {
     setDocument({
@@ -125,6 +132,7 @@ export function SheetGridPreview() {
         displayedPhotoPanX={0}
         displayedPhotoZoom={1}
         document={document}
+        presentationUnit={presentationUnit}
         frameBorder={visualDefaults.frameBorder}
         focusedSheetId={focusedSheetId}
         mediaItems={[
@@ -144,6 +152,7 @@ export function SheetGridPreview() {
         onBeginPhotoZoom={() => undefined}
         onFinishPhotoZoom={async () => undefined}
         onNavigateToSheet={setFocusedSheetId}
+        onPresentationUnitChange={changePresentationUnit}
         onUpdatePhotoZoom={() => undefined}
         onValidateAlbumInformation={async () => ({
           errors: [],

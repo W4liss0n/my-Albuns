@@ -1,0 +1,61 @@
+.visual-default-decorative {
+  display: flex;
+  flex: none;
+}
+
+.visual-default-popup {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--ui-space-1));
+  right: 0;
+  left: 0;
+  display: grid;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  box-shadow: var(--ui-shadow-menu);
+  gap: var(--ui-space-2);
+}
+
+.visual-default-popup:focus {
+  outline: 0;
+}
+
+.visual-default-popup__grid {
+  display: grid;
+  max-height: 164px;
+  overflow-y: auto;
+  align-content: start;
+  grid-template-columns: repeat(auto-fill, 48px);
+  gap: 10px;
+  scrollbar-gutter: stable;
+  user-select: none;
+}
+
+.visual-default-card--import {
+  appearance: none;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.visual-default-card__thumb--import {
+  display: grid;
+  width: 100%;
+  height: auto;
+  border: 1px dashed var(--ui-text-muted);
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text-muted);
+  background: transparent;
+  aspect-ratio: 1;
+  box-shadow: none;
+  place-items: center;
+}

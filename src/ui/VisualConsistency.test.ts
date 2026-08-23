@@ -13,6 +13,7 @@ const previewStyles = readStyles("src/global/NewProjectPreviewPanel.css");
 const editorStyles = readStyles("src/App.css");
 const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
+const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
 const albumInformationSource = readStyles("src/components/AlbumInformationForm.tsx");
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
@@ -108,27 +109,36 @@ test("shares floating notification chrome", () => {
 });
 
 test("keeps media hover and selection on the straight image border", () => {
-  expect(mediaPanelStyles).toMatch(
-    /\.media-thumb\s*\{[^}]*border:\s*3px solid #fff;[^}]*border-radius:\s*0;/s,
+  expect(mediaThumbnailStyles).toMatch(
+    /\.media-preview-thumbnail\s*\{[^}]*border:\s*3px solid #fff;[^}]*border-radius:\s*0;/s,
   );
-  expect(mediaPanelStyles).toMatch(
-    /\.media-card:hover \.media-thumb\s*\{\s*border-color:\s*var\(--ui-border-strong\);\s*\}/,
+  expect(mediaThumbnailStyles).toMatch(
+    /\.media-preview-card:hover \.media-preview-thumbnail\s*\{\s*border-color:\s*var\(--ui-border-strong\);\s*\}/,
   );
-  expect(mediaPanelStyles).toMatch(
-    /\.media-card\[data-selected="true"\] \.media-thumb\s*\{\s*border-color:\s*var\(--ui-accent\);\s*\}/,
+  expect(mediaThumbnailStyles).toMatch(
+    /\.media-preview-card\[data-selected="true"\] \.media-preview-thumbnail\s*\{\s*border-color:\s*var\(--ui-accent\);\s*\}/,
   );
-  expect(mediaPanelStyles).toMatch(
-    /\.media-thumb img\s*\{[^}]*object-fit:\s*contain;/s,
+  expect(mediaThumbnailStyles).toMatch(
+    /\.media-preview-thumbnail img\s*\{[^}]*object-fit:\s*contain;/s,
   );
   expect(mediaPanelStyles).toContain("user-select: none;");
-  expect(mediaPanelStyles).not.toMatch(
-    /\.media-card:hover \.media-thumb\s*\{[^}]*box-shadow/s,
+  expect(mediaThumbnailStyles).not.toMatch(
+    /\.media-preview-card:hover \.media-preview-thumbnail\s*\{[^}]*box-shadow/s,
   );
-  expect(mediaPanelStyles).toMatch(
-    /\.media-card:focus-visible \.media-thumb\s*\{[^}]*outline:\s*1px solid var\(--ui-text-muted\);/s,
+  expect(mediaThumbnailStyles).toMatch(
+    /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*outline:\s*1px solid var\(--ui-text-muted\);/s,
   );
-  expect(mediaPanelStyles).not.toMatch(
-    /\.media-card:focus(?:-visible)? \.media-thumb\s*\{[^}]*border-color:/s,
+  expect(mediaThumbnailStyles).not.toMatch(
+    /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*border-color:/s,
+  );
+});
+
+test("keeps compact visual-default focus independent from selection", () => {
+  expect(inspectorPanelStyles).toMatch(
+    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile,[\s\S]*outline:\s*1px solid var\(--ui-text-muted\);[\s\S]*outline-offset:\s*2px;/,
+  );
+  expect(inspectorPanelStyles).toMatch(
+    /\.visual-default-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
   );
 });
 

@@ -278,6 +278,7 @@ export function MediaPanelToolbar({
               <span>Tamanho</span>
               <input
                 aria-label="Tamanho das miniaturas"
+                className="ui-range"
                 max={MEDIA_THUMBNAIL_MAX_SIZE}
                 min={MEDIA_THUMBNAIL_MIN_SIZE}
                 step="2"

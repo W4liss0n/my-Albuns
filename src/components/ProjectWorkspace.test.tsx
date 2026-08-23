@@ -916,6 +916,142 @@ test("shows the physical configuration projected from the opened Project", () =>
   ).toHaveValue("0.5");
 });
 
+test("projects the pending Unidade across the Project Window without changing Album Design", async () => {
+  const projectionWithBorder: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: false,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_540 },
+        },
+      },
+    },
+    composition: {
+      ...projection.composition,
+      frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_540 },
+    },
+  };
+  const apply = vi.fn(async () => projectionWithBorder);
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithBorder}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const informationSection = screen
+    .getByRole("button", { name: "Informações do Álbum" })
+    .closest("section") as HTMLElement;
+  const designSection = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
+  const design = within(designSection);
+  const designApply = design.getByRole("button", { name: "Aplicar" });
+
+  fireEvent.change(within(informationSection).getByLabelText("Unidade"), {
+    target: { value: "in" },
+  });
+
+  expect(await screen.findByText("11.811×11.811 pol · 1 Lâmina")).toBeVisible();
+  expect(
+    design.getByText("Borda padrão").closest("label"),
+  ).toHaveTextContent("0.1 pol");
+  expect(
+    design.getByText("Espaço entre Frames").closest("label"),
+  ).toHaveTextContent("0.236 pol");
+  expect(designApply).toBeDisabled();
+  expect(screen.getByText("salvo")).toBeVisible();
+  expect(apply).not.toHaveBeenCalled();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Informações do Álbum" }),
+  );
+  expect(await screen.findByText("300×300 mm · 1 Lâmina")).toBeVisible();
+  expect(
+    design.getByText("Espaço entre Frames").closest("label"),
+  ).toHaveTextContent("6 mm");
+  expect(designApply).toBeDisabled();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Informações do Álbum" }),
+  );
+  fireEvent.change(
+    within(
+      screen
+        .getByRole("button", { name: "Informações do Álbum" })
+        .closest("section") as HTMLElement,
+    ).getByLabelText("Unidade"),
+    { target: { value: "in" } },
+  );
+  expect(await screen.findByText("11.811×11.811 pol · 1 Lâmina")).toBeVisible();
+
+  const otherProject: EditorProjection = {
+    ...projectionWithBorder,
+    state: {
+      ...projectionWithBorder.state,
+      projectId: "project-spike-002",
+      document: {
+        ...projectionWithBorder.state.document,
+        displayUnit: "cm",
+      },
+    },
+  };
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={otherProject}
+      projectSessionPort={projectSessionPortWithApply(async () => otherProject)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  expect(screen.getByText("30×30 cm · 1 Lâmina")).toBeVisible();
+  expect(apply).not.toHaveBeenCalled();
+});
+
+test("clears pending Apply actions when their inspector forms are collapsed", async () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const informationTrigger = screen.getByRole("button", {
+    name: "Informações do Álbum",
+  });
+  const designTrigger = screen.getByRole("button", {
+    name: "Design do Álbum",
+  });
+  const information = within(informationTrigger.closest("section") as HTMLElement);
+  const design = within(designTrigger.closest("section") as HTMLElement);
+  const informationApply = information.getByRole("button", { name: "Aplicar" });
+  const designApply = design.getByRole("button", { name: "Aplicar" });
+
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+
+  await waitFor(() => expect(informationApply).toBeEnabled());
+  await waitFor(() => expect(designApply).toBeEnabled());
+
+  fireEvent.click(informationTrigger);
+  fireEvent.click(designTrigger);
+
+  await waitFor(() => expect(informationApply).toBeDisabled());
+  await waitFor(() => expect(designApply).toBeDisabled());
+});
+
 test("uses the current reference layout for the Album context", () => {
   render(
     <ProjectWorkspace
@@ -992,9 +1128,12 @@ test("uses the current reference layout for the Album context", () => {
   expect(albumDesign.getByText("Padrões visuais")).toBeInTheDocument();
   expect(albumDesign.getByText("Padrão dos Frames")).toBeInTheDocument();
   expect(
-    albumDesign.getByRole("img", { name: "Prévia da Borda dos Frames" }),
+    albumDesign.getByRole("slider", { name: "Espessura da Borda" }),
   ).toBeInTheDocument();
-  expect(albumDesign.getByText("cor")).toBeInTheDocument();
+  expect(
+    albumDesign.queryByRole("checkbox", { name: "Exibir borda" }),
+  ).not.toBeInTheDocument();
+  expect(albumDesign.getByLabelText("Cor do Background")).toBeInTheDocument();
 });
 
 test("edits and applies the complete Album design draft as one intent", async () => {
@@ -1057,29 +1196,37 @@ test("edits and applies the complete Album design draft as one intent", async ()
   expect(
     albumDesign.queryByRole("button", { name: /Abrir mais opções/ }),
   ).not.toBeInTheDocument();
+  expect(
+    albumDesign.getByRole("group", { name: "Opções de Background" }),
+  ).toBeInTheDocument();
+
   fireEvent.click(
     albumDesign.getByRole("button", {
+      name: "Escolher Decorativo para Overlay",
+    }),
+  );
+  fireEvent.click(
+    albumDesign.getByRole("menuitem", {
       name: "Usar Overlay Overlay translúcido.png",
     }),
   );
+  expect(
+    albumDesign.queryByRole("menu", { name: "Decorativos para Overlay" }),
+  ).not.toBeInTheDocument();
   expect(albumDesign.queryByRole("dialog")).not.toBeInTheDocument();
   const frame = albumDesign.getByLabelText("Frame demonstrativo esquerdo 1");
   const overlay = albumDesign.getByLabelText("Overlay do lado esquerdo");
   expect(
     frame.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
-  fireEvent.click(albumDesign.getByRole("checkbox", { name: "Exibir borda" }));
   fireEvent.change(albumDesign.getByLabelText("Cor da Borda"), {
     target: { value: "#2c2924" },
   });
-  fireEvent.change(albumDesign.getByRole("slider", { name: "Espessura da Borda" }), {
-    target: { value: "1250" },
+  const borderWidth = albumDesign.getByRole("slider", {
+    name: "Espessura da Borda",
   });
-  expect(
-    albumDesign
-      .getByRole("img", { name: "Prévia da Borda dos Frames" })
-      .querySelectorAll("[data-border-segment]"),
-  ).toHaveLength(4);
+  expect(borderWidth).toHaveAttribute("min", "0");
+  fireEvent.change(borderWidth, { target: { value: "1250" } });
 
   expect(applyDesign).toBeEnabled();
   fireEvent.click(applyDesign);
@@ -1106,6 +1253,168 @@ test("edits and applies the complete Album design draft as one intent", async ()
       },
     }),
   );
+});
+
+test("maps Borda zero to none and a positive value back to solid", async () => {
+  const projectionWithBorder: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_500 },
+        },
+      },
+    },
+    composition: {
+      ...projection.composition,
+      frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_500 },
+    },
+  };
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    projectionWithBorder,
+  );
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithBorder}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const borderWidth = design.getByRole("slider", {
+    name: "Espessura da Borda",
+  });
+  const applyDesign = design.getByRole("button", { name: "Aplicar" });
+
+  fireEvent.change(borderWidth, { target: { value: "0" } });
+  expect(design.getByText("sem borda")).toBeVisible();
+  fireEvent.click(applyDesign);
+  await waitFor(() =>
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "setVisualDefaults",
+      visualDefaults: {
+        ...projectionWithBorder.state.album.visualDefaults,
+        frameBorder: { kind: "none" },
+      },
+    }),
+  );
+
+  fireEvent.change(borderWidth, { target: { value: "1250" } });
+  expect(design.getByText("1.25 mm")).toBeVisible();
+  fireEvent.click(applyDesign);
+  await waitFor(() =>
+    expect(apply).toHaveBeenLastCalledWith({
+      kind: "setVisualDefaults",
+      visualDefaults: {
+        ...projectionWithBorder.state.album.visualDefaults,
+        frameBorder: {
+          kind: "solid",
+          rgb: "#2C2924",
+          widthUm: 1_250,
+        },
+      },
+    }),
+  );
+});
+
+test("keeps Espaço entre Frames as a preview-only placeholder", () => {
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () => projection);
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const designSection = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
+  const design = within(designSection);
+  const gap = design.getByRole("slider", { name: "Espaço entre Frames" });
+  const secondFrame = design.getByLabelText("Frame demonstrativo esquerdo 2");
+  const initialSecondFrameX = Number(secondFrame.getAttribute("x"));
+  const applyDesign = design.getByRole("button", { name: "Aplicar" });
+
+  expect(gap.closest("label")).toHaveAttribute(
+    "data-placeholder-feature",
+    "album-design-frame-gap",
+  );
+  fireEvent.change(gap, { target: { value: "18000" } });
+
+  expect(design.getByText("18 mm")).toBeVisible();
+  expect(Number(secondFrame.getAttribute("x"))).toBeGreaterThan(
+    initialSecondFrameX,
+  );
+  expect(applyDesign).toBeDisabled();
+  expect(apply).not.toHaveBeenCalled();
+});
+
+test("coordinates Decorative popups, placeholder import and focus restoration", async () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={decorativeProjection}
+      projectSessionPort={projectSessionPortWithApply(async () =>
+        decorativeProjection
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const designSection = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
+  const design = within(designSection);
+  const backgroundTrigger = design.getByRole("button", {
+    name: "Escolher Decorativo para Background",
+  });
+  const overlayTrigger = design.getByRole("button", {
+    name: /Decorativo do Overlay: Overlay translúcido\.png/,
+  });
+
+  fireEvent.click(backgroundTrigger);
+  const backgroundMenu = design.getByRole("menu", {
+    name: "Decorativos para Background",
+  });
+  const importPlaceholder = within(backgroundMenu).getByRole("menuitem", {
+    name: "Importar Decorativo",
+  });
+  expect(importPlaceholder).toBeDisabled();
+  expect(importPlaceholder).toHaveAttribute(
+    "data-placeholder-feature",
+    "import-decorative-files",
+  );
+
+  fireEvent.click(overlayTrigger);
+  expect(backgroundMenu).not.toBeInTheDocument();
+  const overlayMenu = design.getByRole("menu", {
+    name: "Decorativos para Overlay",
+  });
+  await waitFor(() =>
+    expect(within(overlayMenu).getAllByRole("menuitem")[0]).toHaveFocus(),
+  );
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(overlayMenu).not.toBeInTheDocument();
+  expect(overlayTrigger).toHaveFocus();
+
+  fireEvent.click(backgroundTrigger);
+  fireEvent.pointerDown(design.getByText("Padrões visuais"));
+  expect(
+    design.queryByRole("menu", { name: "Decorativos para Background" }),
+  ).not.toBeInTheDocument();
+  await waitFor(() => expect(backgroundTrigger).toHaveFocus());
 });
 
 test("presents an empty per-side Overlay as absent", () => {
@@ -1137,10 +1446,51 @@ test("presents an empty per-side Overlay as absent", () => {
   const visualDefaults = screen
     .getByRole("button", { name: "Design do Álbum" })
     .closest("section") as HTMLElement;
-  expect(within(visualDefaults).getByText("sem")).toBeInTheDocument();
+  expect(
+    within(visualDefaults).getByRole("button", { name: "Sem Overlay" }),
+  ).toHaveAttribute("aria-pressed", "true");
   expect(
     visualDefaults.querySelector(".visual-default-picker__preview--none"),
   ).toBeInTheDocument();
+});
+
+test("does not present divergent per-side Overlays as absent", () => {
+  const projectionWithMixedOverlay: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          overlay: {
+            scope: "perSide",
+            left: { kind: "media", mediaId: "decorative-overlay" },
+            right: null,
+          },
+        },
+      },
+    },
+  };
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithMixedOverlay}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => projectionWithMixedOverlay,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const visualDefaults = screen
+    .getByRole("button", { name: "Design do Álbum" })
+    .closest("section") as HTMLElement;
+  // Um lado tem Overlay e o outro não: o escopo é misto, não é ausência.
+  expect(
+    within(visualDefaults).getByRole("button", { name: "Sem Overlay" }),
+  ).toHaveAttribute("aria-pressed", "false");
 });
 
 test("confirms and applies Album information as one authoritative Project change", async () => {
