@@ -1140,12 +1140,14 @@ try {
           checkpoint.baseRevision?.projectId === originalProjectId &&
           checkpoint.baseRevision?.revision === 3 &&
           checkpoint.creativeState?.projectId === originalProjectId &&
+          checkpoint.creativeState?.documentType === "myalbuns.project" &&
           checkpoint.creativeState?.revision === 4 &&
           checkpoint.creativeState?.project?.document?.dpi === 360 &&
           envelopeKeys ===
             "baseRevision,creativeState,projectId,schemaVersion" &&
           baseKeys === "projectId,revision" &&
-          creativeKeys === "project,projectId,revision,schemaVersion"
+          creativeKeys ===
+            "documentType,project,projectId,revision,schemaVersion"
           ? checkpoint
           : undefined;
       } catch {
