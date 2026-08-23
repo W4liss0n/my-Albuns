@@ -113,3 +113,56 @@ fn interrupted_session_restores_consolidated_state_without_history_or_autosave()
     assert_eq!(saved_recovery.projection().state.document.dpi, 360);
     assert!(!saved_recovery.projection().state.dirty);
 }
+
+#[test]
+fn recovering_the_saved_revision_still_requires_an_explicit_save() {
+    let root = tempfile::tempdir().expect("temporary saved-revision Recuperação fixture");
+    let project_path = root.path().join("Projeto recuperado na base.myalbuns");
+    let core = ProjectCore::new()
+        .with_identity_storage_roots(root.path().join("leases"), root.path().join("identities"));
+    let mut project = core
+        .create_editable(CreateProjectRequest::new(
+            project_location(&project_path),
+            InitialProject::neutral(),
+            CreateAuthorization::CreateOnly,
+        ))
+        .expect("the Project is created through ProjectCore");
+    project
+        .apply(ProjectIntent::SetDpi { dpi: 360 })
+        .expect("one creative action is completed");
+    let returned_to_base = project
+        .undo()
+        .expect("Undo returns the live Session to its saved revision");
+    assert_eq!(returned_to_base.state.revision, 0);
+    assert!(!returned_to_base.state.dirty);
+    let checkpoint = project
+        .recovery_checkpoint()
+        .expect("the completed Undo is consolidated");
+    drop(project);
+
+    let mut reopened = core
+        .open_editable(OpenProjectRequest::new(project_location(&project_path)))
+        .expect("another Host reopens the saved Project");
+    let recovered = reopened
+        .restore_recovery(checkpoint)
+        .expect("the matching saved-revision checkpoint is restored");
+
+    assert_eq!(recovered.state.revision, recovered.state.saved_revision);
+    assert!(
+        recovered.state.dirty,
+        "choosing recovery always creates an unsaved Session"
+    );
+    assert!(reopened.has_unsaved_changes());
+    assert!(!recovered.state.can_undo);
+    assert!(!recovered.state.can_redo);
+
+    assert_eq!(
+        reopened
+            .save(recovered.state.revision)
+            .expect("the recovered Session is explicitly saved"),
+        SaveProjectOutcome::Saved {
+            revision: recovered.state.revision
+        }
+    );
+    assert!(!reopened.projection().state.dirty);
+}
