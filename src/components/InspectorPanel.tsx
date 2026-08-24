@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "react-aria-components";
 import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
@@ -24,6 +24,10 @@ import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
 import { SheetPreview } from "./SheetPreview";
+import {
+  SheetDesignInspector,
+  type SheetDesignScope,
+} from "./SheetDesignInspector";
 import { inactiveSideCssGradient } from "./sheetVisualStyle";
 import "./InspectorPanel.css";
 
@@ -41,9 +45,18 @@ const PHOTO_ZOOM_KEYS = new Set([
 const ALBUM_INFORMATION_FORM_ID = "album-information-settings";
 const ALBUM_DESIGN_FORM_ID = "album-design-settings";
 
+export type InspectorContext =
+  | { kind: "album" }
+  | { kind: "sheet"; sheet: ComposedSheet }
+  | {
+      kind: "frame";
+      frame: FrameSnapshot;
+      composedPhoto: ComposedPhoto | null;
+      editingSheet?: ComposedSheet;
+    };
+
 export interface InspectorPanelProps {
-  selectedFrame: FrameSnapshot | null;
-  selectedComposedPhoto: ComposedPhoto | null;
+  context: InspectorContext;
   displayedPhotoZoom: number;
   displayedPhotoPanX: number;
   zoomCommitting: boolean;
@@ -75,8 +88,7 @@ export interface InspectorPanelProps {
 }
 
 export function InspectorPanel({
-  selectedFrame,
-  selectedComposedPhoto,
+  context,
   displayedPhotoZoom,
   displayedPhotoPanX,
   zoomCommitting,
@@ -100,9 +112,31 @@ export function InspectorPanel({
 }: InspectorPanelProps) {
   const [informationDirty, setInformationDirty] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
+  const [sheetScopeSelection, setSheetScopeSelection] = useState<{
+    sheetId: string;
+    scope: SheetDesignScope;
+  } | null>(null);
   const sheetStateById = new Map(
     sheetStates.map((sheet) => [sheet.id, sheet] as const),
   );
+  const editingSheet =
+    context.kind === "sheet"
+      ? context.sheet
+      : context.kind === "frame"
+        ? context.editingSheet ?? null
+        : null;
+  const selectedSheetScope = editingSheet
+    ? normalizeSheetScope(
+        sheetScopeSelection?.sheetId === editingSheet.sheetId
+          ? sheetScopeSelection.scope
+          : defaultSheetScope(editingSheet),
+        editingSheet,
+      )
+    : null;
+
+  useEffect(() => {
+    if (!editingSheet) setSheetScopeSelection(null);
+  }, [editingSheet]);
 
   return (
     <aside
@@ -111,11 +145,11 @@ export function InspectorPanel({
       aria-label="Painel contextual"
     >
       <div className="inspector-scroll">
-        {selectedFrame ? (
+        {context.kind === "frame" ? (
           <>
             <div className="context-heading">
               <span>Frame selecionado</span>
-              <h2>{selectedComposedPhoto?.name ?? "Frame placeholder"}</h2>
+              <h2>{context.composedPhoto?.name ?? "Frame placeholder"}</h2>
             </div>
             <InspectorSection
               key="frame-photo-design"
@@ -125,13 +159,13 @@ export function InspectorPanel({
             >
               <PropertyRow
                 label="Frame"
-                value={selectedFrame.id.replace("frame-", "").toUpperCase()}
+                value={context.frame.id.replace("frame-", "").toUpperCase()}
               />
               <PropertyRow
                 label="Pan horizontal"
                 value={`${Math.round(displayedPhotoPanX * 100)}%`}
               />
-              {selectedFrame.photo && selectedComposedPhoto && (
+              {context.frame.photo && context.composedPhoto && (
                 <label className="photo-zoom-control">
                   <span className="photo-zoom-label">
                     <span>Zoom da Foto</span>
@@ -142,10 +176,10 @@ export function InspectorPanel({
                     type="range"
                     aria-label="Zoom da Foto"
                     min={
-                      selectedComposedPhoto.placement.zoomRange.minimum * 100
+                      context.composedPhoto.placement.zoomRange.minimum * 100
                     }
                     max={
-                      selectedComposedPhoto.placement.zoomRange.maximum * 100
+                      context.composedPhoto.placement.zoomRange.maximum * 100
                     }
                     step="1"
                     value={Math.round(displayedPhotoZoom * 100)}
@@ -173,6 +207,27 @@ export function InspectorPanel({
               )}
             </InspectorSection>
           </>
+        ) : context.kind === "sheet" && selectedSheetScope ? (
+          <InspectorSection
+            accessibleTitle="Design da Lâmina"
+            key="sheet-design"
+            title="Design da Lâmina"
+            preferenceKey="sheet.design"
+            defaultOpen
+          >
+            <SheetDesignInspector
+              frameBorder={frameBorder}
+              mediaPreviewUrls={mediaPreviewUrls}
+              scope={selectedSheetScope}
+              sheet={context.sheet}
+              onScopeChange={(scope) =>
+                setSheetScopeSelection({
+                  sheetId: context.sheet.sheetId,
+                  scope,
+                })
+              }
+            />
+          </InspectorSection>
         ) : (
           <>
             <InspectorSection
@@ -365,6 +420,18 @@ function PropertyRow({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function defaultSheetScope(sheet: ComposedSheet): SheetDesignScope {
+  return sheet.activeSides === "both" ? "both" : sheet.activeSides;
+}
+
+function normalizeSheetScope(
+  scope: SheetDesignScope,
+  sheet: ComposedSheet,
+): SheetDesignScope {
+  if (sheet.activeSides === "both") return scope;
+  return sheet.activeSides;
 }
 
 function formatSheetPageMetadata(sheet: SheetSnapshot | undefined) {

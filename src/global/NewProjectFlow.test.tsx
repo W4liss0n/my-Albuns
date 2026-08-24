@@ -574,6 +574,52 @@ test("hover fills only an unselected candidate without changing the fixed scope"
   );
 });
 
+test("presents divergent side values as mixed when returning to both sides", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  await user.click(
+    await screen.findByRole("button", { name: "Lado esquerdo" }),
+  );
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#abcdef" },
+  });
+  await user.click(screen.getByRole("button", { name: "Lado direito" }));
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#123456" },
+  });
+  await user.click(screen.getByRole("button", { name: "Ambos os lados" }));
+
+  const backgroundSection = screen
+    .getByRole("heading", { name: "Background" })
+    .closest("section") as HTMLElement;
+  expect(within(backgroundSection).getByText("Valores diferentes")).toBeVisible();
+  expect(
+    within(backgroundSection)
+      .getAllByRole("button", { name: /Usar Background/ })
+      .some((button) => button.getAttribute("aria-pressed") === "true"),
+  ).toBe(false);
+
+  fireEvent.change(within(backgroundSection).getByLabelText("Cor do Background"), {
+    target: { value: "#eeeeee" },
+  });
+  expect(
+    within(backgroundSection).queryByText("Valores diferentes"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Background de ambos os lados")).toHaveAttribute(
+    "fill",
+    "#EEEEEE",
+  );
+});
+
 test("hover tint keeps the fixed selection and Frame contrast independent", async () => {
   const user = userEvent.setup();
 
@@ -737,6 +783,53 @@ test("shows a solid Frame border immediately and sends its canonical values", as
           kind: "solid",
           rgb: "#C5A46D",
           widthUm: 2500,
+        },
+      }),
+    }),
+  );
+});
+
+test("restores the chosen Frame border color after passing through zero", async () => {
+  const user = userEvent.setup();
+  const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={onCreate}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  const width = await screen.findByRole("slider", {
+    name: "Espessura da Borda padrão",
+  });
+  fireEvent.change(width, { target: { value: "2500" } });
+  await user.click(
+    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+  );
+
+  fireEvent.change(width, { target: { value: "0" } });
+  expect(screen.getByText("sem borda")).toBeVisible();
+  fireEvent.change(width, { target: { value: "1250" } });
+
+  expect(
+    screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (const segment of screen
+    .getByLabelText("Borda do Frame esquerdo 1")
+    .querySelectorAll("rect")) {
+    expect(segment).toHaveAttribute("fill", "#C5A46D");
+  }
+
+  await user.click(screen.getByRole("button", { name: "Criar" }));
+  expect(onCreate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      visualDefaults: expect.objectContaining({
+        frameBorder: {
+          kind: "solid",
+          rgb: "#C5A46D",
+          widthUm: 1_250,
         },
       }),
     }),
@@ -948,7 +1041,7 @@ test("keeps a custom preset across both steps for the current placeholder sessio
       name: "Salvar configuração atual como modelo",
     }),
   );
-  const saveModelForm = screen.getByRole("form", { name: "Salvar modelo" });
+  const saveModelForm = screen.getByRole("dialog", { name: "Salvar modelo" });
   expect(
     within(saveModelForm).getByRole("button", { name: "Cancelar" }),
   ).toHaveClass("ui-action-button");
@@ -982,6 +1075,59 @@ test("keeps a custom preset across both steps for the current placeholder sessio
       name: "Usar Background #1d2a3a",
     }),
   ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("dismisses the Save model popover and restores focus to its trigger", async () => {
+  const user = userEvent.setup();
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const trigger = screen.getByRole("button", {
+    name: "Salvar configuração atual como modelo",
+  });
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+  await user.click(trigger);
+  const form = screen.getByRole("dialog", { name: "Salvar modelo" });
+  expect(trigger).toHaveAttribute("aria-expanded", "true");
+  expect(trigger).toHaveAttribute("aria-controls", form.id);
+  expect(screen.getByRole("textbox", { name: "Nome do modelo" })).toHaveFocus();
+
+  await user.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog", { name: "Salvar modelo" })).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+
+  await user.click(trigger);
+  fireEvent.pointerDown(screen.getByRole("button", { name: "Continuar" }));
+  expect(screen.queryByRole("dialog", { name: "Salvar modelo" })).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+
+  await user.click(trigger);
+  await user.click(
+    within(screen.getByRole("dialog", { name: "Salvar modelo" })).getByRole(
+      "button",
+      { name: "Cancelar" },
+    ),
+  );
+  expect(trigger).toHaveFocus();
+
+  await user.click(trigger);
+  await user.type(
+    screen.getByRole("textbox", { name: "Nome do modelo" }),
+    "Modelo com foco",
+  );
+  await user.click(
+    within(screen.getByRole("dialog", { name: "Salvar modelo" })).getByRole(
+      "button",
+      { name: "Salvar" },
+    ),
+  );
+  expect(trigger).toHaveFocus();
 });
 
 test("shows a typed native picker failure without changing personalization", async () => {

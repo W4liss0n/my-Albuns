@@ -1,35 +1,25 @@
 import type {
   NewProjectConfiguration,
-  ProjectConfigurationValidationCode,
   ProjectDisplayUnit,
   ProjectEndSheetFormat,
 } from "./globalProjectPort";
+import {
+  INVALID_PHYSICAL_MEASUREMENT_MESSAGE,
+  parseIntegerText,
+  type ProjectConfigurationErrors,
+  type ProjectConfigurationFieldName,
+} from "../../application/projectConfigurationFields";
 import {
   createPhysicalFieldDraft,
   editPhysicalFieldDraft,
   type PhysicalFieldDraft,
 } from "../../application/physicalMeasurements";
 
-export {
-  displayUnitLabel,
-  formatMicrometers,
-  parsePhysicalText,
-} from "../../application/physicalMeasurements";
-export type { PhysicalFieldDraft } from "../../application/physicalMeasurements";
-
 export type PhysicalFieldName =
   | "closedSheetWidth"
   | "sheetHeight"
   | "bleed"
   | "safety";
-
-export type DimensionsFieldName =
-  | "sheetWidth"
-  | "sheetHeight"
-  | "bleed"
-  | "safety"
-  | "dpi"
-  | "sheetCount";
 
 export interface NewProjectDimensionsDraft {
   displayUnit: ProjectDisplayUnit;
@@ -43,11 +33,7 @@ export interface NewProjectDimensionsDraft {
   safety: PhysicalFieldDraft;
 }
 
-export type DimensionsErrors = Partial<
-  Record<DimensionsFieldName, readonly string[]>
->;
-
-export const DIMENSIONS_FIELD_ORDER: readonly DimensionsFieldName[] = [
+export const DIMENSIONS_FIELD_ORDER: readonly ProjectConfigurationFieldName[] = [
   "sheetWidth",
   "sheetHeight",
   "bleed",
@@ -55,81 +41,6 @@ export const DIMENSIONS_FIELD_ORDER: readonly DimensionsFieldName[] = [
   "sheetCount",
   "dpi",
 ];
-
-const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
-
-const validationPresentation: Record<
-  ProjectConfigurationValidationCode,
-  { field: DimensionsFieldName; message: string }
-> = {
-  sheetWidthNotPositive: {
-    field: "sheetWidth",
-    message: "A largura da Lâmina deve ser maior que zero.",
-  },
-  sheetWidthAboveSafeInteger: {
-    field: "sheetWidth",
-    message: "A largura da Lâmina excede o intervalo suportado.",
-  },
-  sheetWidthNotEven: {
-    field: "sheetWidth",
-    message: "A largura da Lâmina precisa resultar em micrômetros pares.",
-  },
-  sheetWidthRasterOutOfRange: {
-    field: "sheetWidth",
-    message:
-      "Lâmina e Página devem ter largura raster entre 1 e 65.535 pixels.",
-  },
-  sheetHeightNotPositive: {
-    field: "sheetHeight",
-    message: "A altura da Lâmina deve ser maior que zero.",
-  },
-  sheetHeightAboveSafeInteger: {
-    field: "sheetHeight",
-    message: "A altura da Lâmina excede o intervalo suportado.",
-  },
-  sheetHeightRasterOutOfRange: {
-    field: "sheetHeight",
-    message: "A altura raster deve ficar entre 1 e 65.535 pixels.",
-  },
-  sheetDimensionsNotProportional: {
-    field: "sheetWidth",
-    message:
-      "Mantenha a proporção atual da Lâmina para preservar a composição.",
-  },
-  dpiOutOfRange: {
-    field: "dpi",
-    message: "Informe um DPI inteiro entre 1 e 1.200.",
-  },
-  sheetCountTooSmall: {
-    field: "sheetCount",
-    message: "O Álbum deve conter pelo menos 2 Lâminas.",
-  },
-  bleedNegative: {
-    field: "bleed",
-    message: "A Sangria não pode ser negativa.",
-  },
-  bleedAboveSafeInteger: {
-    field: "bleed",
-    message: "A Sangria excede o intervalo suportado.",
-  },
-  bleedEliminatesCutArea: {
-    field: "bleed",
-    message: "A Sangria deve manter uma Área de corte positiva.",
-  },
-  safetyNegative: {
-    field: "safety",
-    message: "A segurança não pode ser negativa.",
-  },
-  safetyAboveSafeInteger: {
-    field: "safety",
-    message: "A segurança excede o intervalo suportado.",
-  },
-  safetyEliminatesSafeArea: {
-    field: "safety",
-    message:
-      "Sangria e segurança devem manter uma Área de segurança positiva.",
-  },
-};
 
 export function createDefaultDimensionsDraft(): NewProjectDimensionsDraft {
   const displayUnit = "mm";
@@ -187,8 +98,8 @@ export function changeDisplayUnit(
 
 export function getLocalInputErrors(
   draft: NewProjectDimensionsDraft,
-): DimensionsErrors {
-  const errors: DimensionsErrors = {};
+): ProjectConfigurationErrors {
+  const errors: ProjectConfigurationErrors = {};
   addPhysicalInputError(errors, "sheetWidth", draft.closedSheetWidth);
   addPhysicalInputError(errors, "sheetHeight", draft.sheetHeight);
   addPhysicalInputError(errors, "bleed", draft.bleed);
@@ -245,40 +156,12 @@ export function toNewProjectConfiguration(
   };
 }
 
-export function presentConfigurationValidationErrors(
-  validationErrors: readonly ProjectConfigurationValidationCode[],
-): DimensionsErrors {
-  const errors: DimensionsErrors = {};
-  for (const error of validationErrors) {
-    const presentation = validationPresentation[error];
-    errors[presentation.field] = [
-      ...(errors[presentation.field] ?? []),
-      presentation.message,
-    ];
-  }
-  return errors;
-}
-
-export function parseIntegerText(text: string): number | null {
-  const normalized = text.trim();
-  if (!/^[+-]?\d+$/.test(normalized)) {
-    return null;
-  }
-  const value = BigInt(normalized);
-  if (value > MAX_SAFE_INTEGER || value < -MAX_SAFE_INTEGER) {
-    return null;
-  }
-  return Number(value);
-}
-
 function addPhysicalInputError(
-  errors: DimensionsErrors,
-  name: DimensionsFieldName,
+  errors: ProjectConfigurationErrors,
+  name: ProjectConfigurationFieldName,
   field: PhysicalFieldDraft,
 ) {
   if (!field.hasExactValue) {
-    errors[name] = [
-      "Informe uma medida decimal que corresponda a micrômetros inteiros.",
-    ];
+    errors[name] = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
   }
 }

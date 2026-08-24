@@ -1,25 +1,29 @@
 import { useState } from "react";
 import { Image as ImageIcon, X } from "lucide-react";
 
+import {
+  changeFrameBorderColor as transitionFrameBorderColor,
+  changeFrameBorderWidth as transitionFrameBorderWidth,
+} from "../application/frameBorderEditor";
+import {
+  displayUnitLabel,
+  formatMicrometers,
+} from "../application/physicalMeasurements";
 import type {
   ProjectLaunchFailure,
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
 import {
-  displayUnitLabel,
-  formatMicrometers,
   type NewProjectDimensionsDraft,
 } from "./application/newProjectDimensions";
 import {
-  backgroundForFixedScope,
   clearOverlay,
   fixPersonalizationScope,
-  overlayForFixedScope,
+  personalizationPreviewFromDraft,
+  readBackgroundForFixedScope,
+  readOverlayForFixedScope,
   setBackgroundColor,
   setBackgroundImage,
-  setFrameBorderColor,
-  setFrameBorderEnabled,
-  setFrameBorderWidth,
   setOverlayImage,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
@@ -53,15 +57,19 @@ export function PersonalizationStep({
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
   // persistência; a medida física controla somente a reprodução desta etapa.
   const [frameGapUm, setFrameGapUm] = useState(6_000);
-  const selectedBackground = backgroundForFixedScope(personalization);
+  const backgroundRead = readBackgroundForFixedScope(personalization);
+  const selectedBackground =
+    backgroundRead.kind === "uniform" ? backgroundRead.value : null;
   const backgroundColor =
-    selectedBackground.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
-  const selectedOverlay = overlayForFixedScope(personalization);
+    selectedBackground?.kind === "color" ? selectedBackground.rgb : "#FFFFFF";
+  const overlayRead = readOverlayForFixedScope(personalization);
+  const selectedOverlay =
+    overlayRead.kind === "uniform" ? overlayRead.value : undefined;
   const activeFrameBorder =
     personalization.frameBorder.kind === "solid"
       ? personalization.frameBorder
       : null;
-  const frameBorderColor = activeFrameBorder?.rgb ?? "#FFFFFF";
+  const frameBorderColor = personalization.frameBorderPreference.rgb;
   const frameBorderWidthUm = activeFrameBorder?.widthUm ?? 0;
   const frameBorderValue = activeFrameBorder
     ? `${formatMicrometers(
@@ -70,23 +78,25 @@ export function PersonalizationStep({
       )} ${displayUnitLabel(draft.displayUnit)}`
     : "sem borda";
   const scopeLabel = personalizationScopeLabel(personalization.fixedScope);
-  const withSolidFrameBorder = () =>
-    activeFrameBorder
-      ? personalization
-      : setFrameBorderColor(
-          setFrameBorderEnabled(personalization, true),
-          frameBorderColor,
-        );
+  const frameBorderEditor = {
+    border: personalization.frameBorder,
+    solid: personalization.frameBorderPreference,
+  };
   const changeFrameBorderWidth = (widthUm: number) => {
-    if (widthUm <= 0) {
-      onChange(setFrameBorderEnabled(personalization, false));
-      return;
-    }
-
-    onChange(setFrameBorderWidth(withSolidFrameBorder(), widthUm));
+    const next = transitionFrameBorderWidth(frameBorderEditor, widthUm);
+    onChange({
+      ...personalization,
+      frameBorder: next.border,
+      frameBorderPreference: next.solid,
+    });
   };
   const changeFrameBorderColor = (rgb: string) => {
-    onChange(setFrameBorderColor(withSolidFrameBorder(), rgb));
+    const next = transitionFrameBorderColor(frameBorderEditor, rgb);
+    onChange({
+      ...personalization,
+      frameBorder: next.border,
+      frameBorderPreference: next.solid,
+    });
   };
   const chooseBackground = async () => {
     setPickerFailure(null);
@@ -127,7 +137,8 @@ export function PersonalizationStep({
             frameGapUm={frameGapUm}
             geometry={geometry}
             hoveredScope={hoveredScope}
-            personalization={personalization}
+            personalization={personalizationPreviewFromDraft(personalization)}
+            presentation={NEW_PROJECT_SCOPE_PRESENTATION}
             onFocusedScopeChange={setFocusedScope}
             onHoveredScopeChange={setHoveredScope}
             onScopeChange={(scope) =>
@@ -151,7 +162,7 @@ export function PersonalizationStep({
               <button
                 aria-label={`Usar Background ${color}`}
                 aria-pressed={
-                  selectedBackground.kind === "color" &&
+                  selectedBackground?.kind === "color" &&
                   selectedBackground.rgb.toLowerCase() === color.toLowerCase()
                 }
                 key={color}
@@ -184,7 +195,9 @@ export function PersonalizationStep({
             <AppIcon icon={ImageIcon} size={14} />
             Usar imagem…
           </ActionButton>
-          {selectedBackground.kind === "image" ? (
+          {backgroundRead.kind === "mixed" ? (
+            <p className="new-project-native-note">Valores diferentes</p>
+          ) : selectedBackground?.kind === "image" ? (
             <p className="new-project-selection-name">
               {selectedBackground.selection.displayName}
             </p>
@@ -200,7 +213,9 @@ export function PersonalizationStep({
             <AppIcon icon={ImageIcon} size={14} />
             Escolher imagem…
           </ActionButton>
-          {selectedOverlay ? (
+          {overlayRead.kind === "mixed" ? (
+            <p className="new-project-native-note">Valores diferentes</p>
+          ) : selectedOverlay ? (
             <>
               <p className="new-project-selection-name">
                 {selectedOverlay.selection.displayName}
@@ -297,6 +312,13 @@ const BACKGROUND_SWATCHES = [
 ] as const;
 
 const FRAME_BORDER_SWATCHES = ["#FFFFFF", "#2C2924", "#C5A46D"] as const;
+
+const NEW_PROJECT_SCOPE_PRESENTATION = {
+  accessiblePreviewLabel: "Reprodução da Lâmina",
+  externalSelection: true,
+  scopeControlsLabel: "Escopo da personalização",
+  technicalGuides: true,
+} as const;
 
 function FrameRangeControl({
   dataPlaceholderFeature,

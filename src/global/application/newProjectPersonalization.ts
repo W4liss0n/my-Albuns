@@ -6,13 +6,23 @@ import type {
   NewProjectCreationConfiguration,
   ProvisionalDecorativeSelection,
 } from "./globalProjectPort";
+import type {
+  FrameBorderValue,
+  SolidFrameBorder,
+} from "../../application/frameBorderEditor";
+import {
+  applyScopedValue,
+  readScopedValue,
+  type ScopedValue,
+  type ScopedValueRead,
+  type VisualScope,
+} from "../../application/scopedValues";
+import type { VisualPersonalizationPreview } from "../../application/visualPersonalizationPreview";
 
 export type {
   NewProjectCreationConfiguration,
   ProvisionalDecorativeSelection,
 } from "./globalProjectPort";
-
-export type PersonalizationScope = "both" | "left" | "right";
 
 export type BackgroundDraftContent =
   | { kind: "color"; rgb: string }
@@ -22,19 +32,12 @@ export type OverlayDraftContent =
   | { kind: "image"; selection: ProvisionalDecorativeSelection }
   | null;
 
-export type ScopedDraft<T> =
-  | { scope: "bothSides"; both: T }
-  | { scope: "perSide"; left: T; right: T };
-
-export type FrameBorderDraft =
-  | { kind: "none" }
-  | { kind: "solid"; rgb: string; widthUm: number };
-
 export interface NewProjectPersonalizationDraft {
-  fixedScope: PersonalizationScope;
-  background: ScopedDraft<BackgroundDraftContent>;
-  overlay: ScopedDraft<OverlayDraftContent>;
-  frameBorder: FrameBorderDraft;
+  fixedScope: VisualScope;
+  background: ScopedValue<BackgroundDraftContent>;
+  overlay: ScopedValue<OverlayDraftContent>;
+  frameBorder: FrameBorderValue;
+  frameBorderPreference: SolidFrameBorder;
 }
 
 export function createDefaultPersonalizationDraft(): NewProjectPersonalizationDraft {
@@ -46,20 +49,21 @@ export function createDefaultPersonalizationDraft(): NewProjectPersonalizationDr
     },
     overlay: { scope: "bothSides", both: null },
     frameBorder: { kind: "none" },
+    frameBorderPreference: { rgb: "#FFFFFF", widthUm: 1_000 },
   };
 }
 
 export function fixPersonalizationScope(
   draft: NewProjectPersonalizationDraft,
-  fixedScope: PersonalizationScope,
+  fixedScope: VisualScope,
 ): NewProjectPersonalizationDraft {
   return { ...draft, fixedScope };
 }
 
-export function backgroundForFixedScope(
+export function readBackgroundForFixedScope(
   draft: NewProjectPersonalizationDraft,
-): BackgroundDraftContent {
-  return contentForScope(draft.background, draft.fixedScope);
+): ScopedValueRead<BackgroundDraftContent> {
+  return readScopedValue(draft.background, draft.fixedScope, sameBackground);
 }
 
 export function setBackgroundColor(
@@ -68,7 +72,7 @@ export function setBackgroundColor(
 ): NewProjectPersonalizationDraft {
   return {
     ...draft,
-    background: applyToScope(draft.background, draft.fixedScope, {
+    background: applyScopedValue(draft.background, draft.fixedScope, {
       kind: "color",
       rgb: rgb.toUpperCase(),
     }),
@@ -81,17 +85,17 @@ export function setBackgroundImage(
 ): NewProjectPersonalizationDraft {
   return {
     ...draft,
-    background: applyToScope(draft.background, draft.fixedScope, {
+    background: applyScopedValue(draft.background, draft.fixedScope, {
       kind: "image",
       selection,
     }),
   };
 }
 
-export function overlayForFixedScope(
+export function readOverlayForFixedScope(
   draft: NewProjectPersonalizationDraft,
-): OverlayDraftContent {
-  return contentForScope(draft.overlay, draft.fixedScope);
+): ScopedValueRead<OverlayDraftContent> {
+  return readScopedValue(draft.overlay, draft.fixedScope, sameOverlay);
 }
 
 export function setOverlayImage(
@@ -100,7 +104,7 @@ export function setOverlayImage(
 ): NewProjectPersonalizationDraft {
   return {
     ...draft,
-    overlay: applyToScope(draft.overlay, draft.fixedScope, {
+    overlay: applyScopedValue(draft.overlay, draft.fixedScope, {
       kind: "image",
       selection,
     }),
@@ -112,7 +116,7 @@ export function clearOverlay(
 ): NewProjectPersonalizationDraft {
   return {
     ...draft,
-    overlay: applyToScope(draft.overlay, draft.fixedScope, null),
+    overlay: applyScopedValue(draft.overlay, draft.fixedScope, null),
   };
 }
 
@@ -137,47 +141,6 @@ export function provisionalSelections(
   return selections;
 }
 
-export function setFrameBorderEnabled(
-  draft: NewProjectPersonalizationDraft,
-  enabled: boolean,
-): NewProjectPersonalizationDraft {
-  return {
-    ...draft,
-    frameBorder: enabled
-      ? { kind: "solid", rgb: "#000000", widthUm: 1_000 }
-      : { kind: "none" },
-  };
-}
-
-export function setFrameBorderColor(
-  draft: NewProjectPersonalizationDraft,
-  rgb: string,
-): NewProjectPersonalizationDraft {
-  if (draft.frameBorder.kind === "none") {
-    return draft;
-  }
-  return {
-    ...draft,
-    frameBorder: { ...draft.frameBorder, rgb: rgb.toUpperCase() },
-  };
-}
-
-export function setFrameBorderWidth(
-  draft: NewProjectPersonalizationDraft,
-  widthUm: number,
-): NewProjectPersonalizationDraft {
-  if (draft.frameBorder.kind === "none" || !Number.isFinite(widthUm)) {
-    return draft;
-  }
-  return {
-    ...draft,
-    frameBorder: {
-      ...draft.frameBorder,
-      widthUm: Math.max(1, Math.trunc(widthUm)),
-    },
-  };
-}
-
 export function toCreationConfiguration(
   dimensions: NewProjectConfiguration,
   personalization: NewProjectPersonalizationDraft,
@@ -193,9 +156,9 @@ export function toCreationConfiguration(
 }
 
 function mapScoped<T, U>(
-  scoped: ScopedDraft<T>,
+  scoped: ScopedValue<T>,
   map: (content: T) => U,
-): ScopedDraft<U> {
+): ScopedValue<U> {
   return scoped.scope === "bothSides"
     ? { scope: "bothSides", both: map(scoped.both) }
     : {
@@ -205,33 +168,8 @@ function mapScoped<T, U>(
       };
 }
 
-function contentForScope<T>(
-  scoped: ScopedDraft<T>,
-  scope: PersonalizationScope,
-): T {
-  if (scoped.scope === "bothSides") {
-    return scoped.both;
-  }
-  return scope === "right" ? scoped.right : scoped.left;
-}
-
-export function applyToScope<T>(
-  scoped: ScopedDraft<T>,
-  scope: PersonalizationScope,
-  content: T,
-): ScopedDraft<T> {
-  if (scope === "both") {
-    return { scope: "bothSides", both: content };
-  }
-  const left = contentForScope(scoped, "left");
-  const right = contentForScope(scoped, "right");
-  return scope === "left"
-    ? { scope: "perSide", left: content, right }
-    : { scope: "perSide", left, right: content };
-}
-
 function collectScoped<T>(
-  scoped: ScopedDraft<T>,
+  scoped: ScopedValue<T>,
   collect: (content: T) => void,
 ) {
   if (scoped.scope === "bothSides") {
@@ -252,4 +190,39 @@ function mapOverlay(content: OverlayDraftContent): InitialOverlayContent {
   return content
     ? { kind: "image", selectionId: content.selection.selectionId }
     : null;
+}
+
+export function personalizationPreviewFromDraft(
+  draft: NewProjectPersonalizationDraft,
+): VisualPersonalizationPreview {
+  return {
+    fixedScope: draft.fixedScope,
+    background: mapScoped(draft.background, (content) =>
+      content.kind === "color"
+        ? content
+        : { kind: "image", previewUrl: content.selection.previewUrl },
+    ),
+    overlay: mapScoped(draft.overlay, (content) =>
+      content
+        ? { kind: "image", previewUrl: content.selection.previewUrl }
+        : null,
+    ),
+    frameBorder: draft.frameBorder,
+  };
+}
+
+function sameBackground(
+  left: BackgroundDraftContent,
+  right: BackgroundDraftContent,
+) {
+  if (left.kind !== right.kind) return false;
+  return left.kind === "color"
+    ? right.kind === "color" && left.rgb === right.rgb
+    : right.kind === "image" &&
+        left.selection.selectionId === right.selection.selectionId;
+}
+
+function sameOverlay(left: OverlayDraftContent, right: OverlayDraftContent) {
+  if (left === null || right === null) return left === right;
+  return left.selection.selectionId === right.selection.selectionId;
 }

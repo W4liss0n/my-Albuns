@@ -268,10 +268,6 @@
   width: 240px;
   flex-direction: column;
   padding: 11px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 7px;
-  background: var(--ui-surface-raised);
-  box-shadow: 0 10px 26px rgb(60 54 44 / 20%);
   gap: 9px;
 }
 

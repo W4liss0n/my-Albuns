@@ -11,11 +11,6 @@
   left: 0;
   display: grid;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius);
-  color: var(--ui-text);
-  background: var(--ui-surface-raised);
-  box-shadow: var(--ui-shadow-menu);
   gap: var(--ui-space-2);
 }
 

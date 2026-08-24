@@ -175,7 +175,7 @@ function BackgroundPreview({
   ) : (
     <rect
       data-preview-background-id={background.mediaId}
-      fill="#D8DEE2"
+      fill={SHEET_VISUAL_STYLE.mediaFallback.fill}
       x={drawRect.x}
       y={drawRect.y}
       width={drawRect.width}

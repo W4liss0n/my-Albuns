@@ -130,6 +130,14 @@
   background: var(--ui-accent);
 }
 
+.media-folder-chip:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--ui-text-muted);
+}
+
+.media-folder-chip.active:focus-visible {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 86%);
+}
+
 .media-folder-chip small {
   color: inherit;
   font-family: var(--ui-font-mono);
@@ -211,11 +219,6 @@
 .media-popup {
   position: absolute;
   z-index: 20;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius);
-  color: var(--ui-text);
-  background: var(--ui-surface-raised);
-  box-shadow: var(--ui-shadow-menu);
 }
 
 .media-import-popup {

@@ -1,4 +1,5 @@
 import type { ApplicationMenuGroup } from "./ApplicationMenuBar";
+import { projectCommandShortcutLabel } from "./projectCommandCatalog";
 
 interface ProjectApplicationMenuOptions {
   canExport: boolean;
@@ -33,17 +34,27 @@ export function createProjectApplicationMenus({
           "new-project",
           "Novo Projeto…",
           "new-project-from-project-window",
-          "Ctrl+N",
+          projectCommandShortcutLabel("new-project"),
         ),
         placeholder(
           "open-project",
           "Abrir Projeto…",
           "open-project-from-project-window",
-          "Ctrl+O",
+          projectCommandShortcutLabel("open-project"),
         ),
         separator("file-project-separator"),
-        implemented("save", "Salvar", save, "Ctrl+S"),
-        placeholder("save-as", "Salvar como…", "save-project-as", "Ctrl+Shift+S"),
+        implemented(
+          "save",
+          "Salvar",
+          save,
+          projectCommandShortcutLabel("save"),
+        ),
+        placeholder(
+          "save-as",
+          "Salvar como…",
+          "save-project-as",
+          projectCommandShortcutLabel("save-as"),
+        ),
         separator("file-export-separator"),
         implemented(
           "export-sheet",
@@ -54,18 +65,45 @@ export function createProjectApplicationMenus({
         ),
         placeholder("export", "Exportar…", "normal-project-export"),
         separator("file-close-separator"),
-        implemented("close", "Fechar Projeto", closeProject, "Ctrl+W"),
+        implemented(
+          "close",
+          "Fechar Projeto",
+          closeProject,
+          projectCommandShortcutLabel("close"),
+        ),
       ],
     },
     {
       id: "edit",
       label: "Editar",
       items: [
-        implemented("undo", "Desfazer", undo, "Ctrl+Z", !canUndo),
-        implemented("redo", "Refazer", redo, "Ctrl+Shift+Z", !canRedo),
+        implemented(
+          "undo",
+          "Desfazer",
+          undo,
+          projectCommandShortcutLabel("undo"),
+          !canUndo,
+        ),
+        implemented(
+          "redo",
+          "Refazer",
+          redo,
+          projectCommandShortcutLabel("redo"),
+          !canRedo,
+        ),
         separator("edit-clipboard-separator"),
-        placeholder("copy-frames", "Copiar", "copy-frames", "Ctrl+C"),
-        placeholder("paste-frames", "Colar", "paste-frames", "Ctrl+V"),
+        placeholder(
+          "copy-frames",
+          "Copiar",
+          "copy-frames",
+          projectCommandShortcutLabel("copy-frames"),
+        ),
+        placeholder(
+          "paste-frames",
+          "Colar",
+          "paste-frames",
+          projectCommandShortcutLabel("paste-frames"),
+        ),
         separator("edit-frame-separator"),
         placeholder(
           "swap-frame-contents",
@@ -83,13 +121,13 @@ export function createProjectApplicationMenus({
             "advance-frames",
             "Avançar uma posição",
             "advance-selected-frames",
-            "Ctrl+]",
+            projectCommandShortcutLabel("advance-frames"),
           ),
           placeholder(
             "recede-frames",
             "Recuar uma posição",
             "recede-selected-frames",
-            "Ctrl+[",
+            projectCommandShortcutLabel("recede-frames"),
           ),
           placeholder(
             "send-frames-to-back",
@@ -107,7 +145,7 @@ export function createProjectApplicationMenus({
           "select-all",
           "Selecionar tudo",
           "select-all-in-active-context",
-          "Ctrl+A",
+          projectCommandShortcutLabel("select-all"),
         ),
       ],
     },
@@ -118,7 +156,12 @@ export function createProjectApplicationMenus({
         placeholder("add-before", "Adicionar antes", "add-sheet-before"),
         placeholder("add-after", "Adicionar depois", "add-sheet-after"),
         placeholder("duplicate-sheet", "Duplicar Lâmina", "duplicate-sheet"),
-        placeholder("delete-sheet", "Excluir", "delete-sheet", "Delete"),
+        placeholder(
+          "delete-sheet",
+          "Excluir",
+          "delete-sheet",
+          projectCommandShortcutLabel("delete-sheet"),
+        ),
         separator("sheet-edge-separator"),
         placeholder(
           "convert-edge",

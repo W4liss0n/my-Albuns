@@ -197,7 +197,7 @@ export function createSheetRenderNode(
     } else {
       const fallback = new Graphics()
         .rect(x, y, backgroundWidth, backgroundHeight)
-        .fill({ color: 0xd8dee2 });
+        .fill({ color: pixiColor(SHEET_VISUAL_STYLE.mediaFallback.fill) });
       fallback.label = `background-media-fallback-${background.mediaId}`;
       fallback.eventMode = "none";
       activeContent.addChild(fallback);

@@ -1,15 +1,9 @@
+import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
 import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
-
-export interface NewProjectPreviewGeometry {
-  bleedUm: number;
-  heightUm: number;
-  safetyUm: number;
-  widthUm: number;
-}
 
 export function createNewProjectPreviewGeometry(
   draft: NewProjectDimensionsDraft,
-): NewProjectPreviewGeometry {
+): VisualPreviewGeometry {
   return {
     bleedUm: draft.bleed.valueUm,
     heightUm: Math.max(1, draft.sheetHeight.valueUm),

@@ -120,7 +120,7 @@ export function MediaPanelToolbar({
         {openPopup === "import" && (
           <div
             aria-label="Importar"
-            className="media-popup media-import-popup"
+            className="ui-floating-surface media-popup media-import-popup"
             role="menu"
           >
             {/* PLACEHOLDER UI: import commands await their application port. */}
@@ -219,7 +219,7 @@ export function MediaPanelToolbar({
         {openPopup === "options" && (
           <div
             aria-label="Filtro, ordem e tamanho"
-            className="media-popup media-options-popup"
+            className="ui-floating-surface media-popup media-options-popup"
             id="media-panel-options"
             role="group"
           >

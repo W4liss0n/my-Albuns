@@ -34,8 +34,7 @@
   line-height: 1.6;
 }
 
-.eyebrow,
-.global-eyebrow {
+.eyebrow {
   margin: 0;
   color: var(--ui-accent) !important;
   font-family: var(--ui-font-mono);

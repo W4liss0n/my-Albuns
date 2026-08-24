@@ -1,21 +1,28 @@
-import type { NewProjectPersonalizationDraft } from "./application/newProjectPersonalization";
-import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
+import type { VisualScope } from "../application/scopedValues";
+import type {
+  VisualPersonalizationPreview,
+  VisualPreviewGeometry,
+} from "../application/visualPersonalizationPreview";
 import { PersonalizationPreview } from "./PersonalizationPreview";
+
+export interface PersonalizationScopeSurfacePresentation {
+  accessiblePreviewLabel: string;
+  externalSelection: boolean;
+  scopeControlsLabel: string;
+  technicalGuides: boolean;
+}
 
 interface PersonalizationScopeSurfaceProps {
   includeBothSidesControl?: boolean;
-  focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
+  focusedScope: VisualScope | null;
   frameGapUm: number;
-  geometry: NewProjectPreviewGeometry;
-  hoveredScope: NewProjectPersonalizationDraft["fixedScope"] | null;
-  personalization: NewProjectPersonalizationDraft;
-  onFocusedScopeChange(
-    scope: NewProjectPersonalizationDraft["fixedScope"] | null,
-  ): void;
-  onHoveredScopeChange(
-    scope: NewProjectPersonalizationDraft["fixedScope"] | null,
-  ): void;
-  onScopeChange(scope: NewProjectPersonalizationDraft["fixedScope"]): void;
+  geometry: VisualPreviewGeometry;
+  hoveredScope: VisualScope | null;
+  personalization: VisualPersonalizationPreview;
+  presentation: PersonalizationScopeSurfacePresentation;
+  onFocusedScopeChange(scope: VisualScope | null): void;
+  onHoveredScopeChange(scope: VisualScope | null): void;
+  onScopeChange(scope: VisualScope): void;
 }
 
 export function PersonalizationScopeSurface({
@@ -25,6 +32,7 @@ export function PersonalizationScopeSurface({
   geometry,
   hoveredScope,
   personalization,
+  presentation,
   onFocusedScopeChange,
   onHoveredScopeChange,
   onScopeChange,
@@ -38,18 +46,22 @@ export function PersonalizationScopeSurface({
   return (
     <>
       <PersonalizationPreview
+        accessibleLabel={presentation.accessiblePreviewLabel}
         frameGapUm={frameGapUm}
         geometry={geometry}
         hoveredScope={previewedScope}
         personalization={personalization}
         focusedScope={focusedScope}
+        showTechnicalGuides={presentation.technicalGuides}
       />
+      {presentation.externalSelection ? (
+        <div
+          aria-hidden="true"
+          className={`new-project-fixed-selection new-project-fixed-selection--${personalization.fixedScope}`}
+        />
+      ) : null}
       <div
-        aria-hidden="true"
-        className={`new-project-fixed-selection new-project-fixed-selection--${personalization.fixedScope}`}
-      />
-      <div
-        aria-label="Escopo da personalização"
+        aria-label={presentation.scopeControlsLabel}
         className={`new-project-scope-controls${
           includeBothSidesControl
             ? " new-project-scope-controls--with-both"

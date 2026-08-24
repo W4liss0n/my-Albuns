@@ -31,7 +31,6 @@ export function useProjectEditorController({
     kind: "normal",
   });
   const mutations = useProjectMutations({
-    interactionBlocked,
     projection,
     runProjectMutation,
     onProjectionChange,

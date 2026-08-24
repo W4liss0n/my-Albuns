@@ -13,6 +13,7 @@ const MICROMETERS_PER_UNIT: Record<DisplayUnit, bigint> = {
 };
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+const MAX_NUMERIC_INPUT_LENGTH = 128;
 const PRESENTATION_DECIMALS: Record<DisplayUnit, number> = {
   mm: 3,
   cm: 4,
@@ -76,6 +77,9 @@ export function parsePhysicalText(
   unit: DisplayUnit,
 ): number | null {
   const normalized = text.trim().replace(",", ".");
+  if (normalized.length > MAX_NUMERIC_INPUT_LENGTH) {
+    return null;
+  }
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
     return null;
   }

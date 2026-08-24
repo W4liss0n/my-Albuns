@@ -1,0 +1,226 @@
+.sheet-design-inspector {
+  display: grid;
+  gap: var(--ui-space-3);
+}
+
+.sheet-design-preview {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-canvas);
+  box-shadow: var(--ui-shadow-thumbnail);
+  aspect-ratio: var(--sheet-design-aspect-ratio);
+  isolation: isolate;
+}
+
+.sheet-design-preview > .sheet-preview {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sheet-design-preview[data-active-sides="left"] > .sheet-preview,
+.sheet-design-preview[data-active-sides="right"] > .sheet-preview {
+  width: 50%;
+}
+
+.sheet-design-preview[data-active-sides="right"] > .sheet-preview {
+  right: 0;
+  left: auto;
+}
+
+.sheet-design-preview__inactive,
+.sheet-design-preview__highlight {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  pointer-events: none;
+}
+
+.sheet-design-preview__inactive[data-side="left"],
+.sheet-design-preview__highlight[data-scope="left"] {
+  left: 0;
+}
+
+.sheet-design-preview__inactive[data-side="right"],
+.sheet-design-preview__highlight[data-scope="right"] {
+  right: 0;
+}
+
+.sheet-design-preview__inactive {
+  background: var(--ui-canvas);
+  opacity: 0.68;
+}
+
+.sheet-design-preview__inactive[data-side="left"] {
+  background: linear-gradient(
+    to right,
+    var(--ui-canvas),
+    var(--ui-surface-muted)
+  );
+}
+
+.sheet-design-preview__inactive[data-side="right"] {
+  background: linear-gradient(
+    to left,
+    var(--ui-canvas),
+    var(--ui-surface-muted)
+  );
+}
+
+.sheet-design-preview__highlight[data-scope="both"] {
+  right: 0;
+  left: 0;
+  width: auto;
+}
+
+.sheet-design-preview__highlight--selected {
+  z-index: 3;
+  box-shadow: inset 0 0 0 2px var(--ui-accent);
+}
+
+.sheet-design-preview__highlight--hovered {
+  z-index: 2;
+  background: var(--ui-surface-muted);
+  opacity: 0.36;
+}
+
+.sheet-design-preview__targets {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+}
+
+.sheet-design-preview__target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sheet-design-preview__target[data-scope="left"] {
+  left: 0;
+}
+
+.sheet-design-preview__target[data-scope="right"] {
+  right: 0;
+}
+
+.sheet-design-preview__target[data-scope="both"] {
+  z-index: 1;
+  left: 40%;
+  width: 20%;
+}
+
+.sheet-design-preview__target:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--ui-text-muted);
+}
+
+.sheet-design-scope-status {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  text-align: center;
+}
+
+.sheet-design-role {
+  display: grid;
+  padding-top: var(--ui-space-3);
+  border-top: 1px solid var(--ui-border);
+  gap: var(--ui-space-2);
+}
+
+.sheet-design-role h3 {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  font-weight: 650;
+}
+
+.sheet-design-role__values {
+  display: grid;
+  gap: var(--ui-space-2);
+}
+
+.sheet-design-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.sheet-design-value__swatch {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--ui-surface-raised);
+  flex: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  box-shadow:
+    0 0 0 1px var(--ui-border),
+    var(--ui-shadow-thumbnail);
+}
+
+.sheet-design-value__swatch--none {
+  background: linear-gradient(
+    135deg,
+    var(--ui-surface-raised) 0 47%,
+    var(--ui-border-strong) 47% 53%,
+    var(--ui-surface-raised) 53%
+  );
+}
+
+.sheet-design-value__copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.sheet-design-value__copy strong {
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-caption);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheet-design-value__copy small {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-micro);
+}
+
+.sheet-design-role__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+
+.sheet-design-color-placeholder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  gap: var(--ui-space-2);
+}
+
+.sheet-design-color-placeholder input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-small);
+}

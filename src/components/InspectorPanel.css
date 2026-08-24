@@ -158,8 +158,7 @@
   background: transparent;
 }
 
-.inspector-dimension,
-.inspector-field-stack {
+.inspector-dimension {
   display: grid;
   gap: var(--ui-space-2);
 }

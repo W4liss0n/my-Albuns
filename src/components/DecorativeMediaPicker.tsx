@@ -153,7 +153,7 @@ export function DecorativeMediaPicker({
       {open ? (
         <div
           aria-label={`Decorativos para ${label}`}
-          className="visual-default-popup"
+          className="ui-floating-surface visual-default-popup"
           ref={menuRef}
           role="menu"
           tabIndex={-1}

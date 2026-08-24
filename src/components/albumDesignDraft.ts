@@ -5,11 +5,11 @@ import type {
   ProjectedVisualDefaults,
 } from "../domain/project";
 import {
-  applyToScope,
-  type PersonalizationScope,
-} from "../global/application/newProjectPersonalization";
+  applyScopedValue,
+  type VisualScope,
+} from "../application/scopedValues";
 
-export type AlbumDesignScope = PersonalizationScope;
+export type AlbumDesignScope = VisualScope;
 
 export function setAlbumBackground(
   defaults: ProjectedVisualDefaults,
@@ -18,7 +18,7 @@ export function setAlbumBackground(
 ): ProjectedVisualDefaults {
   return {
     ...defaults,
-    background: applyToScope(defaults.background, scope, content),
+    background: applyScopedValue(defaults.background, scope, content),
   };
 }
 
@@ -29,7 +29,7 @@ export function setAlbumOverlay(
 ): ProjectedVisualDefaults {
   return {
     ...defaults,
-    overlay: applyToScope(defaults.overlay, scope, content),
+    overlay: applyScopedValue(defaults.overlay, scope, content),
   };
 }
 

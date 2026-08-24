@@ -27,9 +27,13 @@ import {
   ExportPreviewControl,
   type ExportPreviewControlHandle,
 } from "./ExportPreviewControl";
-import { InspectorPanel } from "./InspectorPanel";
+import {
+  InspectorPanel,
+  type InspectorContext,
+} from "./InspectorPanel";
 import { MediaPanel } from "./MediaPanel";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
+import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
@@ -178,12 +182,38 @@ export function ProjectWorkspace({
     displayedPhotoZoom,
     displayedPhotoPanX,
   } = controller;
+  const canvasMode = controller.canvasProps.mode;
+  const editingSheet =
+    canvasMode.kind === "sheet-editing"
+      ? projection.composition.sheets.find(
+          (sheet) => sheet.sheetId === canvasMode.sheetId,
+        ) ?? null
+      : null;
+  const inspectorContext: InspectorContext = selectedFrame
+    ? {
+        kind: "frame",
+        frame: selectedFrame,
+        composedPhoto: selectedComposedPhoto,
+        ...(editingSheet ? { editingSheet } : {}),
+      }
+    : editingSheet
+      ? { kind: "sheet", sheet: editingSheet }
+      : { kind: "album" };
   const projectMetadata = projectAlbumMetadata(projection, presentationUnit);
   const commandsBlocked =
     Boolean(busy) ||
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active;
+  useProjectCommandShortcuts({
+    canRedo: projection.state.canRedo,
+    canUndo: projection.state.canUndo,
+    closeProject: projectClose.requestClose,
+    disabled: commandsBlocked,
+    redo: controller.redo,
+    save: controller.save,
+    undo: controller.undo,
+  });
   const applicationMenus = createProjectApplicationMenus({
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
@@ -258,8 +288,7 @@ export function ProjectWorkspace({
 
         <InspectorPanel
           key={projectId}
-          selectedFrame={selectedFrame}
-          selectedComposedPhoto={selectedComposedPhoto}
+          context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
           displayedPhotoPanX={displayedPhotoPanX}
           zoomCommitting={controller.zoomCommitting}

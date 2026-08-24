@@ -6,9 +6,6 @@ import {
 import {
   createDefaultPersonalizationDraft,
   setBackgroundColor,
-  setFrameBorderColor,
-  setFrameBorderEnabled,
-  setFrameBorderWidth,
   type NewProjectPersonalizationDraft,
 } from "./newProjectPersonalization";
 
@@ -99,9 +96,15 @@ function projectPreset({
     background,
   );
   if (border) {
-    personalization = setFrameBorderEnabled(personalization, true);
-    personalization = setFrameBorderColor(personalization, border.rgb);
-    personalization = setFrameBorderWidth(personalization, border.widthUm);
+    const solid = {
+      rgb: border.rgb.toUpperCase(),
+      widthUm: Math.max(1, Math.trunc(border.widthUm)),
+    };
+    personalization = {
+      ...personalization,
+      frameBorder: { kind: "solid", ...solid },
+      frameBorderPreference: solid,
+    };
   }
 
   return { id, name, dimensions, personalization };

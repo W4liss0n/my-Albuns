@@ -2,10 +2,10 @@ import {
   createSheetGuideGeometry,
   SHEET_GUIDE_STYLE,
 } from "../ui/sheetGuideGeometry";
-import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
+import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
 
 interface SheetGuideLayerProps {
-  geometry: NewProjectPreviewGeometry;
+  geometry: VisualPreviewGeometry;
 }
 
 export function SheetGuideLayer({

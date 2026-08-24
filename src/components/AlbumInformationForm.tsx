@@ -18,10 +18,11 @@ import {
   type PhysicalFieldDraft,
 } from "../application/physicalMeasurements";
 import {
+  INVALID_PHYSICAL_MEASUREMENT_MESSAGE,
   parseIntegerText,
   presentConfigurationValidationErrors,
-  type DimensionsErrors,
-} from "../global/application/newProjectDimensions";
+  type ProjectConfigurationErrors as DimensionsErrors,
+} from "../application/projectConfigurationFields";
 import {
   AppIcon,
   FieldValidationAutoTooltip,
@@ -444,10 +445,18 @@ function toCandidate(draft: AlbumInformationDraft): {
   const safetyUm = draft.safety.hasExactValue ? draft.safety.valueUm : null;
   const dpi = parseIntegerText(draft.dpi);
   const errors: DimensionsErrors = {};
-  if (sheetWidthUm === null) errors.sheetWidth = [invalidMeasurementMessage()];
-  if (sheetHeightUm === null) errors.sheetHeight = [invalidMeasurementMessage()];
-  if (bleedUm === null) errors.bleed = [invalidMeasurementMessage()];
-  if (safetyUm === null) errors.safety = [invalidMeasurementMessage()];
+  if (sheetWidthUm === null) {
+    errors.sheetWidth = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
+  }
+  if (sheetHeightUm === null) {
+    errors.sheetHeight = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
+  }
+  if (bleedUm === null) {
+    errors.bleed = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
+  }
+  if (safetyUm === null) {
+    errors.safety = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
+  }
   if (dpi === null) errors.dpi = ["Informe o DPI como um número inteiro suportado."];
   if (
     sheetWidthUm === null ||
@@ -471,10 +480,6 @@ function toCandidate(draft: AlbumInformationDraft): {
       lastSheet: draft.lastSheet,
     },
   };
-}
-
-function invalidMeasurementMessage() {
-  return "Informe uma medida decimal que corresponda a micrômetros inteiros.";
 }
 
 function mergeErrors(...sources: DimensionsErrors[]): DimensionsErrors {

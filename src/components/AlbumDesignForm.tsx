@@ -6,7 +6,17 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  changeFrameBorderColor,
+  changeFrameBorderWidth,
+  createFrameBorderEditorState,
+} from "../application/frameBorderEditor";
 import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
+import { readScopedValue, type VisualScope } from "../application/scopedValues";
+import type {
+  VisualPersonalizationPreview,
+  VisualPreviewGeometry,
+} from "../application/visualPersonalizationPreview";
 import type {
   DisplayUnit,
   DocumentSnapshot,
@@ -15,8 +25,6 @@ import type {
   ProjectedOverlayContent,
   ProjectedVisualDefaults,
 } from "../domain/project";
-import type { NewProjectPersonalizationDraft } from "../global/application/newProjectPersonalization";
-import type { NewProjectPreviewGeometry } from "../global/newProjectPreviewGeometry";
 import { PersonalizationScopeSurface } from "../global/PersonalizationScopeSurface";
 import { ProportionalPreviewViewport } from "../global/ProportionalPreviewViewport";
 import {
@@ -53,12 +61,8 @@ export function AlbumDesignForm({
   const baselineSignature = JSON.stringify(value);
   const [draft, setDraft] = useState(value);
   const [scope, setScope] = useState<AlbumDesignScope>("both");
-  const [focusedScope, setFocusedScope] = useState<
-    NewProjectPersonalizationDraft["fixedScope"] | null
-  >(null);
-  const [hoveredScope, setHoveredScope] = useState<
-    NewProjectPersonalizationDraft["fixedScope"] | null
-  >(null);
+  const [focusedScope, setFocusedScope] = useState<VisualScope | null>(null);
+  const [hoveredScope, setHoveredScope] = useState<VisualScope | null>(null);
   const [borderEditor, setBorderEditor] = useState(() =>
     value.frameBorder.kind === "solid"
       ? { rgb: value.frameBorder.rgb, widthUm: value.frameBorder.widthUm }
@@ -79,17 +83,18 @@ export function AlbumDesignForm({
   const [openPicker, setOpenPicker] = useState<
     "Background" | "Overlay" | null
   >(null);
+  const [applying, setApplying] = useState(false);
   const dirty = JSON.stringify(draft) !== baselineSignature;
+  const ready = dirty && !applying;
   const background = backgroundAtScope(draft, scope);
   const overlay = overlayAtScope(draft, scope);
   const borderEnabled = draft.frameBorder.kind === "solid";
   const previewPersonalization = albumDesignPreviewDraft(
     draft,
     scope,
-    mediaItems,
     mediaPreviewUrls,
   );
-  const previewGeometry: NewProjectPreviewGeometry = {
+  const previewGeometry: VisualPreviewGeometry = {
     bleedUm: document.bleedUm,
     heightUm: document.sheetHeightUm,
     safetyUm: document.safetyUm,
@@ -98,14 +103,14 @@ export function AlbumDesignForm({
 
   useEffect(() => {
     setDraft(value);
-    setBorderEditor(
+    setBorderEditor((current) =>
       value.frameBorder.kind === "solid"
         ? { rgb: value.frameBorder.rgb, widthUm: value.frameBorder.widthUm }
-        : DEFAULT_FRAME_BORDER,
+        : current,
     );
   }, [baselineSignature, value]);
 
-  useLayoutEffect(() => onReadyChange(dirty), [dirty, onReadyChange]);
+  useLayoutEffect(() => onReadyChange(ready), [onReadyChange, ready]);
 
   useLayoutEffect(
     () => () => {
@@ -122,13 +127,9 @@ export function AlbumDesignForm({
     setDraft((current) => setAlbumOverlay(current, scope, content));
   }
 
-  function updateBorder(next: typeof borderEditor) {
-    setBorderEditor(next);
-    if (borderEnabled) {
-      setDraft((current) =>
-        setAlbumFrameBorder(current, { kind: "solid", ...next }),
-      );
-    }
+  function updateBorder(next: ReturnType<typeof createFrameBorderEditorState>) {
+    setBorderEditor(next.solid);
+    setDraft((current) => setAlbumFrameBorder(current, next.border));
   }
 
   /**
@@ -136,19 +137,22 @@ export function AlbumDesignForm({
    * controle é o próprio slider, sem alternador separado.
    */
   function changeBorderWidth(widthUm: number) {
-    if (widthUm <= 0) {
-      setDraft((current) => setAlbumFrameBorder(current, { kind: "none" }));
-      return;
-    }
-
-    setBorderEditor((current) => ({ ...current, widthUm }));
-    setDraft((current) =>
-      setAlbumFrameBorder(current, {
-        kind: "solid",
-        rgb: borderEditor.rgb,
+    updateBorder(
+      changeFrameBorderWidth(
+        createFrameBorderEditorState(draft.frameBorder, borderEditor),
         widthUm,
-      }),
+      ),
     );
+  }
+
+  async function submit() {
+    if (!ready) return;
+    setApplying(true);
+    try {
+      await onApply(draft);
+    } finally {
+      setApplying(false);
+    }
   }
 
   return (
@@ -157,7 +161,7 @@ export function AlbumDesignForm({
       className="inspector-subsections album-design-form"
       onSubmit={(event) => {
         event.preventDefault();
-        if (dirty) void onApply(draft);
+        void submit();
       }}
     >
       <section className="inspector-subsection">
@@ -175,6 +179,7 @@ export function AlbumDesignForm({
               geometry={previewGeometry}
               hoveredScope={hoveredScope}
               personalization={previewPersonalization}
+              presentation={ALBUM_DESIGN_SCOPE_PRESENTATION}
               onFocusedScopeChange={setFocusedScope}
               onHoveredScopeChange={setHoveredScope}
               onScopeChange={setScope}
@@ -239,10 +244,12 @@ export function AlbumDesignForm({
               type="color"
               value={borderEditor.rgb}
               onChange={(event) =>
-                updateBorder({
-                  ...borderEditor,
-                  rgb: event.currentTarget.value.toUpperCase(),
-                })
+                updateBorder(
+                  changeFrameBorderColor(
+                    createFrameBorderEditorState(draft.frameBorder, borderEditor),
+                    event.currentTarget.value,
+                  ),
+                )
               }
             />
           </label>
@@ -370,22 +377,16 @@ function VisualDefaultControl({
 function albumDesignPreviewDraft(
   defaults: ProjectedVisualDefaults,
   scope: AlbumDesignScope,
-  mediaItems: readonly MediaCatalogItem[],
   mediaPreviewUrls: Readonly<Record<string, string>>,
-): NewProjectPersonalizationDraft {
-  const mediaById = new Map(mediaItems.map((media) => [media.id, media]));
-  const selection = (mediaId: string) => ({
-    selectionId: mediaId,
-    displayName: mediaById.get(mediaId)?.name ?? "Decorativo",
-    previewUrl: mediaPreviewUrls[mediaId] ?? "",
-  });
+): VisualPersonalizationPreview {
+  const previewUrl = (mediaId: string) => mediaPreviewUrls[mediaId] ?? "";
   const backgroundContent = (content: ProjectedBackgroundContent) =>
     content.kind === "color"
       ? content
-      : { kind: "image" as const, selection: selection(content.mediaId) };
+      : { kind: "image" as const, previewUrl: previewUrl(content.mediaId) };
   const overlayContent = (content: ProjectedOverlayContent | null) =>
     content
-      ? { kind: "image" as const, selection: selection(content.mediaId) }
+      ? { kind: "image" as const, previewUrl: previewUrl(content.mediaId) }
       : null;
 
   return {
@@ -420,26 +421,16 @@ function backgroundAtScope(
   defaults: ProjectedVisualDefaults,
   scope: AlbumDesignScope,
 ) {
-  const { background } = defaults;
-  if (scope === "both") {
-    if (background.scope === "bothSides") return background.both;
-    return sameBackground(background.left, background.right)
-      ? background.left
-      : null;
-  }
-  return background.scope === "bothSides" ? background.both : background[scope];
+  const read = readScopedValue(defaults.background, scope, sameBackground);
+  return read.kind === "uniform" ? read.value : null;
 }
 
 function overlayAtScope(
   defaults: ProjectedVisualDefaults,
   scope: AlbumDesignScope,
 ) {
-  const { overlay } = defaults;
-  if (scope === "both") {
-    if (overlay.scope === "bothSides") return overlay.both;
-    return sameOverlay(overlay.left, overlay.right) ? overlay.left : undefined;
-  }
-  return overlay.scope === "bothSides" ? overlay.both : overlay[scope];
+  const read = readScopedValue(defaults.overlay, scope, sameOverlay);
+  return read.kind === "uniform" ? read.value : undefined;
 }
 
 function sameBackground(
@@ -469,3 +460,10 @@ function scopeLabel(scope: AlbumDesignScope) {
   if (scope === "right") return "Página direita";
   return "Ambos os lados";
 }
+
+const ALBUM_DESIGN_SCOPE_PRESENTATION = {
+  accessiblePreviewLabel: "Composição do padrão visual do Álbum",
+  externalSelection: false,
+  scopeControlsLabel: "Escopo do padrão visual do Álbum",
+  technicalGuides: false,
+} as const;

@@ -11,6 +11,9 @@ export const SHEET_VISUAL_STYLE = {
     opacity: 1,
     widthPx: 1,
   },
+  mediaFallback: {
+    fill: "#D8DEE2",
+  },
   canvasShadow: {
     close: {
       color: "#3c362c",

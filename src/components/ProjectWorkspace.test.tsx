@@ -1092,8 +1092,25 @@ test("uses the current reference layout for the Album context", () => {
   expect(
     screen.getByRole("button", { name: "Design do Álbum" }),
   ).toHaveAttribute("aria-expanded", "true");
+  const albumDesignPreview = albumDesign.getByLabelText(
+    "Prévia do padrão visual do Álbum",
+  );
+  expect(albumDesignPreview).toBeInTheDocument();
   expect(
-    albumDesign.getByLabelText("Prévia do padrão visual do Álbum"),
+    within(albumDesignPreview).getByRole("img", {
+      name: "Composição do padrão visual do Álbum",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(albumDesignPreview).queryByLabelText("Guias técnicas da Lâmina"),
+  ).not.toBeInTheDocument();
+  expect(
+    albumDesignPreview.querySelector(".new-project-fixed-selection"),
+  ).not.toBeInTheDocument();
+  expect(
+    within(albumDesignPreview).getByRole("group", {
+      name: "Escopo do padrão visual do Álbum",
+    }),
   ).toBeInTheDocument();
   expect(
     albumInformationSection.querySelector(
@@ -1180,7 +1197,7 @@ test("edits and applies the complete Album design draft as one intent", async ()
 
   const scopeControls = within(
     albumDesign.getByLabelText("Prévia do padrão visual do Álbum"),
-  ).getByRole("group", { name: "Escopo da personalização" });
+  ).getByRole("group", { name: "Escopo do padrão visual do Álbum" });
   expect(within(scopeControls).getAllByRole("button")).toHaveLength(3);
   expect(
     within(scopeControls).getByRole("button", { name: "Ambos os lados" }),
@@ -1255,6 +1272,43 @@ test("edits and applies the complete Album design draft as one intent", async ()
   );
 });
 
+test("prevents re-entering Album Design Apply while its mutation is pending", async () => {
+  const pending = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(() => pending.promise);
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  const applyDesign = albumDesign.getByRole("button", { name: "Aplicar" });
+  expect(applyDesign).toBeEnabled();
+
+  fireEvent.click(applyDesign);
+  fireEvent.click(applyDesign);
+
+  expect(applyDesign).toBeDisabled();
+  expect(apply).toHaveBeenCalledOnce();
+
+  await act(async () => {
+    pending.resolve(projection);
+    await pending.promise;
+  });
+  await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+});
+
 test("maps Borda zero to none and a positive value back to solid", async () => {
   const projectionWithBorder: EditorProjection = {
     ...projection,
@@ -1264,19 +1318,36 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
         ...projection.state.album,
         visualDefaults: {
           ...projection.state.album.visualDefaults,
-          frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_500 },
+          frameBorder: { kind: "solid", rgb: "#C5A46D", widthUm: 2_500 },
         },
       },
     },
     composition: {
       ...projection.composition,
-      frameBorder: { kind: "solid", rgb: "#2C2924", widthUm: 2_500 },
+      frameBorder: { kind: "solid", rgb: "#C5A46D", widthUm: 2_500 },
+    },
+  };
+  const projectionWithoutBorder: EditorProjection = {
+    ...projectionWithBorder,
+    state: {
+      ...projectionWithBorder.state,
+      album: {
+        ...projectionWithBorder.state.album,
+        visualDefaults: {
+          ...projectionWithBorder.state.album.visualDefaults,
+          frameBorder: { kind: "none" },
+        },
+      },
+    },
+    composition: {
+      ...projectionWithBorder.composition,
+      frameBorder: { kind: "none" },
     },
   };
   const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
-    projectionWithBorder,
+    projectionWithoutBorder,
   );
-  render(
+  const view = render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projectionWithBorder}
@@ -1308,7 +1379,18 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
     }),
   );
 
-  fireEvent.change(borderWidth, { target: { value: "1250" } });
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithoutBorder}
+      projectSessionPort={projectSessionPortWithApply(apply)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  fireEvent.change(
+    design.getByRole("slider", { name: "Espessura da Borda" }),
+    { target: { value: "1250" } },
+  );
   expect(design.getByText("1.25 mm")).toBeVisible();
   fireEvent.click(applyDesign);
   await waitFor(() =>
@@ -1318,7 +1400,7 @@ test("maps Borda zero to none and a positive value back to solid", async () => {
         ...projectionWithBorder.state.album.visualDefaults,
         frameBorder: {
           kind: "solid",
-          rgb: "#2C2924",
+          rgb: "#C5A46D",
           widthUm: 1_250,
         },
       },

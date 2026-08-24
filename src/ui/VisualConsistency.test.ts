@@ -1,24 +1,54 @@
 // @ts-expect-error Node is available in Vitest but excluded from frontend types.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "vitest";
 
 const readStyles = (path: string) => readFileSync(path, "utf8") as string;
 
+function discoverStylePaths(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap(
+    (entry: { isDirectory(): boolean; name: string }) => {
+      const path = `${directory}/${entry.name}`;
+      if (entry.isDirectory()) return discoverStylePaths(path);
+      return entry.name.endsWith(".css") ? [path] : [];
+    },
+  );
+}
+
 const themeStyles = readStyles("src/ui/theme.css");
 const sharedStyles = readStyles("src/ui/ui.css");
 const welcomeStyles = readStyles("src/global/GlobalShell.css");
 const newProjectStyles = readStyles("src/global/NewProjectFlow.css");
-const previewStyles = readStyles("src/global/NewProjectPreviewPanel.css");
+const newProjectPreviewStyles = readStyles(
+  "src/global/NewProjectPreviewPanel.css",
+);
 const editorStyles = readStyles("src/App.css");
 const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
+const decorativePickerStyles = readStyles(
+  "src/components/DecorativeMediaPicker.css",
+);
 const albumInformationSource = readStyles("src/components/AlbumInformationForm.tsx");
+const decorativePickerSource = readStyles(
+  "src/components/DecorativeMediaPicker.tsx",
+);
+const mediaToolbarSource = readStyles("src/components/MediaPanelToolbar.tsx");
+const newProjectSource = readStyles("src/global/NewProjectFlow.tsx");
+const newProjectPreviewSource = readStyles(
+  "src/global/NewProjectPreviewPanel.tsx",
+);
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
 const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
+const sheetPreviewSource = readStyles("src/components/SheetPreview.tsx");
+const canvasRenderNodesSource = readStyles(
+  "src/components/albumCanvasRenderNodes.ts",
+);
 const exportSource = readStyles("src/components/ExportPreviewControl.tsx");
+const applicationStyles = discoverStylePaths("src")
+  .filter((path) => path !== "src/ui/theme.css")
+  .map((path) => ({ path, styles: readStyles(path) }));
 
 test("centralizes the shared type scale used by every application surface", () => {
   expect(themeStyles).toContain("--ui-font-size-micro: 9.5px;");
@@ -32,17 +62,15 @@ test("centralizes the shared type scale used by every application surface", () =
   const duplicatedTypeLiteral =
     /font-size:\s*(?:9\.5px|10\.5px|11px|11\.5px|12px|12\.5px|13px|0\.6rem|0\.62rem|0\.64rem|0\.65rem|0\.66rem|0\.68rem|0\.7rem|0\.72rem|0\.75rem|0\.76rem|0\.78rem)/;
 
-  for (const styles of [
-    sharedStyles,
-    welcomeStyles,
-    newProjectStyles,
-    previewStyles,
-    editorStyles,
-    mediaPanelStyles,
-    inspectorPanelStyles,
-    exportStyles,
-  ]) {
-    expect(styles).not.toMatch(duplicatedTypeLiteral);
+  expect(applicationStyles.map(({ path }) => path)).toEqual(
+    expect.arrayContaining([
+      "src/components/DecorativeMediaPicker.css",
+      "src/global/PersonalizationPreview.css",
+      "src/global/ProportionalPreviewViewport.css",
+    ]),
+  );
+  for (const { path, styles } of applicationStyles) {
+    expect(styles, path).not.toMatch(duplicatedTypeLiteral);
   }
 });
 
@@ -131,6 +159,57 @@ test("keeps media hover and selection on the straight image border", () => {
   expect(mediaThumbnailStyles).not.toMatch(
     /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*border-color:/s,
   );
+});
+
+test("shares only the equivalent chrome of floating surfaces", () => {
+  expect(sharedStyles).toMatch(/\.ui-floating-surface\s*\{/);
+  expect(sharedStyles).toMatch(
+    /\.ui-floating-surface\s*\{[^}]*border:\s*1px solid var\(--ui-border-strong\);[^}]*border-radius:\s*var\(--ui-radius\);[^}]*background:\s*var\(--ui-surface-raised\);[^}]*box-shadow:\s*var\(--ui-shadow-menu\);/s,
+  );
+  expect(decorativePickerSource).toContain(
+    'className="ui-floating-surface visual-default-popup"',
+  );
+  expect(mediaToolbarSource).toContain(
+    'className="ui-floating-surface media-popup media-import-popup"',
+  );
+  expect(mediaToolbarSource).toContain(
+    'className="ui-floating-surface media-popup media-options-popup"',
+  );
+  expect(newProjectSource).toContain(
+    'className="ui-floating-surface new-project-save-preset"',
+  );
+  expect(decorativePickerStyles).not.toMatch(
+    /\.visual-default-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
+  );
+  expect(mediaPanelStyles).not.toMatch(
+    /\.media-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
+  );
+  expect(newProjectStyles).not.toMatch(
+    /\.new-project-save-preset\s*\{[^}]*(?:background|box-shadow|border:)/s,
+  );
+});
+
+test("uses the canonical media fallback in SVG and Pixi Sheet renderers", () => {
+  expect(sheetPreviewSource).toContain(
+    "SHEET_VISUAL_STYLE.mediaFallback.fill",
+  );
+  expect(canvasRenderNodesSource).toContain(
+    "pixiColor(SHEET_VISUAL_STYLE.mediaFallback.fill)",
+  );
+  expect(sheetPreviewSource).not.toMatch(/#D8DEE2/i);
+  expect(canvasRenderNodesSource).not.toMatch(/0xd8dee2/i);
+});
+
+test("uses the canonical Sheet guide colors in the New Project legend", () => {
+  expect(newProjectPreviewSource).toContain("SHEET_GUIDE_STYLE.bleed");
+  expect(newProjectPreviewSource).toContain("SHEET_GUIDE_STYLE.safety");
+  expect(newProjectPreviewStyles).toContain(
+    "var(--new-project-guide-bleed)",
+  );
+  expect(newProjectPreviewStyles).toContain(
+    "var(--new-project-guide-safety)",
+  );
+  expect(newProjectPreviewStyles).not.toMatch(/#c57c70|#6f9fbe/i);
 });
 
 test("keeps compact visual-default focus independent from selection", () => {

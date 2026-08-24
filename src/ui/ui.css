@@ -432,6 +432,10 @@
   background: var(--ui-danger-soft);
 }
 
+.ui-action-button--danger:focus-visible:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--ui-danger);
+}
+
 .ui-action-button:disabled {
   cursor: default;
   opacity: 0.52;
@@ -485,6 +489,14 @@
   right: var(--ui-panel-padding);
   bottom: var(--ui-panel-padding);
   z-index: 40;
+  box-shadow: var(--ui-shadow-menu);
+}
+
+.ui-floating-surface {
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius);
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
   box-shadow: var(--ui-shadow-menu);
 }
 
@@ -573,6 +585,11 @@
 .ui-dialog-window__footer .ui-action-button--danger:hover:not(:disabled) {
   border-color: var(--ui-danger-hover);
   background: var(--ui-danger-hover);
+}
+
+.ui-dialog-window__footer
+  .ui-action-button--danger:focus-visible:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 82%);
 }
 
 .ui-dialog-action-spacer,

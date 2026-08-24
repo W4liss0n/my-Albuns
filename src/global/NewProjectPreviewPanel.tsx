@@ -1,23 +1,22 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import {
   displayUnitLabel,
   formatMicrometers,
-  type NewProjectDimensionsDraft,
-} from "./application/newProjectDimensions";
+} from "../application/physicalMeasurements";
+import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
+import { SHEET_GUIDE_STYLE } from "../ui/sheetGuideGeometry";
+import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
 import {
   ProportionalPreviewViewport,
   type PreviewOutsideSurfaceAction,
 } from "./ProportionalPreviewViewport";
-import {
-  createNewProjectPreviewGeometry,
-  type NewProjectPreviewGeometry,
-} from "./newProjectPreviewGeometry";
+import { createNewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 
 import "./NewProjectPreviewPanel.css";
 
 interface NewProjectPreviewPanelProps {
-  children(geometry: NewProjectPreviewGeometry): ReactNode;
+  children(geometry: VisualPreviewGeometry): ReactNode;
   draft: NewProjectDimensionsDraft;
   outsideSurfaceAction?: PreviewOutsideSurfaceAction;
   surfaceLabel?: string;
@@ -37,7 +36,15 @@ export function NewProjectPreviewPanel({
       className="new-project-preview-panel"
       onClick={() => outsideSurfaceAction?.onPress()}
     >
-      <p className="new-project-preview-metadata">
+      <p
+        className="new-project-preview-metadata"
+        style={
+          {
+            "--new-project-guide-bleed": SHEET_GUIDE_STYLE.bleed,
+            "--new-project-guide-safety": SHEET_GUIDE_STYLE.safety,
+          } as CSSProperties
+        }
+      >
         <span>Lâmina aberta</span>
         <strong>
           {formatMicrometers(geometry.widthUm, draft.displayUnit)} ×{" "}

@@ -1,14 +1,19 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { InspectorPanel } from "./components/InspectorPanel";
 import type {
   AlbumInformation,
+  ComposedBackground,
+  ComposedDecorative,
   ComposedSheet,
   DisplayUnit,
   DocumentSnapshot,
   MediaCatalogItem,
   ProjectedActiveSides,
+  ProjectedBackgroundContent,
+  ProjectedOverlayContent,
   ProjectedVisualDefaults,
+  RectUm,
   SheetRole,
   SheetSnapshot,
 } from "./domain/project";
@@ -23,55 +28,23 @@ const sheetColors = [
   "#efeae1",
   "#2b2823",
 ] as const;
-const sheetPageNumbers = [[1], [2, 3], [4, 5], [6, 7], [8, 9], [10]] as const;
 
-const initialSheetStates: readonly SheetSnapshot[] = sheetColors.map((_, index) => {
-  const number = index + 1;
-  const activeSides = activeSidesFor(number);
-  return {
-    activeSides,
-    frames: [],
-    heightUm: 300_000,
-    id: `sheet-${String(number).padStart(3, "0")}`,
-    number,
-    pageNumbers: [...sheetPageNumbers[index]],
-    role: roleFor(number),
-    widthUm: activeSides === "both" ? 600_000 : 300_000,
-  };
-});
-
-const sheets: readonly ComposedSheet[] = initialSheetStates.map((state, index) => {
-  const source = representativeProjection.composition.sheets[0];
-  const drawRect = {
-    height: state.heightUm,
-    width: state.widthUm,
-    x: 0,
-    y: 0,
-  };
-  const showPhoto = state.activeSides === "both" && index % 2 === 1;
-  return {
-    activeSides: state.activeSides,
-    backgrounds: [
-      {
-        drawRect,
-        kind: "color",
-        rgb: sheetColors[index],
-      },
-    ],
-    base: { drawRect, rgb: sheetColors[index] },
-    frames: showPhoto
-      ? source.frames.map((frame) => ({
-          ...frame,
-          frameId: `${frame.frameId}-${state.number}`,
-        }))
-      : [],
-    heightUm: state.heightUm,
-    number: state.number,
-    overlays: [],
-    sheetId: state.id,
-    widthUm: state.widthUm,
-  };
-});
+const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
+  sheetColors.map((_, index) => {
+    const number = index + 1;
+    const activeSides = activeSidesFor(number);
+    return {
+      activeSides,
+      frames: [],
+      heightUm: 300_000,
+      id: `sheet-${String(number).padStart(3, "0")}`,
+      number,
+      pageNumbers: [],
+      role: roleFor(number),
+      widthUm: activeSides === "both" ? 600_000 : 300_000,
+    };
+  }),
+);
 
 const previewUrl =
   mediaPanelPreviewFixture.mediaPreviews["test-media-001"]?.url;
@@ -93,6 +66,14 @@ export function SheetGridPreview() {
   const [visualDefaults, setVisualDefaults] = useState<ProjectedVisualDefaults>(
     representativeProjection.state.album.visualDefaults,
   );
+  const mediaItems = useMemo(
+    () => [...representativeProjection.state.album.media, decorativePreview],
+    [],
+  );
+  const sheets = useMemo(
+    () => composePreviewSheets(sheetStates, visualDefaults, mediaItems),
+    [mediaItems, sheetStates, visualDefaults],
+  );
   const [presentationUnitOverride, setPresentationUnitOverride] =
     useState<DisplayUnit | null>(null);
   const changePresentationUnit = useCallback((unit: DisplayUnit | null) => {
@@ -110,35 +91,43 @@ export function SheetGridPreview() {
       safetyUm: information.safetyUm,
     });
     setSheetStates((current) =>
-      current.map((sheet, index) => ({
-        ...sheet,
-        activeSides:
-          index === 0
-            ? information.firstSheet === "double"
-              ? "both"
-              : "right"
-            : index === current.length - 1
-              ? information.lastSheet === "double"
+      renumberSheetStates(
+        current.map((sheet, index) => {
+          const activeSides =
+            index === 0
+              ? information.firstSheet === "double"
                 ? "both"
-                : "left"
-              : sheet.activeSides,
-      })),
+                : "right"
+              : index === current.length - 1
+                ? information.lastSheet === "double"
+                  ? "both"
+                  : "left"
+                : sheet.activeSides;
+          return {
+            ...sheet,
+            activeSides,
+            heightUm: information.sheetHeightUm,
+            widthUm:
+              activeSides === "both"
+                ? information.sheetWidthUm
+                : information.sheetWidthUm / 2,
+          };
+        }),
+      ),
     );
   }
 
   return (
     <main className="sheet-grid-preview" data-development-preview="sheet-grid">
       <InspectorPanel
+        context={{ kind: "album" }}
         displayedPhotoPanX={0}
         displayedPhotoZoom={1}
         document={document}
         presentationUnit={presentationUnit}
         frameBorder={visualDefaults.frameBorder}
         focusedSheetId={focusedSheetId}
-        mediaItems={[
-          ...representativeProjection.state.album.media,
-          decorativePreview,
-        ]}
+        mediaItems={mediaItems}
         mediaPreviewUrls={
           previewUrl
             ? {
@@ -162,8 +151,6 @@ export function SheetGridPreview() {
             heightPx: 3_543,
           },
         })}
-        selectedComposedPhoto={null}
-        selectedFrame={null}
         sheetStates={sheetStates}
         sheets={sheets}
         visualDefaults={visualDefaults}
@@ -183,4 +170,174 @@ function roleFor(number: number): SheetRole {
   if (number === 1) return "initial";
   if (number === sheetColors.length) return "final";
   return "internal";
+}
+
+function renumberSheetStates(
+  sheets: readonly SheetSnapshot[],
+): SheetSnapshot[] {
+  let nextPageNumber = 1;
+  return sheets.map((sheet) => {
+    const pageCount = sheet.activeSides === "both" ? 2 : 1;
+    const pageNumbers = Array.from(
+      { length: pageCount },
+      () => nextPageNumber++,
+    );
+    return { ...sheet, pageNumbers };
+  });
+}
+
+function composePreviewSheets(
+  states: readonly SheetSnapshot[],
+  visualDefaults: ProjectedVisualDefaults,
+  mediaItems: readonly MediaCatalogItem[],
+): readonly ComposedSheet[] {
+  const source = representativeProjection.composition.sheets[0];
+  const mediaNames = new Map(mediaItems.map((media) => [media.id, media.name]));
+
+  return states.map((state, index) => {
+    const drawRect = rect(0, 0, state.widthUm, state.heightUm);
+    const showPhoto = state.activeSides === "both" && index % 2 === 1;
+    const scaleX = state.widthUm / source.widthUm;
+    const scaleY = state.heightUm / source.heightUm;
+    return {
+      activeSides: state.activeSides,
+      backgrounds: composeBackgrounds(
+        visualDefaults,
+        state.activeSides,
+        drawRect,
+        mediaNames,
+      ),
+      base: { drawRect, rgb: "#FFFFFF" },
+      frames: showPhoto
+        ? source.frames.map((frame) => ({
+            ...frame,
+            frameId: `${frame.frameId}-${state.number}`,
+            clipRect: scaleRect(frame.clipRect, scaleX, scaleY),
+            borderFillRects: frame.borderFillRects.map((border) =>
+              scaleRect(border, scaleX, scaleY),
+            ),
+            photo: frame.photo
+              ? {
+                  ...frame.photo,
+                  drawRect: scaleRect(frame.photo.drawRect, scaleX, scaleY),
+                }
+              : null,
+          }))
+        : [],
+      heightUm: state.heightUm,
+      number: state.number,
+      overlays: composeOverlays(
+        visualDefaults,
+        state.activeSides,
+        drawRect,
+        mediaNames,
+      ),
+      sheetId: state.id,
+      widthUm: state.widthUm,
+    };
+  });
+}
+
+function composeBackgrounds(
+  defaults: ProjectedVisualDefaults,
+  activeSides: ProjectedActiveSides,
+  drawRect: RectUm,
+  mediaNames: ReadonlyMap<string, string>,
+): ComposedBackground[] {
+  if (defaults.background.scope === "bothSides") {
+    return [backgroundLayer(defaults.background.both, drawRect, mediaNames)];
+  }
+  if (activeSides !== "both") {
+    return [
+      backgroundLayer(
+        defaults.background[activeSides],
+        drawRect,
+        mediaNames,
+      ),
+    ];
+  }
+  const halfWidth = drawRect.width / 2;
+  return [
+    backgroundLayer(
+      defaults.background.left,
+      rect(drawRect.x, drawRect.y, halfWidth, drawRect.height),
+      mediaNames,
+    ),
+    backgroundLayer(
+      defaults.background.right,
+      rect(drawRect.x + halfWidth, drawRect.y, halfWidth, drawRect.height),
+      mediaNames,
+    ),
+  ];
+}
+
+function composeOverlays(
+  defaults: ProjectedVisualDefaults,
+  activeSides: ProjectedActiveSides,
+  drawRect: RectUm,
+  mediaNames: ReadonlyMap<string, string>,
+): ComposedDecorative[] {
+  if (defaults.overlay.scope === "bothSides") {
+    return overlayLayer(defaults.overlay.both, drawRect, mediaNames);
+  }
+  if (activeSides !== "both") {
+    return overlayLayer(defaults.overlay[activeSides], drawRect, mediaNames);
+  }
+  const halfWidth = drawRect.width / 2;
+  return [
+    ...overlayLayer(
+      defaults.overlay.left,
+      rect(drawRect.x, drawRect.y, halfWidth, drawRect.height),
+      mediaNames,
+    ),
+    ...overlayLayer(
+      defaults.overlay.right,
+      rect(drawRect.x + halfWidth, drawRect.y, halfWidth, drawRect.height),
+      mediaNames,
+    ),
+  ];
+}
+
+function backgroundLayer(
+  content: ProjectedBackgroundContent,
+  drawRect: RectUm,
+  mediaNames: ReadonlyMap<string, string>,
+): ComposedBackground {
+  return content.kind === "color"
+    ? { drawRect, kind: "color", rgb: content.rgb }
+    : {
+        drawRect,
+        kind: "media",
+        mediaId: content.mediaId,
+        name: mediaNames.get(content.mediaId) ?? "Decorativo",
+      };
+}
+
+function overlayLayer(
+  content: ProjectedOverlayContent | null,
+  drawRect: RectUm,
+  mediaNames: ReadonlyMap<string, string>,
+): ComposedDecorative[] {
+  return content
+    ? [
+        {
+          drawRect,
+          mediaId: content.mediaId,
+          name: mediaNames.get(content.mediaId) ?? "Decorativo",
+        },
+      ]
+    : [];
+}
+
+function scaleRect(source: RectUm, scaleX: number, scaleY: number): RectUm {
+  return rect(
+    source.x * scaleX,
+    source.y * scaleY,
+    source.width * scaleX,
+    source.height * scaleY,
+  );
+}
+
+function rect(x: number, y: number, width: number, height: number): RectUm {
+  return { height, width, x, y };
 }

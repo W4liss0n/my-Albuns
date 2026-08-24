@@ -1,6 +1,19 @@
-import { forwardRef, useId, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { ChevronDown, Minus, Plus, Save } from "lucide-react";
 
+import {
+  presentConfigurationValidationErrors,
+  type ProjectConfigurationErrors as DimensionsErrors,
+  type ProjectConfigurationFieldName as DimensionsFieldName,
+} from "../application/projectConfigurationFields";
+import { displayUnitLabel } from "../application/physicalMeasurements";
 import type {
   NewProjectConfiguration,
   ProjectConfigurationValidationOutcome,
@@ -14,13 +27,9 @@ import {
   changeDisplayUnit,
   createDefaultDimensionsDraft,
   DIMENSIONS_FIELD_ORDER,
-  displayUnitLabel,
   editPhysicalField,
   getLocalInputErrors,
-  presentConfigurationValidationErrors,
   toNewProjectConfiguration,
-  type DimensionsErrors,
-  type DimensionsFieldName,
   type NewProjectDimensionsDraft,
   type PhysicalFieldName,
 } from "./application/newProjectDimensions";
@@ -666,6 +675,14 @@ function PresetControl({
   const [name, setName] = useState("");
   const presetId = useId();
   const presetNameId = useId();
+  const savePopoverId = useId();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const saveTriggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeAndRestoreFocus = useCallback(() => {
+    setIsSaving(false);
+    saveTriggerRef.current?.focus({ preventScroll: true });
+  }, []);
 
   const confirmSave = () => {
     const trimmedName = name.trim();
@@ -674,8 +691,31 @@ function PresetControl({
     }
     onSave(trimmedName);
     setName("");
-    setIsSaving(false);
+    closeAndRestoreFocus();
   };
+
+  useEffect(() => {
+    if (!isSaving) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        closeAndRestoreFocus();
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeAndRestoreFocus();
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [closeAndRestoreFocus, isSaving]);
 
   return (
     <ControlSection
@@ -683,7 +723,7 @@ function PresetControl({
       dataPlaceholderFeature="new-project-presets"
       title="Modelo inicial"
     >
-      <div className="new-project-preset-row">
+      <div className="new-project-preset-row" ref={rootRef}>
         <label className="ui-visually-hidden" htmlFor={presetId}>
           Modelo inicial
         </label>
@@ -703,8 +743,12 @@ function PresetControl({
           <AppIcon icon={ChevronDown} size={14} />
         </span>
         <button
+          aria-controls={savePopoverId}
+          aria-expanded={isSaving}
+          aria-haspopup="dialog"
           aria-label="Salvar configuração atual como modelo"
           onClick={() => setIsSaving((current) => !current)}
+          ref={saveTriggerRef}
           type="button"
         >
           <AppIcon icon={Save} size={14} />
@@ -712,7 +756,9 @@ function PresetControl({
         {isSaving ? (
           <form
             aria-label="Salvar modelo"
-            className="new-project-save-preset"
+            className="ui-floating-surface new-project-save-preset"
+            id={savePopoverId}
+            role="dialog"
             onSubmit={(event) => {
               event.preventDefault();
               confirmSave();
@@ -735,7 +781,7 @@ function PresetControl({
                 density="compact"
                 onClick={() => {
                   setName("");
-                  setIsSaving(false);
+                  closeAndRestoreFocus();
                 }}
                 type="button"
               >

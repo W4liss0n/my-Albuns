@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import type { AlbumCanvasMode } from "./albumCanvasContract";
+import { isTextEntryTarget } from "./isTextEntryTarget";
 
 interface CanvasModeKeyboardShortcutsInput {
   implicitSheetId: string | null | undefined;
@@ -46,15 +47,6 @@ export function useCanvasModeKeyboardShortcuts({
     onEnterSheetEditing,
     onExitSheetEditing,
   ]);
-}
-
-function isTextEntryTarget(target: EventTarget | null) {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
 }
 
 function isCanvasFocusTarget(target: EventTarget | null) {

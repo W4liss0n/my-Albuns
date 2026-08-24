@@ -1,28 +1,32 @@
+import type { VisualScope } from "../application/scopedValues";
 import type {
-  BackgroundDraftContent,
-  NewProjectPersonalizationDraft,
-  OverlayDraftContent,
-  PersonalizationScope,
-} from "./application/newProjectPersonalization";
+  PreviewBackgroundContent,
+  PreviewOverlayContent,
+  VisualPersonalizationPreview,
+  VisualPreviewGeometry,
+} from "../application/visualPersonalizationPreview";
 import { draftFrameBorderFillRects } from "./application/draftFrameBorderGeometry";
-import type { NewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
 import "./PersonalizationPreview.css";
 
 interface PersonalizationPreviewProps {
-  focusedScope: NewProjectPersonalizationDraft["fixedScope"] | null;
+  accessibleLabel: string;
+  focusedScope: VisualScope | null;
   frameGapUm: number;
-  geometry: NewProjectPreviewGeometry;
-  hoveredScope: NewProjectPersonalizationDraft["fixedScope"] | null;
-  personalization: NewProjectPersonalizationDraft;
+  geometry: VisualPreviewGeometry;
+  hoveredScope: VisualScope | null;
+  personalization: VisualPersonalizationPreview;
+  showTechnicalGuides: boolean;
 }
 
 export function PersonalizationPreview({
+  accessibleLabel,
   focusedScope,
   frameGapUm,
   geometry,
   hoveredScope,
   personalization,
+  showTechnicalGuides,
 }: PersonalizationPreviewProps) {
   const { heightUm, widthUm } = geometry;
   const pageWidth = widthUm / 2;
@@ -58,7 +62,7 @@ export function PersonalizationPreview({
 
   return (
     <svg
-      aria-label="Reprodução da Lâmina"
+      aria-label={accessibleLabel}
       className="new-project-sheet new-project-personalization-sheet"
       height={heightUm}
       preserveAspectRatio="xMidYMid meet"
@@ -67,7 +71,7 @@ export function PersonalizationPreview({
       width={widthUm}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <title>Reprodução da Lâmina</title>
+      <title>{accessibleLabel}</title>
       <rect
         aria-label="Base branca canônica"
         fill="#FFFFFF"
@@ -248,13 +252,13 @@ export function PersonalizationPreview({
           {...focusOutline}
         />
       ) : null}
-      <SheetGuideLayer geometry={geometry} />
+      {showTechnicalGuides ? <SheetGuideLayer geometry={geometry} /> : null}
     </svg>
   );
 }
 
 function scopeContainsPage(
-  scope: PersonalizationScope,
+  scope: VisualScope,
   pageIndex: number,
 ) {
   const descriptor = SCOPE_DESCRIPTORS[scope];
@@ -265,7 +269,7 @@ function scopeContainsPage(
 }
 
 function scopeOutline(
-  scope: PersonalizationScope,
+  scope: VisualScope,
   heightUm: number,
   pageWidth: number,
   widthUm: number,
@@ -287,7 +291,7 @@ function scopeOutline(
 
 function scopeOutlineLabel(
   prefix: "Foco de teclado" | "Pré-seleção",
-  scope: PersonalizationScope,
+  scope: VisualScope,
 ) {
   return `${prefix} ${SCOPE_DESCRIPTORS[scope].labelSuffix}`;
 }
@@ -309,7 +313,7 @@ const SCOPE_DESCRIPTORS = {
     pageCount: 1,
   },
 } as const satisfies Record<
-  PersonalizationScope,
+  VisualScope,
   { firstPageIndex: number; labelSuffix: string; pageCount: number }
 >;
 
@@ -320,7 +324,7 @@ function OverlayContent({
   width,
   x,
 }: {
-  content: OverlayDraftContent;
+  content: PreviewOverlayContent;
   height: number;
   label: string;
   width: number;
@@ -330,7 +334,7 @@ function OverlayContent({
     <image
       aria-label={label}
       height={height}
-      href={content.selection.previewUrl}
+      href={content.previewUrl}
       preserveAspectRatio="none"
       width={width}
       x={x}
@@ -346,7 +350,7 @@ function BackgroundContent({
   width,
   x,
 }: {
-  content: BackgroundDraftContent;
+  content: PreviewBackgroundContent;
   height: number;
   label: string;
   width: number;
@@ -365,7 +369,7 @@ function BackgroundContent({
     <image
       aria-label={label}
       height={height}
-      href={content.selection.previewUrl}
+      href={content.previewUrl}
       preserveAspectRatio="none"
       width={width}
       x={x}
