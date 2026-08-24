@@ -20,17 +20,10 @@ import type {
 import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
 import { representativeProjection } from "./test/projectFixtures";
 
-const sheetColors = [
-  "#2b2823",
-  "#efeae1",
-  "#f7f4ef",
-  "#e3ded4",
-  "#efeae1",
-  "#2b2823",
-] as const;
+const PREVIEW_SHEET_COUNT = 6;
 
 const initialSheetStates: readonly SheetSnapshot[] = renumberSheetStates(
-  sheetColors.map((_, index) => {
+  Array.from({ length: PREVIEW_SHEET_COUNT }, (_, index) => {
     const number = index + 1;
     const activeSides = activeSidesFor(number);
     return {
@@ -162,13 +155,13 @@ export function SheetGridPreview() {
 
 function activeSidesFor(number: number): ProjectedActiveSides {
   if (number === 1) return "right";
-  if (number === sheetColors.length) return "left";
+  if (number === PREVIEW_SHEET_COUNT) return "left";
   return "both";
 }
 
 function roleFor(number: number): SheetRole {
   if (number === 1) return "initial";
-  if (number === sheetColors.length) return "final";
+  if (number === PREVIEW_SHEET_COUNT) return "final";
   return "internal";
 }
 

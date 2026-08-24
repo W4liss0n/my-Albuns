@@ -7,6 +7,7 @@ import type {
 } from "../domain/project";
 import { ActionButton } from "../ui";
 import { SheetPreview } from "./SheetPreview";
+import { SHEET_VISUAL_STYLE } from "./sheetVisualStyle";
 import "./SheetDesignInspector.css";
 
 export type SheetDesignScope = VisualScope;
@@ -247,7 +248,9 @@ function VisualSwatch({
           ? { backgroundColor: value.rgb }
           : previewUrl
             ? { backgroundImage: `url("${previewUrl}")` }
-            : undefined
+            : value.kind === "media"
+              ? { backgroundColor: SHEET_VISUAL_STYLE.mediaFallback.fill }
+              : undefined
       }
     />
   );

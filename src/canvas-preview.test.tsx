@@ -44,8 +44,12 @@ afterEach(() => {
 });
 
 test("enters Sheet Edit Mode with Enter while the preview Canvas has focus", () => {
-  window.history.replaceState({}, "", "/canvas-preview.html");
-  render(<CanvasPreview />);
+  window.history.replaceState(
+    {},
+    "",
+    "/canvas-preview.html?acceptance=editor",
+  );
+  const view = render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");
 
   canvas.focus();
@@ -53,6 +57,12 @@ test("enters Sheet Edit Mode with Enter while the preview Canvas has focus", () 
 
   expect(canvas).toHaveAttribute("data-mode", "sheet-editing");
   expect(canvas).toHaveAttribute("data-sheet", "sheet-002");
+  expect(
+    view.container.querySelector('[data-canvas-mode="sheet-editing"]'),
+  ).toBeInTheDocument();
+  expect(
+    view.container.querySelector('[data-acceptance-surface="editor"]'),
+  ).toBeInTheDocument();
 });
 
 test("returns to normal mode with Escape from the preview Sheet Edit Mode", () => {
@@ -61,13 +71,16 @@ test("returns to normal mode with Escape from the preview Sheet Edit Mode", () =
     "",
     "/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
   );
-  render(<CanvasPreview />);
+  const view = render(<CanvasPreview />);
   const canvas = screen.getByTestId("canvas-preview-surface");
   expect(canvas).toHaveAttribute("data-mode", "sheet-editing");
 
   fireEvent.keyDown(window, { key: "Escape" });
 
   expect(canvas).toHaveAttribute("data-mode", "normal");
+  expect(
+    view.container.querySelector('[data-canvas-mode="normal"]'),
+  ).toBeInTheDocument();
 });
 
 test("centers the edited Sheet when the preview returns to normal mode", () => {

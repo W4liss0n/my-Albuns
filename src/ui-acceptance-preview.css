@@ -107,6 +107,12 @@ body {
   text-decoration: none;
 }
 
+.acceptance-scenario__actions > span {
+  align-self: center;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-action);
+}
+
 .acceptance-scenario__actions a:first-child {
   border-color: var(--ui-accent);
   color: var(--ui-accent);

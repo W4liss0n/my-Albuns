@@ -1,6 +1,130 @@
+use std::collections::BTreeMap;
+
 use myalbuns_core::EditorProjection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspacePreferences {
+    pub(crate) inspector_sections: BTreeMap<String, bool>,
+    pub(crate) media_thumbnail_sizes: MediaThumbnailSizes,
+    pub(crate) workspace_panels: WorkspacePanelPreferences,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaThumbnailSizes {
+    pub(crate) decorative: u16,
+    pub(crate) photo: u16,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspacePanelPreferences {
+    pub(crate) inspector: Option<WorkspacePanelPreference>,
+    pub(crate) media: Option<WorkspacePanelPreference>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspacePanelPreference {
+    pub(crate) size: u16,
+    pub(crate) visible: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum WorkspacePreferenceChange {
+    InspectorSection {
+        preference_key: String,
+        open: bool,
+    },
+    MediaThumbnailSize {
+        media_kind: MediaPreferenceKind,
+        size: u16,
+    },
+    WorkspacePanelSize {
+        panel: WorkspacePanelKind,
+        size: u16,
+    },
+    WorkspacePanelVisibility {
+        panel: WorkspacePanelKind,
+        visible: bool,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaPreferenceKind {
+    Decorative,
+    Photo,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum WorkspacePanelKind {
+    Inspector,
+    Media,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSettings {
+    pub(crate) media_panel: MediaPanelSettings,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaPanelSettings {
+    pub(crate) decorative: MediaPanelTabSettings,
+    pub(crate) photo: MediaPanelTabSettings,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaPanelTabSettings {
+    pub(crate) sort_direction: MediaSortDirection,
+    pub(crate) usage_filter: MediaUsageFilter,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaSortDirection {
+    Ascending,
+    Descending,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum MediaUsageFilter {
+    All,
+    Used,
+    Unused,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum SettingsPreferenceChange {
+    MediaPanelSortDirection {
+        media_kind: MediaPreferenceKind,
+        sort_direction: MediaSortDirection,
+    },
+    MediaPanelUsageFilter {
+        media_kind: MediaPreferenceKind,
+        usage_filter: MediaUsageFilter,
+    },
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "snake_case")]

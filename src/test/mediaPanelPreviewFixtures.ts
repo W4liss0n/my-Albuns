@@ -10,7 +10,7 @@ import retratoUrl from "./dev-media/retrato.svg";
 import serraAmanhecerUrl from "./dev-media/serra-amanhecer.svg";
 import serraNevoaUrl from "./dev-media/serra-nevoa.svg";
 
-// Preview-only data. This catalog simulates imported Fotos and must not be
+// Preview-only data. This catalog simulates imported Fotos and Decorativos and must not be
 // used by any production entry point or persisted in a real Projeto.
 const importedPhotos = [
   photo({
@@ -105,12 +105,35 @@ const importedPhotos = [
   }),
 ];
 
-const mediaItems: readonly MediaCatalogItem[] = importedPhotos.map(
+const importedDecoratives = [
+  decorative({
+    id: "test-decorative-001",
+    name: "Textura serra.svg",
+    sourceWidthPx: 1_600,
+    sourceHeightPx: 900,
+    palette: ["#1d2a3a", "#be7b5b", "#f0cf8f"],
+    previewUrl: serraAmanhecerUrl,
+    usageCount: 0,
+  }),
+  decorative({
+    id: "test-decorative-002",
+    name: "Textura campo.svg",
+    sourceWidthPx: 1_200,
+    sourceHeightPx: 1_200,
+    palette: ["#9b7c4e", "#d2af62", "#ebdfc3"],
+    previewUrl: campoDouradoUrl,
+    usageCount: 1,
+  }),
+];
+
+const importedMedia = [...importedPhotos, ...importedDecoratives];
+
+const mediaItems: readonly MediaCatalogItem[] = importedMedia.map(
   ({ media }) => media,
 );
 
 const mediaPreviews = Object.fromEntries(
-  importedPhotos.map(({ media, previewUrl }) => [
+  importedMedia.map(({ media, previewUrl }) => [
     media.id,
     {
       mediaId: media.id,
@@ -120,7 +143,7 @@ const mediaPreviews = Object.fromEntries(
   ]),
 );
 
-const mediaUsage: readonly MediaUsage[] = importedPhotos.map(
+const mediaUsage: readonly MediaUsage[] = importedMedia.map(
   ({ media, usageCount }) => ({
     mediaId: media.id,
     count: usageCount,
@@ -133,16 +156,27 @@ export const mediaPanelPreviewFixture = {
   mediaUsage,
 } as const;
 
-interface PreviewPhotoInput extends Omit<MediaCatalogItem, "kind"> {
+interface PreviewMediaInput extends Omit<MediaCatalogItem, "kind"> {
   previewUrl: string;
   usageCount: number;
 }
 
-function photo({ previewUrl, usageCount, ...media }: PreviewPhotoInput) {
+function photo({ previewUrl, usageCount, ...media }: PreviewMediaInput) {
   return {
     media: {
       ...media,
       kind: "photo",
+    } satisfies MediaCatalogItem,
+    previewUrl,
+    usageCount,
+  };
+}
+
+function decorative({ previewUrl, usageCount, ...media }: PreviewMediaInput) {
+  return {
+    media: {
+      ...media,
+      kind: "decorative",
     } satisfies MediaCatalogItem,
     previewUrl,
     usageCount,

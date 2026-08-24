@@ -34,6 +34,7 @@ import {
   type AlbumDesignScope,
 } from "./albumDesignDraft";
 import { DecorativeMediaPicker } from "./DecorativeMediaPicker";
+import { useSemanticBaseline } from "./useSemanticBaseline";
 
 const DEFAULT_FRAME_BORDER = { rgb: "#2C2924", widthUm: 1_000 };
 
@@ -59,7 +60,8 @@ export function AlbumDesignForm({
   onReadyChange,
 }: AlbumDesignFormProps) {
   const baselineSignature = JSON.stringify(value);
-  const [draft, setDraft] = useState(value);
+  const baseline = useSemanticBaseline(value, baselineSignature);
+  const [draft, setDraft] = useState(baseline);
   const [scope, setScope] = useState<AlbumDesignScope>("both");
   const [focusedScope, setFocusedScope] = useState<VisualScope | null>(null);
   const [hoveredScope, setHoveredScope] = useState<VisualScope | null>(null);
@@ -102,13 +104,16 @@ export function AlbumDesignForm({
   };
 
   useEffect(() => {
-    setDraft(value);
+    setDraft(baseline);
     setBorderEditor((current) =>
-      value.frameBorder.kind === "solid"
-        ? { rgb: value.frameBorder.rgb, widthUm: value.frameBorder.widthUm }
+      baseline.frameBorder.kind === "solid"
+        ? {
+            rgb: baseline.frameBorder.rgb,
+            widthUm: baseline.frameBorder.widthUm,
+          }
         : current,
     );
-  }, [baselineSignature, value]);
+  }, [baseline]);
 
   useLayoutEffect(() => onReadyChange(ready), [onReadyChange, ready]);
 

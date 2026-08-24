@@ -149,17 +149,67 @@ test("keeps inactive sides inert for a single-page Sheet", () => {
   });
 });
 
-test("stores accordion preferences independently for the Sheet context", () => {
-  render(<InspectorPanel {...inspectorProps(sheetContext())} />);
+test("uses the canonical media fallback when a Sheet decorative has no preview", () => {
+  const sheetWithoutDecorativePreview = {
+    ...composedSheet,
+    backgrounds: [
+      {
+        drawRect: {
+          height: composedSheet.heightUm,
+          width: composedSheet.widthUm,
+          x: 0,
+          y: 0,
+        },
+        kind: "media" as const,
+        mediaId: "decorative-without-preview",
+        name: "Textura sem prévia",
+      },
+    ],
+  };
+  render(
+    <InspectorPanel
+      {...inspectorProps({
+        kind: "sheet",
+        sheet: sheetWithoutDecorativePreview,
+      })}
+    />,
+  );
+
+  const value = screen.getByText("Textura sem prévia").closest(
+    ".sheet-design-value",
+  ) as HTMLElement;
+  expect(value.querySelector(".sheet-design-value__swatch--media")).toHaveStyle(
+    { backgroundColor: "#D8DEE2" },
+  );
+});
+
+test("reads and publishes accordion preferences through the shared workspace state", () => {
+  const onSectionPreferenceChange = vi.fn();
+  const view = render(
+    <InspectorPanel
+      {...inspectorProps(sheetContext())}
+      sectionPreferences={{ "sheet.design": true }}
+      onSectionPreferenceChange={onSectionPreferenceChange}
+    />,
+  );
 
   const trigger = screen.getByRole("button", { name: "Design da Lâmina" });
   fireEvent.click(trigger);
 
-  expect(localStorage.getItem("myalbuns.inspector.sheet.design")).toBe(
-    "closed",
+  expect(onSectionPreferenceChange).toHaveBeenCalledWith(
+    "sheet.design",
+    false,
   );
-  expect(localStorage.getItem("myalbuns.inspector.album.design")).toBeNull();
-  expect(localStorage.getItem("myalbuns.inspector.frame-photo.design")).toBeNull();
+  expect(localStorage.getItem("myalbuns.inspector.sheet.design")).toBeNull();
+
+  view.rerender(
+    <InspectorPanel
+      {...inspectorProps(sheetContext())}
+      sectionPreferences={{ "sheet.design": false }}
+      onSectionPreferenceChange={onSectionPreferenceChange}
+    />,
+  );
+  expect(trigger).toHaveAttribute("aria-expanded", "false");
 });
 
 test("marks unavailable Sheet-design mutations as explicit placeholders", () => {

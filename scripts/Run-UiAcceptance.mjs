@@ -23,6 +23,11 @@ import {
   validateUiAcceptanceManifest,
   webdriverElementId,
 } from "./UiAcceptance.mjs";
+import {
+  captureUiAcceptanceScreenshot,
+  neutralizeUiAcceptancePointer,
+  performUiAcceptanceAction,
+} from "./UiAcceptanceRunner.mjs";
 
 const [workspaceArgument, outputArgument, edgeArgument, driverArgument] =
   process.argv.slice(2);
@@ -87,7 +92,7 @@ function gitOutput(arguments_) {
 }
 
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   gate: "ui-acceptance",
   collectedAtUtc: new Date().toISOString(),
   gitCommit: gitOutput(["rev-parse", "HEAD"]),
@@ -274,16 +279,13 @@ function xpathLiteral(value) {
     .join(`, "'", `)})`;
 }
 
-async function actionElement(request, sessionId, action, label) {
-  if (action.type === "click") {
-    return waitForElement(request, sessionId, action.selector, label);
-  }
+async function waitForButtonText(request, sessionId, text, label) {
   return waitForLocatedElement(
     request,
     sessionId,
     {
       using: "xpath",
-      value: `//button[normalize-space(.)=${xpathLiteral(action.text)}]`,
+      value: `//button[normalize-space(.)=${xpathLiteral(text)}]`,
     },
     label,
   );
@@ -399,6 +401,7 @@ async function navigateAndCapture({
   servedPath,
   readySelector,
   actions,
+  captureSelector,
   screenshotPath,
   label,
 }) {
@@ -409,28 +412,36 @@ async function navigateAndCapture({
   });
   await waitForNavigation(request, sessionId, targetUrl, label);
   await settleDocument(request, sessionId);
+  await neutralizeUiAcceptancePointer({
+    request,
+    sessionId,
+    viewport: scenario.viewport,
+  });
+  await settleDocument(request, sessionId);
+  const locateSelector = (selector) =>
+    waitForElement(request, sessionId, selector, `${label} action`);
+  const locateText = (text) =>
+    waitForButtonText(request, sessionId, text, `${label} action`);
   for (const action of actions) {
-    const elementId = await actionElement(
+    await performUiAcceptanceAction({
+      action,
+      execute: (script, args) => execute(request, sessionId, script, args),
+      locateSelector,
+      locateText,
       request,
       sessionId,
-      action,
-      `${label} action`,
-    );
-    await request(
-      "POST",
-      `/session/${sessionId}/element/${encodeURIComponent(elementId)}/click`,
-      {},
-    );
+    });
     await settleDocument(request, sessionId);
   }
   await waitForElement(request, sessionId, readySelector, label);
   await settleDocument(request, sessionId);
-  const screenshot = await request(
-    "GET",
-    `/session/${sessionId}/screenshot`,
-    undefined,
-    15_000,
-  );
+  const screenshot = await captureUiAcceptanceScreenshot({
+    captureSelector,
+    locateSelector: (selector) =>
+      waitForElement(request, sessionId, selector, `${label} capture`),
+    request,
+    sessionId,
+  });
   if (typeof screenshot !== "string" || !screenshot) {
     throw new Error(`${label} returned no screenshot`);
   }
@@ -510,6 +521,7 @@ try {
 
   for (const scenario of manifest.scenarios) {
     console.log(`Capturing ${scenario.id}`);
+    const paired = scenario.comparison.kind === "paired";
     const implementationName = `${scenario.id}-implementation.png`;
     const referenceName = `${scenario.id}-reference.png`;
     const implementationPath = path.join(screenshotsDirectory, implementationName);
@@ -517,11 +529,18 @@ try {
     const result = {
       ...scenario,
       captureStatus: "capture-failed",
+      comparisonStatus: paired
+        ? "paired-unreviewed"
+        : "reference-unavailable",
       reviewStatus: "not-reviewed",
       implementationUrl: `${frontendOrigin}${scenario.implementationPath}`,
-      referenceUrl: `${frontendOrigin}${scenario.referencePath}`,
       implementationScreenshot: `screenshots/${implementationName}`,
-      referenceScreenshot: `screenshots/${referenceName}`,
+      ...(paired
+        ? {
+            referenceUrl: `${frontendOrigin}${scenario.referencePath}`,
+            referenceScreenshot: `screenshots/${referenceName}`,
+          }
+        : {}),
     };
     try {
       await navigateAndCapture({
@@ -531,19 +550,24 @@ try {
         servedPath: scenario.implementationPath,
         readySelector: scenario.readySelector,
         actions: scenario.actions,
+        captureSelector:
+          scenario.comparison.implementationCaptureSelector,
         screenshotPath: implementationPath,
         label: `${scenario.id} implementation`,
       });
-      await navigateAndCapture({
-        request,
-        sessionId,
-        scenario,
-        servedPath: scenario.referencePath,
-        readySelector: "body",
-        actions: scenario.referenceActions ?? [],
-        screenshotPath: referencePath,
-        label: `${scenario.id} reference`,
-      });
+      if (paired) {
+        await navigateAndCapture({
+          request,
+          sessionId,
+          scenario,
+          servedPath: scenario.referencePath,
+          readySelector: scenario.referenceReadySelector ?? "body",
+          actions: scenario.referenceActions ?? [],
+          captureSelector: scenario.comparison.referenceCaptureSelector,
+          screenshotPath: referencePath,
+          label: `${scenario.id} reference`,
+        });
+      }
       result.captureStatus = "captured-unreviewed";
       console.log(`Captured ${scenario.id}`);
     } catch (error) {
@@ -556,12 +580,18 @@ try {
   fatalError = error;
   const message = error instanceof Error ? error.stack ?? error.message : String(error);
   for (const scenario of manifest.scenarios.slice(evidence.scenarios.length)) {
+    const paired = scenario.comparison.kind === "paired";
     evidence.scenarios.push({
       ...scenario,
       captureStatus: "capture-failed",
+      comparisonStatus: paired
+        ? "paired-unreviewed"
+        : "reference-unavailable",
       reviewStatus: "not-reviewed",
       implementationUrl: `${frontendOrigin}${scenario.implementationPath}`,
-      referenceUrl: `${frontendOrigin}${scenario.referencePath}`,
+      ...(paired
+        ? { referenceUrl: `${frontendOrigin}${scenario.referencePath}` }
+        : {}),
       error: message,
     });
   }

@@ -97,6 +97,8 @@ pub(crate) fn run(
         .manage(MediaMonitor::default())
         .manage(ExportAttempts::default())
         .manage(crate::project_dialog_window::ProjectDialogStateStore::default())
+        .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
+        .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if window.label() != PROJECT_WINDOW_LABEL {
@@ -167,6 +169,10 @@ pub(crate) fn run(
             crate::media_preview_commands::prepare_media_previews,
             crate::export_commands::export_sheet,
             crate::export_commands::cancel_export,
+            crate::workspace_preferences::workspace_preferences,
+            crate::workspace_preferences::update_workspace_preference,
+            crate::settings_preferences::application_settings,
+            crate::settings_preferences::update_application_setting,
         ])
         .run(context);
     run_result?;

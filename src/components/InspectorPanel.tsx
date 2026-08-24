@@ -16,10 +16,6 @@ import type {
   ProjectedVisualDefaults,
   SheetSnapshot,
 } from "../domain/project";
-import {
-  readInspectorSectionPreference,
-  writeInspectorSectionPreference,
-} from "../state/workspacePreferences";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
@@ -85,6 +81,8 @@ export interface InspectorPanelProps {
   ): Promise<AlbumInformationValidation>;
   onPresentationUnitChange(unit: DisplayUnit | null): void;
   onNavigateToSheet(sheetId: string): void;
+  onSectionPreferenceChange?(preferenceKey: string, open: boolean): void;
+  sectionPreferences?: Readonly<Record<string, boolean>>;
 }
 
 export function InspectorPanel({
@@ -109,6 +107,8 @@ export function InspectorPanel({
   onPresentationUnitChange,
   onValidateAlbumInformation,
   onNavigateToSheet,
+  onSectionPreferenceChange,
+  sectionPreferences,
 }: InspectorPanelProps) {
   const [informationDirty, setInformationDirty] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
@@ -155,6 +155,8 @@ export function InspectorPanel({
               key="frame-photo-design"
               title="Design"
               preferenceKey="frame-photo.design"
+              sectionPreferences={sectionPreferences}
+              onSectionPreferenceChange={onSectionPreferenceChange}
               defaultOpen
             >
               <PropertyRow
@@ -213,6 +215,8 @@ export function InspectorPanel({
             key="sheet-design"
             title="Design da Lâmina"
             preferenceKey="sheet.design"
+            sectionPreferences={sectionPreferences}
+            onSectionPreferenceChange={onSectionPreferenceChange}
             defaultOpen
           >
             <SheetDesignInspector
@@ -246,6 +250,8 @@ export function InspectorPanel({
               key="album-information"
               title="Informações do Álbum"
               preferenceKey="album.information"
+              sectionPreferences={sectionPreferences}
+              onSectionPreferenceChange={onSectionPreferenceChange}
               defaultOpen
             >
               <div className="inspector-subsections">
@@ -276,6 +282,8 @@ export function InspectorPanel({
               key="album-design"
               title="Design do Álbum"
               preferenceKey="album.design"
+              sectionPreferences={sectionPreferences}
+              onSectionPreferenceChange={onSectionPreferenceChange}
               defaultOpen
             >
               <AlbumDesignForm
@@ -294,6 +302,8 @@ export function InspectorPanel({
               key="album-sheet-grid"
               title="Grade de Lâminas"
               preferenceKey="album.sheet-grid"
+              sectionPreferences={sectionPreferences}
+              onSectionPreferenceChange={onSectionPreferenceChange}
               meta={sheets.length}
               defaultOpen
             >
@@ -368,6 +378,8 @@ function InspectorSection({
   meta,
   defaultOpen = false,
   children,
+  onSectionPreferenceChange,
+  sectionPreferences,
 }: {
   action?: ReactNode;
   accessibleTitle?: string;
@@ -376,17 +388,19 @@ function InspectorSection({
   meta?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
+  onSectionPreferenceChange?(preferenceKey: string, open: boolean): void;
+  sectionPreferences?: Readonly<Record<string, boolean>>;
 }) {
-  const [open, setOpen] = useState(() =>
-    readInspectorSectionPreference(preferenceKey, defaultOpen),
-  );
+  const [fallbackOpen, setFallbackOpen] = useState(defaultOpen);
+  const open = sectionPreferences?.[preferenceKey] ?? fallbackOpen;
 
   function toggle() {
-    setOpen((current) => {
-      const next = !current;
-      writeInspectorSectionPreference(preferenceKey, next);
-      return next;
-    });
+    const next = !open;
+    if (onSectionPreferenceChange) {
+      onSectionPreferenceChange(preferenceKey, next);
+      return;
+    }
+    setFallbackOpen(next);
   }
 
   return (

@@ -8,6 +8,7 @@ import {
 export type ApplicationMenuCommand =
   | {
       availability: "implemented";
+      checked?: boolean;
       context?: string;
       disabled?: boolean;
       id: string;
@@ -288,7 +289,16 @@ export function ApplicationMenuBar({
         data-placeholder-feature={placeholder ? item.feature : undefined}
         disabled={placeholder || item.disabled}
         key={item.id}
-        role="menuitem"
+        aria-checked={
+          !placeholder && item.checked !== undefined
+            ? item.checked
+            : undefined
+        }
+        role={
+          !placeholder && item.checked !== undefined
+            ? "menuitemcheckbox"
+            : "menuitem"
+        }
         title={placeholder ? PLACEHOLDER_TITLE : undefined}
         type="button"
         onClick={() => {
@@ -300,7 +310,14 @@ export function ApplicationMenuBar({
           if (!nested && openSubmenuIdRef.current !== null) closeSubmenu();
         }}
       >
-        <span>{item.label}</span>
+        <span>
+          {!placeholder && item.checked !== undefined && (
+            <span aria-hidden="true" className="app-menu-checkmark">
+              {item.checked ? "✓" : ""}
+            </span>
+          )}
+          {item.label}
+        </span>
         {item.shortcut && (
           <span className="app-menu-shortcut">{item.shortcut}</span>
         )}

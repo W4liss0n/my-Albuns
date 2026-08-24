@@ -1,4 +1,5 @@
 export type ProjectCommandContext =
+  | "welcome"
   | "project-window"
   | "sheet"
   | "frame"
@@ -73,9 +74,13 @@ const DEFINITIONS = [
     label: "Novo Projeto…",
     description: "Inicia a criação de um novo Projeto.",
     kind: "application",
-    contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "new-project-from-project-window",
+    bindings: [
+      implementedBinding("welcome"),
+      placeholderBinding(
+        "project-window",
+        "new-project-from-project-window",
+      ),
+    ],
     shortcuts: [shortcut("n", "Ctrl+N", { ctrlKey: true })],
   }),
   command({
@@ -83,9 +88,13 @@ const DEFINITIONS = [
     label: "Abrir Projeto…",
     description: "Abre outro Projeto existente.",
     kind: "application",
-    contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "open-project-from-project-window",
+    bindings: [
+      implementedBinding("welcome"),
+      placeholderBinding(
+        "project-window",
+        "open-project-from-project-window",
+      ),
+    ],
     shortcuts: [shortcut("o", "Ctrl+O", { ctrlKey: true })],
   }),
   command({
@@ -315,8 +324,7 @@ const DEFINITIONS = [
     description: "Mostra ou oculta o Painel de imagens.",
     kind: "interface",
     contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "toggle-media-panel",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -325,8 +333,7 @@ const DEFINITIONS = [
     description: "Mostra ou oculta o Painel contextual.",
     kind: "interface",
     contexts: ["project-window"],
-    availability: "placeholder",
-    placeholderFeature: "toggle-contextual-panel",
+    availability: "implemented",
     shortcuts: [],
   }),
   command({
@@ -410,6 +417,23 @@ export function projectCommandShortcutLabel(commandId: ProjectCommandId) {
   return projectCommandDescriptor(commandId).shortcuts.find(
     (candidate) => candidate.display !== undefined,
   )?.display;
+}
+
+export function projectCommandShortcutAria(commandId: ProjectCommandId) {
+  const candidate = projectCommandDescriptor(commandId).shortcuts.find(
+    (shortcut) => shortcut.display !== undefined,
+  );
+  if (!candidate) return undefined;
+  return [
+    candidate.ctrlKey ? "Control" : null,
+    candidate.altKey ? "Alt" : null,
+    candidate.shiftKey ? "Shift" : null,
+    candidate.key.length === 1
+      ? candidate.key.toLocaleUpperCase("en-US")
+      : candidate.key,
+  ]
+    .filter(Boolean)
+    .join("+");
 }
 
 export function projectCommandBinding(

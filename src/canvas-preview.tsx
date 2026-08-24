@@ -126,6 +126,10 @@ const sheetBarMetadata: readonly SheetBarMetadata[] = [
 ];
 
 export function CanvasPreview() {
+  const acceptanceSurface =
+    new URLSearchParams(window.location.search).get("acceptance") === "editor"
+      ? "editor"
+      : undefined;
   const layout = useMemo(
     () =>
       createNormalCanvasLayout(
@@ -182,7 +186,15 @@ export function CanvasPreview() {
   });
 
   return (
-    <main className="canvas-preview canvas-section" data-development-preview="canvas">
+    <main
+      className="canvas-preview canvas-section"
+      data-acceptance-surface={acceptanceSurface}
+      data-canvas-mode={mode.kind}
+      data-development-preview="canvas"
+      data-editing-sheet={
+        mode.kind === "sheet-editing" ? mode.sheetId : undefined
+      }
+    >
       <AlbumCanvas
         projectId="canvas-visual-preview"
         mode={mode}

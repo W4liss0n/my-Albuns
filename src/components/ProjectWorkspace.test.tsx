@@ -27,6 +27,12 @@ import {
   SaveProjectError,
 } from "../application/projectPorts";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import {
+  applyWorkspacePreferenceChange,
+  createFallbackWorkspacePreferencesPort,
+  createWorkspacePreferences,
+  type WorkspacePreferencesPort,
+} from "../application/workspacePreferences";
 import type { EditorProjection } from "../domain/project";
 import { useEditorView } from "../state/editorView";
 import {
@@ -298,7 +304,10 @@ function getApplicationCommand(
   if (menu.getAttribute("aria-expanded") !== "true") {
     fireEvent.click(menu);
   }
-  return screen.getByRole("menuitem", { name: commandName });
+  return (
+    screen.queryByRole("menuitem", { name: commandName }) ??
+    screen.getByRole("menuitemcheckbox", { name: commandName })
+  );
 }
 
 beforeEach(() => {
@@ -395,7 +404,11 @@ test("presents the canonical desktop menus and marks unfinished commands", () =>
     screen.getByRole("menuitem", { name: "Trazer para frente" }),
   ).toBeDisabled();
   expect(getApplicationCommand("Lâmina", "Adicionar depois")).toBeDisabled();
-  expect(getApplicationCommand("Exibir", "Painel de imagens")).toBeDisabled();
+  expect(getApplicationCommand("Exibir", "Painel de imagens")).toBeEnabled();
+  expect(getApplicationCommand("Exibir", "Painel de imagens")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
   expect(getApplicationCommand("Ferramentas", "Configurações…")).toBeDisabled();
   expect(getApplicationCommand("Ajuda", "Manual do MyAlbuns")).toBeDisabled();
 });
@@ -456,6 +469,164 @@ test("temporarily compacts the image panel during Sheet Edit Mode and restores i
     workspace.style.getPropertyValue("--media-panel-height"),
   ).toBe(normalHeight);
   input.remove();
+});
+
+test("hydrates and publishes machine-local Inspector and media density preferences", async () => {
+  let persisted = createWorkspacePreferences({
+    inspectorSections: { "album.information": false },
+    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+  });
+  const update = vi.fn<WorkspacePreferencesPort["update"]>(async (change) => {
+    persisted = applyWorkspacePreferenceChange(persisted, change);
+    return persisted;
+  });
+  const workspacePreferencesPort: WorkspacePreferencesPort = {
+    load: vi.fn(async () => persisted),
+    update,
+  };
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      workspacePreferencesPort={workspacePreferencesPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const information = screen.getByRole("button", {
+    name: "Informações do Álbum",
+  });
+  await waitFor(() =>
+    expect(information).toHaveAttribute("aria-expanded", "false"),
+  );
+  fireEvent.click(information);
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith({
+      kind: "inspectorSection",
+      preferenceKey: "album.information",
+      open: true,
+    }),
+  );
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const size = screen.getByRole("slider", {
+    name: "Tamanho das miniaturas",
+  });
+  expect(size).toHaveValue("124");
+  fireEvent.change(size, { target: { value: "126" } });
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith({
+      kind: "mediaThumbnailSize",
+      mediaKind: "photo",
+      size: 126,
+    }),
+  );
+});
+
+test("toggles canonical panel commands and persists visibility with the current size", async () => {
+  let persisted = createWorkspacePreferences({
+    workspacePanels: {
+      inspector: { size: 350, visible: false },
+      media: { size: 200, visible: true },
+    },
+  });
+  const update = vi.fn<WorkspacePreferencesPort["update"]>(async (change) => {
+    persisted = applyWorkspacePreferenceChange(persisted, change);
+    return persisted;
+  });
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      workspacePreferencesPort={{ load: async () => persisted, update }}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("complementary", { name: "Painel contextual" }),
+    ).not.toBeInTheDocument(),
+  );
+  const showInspector = getApplicationCommand(
+    "Exibir",
+    "Painel contextual",
+  );
+  expect(showInspector).toHaveAttribute("aria-checked", "false");
+  fireEvent.click(showInspector);
+
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith({
+      kind: "workspacePanelVisibility",
+      panel: "inspector",
+      visible: true,
+    }),
+  );
+  expect(
+    screen.getByRole("complementary", { name: "Painel contextual" }),
+  ).toBeInTheDocument();
+
+  const hideMedia = getApplicationCommand("Exibir", "Painel de imagens");
+  expect(hideMedia).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(hideMedia);
+
+  await waitFor(() =>
+    expect(update).toHaveBeenCalledWith({
+      kind: "workspacePanelVisibility",
+      panel: "media",
+      visible: false,
+    }),
+  );
+  expect(
+    screen.queryByRole("region", { name: "Painel de imagens" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("region", { name: "Área de composição" }).parentElement,
+  ).toHaveStyle({
+    "--media-panel-height": "0px",
+    "--media-splitter-size": "0px",
+  });
+});
+
+test("consumes the first Escape in the image-panel options before leaving Sheet Edit Mode", () => {
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
+  expect(canvasHarness.props?.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(
+    screen.getByRole("group", { name: "Filtro, ordem e tamanho" }),
+  ).toBeInTheDocument();
+
+  expect(fireEvent.keyDown(document, { key: "Escape" })).toBe(false);
+
+  expect(
+    screen.queryByRole("group", { name: "Filtro, ordem e tamanho" }),
+  ).not.toBeInTheDocument();
+  expect(canvasHarness.props?.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
+
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(canvasHarness.props?.mode).toEqual({ kind: "normal" });
 });
 
 test("starts the implemented Lâmina export from the Arquivo menu", () => {
@@ -782,13 +953,15 @@ test("forwards a fatal Canvas graphics diagnostic without interpreting it", () =
   expect(onGraphicsUnavailable).toHaveBeenCalledWith(diagnostic);
 });
 
-test("restores accordion preferences after context changes and remounts", () => {
+test("restores accordion preferences after context changes and remounts", async () => {
+  const workspacePreferencesPort = createFallbackWorkspacePreferencesPort();
   const renderWorkspace = () =>
     render(
       <ProjectWorkspace
         exportPort={exportPort}
         projection={projection}
         projectSessionPort={projectSessionPortWithApply(async () => projection)}
+        workspacePreferencesPort={workspacePreferencesPort}
         onProjectionChange={() => undefined}
       />,
     );
@@ -812,11 +985,21 @@ test("restores accordion preferences after context changes and remounts", () => 
     screen.getByRole("button", { name: "Informações do Álbum" }),
   ).toHaveAttribute("aria-expanded", "false");
 
+  await waitFor(async () =>
+    expect(
+      (await workspacePreferencesPort.load()).inspectorSections[
+        "album.information"
+      ],
+    ).toBe(false),
+  );
+
   firstView.unmount();
   renderWorkspace();
-  expect(
-    screen.getByRole("button", { name: "Informações do Álbum" }),
-  ).toHaveAttribute("aria-expanded", "false");
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: "Informações do Álbum" }),
+    ).toHaveAttribute("aria-expanded", "false"),
+  );
 });
 
 test("uses the reference chrome and collapsible contextual sections", () => {
@@ -2207,6 +2390,311 @@ test("saves the visible revision and applies the authoritative saved projection"
   expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
+test("preserves both unapplied Album drafts when Save returns an equivalent projection", async () => {
+  const savedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      document: { ...projection.state.document },
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          background: { ...projection.state.album.visualDefaults.background },
+          overlay: { ...projection.state.album.visualDefaults.overlay },
+          frameBorder: { ...projection.state.album.visualDefaults.frameBorder },
+        },
+      },
+      savedRevision: projection.state.revision,
+      dirty: false,
+    },
+  };
+  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+    outcome: { kind: "saved", revision: savedProjection.state.revision },
+    projection: savedProjection,
+  }));
+  const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  projectSessionPort.save = save;
+  const onProjectionChange = vi.fn();
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
+  await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(savedProjection));
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={savedProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(information.getByLabelText("DPI")).toHaveValue("600");
+  expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("preserves the Album Information draft when Album Design is applied", async () => {
+  const appliedDesignProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: projection.state.revision + 1,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          background: {
+            scope: "bothSides",
+            both: { kind: "color", rgb: "#F7F5F0" },
+          },
+        },
+      },
+    },
+  };
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    appliedDesignProjection,
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  const onProjectionChange = vi.fn();
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+
+  fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(onProjectionChange).toHaveBeenCalledWith(appliedDesignProjection),
+  );
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={appliedDesignProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(information.getByLabelText("DPI")).toHaveValue("600");
+  expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("preserves the Album Design draft when Album Information is applied", async () => {
+  const appliedInformationProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: projection.state.revision + 1,
+      document: { ...projection.state.document, dpi: 600 },
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          background: { ...projection.state.album.visualDefaults.background },
+          overlay: { ...projection.state.album.visualDefaults.overlay },
+          frameBorder: { ...projection.state.album.visualDefaults.frameBorder },
+        },
+      },
+    },
+  };
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    appliedInformationProjection,
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  const dialog = projectDialogHarness();
+  const onProjectionChange = vi.fn();
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+  dialog.emit("confirmAlbumInformation");
+  await waitFor(() =>
+    expect(onProjectionChange).toHaveBeenCalledWith(appliedInformationProjection),
+  );
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={appliedInformationProjection}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+  expect(design.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("preserves both unapplied Album drafts across equivalent Undo and Redo projections", async () => {
+  function equivalentHistoryProjection(
+    revision: number,
+    canUndo: boolean,
+    canRedo: boolean,
+  ): EditorProjection {
+    return {
+      ...projection,
+      state: {
+        ...projection.state,
+        canRedo,
+        canUndo,
+        revision,
+        document: { ...projection.state.document },
+        album: {
+          ...projection.state.album,
+          visualDefaults: {
+            ...projection.state.album.visualDefaults,
+            background: { ...projection.state.album.visualDefaults.background },
+            overlay: { ...projection.state.album.visualDefaults.overlay },
+            frameBorder: { ...projection.state.album.visualDefaults.frameBorder },
+          },
+        },
+      },
+    };
+  }
+
+  const afterUndo = equivalentHistoryProjection(24, false, true);
+  const afterRedo = equivalentHistoryProjection(25, true, false);
+  const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  projectSessionPort.undo = vi.fn(async () => afterUndo);
+  projectSessionPort.redo = vi.fn(async () => afterRedo);
+  const onProjectionChange = vi.fn();
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(afterUndo));
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={afterUndo}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  expect(information.getByLabelText("DPI")).toHaveValue("600");
+  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+  await waitFor(() => expect(onProjectionChange).toHaveBeenCalledWith(afterRedo));
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={afterRedo}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  expect(information.getByLabelText("DPI")).toHaveValue("600");
+  expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
+});
+
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {
   const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
     outcome: { kind: "saved", revision: projection.state.revision },
@@ -2673,12 +3161,22 @@ test("completes Grade navigation requested before Canvas metrics exist", () => {
   expect(useEditorView.getState().centeredSheetId).toBe("sheet-002");
 });
 
-test("resizes both workspace panels with persistent splitters", () => {
+test("resizes both workspace panels and persists only completed drags", async () => {
+  let persisted = createWorkspacePreferences();
+  const update = vi.fn<WorkspacePreferencesPort["update"]>(async (change) => {
+    persisted = applyWorkspacePreferenceChange(persisted, change);
+    return persisted;
+  });
+  const workspacePreferencesPort: WorkspacePreferencesPort = {
+    load: async () => persisted,
+    update,
+  };
   const firstView = render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      workspacePreferencesPort={workspacePreferencesPort}
       onProjectionChange={() => undefined}
     />,
   );
@@ -2706,11 +3204,15 @@ test("resizes both workspace panels with persistent splitters", () => {
 
   fireEvent.pointerDown(verticalSplitter, { pointerId: 1 });
   fireEvent.pointerMove(window, { clientX: 850, clientY: 0 });
+  expect(update).not.toHaveBeenCalled();
   fireEvent.pointerUp(window, { pointerId: 1 });
+  await waitFor(() => expect(update).toHaveBeenCalledOnce());
 
   fireEvent.pointerDown(horizontalSplitter, { pointerId: 2 });
   fireEvent.pointerMove(window, { clientX: 0, clientY: 600 });
+  expect(update).toHaveBeenCalledOnce();
   fireEvent.pointerUp(window, { pointerId: 2 });
+  await waitFor(() => expect(update).toHaveBeenCalledTimes(2));
 
   expect(workspace.getAttribute("style")).toContain(
     "--inspector-width: 350px",
@@ -2718,12 +3220,8 @@ test("resizes both workspace panels with persistent splitters", () => {
   expect(workspace.getAttribute("style")).toContain(
     "--media-panel-height: 200px",
   );
-  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBe(
-    "350",
-  );
-  expect(localStorage.getItem("myalbuns.workspace.media-panel-height")).toBe(
-    "200",
-  );
+  expect(localStorage.getItem("myalbuns.workspace.inspector-width")).toBeNull();
+  expect(localStorage.getItem("myalbuns.workspace.media-panel-height")).toBeNull();
 
   firstView.unmount();
   render(
@@ -2731,16 +3229,19 @@ test("resizes both workspace panels with persistent splitters", () => {
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      workspacePreferencesPort={workspacePreferencesPort}
       onProjectionChange={() => undefined}
     />,
   );
-  expect(
-    screen
-      .getByRole("separator", {
-        name: "Redimensionar Painel contextual",
-      })
-      .parentElement?.getAttribute("style"),
-  ).toContain("--inspector-width: 350px");
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("separator", {
+          name: "Redimensionar Painel contextual",
+        })
+        .parentElement?.getAttribute("style"),
+    ).toContain("--inspector-width: 350px"),
+  );
 });
 
 test("commits a slider zoom once without flashing a global busy state", async () => {

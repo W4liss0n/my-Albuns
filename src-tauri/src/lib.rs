@@ -30,6 +30,7 @@ mod opaque_image_protocol;
 mod operation_gate;
 mod operation_lease;
 mod path_io;
+mod preference_store_io;
 mod product_runtime;
 mod project_bootstrap;
 mod project_close_commands;
@@ -43,6 +44,8 @@ mod runtime_role;
 #[cfg(test)]
 #[path = "../../tests/support/sample_project.rs"]
 mod sample_project;
+mod settings_preferences;
+mod workspace_preferences;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

@@ -19,7 +19,11 @@
           "dismiss_project_dialog",
           "prepare_media_previews",
           "export_sheet",
-          "cancel_export"
+          "cancel_export",
+          "workspace_preferences",
+          "update_workspace_preference",
+          "application_settings",
+          "update_application_setting"
         ],
         "deny": []
       }

@@ -18,11 +18,21 @@ import {
   type SaveProjectOutcome as ApplicationSaveProjectOutcome,
   type SaveProjectResult as ApplicationSaveProjectResult,
 } from "../application/projectPorts";
+import type {
+  WorkspacePreferenceChange,
+  WorkspacePreferences,
+  WorkspacePreferencesPort,
+} from "../application/workspacePreferences";
+import { createWorkspacePreferences } from "../application/workspacePreferences";
+import type { ApplicationSettings as IpcApplicationSettings } from "./generated/ApplicationSettings";
 import type { CancelDisposition as IpcCancelDisposition } from "./generated/CancelDisposition";
 import type { ExportCommandError as IpcExportCommandError } from "./generated/ExportCommandError";
 import type { ExportEvent as IpcExportEvent } from "./generated/ExportEvent";
 import type { ExportResult as IpcExportResult } from "./generated/ExportResult";
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
+import type { WorkspacePreferenceChange as IpcWorkspacePreferenceChange } from "./generated/WorkspacePreferenceChange";
+import type { WorkspacePreferences as IpcWorkspacePreferences } from "./generated/WorkspacePreferences";
+import type { SettingsPreferenceChange as IpcSettingsPreferenceChange } from "./generated/SettingsPreferenceChange";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
@@ -166,6 +176,45 @@ export const tauriProjectSessionPort: ProjectSessionPort = {
         ? error
         : toSaveProjectError(error);
     }
+  },
+};
+
+async function loadWorkspacePreferences(): Promise<WorkspacePreferences> {
+  const [state, settings] = await Promise.all([
+    invoke<IpcWorkspacePreferences>("workspace_preferences"),
+    invoke<IpcApplicationSettings>("application_settings"),
+  ]);
+  return composeWorkspacePreferences(state, settings);
+}
+
+function composeWorkspacePreferences(
+  state: IpcWorkspacePreferences,
+  settings: IpcApplicationSettings,
+) {
+  return createWorkspacePreferences({
+    inspectorSections: state.inspectorSections,
+    mediaPanel: settings.mediaPanel,
+    mediaThumbnailSizes: state.mediaThumbnailSizes,
+    workspacePanels: state.workspacePanels,
+  });
+}
+
+export const tauriWorkspacePreferencesPort: WorkspacePreferencesPort = {
+  load: loadWorkspacePreferences,
+  update: async (change: WorkspacePreferenceChange) => {
+    if (
+      change.kind === "mediaPanelSortDirection" ||
+      change.kind === "mediaPanelUsageFilter"
+    ) {
+      await invoke<IpcApplicationSettings>("update_application_setting", {
+        change: change satisfies IpcSettingsPreferenceChange,
+      });
+    } else {
+      await invoke<IpcWorkspacePreferences>("update_workspace_preference", {
+        change: change satisfies IpcWorkspacePreferenceChange,
+      });
+    }
+    return loadWorkspacePreferences();
   },
 };
 

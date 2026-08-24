@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GraphicsDiagnostic,
@@ -19,6 +19,7 @@ import type {
   ProjectWindowPort,
 } from "./application/projectPorts";
 import type { ProjectDialogPort } from "./application/projectDialogPort";
+import type { WorkspacePreferencesPort } from "./application/workspacePreferences";
 import type { EditorProjection } from "./domain/project";
 import { LoggingProvider } from "./components/loggingContext";
 import {
@@ -40,6 +41,7 @@ interface AppProps {
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
+  workspacePreferencesPort?: WorkspacePreferencesPort;
 }
 
 function App({
@@ -52,6 +54,7 @@ function App({
   graphicsProbe,
   canvasGraphicsDiagnosticProbe,
   logger,
+  workspacePreferencesPort,
 }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [runtimeGraphicsDiagnostic, setRuntimeGraphicsDiagnostic] =
@@ -69,6 +72,7 @@ function App({
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const mediaDemandSequence = useRef({ projectId: "", revision: 0 });
   const uiReadyProject = useRef("");
+  const [preferencesReadyProject, setPreferencesReadyProject] = useState("");
 
   useEffect(() => {
     if (!graphics.supported) return;
@@ -131,8 +135,17 @@ function App({
   }, [graphics, logger]);
 
   const projectId = projection?.state.projectId ?? "";
+  const handlePreferencesReady = useCallback((readyProjectId: string) => {
+    setPreferencesReadyProject(readyProjectId);
+  }, []);
   useEffect(() => {
-    if (!projectId || uiReadyProject.current === projectId) return;
+    if (
+      !projectId ||
+      preferencesReadyProject !== projectId ||
+      uiReadyProject.current === projectId
+    ) {
+      return;
+    }
     uiReadyProject.current = projectId;
     projectStartupPort.confirmUiReady().catch((error: unknown) => {
       if (uiReadyProject.current === projectId) {
@@ -147,7 +160,7 @@ function App({
       });
       setLoadError("Não foi possível confirmar a inicialização da interface do Projeto.");
     });
-  }, [logger, projectId, projectStartupPort]);
+  }, [logger, preferencesReadyProject, projectId, projectStartupPort]);
   const runProjectMutation = useProjectMutationRunner(
     projectId,
     projectSessionPort,
@@ -301,6 +314,8 @@ function App({
           onMediaDemandChange={setMediaDemand}
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
+          onPreferencesReady={handlePreferencesReady}
+          workspacePreferencesPort={workspacePreferencesPort}
         />
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>

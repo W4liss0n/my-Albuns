@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import type {
   AlbumInformation,
   AlbumInformationValidation,
+  DisplayUnit,
 } from "../domain/project";
 import { representativeProjection } from "../test/projectFixtures";
 import { AlbumInformationForm } from "./AlbumInformationForm";
@@ -52,6 +53,42 @@ function renderForm({
     <Harness />,
   );
   return { ...view, onApply, onPresentationUnitChange, onValidate };
+}
+
+function ProjectionHarness({
+  document,
+  onPresentationUnitChange,
+  onValidate,
+  sheetStates,
+}: {
+  document: typeof representativeProjection.state.document;
+  onPresentationUnitChange: (unit: DisplayUnit | null) => void;
+  onValidate: (
+    information: AlbumInformation,
+  ) => Promise<AlbumInformationValidation>;
+  sheetStates: typeof representativeProjection.state.album.sheets;
+}) {
+  const [ready, setReady] = useState(false);
+  return (
+    <>
+      <AlbumInformationForm
+        document={document}
+        formId="album-information-equivalent-projection"
+        sheetStates={sheetStates}
+        onApply={vi.fn()}
+        onPresentationUnitChange={onPresentationUnitChange}
+        onReadyChange={setReady}
+        onValidate={onValidate}
+      />
+      <button
+        disabled={!ready}
+        form="album-information-equivalent-projection"
+        type="submit"
+      >
+        Aplicar
+      </button>
+    </>
+  );
 }
 
 test("edits every Album information field and submits one complete candidate", async () => {
@@ -298,5 +335,73 @@ test("shows validation from the core and blocks Apply", async () => {
   });
 
   expect(await screen.findByText("A Sangria deve manter uma Área de corte positiva.")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+});
+
+test("preserves an unapplied draft across a semantically equivalent projection", async () => {
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const view = render(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...representativeProjection.state.document }}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets.map((sheet) => ({
+        ...sheet,
+      }))}
+    />,
+  );
+
+  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("600");
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("resets the draft when authoritative Album information really changes", async () => {
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const view = render(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...representativeProjection.state.document, dpi: 240 }}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("240"),
+  );
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
 });

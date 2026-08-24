@@ -32,7 +32,13 @@ function ScenarioCard({ scenario }: { scenario: PreviewScenario }) {
       </dl>
       <div className="acceptance-scenario__actions">
         <a href={absoluteUrl(scenario.implementationPath)}>Implementação</a>
-        <a href={absoluteUrl(scenario.referencePath)}>Referência vigente</a>
+        {scenario.comparison.kind === "paired" && scenario.referencePath ? (
+          <a href={absoluteUrl(scenario.referencePath)}>Referência vigente</a>
+        ) : (
+          <span title={scenario.comparison.reason}>
+            Sem referência equivalente
+          </span>
+        )}
       </div>
     </article>
   );

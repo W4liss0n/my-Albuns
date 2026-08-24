@@ -726,7 +726,6 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
 });
 
 test("shows a solid Frame border immediately and sends its canonical values", async () => {
-  const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
 
   render(
@@ -736,7 +735,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
       onValidate={validConfiguration}
     />,
   );
-  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
   fireEvent.change(
     await screen.findByRole("slider", {
       name: "Espessura da Borda padrão",
@@ -745,7 +744,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
       target: { value: "2500" },
     },
   );
-  await user.click(
+  fireEvent.click(
     screen.getByRole("button", { name: "Usar cor da Borda #C5A46D" }),
   );
 
@@ -775,17 +774,19 @@ test("shows a solid Frame border immediately and sends its canonical values", as
   expect(firstFrameSegments[3]).toHaveAttribute("x", "144500");
   expect(firstFrameSegments[3]).toHaveAttribute("width", "2500");
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
-  expect(onCreate).toHaveBeenCalledWith(
-    expect.objectContaining({
-      visualDefaults: expect.objectContaining({
-        frameBorder: {
-          kind: "solid",
-          rgb: "#C5A46D",
-          widthUm: 2500,
-        },
+  fireEvent.click(screen.getByRole("button", { name: "Criar" }));
+  await waitFor(() =>
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visualDefaults: expect.objectContaining({
+          frameBorder: {
+            kind: "solid",
+            rgb: "#C5A46D",
+            widthUm: 2500,
+          },
+        }),
       }),
-    }),
+    ),
   );
 });
 
@@ -1015,7 +1016,6 @@ test("applies a reusable preset across both creation steps", async () => {
 
 test("keeps a custom preset across both steps for the current placeholder session", async () => {
   const user = userEvent.setup();
-
   render(
     <NewProjectFlow
       onCancel={vi.fn()}
@@ -1025,18 +1025,18 @@ test("keeps a custom preset across both steps for the current placeholder sessio
   );
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
-  await user.click(
+  fireEvent.click(
     await screen.findByRole("button", {
       name: "Usar Background #1d2a3a",
     }),
   );
-  await user.click(screen.getByRole("button", { name: "Voltar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
   fireEvent.change(
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "320" } },
   );
 
-  await user.click(
+  fireEvent.click(
     screen.getByRole("button", {
       name: "Salvar configuração atual como modelo",
     }),
@@ -1048,11 +1048,10 @@ test("keeps a custom preset across both steps for the current placeholder sessio
   expect(
     within(saveModelForm).getByRole("button", { name: "Salvar" }),
   ).toHaveClass("ui-action-button", "ui-action-button--primary");
-  await user.type(
-    screen.getByRole("textbox", { name: "Nome do modelo" }),
-    "Estúdio 32 × 30",
-  );
-  await user.click(screen.getByRole("button", { name: "Salvar" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Nome do modelo" }), {
+    target: { value: "Estúdio 32 × 30" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
   expect(
     screen.getByRole("combobox", { name: "Modelo inicial" }),
   ).toHaveDisplayValue("Estúdio 32 × 30");
@@ -1061,10 +1060,9 @@ test("keeps a custom preset across both steps for the current placeholder sessio
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "300" } },
   );
-  await user.selectOptions(
-    screen.getByRole("combobox", { name: "Modelo inicial" }),
-    "custom-1",
-  );
+  fireEvent.change(screen.getByRole("combobox", { name: "Modelo inicial" }), {
+    target: { value: "custom-1" },
+  });
   expect(
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
   ).toHaveValue("320");

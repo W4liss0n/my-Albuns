@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "contract:generate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Generate-Contracts.ps1",
     "contract:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Contracts.ps1",
-    "test": "vitest run --maxWorkers=2",
+    "test": "vitest run --pool=threads --maxWorkers=2",
     "test:watch": "vitest --maxWorkers=2",
     "test:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-Rust.ps1",
     "check:rust": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Invoke-LocalCargo.ps1 check --workspace",

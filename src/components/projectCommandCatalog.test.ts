@@ -4,6 +4,7 @@ import {
   PROJECT_COMMAND_CATALOG,
   matchProjectCommandShortcut,
   projectCommandBinding,
+  projectCommandShortcutAria,
   projectCommandShortcutLabel,
 } from "../application/projectCommandCatalog";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
@@ -56,11 +57,15 @@ test("feeds the canonical shortcuts into the Project application menu", () => {
     canExport: true,
     canRedo: true,
     canUndo: true,
+    contextualPanelVisible: true,
     closeProject: () => undefined,
     exportSheet: () => undefined,
+    mediaPanelVisible: true,
     redo: () => undefined,
     save: () => undefined,
     undo: () => undefined,
+    toggleContextualPanel: () => undefined,
+    toggleMediaPanel: () => undefined,
   });
   const commands = groups.flatMap((group) =>
     group.items.flatMap((item) => {
@@ -128,6 +133,37 @@ test("registers contextual Ctrl+E without pretending Photoshop is implemented", 
   ).toBe("open-in-photoshop");
 });
 
+test("shares New and Open metadata with the Welcome surface without borrowing the Project context", () => {
+  expect(projectCommandBinding("new-project", "welcome")).toEqual({
+    availability: "implemented",
+    context: "welcome",
+  });
+  expect(projectCommandBinding("open-project", "welcome")).toEqual({
+    availability: "implemented",
+    context: "welcome",
+  });
+  expect(projectCommandBinding("new-project", "project-window")).toMatchObject({
+    availability: "placeholder",
+  });
+
+  expect(projectCommandShortcutLabel("new-project")).toBe("Ctrl+N");
+  expect(projectCommandShortcutLabel("open-project")).toBe("Ctrl+O");
+  expect(projectCommandShortcutAria("new-project")).toBe("Control+N");
+  expect(projectCommandShortcutAria("open-project")).toBe("Control+O");
+  expect(
+    matchProjectCommandShortcut(
+      keyboardShortcut("n", { ctrlKey: true }),
+      "welcome",
+    ),
+  ).toBe("new-project");
+  expect(
+    matchProjectCommandShortcut(
+      keyboardShortcut("o", { ctrlKey: true }),
+      "welcome",
+    ),
+  ).toBe("open-project");
+});
+
 test("represents Select all availability per owning context", () => {
   expect(projectCommandBinding("select-all", "media-panel")).toEqual({
     availability: "implemented",
@@ -137,6 +173,17 @@ test("represents Select all availability per owning context", () => {
     availability: "placeholder",
     context: "frame",
     placeholderFeature: "select-all-in-active-context",
+  });
+});
+
+test("keeps both Project panel visibility commands canonical and implemented", () => {
+  expect(projectCommandBinding("media-panel", "project-window")).toEqual({
+    availability: "implemented",
+    context: "project-window",
+  });
+  expect(projectCommandBinding("contextual-panel", "project-window")).toEqual({
+    availability: "implemented",
+    context: "project-window",
   });
 });
 
@@ -150,11 +197,15 @@ test("projects every application-menu command from its canonical descriptor", ()
     canExport: true,
     canRedo: true,
     canUndo: true,
+    contextualPanelVisible: true,
     closeProject: () => undefined,
     exportSheet: () => undefined,
+    mediaPanelVisible: true,
     redo: () => undefined,
     save: () => undefined,
     undo: () => undefined,
+    toggleContextualPanel: () => undefined,
+    toggleMediaPanel: () => undefined,
   });
   const commands = groups.flatMap((group) =>
     group.items.flatMap((item) => {

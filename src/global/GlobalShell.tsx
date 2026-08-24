@@ -8,6 +8,11 @@ import {
 } from "lucide-react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
+import {
+  matchProjectCommandShortcut,
+  projectCommandShortcutAria,
+  projectCommandShortcutLabel,
+} from "../application/projectCommandCatalog";
 import { SafeApplicationShell } from "../components/SafeApplicationShell";
 import type {
   GlobalProjectPort,
@@ -32,10 +37,6 @@ interface GlobalShellProps {
 
 const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
-const welcomeShortcuts = {
-  newProject: { aria: "Control+N", key: "n", label: "Ctrl+N" },
-  openProject: { aria: "Control+O", key: "o", label: "Ctrl+O" },
-} as const;
 
 export function GlobalShell({
   graphicsDiagnostic,
@@ -121,22 +122,16 @@ export function GlobalShell({
       return;
     }
 
-    const handleShortcut = (event: KeyboardEvent) => {
-      if (
-        !event.ctrlKey ||
-        event.altKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        event.repeat
-      ) {
+      const handleShortcut = (event: KeyboardEvent) => {
+      if (event.repeat) {
         return;
       }
 
-      const key = event.key.toLowerCase();
-      if (key === welcomeShortcuts.newProject.key) {
+      const command = matchProjectCommandShortcut(event, "welcome");
+      if (command === "new-project") {
         event.preventDefault();
         startCreation();
-      } else if (key === welcomeShortcuts.openProject.key) {
+      } else if (command === "open-project") {
         event.preventDefault();
         void openProject();
       }
@@ -245,18 +240,18 @@ export function GlobalShell({
           <div className="global-action-stack">
             <ActionButton
               aria-label="Novo Projeto"
-              aria-keyshortcuts={welcomeShortcuts.newProject.aria}
+              aria-keyshortcuts={projectCommandShortcutAria("new-project")}
               disabled={isOpening}
               onClick={startCreation}
               variant="primary"
             >
               <AppIcon icon={Plus} size={16} />
               <span>Novo Projeto</span>
-              <kbd>{welcomeShortcuts.newProject.label}</kbd>
+              <kbd>{projectCommandShortcutLabel("new-project")}</kbd>
             </ActionButton>
             <ActionButton
               aria-label={isOpening ? "Abrindo Projeto…" : "Abrir Projeto"}
-              aria-keyshortcuts={welcomeShortcuts.openProject.aria}
+              aria-keyshortcuts={projectCommandShortcutAria("open-project")}
               disabled={isOpening}
               onClick={openProject}
             >
@@ -264,7 +259,7 @@ export function GlobalShell({
               <span>
                 {isOpening ? "Abrindo Projeto…" : "Abrir Projeto…"}
               </span>
-              <kbd>{welcomeShortcuts.openProject.label}</kbd>
+              <kbd>{projectCommandShortcutLabel("open-project")}</kbd>
             </ActionButton>
           </div>
           <div aria-hidden="true" className="global-action-divider" />

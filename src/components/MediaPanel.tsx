@@ -12,6 +12,7 @@ import type {
   MediaPreviewDemand,
 } from "../application/projectPorts";
 import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
+import type { MediaPanelPersistentPreference } from "../application/workspacePreferences";
 
 import type {
   MediaCatalogItem,
@@ -26,6 +27,7 @@ import {
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
 import { MediaThumbnail } from "./MediaThumbnail";
+import { isTextEntryTarget } from "./isTextEntryTarget";
 import "./MediaPanel.css";
 
 export interface MediaPanelProps {
@@ -34,6 +36,19 @@ export interface MediaPanelProps {
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
+  onSortDirectionChange?(
+    mediaKind: MediaKind,
+    sortDirection: MediaPanelPersistentPreference["sortDirection"],
+  ): void;
+  onUsageFilterChange?(
+    mediaKind: MediaKind,
+    usageFilter: MediaPanelPersistentPreference["usageFilter"],
+  ): void;
+  onThumbnailSizeChange?(mediaKind: MediaKind, size: number): void;
+  persistentPreferences?: Readonly<
+    Record<MediaKind, MediaPanelPersistentPreference>
+  >;
+  thumbnailSizes?: Readonly<Record<MediaKind, number>>;
 }
 
 const naturalNameCollator = new Intl.Collator("pt-BR", {
@@ -47,6 +62,11 @@ export function MediaPanel({
   mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
+  onSortDirectionChange,
+  onThumbnailSizeChange,
+  persistentPreferences,
+  thumbnailSizes,
+  onUsageFilterChange,
 }: MediaPanelProps) {
   const [activeMediaKind, setActiveMediaKind] =
     useState<MediaKind>("photo");
@@ -57,8 +77,18 @@ export function MediaPanel({
   const [preferencesByKind, setPreferencesByKind] = useState<
     Record<MediaKind, MediaPanelViewPreferences>
   >(() => ({
-    decorative: createMediaPanelViewPreferences(),
-    photo: createMediaPanelViewPreferences(),
+    decorative: {
+      ...createMediaPanelViewPreferences(),
+      ...(persistentPreferences?.decorative ?? {}),
+      ...(thumbnailSizes
+        ? { thumbnailSize: thumbnailSizes.decorative }
+        : {}),
+    },
+    photo: {
+      ...createMediaPanelViewPreferences(),
+      ...(persistentPreferences?.photo ?? {}),
+      ...(thumbnailSizes ? { thumbnailSize: thumbnailSizes.photo } : {}),
+    },
   }));
   const [selectedMediaIds, setSelectedMediaIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -110,6 +140,34 @@ export function MediaPanel({
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!thumbnailSizes) return;
+    setPreferencesByKind((current) => ({
+      decorative: {
+        ...current.decorative,
+        thumbnailSize: thumbnailSizes.decorative,
+      },
+      photo: {
+        ...current.photo,
+        thumbnailSize: thumbnailSizes.photo,
+      },
+    }));
+  }, [thumbnailSizes]);
+
+  useEffect(() => {
+    if (!persistentPreferences) return;
+    setPreferencesByKind((current) => ({
+      decorative: {
+        ...current.decorative,
+        ...persistentPreferences.decorative,
+      },
+      photo: {
+        ...current.photo,
+        ...persistentPreferences.photo,
+      },
+    }));
+  }, [persistentPreferences]);
+
+  useEffect(() => {
     setSelectedMediaIds((current) => {
       const visibleSelection = new Set(
         [...current].filter((mediaId) => visibleMediaIdSet.has(mediaId)),
@@ -127,7 +185,9 @@ export function MediaPanel({
     const targets = root?.querySelectorAll<HTMLElement>("[data-media-id]");
     onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
     if (!root || !targets?.length || !("IntersectionObserver" in globalThis)) {
-      return;
+      return () => {
+        onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
+      };
     }
 
     const visible = new Set<string>();
@@ -167,12 +227,28 @@ export function MediaPanel({
     return () => {
       visibleObserver.disconnect();
       preloadObserver.disconnect();
+      onMediaDemandChange({ visibleMediaIds: [], preloadMediaIds: [] });
     };
   }, [onMediaDemandChange, visibleMediaItems]);
 
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
+    if (nextPreferences.thumbnailSize !== undefined) {
+      onThumbnailSizeChange?.(
+        activeMediaKind,
+        nextPreferences.thumbnailSize,
+      );
+    }
+    if (nextPreferences.sortDirection !== undefined) {
+      onSortDirectionChange?.(
+        activeMediaKind,
+        nextPreferences.sortDirection,
+      );
+    }
+    if (nextPreferences.usageFilter !== undefined) {
+      onUsageFilterChange?.(activeMediaKind, nextPreferences.usageFilter);
+    }
     setPreferencesByKind((current) => ({
       ...current,
       [activeMediaKind]: {
@@ -218,9 +294,7 @@ export function MediaPanel({
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
     if (
       matchProjectCommandShortcut(event, "media-panel") !== "select-all" ||
-      (event.target as HTMLElement).matches(
-        "input, textarea, select, [contenteditable='true']",
-      )
+      isTextEntryTarget(event.target)
     ) {
       return;
     }

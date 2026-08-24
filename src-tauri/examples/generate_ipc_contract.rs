@@ -1,10 +1,14 @@
 use std::{env, path::PathBuf};
 
 use myalbuns_desktop_lib::ipc_contract::{
-    CancelDisposition, ExportCommandError, ExportEvent, ExportResult, FrontendLogEvent,
-    LinkedMediaChanged, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
-    MediaPreviewState, ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    ApplicationSettings, CancelDisposition, ExportCommandError, ExportEvent, ExportResult,
+    FrontendLogEvent, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
+    MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
+    MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
+    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
+    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
+    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
+    WorkspacePreferenceChange, WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -25,6 +29,12 @@ fn main() {
     FrontendLogEvent::export_all(&config).expect("frontend log bindings should be generated");
     LinkedMediaChanged::export_all(&config)
         .expect("linked media change bindings should be generated");
+    ApplicationSettings::export_all(&config)
+        .expect("application settings bindings should be generated");
+    MediaPanelSettings::export_all(&config)
+        .expect("media panel settings bindings should be generated");
+    MediaPanelTabSettings::export_all(&config)
+        .expect("media panel tab settings bindings should be generated");
     MediaPreview::export_all(&config).expect("media preview bindings should be generated");
     MediaPreviewDemand::export_all(&config)
         .expect("media preview demand bindings should be generated");
@@ -32,6 +42,13 @@ fn main() {
         .expect("media preview state bindings should be generated");
     MediaPreviewCommandError::export_all(&config)
         .expect("media preview error bindings should be generated");
+    MediaPreferenceKind::export_all(&config)
+        .expect("media preference kind bindings should be generated");
+    MediaSortDirection::export_all(&config)
+        .expect("media sort direction bindings should be generated");
+    MediaThumbnailSizes::export_all(&config)
+        .expect("media thumbnail size bindings should be generated");
+    MediaUsageFilter::export_all(&config).expect("media usage filter bindings should be generated");
     ProjectCloseChoice::export_all(&config)
         .expect("Project close choice bindings should be generated");
     ProjectCloseRequestOutcome::export_all(&config)
@@ -44,4 +61,16 @@ fn main() {
         .expect("Save Project outcome bindings should be generated");
     SaveProjectResult::export_all(&config)
         .expect("Save Project result bindings should be generated");
+    SettingsPreferenceChange::export_all(&config)
+        .expect("settings preference change bindings should be generated");
+    WorkspacePanelKind::export_all(&config)
+        .expect("workspace panel kind bindings should be generated");
+    WorkspacePanelPreference::export_all(&config)
+        .expect("workspace panel preference bindings should be generated");
+    WorkspacePanelPreferences::export_all(&config)
+        .expect("workspace panel preferences bindings should be generated");
+    WorkspacePreferenceChange::export_all(&config)
+        .expect("workspace preference change bindings should be generated");
+    WorkspacePreferences::export_all(&config)
+        .expect("workspace preference bindings should be generated");
 }

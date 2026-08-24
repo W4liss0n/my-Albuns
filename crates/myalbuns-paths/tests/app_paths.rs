@@ -90,6 +90,20 @@ fn derives_the_recent_projects_state_file_from_the_central_local_root() {
 }
 
 #[test]
+fn derives_the_workspace_preferences_state_file_from_the_central_local_root() {
+    let paths = AppPaths::from_roots(
+        Path::new(r"C:\Roaming"),
+        Path::new(r"C:\Local"),
+        Path::new(r"C:\Temp"),
+    );
+
+    assert_eq!(
+        paths.workspace_preferences_file(),
+        Path::new(r"C:\Local\MyAlbuns2\State\workspace-preferences.json")
+    );
+}
+
+#[test]
 fn derives_the_project_identity_lease_root_from_the_central_local_state() {
     let paths = AppPaths::from_roots(
         Path::new(r"C:\Roaming"),

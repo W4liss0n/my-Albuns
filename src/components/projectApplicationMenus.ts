@@ -14,22 +14,30 @@ interface ProjectApplicationMenuOptions {
   canExport: boolean;
   canRedo: boolean;
   canUndo: boolean;
+  contextualPanelVisible: boolean;
   closeProject(): void;
   exportSheet(): void;
+  mediaPanelVisible: boolean;
   redo(): void;
   save(): void;
   undo(): void;
+  toggleContextualPanel(): void;
+  toggleMediaPanel(): void;
 }
 
 export function createProjectApplicationMenus({
   canExport,
   canRedo,
   canUndo,
+  contextualPanelVisible,
   closeProject,
   exportSheet,
+  mediaPanelVisible,
   redo,
   save,
   undo,
+  toggleContextualPanel,
+  toggleMediaPanel,
 }: ProjectApplicationMenuOptions): readonly ApplicationMenuGroup[] {
   // PLACEHOLDER UI: the canonical catalog marks commands whose application
   // port or Project intent does not exist yet. Menus only project that state.
@@ -89,8 +97,20 @@ export function createProjectApplicationMenus({
       id: "view",
       label: "Exibir",
       items: [
-        placeholder("media-panel", "project-window"),
-        placeholder("contextual-panel", "project-window"),
+        implemented(
+          "media-panel",
+          "project-window",
+          toggleMediaPanel,
+          false,
+          mediaPanelVisible,
+        ),
+        implemented(
+          "contextual-panel",
+          "project-window",
+          toggleContextualPanel,
+          false,
+          contextualPanelVisible,
+        ),
         separator("view-canvas-separator"),
         placeholder("fit-sheet", "sheet"),
       ],
@@ -118,6 +138,7 @@ function implemented(
   context: ProjectCommandContext,
   onSelect: () => void,
   disabled?: boolean,
+  checked?: boolean,
 ): ApplicationMenuCommand {
   const descriptor = projectCommandDescriptor(id);
   const binding = projectCommandBinding(id, context);
@@ -128,6 +149,7 @@ function implemented(
     availability: "implemented",
     context,
     disabled,
+    checked,
     id,
     label: descriptor.label,
     onSelect,

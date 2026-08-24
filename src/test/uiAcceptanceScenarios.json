@@ -1,11 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "scenarios": [
     {
       "id": "welcome",
       "title": "Tela de Boas-vindas",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
+      "comparison": { "kind": "paired", "surface": "welcome-window" },
       "viewport": { "width": 1280, "height": 720 },
       "readySelector": "[aria-label=\"Ações principais\"]",
       "actions": []
@@ -15,6 +16,7 @@
       "title": "Novo Projeto — Configurações",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
+      "comparison": { "kind": "paired", "surface": "new-project-window" },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Continuar\"]",
       "actions": [
@@ -26,6 +28,7 @@
       "title": "Novo Projeto — Personalização",
       "implementationPath": "/welcome-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
+      "comparison": { "kind": "paired", "surface": "new-project-window" },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Criar\"]",
       "actions": [
@@ -38,39 +41,188 @@
     },
     {
       "id": "media-panel",
-      "title": "Painel de imagens",
-      "implementationPath": "/media-panel-preview.html",
+      "title": "Painel de imagens — Fotos",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
       "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
-      "viewport": { "width": 1600, "height": 420 },
-      "readySelector": "[data-development-preview=\"imported-media\"]",
+      "comparison": {
+        "kind": "paired",
+        "surface": "media-panel",
+        "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
+        "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-development-preview=\"imported-media\"] .media-grid [data-media-id]",
+      "referenceReadySelector": "button[data-mode=\"imagens\"]",
       "actions": []
     },
     {
-      "id": "sheet-grid-and-album-inspector",
-      "title": "Grade de Lâminas e Inspector do Álbum",
+      "id": "media-panel-decorative-selection",
+      "title": "Painel de imagens — hover e seleção de Decorativo",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "media-panel",
+        "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
+        "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".media-grid [data-media-id][aria-pressed=\"true\"]",
+      "referenceReadySelector": "[data-asset=\"a1\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Decorativos\"]" },
+        { "type": "click", "selector": ".media-grid [data-media-id]" },
+        { "type": "hover", "selector": ".media-grid [data-media-id]" }
+      ],
+      "referenceActions": [
+        { "type": "click", "selector": "button[data-mode=\"estilos\"]" },
+        { "type": "click", "selector": "[data-asset=\"a1\"]" },
+        { "type": "hover", "selector": "[data-asset=\"a1\"]" }
+      ]
+    },
+    {
+      "id": "media-panel-popup-keyboard",
+      "title": "Painel de imagens — popup por teclado",
+      "implementationPath": "/media-panel-preview.html?acceptance=editor",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "media-panel",
+        "implementationCaptureSelector": ".media-panel-preview[data-acceptance-surface=\"editor\"] > .media-panel",
+        "referenceCaptureSelector": "div:has(> div > div > button[data-mode=\"imagens\"])"
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "#media-panel-options",
+      "referenceReadySelector": "select:has(option[value=\"naousadas\"])",
+      "actions": [
+        { "type": "focus", "selector": "button[aria-label=\"Filtro, ordem e tamanho\"]" },
+        { "type": "key", "key": "Enter" }
+      ],
+      "referenceActions": [
+        { "type": "focus", "selector": "button[title=\"Filtro, ordem e tamanho\"]" },
+        { "type": "key", "key": "Enter" }
+      ]
+    },
+    {
+      "id": "sheet-grid",
+      "title": "Grade de Lâminas",
       "implementationPath": "/sheet-grid-preview.html",
       "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "sheet-grid",
+        "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
+        "referenceCaptureSelector": "div:has(> button[data-sec=\"grade\"])"
+      },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-development-preview=\"sheet-grid\"]",
-      "actions": []
+      "readySelector": ".sheet-grid .sheet-tile",
+      "referenceReadySelector": "div:has(> button[data-sec=\"grade\"]) [style*=\"aspect-ratio\"]",
+      "actions": [],
+      "referenceActions": []
+    },
+    {
+      "id": "sheet-grid-hover",
+      "title": "Grade de Lâminas — hover",
+      "implementationPath": "/sheet-grid-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid",
+        "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
+        "reason": "A referência visual vigente antecede o hover padronizado da Grade de Lâminas definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".sheet-grid .sheet-tile",
+      "actions": [
+        { "type": "hover", "selector": ".sheet-grid > .sheet-tile:nth-child(3)" }
+      ]
+    },
+    {
+      "id": "sheet-grid-selection",
+      "title": "Grade de Lâminas — seleção",
+      "implementationPath": "/sheet-grid-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-grid",
+        "implementationCaptureSelector": ".inspector-section:has(.sheet-grid)",
+        "reason": "A referência visual vigente antecede a seleção integrada à numeração da Grade de Lâminas definida nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".sheet-grid > .sheet-tile:nth-child(3)[aria-current=\"true\"]",
+      "actions": [
+        { "type": "click", "selector": ".sheet-grid > .sheet-tile:nth-child(3)" }
+      ]
+    },
+    {
+      "id": "album-information-validation-tooltip",
+      "title": "Inspector — validação de medida",
+      "implementationPath": "/sheet-grid-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "album-information-inspector",
+        "implementationCaptureSelector": ".inspector-section:has(#album-information-settings)",
+        "reason": "A referência visual vigente antecede o balão de validação compartilhado definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".ui-field-validation-auto-tooltip[role=\"tooltip\"]",
+      "actions": [
+        { "type": "focus", "selector": "#album-information-settings input[aria-label=\"Largura\"]" },
+        { "type": "input", "selector": "#album-information-settings input[aria-label=\"Largura\"]", "value": "600.0001" }
+      ]
     },
     {
       "id": "canvas-normal",
-      "title": "Canvas — Modo normal",
-      "implementationPath": "/canvas-preview.html",
+      "title": "Canvas — Modo normal e hover da Lâmina",
+      "implementationPath": "/canvas-preview.html?acceptance=editor",
       "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "continuous-canvas",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "referenceCaptureSelector": "div:has(> [data-l=\"1\"]):has(> [data-l=\"2\"])"
+      },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-development-preview=\"canvas\"] canvas",
-      "actions": []
+      "readySelector": "[data-canvas-mode=\"normal\"] canvas",
+      "referenceReadySelector": "[data-l=\"2\"]",
+      "actions": [
+        { "type": "hover", "selector": "[data-canvas-mode=\"normal\"] canvas" }
+      ],
+      "referenceActions": [
+        { "type": "hover", "selector": "[data-l=\"2\"]" }
+      ]
     },
     {
       "id": "canvas-sheet-editing",
-      "title": "Canvas — Edição da Lâmina",
-      "implementationPath": "/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
-      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "title": "Canvas — entrada na Edição da Lâmina",
+      "implementationPath": "/canvas-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-editing-canvas",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "reason": "A referência visual vigente não representa o Modo de edição da Lâmina definido nas decisões aceitas posteriores."
+      },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-development-preview=\"canvas\"] canvas",
-      "actions": []
+      "readySelector": "[data-canvas-mode=\"sheet-editing\"] canvas",
+      "actions": [
+        { "type": "focus", "selector": "[data-canvas-mode=\"normal\"] canvas" },
+        { "type": "key", "key": "Enter" }
+      ]
+    },
+    {
+      "id": "canvas-sheet-editing-exit",
+      "title": "Canvas — saída da Edição da Lâmina",
+      "implementationPath": "/canvas-preview.html?acceptance=editor&mode=sheet-editing&sheet=sheet-002",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "reason": "A referência visual vigente não representa a transição de saída do Modo de edição definida nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-canvas-mode=\"normal\"] canvas",
+      "actions": [
+        { "type": "focus", "selector": "[data-canvas-mode=\"sheet-editing\"] canvas" },
+        { "type": "key", "key": "Escape" }
+      ]
     }
   ]
 }

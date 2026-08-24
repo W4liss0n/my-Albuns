@@ -10,6 +10,7 @@ import {
   tauriMediaPreviewPort,
   tauriProjectStartupPort,
   tauriProjectSessionPort,
+  tauriWorkspacePreferencesPort,
 } from "./platform/tauriProjectPorts";
 import { installDesktopWebViewPolicy } from "./platform/desktopWebViewPolicy";
 import { tauriLogger } from "./platform/tauriLogger";
@@ -33,6 +34,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         graphicsProbe={probeGraphics}
         canvasGraphicsDiagnosticProbe={probeCanvasGraphics}
         logger={tauriLogger}
+        workspacePreferencesPort={tauriWorkspacePreferencesPort}
       />
     </WindowControlsProvider>
   </React.StrictMode>,

@@ -12,6 +12,7 @@ import {
   tauriExportPort,
   tauriMediaPreviewPort,
   tauriProjectSessionPort,
+  tauriWorkspacePreferencesPort,
 } from "./tauriProjectPorts";
 
 const tauriBoundary = vi.hoisted(() => ({
@@ -49,6 +50,72 @@ beforeEach(() => {
   tauriBoundary.channels.length = 0;
   vi.mocked(listen).mockClear();
   eventBoundary.listeners.length = 0;
+});
+
+test("composes machine-local State with roaming Settings and routes updates to the owning store", async () => {
+  const state = {
+    inspectorSections: { "album.design": true },
+    mediaThumbnailSizes: { decorative: 110, photo: 124 },
+    workspacePanels: {
+      inspector: { size: 350, visible: true },
+      media: null,
+    },
+  };
+  const settings = {
+    mediaPanel: {
+      decorative: { sortDirection: "ascending", usageFilter: "all" },
+      photo: { sortDirection: "descending", usageFilter: "used" },
+    },
+  };
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (
+      command === "workspace_preferences" ||
+      command === "update_workspace_preference"
+    ) {
+      return state;
+    }
+    return settings;
+  });
+
+  const preferences = {
+    ...state,
+    mediaPanel: settings.mediaPanel,
+  };
+
+  await expect(tauriWorkspacePreferencesPort.load()).resolves.toEqual(
+    preferences,
+  );
+  await expect(
+    tauriWorkspacePreferencesPort.update({
+      kind: "inspectorSection",
+      preferenceKey: "album.design",
+      open: true,
+    }),
+  ).resolves.toEqual(preferences);
+  await expect(
+    tauriWorkspacePreferencesPort.update({
+      kind: "mediaPanelSortDirection",
+      mediaKind: "photo",
+      sortDirection: "descending",
+    }),
+  ).resolves.toEqual(preferences);
+
+  expect(invoke).toHaveBeenNthCalledWith(1, "workspace_preferences");
+  expect(invoke).toHaveBeenNthCalledWith(2, "application_settings");
+  expect(invoke).toHaveBeenNthCalledWith(3, "update_workspace_preference", {
+    change: {
+      kind: "inspectorSection",
+      preferenceKey: "album.design",
+      open: true,
+    },
+  });
+  expect(invoke).toHaveBeenCalledWith("update_application_setting", {
+    change: {
+      kind: "mediaPanelSortDirection",
+      mediaKind: "photo",
+      sortDirection: "descending",
+    },
+  });
 });
 
 test("completes an Export attempt with the backend result", async () => {

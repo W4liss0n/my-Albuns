@@ -2,11 +2,14 @@ import { expect, test } from "vitest";
 
 import { mediaPanelPreviewFixture } from "./mediaPanelPreviewFixtures";
 
-test("provides a development-only imported-media catalog with usable previews", () => {
+test("provides a development-only catalog for both acceptance tabs", () => {
   const { mediaItems, mediaPreviews, mediaUsage } = mediaPanelPreviewFixture;
 
-  expect(mediaItems).toHaveLength(10);
-  expect(mediaItems.every(({ kind }) => kind === "photo")).toBe(true);
+  expect(mediaItems).toHaveLength(12);
+  expect(new Set(mediaItems.map(({ kind }) => kind))).toEqual(
+    new Set(["photo", "decorative"]),
+  );
+  expect(mediaItems.every(({ id }) => id.startsWith("test-"))).toBe(true);
   expect(
     mediaItems.some(
       ({ sourceHeightPx, sourceWidthPx }) =>

@@ -1,43 +1,63 @@
-type WorkspacePanelPreference = "inspector" | "media";
+import {
+  WORKSPACE_PANEL_DEFAULTS,
+  type WorkspacePanel,
+} from "../application/workspacePreferences";
 
-const PANEL_SIZE_KEYS: Record<WorkspacePanelPreference, string> = {
+const PANEL_SIZE_KEYS: Record<WorkspacePanel, string> = {
   inspector: "myalbuns.workspace.inspector-width",
   media: "myalbuns.workspace.media-panel-height",
 };
 
-export function readInspectorSectionPreference(
-  preferenceKey: string,
-  fallback: boolean,
-) {
-  const stored = readPreference(
-    `myalbuns.inspector.${preferenceKey}`,
-  );
-  return stored === null ? fallback : stored === "open";
+const LEGACY_INSPECTOR_PREFIX = "myalbuns.inspector.";
+
+export function readLegacyInspectorSectionPreferences() {
+  const preferences: Record<string, boolean> = {};
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const storageKey = window.localStorage.key(index);
+      if (!storageKey?.startsWith(LEGACY_INSPECTOR_PREFIX)) continue;
+      const preferenceKey = storageKey.slice(LEGACY_INSPECTOR_PREFIX.length);
+      if (!isSafePreferenceKey(preferenceKey)) continue;
+      const value = window.localStorage.getItem(storageKey);
+      if (value === "open" || value === "closed") {
+        preferences[preferenceKey] = value === "open";
+      }
+    }
+  } catch {
+    // A Project keeps defaults when its isolated legacy profile is unavailable.
+  }
+  return preferences;
 }
 
-export function writeInspectorSectionPreference(
-  preferenceKey: string,
-  open: boolean,
-) {
-  writePreference(
-    `myalbuns.inspector.${preferenceKey}`,
-    open ? "open" : "closed",
-  );
+export function clearLegacyInspectorSectionPreference(preferenceKey: string) {
+  try {
+    window.localStorage.removeItem(`${LEGACY_INSPECTOR_PREFIX}${preferenceKey}`);
+  } catch {
+    // The successful StateStore write remains authoritative.
+  }
 }
 
-export function readWorkspacePanelSize(
-  panel: WorkspacePanelPreference,
-  fallback: number,
-) {
-  const stored = Number(readPreference(PANEL_SIZE_KEYS[panel]));
-  return Number.isFinite(stored) && stored > 0 ? stored : fallback;
+export function readLegacyWorkspacePanelSizes() {
+  const sizes: Partial<Record<WorkspacePanel, number>> = {};
+  for (const panel of ["inspector", "media"] as const) {
+    const storedSize = readPreference(PANEL_SIZE_KEYS[panel]);
+    if (storedSize === null) continue;
+
+    const candidate = Number(storedSize);
+    sizes[panel] =
+      Number.isFinite(candidate) && candidate > 0
+        ? candidate
+        : WORKSPACE_PANEL_DEFAULTS[panel].size;
+  }
+  return sizes;
 }
 
-export function writeWorkspacePanelSize(
-  panel: WorkspacePanelPreference,
-  value: number,
-) {
-  writePreference(PANEL_SIZE_KEYS[panel], String(Math.round(value)));
+export function clearLegacyWorkspacePanelPreference(panel: WorkspacePanel) {
+  try {
+    window.localStorage.removeItem(PANEL_SIZE_KEYS[panel]);
+  } catch {
+    // The successful StateStore write remains authoritative.
+  }
 }
 
 function readPreference(key: string) {
@@ -48,10 +68,10 @@ function readPreference(key: string) {
   }
 }
 
-function writePreference(key: string, value: string) {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // The in-memory preference remains usable when storage is unavailable.
-  }
+function isSafePreferenceKey(value: string) {
+  return (
+    value.length > 0 &&
+    value.length <= 128 &&
+    /^[a-z0-9._-]+$/i.test(value)
+  );
 }

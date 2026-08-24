@@ -7,11 +7,16 @@ import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
 import "./media-panel-preview.css";
 
 const { mediaItems, mediaPreviews, mediaUsage } = mediaPanelPreviewFixture;
+const acceptanceSurface =
+  new URLSearchParams(window.location.search).get("acceptance") === "editor"
+    ? "editor"
+    : undefined;
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <main
       className="media-panel-preview"
+      data-acceptance-surface={acceptanceSurface}
       data-development-preview="imported-media"
     >
       <MediaPanel

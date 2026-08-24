@@ -9,6 +9,10 @@ import type {
   ProjectSessionPort,
 } from "../application/projectPorts";
 import {
+  createFallbackWorkspacePreferencesPort,
+  type WorkspacePreferencesPort,
+} from "../application/workspacePreferences";
+import {
   displayUnitLabel,
   formatMicrometers,
 } from "../application/physicalMeasurements";
@@ -38,6 +42,7 @@ import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
+import { useWorkspacePreferences } from "../state/useWorkspacePreferences";
 import {
   useWorkspacePanelLayout,
   WorkspacePanelSplitter,
@@ -54,6 +59,8 @@ interface ProjectWorkspaceProps {
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
+  onPreferencesReady?(projectId: string): void;
+  workspacePreferencesPort?: WorkspacePreferencesPort;
 }
 
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
@@ -69,7 +76,20 @@ export function ProjectWorkspace({
   onMediaDemandChange,
   onProjectionChange,
   onGraphicsUnavailable,
+  onPreferencesReady,
+  workspacePreferencesPort,
 }: ProjectWorkspaceProps) {
+  const fallbackWorkspacePreferencesPort =
+    useRef<WorkspacePreferencesPort | null>(null);
+  fallbackWorkspacePreferencesPort.current ??=
+    createFallbackWorkspacePreferencesPort();
+  const workspacePreferences = useWorkspacePreferences(
+    workspacePreferencesPort ?? fallbackWorkspacePreferencesPort.current,
+  );
+  const projectId = projection.state.projectId;
+  useEffect(() => {
+    if (workspacePreferences.ready) onPreferencesReady?.(projectId);
+  }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
   const [presentationUnitOverride, setPresentationUnitOverride] = useState<{
@@ -152,8 +172,31 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
-  const workspacePanels = useWorkspacePanelLayout();
-  const projectId = projection.state.projectId;
+  const updateWorkspacePanelSize = useCallback(
+    (panel: "inspector" | "media", size: number) => {
+      workspacePreferences.update({
+        kind: "workspacePanelSize",
+        panel,
+        size,
+      });
+    },
+    [workspacePreferences.update],
+  );
+  const updateWorkspacePanelVisibility = useCallback(
+    (panel: "inspector" | "media", visible: boolean) => {
+      workspacePreferences.update({
+        kind: "workspacePanelVisibility",
+        panel,
+        visible,
+      });
+    },
+    [workspacePreferences.update],
+  );
+  const workspacePanels = useWorkspacePanelLayout({
+    preferences: workspacePreferences.preferences.workspacePanels,
+    onSizeChange: updateWorkspacePanelSize,
+    onVisibilityChange: updateWorkspacePanelVisibility,
+  });
   const presentationUnit =
     presentationUnitOverride?.projectId === projectId
       ? presentationUnitOverride.unit
@@ -170,10 +213,12 @@ export function ProjectWorkspace({
   const sheetEditing = controller.canvasProps.mode.kind === "sheet-editing";
   const mediaPanelHeight = sheetEditing
     ? SHEET_EDITING_MEDIA_PANEL_HEIGHT
-    : workspacePanels.sizes.media;
+    : workspacePanels.panels.media.size;
   const workspaceStyle = {
     ...workspacePanels.style,
-    "--media-panel-height": `${mediaPanelHeight}px`,
+    "--media-panel-height": workspacePanels.panels.media.visible
+      ? `${mediaPanelHeight}px`
+      : "0px",
   };
   const {
     busy,
@@ -219,11 +264,23 @@ export function ProjectWorkspace({
     canExport: controller.canvasProps.centeredSheetId !== null,
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
+    contextualPanelVisible: workspacePanels.panels.inspector.visible,
     closeProject: () => void projectClose.requestClose(),
     exportSheet: () => exportControlRef.current?.start(),
+    mediaPanelVisible: workspacePanels.panels.media.visible,
     redo: () => void controller.redo(),
     save: () => void controller.save(),
     undo: () => void controller.undo(),
+    toggleContextualPanel: () =>
+      workspacePanels.setPanelVisibility(
+        "inspector",
+        !workspacePanels.panels.inspector.visible,
+      ),
+    toggleMediaPanel: () =>
+      workspacePanels.setPanelVisibility(
+        "media",
+        !workspacePanels.panels.media.visible,
+      ),
   });
 
   return (
@@ -272,22 +329,26 @@ export function ProjectWorkspace({
           />
         </section>
 
-        <WorkspacePanelSplitter
-          disabled={sheetEditing}
-          panel="media"
-          size={mediaPanelHeight}
-          onResizeStart={workspacePanels.beginResize}
-          onResizeBy={workspacePanels.resizeBy}
-        />
+        {workspacePanels.panels.media.visible && (
+          <WorkspacePanelSplitter
+            disabled={sheetEditing}
+            panel="media"
+            size={mediaPanelHeight}
+            onResizeStart={workspacePanels.beginResize}
+            onResizeBy={workspacePanels.resizeBy}
+          />
+        )}
 
-        <WorkspacePanelSplitter
-          panel="inspector"
-          size={workspacePanels.sizes.inspector}
-          onResizeStart={workspacePanels.beginResize}
-          onResizeBy={workspacePanels.resizeBy}
-        />
+        {workspacePanels.panels.inspector.visible && (
+          <WorkspacePanelSplitter
+            panel="inspector"
+            size={workspacePanels.panels.inspector.size}
+            onResizeStart={workspacePanels.beginResize}
+            onResizeBy={workspacePanels.resizeBy}
+          />
+        )}
 
-        <InspectorPanel
+        {workspacePanels.panels.inspector.visible && <InspectorPanel
           key={projectId}
           context={inspectorContext}
           displayedPhotoZoom={displayedPhotoZoom}
@@ -310,15 +371,50 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
-        />
+          sectionPreferences={
+            workspacePreferences.preferences.inspectorSections
+          }
+          onSectionPreferenceChange={(preferenceKey, open) =>
+            workspacePreferences.update({
+              kind: "inspectorSection",
+              preferenceKey,
+              open,
+            })
+          }
+        />}
 
-        <MediaPanel
+        {workspacePanels.panels.media.visible && <MediaPanel
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
-        />
+          thumbnailSizes={
+            workspacePreferences.preferences.mediaThumbnailSizes
+          }
+          onThumbnailSizeChange={(mediaKind, size) =>
+            workspacePreferences.update({
+              kind: "mediaThumbnailSize",
+              mediaKind,
+              size,
+            })
+          }
+          persistentPreferences={workspacePreferences.preferences.mediaPanel}
+          onSortDirectionChange={(mediaKind, sortDirection) =>
+            workspacePreferences.update({
+              kind: "mediaPanelSortDirection",
+              mediaKind,
+              sortDirection,
+            })
+          }
+          onUsageFilterChange={(mediaKind, usageFilter) =>
+            workspacePreferences.update({
+              kind: "mediaPanelUsageFilter",
+              mediaKind,
+              usageFilter,
+            })
+          }
+        />}
       </div>
 
       {(busy || message || closeMessage) && (

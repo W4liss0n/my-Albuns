@@ -8,16 +8,15 @@ import {
 } from "react";
 
 import {
-  readWorkspacePanelSize,
-  writeWorkspacePanelSize,
-} from "../state/workspacePreferences";
-
-export type WorkspacePanel = "inspector" | "media";
+  WORKSPACE_PANEL_DEFAULTS,
+  WORKSPACE_PANEL_SIZE_LIMITS,
+  type WorkspacePanel,
+  type WorkspacePanelPreference,
+} from "../application/workspacePreferences";
 
 interface WorkspacePanelDefinition {
   className: string;
   controls: string;
-  defaultSize: number;
   dimension: "width" | "height";
   increaseKey: string;
   label: string;
@@ -37,41 +36,79 @@ const PANEL_DEFINITIONS: Record<
   inspector: {
     className: "inspector-splitter",
     controls: "contextual-panel",
-    defaultSize: 310,
     dimension: "width",
     increaseKey: "ArrowLeft",
     label: "Redimensionar Painel contextual",
-    maximumSize: 480,
-    minimumSize: 220,
+    maximumSize: WORKSPACE_PANEL_SIZE_LIMITS.inspector.maximum,
+    minimumSize: WORKSPACE_PANEL_SIZE_LIMITS.inspector.minimum,
     minimumWorkAreaSize: 480,
     orientation: "vertical",
   },
   media: {
     className: "media-splitter",
     controls: "media-panel",
-    defaultSize: 202,
     dimension: "height",
     increaseKey: "ArrowUp",
     label: "Redimensionar Painel de imagens",
-    maximumSize: 360,
-    minimumSize: 120,
+    maximumSize: WORKSPACE_PANEL_SIZE_LIMITS.media.maximum,
+    minimumSize: WORKSPACE_PANEL_SIZE_LIMITS.media.minimum,
     minimumWorkAreaSize: 240,
     orientation: "horizontal",
   },
 };
 
-interface WorkspacePanelSizes {
-  inspector: number;
-  media: number;
-}
+type WorkspacePanelStates = Record<WorkspacePanel, WorkspacePanelPreference>;
 
-export function useWorkspacePanelLayout() {
-  const [sizes, setSizes] = useState<WorkspacePanelSizes>(() => ({
-    inspector: readPanelSize("inspector"),
-    media: readPanelSize("media"),
-  }));
+export function useWorkspacePanelLayout({
+  preferences,
+  onSizeChange,
+  onVisibilityChange,
+}: {
+  preferences: Readonly<
+    Record<WorkspacePanel, WorkspacePanelPreference | null>
+  >;
+  onSizeChange(panel: WorkspacePanel, size: number): void;
+  onVisibilityChange(panel: WorkspacePanel, visible: boolean): void;
+}) {
+  const [panels, setPanels] = useState<WorkspacePanelStates>(() =>
+    normalizedPanelStates(preferences),
+  );
+  const panelsRef = useRef(panels);
+  panelsRef.current = panels;
   const workspaceRef = useRef<HTMLDivElement>(null);
   const activePanelRef = useRef<WorkspacePanel | null>(null);
+
+  useEffect(() => {
+    const next = normalizedPanelStates(preferences);
+    panelsRef.current = next;
+    setPanels(next);
+  }, [
+    preferences.inspector?.size,
+    preferences.inspector?.visible,
+    preferences.media?.size,
+    preferences.media?.visible,
+  ]);
+
+  const updatePanel = useCallback(
+    (
+      panel: WorkspacePanel,
+      preference: WorkspacePanelPreference,
+      persist: boolean,
+    ) => {
+      const current = panelsRef.current;
+      if (
+        current[panel].size === preference.size &&
+        current[panel].visible === preference.visible
+      ) {
+        return;
+      }
+      const next = { ...current, [panel]: preference };
+      panelsRef.current = next;
+      setPanels(next);
+      if (persist) onSizeChange(panel, preference.size);
+    },
+    [onSizeChange],
+  );
 
   const setPanelSize = useCallback(
     (
@@ -80,14 +117,9 @@ export function useWorkspacePanelLayout() {
       bounds?: DOMRect,
     ) => {
       const next = constrainPanelSize(panel, candidate, bounds);
-      setSizes((current) =>
-        current[panel] === next
-          ? current
-          : { ...current, [panel]: next },
-      );
-      writeWorkspacePanelSize(panel, next);
+      updatePanel(panel, { ...panelsRef.current[panel], size: next }, false);
     },
-    [],
+    [updatePanel],
   );
 
   useEffect(() => {
@@ -109,7 +141,9 @@ export function useWorkspacePanelLayout() {
       setPanelSize(activePanel, farEdge - pointerPosition, bounds);
     };
     const finishResize = () => {
+      const activePanel = activePanelRef.current;
       activePanelRef.current = null;
+      if (activePanel) onSizeChange(activePanel, panelsRef.current[activePanel].size);
     };
 
     window.addEventListener("pointermove", resizeActivePanel);
@@ -120,7 +154,7 @@ export function useWorkspacePanelLayout() {
       window.removeEventListener("pointerup", finishResize);
       window.removeEventListener("pointercancel", finishResize);
     };
-  }, [setPanelSize]);
+  }, [onSizeChange, setPanelSize]);
 
   const beginResize = useCallback((panel: WorkspacePanel) => {
     activePanelRef.current = panel;
@@ -129,30 +163,47 @@ export function useWorkspacePanelLayout() {
   const resizeBy = useCallback(
     (panel: WorkspacePanel, delta: number) => {
       const bounds = workspaceRef.current?.getBoundingClientRect();
-      setSizes((current) => {
-        const next = constrainPanelSize(
-          panel,
-          current[panel] + delta,
-          bounds,
-        );
-        writeWorkspacePanelSize(panel, next);
-        return current[panel] === next
-          ? current
-          : { ...current, [panel]: next };
-      });
+      const current = panelsRef.current[panel];
+      updatePanel(
+        panel,
+        {
+          ...current,
+          size: constrainPanelSize(panel, current.size + delta, bounds),
+        },
+        true,
+      );
     },
-    [],
+    [updatePanel],
+  );
+
+  const setPanelVisibility = useCallback(
+    (panel: WorkspacePanel, visible: boolean) => {
+      updatePanel(panel, { ...panelsRef.current[panel], visible }, false);
+      onVisibilityChange(panel, visible);
+    },
+    [onVisibilityChange, updatePanel],
   );
 
   const style = {
-    "--inspector-width": `${sizes.inspector}px`,
-    "--media-panel-height": `${sizes.media}px`,
+    "--inspector-width": panels.inspector.visible
+      ? `${panels.inspector.size}px`
+      : "0px",
+    "--inspector-splitter-size": panels.inspector.visible
+      ? `${WORKSPACE_SPLITTER_SIZE}px`
+      : "0px",
+    "--media-panel-height": panels.media.visible
+      ? `${panels.media.size}px`
+      : "0px",
+    "--media-splitter-size": panels.media.visible
+      ? `${WORKSPACE_SPLITTER_SIZE}px`
+      : "0px",
   } as CSSProperties;
 
   return {
     beginResize,
+    panels,
     resizeBy,
-    sizes,
+    setPanelVisibility,
     style,
     workspaceRef,
   };
@@ -246,10 +297,24 @@ function constrainPanelSize(
   );
 }
 
-function readPanelSize(panel: WorkspacePanel) {
-  const definition = PANEL_DEFINITIONS[panel];
-  return constrainPanelSize(
-    panel,
-    readWorkspacePanelSize(panel, definition.defaultSize),
-  );
+function normalizedPanelStates(
+  preferences: Readonly<
+    Record<WorkspacePanel, WorkspacePanelPreference | null>
+  >,
+): WorkspacePanelStates {
+  return {
+    inspector: normalizePanelState("inspector", preferences.inspector),
+    media: normalizePanelState("media", preferences.media),
+  };
+}
+
+function normalizePanelState(
+  panel: WorkspacePanel,
+  preference: WorkspacePanelPreference | null,
+) {
+  const fallback = WORKSPACE_PANEL_DEFAULTS[panel];
+  return {
+    size: constrainPanelSize(panel, preference?.size ?? fallback.size),
+    visible: preference?.visible ?? fallback.visible,
+  };
 }

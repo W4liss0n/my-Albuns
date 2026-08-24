@@ -17,6 +17,10 @@ import type {
 } from "./application/projectPorts";
 import type { ProjectDialogPort } from "./application/projectDialogPort";
 import {
+  createWorkspacePreferences,
+  type WorkspacePreferences,
+} from "./application/workspacePreferences";
+import {
   createEmptyProjection,
   representativeProjection,
 } from "./test/projectFixtures";
@@ -239,6 +243,48 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
     ({ event }) => event === "project_load_started",
   );
   expect(load).toHaveBeenCalledWith(loadStarted?.operationId);
+});
+
+test("confirms Project UI readiness only after shared preferences hydrate", async () => {
+  let finishPreferenceLoad: (value: WorkspacePreferences) => void =
+    () => undefined;
+  const preferenceLoad = new Promise<WorkspacePreferences>((resolve) => {
+    finishPreferenceLoad = resolve;
+  });
+  const confirmUiReady = vi.fn(async () => undefined);
+
+  render(
+    <App
+      exportPort={exportPort}
+      projectStartupPort={{ confirmUiReady }}
+      projectDialogPort={projectDialogPort}
+      projectWindowPort={projectWindowPort}
+      mediaPreviewPort={mediaPreviewPort}
+      projectSessionPort={projectSessionPort}
+      logger={silentLogger}
+      canvasGraphicsDiagnosticProbe={canvasGraphicsDiagnosticProbe}
+      graphicsProbe={() => ({
+        supported: true,
+        renderer: "NVIDIA GeForce RTX",
+        reason: "WebGL2 acelerado por hardware confirmado.",
+        limits: {
+          maxTextureSizePx: 16_384,
+          maxRenderbufferSizePx: 16_384,
+          maxTextureImageUnits: 16,
+        },
+      })}
+      workspacePreferencesPort={{
+        load: () => preferenceLoad,
+        update: async () => createWorkspacePreferences(),
+      }}
+    />,
+  );
+
+  await screen.findByRole("button", { name: "Exportar Lâmina" });
+  expect(confirmUiReady).not.toHaveBeenCalled();
+
+  act(() => finishPreferenceLoad(createWorkspacePreferences()));
+  await waitFor(() => expect(confirmUiReady).toHaveBeenCalledOnce());
 });
 
 test("prepares real media previews after opening without blocking the Workspace", async () => {

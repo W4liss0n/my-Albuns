@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import type {
@@ -31,6 +31,7 @@ import {
   type FieldValidationTooltipModel,
   useFieldValidationTooltip,
 } from "../ui";
+import { useSemanticBaseline } from "./useSemanticBaseline";
 
 interface AlbumInformationFormProps {
   document: DocumentSnapshot;
@@ -85,9 +86,10 @@ export function AlbumInformationForm({
   onReadyChange,
   onValidate,
 }: AlbumInformationFormProps) {
-  const baseline = useMemo(
-    () => createDraft(document, sheetStates),
-    [document, sheetStates],
+  const projectedBaseline = createDraft(document, sheetStates);
+  const baseline = useSemanticBaseline(
+    projectedBaseline,
+    JSON.stringify(toCandidate(projectedBaseline).information),
   );
   const [draft, setDraft] = useState(baseline);
   const [validated, setValidated] = useState<{

@@ -224,6 +224,111 @@ test("resizes thumbnails independently per tab and marks unavailable date orderi
   expect(restoredPhotoSize).toHaveValue("84");
 });
 
+test("hydrates per-tab thumbnail sizes and publishes later changes", async () => {
+  const user = userEvent.setup();
+  const onThumbnailSizeChange = vi.fn();
+  render(
+    <MediaPanel
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      thumbnailSizes={{ decorative: 110, photo: 124 }}
+      onFillPhoto={vi.fn()}
+      onThumbnailSizeChange={onThumbnailSizeChange}
+    />,
+  );
+
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  const photoSize = screen.getByRole("slider", {
+    name: "Tamanho das miniaturas",
+  });
+  expect(photoSize).toHaveValue("124");
+  fireEvent.change(photoSize, { target: { value: "126" } });
+  expect(onThumbnailSizeChange).toHaveBeenCalledWith("photo", 126);
+
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(
+    screen.getByRole("slider", { name: "Tamanho das miniaturas" }),
+  ).toHaveValue("110");
+});
+
+test("hydrates authoritative per-tab settings and publishes only the changed field", async () => {
+  const user = userEvent.setup();
+  const onSortDirectionChange = vi.fn();
+  const onUsageFilterChange = vi.fn();
+  render(
+    <MediaPanel
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onSortDirectionChange={onSortDirectionChange}
+      persistentPreferences={{
+        decorative: { sortDirection: "ascending", usageFilter: "all" },
+        photo: { sortDirection: "descending", usageFilter: "unused" },
+      }}
+      onFillPhoto={vi.fn()}
+      onUsageFilterChange={onUsageFilterChange}
+    />,
+  );
+
+  expect(visibleMediaIds()).toEqual(["photo-album-2"]);
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(screen.getByRole("combobox", { name: "Ordenar por" })).toHaveValue(
+    "name-descending",
+  );
+  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
+    "unused",
+  );
+
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Filtro de uso" }),
+    "used",
+  );
+  expect(onUsageFilterChange).toHaveBeenCalledWith("photo", "used");
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Ordenar por" }),
+    "name-ascending",
+  );
+  expect(onSortDirectionChange).toHaveBeenCalledWith("photo", "ascending");
+
+  await user.click(screen.getByRole("button", { name: "Decorativos" }));
+  await user.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(screen.getByRole("combobox", { name: "Ordenar por" })).toHaveValue(
+    "name-ascending",
+  );
+  expect(screen.getByRole("combobox", { name: "Filtro de uso" })).toHaveValue(
+    "all",
+  );
+});
+
+test("clears preview demand when the panel unmounts", () => {
+  const onMediaDemandChange = vi.fn();
+  const view = render(
+    <MediaPanel
+      mediaItems={mediaItems}
+      mediaUsage={mediaUsage}
+      onFillPhoto={vi.fn()}
+      onMediaDemandChange={onMediaDemandChange}
+    />,
+  );
+  onMediaDemandChange.mockClear();
+
+  view.unmount();
+
+  expect(onMediaDemandChange).toHaveBeenCalledOnce();
+  expect(onMediaDemandChange).toHaveBeenCalledWith({
+    visibleMediaIds: [],
+    preloadMediaIds: [],
+  });
+});
+
 test("uses image orientation and opacity without visible names or usage counts", () => {
   render(
     <MediaPanel
@@ -347,6 +452,24 @@ test("clears selection and keeps Ctrl+A in the grid after a background click", (
     expect(mediaCard).toHaveAttribute("data-selected", "true");
   }
   expect(selectedMediaCards).toHaveLength(3);
+});
+
+test("leaves Ctrl+A to nested editable content inside the image panel", () => {
+  renderPanel();
+
+  const panel = screen.getByRole("region", { name: "Painel de imagens" });
+  const editor = document.createElement("div");
+  const text = document.createElement("span");
+  editor.setAttribute("contenteditable", "");
+  editor.append(text);
+  panel.append(editor);
+
+  expect(fireEvent.keyDown(text, { ctrlKey: true, key: "a" })).toBe(true);
+  const cards = panel.querySelectorAll("button[data-media-id]");
+  expect(cards).toHaveLength(3);
+  for (const card of cards) {
+    expect(card).toHaveAttribute("aria-pressed", "false");
+  }
 });
 
 test("removes hidden items from the transient media selection", async () => {

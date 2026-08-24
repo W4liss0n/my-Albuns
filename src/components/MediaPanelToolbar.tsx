@@ -59,6 +59,8 @@ export function MediaPanelToolbar({
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
       const restoreOptionsFocus = openPopup === "options";
       setOpenPopup(null);
       if (restoreOptionsFocus) optionsButtonRef.current?.focus();

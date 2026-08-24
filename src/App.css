@@ -304,15 +304,21 @@
   font-weight: 400;
 }
 
+.app-menu-checkmark {
+  display: inline-block;
+  width: var(--ui-space-4);
+  color: var(--ui-text-secondary);
+}
+
 .workspace-grid {
   display: grid;
   min-width: 0;
   min-height: 0;
   grid-template-columns:
-    minmax(0, 1fr) 6px
+    minmax(0, 1fr) var(--inspector-splitter-size, 6px)
     var(--inspector-width, 286px);
   grid-template-rows:
-    minmax(0, 1fr) 6px
+    minmax(0, 1fr) var(--media-splitter-size, 6px)
     var(--media-panel-height, 190px);
   grid-template-areas:
     "canvas inspector-splitter inspector"
