@@ -15,6 +15,8 @@ const failureMessages: Readonly<
     "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
   save_state_indeterminate:
     "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
+  recovery_cleanup_failed:
+    "O arquivo do Projeto foi salvo, mas não foi possível encerrar a Recuperação. Tente salvar novamente.",
   session_unavailable:
     "A Sessão do Projeto não está mais disponível. Reabra o Projeto para continuar.",
   not_found:

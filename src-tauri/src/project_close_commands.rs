@@ -175,5 +175,8 @@ mod tests {
         assert!(!must_terminate_after_close_save_failure(
             &ProjectHostSaveError::Project(SaveProjectError::PersistedBaselineConflict)
         ));
+        assert!(!must_terminate_after_close_save_failure(
+            &ProjectHostSaveError::RecoveryCleanupFailed
+        ));
     }
 }

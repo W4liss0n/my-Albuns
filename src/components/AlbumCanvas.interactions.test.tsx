@@ -190,6 +190,34 @@ test("reports the live Photo transform while Pan is moving", async () => {
   expect(onTransformCommit).not.toHaveBeenCalled();
 });
 
+test("keeps a crash-interrupted continuous gesture in memory without committing it", async () => {
+  const onTransformPreview = vi.fn();
+  const onTransformCommit = vi.fn(
+    async (_delta: PhotoTransformDelta) => true,
+  );
+  const view = renderCanvas({
+    compositionPlan: interactiveComposition,
+    onTransformPreview,
+    onTransformCommit,
+  });
+  await finishPixiInitialization();
+
+  displayWithHandler("pointerdown").emit("pointerdown", {
+    altKey: true,
+    global: { x: 0, y: 0 },
+    stopPropagation: vi.fn(),
+  });
+  pixiLifecycle.instances[0].stage.emit("globalpointermove", {
+    global: { x: 40, y: 0 },
+  });
+  expect(onTransformPreview).toHaveBeenCalled();
+  expect(onTransformCommit).not.toHaveBeenCalled();
+
+  view.unmount();
+
+  expect(onTransformCommit).not.toHaveBeenCalled();
+});
+
 test("keeps every frame corner covered while panning a rotated photo", async () => {
   const onTransformCommit = vi.fn(
     async (_delta: PhotoTransformDelta) => true,

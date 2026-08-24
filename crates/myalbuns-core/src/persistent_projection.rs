@@ -115,7 +115,7 @@ pub(crate) fn editor_projection(
         document: DocumentSnapshot::from_settings(settings),
         revision: session.revision(),
         saved_revision: session.saved_revision(),
-        dirty: session.revision() != session.saved_revision(),
+        dirty: session.has_unsaved_changes(),
         can_undo: history_enabled && session.can_undo(),
         can_redo: history_enabled && session.can_redo(),
         album,

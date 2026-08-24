@@ -6,7 +6,7 @@ use myalbuns_core::{
 };
 use myalbuns_logging::{ProcessRole, safe_log_identifier};
 use myalbuns_paths::{AppPaths, AppPathsError, OperationPathContext};
-use tauri::{AppHandle, Manager, State, WebviewWindow};
+use tauri::{AppHandle, Manager, State, WebviewWindow, Window};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 
 use crate::{
@@ -14,15 +14,25 @@ use crate::{
     cache_previews::CachePreviewRegistry,
     cache_service::{ActiveCacheNamespace, CacheService},
     ipc_contract::{
-        ImportPhotoResult, SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult,
-        SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+        ImportPhotoResult, ProjectRecoveryDecision as IpcProjectRecoveryDecision,
+        ProjectRecoveryResolution as IpcProjectRecoveryResolution,
+        ProjectRecoveryStatus as IpcProjectRecoveryStatus, SaveAsProjectCommandError,
+        SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError, SaveProjectOutcome,
+        SaveProjectResult,
     },
     logging::validate_optional_identifier,
     media_runtime::{MediaAvailability, MediaBinding, MediaResolver},
     native_project_dialog::{SaveAsDialogOutcome, choose_save_as_destination},
-    product_runtime::{PROJECT_WINDOW_LABEL, project_window_title},
-    project_host::{ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError},
-    project_recovery::ProjectRecoveryCheckpoints,
+    product_runtime::{
+        PROJECT_WINDOW_LABEL, project_window_title, start_linked_media_monitor_if_active,
+    },
+    project_host::{
+        ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError,
+        ProjectRecoveryDecision as HostProjectRecoveryDecision,
+        ProjectRecoveryResolution as HostProjectRecoveryResolution,
+        ProjectRecoveryStatus as HostProjectRecoveryStatus,
+    },
+    project_recovery::RecoveryCoordinator,
     project_webview_authority::ProjectWebviewAuthority,
 };
 
@@ -44,6 +54,58 @@ pub(crate) fn project_state(
         event = "project_state_read",
     );
     Ok(projection)
+}
+
+#[tauri::command]
+pub(crate) fn project_recovery_status(
+    window: WebviewWindow,
+    state: State<'_, ProjectHost>,
+) -> Result<IpcProjectRecoveryStatus, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A Recuperação só está disponível na Janela do Projeto.".into());
+    }
+    match state.recovery_status()? {
+        HostProjectRecoveryStatus::None => Ok(IpcProjectRecoveryStatus::None),
+        HostProjectRecoveryStatus::Available => Ok(IpcProjectRecoveryStatus::Available),
+    }
+}
+
+#[tauri::command]
+pub(crate) fn resolve_project_recovery(
+    decision: IpcProjectRecoveryDecision,
+    window: Window,
+    state: State<'_, ProjectHost>,
+) -> Result<IpcProjectRecoveryResolution, String> {
+    if window.label() != PROJECT_WINDOW_LABEL {
+        return Err("A Recuperação só está disponível na Janela do Projeto.".into());
+    }
+    let host_decision = match decision {
+        IpcProjectRecoveryDecision::ReopenAndRecover => {
+            HostProjectRecoveryDecision::ReopenAndRecover
+        }
+        IpcProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved => {
+            HostProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved
+        }
+        IpcProjectRecoveryDecision::NowNot => HostProjectRecoveryDecision::NowNot,
+    };
+    match state.resolve_recovery(host_decision)? {
+        HostProjectRecoveryResolution::Recovered(projection) => {
+            start_linked_media_monitor_if_active(window.app_handle().clone());
+            Ok(IpcProjectRecoveryResolution::Recovered {
+                projection: Box::new(projection),
+            })
+        }
+        HostProjectRecoveryResolution::OpenedLastSaved(projection) => {
+            start_linked_media_monitor_if_active(window.app_handle().clone());
+            Ok(IpcProjectRecoveryResolution::OpenedLastSaved {
+                projection: Box::new(projection),
+            })
+        }
+        HostProjectRecoveryResolution::Deferred => {
+            crate::project_window_lifecycle::complete_project_close(&window);
+            Ok(IpcProjectRecoveryResolution::Deferred)
+        }
+    }
 }
 
 #[tauri::command]
@@ -436,7 +498,7 @@ pub(crate) async fn save_project_as(
                     ProjectLocation::new(path, paths.freeze()),
                     authorization,
                 ),
-                |authority, outcome| {
+                |previous_authority, authority, outcome| {
                     let owner = transition_app
                         .state::<CacheService>()
                         .reserve_fresh_namespace(authority)
@@ -493,8 +555,8 @@ pub(crate) async fn save_project_as(
                         return Err(());
                     }
                     if let Err(error) = transition_app
-                        .state::<ProjectRecoveryCheckpoints>()
-                        .finish_previous_checkpoint(outcome.previous_project_id)
+                        .state::<RecoveryCoordinator>()
+                        .finish(previous_authority)
                     {
                         tracing::error!(
                             target: "myalbuns.desktop",
@@ -687,6 +749,9 @@ pub(crate) fn map_save_project_error(error: ProjectHostSaveError) -> SaveProject
         ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate) => {
             SaveProjectCommandError::SaveStateIndeterminate
         }
+        ProjectHostSaveError::RecoveryCleanupFailed => {
+            SaveProjectCommandError::RecoveryCleanupFailed
+        }
         ProjectHostSaveError::SessionUnavailable => SaveProjectCommandError::SessionUnavailable,
     }
 }
@@ -840,6 +905,10 @@ mod tests {
             (
                 ProjectHostSaveError::Project(SaveProjectError::SaveStateIndeterminate),
                 "save_state_indeterminate",
+            ),
+            (
+                ProjectHostSaveError::RecoveryCleanupFailed,
+                "recovery_cleanup_failed",
             ),
             (
                 ProjectHostSaveError::SessionUnavailable,

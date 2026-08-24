@@ -6,6 +6,7 @@ use myalbuns_desktop_lib::ipc_contract::{
     ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult, LinkedMediaChanged,
     MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
     ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
+    ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus,
     SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
     SaveProjectOutcome, SaveProjectResult,
 };
@@ -53,6 +54,12 @@ fn main() {
         .expect("Project close request outcome bindings should be generated");
     ProjectCloseResolution::export_all(&config)
         .expect("Project close resolution bindings should be generated");
+    ProjectRecoveryDecision::export_all(&config)
+        .expect("Project Recovery decision bindings should be generated");
+    ProjectRecoveryResolution::export_all(&config)
+        .expect("Project Recovery resolution bindings should be generated");
+    ProjectRecoveryStatus::export_all(&config)
+        .expect("Project Recovery status bindings should be generated");
     SaveProjectCommandError::export_all(&config)
         .expect("Save Project error bindings should be generated");
     SaveProjectOutcome::export_all(&config)

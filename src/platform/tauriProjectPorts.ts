@@ -29,11 +29,19 @@ import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/Impo
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { ProjectRecoveryDecision as IpcProjectRecoveryDecision } from "./generated/ProjectRecoveryDecision";
+import type { ProjectRecoveryResolution as IpcProjectRecoveryResolution } from "./generated/ProjectRecoveryResolution";
+import type { ProjectRecoveryStatus as IpcProjectRecoveryStatus } from "./generated/ProjectRecoveryStatus";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import type { SaveAsProjectOutcome as IpcSaveAsProjectOutcome } from "./generated/SaveAsProjectOutcome";
 import type { SaveAsProjectResult as IpcSaveAsProjectResult } from "./generated/SaveAsProjectResult";
-import { isIpcRecord, isIpcRevision } from "./ipcGuards";
+import {
+  hasOnlyIpcKeys,
+  isIpcEditorProjection,
+  isIpcRecord,
+  isIpcRevision,
+} from "./ipcGuards";
 import { parseProjectSaveFailure } from "./projectSaveFailure";
 import { parseProjectSaveAsFailure } from "./projectSaveAsFailure";
 
@@ -94,6 +102,39 @@ function toSaveProjectError(error: unknown): SaveProjectError {
   );
 }
 
+function parseProjectRecoveryStatus(value: unknown): IpcProjectRecoveryStatus {
+  if (
+    !isIpcRecord(value) ||
+    !hasOnlyIpcKeys(value, ["kind"]) ||
+    (value.kind !== "none" && value.kind !== "available")
+  ) {
+    throw new Error("Não foi possível verificar a Recuperação do Projeto.");
+  }
+  return { kind: value.kind };
+}
+
+function parseProjectRecoveryResolution(
+  value: unknown,
+): IpcProjectRecoveryResolution {
+  if (!isIpcRecord(value)) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  if (value.kind === "deferred" && hasOnlyIpcKeys(value, ["kind"])) {
+    return { kind: "deferred" };
+  }
+  if (
+    (value.kind !== "recovered" && value.kind !== "openedLastSaved") ||
+    !hasOnlyIpcKeys(value, ["kind", "projection"]) ||
+    !isIpcEditorProjection(value.projection)
+  ) {
+    throw new Error("Não foi possível confirmar a escolha de Recuperação.");
+  }
+  return {
+    kind: value.kind,
+    projection: value.projection,
+  };
+}
+
 function invalidSaveResponse() {
   return new SaveProjectError(
     "invalid_response",
@@ -142,11 +183,7 @@ function parseIpcSaveAsProjectResult(
 
   const { outcome, projection } = value;
   if (
-    !isIpcRecord(projection) ||
-    !isIpcRecord(projection.state) ||
-    !isProjectionIdentity(projection.state.projectId) ||
-    !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision)
+    !isIpcEditorProjection(projection)
   ) {
     throw invalidSaveAsResponse();
   }
@@ -222,11 +259,7 @@ function parseIpcSaveProjectResult(value: unknown): IpcSaveProjectResult {
     (outcome.kind !== "saved" &&
       outcome.kind !== "alreadyCurrent") ||
     !isIpcRevision(outcome.revision) ||
-    !isIpcRecord(projection) ||
-    !isIpcRecord(projection.state) ||
-    typeof projection.state.projectId !== "string" ||
-    !isIpcRevision(projection.state.revision) ||
-    !isIpcRevision(projection.state.savedRevision) ||
+    !isIpcEditorProjection(projection) ||
     projection.state.revision !== outcome.revision ||
     projection.state.savedRevision !== outcome.revision
   ) {
@@ -315,6 +348,16 @@ export const tauriProjectCorePort: ProjectCorePort = {
 };
 
 export const tauriProjectStartupPort: ProjectStartupPort = {
+  recoveryStatus: async () =>
+    parseProjectRecoveryStatus(
+      await invoke<unknown>("project_recovery_status"),
+    ),
+  resolveRecovery: async (decision) =>
+    parseProjectRecoveryResolution(
+      await invoke<unknown>("resolve_project_recovery", {
+        decision: decision satisfies IpcProjectRecoveryDecision,
+      }),
+    ),
   confirmUiReady: () => invoke<void>("project_ui_ready"),
 };
 

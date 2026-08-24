@@ -19,6 +19,7 @@ use crate::{
     persistent_projection,
     persistent_session::PersistentProjectSession,
     project_document::{InitialProject, MediaRef, ProjectDocument, ProjectRevision},
+    project_recovery::{RecoveryCheckpoint, RecoveryCheckpointError},
     project_store::{
         self, CreateStoreError, DocumentFailure, IdentityLeaseError, IdentityLeaseObservation,
         IdentityRegistryLookup, OpenStoreError, PathFailure, PendingProjectIdentityLease,
@@ -415,6 +416,40 @@ impl EditableProject {
 
     pub fn can_redo(&self) -> bool {
         self.session_valid && self.session.can_redo()
+    }
+
+    pub fn recovery_checkpoint(&self) -> Result<RecoveryCheckpoint, RecoveryCheckpointError> {
+        if !self.session_valid {
+            return Err(RecoveryCheckpointError::SessionUnavailable);
+        }
+        Ok(RecoveryCheckpoint {
+            project_id: self.identity_authority.project_id,
+            base_saved_revision: self.session.saved_revision(),
+            creative_revision: self.session.current_revision(),
+        })
+    }
+
+    pub fn restore_recovery(
+        &mut self,
+        checkpoint: RecoveryCheckpoint,
+    ) -> Result<EditorProjection, RecoveryCheckpointError> {
+        if !self.session_valid {
+            return Err(RecoveryCheckpointError::SessionUnavailable);
+        }
+        if checkpoint.project_id != self.identity_authority.project_id {
+            return Err(RecoveryCheckpointError::IdentityMismatch);
+        }
+        if checkpoint.base_saved_revision != self.session.saved_revision()
+            || self.session.revision() != self.session.saved_revision()
+        {
+            return Err(RecoveryCheckpointError::BaselineMismatch);
+        }
+        self.session = PersistentProjectSession::from_recovery(
+            checkpoint.creative_revision,
+            checkpoint.base_saved_revision,
+        );
+        self.photo_sources.clear();
+        Ok(self.projection())
     }
 
     /// Resolved editor view of the current productive Project document.

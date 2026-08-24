@@ -129,6 +129,7 @@ export type SaveProjectFailureCode =
   | "stale_revision"
   | "persisted_baseline_conflict"
   | "save_state_indeterminate"
+  | "recovery_cleanup_failed"
   | "session_unavailable"
   | "not_found"
   | "unavailable"
@@ -197,8 +198,24 @@ export interface ProjectWindowPort {
 }
 
 export interface ProjectStartupPort {
+  recoveryStatus(): Promise<ProjectRecoveryStatus>;
+  resolveRecovery(
+    decision: ProjectRecoveryDecision,
+  ): Promise<ProjectRecoveryResolution>;
   confirmUiReady(): Promise<void>;
 }
+
+export type ProjectRecoveryStatus = { kind: "none" } | { kind: "available" };
+
+export type ProjectRecoveryDecision =
+  | "reopenAndRecover"
+  | "discardCheckpointAndOpenLastSaved"
+  | "nowNot";
+
+export type ProjectRecoveryResolution =
+  | { kind: "recovered"; projection: EditorProjection }
+  | { kind: "openedLastSaved"; projection: EditorProjection }
+  | { kind: "deferred" };
 
 export interface ProjectCorePort {
   load(operationId: string): Promise<EditorProjection>;

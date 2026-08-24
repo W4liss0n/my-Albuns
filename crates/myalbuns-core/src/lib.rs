@@ -4,6 +4,7 @@ mod persistent_project;
 mod persistent_projection;
 mod persistent_session;
 mod project_document;
+mod project_recovery;
 mod project_store;
 mod validation;
 
@@ -35,6 +36,7 @@ pub use project_document::{
     OverlayContent, ProjectDocument, ProjectFrame, ProjectPhoto, ProjectPhotoTransform,
     ProjectRect, ProjectSheet, Rgb, VisualDefaults,
 };
+pub use project_recovery::{RecoveryCheckpoint, RecoveryCheckpointError};
 pub use project_store::{
     DocumentFailure, LoadProjectError, LoadProjectRequest, PathFailure, ProjectLocation,
 };

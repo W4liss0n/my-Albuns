@@ -12,6 +12,7 @@ import {
   tauriExportPipelinePort,
   tauriMediaPreviewPort,
   tauriProjectCorePort,
+  tauriProjectStartupPort,
 } from "./tauriProjectPorts";
 
 const tauriBoundary = vi.hoisted(() => ({
@@ -277,6 +278,53 @@ test("maps the Project and media ports to the desktop commands", async () => {
   });
   expect(retry).toEqual(retriedPreview);
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
+});
+
+test("maps one closed Recovery decision without a separate confirmation flag", async () => {
+  vi.mocked(invoke)
+    .mockResolvedValueOnce({ kind: "available" })
+    .mockResolvedValueOnce({
+      kind: "openedLastSaved",
+      projection: representativeProjection,
+    });
+
+  await expect(tauriProjectStartupPort.recoveryStatus()).resolves.toEqual({
+    kind: "available",
+  });
+  await expect(
+    tauriProjectStartupPort.resolveRecovery(
+      "discardCheckpointAndOpenLastSaved",
+    ),
+  ).resolves.toEqual({
+    kind: "openedLastSaved",
+    projection: representativeProjection,
+  });
+
+  expect(invoke).toHaveBeenNthCalledWith(1, "project_recovery_status");
+  expect(invoke).toHaveBeenNthCalledWith(2, "resolve_project_recovery", {
+    decision: "discardCheckpointAndOpenLastSaved",
+  });
+});
+
+test("rejects an open Recovery response outside the generated contract", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ kind: "futureChoice" });
+
+  await expect(tauriProjectStartupPort.recoveryStatus()).rejects.toThrow(
+    "Não foi possível verificar a Recuperação do Projeto.",
+  );
+});
+
+test("rejects extra fields in the closed Recovery status and resolution envelopes", async () => {
+  vi.mocked(invoke)
+    .mockResolvedValueOnce({ kind: "available", futureField: true })
+    .mockResolvedValueOnce({ kind: "deferred", projection: representativeProjection });
+
+  await expect(tauriProjectStartupPort.recoveryStatus()).rejects.toThrow(
+    "Não foi possível verificar a Recuperação do Projeto.",
+  );
+  await expect(
+    tauriProjectStartupPort.resolveRecovery("nowNot"),
+  ).rejects.toThrow("Não foi possível confirmar a escolha de Recuperação.");
 });
 
 test("maps Photo import, target resolution, and affected Frame outcomes", async () => {
@@ -580,6 +628,12 @@ test.each([
     code: "save_state_indeterminate",
     message:
       "Não foi possível confirmar qual revisão ficou no arquivo. Reabra o Projeto antes de continuar.",
+  },
+  {
+    wire: { code: "recovery_cleanup_failed" },
+    code: "recovery_cleanup_failed",
+    message:
+      "O arquivo do Projeto foi salvo, mas não foi possível encerrar a Recuperação. Tente salvar novamente.",
   },
   {
     wire: { code: "session_unavailable" },

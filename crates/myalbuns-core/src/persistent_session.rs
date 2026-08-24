@@ -10,6 +10,7 @@ pub(crate) struct PersistentProjectSession {
     latest_revision: u64,
     saved_revision: u64,
     schema_upgrade_required: bool,
+    recovered_unsaved: bool,
     undo: Vec<ProjectRevision>,
     redo: Vec<ProjectRevision>,
 }
@@ -23,6 +24,20 @@ impl PersistentProjectSession {
             latest_revision,
             saved_revision,
             schema_upgrade_required,
+            recovered_unsaved: false,
+            undo: Vec::new(),
+            redo: Vec::new(),
+        }
+    }
+
+    pub(crate) fn from_recovery(current: ProjectRevision, saved_revision: u64) -> Self {
+        let latest_revision = current.revision.max(saved_revision);
+        Self {
+            current,
+            latest_revision,
+            saved_revision,
+            schema_upgrade_required: false,
+            recovered_unsaved: true,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -49,7 +64,7 @@ impl PersistentProjectSession {
     }
 
     pub(crate) fn has_unsaved_changes(&self) -> bool {
-        self.current.revision != self.saved_revision
+        self.recovered_unsaved || self.current.revision != self.saved_revision
     }
 
     pub(crate) fn requires_save(&self) -> bool {
@@ -189,6 +204,7 @@ impl PersistentProjectSession {
         }
         self.saved_revision = candidate.revision;
         self.schema_upgrade_required = false;
+        self.recovered_unsaved = false;
         Ok(())
     }
 
@@ -203,6 +219,7 @@ impl PersistentProjectSession {
         }
         self.saved_revision = candidate.revision;
         self.schema_upgrade_required = false;
+        self.recovered_unsaved = false;
         Ok(())
     }
 }

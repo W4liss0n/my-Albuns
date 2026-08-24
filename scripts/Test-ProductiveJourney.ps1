@@ -149,6 +149,12 @@ try {
         throw "The productive journey failed with exit code $LASTEXITCODE."
     }
     $gate = $gateOutput | Select-Object -Last 1 | ConvertFrom-Json
+    $expectedRecoveryChoices = @(
+        'Reabrir e recuperar',
+        "Abrir $([char]0x00FA)ltima vers$([char]0x00E3)o salva",
+        "Agora n$([char]0x00E3)o"
+    )
+    $contractViolations = @()
     if (
         -not $gate.cancelledCreationBeforeCore -or
         -not $gate.cancelledExportBeforePipeline -or
@@ -167,13 +173,40 @@ try {
         $gate.savedDpi -ne 300 -or
         $gate.photoFrameCount -ne 1 -or
         -not $gate.persistedPhotoLinkOnly -or
-        -not $gate.reimportedExistingPhotoWithoutRevision -or
+        -not $gate.reimportedExistingPhotoWithoutRevision
+    ) {
+        $contractViolations += 'base'
+    }
+    if (
+        $gate.sessionRecovery.schemaVersion -ne 1 -or
+        $gate.sessionRecovery.baseSavedRevision -ne 3 -or
+        $gate.sessionRecovery.creativeRevision -ne 4 -or
+        $gate.sessionRecovery.recoveredDpi -ne 360 -or
+        $gate.sessionRecovery.promptChoices.Count -ne 3 -or
+        $gate.sessionRecovery.promptChoices[0] -cne $expectedRecoveryChoices[0] -or
+        $gate.sessionRecovery.promptChoices[1] -cne $expectedRecoveryChoices[1] -or
+        $gate.sessionRecovery.promptChoices[2] -cne $expectedRecoveryChoices[2] -or
+        -not $gate.sessionRecovery.opaqueProjectKey -or
+        -not $gate.sessionRecovery.completedActionCheckpointed -or
+        -not $gate.sessionRecovery.midGesturePreservedPreviousCheckpoint -or
+        -not $gate.sessionRecovery.projectFileUnchangedThroughRecovery -or
+        -not $gate.sessionRecovery.checkpointPreservedAfterRecovery -or
+        -not $gate.sessionRecovery.recoveredUnsaved -or
+        -not $gate.sessionRecovery.recoveredHistoryEmpty -or
+        -not $gate.sessionRecovery.postRecoveryActionsCheckpointed -or
+        -not $gate.sessionRecovery.checkpointPreservedByCancelledSaveAs -or
+        -not $gate.sessionRecovery.checkpointFinishedBySuccessfulSaveAs -or
+        -not $gate.sessionRecovery.lockReleasedToDistinctHost
+    ) {
+        $contractViolations += 'sessionRecovery'
+    }
+    if (
         -not $gate.saveAs.cancelledBeforeCore -or
         $gate.saveAs.createAuthorization -ne 'createOnly' -or
         $gate.saveAs.originalProjectId -notmatch '^[0-9a-f-]{36}$' -or
         $gate.saveAs.copiedProjectId -notmatch '^[0-9a-f-]{36}$' -or
         $gate.saveAs.originalProjectId -eq $gate.saveAs.copiedProjectId -or
-        $gate.saveAs.savedAsRevision -ne 4 -or
+        $gate.saveAs.savedAsRevision -ne 6 -or
         -not $gate.saveAs.contentPreserved -or
         -not $gate.saveAs.originalByteIdentical -or
         -not $gate.saveAs.historyPreserved -or
@@ -182,7 +215,7 @@ try {
         -not $gate.saveAs.isolatedIndependentSaves -or
         $gate.saveAs.originalSavedRevision -ne 4 -or
         $gate.saveAs.originalSavedDpi -ne 320 -or
-        $gate.saveAs.copySavedRevision -ne 5 -or
+        $gate.saveAs.copySavedRevision -ne 7 -or
         $gate.saveAs.copySavedDpi -ne 420 -or
         -not $gate.saveAs.previousRecoveryFinished -or
         -not $gate.saveAs.cacheStagedEmpty -or
@@ -190,7 +223,11 @@ try {
         -not $gate.saveAs.webviewNamespaceTransitioned -or
         -not $gate.saveAs.replacementWebviewReady -or
         -not $gate.saveAs.localStateStartedEmpty -or
-        -not $gate.saveAs.nativeTitleUpdated -or
+        -not $gate.saveAs.nativeTitleUpdated
+    ) {
+        $contractViolations += 'saveAs'
+    }
+    if (
         -not $gate.originalUnchanged -or
         -not $gate.missingOriginalBlocked -or
         -not $gate.missingOriginalActionable -or
@@ -205,20 +242,29 @@ try {
         $gate.jpeg.height -ne 360 -or
         $gate.jpeg.byteCount -le 0 -or
         $gate.jpeg.sha256 -notmatch '^[0-9a-f]{64}$' -or
-        $gate.correlations.bootstraps -ne 3 -or
-        $gate.correlations.imagingAttempts -ne 2 -or
         -not $gate.exportedAfterReopen -or
+        $gate.canvasPhotoSample.cssWidth -le 0 -or
+        $gate.canvasPhotoSample.cssHeight -le 0 -or
+        $gate.sourcePathExposedToWebView
+    ) {
+        $contractViolations += 'output'
+    }
+    if (
+        $gate.correlations.bootstraps -ne 4 -or
+        $gate.correlations.imagingAttempts -ne 2 -or
         $gate.processIds.firstHost -eq $gate.processIds.host -or
         -not $gate.reopenedInIndependentHost -or
         -not $gate.reopenedHistoryEmpty -or
-        $gate.canvasPhotoSample.cssWidth -le 0 -or
-        $gate.canvasPhotoSample.cssHeight -le 0 -or
-        $gate.sourcePathExposedToWebView -or
-        $gate.terminalCounts.globalHandoffs -ne 3 -or
-        $gate.terminalCounts.hostReady -ne 3 -or
+        $gate.terminalCounts.globalHandoffs -ne 4 -or
+        $gate.terminalCounts.hostReady -ne 4 -or
         $gate.terminalCounts.imagingStopped -ne 2
     ) {
-        throw 'The productive journey result did not satisfy its public contract.'
+        $contractViolations += 'processes'
+    }
+    if ($contractViolations.Count -ne 0) {
+        $observed = $gate | ConvertTo-Json -Depth 8 -Compress
+        $violationSummary = $contractViolations -join ', '
+        throw "The productive journey result violated contract groups ($violationSummary): $observed"
     }
     Add-Type -AssemblyName System.Drawing
     $jpegPath = Join-Path $runRoot 'Jornada produtiva_002.jpg'
@@ -385,6 +431,9 @@ try {
             [ordered]@{ name = 'cancel-before-project-core'; passed = $true },
             [ordered]@{ name = 'create-only-causal-handoff'; passed = $true },
             [ordered]@{ name = 'project-core-save-history'; passed = $true },
+            [ordered]@{ name = 'crash-recovery-distinct-host'; passed = $true },
+            [ordered]@{ name = 'interrupted-gesture-keeps-previous-checkpoint'; passed = $true },
+            [ordered]@{ name = 'recovered-project-unsaved-empty-history'; passed = $true },
             [ordered]@{ name = 'native-save-as-cancel-before-core'; passed = $true },
             [ordered]@{ name = 'save-as-copy-content-and-history'; passed = $true },
             [ordered]@{ name = 'save-as-webview-cache-recovery-transition'; passed = $true },
@@ -417,6 +466,7 @@ try {
             photoFrameCount = [int] $gate.photoFrameCount
             persistedPhotoLinkOnly = [bool] $gate.persistedPhotoLinkOnly
             reimportedExistingPhotoWithoutRevision = [bool] $gate.reimportedExistingPhotoWithoutRevision
+            sessionRecovery = $gate.sessionRecovery
             saveAs = $gate.saveAs
             originalUnchanged = [bool] $gate.originalUnchanged
             missingOriginalBlocked = [bool] $gate.missingOriginalBlocked
