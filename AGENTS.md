@@ -29,6 +29,17 @@ Do not translate an identifier that another document or skill matches on. When a
 
 When the appropriate skill or flow is unclear, use `$ask-matt` before proceeding.
 
+### Code review
+
+When reviewing a diff or deciding whether work is ready to integrate, read
+`CODING_STANDARDS.md`.
+
+### UI reference
+
+Before implementing or comparing application visuals, read
+`docs/references/ui-programa-diagramacao/README.md`; it identifies the only
+current visual reference and the precedence of later accepted decisions.
+
 ### Issue tracker
 
 Issues are tracked as GitHub issues in `W4liss0n/my-Albuns` via the `gh` CLI. See `docs/agents/issue-tracker.md`.

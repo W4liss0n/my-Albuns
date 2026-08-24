@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "scenarios": [
+    {
+      "id": "welcome",
+      "title": "Tela de Boas-vindas",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Boas-vindas.dc.html",
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": "[aria-label=\"Ações principais\"]",
+      "actions": []
+    },
+    {
+      "id": "new-project-configuration",
+      "title": "Novo Projeto — Configurações",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Continuar\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" }
+      ]
+    },
+    {
+      "id": "new-project-personalization",
+      "title": "Novo Projeto — Personalização",
+      "implementationPath": "/welcome-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Criar\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "click", "selector": "[aria-label=\"Continuar\"]" }
+      ],
+      "referenceActions": [
+        { "type": "click-text", "text": "Continuar" }
+      ]
+    },
+    {
+      "id": "media-panel",
+      "title": "Painel de imagens",
+      "implementationPath": "/media-panel-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "viewport": { "width": 1600, "height": 420 },
+      "readySelector": "[data-development-preview=\"imported-media\"]",
+      "actions": []
+    },
+    {
+      "id": "sheet-grid-and-album-inspector",
+      "title": "Grade de Lâminas e Inspector do Álbum",
+      "implementationPath": "/sheet-grid-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-development-preview=\"sheet-grid\"]",
+      "actions": []
+    },
+    {
+      "id": "canvas-normal",
+      "title": "Canvas — Modo normal",
+      "implementationPath": "/canvas-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-development-preview=\"canvas\"] canvas",
+      "actions": []
+    },
+    {
+      "id": "canvas-sheet-editing",
+      "title": "Canvas — Edição da Lâmina",
+      "implementationPath": "/canvas-preview.html?mode=sheet-editing&sheet=sheet-002",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-development-preview=\"canvas\"] canvas",
+      "actions": []
+    }
+  ]
+}

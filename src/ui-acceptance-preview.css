@@ -1,0 +1,123 @@
+:root {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.acceptance-index {
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 42px 0 64px;
+}
+
+.acceptance-index > header {
+  max-width: 760px;
+  margin-bottom: 30px;
+}
+
+.acceptance-index h1 {
+  margin: 4px 0 10px;
+  font-size: 28px;
+  font-weight: 650;
+}
+
+.acceptance-index p {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  line-height: 1.55;
+}
+
+.acceptance-index__eyebrow {
+  color: var(--ui-accent) !important;
+  font-size: var(--ui-font-size-support);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.acceptance-index__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.acceptance-scenario {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-toolbar);
+}
+
+.acceptance-scenario h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 620;
+}
+
+.acceptance-scenario p {
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-support);
+}
+
+.acceptance-scenario dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.acceptance-scenario dl > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.acceptance-scenario dt {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-action);
+}
+
+.acceptance-scenario dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-support);
+}
+
+.acceptance-scenario__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.acceptance-scenario__actions a {
+  padding: 8px 11px;
+  border: 1px solid var(--ui-border-strong);
+  color: var(--ui-text);
+  background: var(--ui-surface-raised);
+  font-size: var(--ui-font-size-action);
+  text-decoration: none;
+}
+
+.acceptance-scenario__actions a:first-child {
+  border-color: var(--ui-accent);
+  color: var(--ui-accent);
+}
+
+.acceptance-scenario__actions a:hover {
+  border-color: var(--ui-text-muted);
+}
+
+code {
+  color: var(--ui-text-secondary);
+  font-family: var(--ui-font-mono);
+  font-size: 0.94em;
+}
