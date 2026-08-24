@@ -29,7 +29,7 @@ import type { ImportPhotoResult as IpcImportPhotoResult } from "./generated/Impo
 import type { LinkedMediaChanged as IpcLinkedMediaChanged } from "./generated/LinkedMediaChanged";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
-import type { ProjectRecoveryChoice as IpcProjectRecoveryChoice } from "./generated/ProjectRecoveryChoice";
+import type { ProjectRecoveryDecision as IpcProjectRecoveryDecision } from "./generated/ProjectRecoveryDecision";
 import type { ProjectRecoveryResolution as IpcProjectRecoveryResolution } from "./generated/ProjectRecoveryResolution";
 import type { ProjectRecoveryStatus as IpcProjectRecoveryStatus } from "./generated/ProjectRecoveryStatus";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
@@ -352,11 +352,10 @@ export const tauriProjectStartupPort: ProjectStartupPort = {
     parseProjectRecoveryStatus(
       await invoke<unknown>("project_recovery_status"),
     ),
-  resolveRecovery: async (choice, checkpointDiscardConfirmed) =>
+  resolveRecovery: async (decision) =>
     parseProjectRecoveryResolution(
       await invoke<unknown>("resolve_project_recovery", {
-        choice: choice satisfies IpcProjectRecoveryChoice,
-        checkpointDiscardConfirmed,
+        decision: decision satisfies IpcProjectRecoveryDecision,
       }),
     ),
   confirmUiReady: () => invoke<void>("project_ui_ready"),

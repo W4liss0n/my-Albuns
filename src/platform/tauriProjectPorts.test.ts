@@ -280,7 +280,7 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
 });
 
-test("maps the closed Recovery startup contract and explicit discard confirmation", async () => {
+test("maps one closed Recovery decision without a separate confirmation flag", async () => {
   vi.mocked(invoke)
     .mockResolvedValueOnce({ kind: "available" })
     .mockResolvedValueOnce({
@@ -292,7 +292,9 @@ test("maps the closed Recovery startup contract and explicit discard confirmatio
     kind: "available",
   });
   await expect(
-    tauriProjectStartupPort.resolveRecovery("openLastSaved", true),
+    tauriProjectStartupPort.resolveRecovery(
+      "discardCheckpointAndOpenLastSaved",
+    ),
   ).resolves.toEqual({
     kind: "openedLastSaved",
     projection: representativeProjection,
@@ -300,8 +302,7 @@ test("maps the closed Recovery startup contract and explicit discard confirmatio
 
   expect(invoke).toHaveBeenNthCalledWith(1, "project_recovery_status");
   expect(invoke).toHaveBeenNthCalledWith(2, "resolve_project_recovery", {
-    choice: "openLastSaved",
-    checkpointDiscardConfirmed: true,
+    decision: "discardCheckpointAndOpenLastSaved",
   });
 });
 
@@ -322,7 +323,7 @@ test("rejects extra fields in the closed Recovery status and resolution envelope
     "Não foi possível verificar a Recuperação do Projeto.",
   );
   await expect(
-    tauriProjectStartupPort.resolveRecovery("nowNot", false),
+    tauriProjectStartupPort.resolveRecovery("nowNot"),
   ).rejects.toThrow("Não foi possível confirmar a escolha de Recuperação.");
 });
 

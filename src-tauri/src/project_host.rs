@@ -29,14 +29,166 @@ pub(crate) struct ProjectHost {
     recovery: Option<RecoveryCoordinator>,
 }
 
-enum ProjectHostState {
-    Active(EditableProject),
-    RecoveryPending {
-        project: EditableProject,
-        checkpoint: Box<RecoveryCheckpoint>,
-    },
-    ClosePending(EditableProject),
-    Consumed,
+struct ProjectHostState {
+    session: Option<ProjectHostSession>,
+}
+
+struct ProjectHostSession {
+    project: EditableProject,
+    phase: ProjectHostPhase,
+}
+
+enum ProjectHostPhase {
+    Active,
+    RecoveryPending(Box<RecoveryCheckpoint>),
+    ClosePending,
+}
+
+impl ProjectHostState {
+    fn new(project: EditableProject, checkpoint: Option<RecoveryCheckpoint>) -> Self {
+        let session = match checkpoint {
+            Some(checkpoint) => ProjectHostSession::recovery_pending(project, checkpoint),
+            None => ProjectHostSession::active(project),
+        };
+        Self {
+            session: Some(session),
+        }
+    }
+
+    fn session(&self) -> Result<&ProjectHostSession, String> {
+        self.session
+            .as_ref()
+            .ok_or_else(|| SESSION_UNAVAILABLE_MESSAGE.to_string())
+    }
+
+    fn session_mut(&mut self) -> Result<&mut ProjectHostSession, String> {
+        self.session
+            .as_mut()
+            .ok_or_else(|| SESSION_UNAVAILABLE_MESSAGE.to_string())
+    }
+
+    fn active_project(&self) -> Result<&EditableProject, String> {
+        self.session()?.active_project()
+    }
+
+    fn active_project_mut(&mut self) -> Result<&mut EditableProject, String> {
+        self.session_mut()?.active_project_mut()
+    }
+
+    fn take_session(&mut self) -> Result<ProjectHostSession, String> {
+        self.session
+            .take()
+            .ok_or_else(|| SESSION_UNAVAILABLE_MESSAGE.to_string())
+    }
+
+    fn restore_session(&mut self, session: ProjectHostSession) {
+        debug_assert!(self.session.is_none());
+        self.session = Some(session);
+    }
+
+    fn consume(&mut self) {
+        self.session = None;
+    }
+}
+
+impl ProjectHostSession {
+    fn active(project: EditableProject) -> Self {
+        Self {
+            project,
+            phase: ProjectHostPhase::Active,
+        }
+    }
+
+    fn recovery_pending(project: EditableProject, checkpoint: RecoveryCheckpoint) -> Self {
+        Self {
+            project,
+            phase: ProjectHostPhase::RecoveryPending(Box::new(checkpoint)),
+        }
+    }
+
+    fn startup_projection(&self) -> EditorProjection {
+        self.project.projection()
+    }
+
+    fn recovery_status(&self) -> ProjectRecoveryStatus {
+        if self.phase.is_recovery_pending() {
+            ProjectRecoveryStatus::Available
+        } else {
+            ProjectRecoveryStatus::None
+        }
+    }
+
+    fn projection(&self) -> Result<EditorProjection, String> {
+        if self.phase.permits_projection() {
+            Ok(self.project.projection())
+        } else {
+            Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+        }
+    }
+
+    fn active_project(&self) -> Result<&EditableProject, String> {
+        if self.phase.is_active() {
+            Ok(&self.project)
+        } else {
+            Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+        }
+    }
+
+    fn active_project_mut(&mut self) -> Result<&mut EditableProject, String> {
+        if self.phase.is_active() {
+            Ok(&mut self.project)
+        } else {
+            Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+        }
+    }
+
+    fn take_recovery(&mut self) -> Result<Box<RecoveryCheckpoint>, String> {
+        let phase = std::mem::replace(&mut self.phase, ProjectHostPhase::Active);
+        match phase {
+            ProjectHostPhase::RecoveryPending(checkpoint) => Ok(checkpoint),
+            other => {
+                self.phase = other;
+                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+            }
+        }
+    }
+
+    fn restore_recovery(&mut self, checkpoint: Box<RecoveryCheckpoint>) {
+        debug_assert!(self.phase.is_active());
+        self.phase = ProjectHostPhase::RecoveryPending(checkpoint);
+    }
+
+    fn begin_close_confirmation(&mut self) {
+        debug_assert!(self.phase.is_active());
+        self.phase = ProjectHostPhase::ClosePending;
+    }
+
+    fn cancel_close(&mut self) -> bool {
+        if self.phase.is_close_pending() {
+            self.phase = ProjectHostPhase::Active;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl ProjectHostPhase {
+    fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    fn is_recovery_pending(&self) -> bool {
+        matches!(self, Self::RecoveryPending(_))
+    }
+
+    fn is_close_pending(&self) -> bool {
+        matches!(self, Self::ClosePending)
+    }
+
+    fn permits_projection(&self) -> bool {
+        !self.is_recovery_pending()
+    }
 }
 
 pub(crate) struct ProjectHostSaveResult {
@@ -75,9 +227,9 @@ pub(crate) enum ProjectRecoveryStatus {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ProjectRecoveryChoice {
+pub(crate) enum ProjectRecoveryDecision {
     ReopenAndRecover,
-    OpenLastSaved,
+    DiscardCheckpointAndOpenLastSaved,
     NowNot,
 }
 
@@ -105,7 +257,7 @@ impl ProjectHost {
     #[cfg(test)]
     pub(crate) fn new(project: EditableProject) -> Self {
         Self {
-            state: Arc::new(Mutex::new(ProjectHostState::Active(project))),
+            state: Arc::new(Mutex::new(ProjectHostState::new(project, None))),
             recovery: None,
         }
     }
@@ -115,13 +267,7 @@ impl ProjectHost {
         recovery: RecoveryCoordinator,
     ) -> io::Result<Self> {
         let authority = project.identity_authority().clone();
-        let state = match recovery.load(&authority)? {
-            Some(checkpoint) => ProjectHostState::RecoveryPending {
-                project,
-                checkpoint: Box::new(checkpoint),
-            },
-            None => ProjectHostState::Active(project),
-        };
+        let state = ProjectHostState::new(project, recovery.load(&authority)?);
         Ok(Self {
             state: Arc::new(Mutex::new(state)),
             recovery: Some(recovery),
@@ -133,12 +279,7 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        match &*state {
-            ProjectHostState::Active(project)
-            | ProjectHostState::RecoveryPending { project, .. }
-            | ProjectHostState::ClosePending(project) => Ok(project.projection()),
-            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
-        }
+        Ok(state.session()?.startup_projection())
     }
 
     pub(crate) fn recovery_status(&self) -> Result<ProjectRecoveryStatus, String> {
@@ -146,87 +287,54 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        match &*state {
-            ProjectHostState::RecoveryPending { .. } => Ok(ProjectRecoveryStatus::Available),
-            ProjectHostState::Active(_) | ProjectHostState::ClosePending(_) => {
-                Ok(ProjectRecoveryStatus::None)
-            }
-            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
-        }
+        Ok(state.session()?.recovery_status())
     }
 
     pub(crate) fn resolve_recovery(
         &self,
-        choice: ProjectRecoveryChoice,
-        checkpoint_discard_confirmed: bool,
+        decision: ProjectRecoveryDecision,
     ) -> Result<ProjectRecoveryResolution, String> {
         let mut state = self
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
-        let ProjectHostState::RecoveryPending {
-            mut project,
-            checkpoint,
-        } = current
-        else {
-            *state = current;
-            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
+        let mut session = state.take_session()?;
+        let checkpoint = match session.take_recovery() {
+            Ok(checkpoint) => checkpoint,
+            Err(error) => {
+                state.restore_session(session);
+                return Err(error);
+            }
         };
-        match choice {
-            ProjectRecoveryChoice::ReopenAndRecover => {
-                if checkpoint_discard_confirmed {
-                    *state = ProjectHostState::RecoveryPending {
-                        project,
-                        checkpoint,
-                    };
-                    return Err("A confirmação de descarte não pertence a esta escolha.".into());
-                }
-                match project.restore_recovery(checkpoint.as_ref().clone()) {
+        match decision {
+            ProjectRecoveryDecision::ReopenAndRecover => {
+                match session
+                    .project
+                    .restore_recovery(checkpoint.as_ref().clone())
+                {
                     Ok(projection) => {
-                        *state = ProjectHostState::Active(project);
+                        state.restore_session(session);
                         Ok(ProjectRecoveryResolution::Recovered(projection))
                     }
                     Err(error) => {
-                        *state = ProjectHostState::RecoveryPending {
-                            project,
-                            checkpoint,
-                        };
+                        session.restore_recovery(checkpoint);
+                        state.restore_session(session);
                         Err(error.to_string())
                     }
                 }
             }
-            ProjectRecoveryChoice::OpenLastSaved => {
-                if !checkpoint_discard_confirmed {
-                    *state = ProjectHostState::RecoveryPending {
-                        project,
-                        checkpoint,
-                    };
-                    return Err(
-                        "Confirme o descarte da Recuperação antes de abrir a última versão salva."
-                            .into(),
-                    );
-                }
-                if let Err(error) = self.finish_recovery(&project) {
-                    *state = ProjectHostState::RecoveryPending {
-                        project,
-                        checkpoint,
-                    };
+            ProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved => {
+                if let Err(error) = self.finish_recovery(&session.project) {
+                    session.restore_recovery(checkpoint);
+                    state.restore_session(session);
                     return Err(error.to_string());
                 }
-                let projection = project.projection();
-                *state = ProjectHostState::Active(project);
+                let projection = session.project.projection();
+                state.restore_session(session);
                 Ok(ProjectRecoveryResolution::OpenedLastSaved(projection))
             }
-            ProjectRecoveryChoice::NowNot => {
-                if checkpoint_discard_confirmed {
-                    *state = ProjectHostState::RecoveryPending {
-                        project,
-                        checkpoint,
-                    };
-                    return Err("A confirmação de descarte não pertence a esta escolha.".into());
-                }
-                drop((project, checkpoint));
+            ProjectRecoveryDecision::NowNot => {
+                drop((session, checkpoint));
                 Ok(ProjectRecoveryResolution::Deferred)
             }
         }
@@ -237,14 +345,7 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        match &*state {
-            ProjectHostState::Active(project) | ProjectHostState::ClosePending(project) => {
-                Ok(project.projection())
-            }
-            ProjectHostState::RecoveryPending { .. } | ProjectHostState::Consumed => {
-                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
-            }
-        }
+        state.session()?.projection()
     }
 
     pub(crate) fn apply_with_outcome(
@@ -372,19 +473,15 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
-        let result = match &mut *state {
-            ProjectHostState::Active(project) => project.save(expected_revision),
-            ProjectHostState::RecoveryPending { .. }
-            | ProjectHostState::ClosePending(_)
-            | ProjectHostState::Consumed => {
-                return Err(ProjectHostSaveError::SessionUnavailable);
-            }
-        };
+        let result = state
+            .active_project_mut()
+            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?
+            .save(expected_revision);
         match result {
             Ok(outcome) => {
-                let ProjectHostState::Active(project) = &*state else {
-                    unreachable!("saving an active Project preserves its state")
-                };
+                let project = state
+                    .active_project()
+                    .expect("saving an active Project preserves its state");
                 if let Err(error) = self.finish_recovery(project) {
                     tracing::error!(
                         target: "myalbuns.desktop",
@@ -399,7 +496,7 @@ impl ProjectHost {
                 })
             }
             Err(SaveProjectError::SaveStateIndeterminate) => {
-                *state = ProjectHostState::Consumed;
+                state.consume();
                 Err(ProjectHostSaveError::Project(
                     SaveProjectError::SaveStateIndeterminate,
                 ))
@@ -436,24 +533,18 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| ProjectHostSaveAsError::SessionUnavailable)?;
-        let result = match &mut *state {
-            ProjectHostState::Active(project) => {
-                let previous_authority = project.identity_authority().clone();
-                project.save_as_with_transition(request, move |authority, outcome| {
-                    transition(&previous_authority, authority, outcome)
-                })
-            }
-            ProjectHostState::RecoveryPending { .. }
-            | ProjectHostState::ClosePending(_)
-            | ProjectHostState::Consumed => {
-                return Err(ProjectHostSaveAsError::SessionUnavailable);
-            }
-        };
+        let project = state
+            .active_project_mut()
+            .map_err(|_| ProjectHostSaveAsError::SessionUnavailable)?;
+        let previous_authority = project.identity_authority().clone();
+        let result = project.save_as_with_transition(request, move |authority, outcome| {
+            transition(&previous_authority, authority, outcome)
+        });
         match result {
             Ok(outcome) => {
-                let ProjectHostState::Active(project) = &*state else {
-                    unreachable!("saving an active Project as preserves its Host state")
-                };
+                let project = state
+                    .active_project()
+                    .expect("saving an active Project as preserves its Host state");
                 Ok(ProjectHostSaveAsResult {
                     outcome,
                     projection: project.projection(),
@@ -468,27 +559,25 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
-        match current {
-            ProjectHostState::Active(project) if project.has_unsaved_changes() => {
-                *state = ProjectHostState::ClosePending(project);
-                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
+        let mut session = state.take_session()?;
+        if session.phase.is_recovery_pending() {
+            return Ok(ProjectCloseRequestOutcome::CloseImmediately);
+        }
+        if session.phase.is_close_pending() {
+            state.restore_session(session);
+            return Ok(ProjectCloseRequestOutcome::ConfirmationRequired);
+        }
+        if session.project.has_unsaved_changes() {
+            session.begin_close_confirmation();
+            state.restore_session(session);
+            return Ok(ProjectCloseRequestOutcome::ConfirmationRequired);
+        }
+        match self.finish_recovery(&session.project) {
+            Ok(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
+            Err(error) => {
+                state.restore_session(session);
+                Err(error.to_string())
             }
-            ProjectHostState::Active(project) => match self.finish_recovery(&project) {
-                Ok(_) => Ok(ProjectCloseRequestOutcome::CloseImmediately),
-                Err(error) => {
-                    *state = ProjectHostState::Active(project);
-                    Err(error.to_string())
-                }
-            },
-            ProjectHostState::RecoveryPending { .. } => {
-                Ok(ProjectCloseRequestOutcome::CloseImmediately)
-            }
-            ProjectHostState::ClosePending(project) => {
-                *state = ProjectHostState::ClosePending(project);
-                Ok(ProjectCloseRequestOutcome::ConfirmationRequired)
-            }
-            ProjectHostState::Consumed => Err(SESSION_UNAVAILABLE_MESSAGE.to_string()),
         }
     }
 
@@ -497,18 +586,14 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
-        match current {
-            ProjectHostState::ClosePending(project) => {
-                let projection = project.projection();
-                *state = ProjectHostState::Active(project);
-                Ok(projection)
-            }
-            other => {
-                *state = other;
-                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
-            }
+        let mut session = state.take_session()?;
+        if !session.cancel_close() {
+            state.restore_session(session);
+            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
         }
+        let projection = session.project.projection();
+        state.restore_session(session);
+        Ok(projection)
     }
 
     pub(crate) fn discard_close(&self) -> Result<(), String> {
@@ -516,18 +601,16 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
-        match current {
-            ProjectHostState::ClosePending(project) => match self.finish_recovery(&project) {
-                Ok(_) => Ok(()),
-                Err(error) => {
-                    *state = ProjectHostState::ClosePending(project);
-                    Err(error.to_string())
-                }
-            },
-            other => {
-                *state = other;
-                Err(SESSION_UNAVAILABLE_MESSAGE.to_string())
+        let session = state.take_session()?;
+        if !session.phase.is_close_pending() {
+            state.restore_session(session);
+            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
+        }
+        match self.finish_recovery(&session.project) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                state.restore_session(session);
+                Err(error.to_string())
             }
         }
     }
@@ -537,14 +620,16 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
-        let current = std::mem::replace(&mut *state, ProjectHostState::Consumed);
-        let ProjectHostState::ClosePending(mut project) = current else {
-            *state = current;
+        let mut session = state
+            .take_session()
+            .map_err(|_| ProjectHostSaveError::SessionUnavailable)?;
+        if !session.phase.is_close_pending() {
+            state.restore_session(session);
             return Err(ProjectHostSaveError::SessionUnavailable);
-        };
-        let revision = project.revision();
-        match project.save(revision) {
-            Ok(outcome) => match self.finish_recovery(&project) {
+        }
+        let revision = session.project.revision();
+        match session.project.save(revision) {
+            Ok(outcome) => match self.finish_recovery(&session.project) {
                 Ok(_) => Ok(outcome),
                 Err(error) => {
                     tracing::error!(
@@ -552,7 +637,8 @@ impl ProjectHost {
                         error = %error,
                         event = "project_recovery_checkpoint_finish_after_close_save_failed",
                     );
-                    *state = ProjectHostState::Active(project);
+                    session.phase = ProjectHostPhase::Active;
+                    state.restore_session(session);
                     Err(ProjectHostSaveError::RecoveryCleanupFailed)
                 }
             },
@@ -560,7 +646,8 @@ impl ProjectHost {
                 SaveProjectError::SaveStateIndeterminate,
             )),
             Err(error) => {
-                *state = ProjectHostState::Active(project);
+                session.phase = ProjectHostPhase::Active;
+                state.restore_session(session);
                 Err(ProjectHostSaveError::Project(error))
             }
         }
@@ -627,9 +714,7 @@ impl ProjectHost {
             .state
             .lock()
             .map_err(|_| SESSION_UNAVAILABLE_MESSAGE.to_string())?;
-        if !matches!(*guard, ProjectHostState::Active(_)) {
-            return Err(SESSION_UNAVAILABLE_MESSAGE.to_string());
-        }
+        guard.active_project()?;
         Ok(ActiveProject { guard })
     }
 
@@ -674,27 +759,17 @@ impl std::ops::Deref for ActiveProject<'_> {
     type Target = EditableProject;
 
     fn deref(&self) -> &Self::Target {
-        match &*self.guard {
-            ProjectHostState::Active(project) => project,
-            ProjectHostState::RecoveryPending { .. }
-            | ProjectHostState::ClosePending(_)
-            | ProjectHostState::Consumed => {
-                unreachable!("an ActiveProject guard always contains an active Project")
-            }
-        }
+        self.guard
+            .active_project()
+            .expect("an ActiveProject guard always contains an active Project")
     }
 }
 
 impl std::ops::DerefMut for ActiveProject<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        match &mut *self.guard {
-            ProjectHostState::Active(project) => project,
-            ProjectHostState::RecoveryPending { .. }
-            | ProjectHostState::ClosePending(_)
-            | ProjectHostState::Consumed => {
-                unreachable!("an ActiveProject guard always contains an active Project")
-            }
-        }
+        self.guard
+            .active_project_mut()
+            .expect("an ActiveProject guard always contains an active Project")
     }
 }
 
@@ -717,7 +792,7 @@ mod tests {
     use myalbuns_paths::{AppPaths, ExportWriteAuthorization, OperationPathContext};
 
     use super::{
-        ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError, ProjectRecoveryChoice,
+        ProjectCloseRequestOutcome, ProjectHost, ProjectHostSaveError, ProjectRecoveryDecision,
         ProjectRecoveryResolution, ProjectRecoveryStatus,
     };
     use crate::{
@@ -1086,7 +1161,7 @@ mod tests {
             assert!(host.undo().is_err());
 
             let ProjectRecoveryResolution::Recovered(recovered) = host
-                .resolve_recovery(ProjectRecoveryChoice::ReopenAndRecover, false)
+                .resolve_recovery(ProjectRecoveryDecision::ReopenAndRecover)
                 .expect("the user reopens and recovers")
             else {
                 panic!("the recovered choice must activate the recovered Session");
@@ -1100,7 +1175,59 @@ mod tests {
     }
 
     #[test]
-    fn opening_the_last_saved_version_requires_confirmation_before_discarding_recovery() {
+    fn recovery_pending_capabilities_transition_together_after_recovery() {
+        tauri::async_runtime::block_on(async {
+            let fixture = recovery_fixture();
+            fixture
+                .host
+                .apply_with_outcome(ProjectIntent::SetDpi { dpi: 360 })
+                .expect("the completed action becomes recoverable");
+            tokio::time::sleep(Duration::from_millis(90)).await;
+            drop(fixture.host);
+
+            let host = ProjectHost::with_recovery(
+                open_editable_project(&fixture.project_path, &fixture.identity_lease_root),
+                fixture.coordinator.clone(),
+            )
+            .expect("the next Host detects the prior checkpoint");
+
+            assert_eq!(
+                host.startup_projection()
+                    .expect("startup may identify the saved Project")
+                    .state
+                    .document
+                    .dpi,
+                300
+            );
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
+            assert!(host.projection().is_err());
+            assert!(
+                host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
+                    .is_err()
+            );
+
+            let ProjectRecoveryResolution::Recovered(recovered) = host
+                .resolve_recovery(ProjectRecoveryDecision::ReopenAndRecover)
+                .expect("the recovery decision activates one editable Session")
+            else {
+                panic!("the recovery decision must return the recovered projection");
+            };
+            assert_eq!(recovered.state.document.dpi, 360);
+            assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::None));
+            assert_eq!(
+                host.apply_with_outcome(ProjectIntent::SetDpi { dpi: 420 })
+                    .expect("editing becomes available with the active Session")
+                    .projection
+                    .state
+                    .document
+                    .dpi,
+                420
+            );
+        });
+    }
+
+    #[test]
+    fn explicit_discard_opens_the_last_saved_version_and_finishes_recovery() {
         tauri::async_runtime::block_on(async {
             let fixture = recovery_fixture();
             fixture
@@ -1115,16 +1242,12 @@ mod tests {
             )
             .expect("the next Host detects the prior checkpoint");
 
-            assert!(
-                host.resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, false)
-                    .is_err()
-            );
             assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
             assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
 
             let ProjectRecoveryResolution::OpenedLastSaved(saved) = host
-                .resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, true)
-                .expect("the confirmed choice opens the persisted baseline")
+                .resolve_recovery(ProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved)
+                .expect("the explicit discard decision opens the persisted baseline")
             else {
                 panic!("the saved choice must activate the persisted Session");
             };
@@ -1169,18 +1292,13 @@ mod tests {
 
             assert_eq!(host.recovery_status(), Ok(ProjectRecoveryStatus::Available));
             assert!(
-                host.resolve_recovery(ProjectRecoveryChoice::ReopenAndRecover, false)
-                    .is_err()
-            );
-            assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
-            assert!(
-                host.resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, false)
+                host.resolve_recovery(ProjectRecoveryDecision::ReopenAndRecover)
                     .is_err()
             );
             assert!(fixture.store.load(&fixture.authority).unwrap().is_some());
 
             let ProjectRecoveryResolution::OpenedLastSaved(saved) = host
-                .resolve_recovery(ProjectRecoveryChoice::OpenLastSaved, true)
+                .resolve_recovery(ProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved)
                 .expect("explicit confirmation discards the older checkpoint")
             else {
                 panic!("the saved baseline must become active after confirmation");
@@ -1208,7 +1326,7 @@ mod tests {
             .expect("the next Host detects the prior checkpoint");
 
             assert_eq!(
-                host.resolve_recovery(ProjectRecoveryChoice::NowNot, false),
+                host.resolve_recovery(ProjectRecoveryDecision::NowNot),
                 Ok(ProjectRecoveryResolution::Deferred)
             );
             assert!(host.projection().is_err());

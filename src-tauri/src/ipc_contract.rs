@@ -532,9 +532,9 @@ pub enum ProjectRecoveryStatus {
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, TS)]
 #[serde(rename_all = "camelCase")]
-pub enum ProjectRecoveryChoice {
+pub enum ProjectRecoveryDecision {
     ReopenAndRecover,
-    OpenLastSaved,
+    DiscardCheckpointAndOpenLastSaved,
     NowNot,
 }
 
@@ -561,21 +561,40 @@ pub enum ProjectRecoveryResolution {
 mod recovery_contract_tests {
     use serde_json::json;
 
-    use super::{ProjectRecoveryChoice, ProjectRecoveryResolution, ProjectRecoveryStatus};
+    use super::{ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus};
 
     #[test]
-    fn recovery_status_and_choices_are_closed_and_stable() {
+    fn recovery_status_and_decisions_are_closed_and_stable() {
         assert_eq!(
             serde_json::to_value(ProjectRecoveryStatus::Available)
                 .expect("the available status serializes"),
             json!({ "kind": "available" })
         );
         assert_eq!(
-            serde_json::from_value::<ProjectRecoveryChoice>(json!("reopenAndRecover"))
-                .expect("the recover choice deserializes"),
-            ProjectRecoveryChoice::ReopenAndRecover
+            serde_json::from_value::<ProjectRecoveryDecision>(json!("reopenAndRecover"))
+                .expect("the recover decision deserializes"),
+            ProjectRecoveryDecision::ReopenAndRecover
         );
-        assert!(serde_json::from_value::<ProjectRecoveryChoice>(json!("unknownChoice")).is_err());
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!(
+                "discardCheckpointAndOpenLastSaved"
+            ))
+            .expect("the confirmed discard decision deserializes"),
+            ProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved
+        );
+        assert_eq!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!("nowNot"))
+                .expect("the defer decision deserializes"),
+            ProjectRecoveryDecision::NowNot
+        );
+        assert!(serde_json::from_value::<ProjectRecoveryDecision>(json!("openLastSaved")).is_err());
+        assert!(
+            serde_json::from_value::<ProjectRecoveryDecision>(json!({
+                "choice": "openLastSaved",
+                "checkpointDiscardConfirmed": true
+            }))
+            .is_err()
+        );
     }
 
     #[test]

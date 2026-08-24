@@ -16,7 +16,7 @@ import type {
   MediaPreviewDemand,
   MediaPreviewPort,
   ProjectStartupPort,
-  ProjectRecoveryChoice,
+  ProjectRecoveryDecision,
   ProjectCorePort,
   ProjectWindowPort,
 } from "./application/projectPorts";
@@ -191,17 +191,11 @@ function App({
   }, [logger, projectStartupPort, recoveryStartup]);
 
   const resolveRecovery = useCallback(
-    async (
-      choice: ProjectRecoveryChoice,
-      checkpointDiscardConfirmed: boolean,
-    ) => {
+    async (decision: ProjectRecoveryDecision) => {
       setRecoveryError(null);
       setRecoveryStartup("resolving");
       try {
-        const resolution = await projectStartupPort.resolveRecovery(
-          choice,
-          checkpointDiscardConfirmed,
-        );
+        const resolution = await projectStartupPort.resolveRecovery(decision);
         if (resolution.kind === "deferred") {
           setRecoveryStartup("deferred");
           return;
@@ -216,7 +210,9 @@ function App({
             : "Não foi possível concluir a escolha de Recuperação.",
         );
         setRecoveryStartup(
-          choice === "openLastSaved" ? "confirmDiscard" : "available",
+          decision === "discardCheckpointAndOpenLastSaved"
+            ? "confirmDiscard"
+            : "available",
         );
       }
     },
@@ -550,7 +546,9 @@ function App({
             <button
               className="recovery-primary"
               type="button"
-              onClick={() => void resolveRecovery("openLastSaved", true)}
+              onClick={() =>
+                void resolveRecovery("discardCheckpointAndOpenLastSaved")
+              }
             >
               Descartar recuperação e abrir
             </button>
@@ -586,7 +584,7 @@ function App({
               className="recovery-primary"
               disabled={busy}
               type="button"
-              onClick={() => void resolveRecovery("reopenAndRecover", false)}
+              onClick={() => void resolveRecovery("reopenAndRecover")}
             >
               Reabrir e recuperar
             </button>
@@ -600,7 +598,7 @@ function App({
             <button
               disabled={busy}
               type="button"
-              onClick={() => void resolveRecovery("nowNot", false)}
+              onClick={() => void resolveRecovery("nowNot")}
             >
               Agora não
             </button>

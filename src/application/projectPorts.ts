@@ -200,17 +200,16 @@ export interface ProjectWindowPort {
 export interface ProjectStartupPort {
   recoveryStatus(): Promise<ProjectRecoveryStatus>;
   resolveRecovery(
-    choice: ProjectRecoveryChoice,
-    checkpointDiscardConfirmed: boolean,
+    decision: ProjectRecoveryDecision,
   ): Promise<ProjectRecoveryResolution>;
   confirmUiReady(): Promise<void>;
 }
 
 export type ProjectRecoveryStatus = { kind: "none" } | { kind: "available" };
 
-export type ProjectRecoveryChoice =
+export type ProjectRecoveryDecision =
   | "reopenAndRecover"
-  | "openLastSaved"
+  | "discardCheckpointAndOpenLastSaved"
   | "nowNot";
 
 export type ProjectRecoveryResolution =

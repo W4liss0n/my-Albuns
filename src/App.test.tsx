@@ -208,7 +208,7 @@ test("offers exactly the three Recovery choices before reading editor state", as
     screen.getByRole("button", { name: "Reabrir e recuperar" }),
   );
   await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith("reopenAndRecover", false),
+    expect(resolveRecovery).toHaveBeenCalledWith("reopenAndRecover"),
   );
   expect(
     await screen.findByRole("button", { name: "Exportar Lâmina" }),
@@ -259,7 +259,9 @@ test("requires a separate confirmation before discarding Recovery for the saved 
     screen.getByRole("button", { name: "Descartar recuperação e abrir" }),
   );
   await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith("openLastSaved", true),
+    expect(resolveRecovery).toHaveBeenCalledWith(
+      "discardCheckpointAndOpenLastSaved",
+    ),
   );
   expect(load).not.toHaveBeenCalled();
 });
@@ -286,7 +288,7 @@ test("defers opening without loading or discarding the Recovery checkpoint", asy
 
   fireEvent.click(await screen.findByRole("button", { name: "Agora não" }));
   await waitFor(() =>
-    expect(resolveRecovery).toHaveBeenCalledWith("nowNot", false),
+    expect(resolveRecovery).toHaveBeenCalledWith("nowNot"),
   );
   expect(load).not.toHaveBeenCalled();
   expect(screen.getByText("Fechando o Projeto…")).toBeInTheDocument();

@@ -14,7 +14,7 @@ use crate::{
     cache_previews::CachePreviewRegistry,
     cache_service::{ActiveCacheNamespace, CacheService},
     ipc_contract::{
-        ImportPhotoResult, ProjectRecoveryChoice as IpcProjectRecoveryChoice,
+        ImportPhotoResult, ProjectRecoveryDecision as IpcProjectRecoveryDecision,
         ProjectRecoveryResolution as IpcProjectRecoveryResolution,
         ProjectRecoveryStatus as IpcProjectRecoveryStatus, SaveAsProjectCommandError,
         SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError, SaveProjectOutcome,
@@ -28,7 +28,7 @@ use crate::{
     },
     project_host::{
         ProjectHost, ProjectHostSaveAsError, ProjectHostSaveError,
-        ProjectRecoveryChoice as HostProjectRecoveryChoice,
+        ProjectRecoveryDecision as HostProjectRecoveryDecision,
         ProjectRecoveryResolution as HostProjectRecoveryResolution,
         ProjectRecoveryStatus as HostProjectRecoveryStatus,
     },
@@ -72,20 +72,23 @@ pub(crate) fn project_recovery_status(
 
 #[tauri::command]
 pub(crate) fn resolve_project_recovery(
-    choice: IpcProjectRecoveryChoice,
-    checkpoint_discard_confirmed: bool,
+    decision: IpcProjectRecoveryDecision,
     window: Window,
     state: State<'_, ProjectHost>,
 ) -> Result<IpcProjectRecoveryResolution, String> {
     if window.label() != PROJECT_WINDOW_LABEL {
         return Err("A Recuperação só está disponível na Janela do Projeto.".into());
     }
-    let host_choice = match choice {
-        IpcProjectRecoveryChoice::ReopenAndRecover => HostProjectRecoveryChoice::ReopenAndRecover,
-        IpcProjectRecoveryChoice::OpenLastSaved => HostProjectRecoveryChoice::OpenLastSaved,
-        IpcProjectRecoveryChoice::NowNot => HostProjectRecoveryChoice::NowNot,
+    let host_decision = match decision {
+        IpcProjectRecoveryDecision::ReopenAndRecover => {
+            HostProjectRecoveryDecision::ReopenAndRecover
+        }
+        IpcProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved => {
+            HostProjectRecoveryDecision::DiscardCheckpointAndOpenLastSaved
+        }
+        IpcProjectRecoveryDecision::NowNot => HostProjectRecoveryDecision::NowNot,
     };
-    match state.resolve_recovery(host_choice, checkpoint_discard_confirmed)? {
+    match state.resolve_recovery(host_decision)? {
         HostProjectRecoveryResolution::Recovered(projection) => {
             start_linked_media_monitor_if_active(window.app_handle().clone());
             Ok(IpcProjectRecoveryResolution::Recovered {

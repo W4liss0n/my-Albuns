@@ -5,10 +5,10 @@ use myalbuns_desktop_lib::ipc_contract::{
     CacheServiceCommandError, CacheServiceStatus, CancelDisposition, ExportCommandError,
     ExportEvent, ExportResult, FrontendLogEvent, ImportPhotoResult, LinkedMediaChanged,
     MediaPreview, MediaPreviewCommandError, MediaPreviewDemand, MediaPreviewState,
-    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectRecoveryChoice,
-    ProjectRecoveryResolution, ProjectRecoveryStatus, SaveAsProjectCommandError,
-    SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError, SaveProjectOutcome,
-    SaveProjectResult,
+    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
+    ProjectRecoveryDecision, ProjectRecoveryResolution, ProjectRecoveryStatus,
+    SaveAsProjectCommandError, SaveAsProjectOutcome, SaveAsProjectResult, SaveProjectCommandError,
+    SaveProjectOutcome, SaveProjectResult,
 };
 use ts_rs::{Config, TS};
 
@@ -54,8 +54,8 @@ fn main() {
         .expect("Project close request outcome bindings should be generated");
     ProjectCloseResolution::export_all(&config)
         .expect("Project close resolution bindings should be generated");
-    ProjectRecoveryChoice::export_all(&config)
-        .expect("Project Recovery choice bindings should be generated");
+    ProjectRecoveryDecision::export_all(&config)
+        .expect("Project Recovery decision bindings should be generated");
     ProjectRecoveryResolution::export_all(&config)
         .expect("Project Recovery resolution bindings should be generated");
     ProjectRecoveryStatus::export_all(&config)
