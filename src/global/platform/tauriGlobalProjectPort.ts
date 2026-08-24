@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import {
   PROJECT_CONFIGURATION_VALIDATION_CODES,
@@ -10,6 +11,10 @@ import {
   type ProvisionalDecorativeSelection,
   type RecentProjectSummary,
 } from "../application/globalProjectPort";
+import { hasOnlyIpcKeys, isIpcRecord } from "../../platform/ipcGuards";
+
+export const GLOBAL_ACTIVATION_TERMINAL_EVENT =
+  "myalbuns://global-activation-terminal";
 
 const openFallbackFailure: ProjectLaunchFailure = {
   code: "open_project_unavailable",
@@ -51,12 +56,11 @@ const validationCodes = new Set<ProjectConfigurationValidationCode>(
   PROJECT_CONFIGURATION_VALIDATION_CODES,
 );
 
-function toProjectLaunchFailure(
+function parseProjectLaunchFailure(
   error: unknown,
-  fallback: ProjectLaunchFailure,
-): ProjectLaunchFailure {
+): ProjectLaunchFailure | null {
   if (typeof error !== "object" || error === null) {
-    return fallback;
+    return null;
   }
 
   const candidate = error as Record<string, unknown>;
@@ -64,7 +68,7 @@ function toProjectLaunchFailure(
     typeof candidate.code !== "string" ||
     typeof candidate.message !== "string"
   ) {
-    return fallback;
+    return null;
   }
 
   return {
@@ -83,27 +87,64 @@ function toProjectLaunchOutcome(
   result: unknown,
   fallback: ProjectLaunchFailure,
 ): ProjectLaunchOutcome {
-  if (typeof result !== "object" || result === null) {
-    return { status: "failed", error: fallback };
-  }
+  return parseProjectLaunchOutcome(result) ?? {
+    status: "failed",
+    error: fallback,
+  };
+}
 
-  const candidate = result as Record<string, unknown>;
+interface GlobalActivationTerminal {
+  sequence: number;
+  outcome: ProjectLaunchOutcome;
+}
+
+function toProjectLaunchFailure(
+  error: unknown,
+  fallback: ProjectLaunchFailure,
+): ProjectLaunchFailure {
+  return parseProjectLaunchFailure(error) ?? fallback;
+}
+
+function parseProjectLaunchOutcome(
+  value: unknown,
+): ProjectLaunchOutcome | null {
+  if (!isIpcRecord(value) || typeof value.status !== "string") {
+    return null;
+  }
   if (
-    candidate.status === "opened" ||
-    candidate.status === "focused" ||
-    candidate.status === "externalCopyNotWritable" ||
-    candidate.status === "cancelled"
+    (value.status === "opened" ||
+      value.status === "focused" ||
+      value.status === "externalCopyNotWritable" ||
+      value.status === "cancelled") &&
+    hasOnlyIpcKeys(value, ["status"])
   ) {
-    return { status: candidate.status };
+    return { status: value.status };
   }
-  if (candidate.status === "failed") {
-    return {
-      status: "failed",
-      error: toProjectLaunchFailure(candidate.error, fallback),
-    };
+  if (
+    value.status === "failed" &&
+    hasOnlyIpcKeys(value, ["status", "error"])
+  ) {
+    const error = parseProjectLaunchFailure(value.error);
+    return error ? { status: "failed", error } : null;
   }
+  return null;
+}
 
-  return { status: "failed", error: fallback };
+function parseActivationTerminal(
+  value: unknown,
+): GlobalActivationTerminal | null {
+  if (
+    !isIpcRecord(value) ||
+    !hasOnlyIpcKeys(value, ["sequence", "outcome"]) ||
+    !Number.isSafeInteger(value.sequence) ||
+    Number(value.sequence) <= 0
+  ) {
+    return null;
+  }
+  const outcome = parseProjectLaunchOutcome(value.outcome);
+  return outcome
+    ? { sequence: Number(value.sequence), outcome }
+    : null;
 }
 
 function toRecentProjectSummaries(
@@ -205,6 +246,25 @@ async function validateProjectConfiguration(
 }
 
 export const tauriGlobalProjectPort: GlobalProjectPort = {
+  onActivationTerminal: async (listener) => {
+    let lastSequence = 0;
+    const deliver = (value: unknown) => {
+      const terminal = parseActivationTerminal(value);
+      if (!terminal || terminal.sequence <= lastSequence) return;
+      lastSequence = terminal.sequence;
+      listener(terminal.outcome);
+    };
+    const unlisten = await listen<unknown>(
+      GLOBAL_ACTIVATION_TERMINAL_EVENT,
+      (event) => deliver(event.payload),
+    );
+    try {
+      deliver(await invoke<unknown>("latest_global_activation_terminal"));
+    } catch {
+      // The live listener remains authoritative when the snapshot is unavailable.
+    }
+    return unlisten;
+  },
   completeGraphicsGate: async (supported) => {
     try {
       const result = await invoke<unknown>("complete_graphics_gate", {

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
 
 import type {
@@ -11,8 +12,13 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(),
+}));
+
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+  vi.mocked(listen).mockReset();
 });
 
 const configuration: NewProjectConfiguration = {
@@ -66,6 +72,23 @@ test.each([
     });
   },
 );
+
+test("fails closed when a command outcome carries fields outside the closed contract", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    status: "opened",
+    pathname: "C:\\Trabalho\\Álbum.myalbuns",
+  });
+
+  await expect(tauriGlobalProjectPort.openProject()).resolves.toEqual({
+    status: "failed",
+    error: {
+      code: "open_project_unavailable",
+      message: "Não foi possível iniciar a abertura do Projeto.",
+      action:
+        "Tente novamente. Se o problema continuar, reinicie o MyAlbuns.",
+    },
+  });
+});
 
 test("starts creation with exactly the normalized configuration and no pathname or overwrite authority", async () => {
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cancelled" });
@@ -233,12 +256,9 @@ test.each([
   "externalCopyNotWritable",
   "cancelled",
 ] as const)(
-  "opens through the native backend and returns the %s terminal without a pathname",
+  "opens through the native backend and returns the exact %s terminal",
   async (status) => {
-    vi.mocked(invoke).mockResolvedValueOnce({
-      status,
-      pathname: "C:\\Trabalho\\Álbum.myalbuns",
-    });
+    vi.mocked(invoke).mockResolvedValueOnce({ status });
 
     await expect(tauriGlobalProjectPort.openProject()).resolves.toEqual({
       status,
@@ -305,10 +325,7 @@ test("keeps the welcome surface operational when recent Projects are unavailable
 });
 
 test("reopens a recent Project by opaque id only", async () => {
-  vi.mocked(invoke).mockResolvedValueOnce({
-    status: "opened",
-    pathname: "C:\\Trabalho\\Ana.myalbuns",
-  });
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "opened" });
 
   await expect(
     tauriGlobalProjectPort.openRecentProject("recent-ana"),
@@ -342,4 +359,119 @@ test("ignores an unavailable startup diagnostic", async () => {
   await expect(
     tauriGlobalProjectPort.startupOpenFailure(),
   ).resolves.toBeNull();
+});
+
+test("subscribes before snapshotting and delivers each activation terminal once", async () => {
+  const listener = vi.fn();
+  const unlisten = vi.fn();
+  let emit!: (payload: unknown) => void;
+  vi.mocked(listen).mockImplementation(async (_event, handler) => {
+    emit = (payload) => handler({ payload } as never);
+    return unlisten;
+  });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    sequence: 2,
+    outcome: {
+      status: "failed",
+      error: {
+        code: "project_in_use",
+        message: "Este Projeto está aberto por outra instância.",
+        action: "Focalize a instância proprietária.",
+        pathname: "C:\\Acervo\\Álbum.myalbuns",
+      },
+    },
+  });
+
+  await expect(
+    tauriGlobalProjectPort.onActivationTerminal(listener),
+  ).resolves.toBe(unlisten);
+  expect(listen).toHaveBeenCalledWith(
+    "myalbuns://global-activation-terminal",
+    expect.any(Function),
+  );
+  expect(invoke).toHaveBeenCalledWith(
+    "latest_global_activation_terminal",
+  );
+  expect(
+    vi.mocked(listen).mock.invocationCallOrder[0],
+  ).toBeLessThan(vi.mocked(invoke).mock.invocationCallOrder[0]);
+  expect(listener).toHaveBeenCalledWith({
+    status: "failed",
+    error: {
+      code: "project_in_use",
+      message: "Este Projeto está aberto por outra instância.",
+      action: "Focalize a instância proprietária.",
+    },
+  });
+
+  emit({ sequence: 1, outcome: { status: "externalCopyNotWritable" } });
+  emit({
+    sequence: 2,
+    outcome: {
+      status: "failed",
+      error: {
+        code: "project_in_use",
+        message: "Duplicada.",
+      },
+    },
+  });
+  emit({ sequence: 3, outcome: { status: "externalCopyNotWritable" } });
+
+  expect(listener).toHaveBeenCalledTimes(2);
+  expect(listener).toHaveBeenLastCalledWith({
+    status: "externalCopyNotWritable",
+  });
+});
+
+test("does not let a stale snapshot overwrite an event received during subscription", async () => {
+  const listener = vi.fn();
+  const unlisten = vi.fn();
+  vi.mocked(listen).mockImplementation(async (_event, handler) => {
+    handler({
+      payload: {
+        sequence: 3,
+        outcome: { status: "externalCopyNotWritable" },
+      },
+    } as never);
+    return unlisten;
+  });
+  vi.mocked(invoke).mockResolvedValueOnce({
+    sequence: 2,
+    outcome: {
+      status: "failed",
+      error: {
+        code: "stale_failure",
+        message: "Esta falha já foi substituída.",
+      },
+    },
+  });
+
+  await tauriGlobalProjectPort.onActivationTerminal(listener);
+
+  expect(listener).toHaveBeenCalledOnce();
+  expect(listener).toHaveBeenCalledWith({
+    status: "externalCopyNotWritable",
+  });
+});
+
+test("fails closed on malformed activation terminal payloads", async () => {
+  const listener = vi.fn();
+  const unlisten = vi.fn<() => void>();
+  let emit!: (payload: unknown) => void;
+  vi.mocked(listen).mockImplementation(async (_event, handler) => {
+    emit = (payload) => handler({ payload } as never);
+    return unlisten;
+  });
+  vi.mocked(invoke).mockResolvedValueOnce(null);
+
+  await tauriGlobalProjectPort.onActivationTerminal(listener);
+  emit({ sequence: 0, outcome: { status: "externalCopyNotWritable" } });
+  emit({ sequence: 1, outcome: { status: "failed" } });
+  emit({
+    sequence: 2,
+    outcome: { status: "opened" },
+    pathname: "C:\\Acervo\\Álbum.myalbuns",
+  });
+
+  expect(listener).not.toHaveBeenCalled();
 });

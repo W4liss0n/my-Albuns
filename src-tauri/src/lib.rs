@@ -14,6 +14,7 @@ mod dev_supervisor_protocol;
 mod export_attempts;
 mod export_commands;
 mod export_pipeline;
+mod global_activation;
 mod global_runtime;
 mod graphics_launch_gate;
 mod imaging_processor;
@@ -67,7 +68,9 @@ pub fn run() {
 
 fn run_selected_runtime_role() -> Result<(), Box<dyn std::error::Error>> {
     match runtime_role::parse_runtime_role(std::env::args_os()) {
-        runtime_role::RuntimeRole::Global { direct_project } => global_runtime::run(direct_project),
+        runtime_role::RuntimeRole::Global { direct_projects } => {
+            global_runtime::run(direct_projects)
+        }
         runtime_role::RuntimeRole::ProjectHost => run_project_host(),
     }
 }
@@ -208,7 +211,11 @@ mod tests {
         );
         assert_eq!(
             global_capability["permissions"],
-            serde_json::json!(["global-window-commands"])
+            serde_json::json!([
+                "global-window-commands",
+                "core:event:allow-listen",
+                "core:event:allow-unlisten"
+            ])
         );
         assert!(
             allowed_commands(&project_permission)

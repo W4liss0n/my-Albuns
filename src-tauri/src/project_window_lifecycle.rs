@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(
             parse_runtime_role(arguments),
             RuntimeRole::Global {
-                direct_project: None
+                direct_projects: Vec::new()
             }
         );
     }

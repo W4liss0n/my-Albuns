@@ -151,6 +151,11 @@ test("keeps the global-window capability isolated from project commands", () => 
   );
 
   expect(capability.windows).toEqual(["global"]);
+  expect(capability.permissions).toEqual([
+    "global-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+  ]);
   expect([...allowedCommands].sort()).toEqual(
     [...explicitGlobalSurface].sort(),
   );

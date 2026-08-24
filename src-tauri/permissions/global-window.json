@@ -12,6 +12,7 @@
           "recent_projects",
           "open_recent_project",
           "startup_open_failure",
+          "latest_global_activation_terminal",
           "validate_project_configuration",
           "choose_provisional_decorative",
           "release_provisional_decorative",

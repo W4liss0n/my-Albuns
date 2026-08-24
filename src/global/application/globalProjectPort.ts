@@ -110,6 +110,9 @@ export interface RecentProjectSummary {
 }
 
 export interface GlobalProjectPort {
+  onActivationTerminal(
+    listener: (outcome: ProjectLaunchOutcome) => void,
+  ): Promise<() => void>;
   completeGraphicsGate(
     supported: boolean,
   ): Promise<ProjectLaunchOutcome | null>;
