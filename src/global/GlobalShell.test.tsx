@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, test, vi } from "vitest";
 
@@ -41,6 +41,7 @@ function createProjectPort(
   overrides: Partial<GlobalProjectPort> = {},
 ): GlobalProjectPort {
   return {
+    onActivationTerminal: async () => () => undefined,
     completeGraphicsGate: async () => null,
     validateProjectConfiguration: async () => ({ status: "valid" }),
     createProject: async () => ({ status: "cancelled" }),
@@ -310,6 +311,47 @@ test("offers Salvar cópia como for a validated read-only external copy", async 
   expect(screen.queryByText(/\.(?:myalbuns)|\\|:\//i)).not.toBeInTheDocument();
 });
 
+test("keeps resolving queued read-only external copies one at a time", async () => {
+  const user = userEvent.setup();
+  const saveExternalCopyAs = vi
+    .fn<() => Promise<OpenProjectOutcome>>()
+    .mockResolvedValueOnce({ status: "externalCopyNotWritable" })
+    .mockResolvedValueOnce({ status: "cancelled" });
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({
+        openProject: async () => ({
+          status: "externalCopyNotWritable",
+        }),
+        saveExternalCopyAs,
+      })}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
+  const saveCopy = await screen.findByRole("button", {
+    name: "Salvar cópia como…",
+  });
+  await user.click(saveCopy);
+
+  expect(saveExternalCopyAs).toHaveBeenCalledOnce();
+  expect(
+    screen.getByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).toBeInTheDocument();
+
+  await user.click(saveCopy);
+  expect(saveExternalCopyAs).toHaveBeenCalledTimes(2);
+  expect(
+    screen.queryByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).not.toBeInTheDocument();
+});
+
 test("offers Salvar cópia como after a direct Windows opening", async () => {
   const completeGraphicsGate = vi.fn(async () => ({
     status: "externalCopyNotWritable" as const,
@@ -468,4 +510,94 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
   });
 
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+test("reacts to terminal outcomes forwarded after Global mounted and releases the listener", async () => {
+  let activationListener:
+    | ((outcome: OpenProjectOutcome) => void)
+    | undefined;
+  const unlisten = vi.fn();
+  const onActivationTerminal = vi.fn(
+    async (listener: (outcome: OpenProjectOutcome) => void) => {
+      activationListener = listener;
+      return unlisten;
+    },
+  );
+
+  const view = render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({ onActivationTerminal })}
+    />,
+  );
+
+  await waitFor(() => expect(onActivationTerminal).toHaveBeenCalledOnce());
+
+  act(() => {
+    activationListener?.({
+      status: "failed",
+      error: {
+        code: "project_in_use",
+        message: "Este Projeto está aberto por outra instância.",
+        action: "Focalize a instância proprietária.",
+      },
+    });
+  });
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    "Este Projeto está aberto por outra instância.",
+  );
+
+  act(() => {
+    activationListener?.({ status: "externalCopyNotWritable" });
+  });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).toBeInTheDocument();
+
+  view.unmount();
+  await waitFor(() => expect(unlisten).toHaveBeenCalledOnce());
+});
+
+test("does not overwrite a forwarded terminal with a late graphics-gate outcome", async () => {
+  const graphicsGate = deferred<OpenProjectOutcome | null>();
+  let activationListener:
+    | ((outcome: OpenProjectOutcome) => void)
+    | undefined;
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      projectPort={createProjectPort({
+        completeGraphicsGate: () => graphicsGate.promise,
+        onActivationTerminal: async (listener) => {
+          activationListener = listener;
+          return () => undefined;
+        },
+      })}
+    />,
+  );
+  await waitFor(() => expect(activationListener).toBeTypeOf("function"));
+
+  act(() => {
+    activationListener?.({ status: "externalCopyNotWritable" });
+  });
+  await act(async () => {
+    graphicsGate.resolve({
+      status: "failed",
+      error: {
+        code: "stale_graphics_gate_failure",
+        message: "Esta falha inicial já foi substituída.",
+      },
+    });
+  });
+
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", {
+      name: "Cópia externa somente leitura",
+    }),
+  ).toBeInTheDocument();
 });

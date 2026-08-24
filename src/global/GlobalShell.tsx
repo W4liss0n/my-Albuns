@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { SafeApplicationShell } from "../components/SafeApplicationShell";
@@ -15,33 +15,78 @@ interface GlobalShellProps {
   projectPort: GlobalProjectPort;
 }
 
+interface LaunchViewState {
+  externalCopyPending: boolean;
+  failure: OpenProjectFailure | null;
+}
+
+type LaunchOutcomeContext = "opening" | "externalCopyResolution";
+
+function reduceLaunchOutcome(
+  state: LaunchViewState,
+  outcome: OpenProjectOutcome,
+  context: LaunchOutcomeContext,
+): LaunchViewState {
+  switch (outcome.status) {
+    case "failed":
+      return {
+        externalCopyPending:
+          context === "externalCopyResolution"
+            ? false
+            : state.externalCopyPending,
+        failure: outcome.error,
+      };
+    case "externalCopyNotWritable":
+      return { externalCopyPending: true, failure: null };
+    case "opened":
+    case "focused":
+      return { externalCopyPending: false, failure: null };
+    case "cancelled":
+      return context === "externalCopyResolution"
+        ? { externalCopyPending: false, failure: null }
+        : state;
+  }
+}
+
 export function GlobalShell({
   graphicsDiagnostic,
   projectPort,
 }: GlobalShellProps) {
   const [isOpening, setIsOpening] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [externalCopyPending, setExternalCopyPending] = useState(false);
-  const [failure, setFailure] = useState<OpenProjectFailure | null>(null);
+  const [{ externalCopyPending, failure }, setLaunchView] =
+    useState<LaunchViewState>({
+      externalCopyPending: false,
+      failure: null,
+    });
   const [recentProjects, setRecentProjects] = useState<
     readonly RecentProjectSummary[]
   >([]);
   const openingAttempt = useRef(0);
   const graphicsGateReported = useRef(false);
+  const applyLaunchOutcome = useCallback(
+    (
+      outcome: OpenProjectOutcome,
+      context: LaunchOutcomeContext = "opening",
+    ) => {
+      setLaunchView((state) =>
+        reduceLaunchOutcome(state, outcome, context),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     if (graphicsGateReported.current) return;
     graphicsGateReported.current = true;
+    const graphicsAttempt = openingAttempt.current;
     void projectPort
       .completeGraphicsGate(graphicsDiagnostic.supported)
       .then((outcome) => {
-        if (outcome?.status === "failed") {
-          setFailure(outcome.error);
-        } else if (outcome?.status === "externalCopyNotWritable") {
-          setExternalCopyPending(true);
-        }
+        if (openingAttempt.current !== graphicsAttempt) return;
+        if (outcome) applyLaunchOutcome(outcome);
       });
-  }, [graphicsDiagnostic.supported, projectPort]);
+  }, [applyLaunchOutcome, graphicsDiagnostic.supported, projectPort]);
 
   useEffect(() => {
     let active = true;
@@ -57,7 +102,10 @@ export function GlobalShell({
         startupFailure &&
         openingAttempt.current === startupAttempt
       ) {
-        setFailure(startupFailure);
+        setLaunchView((state) => ({
+          ...state,
+          failure: startupFailure,
+        }));
       }
     });
     return () => {
@@ -65,20 +113,40 @@ export function GlobalShell({
     };
   }, [projectPort]);
 
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void projectPort
+      .onActivationTerminal((outcome) => {
+        if (!active) return;
+        openingAttempt.current += 1;
+        setIsOpening(false);
+        applyLaunchOutcome(outcome);
+      })
+      .then((release) => {
+        if (active) {
+          unlisten = release;
+        } else {
+          release();
+        }
+      })
+      .catch(() => {
+        // Direct commands still surface failures if the event channel is unavailable.
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [applyLaunchOutcome, projectPort]);
+
   const runOpening = async (
     attempt: () => Promise<OpenProjectOutcome>,
   ) => {
     openingAttempt.current += 1;
     setIsOpening(true);
-    setFailure(null);
+    setLaunchView((state) => ({ ...state, failure: null }));
     const outcome = await attempt();
-    if (outcome.status === "failed") {
-      setFailure(outcome.error);
-    } else if (outcome.status === "externalCopyNotWritable") {
-      setExternalCopyPending(true);
-    } else if (outcome.status === "opened" || outcome.status === "focused") {
-      setExternalCopyPending(false);
-    }
+    applyLaunchOutcome(outcome);
     setIsOpening(false);
   };
 
@@ -89,18 +157,15 @@ export function GlobalShell({
 
   const saveExternalCopyAs = async () => {
     setIsOpening(true);
-    setFailure(null);
+    setLaunchView((state) => ({ ...state, failure: null }));
     const outcome = await projectPort.saveExternalCopyAs();
-    if (outcome.status === "failed") {
-      setFailure(outcome.error);
-    }
-    setExternalCopyPending(false);
+    applyLaunchOutcome(outcome, "externalCopyResolution");
     setIsOpening(false);
   };
 
   const startCreation = () => {
     openingAttempt.current += 1;
-    setFailure(null);
+    setLaunchView((state) => ({ ...state, failure: null }));
     setIsCreating(true);
   };
 

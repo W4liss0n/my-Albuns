@@ -5,6 +5,8 @@
   "local": true,
   "windows": ["global"],
   "permissions": [
-    "global-window-commands"
+    "global-window-commands",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
   ]
 }

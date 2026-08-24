@@ -119,7 +119,7 @@ impl NamedMutex {
     }
 }
 
-fn scoped_name(local_root: &Path, kind: &str, scope: &str) -> Result<String, String> {
+pub(crate) fn scoped_name(local_root: &Path, kind: &str, scope: &str) -> Result<String, String> {
     let mut digest = Sha256::new();
     for unit in windows_filesystem_case(local_root)? {
         digest.update(unit.to_le_bytes());

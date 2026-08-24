@@ -7,7 +7,7 @@ pub(crate) const PROJECT_HOST_ROLE_ARGUMENT: &str = "--myalbuns-project-host";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RuntimeRole {
-    Global { direct_project: Option<PathBuf> },
+    Global { direct_projects: Vec<PathBuf> },
     ProjectHost,
 }
 
@@ -16,19 +16,19 @@ pub(crate) enum RuntimeRole {
 /// Association paths remain as `OsString`/`PathBuf` throughout classification;
 /// only the ASCII file extension is inspected.
 pub(crate) fn parse_runtime_role(arguments: impl IntoIterator<Item = OsString>) -> RuntimeRole {
-    let mut direct_project = None;
+    let mut direct_projects = Vec::new();
 
     for argument in arguments.into_iter().skip(1) {
         if argument == OsStr::new(PROJECT_HOST_ROLE_ARGUMENT) {
             return RuntimeRole::ProjectHost;
         }
 
-        if direct_project.is_none() && is_project_path(&argument) {
-            direct_project = Some(PathBuf::from(argument));
+        if is_project_path(&argument) {
+            direct_projects.push(PathBuf::from(argument));
         }
     }
 
-    RuntimeRole::Global { direct_project }
+    RuntimeRole::Global { direct_projects }
 }
 
 fn is_project_path(argument: &OsStr) -> bool {
@@ -53,7 +53,7 @@ mod tests {
         assert_eq!(
             parse([OsString::from("MyAlbuns.exe")]),
             RuntimeRole::Global {
-                direct_project: None
+                direct_projects: Vec::new()
             }
         );
     }
@@ -71,7 +71,7 @@ mod tests {
                 project.as_os_str().to_owned(),
             ]),
             RuntimeRole::Global {
-                direct_project: Some(project)
+                direct_projects: vec![project]
             }
         );
     }
@@ -83,7 +83,7 @@ mod tests {
             assert_eq!(
                 parse([OsString::from("MyAlbuns.exe"), OsString::from(alias)]),
                 RuntimeRole::Global {
-                    direct_project: None
+                    direct_projects: Vec::new()
                 },
                 "unexpected internal role alias: {alias}"
             );
@@ -110,9 +110,26 @@ mod tests {
                 project.as_os_str().to_owned(),
             ]),
             RuntimeRole::Global {
-                direct_project: Some(project)
+                direct_projects: vec![project]
             }
         );
+    }
+
+    #[test]
+    fn preserves_every_project_from_one_native_activation() {
+        let first = PathBuf::from(r"C:\Projetos\Casamento.myalbuns");
+        let second = PathBuf::from(r"\\servidor\Albuns\Formatura.myalbuns");
+
+        let RuntimeRole::Global { direct_projects } = parse([
+            OsString::from("MyAlbuns.exe"),
+            first.as_os_str().to_owned(),
+            OsString::from("--unrelated"),
+            second.as_os_str().to_owned(),
+        ]) else {
+            panic!("a file activation must retain the Global role");
+        };
+
+        assert_eq!(direct_projects, vec![first, second]);
     }
 
     #[test]
@@ -143,7 +160,7 @@ mod tests {
                 project.as_os_str().to_owned(),
             ]),
             RuntimeRole::Global {
-                direct_project: Some(project)
+                direct_projects: vec![project]
             }
         );
     }
