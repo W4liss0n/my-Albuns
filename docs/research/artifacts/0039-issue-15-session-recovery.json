@@ -1,8 +1,8 @@
 {
     "schemaVersion":  1,
     "gate":  "productive-end-to-end-journey",
-    "collectedAtUtc":  "2026-08-23T17:30:01.1512269Z",
-    "gitCommit":  "80a882b77b5c362fc8dc55e9b974fb64441a1840",
+    "collectedAtUtc":  "2026-08-24T01:02:13.8246229Z",
+    "gitCommit":  "98eb61b8b7f2149e4f4671bbd546663093747a10",
     "sourceInputsDirty":  false,
     "platform":  {
                      "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
@@ -97,7 +97,7 @@
                      "cancelledExportBeforePipeline":  true,
                      "createAuthorization":  "createOnly",
                      "exportedSheetNumber":  2,
-                     "selectedSheetId":  "efd09126-ae32-4ee4-8b94-4838c2cab015",
+                     "selectedSheetId":  "a336789a-c135-436a-ab55-83b9f6de1a6e",
                      "selectedSheetActiveSides":  "both",
                      "firstSheetDimensions":  {
                                                   "width":  360,
@@ -135,15 +135,15 @@
                                              "postRecoveryActionsCheckpointed":  true,
                                              "checkpointPreservedByCancelledSaveAs":  true,
                                              "checkpointFinishedBySuccessfulSaveAs":  true,
-                                             "crashedHostProcessId":  10368,
-                                             "recoveredHostProcessId":  31180,
+                                             "crashedHostProcessId":  35688,
+                                             "recoveredHostProcessId":  12640,
                                              "lockReleasedToDistinctHost":  true
                                          },
                      "saveAs":  {
                                     "cancelledBeforeCore":  true,
                                     "createAuthorization":  "createOnly",
-                                    "originalProjectId":  "baac6410-768a-4769-afc4-fdea96861bc6",
-                                    "copiedProjectId":  "36ec9055-4889-4558-b0b7-2b9b7dbb503c",
+                                    "originalProjectId":  "87d3f814-34cf-46ab-86a5-9b18b3ec03df",
+                                    "copiedProjectId":  "2d09af13-42c6-450f-b769-92b5bdac61be",
                                     "savedAsRevision":  6,
                                     "contentPreserved":  true,
                                     "originalByteIdentical":  true,
@@ -160,7 +160,7 @@
                                     "localAuthorityTransitioned":  true,
                                     "webviewNamespaceTransitioned":  true,
                                     "nativeTitleUpdated":  true,
-                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\ba38\\my-Albuns\\.scratch\\j8-14928-d679bc\\Jornada produtiva - Cópia.myalbuns",
+                                    "observedNativeTitle":  "Jornada produtiva - Cópia — C:\\Users\\Usuario\\.codex\\worktrees\\ba38\\my-Albuns\\.scratch\\j8-37936-405b6c\\Jornada produtiva - Cópia.myalbuns",
                                     "replacementWebviewReady":  true,
                                     "localStateStartedEmpty":  true
                                 },
@@ -198,16 +198,16 @@
                                                   }
                               },
                      "processIds":  {
-                                        "firstGlobal":  13272,
-                                        "firstHost":  9624,
-                                        "global":  10616,
-                                        "crashedHost":  10368,
-                                        "recoveryGlobal":  29508,
-                                        "host":  31180,
-                                        "simultaneousOriginalGlobal":  3048,
-                                        "simultaneousOriginalHost":  13564,
-                                        "imaging":  30468,
-                                        "missingOriginalImaging":  11676
+                                        "firstGlobal":  28516,
+                                        "firstHost":  29488,
+                                        "global":  13896,
+                                        "crashedHost":  35688,
+                                        "recoveryGlobal":  12888,
+                                        "host":  12640,
+                                        "simultaneousOriginalGlobal":  36564,
+                                        "simultaneousOriginalHost":  28420,
+                                        "imaging":  13508,
+                                        "missingOriginalImaging":  22568
                                     },
                      "correlations":  {
                                           "bootstraps":  4,
