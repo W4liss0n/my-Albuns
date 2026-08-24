@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 
 import { draftFrameBorderFillRects } from "./draftFrameBorderGeometry";
 
-test("keeps an oversized draft Frame border fully inside without degenerate rectangles", () => {
+test("keeps an oversized shared-preview Frame border fully inside", () => {
   expect(
     draftFrameBorderFillRects(
       { x: 10, y: 20, width: 100, height: 60 },

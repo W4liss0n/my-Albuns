@@ -11,6 +11,7 @@ import type {
   MediaPreview,
   MediaPreviewDemand,
 } from "../application/projectPorts";
+import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
 
 import type {
   MediaCatalogItem,
@@ -216,8 +217,7 @@ export function MediaPanel({
 
   function selectAllVisibleMedia(event: KeyboardEvent<HTMLElement>) {
     if (
-      !(event.ctrlKey || event.metaKey) ||
-      event.key.toLocaleLowerCase("pt-BR") !== "a" ||
+      matchProjectCommandShortcut(event, "media-panel") !== "select-all" ||
       (event.target as HTMLElement).matches(
         "input, textarea, select, [contenteditable='true']",
       )

@@ -55,7 +55,7 @@ test("remains current after StrictMode replays its mount effect", async () => {
   );
 
   await expect(
-    view.result.current(async () => representativeProjection),
+    view.result.current.run(async () => representativeProjection),
   ).resolves.toEqual({
     status: "completed",
     projection: representativeProjection,
@@ -72,8 +72,8 @@ test("keeps Project mutations serial and applies them in request order", async (
     useProjectMutationRunner("project-001", port),
   );
 
-  const firstResult = view.result.current(firstOperation);
-  const secondResult = view.result.current(secondOperation);
+  const firstResult = view.result.current.run(firstOperation);
+  const secondResult = view.result.current.run(secondOperation);
 
   expect(firstOperation).toHaveBeenCalledOnce();
   expect(secondOperation).not.toHaveBeenCalled();
@@ -122,8 +122,8 @@ test("continues the Project queue after a mutation fails", async () => {
     useProjectMutationRunner("project-001", port),
   );
 
-  const failedResult = view.result.current(firstOperation);
-  const nextResult = view.result.current(secondOperation);
+  const failedResult = view.result.current.run(firstOperation);
+  const nextResult = view.result.current.run(secondOperation);
 
   await expect(failedResult).resolves.toEqual({
     status: "failed",
@@ -134,7 +134,7 @@ test("continues the Project queue after a mutation fails", async () => {
     projection: nextProjection,
   });
   expect(secondOperation).toHaveBeenCalledOnce();
-  expect(secondOperation).toHaveBeenCalledWith(port);
+  expect(secondOperation).toHaveBeenCalledWith(port, null);
 });
 
 test("keeps the committed Project context when a concurrent render is abandoned", async () => {
@@ -178,7 +178,7 @@ test("keeps the committed Project context when a concurrent render is abandoned"
   beginSuspendedRender();
   await waitFor(() => expect(suspendedRenderAttempted).toBe(true));
 
-  await expect(runCommittedMutation(operation)).resolves.toEqual({
+  await expect(runCommittedMutation.run(operation)).resolves.toEqual({
     status: "completed",
     projection: representativeProjection,
   });
@@ -208,8 +208,8 @@ test("starts a new Project queue immediately and discards obsolete queued work",
     },
   );
 
-  const running = view.result.current(() => first.promise);
-  const queued = view.result.current(obsoleteQueuedOperation);
+  const running = view.result.current.run(() => first.promise);
+  const queued = view.result.current.run(obsoleteQueuedOperation);
 
   view.rerender({
     projectId: "project-002",
@@ -230,7 +230,7 @@ test("starts a new Project queue immediately and discards obsolete queued work",
     },
   );
 
-  await expect(view.result.current(currentOperation)).resolves.toEqual({
+  await expect(view.result.current.run(currentOperation)).resolves.toEqual({
     status: "completed",
     projection: currentProjection,
   });

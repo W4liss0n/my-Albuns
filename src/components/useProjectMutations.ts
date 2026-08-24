@@ -38,12 +38,15 @@ export function useProjectMutations({
   async function runWithGlobalFeedback(
     label: string,
     operation: ProjectMutationOperation,
+    cancelAfterPendingFailure = false,
   ) {
     const feedbackToken = feedbackTokenRef.current + 1;
     feedbackTokenRef.current = feedbackToken;
     setBusy(label);
     setMessage(null);
-    const outcome = await runProjectMutation(operation);
+    const outcome = await runProjectMutation.run(operation, {
+      cancelAfterPendingFailure,
+    });
     if (outcome.status === "completed") {
       onProjectionChange(outcome.projection);
     } else if (
@@ -64,16 +67,40 @@ export function useProjectMutations({
   }
 
   function saveVisibleRevision() {
-    const expectedRevision = projection.state.revision;
-    return runWithGlobalFeedback("Salvando", async (port) => {
-      const result = await port.save(expectedRevision);
-      return result.projection;
-    });
+    const visibleRevision = projection.state.revision;
+    return runWithGlobalFeedback(
+      "Salvando",
+      async (port, latestProjection) => {
+        const expectedRevision =
+          latestProjection?.state.revision ?? visibleRevision;
+        const result = await port.save(expectedRevision);
+        return result.projection;
+      },
+      true,
+    );
+  }
+
+  function runHistoryCommand(
+    label: string,
+    availability: "canUndo" | "canRedo",
+    operation: "undo" | "redo",
+  ) {
+    return runWithGlobalFeedback(
+      label,
+      (port, latestProjection) => {
+        const effectiveProjection = latestProjection ?? projection;
+        if (!effectiveProjection.state[availability]) {
+          return Promise.resolve(effectiveProjection);
+        }
+        return port[operation]();
+      },
+      true,
+    );
   }
 
   async function commitInteraction(intent: ProjectIntent) {
     setMessage(null);
-    const outcome = await runProjectMutation((port) =>
+    const outcome = await runProjectMutation.run((port) =>
       port.apply(intent),
     );
     if (outcome.status === "completed") {
@@ -102,14 +129,8 @@ export function useProjectMutations({
         visualDefaults,
       }),
     save: () => void saveVisibleRevision(),
-    undo: () =>
-      void runWithGlobalFeedback("Desfazendo", (port) =>
-        port.undo(),
-      ),
-    redo: () =>
-      void runWithGlobalFeedback("Refazendo", (port) =>
-        port.redo(),
-      ),
+    undo: () => void runHistoryCommand("Desfazendo", "canUndo", "undo"),
+    redo: () => void runHistoryCommand("Refazendo", "canRedo", "redo"),
     dismissFeedback: () => {
       setMessage(null);
     },

@@ -1,9 +1,11 @@
 import { expect, test } from "vitest";
 
 import {
+  PROJECT_COMMAND_CATALOG,
   matchProjectCommandShortcut,
+  projectCommandBinding,
   projectCommandShortcutLabel,
-} from "./projectCommandCatalog";
+} from "../application/projectCommandCatalog";
 import { createProjectApplicationMenus } from "./projectApplicationMenus";
 
 function keyboardShortcut(
@@ -32,14 +34,19 @@ test("keeps displayed Project command shortcuts and accepted aliases in one cata
   expect(
     matchProjectCommandShortcut(
       keyboardShortcut("Z", { ctrlKey: true, shiftKey: true }),
+      "project-window",
     ),
   ).toBe("redo");
   expect(
-    matchProjectCommandShortcut(keyboardShortcut("y", { ctrlKey: true })),
+    matchProjectCommandShortcut(
+      keyboardShortcut("y", { ctrlKey: true }),
+      "project-window",
+    ),
   ).toBe("redo");
   expect(
     matchProjectCommandShortcut(
       keyboardShortcut("s", { ctrlKey: true, shiftKey: true }),
+      "project-window",
     ),
   ).toBe("save-as");
 });
@@ -70,4 +77,110 @@ test("feeds the canonical shortcuts into the Project application menu", () => {
   expect(displayedShortcut("close")).toBe("Ctrl+W");
   expect(displayedShortcut("undo")).toBe("Ctrl+Z");
   expect(displayedShortcut("redo")).toBe("Ctrl+Shift+Z");
+});
+
+test("keeps stable command metadata complete and conflict-free by context", () => {
+  const ids = new Set<string>();
+  const associations = new Set<string>();
+
+  for (const command of PROJECT_COMMAND_CATALOG) {
+    expect(command.id).not.toBe("");
+    expect(command.label).not.toBe("");
+    expect(command.description).not.toBe("");
+    expect(command.bindings.length).toBeGreaterThan(0);
+    expect(ids.has(command.id), command.id).toBe(false);
+    ids.add(command.id);
+
+    for (const binding of command.bindings) {
+      for (const shortcut of command.shortcuts) {
+        const association = [
+          binding.context,
+          shortcut.ctrlKey ? "Ctrl" : "",
+          shortcut.altKey ? "Alt" : "",
+          shortcut.shiftKey ? "Shift" : "",
+          shortcut.key.toLowerCase(),
+        ].join("+");
+        expect(associations.has(association), association).toBe(false);
+        associations.add(association);
+      }
+    }
+  }
+});
+
+test("registers contextual Ctrl+E without pretending Photoshop is implemented", () => {
+  const photoshop = PROJECT_COMMAND_CATALOG.find(
+    (command) => command.id === "open-in-photoshop",
+  );
+
+  expect(photoshop).toMatchObject({
+    label: "Abrir no Photoshop",
+  });
+  expect(projectCommandBinding("open-in-photoshop", "frame-photo"))
+    .toMatchObject({ availability: "placeholder" });
+  expect(projectCommandBinding("open-in-photoshop", "media-photo"))
+    .toMatchObject({ availability: "placeholder" });
+  expect(projectCommandShortcutLabel("open-in-photoshop")).toBe("Ctrl+E");
+  expect(
+    matchProjectCommandShortcut(
+      keyboardShortcut("e", { ctrlKey: true }),
+      "frame-photo",
+    ),
+  ).toBe("open-in-photoshop");
+});
+
+test("represents Select all availability per owning context", () => {
+  expect(projectCommandBinding("select-all", "media-panel")).toEqual({
+    availability: "implemented",
+    context: "media-panel",
+  });
+  expect(projectCommandBinding("select-all", "frame")).toEqual({
+    availability: "placeholder",
+    context: "frame",
+    placeholderFeature: "select-all-in-active-context",
+  });
+});
+
+test("projects every application-menu command from its canonical descriptor", () => {
+  const descriptors = new Map(
+    PROJECT_COMMAND_CATALOG.map(
+      (command) => [command.id as string, command] as const,
+    ),
+  );
+  const groups = createProjectApplicationMenus({
+    canExport: true,
+    canRedo: true,
+    canUndo: true,
+    closeProject: () => undefined,
+    exportSheet: () => undefined,
+    redo: () => undefined,
+    save: () => undefined,
+    undo: () => undefined,
+  });
+  const commands = groups.flatMap((group) =>
+    group.items.flatMap((item) => {
+      if (item.type === "command") return [item];
+      if (item.type === "submenu") return item.items;
+      return [];
+    }),
+  );
+
+  for (const command of commands) {
+    const descriptor = descriptors.get(command.id);
+    const binding = descriptor?.bindings.find(
+      (candidate) => candidate.context === command.context,
+    );
+    expect(descriptor, command.id).toBeDefined();
+    expect(command.label).toBe(descriptor?.label);
+    expect(command.shortcut).toBe(
+      descriptor?.shortcuts.find((shortcut) => shortcut.display)?.display,
+    );
+    expect(command.availability).toBe(binding?.availability);
+    if (command.availability === "placeholder") {
+      expect(command.feature).toBe(
+        binding?.availability === "placeholder"
+          ? binding.placeholderFeature
+          : undefined,
+      );
+    }
+  }
 });

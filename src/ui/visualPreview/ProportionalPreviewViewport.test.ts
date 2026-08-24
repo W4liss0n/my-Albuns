@@ -4,13 +4,13 @@ import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 
 const viewportStyles = readFileSync(
-  "src/global/ProportionalPreviewViewport.css",
+  "src/ui/visualPreview/ProportionalPreviewViewport.css",
   "utf8",
 ) as string;
 
 test("lets the proportional preview use all available panel space", () => {
   const viewportRule = viewportStyles.match(
-    /\.new-project-proportional-preview-viewport\s*\{([^}]*)\}/s,
+    /\.visual-preview-viewport\s*\{([^}]*)\}/s,
   )?.[1];
 
   expect(viewportRule).toBeDefined();

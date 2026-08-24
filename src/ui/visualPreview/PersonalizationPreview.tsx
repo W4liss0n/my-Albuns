@@ -1,11 +1,11 @@
-import type { VisualScope } from "../application/scopedValues";
+import type { VisualScope } from "../../application/scopedValues";
 import type {
   PreviewBackgroundContent,
   PreviewOverlayContent,
   VisualPersonalizationPreview,
   VisualPreviewGeometry,
-} from "../application/visualPersonalizationPreview";
-import { draftFrameBorderFillRects } from "./application/draftFrameBorderGeometry";
+} from "./types";
+import { draftFrameBorderFillRects } from "./draftFrameBorderGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
 import "./PersonalizationPreview.css";
 
@@ -63,7 +63,7 @@ export function PersonalizationPreview({
   return (
     <svg
       aria-label={accessibleLabel}
-      className="new-project-sheet new-project-personalization-sheet"
+      className="visual-preview-sheet visual-personalization-preview"
       height={heightUm}
       preserveAspectRatio="xMidYMid meet"
       role="img"

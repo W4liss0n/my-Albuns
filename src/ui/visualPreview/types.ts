@@ -1,5 +1,5 @@
-import type { FrameBorderValue } from "./frameBorderEditor";
-import type { ScopedValue, VisualScope } from "./scopedValues";
+import type { FrameBorderValue } from "../../application/frameBorderEditor";
+import type { ScopedValue, VisualScope } from "../../application/scopedValues";
 
 export type PreviewBackgroundContent =
   | { kind: "color"; rgb: string }

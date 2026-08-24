@@ -1,5 +1,14 @@
-import type { ApplicationMenuGroup } from "./ApplicationMenuBar";
-import { projectCommandShortcutLabel } from "./projectCommandCatalog";
+import {
+  projectCommandBinding,
+  projectCommandDescriptor,
+  projectCommandShortcutLabel,
+  type ProjectCommandContext,
+  type ProjectCommandId,
+} from "../application/projectCommandCatalog";
+import type {
+  ApplicationMenuCommand,
+  ApplicationMenuGroup,
+} from "./ApplicationMenuBar";
 
 interface ProjectApplicationMenuOptions {
   canExport: boolean;
@@ -22,223 +31,128 @@ export function createProjectApplicationMenus({
   save,
   undo,
 }: ProjectApplicationMenuOptions): readonly ApplicationMenuGroup[] {
-  // PLACEHOLDER UI: these commands establish the accepted desktop information
-  // architecture. Each placeholder stays disabled until its application port or
-  // Project intent exists; commands already backed by a port remain functional.
+  // PLACEHOLDER UI: the canonical catalog marks commands whose application
+  // port or Project intent does not exist yet. Menus only project that state.
   return [
     {
       id: "file",
       label: "Arquivo",
       items: [
-        placeholder(
-          "new-project",
-          "Novo Projeto…",
-          "new-project-from-project-window",
-          projectCommandShortcutLabel("new-project"),
-        ),
-        placeholder(
-          "open-project",
-          "Abrir Projeto…",
-          "open-project-from-project-window",
-          projectCommandShortcutLabel("open-project"),
-        ),
+        placeholder("new-project", "project-window"),
+        placeholder("open-project", "project-window"),
         separator("file-project-separator"),
-        implemented(
-          "save",
-          "Salvar",
-          save,
-          projectCommandShortcutLabel("save"),
-        ),
-        placeholder(
-          "save-as",
-          "Salvar como…",
-          "save-project-as",
-          projectCommandShortcutLabel("save-as"),
-        ),
+        implemented("save", "project-window", save),
+        placeholder("save-as", "project-window"),
         separator("file-export-separator"),
-        implemented(
-          "export-sheet",
-          "Exportar Lâmina…",
-          exportSheet,
-          undefined,
-          !canExport,
-        ),
-        placeholder("export", "Exportar…", "normal-project-export"),
+        implemented("export-sheet", "sheet", exportSheet, !canExport),
+        placeholder("export", "project-window"),
         separator("file-close-separator"),
-        implemented(
-          "close",
-          "Fechar Projeto",
-          closeProject,
-          projectCommandShortcutLabel("close"),
-        ),
+        implemented("close", "project-window", closeProject),
       ],
     },
     {
       id: "edit",
       label: "Editar",
       items: [
-        implemented(
-          "undo",
-          "Desfazer",
-          undo,
-          projectCommandShortcutLabel("undo"),
-          !canUndo,
-        ),
-        implemented(
-          "redo",
-          "Refazer",
-          redo,
-          projectCommandShortcutLabel("redo"),
-          !canRedo,
-        ),
+        implemented("undo", "project-window", undo, !canUndo),
+        implemented("redo", "project-window", redo, !canRedo),
         separator("edit-clipboard-separator"),
-        placeholder(
-          "copy-frames",
-          "Copiar",
-          "copy-frames",
-          projectCommandShortcutLabel("copy-frames"),
-        ),
-        placeholder(
-          "paste-frames",
-          "Colar",
-          "paste-frames",
-          projectCommandShortcutLabel("paste-frames"),
-        ),
+        placeholder("copy-frames", "frame"),
+        placeholder("paste-frames", "frame"),
         separator("edit-frame-separator"),
-        placeholder(
-          "swap-frame-contents",
-          "Trocar conteúdo dos Frames",
-          "swap-selected-frame-contents",
-        ),
-        placeholder("add-frame", "Adicionar Frame", "add-frame"),
+        placeholder("swap-frame-contents", "frame"),
+        placeholder("add-frame", "frame"),
         submenu("arrange-frames", "Organizar", [
-          placeholder(
-            "bring-frames-to-front",
-            "Trazer para frente",
-            "bring-selected-frames-to-front",
-          ),
-          placeholder(
-            "advance-frames",
-            "Avançar uma posição",
-            "advance-selected-frames",
-            projectCommandShortcutLabel("advance-frames"),
-          ),
-          placeholder(
-            "recede-frames",
-            "Recuar uma posição",
-            "recede-selected-frames",
-            projectCommandShortcutLabel("recede-frames"),
-          ),
-          placeholder(
-            "send-frames-to-back",
-            "Enviar para trás",
-            "send-selected-frames-to-back",
-          ),
+          placeholder("bring-frames-to-front", "frame"),
+          placeholder("advance-frames", "frame"),
+          placeholder("recede-frames", "frame"),
+          placeholder("send-frames-to-back", "frame"),
         ]),
         separator("edit-layout-separator"),
-        placeholder(
-          "save-frame-arrangement-as-layout",
-          "Salvar disposição como Layout",
-          "save-frame-arrangement-as-layout",
-        ),
-        placeholder(
-          "select-all",
-          "Selecionar tudo",
-          "select-all-in-active-context",
-          projectCommandShortcutLabel("select-all"),
-        ),
+        placeholder("save-frame-arrangement-as-layout", "frame"),
+        placeholder("select-all", "frame"),
       ],
     },
     {
       id: "sheet",
       label: "Lâmina",
       items: [
-        placeholder("add-before", "Adicionar antes", "add-sheet-before"),
-        placeholder("add-after", "Adicionar depois", "add-sheet-after"),
-        placeholder("duplicate-sheet", "Duplicar Lâmina", "duplicate-sheet"),
-        placeholder(
-          "delete-sheet",
-          "Excluir",
-          "delete-sheet",
-          projectCommandShortcutLabel("delete-sheet"),
-        ),
+        placeholder("add-before", "sheet"),
+        placeholder("add-after", "sheet"),
+        placeholder("duplicate-sheet", "sheet"),
+        placeholder("delete-sheet", "sheet"),
         separator("sheet-edge-separator"),
-        placeholder(
-          "convert-edge",
-          "Converter extremidade",
-          "convert-edge-sheet",
-        ),
+        placeholder("convert-edge", "sheet"),
       ],
     },
     {
       id: "view",
       label: "Exibir",
       items: [
-        placeholder("media-panel", "Painel de imagens", "toggle-media-panel"),
-        placeholder(
-          "contextual-panel",
-          "Painel contextual",
-          "toggle-contextual-panel",
-        ),
+        placeholder("media-panel", "project-window"),
+        placeholder("contextual-panel", "project-window"),
         separator("view-canvas-separator"),
-        placeholder("fit-sheet", "Ajustar Lâmina", "fit-sheet-in-edit-mode"),
+        placeholder("fit-sheet", "sheet"),
       ],
     },
     {
       id: "tools",
       label: "Ferramentas",
-      items: [
-        placeholder(
-          "settings",
-          "Configurações…",
-          "open-global-settings-from-project",
-        ),
-      ],
+      items: [placeholder("settings", "project-window")],
     },
     {
       id: "help",
       label: "Ajuda",
       items: [
-        placeholder("manual", "Manual do MyAlbuns", "application-manual"),
-        placeholder("shortcuts", "Atalhos de teclado", "keyboard-shortcuts"),
+        placeholder("manual", "project-window"),
+        placeholder("shortcuts", "project-window"),
         separator("help-about-separator"),
-        placeholder("about", "Sobre o MyAlbuns", "about-application"),
+        placeholder("about", "project-window"),
       ],
     },
   ];
 }
 
 function implemented(
-  id: string,
-  label: string,
+  id: ProjectCommandId,
+  context: ProjectCommandContext,
   onSelect: () => void,
-  shortcut?: string,
   disabled?: boolean,
-) {
+): ApplicationMenuCommand {
+  const descriptor = projectCommandDescriptor(id);
+  const binding = projectCommandBinding(id, context);
+  if (binding?.availability !== "implemented") {
+    throw new Error(`Comando ${id} não está implementado em ${context}.`);
+  }
   return {
-    availability: "implemented" as const,
+    availability: "implemented",
+    context,
     disabled,
     id,
-    label,
+    label: descriptor.label,
     onSelect,
-    shortcut,
-    type: "command" as const,
+    shortcut: projectCommandShortcutLabel(id),
+    type: "command",
   };
 }
 
 function placeholder(
-  id: string,
-  label: string,
-  feature: string,
-  shortcut?: string,
-) {
+  id: ProjectCommandId,
+  context: ProjectCommandContext,
+): ApplicationMenuCommand {
+  const descriptor = projectCommandDescriptor(id);
+  const binding = projectCommandBinding(id, context);
+  if (binding?.availability !== "placeholder") {
+    throw new Error(`Comando ${id} não é um placeholder em ${context}.`);
+  }
   return {
-    availability: "placeholder" as const,
-    feature,
+    availability: "placeholder",
+    context,
+    feature: binding.placeholderFeature,
     id,
-    label,
-    shortcut,
-    type: "command" as const,
+    label: descriptor.label,
+    shortcut: projectCommandShortcutLabel(id),
+    type: "command",
   };
 }
 
@@ -249,7 +163,7 @@ function separator(id: string) {
 function submenu(
   id: string,
   label: string,
-  items: readonly ReturnType<typeof placeholder>[],
+  items: readonly ApplicationMenuCommand[],
 ) {
   return { id, items, label, type: "submenu" as const };
 }

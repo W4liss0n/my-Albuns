@@ -72,6 +72,24 @@ test("keeps placeholder Save as distinct from Save", () => {
   expect(actions.save).not.toHaveBeenCalled();
 });
 
+test("leaves contextual Ctrl+E to the active photo owner", () => {
+  const actions = handlers();
+  renderHook(() =>
+    useProjectCommandShortcuts({
+      ...actions,
+      canRedo: true,
+      canUndo: true,
+      disabled: false,
+    }),
+  );
+
+  const event = dispatchShortcut("e");
+
+  expect(event.defaultPrevented).toBe(false);
+  expect(actions.save).not.toHaveBeenCalled();
+  expect(actions.closeProject).not.toHaveBeenCalled();
+});
+
 test("leaves text Undo and Redo to editable targets", () => {
   const actions = handlers();
   renderHook(() =>

@@ -156,10 +156,12 @@ const decorativeProjection: EditorProjection = {
 
 function deferredProjection() {
   let resolve!: (value: EditorProjection) => void;
-  const promise = new Promise<EditorProjection>((resolver) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<EditorProjection>((resolver, rejecter) => {
     resolve = resolver;
+    reject = rejecter;
   });
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 const exportPort: ExportPort = {
@@ -211,12 +213,12 @@ function projectDialogHarness() {
 function projectWindowHarness() {
   let closeRequested: (() => void) | null = null;
   const port: ProjectWindowPort = {
-    onCloseRequested: async (listener) => {
+    onCloseRequested: vi.fn(async (listener) => {
       closeRequested = listener;
       return () => {
         closeRequested = null;
       };
-    },
+    }),
     requestClose: vi.fn(async () => ({
       kind: "confirmationRequired" as const,
     })),
@@ -578,7 +580,9 @@ test("uses the same close decision for the application command and blocks it whi
 
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
-  expect(harness.port.requestClose).toHaveBeenCalledOnce();
+  await waitFor(() =>
+    expect(harness.port.requestClose).toHaveBeenCalledOnce(),
+  );
   await waitFor(() =>
     expect(harness.dialog.present).toHaveBeenCalledWith({
       busy: false,
@@ -1105,7 +1109,7 @@ test("uses the current reference layout for the Album context", () => {
     within(albumDesignPreview).queryByLabelText("Guias técnicas da Lâmina"),
   ).not.toBeInTheDocument();
   expect(
-    albumDesignPreview.querySelector(".new-project-fixed-selection"),
+    albumDesignPreview.querySelector(".visual-preview-fixed-selection"),
   ).not.toBeInTheDocument();
   expect(
     within(albumDesignPreview).getByRole("group", {
@@ -1307,6 +1311,465 @@ test("prevents re-entering Album Design Apply while its mutation is pending", as
     await pending.promise;
   });
   await waitFor(() => expect(apply).toHaveBeenCalledOnce());
+});
+
+test("saves the revision committed by a pending Album Design Apply", async () => {
+  const pendingApply = deferredProjection();
+  const appliedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+      revision: projection.state.revision + 1,
+    },
+  };
+  const savedProjection: EditorProjection = {
+    ...appliedProjection,
+    state: {
+      ...appliedProjection.state,
+      dirty: false,
+      savedRevision: appliedProjection.state.revision,
+    },
+  };
+  const projectSessionPort = projectSessionPortWithApply(
+    vi.fn(() => pendingApply.promise),
+  );
+  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+    outcome: {
+      kind: "saved",
+      revision: savedProjection.state.revision,
+    },
+    projection: savedProjection,
+  }));
+  projectSessionPort.save = save;
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
+
+  expect(save).not.toHaveBeenCalled();
+
+  await act(async () => {
+    pendingApply.resolve(appliedProjection);
+    await pendingApply.promise;
+  });
+
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(appliedProjection.state.revision),
+  );
+});
+
+test("cancels a queued Save when Album Design Apply fails and allows a clean retry", async () => {
+  const pendingApply = deferredProjection();
+  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  const appliedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+      revision: projection.state.revision + 1,
+    },
+  };
+  const savedProjection: EditorProjection = {
+    ...appliedProjection,
+    state: {
+      ...appliedProjection.state,
+      dirty: false,
+      savedRevision: appliedProjection.state.revision,
+    },
+  };
+  const apply = vi
+    .fn<ProjectSessionPort["apply"]>()
+    .mockImplementationOnce(() => pendingApply.promise)
+    .mockResolvedValueOnce(appliedProjection);
+  const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
+    outcome: {
+      kind: "saved",
+      revision: savedProjection.state.revision,
+    },
+    projection: savedProjection,
+  }));
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.save = save;
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
+
+  await act(async () => {
+    pendingApply.reject(failure);
+    await pendingApply.promise.catch(() => undefined);
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  expect(save).not.toHaveBeenCalled();
+  await waitFor(() =>
+    expect(albumDesign.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(apply).toHaveBeenCalledTimes(2));
+  fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
+
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(appliedProjection.state.revision),
+  );
+});
+
+test("clears pending Save state after a queued Album Design save fails", async () => {
+  const pendingApply = deferredProjection();
+  const appliedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+      revision: projection.state.revision + 1,
+    },
+  };
+  const savedProjection: EditorProjection = {
+    ...appliedProjection,
+    state: {
+      ...appliedProjection.state,
+      dirty: false,
+      savedRevision: appliedProjection.state.revision,
+    },
+  };
+  const saveFailure = new SaveProjectError(
+    "persisted_baseline_conflict",
+    "O arquivo do Projeto foi alterado fora do MyAlbuns.",
+  );
+  const save = vi
+    .fn<ProjectSessionPort["save"]>()
+    .mockRejectedValueOnce(saveFailure)
+    .mockResolvedValueOnce({
+      outcome: {
+        kind: "saved",
+        revision: savedProjection.state.revision,
+      },
+      projection: savedProjection,
+    });
+  const projectSessionPort = projectSessionPortWithApply(
+    () => pendingApply.promise,
+  );
+  projectSessionPort.save = save;
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
+
+  await act(async () => {
+    pendingApply.resolve(appliedProjection);
+    await pendingApply.promise;
+  });
+
+  await waitFor(() => expect(save).toHaveBeenCalledOnce());
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    saveFailure.message,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled(),
+  );
+  fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
+
+  await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
+  expect(save).toHaveBeenNthCalledWith(
+    2,
+    appliedProjection.state.revision,
+  );
+}, 15_000);
+
+test("revalidates queued Redo after Album Design Apply changes History eligibility", async () => {
+  const pendingApply = deferredProjection();
+  const projectionWithRedo: EditorProjection = {
+    ...projection,
+    state: { ...projection.state, canRedo: true },
+  };
+  const appliedProjection: EditorProjection = {
+    ...projectionWithRedo,
+    state: {
+      ...projectionWithRedo.state,
+      canRedo: false,
+      revision: projectionWithRedo.state.revision + 1,
+    },
+  };
+  const projectSessionPort = projectSessionPortWithApply(
+    () => pendingApply.promise,
+  );
+  const redo = vi.fn<ProjectSessionPort["redo"]>(async () => projection);
+  projectSessionPort.redo = redo;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projectionWithRedo}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+
+  await act(async () => {
+    pendingApply.resolve(appliedProjection);
+    await pendingApply.promise;
+  });
+
+  await waitFor(() =>
+    expect(onProjectionChange).toHaveBeenCalledWith(appliedProjection),
+  );
+  expect(redo).not.toHaveBeenCalled();
+});
+
+test("cancels queued Undo when Album Design Apply fails", async () => {
+  const pendingApply = deferredProjection();
+  const projectSessionPort = projectSessionPortWithApply(
+    () => pendingApply.promise,
+  );
+  const undo = vi.fn<ProjectSessionPort["undo"]>(async () => projection);
+  projectSessionPort.undo = undo;
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+
+  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  await act(async () => {
+    pendingApply.reject(failure);
+    await pendingApply.promise.catch(() => undefined);
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  expect(undo).not.toHaveBeenCalled();
+});
+
+test("waits for a pending Album Design Apply before requesting Project close", async () => {
+  const pendingApply = deferredProjection();
+  const appliedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      dirty: true,
+      revision: projection.state.revision + 1,
+    },
+  };
+  const close = projectWindowHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(() => pendingApply.promise)}
+      projectDialogPort={close.dialog.port}
+      projectWindowPort={close.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+
+  expect(close.port.requestClose).not.toHaveBeenCalled();
+
+  await act(async () => {
+    pendingApply.resolve(appliedProjection);
+    await pendingApply.promise;
+  });
+
+  await waitFor(() => expect(close.port.requestClose).toHaveBeenCalledOnce());
+  expect(close.dialog.present).toHaveBeenCalledWith({
+    busy: false,
+    kind: "projectCloseConfirmation",
+  });
+});
+
+test("cancels a queued Project close after Album Design Apply fails and allows retry", async () => {
+  const pendingApply = deferredProjection();
+  const close = projectWindowHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(() => pendingApply.promise)}
+      projectDialogPort={close.dialog.port}
+      projectWindowPort={close.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+
+  expect(close.port.requestClose).not.toHaveBeenCalled();
+
+  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  await act(async () => {
+    pendingApply.reject(failure);
+    await pendingApply.promise.catch(() => undefined);
+  });
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  expect(close.port.requestClose).not.toHaveBeenCalled();
+  expect(close.dialog.present).not.toHaveBeenCalled();
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled(),
+  );
+
+  fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
+
+  await waitFor(() => expect(close.port.requestClose).toHaveBeenCalledOnce());
+  expect(close.dialog.present).toHaveBeenCalledWith({
+    busy: false,
+    kind: "projectCloseConfirmation",
+  });
+});
+
+test("releases a native close request when pending Album Design Apply fails", async () => {
+  const pendingApply = deferredProjection();
+  const close = projectWindowHarness();
+  const onProjectionChange = vi.fn();
+  close.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(() => pendingApply.promise)}
+      projectDialogPort={close.dialog.port}
+      projectWindowPort={close.port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(close.port.onCloseRequested).toHaveBeenCalledOnce(),
+  );
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(albumDesign.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
+  close.emitCloseRequested();
+
+  expect(close.port.resolveClose).not.toHaveBeenCalled();
+
+  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  await act(async () => {
+    pendingApply.reject(failure);
+    await pendingApply.promise.catch(() => undefined);
+  });
+
+  await waitFor(() =>
+    expect(close.port.resolveClose).toHaveBeenCalledWith("cancel"),
+  );
+  expect(onProjectionChange).toHaveBeenCalledWith(projection);
+  expect(close.dialog.present).not.toHaveBeenCalled();
+
+  close.emitCloseRequested();
+
+  await waitFor(() =>
+    expect(close.dialog.present).toHaveBeenCalledWith({
+      busy: false,
+      kind: "projectCloseConfirmation",
+    }),
+  );
 });
 
 test("maps Borda zero to none and a positive value back to solid", async () => {

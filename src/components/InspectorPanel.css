@@ -313,7 +313,7 @@
   box-shadow: var(--ui-shadow-thumbnail);
 }
 
-.album-design-preview .new-project-proportional-preview-viewport {
+.album-design-preview .visual-preview-viewport {
   padding: var(--ui-space-2);
 }
 

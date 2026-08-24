@@ -1,4 +1,4 @@
-import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
+import type { VisualPreviewGeometry } from "../ui/visualPreview";
 import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
 
 export function createNewProjectPreviewGeometry(

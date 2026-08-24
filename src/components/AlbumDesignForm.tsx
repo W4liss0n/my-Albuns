@@ -14,10 +14,6 @@ import {
 import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
 import { readScopedValue, type VisualScope } from "../application/scopedValues";
 import type {
-  VisualPersonalizationPreview,
-  VisualPreviewGeometry,
-} from "../application/visualPersonalizationPreview";
-import type {
   DisplayUnit,
   DocumentSnapshot,
   MediaCatalogItem,
@@ -25,8 +21,12 @@ import type {
   ProjectedOverlayContent,
   ProjectedVisualDefaults,
 } from "../domain/project";
-import { PersonalizationScopeSurface } from "../global/PersonalizationScopeSurface";
-import { ProportionalPreviewViewport } from "../global/ProportionalPreviewViewport";
+import {
+  PersonalizationScopeSurface,
+  ProportionalPreviewViewport,
+  type VisualPersonalizationPreview,
+  type VisualPreviewGeometry,
+} from "../ui/visualPreview";
 import {
   setAlbumBackground,
   setAlbumFrameBorder,

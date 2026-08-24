@@ -39,6 +39,17 @@ const newProjectSource = readStyles("src/global/NewProjectFlow.tsx");
 const newProjectPreviewSource = readStyles(
   "src/global/NewProjectPreviewPanel.tsx",
 );
+const newProjectPersonalizationSource = readStyles(
+  "src/global/PersonalizationStep.tsx",
+);
+const albumDesignSource = readStyles("src/components/AlbumDesignForm.tsx");
+const sharedVisualPreviewSources = [
+  "src/ui/visualPreview/PersonalizationPreview.tsx",
+  "src/ui/visualPreview/PersonalizationScopeSurface.tsx",
+  "src/ui/visualPreview/ProportionalPreviewViewport.tsx",
+  "src/ui/visualPreview/PersonalizationPreview.css",
+  "src/ui/visualPreview/ProportionalPreviewViewport.css",
+].map((path) => ({ path, source: readStyles(path) }));
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
 const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
 const sheetPreviewSource = readStyles("src/components/SheetPreview.tsx");
@@ -65,8 +76,8 @@ test("centralizes the shared type scale used by every application surface", () =
   expect(applicationStyles.map(({ path }) => path)).toEqual(
     expect.arrayContaining([
       "src/components/DecorativeMediaPicker.css",
-      "src/global/PersonalizationPreview.css",
-      "src/global/ProportionalPreviewViewport.css",
+      "src/ui/visualPreview/PersonalizationPreview.css",
+      "src/ui/visualPreview/ProportionalPreviewViewport.css",
     ]),
   );
   for (const { path, styles } of applicationStyles) {
@@ -210,6 +221,18 @@ test("uses the canonical Sheet guide colors in the New Project legend", () => {
     "var(--new-project-guide-safety)",
   );
   expect(newProjectPreviewStyles).not.toMatch(/#c57c70|#6f9fbe/i);
+});
+
+test("keeps the shared visual preview neutral from New Project chrome", () => {
+  for (const { path, source } of sharedVisualPreviewSources) {
+    expect(source, path).not.toContain("new-project-");
+    expect(source, path).not.toMatch(/from\s+["'][^"']*global\//);
+  }
+  expect(newProjectPersonalizationSource).toContain(
+    'from "../ui/visualPreview"',
+  );
+  expect(albumDesignSource).toContain('from "../ui/visualPreview"');
+  expect(albumDesignSource).not.toMatch(/from\s+["'][^"']*global\//);
 });
 
 test("keeps compact visual-default focus independent from selection", () => {

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
+import { matchProjectCommandShortcut } from "../application/projectCommandCatalog";
 import { isTextEntryTarget } from "./isTextEntryTarget";
-import { matchProjectCommandShortcut } from "./projectCommandCatalog";
 
 interface ProjectCommandShortcutHandlers {
   canRedo: boolean;
@@ -25,7 +25,7 @@ export function useProjectCommandShortcuts({
   useEffect(() => {
     const handleProjectCommand = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
-      const command = matchProjectCommandShortcut(event);
+      const command = matchProjectCommandShortcut(event, "project-window");
       if (command === null) return;
       if (
         (command === "undo" || command === "redo") &&

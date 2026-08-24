@@ -137,6 +137,7 @@ export function ProjectWorkspace({
   const projectClose = useProjectCloseController({
     projectDialogPort,
     projectWindowPort,
+    waitForPendingMutations: runProjectMutation.waitForIdle,
     onProjectionChange,
     onError: reportCloseError,
   });

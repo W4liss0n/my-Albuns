@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 export interface FieldValidationEntry {
   field: string;
@@ -93,7 +99,7 @@ export function FieldValidationAutoTooltip({
   const elementRef = useRef<HTMLSpanElement>(null);
   const open = tooltip.openField === field;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
     const fieldElement = elementRef.current?.parentElement;
     const dismissOutside = (event: PointerEvent) => {

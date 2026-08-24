@@ -8,7 +8,7 @@ test.each([
   { bleedUm: 3_000, safetyUm: 0, expectedGuideCount: 1 },
   { bleedUm: 0, safetyUm: 0, expectedGuideCount: 0 },
 ])(
-  "does not render a zero-valued guide (%o)",
+  "does not render a zero-valued shared preview guide (%o)",
   ({ bleedUm, safetyUm, expectedGuideCount }) => {
     const { container } = render(
       <svg>

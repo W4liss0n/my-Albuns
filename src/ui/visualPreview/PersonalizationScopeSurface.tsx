@@ -1,8 +1,8 @@
-import type { VisualScope } from "../application/scopedValues";
+import type { VisualScope } from "../../application/scopedValues";
 import type {
   VisualPersonalizationPreview,
   VisualPreviewGeometry,
-} from "../application/visualPersonalizationPreview";
+} from "./types";
 import { PersonalizationPreview } from "./PersonalizationPreview";
 
 export interface PersonalizationScopeSurfacePresentation {
@@ -57,14 +57,14 @@ export function PersonalizationScopeSurface({
       {presentation.externalSelection ? (
         <div
           aria-hidden="true"
-          className={`new-project-fixed-selection new-project-fixed-selection--${personalization.fixedScope}`}
+          className={`visual-preview-fixed-selection visual-preview-fixed-selection--${personalization.fixedScope}`}
         />
       ) : null}
       <div
         aria-label={presentation.scopeControlsLabel}
-        className={`new-project-scope-controls${
+        className={`visual-preview-scope-controls${
           includeBothSidesControl
-            ? " new-project-scope-controls--with-both"
+            ? " visual-preview-scope-controls--with-both"
             : ""
         }`}
         role="group"

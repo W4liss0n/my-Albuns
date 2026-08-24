@@ -17,7 +17,7 @@ import {
   type ScopedValueRead,
   type VisualScope,
 } from "../../application/scopedValues";
-import type { VisualPersonalizationPreview } from "../../application/visualPersonalizationPreview";
+import type { VisualPersonalizationPreview } from "../../ui/visualPreview";
 
 export type {
   NewProjectCreationConfiguration,

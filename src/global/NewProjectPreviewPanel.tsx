@@ -4,13 +4,13 @@ import {
   displayUnitLabel,
   formatMicrometers,
 } from "../application/physicalMeasurements";
-import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
-import { SHEET_GUIDE_STYLE } from "../ui/sheetGuideGeometry";
-import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
 import {
   ProportionalPreviewViewport,
   type PreviewOutsideSurfaceAction,
-} from "./ProportionalPreviewViewport";
+  type VisualPreviewGeometry,
+} from "../ui/visualPreview";
+import { SHEET_GUIDE_STYLE } from "../ui/sheetGuideGeometry";
+import type { NewProjectDimensionsDraft } from "./application/newProjectDimensions";
 import { createNewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 
 import "./NewProjectPreviewPanel.css";

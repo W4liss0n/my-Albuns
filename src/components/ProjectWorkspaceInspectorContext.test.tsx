@@ -62,7 +62,10 @@ test("derives Album, Sheet and Frame Inspector contexts from the editing state",
       projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       projection={representativeProjection}
-      runProjectMutation={async () => ({ status: "obsolete" })}
+      runProjectMutation={{
+        run: async () => ({ status: "obsolete" }),
+        waitForIdle: async () => null,
+      }}
       validateAlbumInformation={async () => ({
         errors: [],
         impact: {

@@ -8,6 +8,7 @@ import {
 export type ApplicationMenuCommand =
   | {
       availability: "implemented";
+      context?: string;
       disabled?: boolean;
       id: string;
       label: string;
@@ -17,6 +18,7 @@ export type ApplicationMenuCommand =
     }
   | {
       availability: "placeholder";
+      context?: string;
       feature: string;
       id: string;
       label: string;

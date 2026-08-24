@@ -1,4 +1,4 @@
-.new-project-sheet {
+.visual-preview-sheet {
   display: block;
   width: 100%;
   height: 100%;
@@ -9,18 +9,18 @@
   box-shadow: 0 10px 26px rgb(60 54 44 / 16%);
 }
 
-.new-project-scope-controls {
+.visual-preview-scope-controls {
   position: absolute;
   inset: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
 
-.new-project-scope-controls--with-both {
+.visual-preview-scope-controls--with-both {
   grid-template-columns: minmax(0, 1fr) 15% minmax(0, 1fr);
 }
 
-.new-project-fixed-selection {
+.visual-preview-fixed-selection {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -29,22 +29,22 @@
   pointer-events: none;
 }
 
-.new-project-fixed-selection--both {
+.visual-preview-fixed-selection--both {
   right: 0;
   left: 0;
 }
 
-.new-project-fixed-selection--left {
+.visual-preview-fixed-selection--left {
   left: 0;
   width: 50%;
 }
 
-.new-project-fixed-selection--right {
+.visual-preview-fixed-selection--right {
   right: 0;
   width: 50%;
 }
 
-.new-project-scope-controls button {
+.visual-preview-scope-controls button {
   min-width: 0;
   padding: 0;
   border: 0;
@@ -52,6 +52,6 @@
   background: transparent;
 }
 
-.new-project-scope-controls button:focus-visible {
+.visual-preview-scope-controls button:focus-visible {
   outline: 0;
 }

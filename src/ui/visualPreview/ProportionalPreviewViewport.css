@@ -1,4 +1,4 @@
-.new-project-proportional-preview-viewport {
+.visual-preview-viewport {
   position: relative;
   display: grid;
   width: 100%;
@@ -11,7 +11,7 @@
   place-items: center;
 }
 
-.new-project-proportional-preview-outside-action {
+.visual-preview-outside-action {
   position: absolute;
   z-index: 0;
   inset: 0;
@@ -22,7 +22,7 @@
   cursor: default;
 }
 
-.new-project-proportional-preview-surface {
+.visual-preview-surface {
   position: relative;
   z-index: 1;
   min-width: 0;

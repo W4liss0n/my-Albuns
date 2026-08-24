@@ -510,8 +510,8 @@ test("hover fills only an unselected candidate without changing the fixed scope"
   expect(
     screen.queryByLabelText("Pré-seleção do lado esquerdo"),
   ).not.toBeInTheDocument();
-  expect(document.querySelector(".new-project-fixed-selection")).toHaveClass(
-    "new-project-fixed-selection--both",
+  expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
+    "visual-preview-fixed-selection--both",
   );
   expect(screen.getByLabelText("Frame demonstrativo esquerdo 1")).toHaveAttribute(
     "fill-opacity",
@@ -659,11 +659,11 @@ test("hover tint keeps the fixed selection and Frame contrast independent", asyn
 
   expect(right).toHaveAttribute("aria-pressed", "true");
   const fixedSelection = document.querySelector(
-    ".new-project-fixed-selection",
+    ".visual-preview-fixed-selection",
   );
   expect(fixedSelection).toHaveAttribute("aria-hidden", "true");
   expect(fixedSelection).toHaveClass(
-    "new-project-fixed-selection--right",
+    "visual-preview-fixed-selection--right",
   );
   expect(screen.getByLabelText("Frame demonstrativo direito 1")).toHaveAttribute(
     "fill-opacity",
@@ -720,8 +720,8 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
     "stroke",
     "#73A9CE",
   );
-  expect(document.querySelector(".new-project-fixed-selection")).toHaveClass(
-    "new-project-fixed-selection--both",
+  expect(document.querySelector(".visual-preview-fixed-selection")).toHaveClass(
+    "visual-preview-fixed-selection--both",
   );
 });
 

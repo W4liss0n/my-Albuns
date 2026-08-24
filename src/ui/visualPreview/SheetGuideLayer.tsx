@@ -1,8 +1,8 @@
 import {
   createSheetGuideGeometry,
   SHEET_GUIDE_STYLE,
-} from "../ui/sheetGuideGeometry";
-import type { VisualPreviewGeometry } from "../application/visualPersonalizationPreview";
+} from "../sheetGuideGeometry";
+import type { VisualPreviewGeometry } from "./types";
 
 interface SheetGuideLayerProps {
   geometry: VisualPreviewGeometry;

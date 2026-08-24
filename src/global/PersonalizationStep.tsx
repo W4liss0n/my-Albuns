@@ -28,8 +28,8 @@ import {
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
 import { ActionButton, AppIcon, FailureNotice } from "../ui";
+import { PersonalizationScopeSurface } from "../ui/visualPreview";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
-import { PersonalizationScopeSurface } from "./PersonalizationScopeSurface";
 
 interface PersonalizationStepProps {
   draft: NewProjectDimensionsDraft;

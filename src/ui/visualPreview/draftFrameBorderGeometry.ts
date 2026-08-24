@@ -1,3 +1,4 @@
+/** Geometry used by the shared visual-personalization renderer. */
 export interface DraftFrameRect {
   height: number;
   width: number;

@@ -98,12 +98,12 @@ export function ProportionalPreviewViewport({
   };
 
   return (
-    <div className="new-project-proportional-preview-viewport" ref={viewportRef}>
+    <div className="visual-preview-viewport" ref={viewportRef}>
       {outsideSurfaceAction ? (
         <button
           aria-label={outsideSurfaceAction.label}
           aria-pressed={outsideSurfaceAction.pressed}
-          className="new-project-proportional-preview-outside-action"
+          className="visual-preview-outside-action"
           onBlur={() => outsideSurfaceAction.onFocusChange(false)}
           onClick={(event) => {
             event.stopPropagation();
@@ -119,7 +119,7 @@ export function ProportionalPreviewViewport({
       ) : null}
       <div
         aria-label={label}
-        className="new-project-proportional-preview-surface"
+        className="visual-preview-surface"
         onClick={(event) => event.stopPropagation()}
         style={surfaceStyle}
       >

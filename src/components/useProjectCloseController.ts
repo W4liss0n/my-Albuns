@@ -10,6 +10,7 @@ import {
   type ProjectWindowPort,
 } from "../application/projectPorts";
 import type { EditorProjection } from "../domain/project";
+import type { ProjectMutationOutcome } from "./useProjectMutationRunner";
 
 type ClosePhase =
   | "idle"
@@ -22,6 +23,7 @@ type ClosePhase =
 interface ProjectCloseControllerOptions {
   projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
+  waitForPendingMutations(): Promise<ProjectMutationOutcome | null>;
   onProjectionChange(projection: EditorProjection): void;
   onError(message: string): void;
 }
@@ -33,9 +35,17 @@ function closeErrorMessage(error: unknown) {
   return "Não foi possível concluir o fechamento do Projeto.";
 }
 
+function hasClosePhase(
+  phaseRef: { readonly current: ClosePhase },
+  expected: ClosePhase,
+) {
+  return phaseRef.current === expected;
+}
+
 export function useProjectCloseController({
   projectDialogPort,
   projectWindowPort,
+  waitForPendingMutations,
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
@@ -64,6 +74,15 @@ export function useProjectCloseController({
     if (phaseRef.current !== "idle") return;
     transition("requesting");
     try {
+      const pendingOutcome = await waitForPendingMutations();
+      if (!hasClosePhase(phaseRef, "requesting")) return;
+      if (
+        pendingOutcome?.status === "failed" ||
+        pendingOutcome?.status === "obsolete"
+      ) {
+        transition("idle");
+        return;
+      }
       const outcome = await projectWindowPort.requestClose();
       if (outcome.kind === "confirmationRequired") {
         presentConfirmation();
@@ -74,7 +93,13 @@ export function useProjectCloseController({
       transition("idle");
       onError(closeErrorMessage(error));
     }
-  }, [onError, presentConfirmation, projectWindowPort, transition]);
+  }, [
+    onError,
+    presentConfirmation,
+    projectWindowPort,
+    transition,
+    waitForPendingMutations,
+  ]);
 
   const resolveClose = useCallback(
     async (choice: ProjectCloseChoice) => {
@@ -154,15 +179,37 @@ export function useProjectCloseController({
   useEffect(() => {
     let active = true;
     let unsubscribe: (() => void) | undefined;
+    const releaseNativeClose = async () => {
+      try {
+        const resolution = await projectWindowPort.resolveClose("cancel");
+        if (!active || !hasClosePhase(phaseRef, "requesting")) return;
+        if (resolution.kind === "cancelled") {
+          onProjectionChange(resolution.projection);
+          transition("idle");
+        } else {
+          transition("terminal");
+        }
+      } catch (error: unknown) {
+        if (!active || !hasClosePhase(phaseRef, "requesting")) return;
+        transition("idle");
+        onError(closeErrorMessage(error));
+      }
+    };
     void projectWindowPort
       .onCloseRequested(() => {
-        if (
-          active &&
-          phaseRef.current !== "terminal" &&
-          phaseRef.current !== "resolving"
-        ) {
+        if (!active || phaseRef.current !== "idle") return;
+        transition("requesting");
+        void waitForPendingMutations().then((pendingOutcome) => {
+          if (!active || !hasClosePhase(phaseRef, "requesting")) return;
+          if (
+            pendingOutcome?.status === "failed" ||
+            pendingOutcome?.status === "obsolete"
+          ) {
+            void releaseNativeClose();
+            return;
+          }
           presentConfirmation();
-        }
+        });
       })
       .then((registeredUnsubscribe) => {
         if (active) unsubscribe = registeredUnsubscribe;
@@ -175,7 +222,14 @@ export function useProjectCloseController({
       active = false;
       unsubscribe?.();
     };
-  }, [onError, presentConfirmation, projectWindowPort]);
+  }, [
+    onError,
+    onProjectionChange,
+    presentConfirmation,
+    projectWindowPort,
+    transition,
+    waitForPendingMutations,
+  ]);
 
   return {
     interactionBlocked: phase !== "idle",

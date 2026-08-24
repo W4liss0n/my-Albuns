@@ -39,12 +39,14 @@ beforeEach(() => {
 test("routes editor changes through the shared Project mutation runner", async () => {
   const port = projectSessionPort();
   const apply = vi.spyOn(port, "apply");
-  const runProjectMutation = vi.fn<ProjectMutationRunner>(
-    async (operation) => ({
-      status: "completed",
-      projection: await operation(port),
-    }),
-  );
+  const run = vi.fn<ProjectMutationRunner["run"]>(async (operation) => ({
+    status: "completed",
+    projection: await operation(port, null),
+  }));
+  const runProjectMutation: ProjectMutationRunner = {
+    run,
+    waitForIdle: async () => null,
+  };
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
@@ -62,7 +64,7 @@ test("routes editor changes through the shared Project mutation runner", async (
     });
   });
 
-  expect(runProjectMutation).toHaveBeenCalledOnce();
+  expect(run).toHaveBeenCalledOnce();
   expect(apply).toHaveBeenCalledWith({
     kind: "transformPhoto",
     frameId: "frame-001",
@@ -76,7 +78,10 @@ test("enters the centered Sheet Edit Mode with Enter and returns to normal mode 
   const view = renderHook(() =>
     useProjectEditorController({
       projection: representativeProjection,
-      runProjectMutation: vi.fn(),
+      runProjectMutation: {
+        run: vi.fn(),
+        waitForIdle: async () => null,
+      },
       onProjectionChange: vi.fn(),
     }),
   );
@@ -113,7 +118,10 @@ test("targets the edited Sheet when leaving Sheet Edit Mode", () => {
   const view = renderHook(() =>
     useProjectEditorController({
       projection,
-      runProjectMutation: vi.fn(),
+      runProjectMutation: {
+        run: vi.fn(),
+        waitForIdle: async () => null,
+      },
       onProjectionChange: vi.fn(),
     }),
   );
