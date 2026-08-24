@@ -1,0 +1,112 @@
+{
+    "schemaVersion":  1,
+    "gate":  "issue-14-opening-lock",
+    "collectedAtUtc":  "2026-08-24T18:44:03.9012904Z",
+    "gitCommit":  "8a688fa573476a6038af1e32cdfe370de378a5d4",
+    "sourceInputsDirty":  false,
+    "platform":  {
+                     "operatingSystem":  "Microsoft Windows NT 10.0.26200.0",
+                     "architecture":  "X64"
+                 },
+    "checks":  [
+                   {
+                       "name":  "debug-product-and-public-core-build",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-loopback-unc-and-mapped-drive",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "single-primary-forwards-second-native-entry",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "multi-file-batches-open-distinct-and-focus-duplicates",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "external-copy-has-independent-identity-lock-and-host",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "unc-and-mapped-aliases-reuse-exact-live-session",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "live-owner-uses-pid-and-creation-time",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "real-project-file-lock-is-final-protection",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "forced-death-preserves-document-and-orphan-provenance",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "orphan-recovers-only-through-normal-open-flow",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "normal-close-releases-identity-and-file-locks",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "later-explorer-entry-is-forwarded-to-existing-global",
+                       "passed":  true
+                   },
+                   {
+                       "name":  "same-different-indeterminate-fails-closed",
+                       "passed":  true
+                   }
+               ],
+    "evidence":  {
+                     "activation":  {
+                                        "firstEntry":  {
+                                                           "processId":  7108,
+                                                           "creationTime":  134320705328901632
+                                                       },
+                                        "secondEntry":  {
+                                                            "processId":  35740,
+                                                            "creationTime":  134320705332012553
+                                                        },
+                                        "forwardedClientProcessId":  35740,
+                                        "initialBatchCount":  2,
+                                        "totalBatchCount":  5,
+                                        "totalFocusedAliases":  4,
+                                        "foregroundPolicyFallbacks":  4
+                                    },
+                     "identity":  {
+                                      "sameAliasOutcome":  "focusExisting",
+                                      "differentCopyOutcome":  "newIdentity",
+                                      "indeterminateOutcome":  "identityIndeterminate",
+                                      "originalProjectId":  "f8d2e5c4-fc15-432a-acfa-3d90fb03f528",
+                                      "copiedProjectId":  "53286c71-3a37-4101-9d26-c949ba1cd0b9",
+                                      "originalHostProcessId":  31820,
+                                      "copiedHostProcessId":  9944
+                                  },
+                     "lock":  {
+                                  "liveOwner":  {
+                                                    "processId":  31820,
+                                                    "creationTime":  134320705354470281
+                                                },
+                                  "bypassedIdentityNamespaceOutcome":  "projectInUse",
+                                  "orphanOwner":  {
+                                                      "processId":  31820,
+                                                      "creationTime":  134320705354470281
+                                                  },
+                                  "recoveredOwner":  {
+                                                         "processId":  12016,
+                                                         "creationTime":  134320705941767561
+                                                     },
+                                  "normalReopenProcessId":  2212,
+                                  "normalReleaseProbeOutcome":  "opened",
+                                  "forcedDeathPreservedDocument":  true,
+                                  "normalCloseReleasedLocks":  true,
+                                  "originalSha256":  "a4c9e9cf63df162d7b070449ce3721565fdf0fda634eaec26724fdbe148c8c3a"
+                              },
+                     "cleanupCompleted":  true
+                 }
+}
