@@ -5,6 +5,8 @@ import progressDialogWindowCapability from "../../src-tauri/capabilities/dialog-
 import projectDialogWindowCapability from "../../src-tauri/capabilities/project-dialog.json?raw";
 import projectWindowCapability from "../../src-tauri/capabilities/default.json?raw";
 import globalWindowPermission from "../../src-tauri/permissions/global-window.json?raw";
+import messageDialogWindowPermission from "../../src-tauri/permissions/message-dialog-window.json?raw";
+import ownedDialogWindowPermission from "../../src-tauri/permissions/owned-dialog-window.json?raw";
 import projectWindowPermission from "../../src-tauri/permissions/project-window.json?raw";
 import projectDialogWindowPermission from "../../src-tauri/permissions/project-dialog-window.json?raw";
 
@@ -16,6 +18,8 @@ const sourceFiles = import.meta.glob("../**/*.{ts,tsx}", {
 
 const tauriCommandSources = {
   shared: ["./tauriLogger.ts"],
+  ownedDialog: ["./tauriWindowControls.ts"],
+  messageDialog: ["./tauriOwnedDialogControls.ts"],
   project: [
     "./tauriProjectDialogPort.ts",
     "./tauriProjectPorts.ts",
@@ -125,6 +129,8 @@ test("assigns every Tauri command adapter to an explicit surface", () => {
     .sort();
   const assignedSources = [
     ...tauriCommandSources.shared,
+    ...tauriCommandSources.ownedDialog,
+    ...tauriCommandSources.messageDialog,
     ...tauriCommandSources.project,
     ...tauriCommandSources.projectDialog,
     ...tauriCommandSources.global,
@@ -177,7 +183,10 @@ test("keeps the global-window capability isolated from project commands", () => 
 
 test("limits the Project dialog to state hydration and semantic actions", () => {
   const invokedCommands = extractInvokedCommands(
-    tauriCommandSources.projectDialog,
+    [
+      ...tauriCommandSources.projectDialog,
+      ...tauriCommandSources.ownedDialog,
+    ],
   );
   const { capability, allowedCommands } = parseSurfaceContract(
     projectDialogWindowCapability,
@@ -198,28 +207,50 @@ test("limits the Project dialog to state hydration and semantic actions", () => 
 });
 
 test("gives each standard dialog only the abilities exposed by its titlebar", () => {
-  const messageCapability = JSON.parse(dialogWindowCapability) as {
-    windows: string[];
-    permissions: string[];
-  };
-  const progressCapability = JSON.parse(progressDialogWindowCapability) as {
-    windows: string[];
-    permissions: string[];
-  };
+  const messageInvokedCommands = extractInvokedCommands(
+    [
+      ...tauriCommandSources.ownedDialog,
+      ...tauriCommandSources.messageDialog,
+    ],
+  );
+  const progressInvokedCommands = extractInvokedCommands(
+    tauriCommandSources.ownedDialog,
+  );
+  const {
+    capability: messageCapability,
+    allowedCommands: messageCommands,
+  } = parseSurfaceContract(
+    dialogWindowCapability,
+    messageDialogWindowPermission,
+  );
+  const {
+    capability: progressCapability,
+    allowedCommands: progressCommands,
+  } = parseSurfaceContract(
+    progressDialogWindowCapability,
+    ownedDialogWindowPermission,
+  );
 
   expect(messageCapability.windows).toEqual(["dialog-project-failure"]);
   expect(messageCapability.permissions).toEqual([
-    "core:window:allow-close",
+    "message-dialog-window-commands",
     "core:window:allow-center",
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
   ]);
   expect(progressCapability.windows).toEqual(["dialog-opening-progress"]);
   expect(progressCapability.permissions).toEqual([
+    "owned-dialog-window-commands",
     "core:window:allow-center",
     "core:window:allow-set-size",
     "core:window:allow-start-dragging",
   ]);
+  expect([...messageCommands].sort()).toEqual(
+    [...messageInvokedCommands].sort(),
+  );
+  expect([...progressCommands].sort()).toEqual(
+    [...progressInvokedCommands].sort(),
+  );
 });
 
 test("uses only the minimal Tauri core, event, and window bridges", () => {

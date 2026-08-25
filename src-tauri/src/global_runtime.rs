@@ -866,6 +866,8 @@ pub(crate) fn run(direct_project: Option<PathBuf>) -> Result<(), Box<dyn std::er
         })
         .invoke_handler(tauri::generate_handler![
             complete_graphics_gate,
+            crate::native_dialog_window::dismiss_owned_dialog,
+            crate::native_dialog_window::owned_window_content_ready,
             create_project,
             open_project,
             recent_projects,

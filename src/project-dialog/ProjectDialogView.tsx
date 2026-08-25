@@ -34,11 +34,27 @@ export function ProjectDialogView({
           description="As alterações serão aplicadas juntas e poderão ser desfeitas em uma única ação."
           title="Aplicar alterações no Álbum?"
         >
-          {state.details.map((detail) => (
-            <div className="ui-standard-message__detail" key={detail}>
-              {detail}
-            </div>
-          ))}
+          <dl className="album-information-change-list">
+            {state.details.map((detail) => {
+              const separator = detail.indexOf(":");
+              const label =
+                separator >= 0 ? detail.slice(0, separator) : "Alteração";
+              const value =
+                separator >= 0
+                  ? detail.slice(separator + 1).trim()
+                  : detail;
+              return (
+                <div className="album-information-change" key={detail}>
+                  <dt className="album-information-change__label">
+                    {label}
+                  </dt>
+                  <dd className="album-information-change__value">
+                    {value}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
         </ConfirmationDialog>
       );
 
@@ -62,9 +78,7 @@ export function ProjectDialogView({
             onClick: () => onAction("discardAndClose"),
           }}
           title="Salvar alterações antes de fechar?"
-        >
-          {state.busy ? <p aria-live="polite">Concluindo…</p> : null}
-        </ConfirmationDialog>
+        />
       );
 
     case "projectCloseFailure":
@@ -76,6 +90,19 @@ export function ProjectDialogView({
             onClick: () => onAction("dismissProjectCloseFailure"),
           }}
           title="Não foi possível fechar o Projeto"
+          tone="error"
+        />
+      );
+
+    case "projectOperationFailure":
+      return (
+        <MessageDialog
+          description={state.message}
+          secondaryAction={{
+            label: "Fechar",
+            onClick: () => onAction("dismissProjectOperationFailure"),
+          }}
+          title="A operação não foi concluída"
           tone="error"
         />
       );
@@ -118,6 +145,19 @@ export function ProjectDialogView({
               : "Exportação não concluída"
           }
           tone="error"
+        />
+      );
+
+    case "exportSuccess":
+      return (
+        <MessageDialog
+          description={state.message}
+          secondaryAction={{
+            label: "Fechar",
+            onClick: () => onAction("dismissExport"),
+          }}
+          title="Exportação concluída"
+          tone="success"
         />
       );
   }

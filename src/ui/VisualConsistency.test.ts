@@ -52,6 +52,7 @@ const sharedVisualPreviewSources = [
 ].map((path) => ({ path, source: readStyles(path) }));
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
 const projectWorkspaceSource = readStyles("src/components/ProjectWorkspace.tsx");
+const inlineNoticeSource = readStyles("src/ui/InlineNotice.tsx");
 const sheetPreviewSource = readStyles("src/components/SheetPreview.tsx");
 const canvasRenderNodesSource = readStyles(
   "src/components/albumCanvasRenderNodes.ts",
@@ -139,12 +140,12 @@ test("shares application menus and empty states across surfaces", () => {
   expect(projectWorkspaceSource).toContain("<ApplicationMenuBar");
 });
 
-test("shares floating notification chrome", () => {
-  expect(sharedStyles).toMatch(/\.ui-inline-notice--floating\s*\{/);
-  expect(projectWorkspaceSource).toContain("<InlineNotice");
-  expect(projectWorkspaceSource).toContain("floating");
-  expect(exportSource).toContain("floating");
-  expect(exportStyles).not.toContain("position: fixed");
+test("keeps operation feedback out of floating in-window notices", () => {
+  expect(sharedStyles).not.toMatch(/\.ui-inline-notice--floating\s*\{/);
+  expect(inlineNoticeSource).not.toContain("floating");
+  expect(projectWorkspaceSource).not.toContain("operation-toast");
+  expect(exportSource).not.toContain("floating");
+  expect(exportStyles).not.toContain("export-preview-notification");
 });
 
 test("keeps media hover and selection on the straight image border", () => {

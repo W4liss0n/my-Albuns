@@ -720,6 +720,10 @@ test("offers the three close choices for a native request and Cancel keeps the P
     expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
     expect(harness.dialog.dismiss).toHaveBeenCalled();
   });
+  expect(harness.dialog.present).not.toHaveBeenCalledWith({
+    busy: true,
+    kind: "projectCloseConfirmation",
+  });
   expect(
     getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
@@ -1560,6 +1564,7 @@ test("saves the revision committed by a pending Album Design Apply", async () =>
 
 test("cancels a queued Save when Album Design Apply fails and allows a clean retry", async () => {
   const pendingApply = deferredProjection();
+  const dialog = projectDialogHarness();
   const failure = new Error("O Design do Álbum não pôde ser aplicado.");
   const appliedProjection: EditorProjection = {
     ...projection,
@@ -1595,6 +1600,7 @@ test("cancels a queued Save when Album Design Apply fails and allows a clean ret
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={() => undefined}
     />,
@@ -1616,10 +1622,21 @@ test("cancels a queued Save when Album Design Apply fails and allows a clean ret
     await pendingApply.promise.catch(() => undefined);
   });
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: failure.message,
+    }),
+  );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(save).not.toHaveBeenCalled();
   await waitFor(() =>
     expect(albumDesign.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  const dismissCount = dialog.dismiss.mock.calls.length;
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() =>
+    expect(dialog.dismiss).toHaveBeenCalledTimes(dismissCount + 1),
   );
 
   fireEvent.click(albumDesign.getByRole("button", { name: "Aplicar" }));
@@ -1633,6 +1650,7 @@ test("cancels a queued Save when Album Design Apply fails and allows a clean ret
 
 test("clears pending Save state after a queued Album Design save fails", async () => {
   const pendingApply = deferredProjection();
+  const dialog = projectDialogHarness();
   const appliedProjection: EditorProjection = {
     ...projection,
     state: {
@@ -1672,6 +1690,7 @@ test("clears pending Save state after a queued Album Design save fails", async (
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={() => undefined}
     />,
@@ -1694,11 +1713,20 @@ test("clears pending Save state after a queued Album Design save fails", async (
   });
 
   await waitFor(() => expect(save).toHaveBeenCalledOnce());
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    saveFailure.message,
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: saveFailure.message,
+    }),
   );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled(),
+  );
+  const dismissCount = dialog.dismiss.mock.calls.length;
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() =>
+    expect(dialog.dismiss).toHaveBeenCalledTimes(dismissCount + 1),
   );
   fireEvent.click(getApplicationCommand("Arquivo", "Salvar"));
 
@@ -1763,6 +1791,7 @@ test("revalidates queued Redo after Album Design Apply changes History eligibili
 
 test("cancels queued Undo when Album Design Apply fails", async () => {
   const pendingApply = deferredProjection();
+  const dialog = projectDialogHarness();
   const projectSessionPort = projectSessionPortWithApply(
     () => pendingApply.promise,
   );
@@ -1773,6 +1802,7 @@ test("cancels queued Undo when Album Design Apply fails", async () => {
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={() => undefined}
     />,
@@ -1795,7 +1825,13 @@ test("cancels queued Undo when Album Design Apply fails", async () => {
     await pendingApply.promise.catch(() => undefined);
   });
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: failure.message,
+    }),
+  );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(undo).not.toHaveBeenCalled();
 });
 
@@ -1881,17 +1917,27 @@ test("cancels a queued Project close after Album Design Apply fails and allows r
     await pendingApply.promise.catch(() => undefined);
   });
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(failure.message);
+  await waitFor(() =>
+    expect(close.dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: failure.message,
+    }),
+  );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(close.port.requestClose).not.toHaveBeenCalled();
-  expect(close.dialog.present).not.toHaveBeenCalled();
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled(),
+  );
+  const dismissCount = close.dialog.dismiss.mock.calls.length;
+  act(() => close.dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() =>
+    expect(close.dialog.dismiss).toHaveBeenCalledTimes(dismissCount + 1),
   );
 
   fireEvent.click(getApplicationCommand("Arquivo", "Fechar Projeto"));
 
   await waitFor(() => expect(close.port.requestClose).toHaveBeenCalledOnce());
-  expect(close.dialog.present).toHaveBeenCalledWith({
+  expect(close.dialog.present).toHaveBeenLastCalledWith({
     busy: false,
     kind: "projectCloseConfirmation",
   });
@@ -1943,7 +1989,15 @@ test("releases a native close request when pending Album Design Apply fails", as
     expect(close.port.resolveClose).toHaveBeenCalledWith("cancel"),
   );
   expect(onProjectionChange).toHaveBeenCalledWith(projection);
-  expect(close.dialog.present).not.toHaveBeenCalled();
+  expect(close.dialog.present).toHaveBeenCalledWith({
+    kind: "projectOperationFailure",
+    message: failure.message,
+  });
+  const dismissCount = close.dialog.dismiss.mock.calls.length;
+  act(() => close.dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() =>
+    expect(close.dialog.dismiss).toHaveBeenCalledTimes(dismissCount + 1),
+  );
 
   close.emitCloseRequested();
 
@@ -2390,6 +2444,98 @@ test("saves the visible revision and applies the authoritative saved projection"
   expect(getApplicationCommand("Editar", "Desfazer")).toBeEnabled();
 });
 
+test("saves with Ctrl+S without transient feedback or flashing unrelated controls", async () => {
+  const savedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      savedRevision: projection.state.revision,
+      dirty: false,
+    },
+  };
+  let finishSave!: (
+    result: Awaited<ReturnType<ProjectSessionPort["save"]>>,
+  ) => void;
+  const pendingSave = new Promise<
+    Awaited<ReturnType<ProjectSessionPort["save"]>>
+  >((resolve) => {
+    finishSave = resolve;
+  });
+  const save = vi.fn<ProjectSessionPort["save"]>(() => pendingSave);
+  const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  projectSessionPort.save = save;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  const exportButton = screen.getByRole("button", {
+    name: "Exportar Lâmina",
+  });
+  await act(async () => {
+    fireEvent.keyDown(window, { ctrlKey: true, key: "s" });
+    await Promise.resolve();
+  });
+
+  expect(save).toHaveBeenCalledWith(projection.state.revision);
+  expect(screen.queryByText("Salvando")).not.toBeInTheDocument();
+  expect(screen.queryByText("Aguarde…")).not.toBeInTheDocument();
+  expect(exportButton).toBeEnabled();
+
+  await act(async () => {
+    finishSave({
+      outcome: {
+        kind: "saved",
+        revision: savedProjection.state.revision,
+      },
+      projection: savedProjection,
+    });
+    await pendingSave;
+  });
+  expect(onProjectionChange).toHaveBeenCalledWith(savedProjection);
+});
+
+test("keeps unrelated controls stable while a History command is pending", async () => {
+  const pendingUndo = deferredProjection();
+  const projectSessionPort = projectSessionPortWithApply(async () => projection);
+  const undo = vi.fn<ProjectSessionPort["undo"]>(() => pendingUndo.promise);
+  projectSessionPort.undo = undo;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  const exportButton = screen.getByRole("button", {
+    name: "Exportar Lâmina",
+  });
+  await act(async () => {
+    fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+    await Promise.resolve();
+  });
+
+  expect(undo).toHaveBeenCalledOnce();
+  expect(screen.queryByText("Desfazendo")).not.toBeInTheDocument();
+  expect(exportButton).toBeEnabled();
+
+  await act(async () => {
+    pendingUndo.resolve(projection);
+    await pendingUndo.promise;
+  });
+  expect(onProjectionChange).toHaveBeenCalledWith(projection);
+});
+
 test("preserves both unapplied Album drafts when Save returns an equivalent projection", async () => {
   const savedProjection: EditorProjection = {
     ...projection,
@@ -2737,6 +2883,7 @@ test("uses Ctrl+S for Project save and prevents the browser default", async () =
 });
 
 test("shows the localized Project save failure", async () => {
+  const dialog = projectDialogHarness();
   const projectSessionPort = projectSessionPortWithApply(
     async () => projection,
   );
@@ -2750,6 +2897,7 @@ test("shows the localized Project save failure", async () => {
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPort}
       onProjectionChange={() => undefined}
     />,
@@ -2761,9 +2909,14 @@ test("shows the localized Project save failure", async () => {
     await Promise.resolve();
   });
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message:
+        "O arquivo do Projeto foi alterado fora do MyAlbuns. O Salvamento não substituiu essas alterações.",
+    }),
   );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 
 test("renders each Grade item from its own composed sheet", () => {
@@ -3333,12 +3486,14 @@ test("discards a live Canvas value when its commit fails", async () => {
   const apply = vi.fn(async () => {
     throw new Error("Falha simulada");
   });
+  const dialog = projectDialogHarness();
   useEditorView.setState({ selectedFrameId: "frame-001" });
 
   render(
     <ProjectWorkspace
       exportPort={exportPort}
       projection={projection}
+      projectDialogPort={dialog.port}
       projectSessionPort={projectSessionPortWithApply(apply)}
       onProjectionChange={() => undefined}
     />,
@@ -3367,9 +3522,13 @@ test("discards a live Canvas value when its commit fails", async () => {
   });
 
   expect(accepted).toBe(false);
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Falha simulada",
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: "Falha simulada",
+    }),
   );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(slider).toHaveValue("100");
 });
 

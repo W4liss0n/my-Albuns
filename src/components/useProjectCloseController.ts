@@ -105,9 +105,11 @@ export function useProjectCloseController({
     async (choice: ProjectCloseChoice) => {
       if (phaseRef.current !== "deciding") return;
       transition("resolving");
-      void projectDialogPort
-        .present({ busy: true, kind: "projectCloseConfirmation" })
-        .catch((error: unknown) => onError(closeErrorMessage(error)));
+      if (choice !== "cancel") {
+        void projectDialogPort
+          .present({ busy: true, kind: "projectCloseConfirmation" })
+          .catch((error: unknown) => onError(closeErrorMessage(error)));
+      }
 
       try {
         const resolution = await projectWindowPort.resolveClose(choice);

@@ -480,52 +480,6 @@ kbd {
   pointer-events: none;
 }
 
-.operation-toast.ui-inline-notice {
-  width: min(410px, calc(100vw - 36px));
-  min-height: 58px;
-}
-
-.operation-toast > div {
-  display: grid;
-  align-items: center;
-  grid-template-columns: auto 1fr auto;
-  gap: var(--ui-space-2);
-}
-
-.operation-toast__message {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.operation-toast strong {
-  font-size: var(--ui-font-size-support);
-}
-
-.operation-toast span {
-  overflow: hidden;
-  color: inherit;
-  font-size: var(--ui-font-size-micro);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  opacity: 0.78;
-}
-
-.operation-toast__close.ui-action-button {
-  width: var(--ui-compact-control-height);
-  padding: 0;
-  color: inherit;
-}
-
-.toast-spinner {
-  width: 17px;
-  height: 17px;
-  border: 2px solid rgb(63 121 89 / 18%);
-  border-top-color: var(--ui-success);
-  border-radius: 50%;
-  animation: loading-spin 700ms linear infinite;
-}
-
 @media (max-width: 1180px) {
   .app-menu button {
     padding: 0 var(--ui-space-2);

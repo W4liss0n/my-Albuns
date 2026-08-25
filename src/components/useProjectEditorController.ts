@@ -165,7 +165,6 @@ export function useProjectEditorController({
   };
 
   return {
-    busy: mutations.busy,
     message: mutations.message,
     selectedFrame,
     selectedComposedPhoto,
@@ -185,7 +184,7 @@ export function useProjectEditorController({
     redo: mutations.redo,
     fillMedia: (mediaId: string) => {
       if (navigation.implicitSheetId) {
-        void mutations.applyWithStatus({
+        void mutations.applyIntent({
           kind: "fillLeftmostPlaceholder",
           sheetId: navigation.implicitSheetId,
           mediaId,

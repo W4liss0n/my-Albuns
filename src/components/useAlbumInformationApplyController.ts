@@ -8,7 +8,10 @@ import type {
   AlbumInformation,
   AlbumInformationImpact,
 } from "../domain/project";
-import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
+import {
+  displayUnitLabel,
+  formatPhysicalMeasurement,
+} from "../application/physicalMeasurements";
 
 interface AlbumInformationApplyControllerOptions {
   projectDialogPort: ProjectDialogPort;
@@ -130,26 +133,77 @@ export function albumInformationDetails(
     formatPhysicalMeasurement(valueUm, information.displayUnit);
   const formatEnd = (value: AlbumInformation["firstSheet"]) =>
     value === "double" ? "Lâmina dupla" : "Página única";
-  const details = [
-    `Lâmina: ${measurement(information.sheetWidthUm)} × ${measurement(information.sheetHeightUm)}`,
-    `Resolução final: Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · Página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
-    `DPI: ${information.dpi}`,
-    `Sangria: ${measurement(information.bleedUm)} · Segurança: ${measurement(information.safetyUm)}`,
-  ];
-  if (
+  const details: string[] = [];
+  const addChange = (
+    label: string,
+    before: string | number,
+    after: string | number,
+  ) => details.push(`${label}: ${before} → ${after}`);
+  const dimensionsChanged =
     information.sheetWidthUm !== baseline.sheetWidthUm ||
-    information.sheetHeightUm !== baseline.sheetHeightUm
-  ) {
-    details.push(
-      "Dimensão: a proporção da composição será preservada no novo formato.",
+    information.sheetHeightUm !== baseline.sheetHeightUm;
+  const rasterChanged = dimensionsChanged || information.dpi !== baseline.dpi;
+
+  if (information.firstSheet !== baseline.firstSheet) {
+    addChange(
+      "Primeira Lâmina",
+      formatEnd(baseline.firstSheet),
+      formatEnd(information.firstSheet),
     );
   }
-  if (
-    information.firstSheet !== baseline.firstSheet ||
-    information.lastSheet !== baseline.lastSheet
-  ) {
+  if (information.lastSheet !== baseline.lastSheet) {
+    addChange(
+      "Última Lâmina",
+      formatEnd(baseline.lastSheet),
+      formatEnd(information.lastSheet),
+    );
+  }
+  if (information.displayUnit !== baseline.displayUnit) {
+    addChange(
+      "Unidade",
+      displayUnitLabel(baseline.displayUnit),
+      displayUnitLabel(information.displayUnit),
+    );
+  }
+  if (information.dpi !== baseline.dpi) {
+    addChange("DPI", baseline.dpi, information.dpi);
+  }
+  if (information.sheetWidthUm !== baseline.sheetWidthUm) {
+    addChange(
+      "Largura da Lâmina",
+      measurement(baseline.sheetWidthUm),
+      measurement(information.sheetWidthUm),
+    );
+  }
+  if (information.sheetHeightUm !== baseline.sheetHeightUm) {
+    addChange(
+      "Altura da Lâmina",
+      measurement(baseline.sheetHeightUm),
+      measurement(information.sheetHeightUm),
+    );
+  }
+  if (information.bleedUm !== baseline.bleedUm) {
+    addChange(
+      "Sangria",
+      measurement(baseline.bleedUm),
+      measurement(information.bleedUm),
+    );
+  }
+  if (information.safetyUm !== baseline.safetyUm) {
+    addChange(
+      "Área de segurança",
+      measurement(baseline.safetyUm),
+      measurement(information.safetyUm),
+    );
+  }
+  if (rasterChanged) {
     details.push(
-      `Extremidades: ${formatEnd(baseline.firstSheet)} / ${formatEnd(baseline.lastSheet)} → ${formatEnd(information.firstSheet)} / ${formatEnd(information.lastSheet)}`,
+      `Resolução resultante: Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · Página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
+    );
+  }
+  if (dimensionsChanged) {
+    details.push(
+      "Composição: A proporção será preservada no novo formato.",
     );
   }
   return details;

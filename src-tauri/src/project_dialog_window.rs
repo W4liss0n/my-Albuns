@@ -9,7 +9,7 @@ pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-
 pub(crate) const PROJECT_DIALOG_STATE_EVENT: &str = "myalbuns://project-dialog-state";
 const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
-const MAX_DIALOG_DETAILS: usize = 8;
+const MAX_DIALOG_DETAILS: usize = 10;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
@@ -41,6 +41,9 @@ pub(crate) enum ProjectDialogState {
     ProjectCloseFailure {
         message: String,
     },
+    ProjectOperationFailure {
+        message: String,
+    },
     ExportProgress {
         cancel_requested: bool,
         cancellable: bool,
@@ -50,6 +53,9 @@ pub(crate) enum ProjectDialogState {
         cancelled: bool,
         message: String,
         retry_disabled: bool,
+    },
+    ExportSuccess {
+        message: String,
     },
 }
 
@@ -68,6 +74,9 @@ impl ProjectDialogState {
             }
             Self::ProjectCloseConfirmation { busy } => Self::ProjectCloseConfirmation { busy },
             Self::ProjectCloseFailure { message } => Self::ProjectCloseFailure {
+                message: bound_text(message),
+            },
+            Self::ProjectOperationFailure { message } => Self::ProjectOperationFailure {
                 message: bound_text(message),
             },
             Self::ExportProgress {
@@ -103,6 +112,9 @@ impl ProjectDialogState {
                 message: bound_text(message),
                 retry_disabled,
             },
+            Self::ExportSuccess { message } => Self::ExportSuccess {
+                message: bound_text(message),
+            },
         }
     }
 
@@ -116,7 +128,10 @@ impl ProjectDialogState {
                 520.0,
                 214.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
-            Self::ProjectCloseFailure { .. } | Self::ExportFailure { .. } => (
+            Self::ProjectCloseFailure { .. }
+            | Self::ProjectOperationFailure { .. }
+            | Self::ExportFailure { .. }
+            | Self::ExportSuccess { .. } => (
                 440.0,
                 202.0 + native_dialog_window::OWNED_WINDOW_TITLEBAR_HEIGHT,
             ),
@@ -138,6 +153,7 @@ pub(crate) enum ProjectDialogAction {
     ConfirmAlbumInformation,
     DismissExport,
     DismissProjectCloseFailure,
+    DismissProjectOperationFailure,
     RetryExport,
     SaveAndClose,
 }
@@ -203,7 +219,7 @@ pub(crate) async fn present_project_dialog(
     let owner_after_close = owner.clone();
     dialog.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
-            native_dialog_window::restore_owner(&owner_after_close);
+            native_dialog_window::release_blocked_owner_if_disabled(&owner_after_close, true);
         }
     });
     native_dialog_window::display_owned_dialog(&owner, &dialog).map_err(|error| error.to_string())
@@ -224,7 +240,8 @@ pub(crate) fn current_project_dialog_state(
 pub(crate) fn dismiss_project_dialog(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
     require_project_owner(&window)?;
     if let Some(dialog) = app.get_webview_window(PROJECT_DIALOG_LABEL) {
-        dialog.destroy().map_err(|error| error.to_string())?;
+        native_dialog_window::dismiss_blocked_window(&window, &dialog, true)
+            .map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -288,6 +305,21 @@ mod tests {
                 .expect("dialog action serializes"),
             serde_json::json!("saveAndClose")
         );
+        assert_eq!(
+            serde_json::to_value(ProjectDialogState::ExportSuccess {
+                message: "A prova foi exportada com sucesso.".into(),
+            })
+            .expect("success state serializes"),
+            serde_json::json!({
+                "kind": "exportSuccess",
+                "message": "A prova foi exportada com sucesso."
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(ProjectDialogAction::DismissProjectOperationFailure)
+                .expect("operation failure action serializes"),
+            serde_json::json!("dismissProjectOperationFailure")
+        );
     }
 
     #[test]
@@ -300,6 +332,19 @@ mod tests {
             panic!("the variant is preserved")
         };
         assert_eq!(message.chars().count(), MAX_DIALOG_TEXT_CHARS);
+    }
+
+    #[test]
+    fn album_information_dialog_keeps_the_complete_change_summary() {
+        let state = ProjectDialogState::AlbumInformationConfirmation {
+            busy: false,
+            details: (0..12).map(|index| format!("Alteração {index}")).collect(),
+        }
+        .sanitized();
+        let ProjectDialogState::AlbumInformationConfirmation { details, .. } = state else {
+            panic!("the variant is preserved")
+        };
+        assert_eq!(details.len(), 10);
     }
 
     #[test]

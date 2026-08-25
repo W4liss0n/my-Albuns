@@ -25,6 +25,10 @@ export type ProjectDialogState =
       message: string;
     }
   | {
+      kind: "projectOperationFailure";
+      message: string;
+    }
+  | {
       cancelRequested: boolean;
       cancellable: boolean;
       kind: "exportProgress";
@@ -35,6 +39,10 @@ export type ProjectDialogState =
       kind: "exportFailure";
       message: string;
       retryDisabled: boolean;
+    }
+  | {
+      kind: "exportSuccess";
+      message: string;
     };
 
 export type ProjectDialogAction =
@@ -45,6 +53,7 @@ export type ProjectDialogAction =
   | "confirmAlbumInformation"
   | "dismissExport"
   | "dismissProjectCloseFailure"
+  | "dismissProjectOperationFailure"
   | "retryExport"
   | "saveAndClose";
 

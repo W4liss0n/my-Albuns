@@ -28,6 +28,10 @@ export function parseProjectDialogState(
       return typeof value.message === "string"
         ? { kind: value.kind, message: value.message }
         : null;
+    case "projectOperationFailure":
+      return typeof value.message === "string"
+        ? { kind: value.kind, message: value.message }
+        : null;
     case "exportProgress": {
       if (
         typeof value.cancelRequested !== "boolean" ||
@@ -75,6 +79,10 @@ export function parseProjectDialogState(
             message: value.message,
             retryDisabled: value.retryDisabled,
           }
+        : null;
+    case "exportSuccess":
+      return typeof value.message === "string"
+        ? { kind: value.kind, message: value.message }
         : null;
     default:
       return null;

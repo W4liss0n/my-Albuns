@@ -187,9 +187,15 @@ mod tests {
         let global_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/global-window.json"))
                 .expect("valid global permission");
+        let message_dialog_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/message-dialog-window.json"))
+                .expect("valid message dialog permission");
         let project_dialog_permission: serde_json::Value =
             serde_json::from_str(include_str!("../permissions/project-dialog-window.json"))
                 .expect("valid project dialog permission");
+        let owned_dialog_permission: serde_json::Value =
+            serde_json::from_str(include_str!("../permissions/owned-dialog-window.json"))
+                .expect("valid owned dialog permission");
 
         assert_eq!(
             project_capability["windows"],
@@ -203,7 +209,7 @@ mod tests {
         assert_eq!(
             dialog_capability["permissions"],
             serde_json::json!([
-                "core:window:allow-close",
+                "message-dialog-window-commands",
                 "core:window:allow-center",
                 "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
@@ -216,6 +222,7 @@ mod tests {
         assert_eq!(
             progress_dialog_capability["permissions"],
             serde_json::json!([
+                "owned-dialog-window-commands",
                 "core:window:allow-center",
                 "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
@@ -273,8 +280,17 @@ mod tests {
             allowed_commands(&project_dialog_permission),
             BTreeSet::from([
                 "current_project_dialog_state",
+                "owned_window_content_ready",
                 "submit_project_dialog_action"
             ])
+        );
+        assert_eq!(
+            allowed_commands(&owned_dialog_permission),
+            BTreeSet::from(["owned_window_content_ready"])
+        );
+        assert_eq!(
+            allowed_commands(&message_dialog_permission),
+            BTreeSet::from(["dismiss_owned_dialog", "owned_window_content_ready"])
         );
         let global_commands = allowed_commands(&global_permission);
         let project_commands = allowed_commands(&project_permission);

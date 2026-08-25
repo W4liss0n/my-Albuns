@@ -1,0 +1,12 @@
+{
+  "permission": [
+    {
+      "identifier": "message-dialog-window-commands",
+      "description": "Allows the standard message dialog to report readiness and request native owner-safe dismissal.",
+      "commands": {
+        "allow": ["dismiss_owned_dialog", "owned_window_content_ready"],
+        "deny": []
+      }
+    }
+  ]
+}

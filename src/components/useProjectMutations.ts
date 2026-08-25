@@ -26,23 +26,19 @@ export function useProjectMutations({
   runProjectMutation,
   onProjectionChange,
 }: ProjectMutationsInput) {
-  const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const feedbackTokenRef = useRef(0);
 
   useEffect(() => {
-    setBusy(null);
     setMessage(null);
   }, [runProjectMutation, projection.state.projectId]);
 
-  async function runWithGlobalFeedback(
-    label: string,
+  async function runWithErrorFeedback(
     operation: ProjectMutationOperation,
     cancelAfterPendingFailure = false,
   ) {
     const feedbackToken = feedbackTokenRef.current + 1;
     feedbackTokenRef.current = feedbackToken;
-    setBusy(label);
     setMessage(null);
     const outcome = await runProjectMutation.run(operation, {
       cancelAfterPendingFailure,
@@ -55,21 +51,17 @@ export function useProjectMutations({
     ) {
       setMessage(messageFromError(outcome.error));
     }
-    if (feedbackToken === feedbackTokenRef.current) {
-      setBusy(null);
-    }
   }
 
-  function applyWithStatus(intent: ProjectIntent) {
-    return runWithGlobalFeedback("Aplicando alteração", (port) =>
+  function applyIntent(intent: ProjectIntent) {
+    return runWithErrorFeedback((port) =>
       port.apply(intent),
     );
   }
 
   function saveVisibleRevision() {
     const visibleRevision = projection.state.revision;
-    return runWithGlobalFeedback(
-      "Salvando",
+    return runWithErrorFeedback(
       async (port, latestProjection) => {
         const expectedRevision =
           latestProjection?.state.revision ?? visibleRevision;
@@ -81,12 +73,10 @@ export function useProjectMutations({
   }
 
   function runHistoryCommand(
-    label: string,
     availability: "canUndo" | "canRedo",
     operation: "undo" | "redo",
   ) {
-    return runWithGlobalFeedback(
-      label,
+    return runWithErrorFeedback(
       (port, latestProjection) => {
         const effectiveProjection = latestProjection ?? projection;
         if (!effectiveProjection.state[availability]) {
@@ -114,9 +104,8 @@ export function useProjectMutations({
   }
 
   return {
-    busy,
     message,
-    applyWithStatus,
+    applyIntent,
     commitInteraction,
     applyAlbumInformation: (information: AlbumInformation) =>
       commitInteraction({
@@ -129,8 +118,8 @@ export function useProjectMutations({
         visualDefaults,
       }),
     save: () => void saveVisibleRevision(),
-    undo: () => void runHistoryCommand("Desfazendo", "canUndo", "undo"),
-    redo: () => void runHistoryCommand("Refazendo", "canRedo", "redo"),
+    undo: () => void runHistoryCommand("canUndo", "undo"),
+    redo: () => void runHistoryCommand("canRedo", "redo"),
     dismissFeedback: () => {
       setMessage(null);
     },

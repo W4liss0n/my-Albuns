@@ -17,6 +17,7 @@ const projectDialogActions = new Set<ProjectDialogAction>([
   "discardAndClose",
   "dismissExport",
   "dismissProjectCloseFailure",
+  "dismissProjectOperationFailure",
   "retryExport",
   "saveAndClose",
 ]);

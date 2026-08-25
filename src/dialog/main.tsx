@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
+import { dismissOwnedWindow } from "../platform/tauriOwnedDialogControls";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import {
   MessageDialog,
@@ -25,11 +26,7 @@ function DialogContent() {
   const kind = parameters.get("kind");
 
   const closeDialog = () => {
-    try {
-      void Promise.resolve(windowControls.close()).catch(() => window.close());
-    } catch {
-      window.close();
-    }
+    void Promise.resolve(windowControls.close()).catch(() => undefined);
   };
 
   if (kind === "creating-project") {
@@ -79,13 +76,19 @@ function DialogContent() {
 
 function DialogWindow() {
   const kind = parameters.get("kind");
+  const controls =
+    kind === "project-failure"
+      ? { ...tauriWindowControls, close: dismissOwnedWindow }
+      : tauriWindowControls;
 
   return (
-    <OwnedWindowShell
-      controls={kind === "project-failure" ? "close" : "none"}
-    >
-      <DialogContent />
-    </OwnedWindowShell>
+    <WindowControlsProvider controls={controls}>
+      <OwnedWindowShell
+        controls={kind === "project-failure" ? "close" : "none"}
+      >
+        <DialogContent />
+      </OwnedWindowShell>
+    </WindowControlsProvider>
   );
 }
 
@@ -93,8 +96,6 @@ installDesktopWebViewPolicy(document);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <WindowControlsProvider controls={tauriWindowControls}>
-      <DialogWindow />
-    </WindowControlsProvider>
+    <DialogWindow />
   </React.StrictMode>,
 );

@@ -17,7 +17,7 @@ import type {
   ExportProgressEvent,
   ExportProgressStage,
 } from "../application/projectPorts";
-import { ActionButton, InlineNotice } from "../ui";
+import { ActionButton } from "../ui";
 import "./ExportPreviewControl.css";
 
 interface ExportPreviewControlProps {
@@ -31,11 +31,6 @@ interface ExportPreviewControlProps {
 
 export interface ExportPreviewControlHandle {
   start(): void;
-}
-
-interface ExportNotification {
-  kind: "error" | "success";
-  message: string;
 }
 
 export const ExportPreviewControl = forwardRef<
@@ -53,10 +48,8 @@ export const ExportPreviewControl = forwardRef<
   ref,
 ) {
   const [phase, setPhase] = useState<
-    "idle" | "starting" | "running" | "cancelled" | "failed"
+    "idle" | "starting" | "running" | "cancelled" | "completed" | "failed"
   >("idle");
-  const [notification, setNotification] =
-    useState<ExportNotification | null>(null);
   const nextAttemptId = useRef(0);
   const currentAttemptId = useRef<number | null>(null);
   const startedAttemptId = useRef<number | null>(null);
@@ -69,7 +62,6 @@ export const ExportPreviewControl = forwardRef<
     ExportPreviewControlProps["onActiveChange"]
   >(undefined);
   const interactionActive = useRef(false);
-  const notificationTimer = useRef<number | undefined>(undefined);
   const lastDialogState = useRef<ProjectDialogState | undefined>(undefined);
   const dialogPresentationFailed = useRef(false);
   const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
@@ -114,14 +106,12 @@ export const ExportPreviewControl = forwardRef<
 
   useLayoutEffect(() => {
     setPhase("idle");
-    clearNotification();
     lastDialogState.current = undefined;
     dialogPresentationFailed.current = false;
     void dialogPort.dismiss().catch(() => undefined);
 
     return () => {
       retireActiveAttempt();
-      clearNotificationTimer();
       lastDialogState.current = undefined;
       void dialogPort.dismiss().catch(() => undefined);
     };
@@ -136,7 +126,6 @@ export const ExportPreviewControl = forwardRef<
     currentAttemptId.current = attemptId;
     beginInteraction();
     setPhase("starting");
-    clearNotification();
     dialogPresentationFailed.current = false;
 
     let attempt: ExportAttempt;
@@ -205,13 +194,10 @@ export const ExportPreviewControl = forwardRef<
           return;
         }
 
-        setPhase("idle");
-        endInteraction();
-        lastDialogState.current = undefined;
-        void dialogPort.dismiss().catch(() => undefined);
-        showNotification({
-          kind: "success",
-          message: "Exportação concluída",
+        setPhase("completed");
+        presentDialog({
+          kind: "exportSuccess",
+          message: "A prova foi exportada com sucesso.",
         });
       },
       (error: unknown) => finishAttemptWithFailure(attemptId, error),
@@ -240,7 +226,13 @@ export const ExportPreviewControl = forwardRef<
   }
 
   function dismissFeedback() {
-    if (phase !== "cancelled" && phase !== "failed") return;
+    if (
+      phase !== "cancelled" &&
+      phase !== "completed" &&
+      phase !== "failed"
+    ) {
+      return;
+    }
     setPhase("idle");
     lastDialogState.current = undefined;
     void dialogPort.dismiss().catch(() => undefined);
@@ -249,10 +241,9 @@ export const ExportPreviewControl = forwardRef<
 
   function presentDialog(state: ProjectDialogState) {
     lastDialogState.current = state;
-    void dialogPort.present(state).catch((error: unknown) => {
+    void dialogPort.present(state).catch(() => {
       if (dialogPresentationFailed.current) return;
       dialogPresentationFailed.current = true;
-      showNotification({ kind: "error", message: messageFromError(error) });
       const current = activeAttempt.current;
       if (current && !current.cancelRequested) {
         current.cancelRequested = true;
@@ -297,9 +288,13 @@ export const ExportPreviewControl = forwardRef<
       return;
     }
 
-    setPhase("idle");
-    endInteraction();
-    showNotification({ kind: "error", message });
+    setPhase("failed");
+    presentDialog({
+      cancelled: false,
+      kind: "exportFailure",
+      message,
+      retryDisabled: false,
+    });
   }
 
   function retireActiveAttempt() {
@@ -330,27 +325,6 @@ export const ExportPreviewControl = forwardRef<
     notify?.(false);
   }
 
-  function clearNotificationTimer() {
-    if (notificationTimer.current !== undefined) {
-      window.clearTimeout(notificationTimer.current);
-      notificationTimer.current = undefined;
-    }
-  }
-
-  function clearNotification() {
-    clearNotificationTimer();
-    setNotification(null);
-  }
-
-  function showNotification(nextNotification: ExportNotification) {
-    clearNotificationTimer();
-    setNotification(nextNotification);
-    notificationTimer.current = window.setTimeout(() => {
-      notificationTimer.current = undefined;
-      setNotification(null);
-    }, nextNotification.kind === "success" ? 3_000 : 6_000);
-  }
-
   return (
     <div className="export-preview-control">
       <ActionButton
@@ -363,16 +337,6 @@ export const ExportPreviewControl = forwardRef<
         Exportar
       </ActionButton>
 
-      {notification ? (
-        <InlineNotice
-          className="export-preview-notification"
-          floating
-          role={notification.kind === "error" ? "alert" : "status"}
-          tone={notification.kind}
-        >
-          <p>{notification.message}</p>
-        </InlineNotice>
-      ) : null}
     </div>
   );
 });

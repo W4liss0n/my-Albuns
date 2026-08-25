@@ -22,7 +22,15 @@ test("confirms all Album information changes as one action", async () => {
   const dialog = screen.getByRole("dialog", {
     name: "Aplicar alterações no Álbum?",
   });
-  expect(dialog).toHaveTextContent("Lâmina: 700 mm × 350 mm");
+  expect(
+    dialog.querySelector(".album-information-change-list"),
+  ).toBeInTheDocument();
+  expect(within(dialog).getByText("Lâmina")).toHaveClass(
+    "album-information-change__label",
+  );
+  expect(within(dialog).getByText("700 mm × 350 mm")).toHaveClass(
+    "album-information-change__value",
+  );
   await user.click(within(dialog).getByRole("button", { name: "Aplicar" }));
   await user.click(within(dialog).getByRole("button", { name: "Cancelar" }));
   expect(onAction.mock.calls).toEqual([
@@ -58,6 +66,38 @@ test("projects close decisions through the standard confirmation dialog", async 
     ["discardAndClose"],
     ["cancelProjectClose"],
   ]);
+});
+
+test("keeps the Project close confirmation body stable while resolving", () => {
+  const { rerender } = render(
+    <ProjectDialogView
+      onAction={vi.fn()}
+      state={{ busy: false, kind: "projectCloseConfirmation" }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "Salvar alterações antes de fechar?",
+  });
+  expect(within(dialog).queryByText("Concluindo…")).not.toBeInTheDocument();
+  expect(
+    dialog.querySelector(".ui-standard-message__extra"),
+  ).not.toBeInTheDocument();
+
+  rerender(
+    <ProjectDialogView
+      onAction={vi.fn()}
+      state={{ busy: true, kind: "projectCloseConfirmation" }}
+    />,
+  );
+
+  expect(within(dialog).queryByText("Concluindo…")).not.toBeInTheDocument();
+  expect(
+    dialog.querySelector(".ui-standard-message__extra"),
+  ).not.toBeInTheDocument();
+  expect(dialog).toHaveTextContent(
+    "O Projeto tem alterações que ainda não foram salvas.",
+  );
 });
 
 test("projects export progress and cancellation through the standard progress dialog", async () => {
@@ -116,4 +156,52 @@ test("projects export failure through the standard message dialog", async () => 
     ["retryExport"],
     ["dismissExport"],
   ]);
+});
+
+test("projects generic operation failures through the standard message dialog", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+
+  render(
+    <ProjectDialogView
+      onAction={onAction}
+      state={{
+        kind: "projectOperationFailure",
+        message: "O Projeto não pôde ser salvo.",
+      }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "A operação não foi concluída",
+  });
+  expect(within(dialog).getByRole("alert")).toHaveTextContent(
+    "O Projeto não pôde ser salvo.",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
+  expect(onAction).toHaveBeenCalledWith("dismissProjectOperationFailure");
+});
+
+test("projects export success through the standard message dialog", async () => {
+  const user = userEvent.setup();
+  const onAction = vi.fn();
+
+  render(
+    <ProjectDialogView
+      onAction={onAction}
+      state={{
+        kind: "exportSuccess",
+        message: "A prova foi exportada com sucesso.",
+      }}
+    />,
+  );
+
+  const dialog = screen.getByRole("dialog", {
+    name: "Exportação concluída",
+  });
+  expect(within(dialog).getByRole("status")).toHaveTextContent(
+    "A prova foi exportada com sucesso.",
+  );
+  await user.click(within(dialog).getByRole("button", { name: "Fechar" }));
+  expect(onAction).toHaveBeenCalledWith("dismissExport");
 });

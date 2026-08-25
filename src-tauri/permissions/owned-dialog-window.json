@@ -1,0 +1,12 @@
+{
+  "permission": [
+    {
+      "identifier": "owned-dialog-window-commands",
+      "description": "Allows an owned dialog window to report that its fitted content is ready to be shown.",
+      "commands": {
+        "allow": ["owned_window_content_ready"],
+        "deny": []
+      }
+    }
+  ]
+}

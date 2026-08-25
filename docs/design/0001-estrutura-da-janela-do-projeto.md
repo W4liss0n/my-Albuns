@@ -33,6 +33,12 @@ Confirmações, avisos, seletores e progressos abrem em uma janela nativa separa
 
 Cada diálogo conserva uma largura estável adequada ao seu tipo, mas sua altura acompanha o conteúdo efetivamente renderizado, sem reservar uma área vazia padrão. Mudanças de estado, mensagens ou detalhes recalculam essa altura; a janela é recentralizada depois do ajuste e, quando o conteúdo excede a área útil do monitor, fica limitada a ela em vez de ultrapassar a tela.
 
+Em diálogos de confirmação, estados transitórios que apenas bloqueiam as ações não adicionam nem removem linhas no corpo e, portanto, não alteram a geometria da janela. `Cancelar` não projeta estado ocupado. Mensagens variáveis no corpo ficam reservadas a progresso real ou a uma falha que exija explicação, nos componentes correspondentes.
+
+Uma janela de diálogo nova permanece oculta até o primeiro ajuste ao conteúdo ser concluído; somente então é apresentada já no tamanho e na posição finais. Ajustes simultâneos são consolidados e executados em sequência. Quando um diálogo já visível recebe uma nova projeção de estado, apenas seu conteúdo é atualizado: nem o diálogo nem sua janela proprietária são reapresentados. Essas regras pertencem ao ciclo compartilhado das janelas de diálogo e valem para confirmações, avisos e progressos de qualquer módulo.
+
+No encerramento de um diálogo que bloqueia uma proprietária visível, o ciclo nativo primeiro reabilita a proprietária, depois destrói o diálogo e só então devolve o foco uma única vez. O evento de destruição atua apenas como recuperação de um fechamento inesperado e não repete essa ativação quando o encerramento normal já a concluiu. Essa ordem é parte do componente compartilhado: módulos não fecham diretamente sua janela de diálogo nem reapresentam a janela principal para simular o retorno.
+
 A única política de substituição pertence ao fluxo `Abrir Projeto`: depois que um arquivo existente ou um Projeto recente foi escolhido, a superfície de origem sai da área visível antes da janela de progresso. O detalhamento e a recuperação em caso de falha pertencem ao design da [Tela de Boas-vindas](0002-tela-de-boas-vindas.md). `Novo Projeto`, a confirmação de `Informações do Álbum`, fechamento, Exportação e os demais avisos ou progressos seguem o padrão de proprietário visível e bloqueado.
 
 ## Estrutura-base
@@ -111,6 +117,8 @@ Se o gesto começou no Canvas, somente o Canvas anima a prévia e a Grade conser
 Posições que deslocariam uma Página única para o interior são inválidas e não recebem o espaço reservado. Depois de uma soltura válida, papéis e Numeração são recalculados e a Lâmina movida fica centralizada no Canvas; essa centralização não integra o Histórico.
 
 Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de menus não substitui controles contextuais dentro dos painéis.
+
+Comandos rotineiros e serializados, como `Salvar`, `Desfazer`, `Refazer` e alterações imediatas da composição, não exibem avisos transitórios de andamento e não desabilitam controles sem relação com a ação. Eles preservam a aparência da barra de menus e de botões como `Exportar`. Falhas e conclusões que precisam ser comunicadas usam os diálogos pertencentes à Janela; a Janela do Projeto não cria avisos flutuantes próprios. Um controle muda para estado ocupado ou desabilitado apenas enquanto a própria ação dele está ativa ou quando um diálogo ou fluxo realmente exclusivo bloqueia a Janela.
 
 ## Canvas contínuo
 
@@ -426,7 +434,9 @@ Em `Documento`, trocar a Unidade converte imediatamente somente a apresentação
 
 Mensagens de validação que orientam a correção de uma medida física seguem essa mesma Unidade pendente e o DPI corrente. Limites internos de raster são convertidos para o intervalo físico equivalente do campo — inclusive distinguindo largura da Lâmina aberta e largura da Lâmina fechada — em vez de expor pixels ou micrômetros como se fossem a entrada esperada da pessoa.
 
-O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
+O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`.
+
+A confirmação de `Informações do Álbum` enumera somente os campos cujo valor pendente difere do valor aplicado, cada um no formato `anterior → novo`. Primeira e Última Lâmina aparecem separadamente. A resolução resultante aparece somente quando Largura, Altura ou DPI mudam; a preservação proporcional é informada somente em uma mudança dimensional. Rótulos e valores formam colunas visuais distintas para que o resumo continue legível com uma ou várias alterações.
 
 As entradas numéricas de `Informações do Álbum` mostram um `X` dentro do controle somente enquanto o próprio draft diverge do último valor aplicado. Essa ação restaura apenas a entrada correspondente. Para medidas físicas, o valor restaurado é apresentado na Unidade corrente; trocar somente a Unidade não marca as medidas como editadas nem cria ações de restauração falsas.
 

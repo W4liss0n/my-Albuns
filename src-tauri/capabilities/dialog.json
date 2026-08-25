@@ -5,7 +5,7 @@
   "local": true,
   "windows": ["dialog-project-failure"],
   "permissions": [
-    "core:window:allow-close",
+    "message-dialog-window-commands",
     "core:window:allow-center",
     "core:window:allow-set-size",
     "core:window:allow-start-dragging"

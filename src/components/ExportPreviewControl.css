@@ -10,12 +10,3 @@
   border-radius: 0;
   font-size: var(--ui-font-size-support);
 }
-
-.export-preview-notification.ui-inline-notice {
-  font-size: var(--ui-font-size-support);
-  font-weight: 600;
-}
-
-.export-preview-notification p {
-  margin: 0;
-}

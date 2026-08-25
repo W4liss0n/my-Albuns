@@ -484,14 +484,6 @@
   background: var(--ui-warning-soft);
 }
 
-.ui-inline-notice--floating {
-  position: fixed;
-  right: var(--ui-panel-padding);
-  bottom: var(--ui-panel-padding);
-  z-index: 40;
-  box-shadow: var(--ui-shadow-menu);
-}
-
 .ui-floating-surface {
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius);
@@ -749,6 +741,38 @@
 
 .ui-standard-message__extra {
   margin-top: 4px;
+}
+
+.album-information-change-list {
+  display: grid;
+  margin: 0;
+  gap: 6px;
+}
+
+.album-information-change {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 124px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+}
+
+.album-information-change__label,
+.album-information-change__value {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--ui-font-size-support);
+  line-height: 1.45;
+}
+
+.album-information-change__label {
+  color: var(--ui-text-muted);
+}
+
+.album-information-change__value {
+  color: var(--ui-text-secondary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .ui-standard-message__detail {

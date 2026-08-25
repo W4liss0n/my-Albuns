@@ -30,11 +30,14 @@ function defaultCloseAction(
       return state.busy ? null : "cancelProjectClose";
     case "projectCloseFailure":
       return "dismissProjectCloseFailure";
+    case "projectOperationFailure":
+      return "dismissProjectOperationFailure";
     case "exportProgress":
       return state.cancellable && !state.cancelRequested
         ? "cancelExport"
         : null;
     case "exportFailure":
+    case "exportSuccess":
       return "dismissExport";
   }
 }

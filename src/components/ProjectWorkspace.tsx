@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
 
 import type {
   ExportPort,
@@ -19,12 +18,7 @@ import {
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
-import {
-  ActionButton,
-  AppIcon,
-  ApplicationHeader,
-  InlineNotice,
-} from "../ui";
+import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
 import { ApplicationMenuBar } from "./ApplicationMenuBar";
 import {
@@ -40,6 +34,7 @@ import { createProjectApplicationMenus } from "./projectApplicationMenus";
 import { useProjectCommandShortcuts } from "./useProjectCommandShortcuts";
 import { useProjectCloseController } from "./useProjectCloseController";
 import { useProjectEditorController } from "./useProjectEditorController";
+import { useProjectOperationFailureDialog } from "./useProjectOperationFailureDialog";
 import { useAlbumInformationApplyController } from "./useAlbumInformationApplyController";
 import type { ProjectMutationRunner } from "./useProjectMutationRunner";
 import { useWorkspacePreferences } from "../state/useWorkspacePreferences";
@@ -172,6 +167,14 @@ export function ProjectWorkspace({
     onApply: controller.applyAlbumInformation,
     onError: setCloseMessage,
   });
+  useProjectOperationFailureDialog({
+    message: closeMessage ?? controller.message,
+    projectDialogPort,
+    onDismiss: () => {
+      setCloseMessage(null);
+      controller.dismissFeedback();
+    },
+  });
   const updateWorkspacePanelSize = useCallback(
     (panel: "inspector" | "media", size: number) => {
       workspacePreferences.update({
@@ -221,8 +224,6 @@ export function ProjectWorkspace({
       : "0px",
   };
   const {
-    busy,
-    message,
     selectedFrame,
     selectedComposedPhoto,
     displayedPhotoZoom,
@@ -247,7 +248,6 @@ export function ProjectWorkspace({
       : { kind: "album" };
   const projectMetadata = projectAlbumMetadata(projection, presentationUnit);
   const commandsBlocked =
-    Boolean(busy) ||
     exportActive ||
     projectClose.interactionBlocked ||
     albumInformationApply.active;
@@ -299,7 +299,7 @@ export function ProjectWorkspace({
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
-          disabled={Boolean(busy) || projectClose.interactionBlocked}
+          disabled={projectClose.interactionBlocked}
           exportPort={exportPort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
@@ -416,39 +416,6 @@ export function ProjectWorkspace({
           }
         />}
       </div>
-
-      {(busy || message || closeMessage) && (
-        <InlineNotice
-          className="operation-toast"
-          floating
-          role={message || closeMessage ? "alert" : "status"}
-          tone={message || closeMessage ? "error" : "success"}
-        >
-          {busy && <span className="toast-spinner" aria-hidden="true" />}
-          <div className="operation-toast__message">
-            <strong>
-              {message || closeMessage
-                ? "A operação não foi concluída"
-                : busy}
-            </strong>
-            <span>{closeMessage ?? message ?? "Aguarde…"}</span>
-          </div>
-          {!busy && (
-            <ActionButton
-              aria-label="Fechar mensagem"
-              className="operation-toast__close"
-              density="compact"
-              variant="quiet"
-              onClick={() => {
-                setCloseMessage(null);
-                controller.dismissFeedback();
-              }}
-            >
-              <AppIcon icon={X} size={14} />
-            </ActionButton>
-          )}
-        </InlineNotice>
-      )}
 
     </div>
   );

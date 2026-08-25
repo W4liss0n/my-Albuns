@@ -91,11 +91,16 @@ test("forwards only valid semantic actions from the native dialog", async () => 
 
   emit("cancelAlbumInformation");
   emit("confirmAlbumInformation");
+  emit("dismissProjectOperationFailure");
   emit("retryExport");
   emit("unknownAction");
 
-  expect(listener).toHaveBeenCalledTimes(3);
+  expect(listener).toHaveBeenCalledTimes(4);
   expect(listener).toHaveBeenNthCalledWith(1, "cancelAlbumInformation");
   expect(listener).toHaveBeenNthCalledWith(2, "confirmAlbumInformation");
-  expect(listener).toHaveBeenNthCalledWith(3, "retryExport");
+  expect(listener).toHaveBeenNthCalledWith(
+    3,
+    "dismissProjectOperationFailure",
+  );
+  expect(listener).toHaveBeenNthCalledWith(4, "retryExport");
 });

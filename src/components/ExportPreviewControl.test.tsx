@@ -193,7 +193,7 @@ test("handles cancellation actions from the child window and keeps feedback ther
   });
 });
 
-test("keeps a pre-start conflict inline because no child window was opened", async () => {
+test("opens the standard failure dialog for a pre-start conflict", async () => {
   const user = userEvent.setup();
   const onActiveChange = vi.fn();
   const { dialog, exportHarness } = renderControl({ onActiveChange });
@@ -207,11 +207,14 @@ test("keeps a pre-start conflict inline because no child window was opened", asy
     await Promise.resolve();
   });
 
-  expect(dialog.present).not.toHaveBeenCalled();
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Outra operação exclusiva já está em andamento.",
-  );
-  expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
+  expect(dialog.present).toHaveBeenCalledWith({
+    cancelled: false,
+    kind: "exportFailure",
+    message: "Outra operação exclusiva já está em andamento.",
+    retryDisabled: false,
+  });
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(onActiveChange.mock.calls).toEqual([[true]]);
 });
 
 test("recovers after the native progress window cannot be presented", async () => {
@@ -231,9 +234,7 @@ test("recovers after the native progress window cannot be presented", async () =
   await waitFor(() => {
     expect(exportHarness.attempts[0].cancel).toHaveBeenCalledOnce();
   });
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Não foi possível abrir a janela de progresso.",
-  );
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
   await act(async () => {
     exportHarness.attempts[0].resolve({ status: "cancelled" });
@@ -245,8 +246,7 @@ test("recovers after the native progress window cannot be presented", async () =
   expect(onActiveChange.mock.calls).toEqual([[true], [false]]);
 });
 
-test("dismisses native progress on success and uses the shared inline notice", async () => {
-  vi.useFakeTimers();
+test("replaces native progress with the standard success dialog", async () => {
   const { dialog, exportHarness } = renderControl();
   fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   act(() => {
@@ -260,9 +260,10 @@ test("dismisses native progress on success and uses the shared inline notice", a
     await Promise.resolve();
   });
 
-  expect(dialog.dismiss).toHaveBeenCalled();
-  expect(screen.getByRole("status")).toHaveTextContent("Exportação concluída");
-  act(() => vi.advanceTimersByTime(4_000));
+  expect(dialog.present).toHaveBeenLastCalledWith({
+    kind: "exportSuccess",
+    message: "A prova foi exportada com sucesso.",
+  });
   expect(screen.queryByRole("status")).not.toBeInTheDocument();
 });
 
