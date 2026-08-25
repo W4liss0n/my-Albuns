@@ -2,6 +2,27 @@ import { expect, test } from "vitest";
 
 import { parseProjectDialogState } from "./projectDialogState";
 
+test("accepts structured Album information details", () => {
+  expect(
+    parseProjectDialogState({
+      busy: false,
+      details: [{ label: "DPI", value: "300 → 240" }],
+      kind: "albumInformationConfirmation",
+    }),
+  ).toEqual({
+    busy: false,
+    details: [{ label: "DPI", value: "300 → 240" }],
+    kind: "albumInformationConfirmation",
+  });
+  expect(
+    parseProjectDialogState({
+      busy: false,
+      details: ["DPI: 300 → 240"],
+      kind: "albumInformationConfirmation",
+    }),
+  ).toBeNull();
+});
+
 test("accepts standard operation failure and export success states", () => {
   expect(
     parseProjectDialogState({

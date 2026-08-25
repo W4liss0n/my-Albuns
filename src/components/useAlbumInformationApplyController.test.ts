@@ -26,7 +26,10 @@ test("describes only the Album information field that actually changed", () => {
   );
 
   expect(details).toEqual([
-    "Primeira Lâmina: Lâmina dupla → Página única",
+    {
+      label: "Primeira Lâmina",
+      value: "Lâmina dupla → Página única",
+    },
   ]);
 });
 
@@ -48,12 +51,21 @@ test("describes final raster size and structural and dimensional impact", () => 
   );
 
   expect(details).toEqual([
-    "Primeira Lâmina: Lâmina dupla → Página única",
-    "DPI: 300 → 240",
-    "Largura da Lâmina: 600 mm → 700 mm",
-    "Altura da Lâmina: 300 mm → 350 mm",
-    "Resolução resultante: Lâmina 6.614 × 3.307 px · Página 3.307 × 3.307 px",
-    "Composição: A proporção será preservada no novo formato.",
+    {
+      label: "Primeira Lâmina",
+      value: "Lâmina dupla → Página única",
+    },
+    { label: "DPI", value: "300 → 240" },
+    { label: "Largura da Lâmina", value: "600 mm → 700 mm" },
+    { label: "Altura da Lâmina", value: "300 mm → 350 mm" },
+    {
+      label: "Resolução resultante",
+      value: "Lâmina 6.614 × 3.307 px · Página 3.307 × 3.307 px",
+    },
+    {
+      label: "Composição",
+      value: "A proporção será preservada no novo formato.",
+    },
   ]);
 });
 
@@ -73,7 +85,7 @@ test("uses the selected Unit for changed measurements without unrelated raster d
   );
 
   expect(details).toEqual([
-    "Unidade: mm → cm",
-    "Sangria: 0.3 cm → 0.5 cm",
+    { label: "Unidade", value: "mm → cm" },
+    { label: "Sangria", value: "0.3 cm → 0.5 cm" },
   ]);
 });

@@ -26,31 +26,36 @@ function currentReadyToken() {
 
 async function runFitQueue() {
   const currentWindow = getCurrentWindow();
-  while (requestedFit) {
-    const nextFit = requestedFit;
-    if (nextFit.sizeKey === lastFittedSize) {
+  for (;;) {
+    while (requestedFit) {
+      const nextFit = requestedFit;
+      if (nextFit.sizeKey === lastFittedSize) {
+        if (requestedFit === nextFit) requestedFit = null;
+        continue;
+      }
+
+      await currentWindow.setSize(
+        new LogicalSize(nextFit.width, nextFit.height),
+      );
+      await currentWindow.center();
+      lastFittedSize = nextFit.sizeKey;
       if (requestedFit === nextFit) requestedFit = null;
-      continue;
     }
 
-    await currentWindow.setSize(
-      new LogicalSize(nextFit.width, nextFit.height),
-    );
-    await currentWindow.center();
-    lastFittedSize = nextFit.sizeKey;
-    if (requestedFit === nextFit) requestedFit = null;
-  }
-  const readyToken = currentReadyToken();
-  if (readyToken !== null && confirmedReadyToken !== readyToken) {
-    confirmedReadyToken = readyToken;
-    try {
-      await invoke<void>("owned_window_content_ready", {
-        token: readyToken,
-      });
-    } catch (error) {
-      confirmedReadyToken = null;
-      throw error;
+    const readyToken = currentReadyToken();
+    if (readyToken !== null && confirmedReadyToken !== readyToken) {
+      confirmedReadyToken = readyToken;
+      try {
+        await invoke<void>("owned_window_content_ready", {
+          token: readyToken,
+        });
+      } catch (error) {
+        confirmedReadyToken = null;
+        throw error;
+      }
     }
+
+    if (!requestedFit) return;
   }
 }
 

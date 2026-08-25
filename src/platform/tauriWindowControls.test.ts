@@ -123,6 +123,32 @@ test("serializes changing fits instead of racing native window updates", async (
   expect(windowApi.center).toHaveBeenCalledTimes(2);
 });
 
+test("applies a newer fit requested during the readiness handshake", async () => {
+  let releaseReadiness: (() => void) | undefined;
+  coreApi.invoke.mockReturnValue(
+    new Promise<undefined>((resolve) => {
+      releaseReadiness = () => resolve(undefined);
+    }),
+  );
+
+  const firstFit = tauriWindowControls.fitContent(198);
+  await vi.waitFor(() => expect(coreApi.invoke).toHaveBeenCalledOnce());
+
+  const newerFit = tauriWindowControls.fitContent(236);
+  releaseReadiness?.();
+  await Promise.all([firstFit, newerFit]);
+
+  expect(windowApi.setSize).toHaveBeenNthCalledWith(1, {
+    height: 198,
+    width: 520,
+  });
+  expect(windowApi.setSize).toHaveBeenNthCalledWith(2, {
+    height: 236,
+    width: 520,
+  });
+  expect(windowApi.center).toHaveBeenCalledTimes(2);
+});
+
 test("retries the readiness handshake without resizing again", async () => {
   coreApi.invoke.mockRejectedValueOnce(new Error("temporary IPC failure"));
 

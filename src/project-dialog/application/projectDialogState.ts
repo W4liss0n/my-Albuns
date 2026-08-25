@@ -13,7 +13,12 @@ export function parseProjectDialogState(
     case "albumInformationConfirmation":
       return typeof value.busy === "boolean" &&
         Array.isArray(value.details) &&
-        value.details.every((detail) => typeof detail === "string")
+        value.details.every(
+          (detail) =>
+            isRecord(detail) &&
+            typeof detail.label === "string" &&
+            typeof detail.value === "string",
+        )
         ? {
             busy: value.busy,
             details: value.details,

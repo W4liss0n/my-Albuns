@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
+  ProjectDialogDetail,
   ProjectDialogAction,
   ProjectDialogPort,
 } from "../application/projectDialogPort";
@@ -133,12 +134,12 @@ export function albumInformationDetails(
     formatPhysicalMeasurement(valueUm, information.displayUnit);
   const formatEnd = (value: AlbumInformation["firstSheet"]) =>
     value === "double" ? "Lâmina dupla" : "Página única";
-  const details: string[] = [];
+  const details: ProjectDialogDetail[] = [];
   const addChange = (
     label: string,
     before: string | number,
     after: string | number,
-  ) => details.push(`${label}: ${before} → ${after}`);
+  ) => details.push({ label, value: `${before} → ${after}` });
   const dimensionsChanged =
     information.sheetWidthUm !== baseline.sheetWidthUm ||
     information.sheetHeightUm !== baseline.sheetHeightUm;
@@ -197,14 +198,16 @@ export function albumInformationDetails(
     );
   }
   if (rasterChanged) {
-    details.push(
-      `Resolução resultante: Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · Página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
-    );
+    details.push({
+      label: "Resolução resultante",
+      value: `Lâmina ${formatPixels(impact.sheetWidthPx)} × ${formatPixels(impact.heightPx)} px · Página ${formatPixels(impact.pageWidthPx)} × ${formatPixels(impact.heightPx)} px`,
+    });
   }
   if (dimensionsChanged) {
-    details.push(
-      "Composição: A proporção será preservada no novo formato.",
-    );
+    details.push({
+      label: "Composição",
+      value: "A proporção será preservada no novo formato.",
+    });
   }
   return details;
 }

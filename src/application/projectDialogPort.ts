@@ -10,10 +10,15 @@ export type ProjectDialogProgress =
       total: number;
     };
 
+export interface ProjectDialogDetail {
+  label: string;
+  value: string;
+}
+
 export type ProjectDialogState =
   | {
       busy: boolean;
-      details: readonly string[];
+      details: readonly ProjectDialogDetail[];
       kind: "albumInformationConfirmation";
     }
   | {

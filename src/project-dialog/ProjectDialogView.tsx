@@ -7,6 +7,7 @@ import {
   MessageDialog,
   ProgressDialog,
 } from "../ui";
+import "./ProjectDialogView.css";
 
 interface ProjectDialogViewProps {
   onAction(action: ProjectDialogAction): void;
@@ -36,20 +37,16 @@ export function ProjectDialogView({
         >
           <dl className="album-information-change-list">
             {state.details.map((detail) => {
-              const separator = detail.indexOf(":");
-              const label =
-                separator >= 0 ? detail.slice(0, separator) : "Alteração";
-              const value =
-                separator >= 0
-                  ? detail.slice(separator + 1).trim()
-                  : detail;
               return (
-                <div className="album-information-change" key={detail}>
+                <div
+                  className="album-information-change"
+                  key={`${detail.label}:${detail.value}`}
+                >
                   <dt className="album-information-change__label">
-                    {label}
+                    {detail.label}
                   </dt>
                   <dd className="album-information-change__value">
-                    {value}
+                    {detail.value}
                   </dd>
                 </div>
               );

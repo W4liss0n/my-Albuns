@@ -25,6 +25,13 @@ pub(crate) enum ProjectDialogProgress {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ProjectDialogDetail {
+    label: String,
+    value: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
@@ -33,7 +40,7 @@ pub(crate) enum ProjectDialogProgress {
 pub(crate) enum ProjectDialogState {
     AlbumInformationConfirmation {
         busy: bool,
-        details: Vec<String>,
+        details: Vec<ProjectDialogDetail>,
     },
     ProjectCloseConfirmation {
         busy: bool,
@@ -68,7 +75,10 @@ impl ProjectDialogState {
                     details: details
                         .into_iter()
                         .take(MAX_DIALOG_DETAILS)
-                        .map(bound_text)
+                        .map(|detail| ProjectDialogDetail {
+                            label: bound_text(detail.label),
+                            value: bound_text(detail.value),
+                        })
                         .collect(),
                 }
             }
@@ -338,7 +348,12 @@ mod tests {
     fn album_information_dialog_keeps_the_complete_change_summary() {
         let state = ProjectDialogState::AlbumInformationConfirmation {
             busy: false,
-            details: (0..12).map(|index| format!("Alteração {index}")).collect(),
+            details: (0..12)
+                .map(|index| ProjectDialogDetail {
+                    label: format!("Alteração {index}"),
+                    value: format!("Valor {index}"),
+                })
+                .collect(),
         }
         .sanitized();
         let ProjectDialogState::AlbumInformationConfirmation { details, .. } = state else {

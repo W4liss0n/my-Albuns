@@ -13,7 +13,10 @@ test("confirms all Album information changes as one action", async () => {
       onAction={onAction}
       state={{
         busy: false,
-        details: ["Lâmina: 700 mm × 350 mm", "DPI: 240"],
+        details: [
+          { label: "Lâmina", value: "700 mm × 350 mm" },
+          { label: "DPI", value: "240" },
+        ],
         kind: "albumInformationConfirmation",
       }}
     />,

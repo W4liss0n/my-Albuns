@@ -28,7 +28,7 @@
     {
       "id": "album-information-confirmation-single-change",
       "title": "Diálogo de Informações do Álbum — uma alteração",
-      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%22Primeira%20L%C3%A2mina%3A%20P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%5D%7D",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
       "comparison": {
         "kind": "implementation-only",
         "surface": "owned-confirmation-dialog",
