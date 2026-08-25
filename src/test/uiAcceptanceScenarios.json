@@ -12,6 +12,20 @@
       "actions": []
     },
     {
+      "id": "opening-progress-indeterminate",
+      "title": "Diálogo de abertura — progresso indeterminado",
+      "implementationPath": "/dialog.html?kind=opening-project",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A referência visual vigente mostra o antigo rótulo redundante de estimativa e não representa o diálogo em janela nativa do Windows definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
       "id": "new-project-configuration",
       "title": "Novo Projeto — Configurações",
       "implementationPath": "/welcome-preview.html",

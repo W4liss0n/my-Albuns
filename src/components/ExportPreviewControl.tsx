@@ -155,7 +155,6 @@ export const ExportPreviewControl = forwardRef<
             kind: "exportProgress",
             progress: {
               kind: "indeterminate",
-              note: "sem estimativa de tempo",
               status: "Iniciando a Exportação",
             },
           });
@@ -396,7 +395,6 @@ function progressDialogState(
           }
         : {
             kind: "indeterminate",
-            note: "sem estimativa de tempo",
             status,
           },
   };

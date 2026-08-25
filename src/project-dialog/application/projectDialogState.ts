@@ -42,9 +42,6 @@ export function parseProjectDialogState(
         value.progress.kind === "indeterminate"
           ? {
               kind: "indeterminate" as const,
-              ...(typeof value.progress.note === "string"
-                ? { note: value.progress.note }
-                : {}),
               status: value.progress.status,
             }
           : value.progress.kind === "determinate" &&

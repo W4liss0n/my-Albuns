@@ -14,7 +14,6 @@ type DeterminateProgress = {
 
 type IndeterminateProgress = {
   kind: "indeterminate";
-  note?: ReactNode;
   status: ReactNode;
 };
 
@@ -120,11 +119,7 @@ export function ProgressDialog({
                 <span className="ui-progress-dialog__meta-spacer" />
                 {progress.remaining ? <span>{progress.remaining}</span> : null}
               </div>
-            ) : (
-              <p className="ui-progress-dialog__note">
-                {progress.note ?? "sem estimativa de tempo"}
-              </p>
-            )}
+            ) : null}
           </>
         )}
       </div>

@@ -603,8 +603,7 @@
   gap: 9px;
 }
 
-.ui-progress-dialog__status,
-.ui-progress-dialog__note {
+.ui-progress-dialog__status {
   margin: 0;
 }
 
@@ -637,8 +636,7 @@
     infinite;
 }
 
-.ui-progress-dialog__meta,
-.ui-progress-dialog__note {
+.ui-progress-dialog__meta {
   color: var(--ui-text-muted);
   font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-support);

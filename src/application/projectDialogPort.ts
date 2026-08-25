@@ -1,7 +1,6 @@
 export type ProjectDialogProgress =
   | {
       kind: "indeterminate";
-      note?: string;
       status: string;
     }
   | {

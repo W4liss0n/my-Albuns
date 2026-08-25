@@ -114,7 +114,6 @@ test("waits for the backend started event before opening the native progress win
     kind: "exportProgress",
     progress: {
       kind: "indeterminate",
-      note: "sem estimativa de tempo",
       status: "Iniciando a Exportação",
     },
   });
@@ -147,7 +146,6 @@ test("projects measured and unmeasured progress through the dialog port", async 
     kind: "exportProgress",
     progress: {
       kind: "indeterminate",
-      note: "sem estimativa de tempo",
       status: "Preparando a prova",
     },
   });

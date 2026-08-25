@@ -37,7 +37,6 @@ function DialogContent() {
       <ProgressDialog
         progress={{
           kind: "indeterminate",
-          note: "sem estimativa de tempo",
           status: "Preparando a Janela do Projeto…",
         }}
         title="Criando Projeto"
@@ -71,7 +70,6 @@ function DialogContent() {
     <ProgressDialog
       progress={{
         kind: "indeterminate",
-        note: "sem estimativa de tempo",
         status: "Preparando a Janela do Projeto…",
       }}
       title="Abrindo Projeto"

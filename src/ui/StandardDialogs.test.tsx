@@ -11,7 +11,6 @@ test("presents indeterminate progress without inventing a percentage", () => {
     <ProgressDialog
       progress={{
         kind: "indeterminate",
-        note: "sem estimativa de tempo",
         status: "Preparando a Janela do Projeto…",
       }}
       title="Abrindo Projeto"
@@ -27,6 +26,9 @@ test("presents indeterminate progress without inventing a percentage", () => {
     "Preparando a Janela do Projeto",
   );
   expect(progressbar).not.toHaveAttribute("aria-valuenow");
+  expect(
+    within(dialog).queryByText("sem estimativa de tempo", { exact: false }),
+  ).not.toBeInTheDocument();
   expect(within(dialog).queryByRole("button")).not.toBeInTheDocument();
 });
 

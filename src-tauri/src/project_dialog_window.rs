@@ -15,7 +15,6 @@ const MAX_DIALOG_DETAILS: usize = 8;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(crate) enum ProjectDialogProgress {
     Indeterminate {
-        note: Option<String>,
         status: String,
     },
     Determinate {
@@ -79,9 +78,8 @@ impl ProjectDialogState {
                 cancel_requested,
                 cancellable,
                 progress: match progress {
-                    ProjectDialogProgress::Indeterminate { note, status } => {
+                    ProjectDialogProgress::Indeterminate { status } => {
                         ProjectDialogProgress::Indeterminate {
-                            note: note.map(bound_text),
                             status: bound_text(status),
                         }
                     }
