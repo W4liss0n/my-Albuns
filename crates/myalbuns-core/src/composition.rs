@@ -127,55 +127,6 @@ pub(crate) fn compose_frame_border_fill_rects(
     ]
 }
 
-#[cfg(test)]
-mod frame_border_tests {
-    use super::*;
-
-    #[test]
-    fn composes_an_inward_border_and_saturates_without_degenerate_rects() {
-        let frame = RectUm {
-            x: 10,
-            y: 20,
-            width: 100,
-            height: 60,
-        };
-        let border = ProjectedFrameBorder::Solid {
-            rgb: "#000000".into(),
-            width_um: 100,
-        };
-
-        assert_eq!(
-            compose_frame_border_fill_rects(&frame, &border),
-            vec![
-                RectUm {
-                    x: 10,
-                    y: 20,
-                    width: 100,
-                    height: 60,
-                },
-                RectUm {
-                    x: 10,
-                    y: 20,
-                    width: 100,
-                    height: 60,
-                },
-                RectUm {
-                    x: 10,
-                    y: 20,
-                    width: 60,
-                    height: 60,
-                },
-                RectUm {
-                    x: 50,
-                    y: 20,
-                    width: 60,
-                    height: 60,
-                },
-            ],
-        );
-    }
-}
-
 pub(crate) fn derive_media_usage(
     album: &AlbumSnapshot,
     composition: &CompositionPlan,
@@ -471,5 +422,54 @@ fn apply_matrix(matrix: &Matrix2, vector: &NormalizedPan) -> VectorUm {
     VectorUm {
         x: matrix.xx * vector.x + matrix.xy * vector.y,
         y: matrix.yx * vector.x + matrix.yy * vector.y,
+    }
+}
+
+#[cfg(test)]
+mod frame_border_tests {
+    use super::*;
+
+    #[test]
+    fn composes_an_inward_border_and_saturates_without_degenerate_rects() {
+        let frame = RectUm {
+            x: 10,
+            y: 20,
+            width: 100,
+            height: 60,
+        };
+        let border = ProjectedFrameBorder::Solid {
+            rgb: "#000000".into(),
+            width_um: 100,
+        };
+
+        assert_eq!(
+            compose_frame_border_fill_rects(&frame, &border),
+            vec![
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 100,
+                    height: 60,
+                },
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 100,
+                    height: 60,
+                },
+                RectUm {
+                    x: 10,
+                    y: 20,
+                    width: 60,
+                    height: 60,
+                },
+                RectUm {
+                    x: 50,
+                    y: 20,
+                    width: 60,
+                    height: 60,
+                },
+            ],
+        );
     }
 }
