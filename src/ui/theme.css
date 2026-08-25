@@ -36,6 +36,9 @@
   --ui-shadow-toolbar: 0 2px 6px rgb(60 54 44 / 8%);
   --ui-shadow-dialog: 0 22px 60px rgb(60 54 44 / 18%);
   --ui-shadow-menu: 0 12px 28px rgb(60 54 44 / 16%);
+  --ui-scrollbar-track: transparent;
+  --ui-scrollbar-thumb: #c9c4ba;
+  --ui-scrollbar-thumb-hover: #b5afa4;
   --ui-radius-small: 4px;
   --ui-radius: 6px;
   --ui-titlebar-height: 38px;
@@ -119,15 +122,15 @@ textarea:focus-visible {
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 99px;
-  background: #c9c4ba;
+  background: var(--ui-scrollbar-thumb);
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #b5afa4;
+  background: var(--ui-scrollbar-thumb-hover);
   background-clip: content-box;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--ui-scrollbar-track);
 }

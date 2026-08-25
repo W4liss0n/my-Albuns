@@ -298,7 +298,10 @@ test("uses the focused Sheet instead of the Canvas perimeter as the keyboard foc
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*none;/s,
   );
   expect(editorStyles).toMatch(
-    /\.canvas-horizontal-scrollbar:focus-visible\s*\{[^}]*background:\s*var\(--ui-surface-muted\);/s,
+    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-border\);[^}]*--ui-scrollbar-thumb:\s*var\(--ui-panel-surface\);/s,
+  );
+  expect(editorStyles).toMatch(
+    /\.canvas-horizontal-scrollbar:focus-visible\s*\{[^}]*background:\s*var\(--ui-scrollbar-track\);/s,
   );
   expect(editorStyles).not.toMatch(
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-accent\);/s,
