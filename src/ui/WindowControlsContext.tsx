@@ -6,12 +6,14 @@ import {
 
 export interface WindowControls {
   close(): Promise<void> | void;
+  fitContent(height: number): Promise<void> | void;
   minimize(): Promise<void> | void;
   toggleMaximize(): Promise<void> | void;
 }
 
 const browserWindowControls: WindowControls = {
   close: () => undefined,
+  fitContent: () => undefined,
   minimize: () => undefined,
   toggleMaximize: () => undefined,
 };

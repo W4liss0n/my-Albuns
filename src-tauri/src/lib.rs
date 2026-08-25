@@ -204,6 +204,8 @@ mod tests {
             dialog_capability["permissions"],
             serde_json::json!([
                 "core:window:allow-close",
+                "core:window:allow-center",
+                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );
@@ -213,7 +215,11 @@ mod tests {
         );
         assert_eq!(
             progress_dialog_capability["permissions"],
-            serde_json::json!(["core:window:allow-start-dragging"])
+            serde_json::json!([
+                "core:window:allow-center",
+                "core:window:allow-set-size",
+                "core:window:allow-start-dragging"
+            ])
         );
         assert_eq!(
             project_capability["permissions"],
@@ -250,6 +256,8 @@ mod tests {
                 "core:event:allow-listen",
                 "core:event:allow-unlisten",
                 "core:window:allow-close",
+                "core:window:allow-center",
+                "core:window:allow-set-size",
                 "core:window:allow-start-dragging"
             ])
         );

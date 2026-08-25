@@ -536,6 +536,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 ### Estrutura da interface
 
 - Todo diálogo do aplicativo abre como uma janela nativa separada e pertencente à janela que o solicitou. Fora da abertura de um Projeto existente, a proprietária permanece visível ao fundo, bloqueada para interação enquanto o diálogo estiver aberto, e recupera interação e foco quando ele termina.
+- A largura de cada tipo de diálogo permanece estável, enquanto a altura acompanha seu conteúdo renderizado e é recalculada quando o estado muda; o ajuste recentraliza a janela e respeita a área útil do monitor.
 - `Abrir Projeto`, inclusive por `Projetos recentes`, é a única transição que retira a superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
 - Toda operação que precisa de uma janela de progresso usa a mesma representação minimalista.
 - Com total conhecido, ela mostra uma linha curta de estado, uma barra geral, porcentagem e uma estimativa de tempo somente quando confiável; a própria linha pode expressar a unidade como `X/Y`. Sem total confiável, usa barra animada indeterminada e omite porcentagem, contagem e estimativa.

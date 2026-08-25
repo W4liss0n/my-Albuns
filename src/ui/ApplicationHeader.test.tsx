@@ -11,6 +11,7 @@ import { WindowControlsProvider } from "./WindowControlsContext";
 
 const windowActions = {
   close: vi.fn(async () => undefined),
+  fitContent: vi.fn(async () => undefined),
   minimize: vi.fn(async () => undefined),
   toggleMaximize: vi.fn(async () => undefined),
 };

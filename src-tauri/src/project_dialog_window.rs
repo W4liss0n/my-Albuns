@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, LogicalSize, Manager, State, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{native_dialog_window, product_runtime::PROJECT_WINDOW_LABEL};
 
@@ -108,7 +108,7 @@ impl ProjectDialogState {
         }
     }
 
-    fn dimensions(&self) -> (f64, f64) {
+    fn initial_dimensions(&self) -> (f64, f64) {
         match self {
             Self::AlbumInformationConfirmation { .. } => (
                 520.0,
@@ -177,11 +177,6 @@ pub(crate) async fn present_project_dialog(
     let owner = window;
 
     if let Some(dialog) = app.get_webview_window(PROJECT_DIALOG_LABEL) {
-        let (width, height) = state.dimensions();
-        dialog
-            .set_size(LogicalSize::new(width, height))
-            .map_err(|error| error.to_string())?;
-        dialog.center().map_err(|error| error.to_string())?;
         dialog
             .emit(PROJECT_DIALOG_STATE_EVENT, &state)
             .map_err(|error| error.to_string())?;
@@ -194,7 +189,7 @@ pub(crate) async fn present_project_dialog(
         "project-dialog.html?state={}",
         native_dialog_window::encode_unbounded_component(&serialized)
     );
-    let (width, height) = state.dimensions();
+    let (width, height) = state.initial_dimensions();
     let dialog = native_dialog_window::build_hidden_owned_window(
         &app,
         &owner,

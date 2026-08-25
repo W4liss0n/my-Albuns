@@ -512,11 +512,11 @@
 .ui-owned-window-shell {
   display: grid;
   width: 100%;
-  height: 100%;
+  height: max-content;
   box-sizing: border-box;
   border: 1px solid var(--ui-border-strong);
   background: var(--ui-surface-raised);
-  grid-template-rows: var(--ui-titlebar-height) minmax(0, 1fr);
+  grid-template-rows: var(--ui-titlebar-height) auto;
 }
 
 .ui-owned-window-shell > .ui-application-header {

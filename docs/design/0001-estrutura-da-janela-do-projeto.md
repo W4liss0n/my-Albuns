@@ -31,6 +31,8 @@ No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de n
 
 Confirmações, avisos, seletores e progressos abrem em uma janela nativa separada com a janela solicitante como proprietária. A proprietária continua visível atrás do diálogo, mas fica desabilitada para mouse, teclado e comandos enquanto o diálogo estiver aberto. A relação nativa mantém o diálogo à frente sem recorrer a uma camada modal dentro da WebView. Fechar, cancelar ou concluir o diálogo reabilita a proprietária e devolve o foco a ela.
 
+Cada diálogo conserva uma largura estável adequada ao seu tipo, mas sua altura acompanha o conteúdo efetivamente renderizado, sem reservar uma área vazia padrão. Mudanças de estado, mensagens ou detalhes recalculam essa altura; a janela é recentralizada depois do ajuste e, quando o conteúdo excede a área útil do monitor, fica limitada a ela em vez de ultrapassar a tela.
+
 A única política de substituição pertence ao fluxo `Abrir Projeto`: depois que um arquivo existente ou um Projeto recente foi escolhido, a superfície de origem sai da área visível antes da janela de progresso. O detalhamento e a recuperação em caso de falha pertencem ao design da [Tela de Boas-vindas](0002-tela-de-boas-vindas.md). `Novo Projeto`, a confirmação de `Informações do Álbum`, fechamento, Exportação e os demais avisos ou progressos seguem o padrão de proprietário visível e bloqueado.
 
 ## Estrutura-base

@@ -6,6 +6,8 @@
   "windows": ["dialog-project-failure"],
   "permissions": [
     "core:window:allow-close",
+    "core:window:allow-center",
+    "core:window:allow-set-size",
     "core:window:allow-start-dragging"
   ]
 }
