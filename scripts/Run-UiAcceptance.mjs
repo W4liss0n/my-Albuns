@@ -19,6 +19,7 @@ import {
   waitForProcessInstance,
 } from "./DevLifecycleProcessInstances.mjs";
 import {
+  finalizeUiAcceptanceSourceEvidence,
   renderUiAcceptanceReport,
   validateUiAcceptanceManifest,
   webdriverElementId,
@@ -91,12 +92,27 @@ function gitOutput(arguments_) {
   }
 }
 
+function captureSourceInputs() {
+  const gitCommit = gitOutput(["rev-parse", "HEAD"]);
+  const status = gitOutput(["status", "--porcelain"]);
+  return {
+    dirty: status === "unavailable" ? null : status !== "",
+    gitCommit,
+  };
+}
+
+const initialSourceInputs = captureSourceInputs();
+
 const evidence = {
   schemaVersion: 2,
   gate: "ui-acceptance",
   collectedAtUtc: new Date().toISOString(),
-  gitCommit: gitOutput(["rev-parse", "HEAD"]),
-  sourceInputsDirty: gitOutput(["status", "--porcelain"]) !== "",
+  gitCommit: initialSourceInputs.gitCommit,
+  sourceInputsDirty: initialSourceInputs.dirty,
+  sourceInputs: {
+    initial: initialSourceInputs,
+    final: null,
+  },
   captureStatus: "capture-failed",
   reviewStatus: "not-reviewed",
   browser: {
@@ -626,6 +642,10 @@ const allCaptured = evidence.scenarios.every(
 evidence.captureStatus = allCaptured
   ? "captured-unreviewed"
   : "capture-failed";
+const sourceInputsResult = finalizeUiAcceptanceSourceEvidence(
+  evidence,
+  captureSourceInputs(),
+);
 const evidencePath = path.join(outputDirectory, "evidence.json");
 const reportPath = path.join(outputDirectory, "report.html");
 writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
@@ -637,6 +657,15 @@ console.log(
     cleanupCompleted: evidence.cleanupCompleted,
     evidencePath,
     reportPath,
+    sourceInputs: evidence.sourceInputs,
   }),
 );
-if (fatalError || cleanupError || !allCaptured) process.exitCode = 1;
+if (
+  fatalError ||
+  cleanupError ||
+  !allCaptured ||
+  sourceInputsResult.changedDuringCapture ||
+  !sourceInputsResult.snapshotsKnown
+) {
+  process.exitCode = 1;
+}

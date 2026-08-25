@@ -22,6 +22,7 @@
     "test:dev-lifecycle": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-DevLifecycle.ps1",
     "test:ui-acceptance": "node --test scripts/Test-UiAcceptance.mjs",
     "ui:acceptance": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Run-UiAcceptance.ps1",
+    "ui:acceptance:review": "node scripts/Review-UiAcceptance.mjs",
     "test:windows-path": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Test-WindowsPathGate.ps1",
     "preview": "vite preview",
     "tauri": "tauri"

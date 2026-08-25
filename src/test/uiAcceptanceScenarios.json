@@ -68,6 +68,104 @@
       "actions": []
     },
     {
+      "id": "project-close-confirmation",
+      "title": "Diálogo do Projeto — confirmar fechamento",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseConfirmation%22%2C%22busy%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O fechamento usa o diálogo pertencente à Janela definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 600, "height": 320 },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "project-close-confirmation-busy",
+      "title": "Diálogo do Projeto — fechamento durante Salvamento",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseConfirmation%22%2C%22busy%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O estado ocupado do fechamento pertence ao fluxo nativo aceito e não possui equivalente na referência visual vigente."
+      },
+      "viewport": { "width": 600, "height": 320 },
+      "readySelector": ".ui-standard-message",
+      "actions": []
+    },
+    {
+      "id": "project-close-failure",
+      "title": "Diálogo do Projeto — falha ao fechar",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseFailure%22%2C%22message%22%3A%22O%20Projeto%20n%C3%A3o%20p%C3%B4de%20ser%20fechado.%22%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Falhas de fechamento seguem o componente canônico pertencente à Janela."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
+      "id": "export-progress-determinate",
+      "title": "Diálogo de Exportação — progresso determinado",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A3%2C%22total%22%3A8%2C%22status%22%3A%22Compondo%20L%C3%A2minas%E2%80%A6%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A Exportação usa progresso pertencente à Janela conforme as decisões aceitas posteriores."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "export-progress-cancel-requested",
+      "title": "Diálogo de Exportação — cancelamento solicitado",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Atrue%2C%22cancellable%22%3Atrue%2C%22progress%22%3A%7B%22kind%22%3A%22indeterminate%22%2C%22status%22%3A%22Cancelando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O cancelamento em andamento não possui equivalente na referência visual vigente."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "export-failure-retryable",
+      "title": "Diálogo de Exportação — falha recuperável",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Afalse%2C%22message%22%3A%22N%C3%A3o%20foi%20poss%C3%ADvel%20publicar%20a%20Exporta%C3%A7%C3%A3o.%22%2C%22retryDisabled%22%3Afalse%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Falhas de Exportação seguem o componente canônico pertencente à Janela."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
+      "id": "export-failure-cancelled",
+      "title": "Diálogo de Exportação — cancelada",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportFailure%22%2C%22cancelled%22%3Atrue%2C%22message%22%3A%22A%20Exporta%C3%A7%C3%A3o%20foi%20cancelada.%22%2C%22retryDisabled%22%3Atrue%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A conclusão cancelada usa o estado canônico posterior à referência visual vigente."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
       "id": "new-project-configuration",
       "title": "Novo Projeto — Configurações",
       "implementationPath": "/welcome-preview.html",
@@ -94,6 +192,153 @@
       "referenceActions": [
         { "type": "click-text", "text": "Continuar" }
       ]
+    },
+    {
+      "id": "project-workspace-integrated",
+      "title": "Janela do Projeto — workspace integrado e contexto Álbum",
+      "implementationPath": "/workspace-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "project-workspace",
+        "implementationCaptureSelector": ".app-shell",
+        "referenceCaptureSelector": "body"
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".app-shell:has(.workspace-grid canvas):has(#contextual-panel button[aria-label=\"Informações do Álbum\"][aria-expanded=\"true\"])",
+      "referenceReadySelector": "[data-l=\"2\"]",
+      "actions": [],
+      "referenceActions": []
+    },
+    {
+      "id": "project-workspace-sheet-context",
+      "title": "Janela do Projeto — contexto Lâmina",
+      "implementationPath": "/workspace-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-sheet-context",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o Modo de edição da Lâmina e seu Painel contextual definidos nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "#contextual-panel button[aria-label=\"Design da Lâmina\"][aria-expanded=\"true\"]",
+      "actions": [
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" }
+      ]
+    },
+    {
+      "id": "project-workspace-photo-context",
+      "title": "Janela do Projeto — contexto Frame com Foto",
+      "implementationPath": "/workspace-preview.html?frame=photo",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-photo-context",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o contexto produtivo atual de Frame e Foto depois da seleção no Modo de edição da Lâmina."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
+      "actions": [
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".workspace-grid canvas" }
+      ]
+    },
+    {
+      "id": "project-workspace-frame-placeholder-context",
+      "title": "Janela do Projeto — contexto Frame placeholder",
+      "implementationPath": "/workspace-preview.html?frame=empty",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-frame-context",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa o contexto produtivo atual de Frame placeholder depois da seleção no Modo de edição da Lâmina."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
+      "actions": [
+        { "type": "focus", "selector": ".workspace-grid canvas" },
+        { "type": "key", "key": "Enter" },
+        { "type": "click", "selector": ".workspace-grid canvas" }
+      ]
+    },
+    {
+      "id": "project-workspace-menu-open",
+      "title": "Janela do Projeto — menu Arquivo aberto",
+      "implementationPath": "/workspace-preview.html",
+      "referencePath": "/docs/references/ui-programa-diagramacao/myalbuns.dc.html",
+      "comparison": {
+        "kind": "paired",
+        "surface": "project-workspace-menu",
+        "implementationCaptureSelector": ".app-shell",
+        "referenceCaptureSelector": "body"
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "#application-menu-file",
+      "referenceReadySelector": "button[data-menu=\"arquivo\"]",
+      "actions": [
+        { "type": "click", "selector": "[aria-controls=\"application-menu-file\"]" }
+      ],
+      "referenceActions": [
+        { "type": "click", "selector": "button[data-menu=\"arquivo\"]" }
+      ]
+    },
+    {
+      "id": "project-workspace-panels-persisted",
+      "title": "Janela do Projeto — tamanhos de painéis persistidos",
+      "implementationPath": "/workspace-preview.html?layout=persisted",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-panels",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a restauração persistida dos tamanhos dos Painéis definida nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".workspace-grid[style*=\"--inspector-width: 420px\"][style*=\"--media-panel-height: 140px\"]",
+      "actions": []
+    },
+    {
+      "id": "project-workspace-panels-collapsed",
+      "title": "Janela do Projeto — painéis ocultos persistidos",
+      "implementationPath": "/workspace-preview.html?layout=collapsed",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-panels",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente não representa a restauração persistida da visibilidade dos Painéis definida nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".workspace-grid:not(:has(#contextual-panel)):not(:has(.media-panel))",
+      "actions": []
+    },
+    {
+      "id": "project-graphics-failure",
+      "title": "Janela do Projeto — falha gráfica inicial",
+      "implementationPath": "/workspace-preview.html?graphics=unsupported",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-graphics-failure",
+        "implementationCaptureSelector": ".startup-surface",
+        "reason": "A referência visual vigente não representa o bloqueio seguro da Janela do Projeto quando WebGL2 por hardware não é confirmado."
+      },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": ".startup-card[role=\"alert\"]",
+      "actions": []
+    },
+    {
+      "id": "safe-application-shell",
+      "title": "Aplicativo — Safe Shell por falha gráfica",
+      "implementationPath": "/welcome-preview.html?graphics=unsupported",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "safe-application-shell",
+        "implementationCaptureSelector": ".safe-application-shell",
+        "reason": "A referência visual vigente não representa o Safe Shell global definido pelas decisões aceitas posteriores para hardware gráfico indisponível."
+      },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": ".safe-shell",
+      "actions": []
     },
     {
       "id": "media-panel",

@@ -5,9 +5,11 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  finalizeUiAcceptanceSourceEvidence,
   renderUiAcceptanceReport,
   servedFilePath,
   validateUiAcceptanceManifest,
+  validateUiAcceptanceReview,
 } from "./UiAcceptance.mjs";
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -75,6 +77,190 @@ test("editor scenarios declare honest, surface-matched comparisons", () => {
       `${scenario.id} repeats a misleading reference state`,
     );
     pairedFingerprints.add(fingerprint);
+  }
+});
+
+test("the manifest covers the integrated workspace and every critical Project dialog state", () => {
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  const workspaceScenario = scenariosById.get("project-workspace-integrated");
+  assert.equal(workspaceScenario?.implementationPath, "/workspace-preview.html");
+  assert.equal(workspaceScenario?.comparison.surface, "project-workspace");
+  assert.equal(workspaceScenario?.comparison.kind, "paired");
+  assert.equal(
+    existsSync(path.join(workspace, "src", "workspace-preview.tsx")),
+    true,
+    "the integrated workspace entrypoint is missing",
+  );
+
+  const workspaceEntrypoint = readFileSync(
+    path.join(workspace, "src", "workspace-preview.tsx"),
+    "utf8",
+  );
+  assert.match(
+    workspaceEntrypoint,
+    /import App from "\.\/App";/u,
+    "the integrated workspace must use the production App composition",
+  );
+  assert.match(
+    workspaceEntrypoint,
+    /<App\s/u,
+    "the integrated workspace must render the production App composition",
+  );
+
+  const criticalStates = {
+    "project-close-confirmation": {
+      busy: false,
+      kind: "projectCloseConfirmation",
+    },
+    "project-close-confirmation-busy": {
+      busy: true,
+      kind: "projectCloseConfirmation",
+    },
+    "project-close-failure": { kind: "projectCloseFailure" },
+    "export-progress-determinate": {
+      cancelRequested: false,
+      kind: "exportProgress",
+      progressKind: "determinate",
+    },
+    "export-progress-cancel-requested": {
+      cancelRequested: true,
+      kind: "exportProgress",
+      progressKind: "indeterminate",
+    },
+    "export-failure-retryable": {
+      cancelled: false,
+      kind: "exportFailure",
+      retryDisabled: false,
+    },
+    "export-failure-cancelled": {
+      cancelled: true,
+      kind: "exportFailure",
+      retryDisabled: true,
+    },
+  };
+  for (const [id, expected] of Object.entries(criticalStates)) {
+    const scenario = scenariosById.get(id);
+    assert.ok(scenario, `${id} is missing`);
+    assert.match(scenario.implementationPath, /^\/project-dialog\.html\?state=/u);
+    assert.equal(scenario.comparison.kind, "implementation-only");
+    assert.equal(scenario.comparison.surface.startsWith("owned-"), true);
+
+    const state = JSON.parse(
+      new URL(scenario.implementationPath, "http://127.0.0.1").searchParams.get(
+        "state",
+      ),
+    );
+    assert.equal(state.kind, expected.kind, `${id} captures the wrong state kind`);
+    for (const modifier of [
+      "busy",
+      "cancelRequested",
+      "cancelled",
+      "retryDisabled",
+    ]) {
+      if (modifier in expected) {
+        assert.equal(
+          state[modifier],
+          expected[modifier],
+          `${id} captures the wrong ${modifier} modifier`,
+        );
+      }
+    }
+    if ("progressKind" in expected) {
+      assert.equal(
+        state.progress?.kind,
+        expected.progressKind,
+        `${id} captures the wrong progress variant`,
+      );
+    }
+  }
+
+  const capturedDialogKinds = new Set(
+    manifest.scenarios
+      .filter((scenario) => scenario.implementationPath.startsWith("/project-dialog.html?state="))
+      .map((scenario) =>
+        JSON.parse(
+          new URL(
+            scenario.implementationPath,
+            "http://127.0.0.1",
+          ).searchParams.get("state"),
+        ).kind,
+      ),
+  );
+  assert.deepEqual(
+    [...capturedDialogKinds].sort(),
+    [
+      "albumInformationConfirmation",
+      "exportFailure",
+      "exportProgress",
+      "exportSuccess",
+      "projectCloseConfirmation",
+      "projectCloseFailure",
+      "projectOperationFailure",
+    ],
+  );
+});
+
+test("the manifest covers critical integrated workspace, panel, menu, and graphics states", () => {
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  const expectedStates = {
+    "project-workspace-integrated": {
+      path: "/workspace-preview.html",
+      ready: /Informações do Álbum/u,
+    },
+    "project-workspace-sheet-context": {
+      path: "/workspace-preview.html",
+      ready: /Design da Lâmina/u,
+      actions: ["focus", "key"],
+    },
+    "project-workspace-photo-context": {
+      path: "/workspace-preview.html?frame=photo",
+      ready: /Zoom da Foto/u,
+      actions: ["focus", "key", "click"],
+    },
+    "project-workspace-frame-placeholder-context": {
+      path: "/workspace-preview.html?frame=empty",
+      ready: /context-heading/u,
+      actions: ["focus", "key", "click"],
+    },
+    "project-workspace-menu-open": {
+      path: "/workspace-preview.html",
+      ready: /application-menu-file/u,
+      actions: ["click"],
+    },
+    "project-workspace-panels-persisted": {
+      path: "/workspace-preview.html?layout=persisted",
+      ready: /inspector-width/u,
+    },
+    "project-workspace-panels-collapsed": {
+      path: "/workspace-preview.html?layout=collapsed",
+      ready: /not\(:has/u,
+    },
+    "project-graphics-failure": {
+      path: "/workspace-preview.html?graphics=unsupported",
+      ready: /startup-card/u,
+    },
+    "safe-application-shell": {
+      path: "/welcome-preview.html?graphics=unsupported",
+      ready: /safe-shell/u,
+    },
+  };
+
+  for (const [id, expected] of Object.entries(expectedStates)) {
+    const scenario = scenariosById.get(id);
+    assert.ok(scenario, `${id} is missing`);
+    assert.equal(scenario.implementationPath, expected.path);
+    assert.match(scenario.readySelector, expected.ready);
+    if (expected.actions) {
+      assert.deepEqual(
+        scenario.actions.map((action) => action.type),
+        expected.actions,
+        `${id} must exercise the declared user transition`,
+      );
+    }
   }
 });
 
@@ -265,11 +451,51 @@ test("runner captures the declared surface instead of the whole viewport", async
   ]);
 });
 
+test("runner snapshots HEAD and dirty state before and after capture", () => {
+  const runner = readFileSync(
+    path.join(workspace, "scripts", "Run-UiAcceptance.mjs"),
+    "utf8",
+  );
+  const initialSnapshot = runner.indexOf(
+    "const initialSourceInputs = captureSourceInputs();",
+  );
+  const captureLoop = runner.indexOf("for (const scenario of manifest.scenarios)");
+  const finalSnapshot = runner.indexOf(
+    "const sourceInputsResult = finalizeUiAcceptanceSourceEvidence(",
+  );
+  const evidenceWrite = runner.indexOf(
+    "writeFileSync(evidencePath",
+  );
+
+  assert.ok(initialSnapshot >= 0, "the initial source snapshot is missing");
+  assert.ok(
+    initialSnapshot < captureLoop,
+    "the initial source snapshot must precede scenario capture",
+  );
+  assert.ok(
+    finalSnapshot > captureLoop,
+    "the final source snapshot must follow scenario capture",
+  );
+  assert.ok(
+    finalSnapshot < evidenceWrite,
+    "source integrity must be finalized before evidence is written",
+  );
+  assert.match(
+    runner,
+    /sourceInputsResult\.changedDuringCapture[\s\S]*process\.exitCode = 1/u,
+    "source mutation must fail the capture gate",
+  );
+});
+
 test("the report labels captures as unreviewed and includes every scenario", () => {
   const evidence = {
     collectedAtUtc: "2026-08-24T12:00:00.000Z",
     gitCommit: "abc123",
     sourceInputsDirty: true,
+    sourceInputs: {
+      initial: { dirty: true, gitCommit: "abc123" },
+      final: { dirty: true, gitCommit: "abc123" },
+    },
     captureStatus: "captured-unreviewed",
     scenarios: manifest.scenarios.map((scenario) => ({
       ...scenario,
@@ -292,4 +518,197 @@ test("the report labels captures as unreviewed and includes every scenario", () 
   assert.match(html, /A referência visual vigente não representa o Modo de edição/);
   assert.doesNotMatch(html, /undefined/);
   for (const scenario of manifest.scenarios) assert.match(html, new RegExp(scenario.id));
+});
+
+test("a visual review is complete, explicit, and bound to the captured commit", () => {
+  const evidence = {
+    gitCommit: "abc123",
+    sourceInputsDirty: false,
+    sourceInputs: {
+      initial: { dirty: false, gitCommit: "abc123" },
+      final: { dirty: false, gitCommit: "abc123" },
+    },
+    scenarios: manifest.scenarios.slice(0, 2).map((scenario) => ({
+      ...scenario,
+      captureStatus: "captured-unreviewed",
+    })),
+  };
+  const review = {
+    schemaVersion: 1,
+    gitCommit: "abc123",
+    reviewedAtUtc: "2026-08-25T12:00:00.000Z",
+    reviewer: "Codex visual review",
+    scenarios: evidence.scenarios.map((scenario) => ({
+      id: scenario.id,
+      outcome: "accepted",
+      notes: "Conferido contra a referência vigente e as decisões aceitas.",
+    })),
+  };
+
+  assert.equal(validateUiAcceptanceReview(evidence, review), review);
+  const reviewedReport = renderUiAcceptanceReport(
+    {
+      ...evidence,
+      collectedAtUtc: "2026-08-25T11:00:00.000Z",
+      captureStatus: "captured-unreviewed",
+      sourceInputsDirty: false,
+      scenarios: evidence.scenarios.map((scenario) => ({
+        ...scenario,
+        implementationScreenshot: `screenshots/${scenario.id}.png`,
+        implementationUrl: `http://127.0.0.1:1437${scenario.implementationPath}`,
+        ...(scenario.comparison.kind === "paired"
+          ? {
+              referenceScreenshot: `screenshots/${scenario.id}-reference.png`,
+              referenceUrl: `http://127.0.0.1:1437${scenario.referencePath}`,
+            }
+          : {}),
+      })),
+    },
+    review,
+  );
+  assert.match(reviewedReport, /Aceito · revisão registrada/u);
+  assert.match(reviewedReport, /Codex visual review/u);
+  assert.doesNotMatch(reviewedReport, /Nenhuma captura foi aprovada automaticamente/u);
+
+  const stale = structuredClone(review);
+  stale.gitCommit = "outro-commit";
+  assert.throws(
+    () => validateUiAcceptanceReview(evidence, stale),
+    /must match the captured commit/u,
+  );
+
+  const incomplete = structuredClone(review);
+  incomplete.scenarios.pop();
+  assert.throws(
+    () => validateUiAcceptanceReview(evidence, incomplete),
+    /must cover every captured scenario/u,
+  );
+
+  const dirtyEvidence = { ...evidence, sourceInputsDirty: true };
+  assert.throws(
+    () => validateUiAcceptanceReview(dirtyEvidence, review),
+    /cannot review evidence captured from a dirty worktree/u,
+  );
+});
+
+test("source changes during capture invalidate every screenshot and block review", () => {
+  const evidence = {
+    gitCommit: "commit-before",
+    sourceInputsDirty: false,
+    sourceInputs: {
+      initial: { dirty: false, gitCommit: "commit-before" },
+      final: null,
+    },
+    captureStatus: "captured-unreviewed",
+    scenarios: manifest.scenarios.slice(0, 2).map((scenario) => ({
+      ...scenario,
+      captureStatus: "captured-unreviewed",
+      reviewStatus: "not-reviewed",
+    })),
+  };
+
+  const result = finalizeUiAcceptanceSourceEvidence(evidence, {
+    dirty: true,
+    gitCommit: "commit-before",
+  });
+
+  assert.equal(result.changedDuringCapture, true);
+  assert.equal(result.reviewable, false);
+  assert.match(result.invalidationReason, /dirty state changed/u);
+  assert.equal(evidence.captureStatus, "capture-invalidated");
+  assert.deepEqual(
+    evidence.scenarios.map((scenario) => scenario.captureStatus),
+    ["capture-invalidated", "capture-invalidated"],
+  );
+  assert.deepEqual(
+    evidence.scenarios.map((scenario) => scenario.reviewStatus),
+    ["unvalidated", "unvalidated"],
+  );
+  const invalidatedReport = renderUiAcceptanceReport({
+    ...evidence,
+    collectedAtUtc: "2026-08-25T12:00:00.000Z",
+    scenarios: evidence.scenarios.map((scenario) => ({
+      ...scenario,
+      implementationUrl: `http://127.0.0.1:1437${scenario.implementationPath}`,
+      ...(scenario.comparison.kind === "paired"
+        ? {
+            referenceUrl: `http://127.0.0.1:1437${scenario.referencePath}`,
+          }
+        : {}),
+    })),
+  });
+  assert.match(invalidatedReport, /2 foram invalidados/u);
+  assert.match(invalidatedReport, /Captura invalidada/u);
+  assert.match(invalidatedReport, /dirty state changed during UI acceptance capture/u);
+
+  const review = {
+    schemaVersion: 1,
+    gitCommit: "commit-before",
+    reviewedAtUtc: "2026-08-25T12:00:00.000Z",
+    reviewer: "Codex visual review",
+    scenarios: evidence.scenarios.map((scenario) => ({
+      id: scenario.id,
+      outcome: "unvalidated",
+      notes: "As fontes mudaram durante a captura.",
+    })),
+  };
+  assert.throws(
+    () => validateUiAcceptanceReview(evidence, review),
+    /source inputs changed during capture/u,
+  );
+
+  const headChanged = {
+    ...evidence,
+    captureStatus: "captured-unreviewed",
+    scenarios: evidence.scenarios.map((scenario) => ({
+      ...scenario,
+      captureStatus: "captured-unreviewed",
+      reviewStatus: "not-reviewed",
+    })),
+    sourceInputs: {
+      initial: { dirty: false, gitCommit: "commit-before" },
+      final: null,
+    },
+  };
+  const headResult = finalizeUiAcceptanceSourceEvidence(headChanged, {
+    dirty: false,
+    gitCommit: "commit-after",
+  });
+  assert.equal(headResult.changedDuringCapture, true);
+  assert.match(headResult.invalidationReason, /HEAD changed/u);
+  assert.equal(headChanged.captureStatus, "capture-invalidated");
+});
+
+test("stable source snapshots preserve captures but only clean inputs are reviewable", () => {
+  const cleanEvidence = {
+    captureStatus: "captured-unreviewed",
+    scenarios: [{ captureStatus: "captured-unreviewed" }],
+    sourceInputs: {
+      initial: { dirty: false, gitCommit: "stable-commit" },
+      final: null,
+    },
+  };
+  const cleanResult = finalizeUiAcceptanceSourceEvidence(cleanEvidence, {
+    dirty: false,
+    gitCommit: "stable-commit",
+  });
+  assert.equal(cleanResult.changedDuringCapture, false);
+  assert.equal(cleanResult.reviewable, true);
+  assert.equal(cleanEvidence.captureStatus, "captured-unreviewed");
+
+  const dirtyEvidence = {
+    captureStatus: "captured-unreviewed",
+    scenarios: [{ captureStatus: "captured-unreviewed" }],
+    sourceInputs: {
+      initial: { dirty: true, gitCommit: "stable-commit" },
+      final: null,
+    },
+  };
+  const dirtyResult = finalizeUiAcceptanceSourceEvidence(dirtyEvidence, {
+    dirty: true,
+    gitCommit: "stable-commit",
+  });
+  assert.equal(dirtyResult.changedDuringCapture, false);
+  assert.equal(dirtyResult.reviewable, false);
+  assert.equal(dirtyEvidence.captureStatus, "captured-unreviewed");
 });

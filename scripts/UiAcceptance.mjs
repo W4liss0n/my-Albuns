@@ -166,6 +166,187 @@ export function validateUiAcceptanceManifest(manifest) {
   return manifest;
 }
 
+function reviewInvariant(condition, message) {
+  if (!condition) throw new Error(`Invalid UI acceptance review: ${message}`);
+}
+
+function sourceSnapshotIsKnown(snapshot) {
+  return Boolean(
+    snapshot &&
+    typeof snapshot === "object" &&
+    typeof snapshot.gitCommit === "string" &&
+    snapshot.gitCommit.length > 0 &&
+    snapshot.gitCommit !== "unavailable" &&
+    typeof snapshot.dirty === "boolean",
+  );
+}
+
+function evaluateUiAcceptanceSourceInputs(initial, final) {
+  const snapshotsKnown =
+    sourceSnapshotIsKnown(initial) && sourceSnapshotIsKnown(final);
+  const headChanged =
+    snapshotsKnown && initial.gitCommit !== final.gitCommit;
+  const dirtyStateChanged = snapshotsKnown && initial.dirty !== final.dirty;
+  const changedDuringCapture = headChanged || dirtyStateChanged;
+  let invalidationReason;
+  if (!snapshotsKnown) {
+    invalidationReason =
+      "source snapshot unavailable; HEAD and dirty state could not be verified";
+  } else if (headChanged && dirtyStateChanged) {
+    invalidationReason =
+      "HEAD changed and dirty state changed during UI acceptance capture";
+  } else if (headChanged) {
+    invalidationReason = "HEAD changed during UI acceptance capture";
+  } else if (dirtyStateChanged) {
+    invalidationReason =
+      "dirty state changed during UI acceptance capture";
+  }
+
+  return {
+    changedDuringCapture,
+    dirtyStateChanged,
+    headChanged,
+    invalidationReason,
+    reviewable:
+      snapshotsKnown &&
+      !changedDuringCapture &&
+      initial.dirty === false &&
+      final.dirty === false,
+    snapshotsKnown,
+  };
+}
+
+export function finalizeUiAcceptanceSourceEvidence(evidence, finalSnapshot) {
+  const initialSnapshot = evidence?.sourceInputs?.initial;
+  const result = evaluateUiAcceptanceSourceInputs(
+    initialSnapshot,
+    finalSnapshot,
+  );
+  const sourceIntegrityInvalid =
+    result.changedDuringCapture || !result.snapshotsKnown;
+
+  evidence.sourceInputs = {
+    initial: initialSnapshot,
+    final: finalSnapshot,
+    changedDuringCapture: result.changedDuringCapture,
+    reviewable: result.reviewable,
+    ...(result.invalidationReason
+      ? { invalidationReason: result.invalidationReason }
+      : {}),
+  };
+
+  if (sourceIntegrityInvalid) {
+    evidence.captureStatus = "capture-invalidated";
+    evidence.reviewStatus = "unvalidated";
+    for (const scenario of evidence.scenarios ?? []) {
+      scenario.reviewStatus = "unvalidated";
+      if (scenario.captureStatus === "captured-unreviewed") {
+        scenario.captureStatus = "capture-invalidated";
+        scenario.comparisonStatus = "source-invalidated";
+        scenario.error = result.invalidationReason;
+      }
+    }
+  }
+
+  return result;
+}
+
+export function validateUiAcceptanceReview(evidence, review) {
+  reviewInvariant(evidence && typeof evidence === "object", "evidence is required");
+  reviewInvariant(
+    typeof evidence.gitCommit === "string" && evidence.gitCommit,
+    "evidence.gitCommit is required",
+  );
+  reviewInvariant(
+    evidence.sourceInputs && typeof evidence.sourceInputs === "object",
+    "evidence.sourceInputs is required",
+  );
+  const sourceInputs = evaluateUiAcceptanceSourceInputs(
+    evidence.sourceInputs.initial,
+    evidence.sourceInputs.final,
+  );
+  reviewInvariant(
+    sourceInputs.snapshotsKnown,
+    "source inputs could not be verified",
+  );
+  reviewInvariant(
+    !sourceInputs.changedDuringCapture,
+    `source inputs changed during capture: ${sourceInputs.invalidationReason}`,
+  );
+  reviewInvariant(
+    evidence.sourceInputsDirty === false && sourceInputs.reviewable,
+    "cannot review evidence captured from a dirty worktree",
+  );
+  reviewInvariant(
+    evidence.gitCommit === evidence.sourceInputs.initial.gitCommit,
+    "evidence.gitCommit must match the initial source snapshot",
+  );
+  reviewInvariant(
+    Array.isArray(evidence.scenarios),
+    "evidence.scenarios must be an array",
+  );
+  reviewInvariant(review && typeof review === "object", "the document must be an object");
+  reviewInvariant(review.schemaVersion === 1, "schemaVersion must be 1");
+  reviewInvariant(
+    review.gitCommit === evidence.gitCommit,
+    "gitCommit must match the captured commit",
+  );
+  reviewInvariant(
+    typeof review.reviewer === "string" && review.reviewer.trim(),
+    "reviewer is required",
+  );
+  reviewInvariant(
+    typeof review.reviewedAtUtc === "string" &&
+      Number.isFinite(Date.parse(review.reviewedAtUtc)),
+    "reviewedAtUtc must be an ISO timestamp",
+  );
+  reviewInvariant(
+    Array.isArray(review.scenarios) &&
+      review.scenarios.length === evidence.scenarios.length,
+    "scenarios must cover every captured scenario",
+  );
+
+  const evidenceById = new Map(
+    evidence.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  const reviewedIds = new Set();
+  for (const [index, decision] of review.scenarios.entries()) {
+    const location = `scenarios[${index}]`;
+    reviewInvariant(
+      decision && typeof decision === "object",
+      `${location} must be an object`,
+    );
+    reviewInvariant(
+      typeof decision.id === "string" && evidenceById.has(decision.id),
+      `${location}.id must identify a captured scenario`,
+    );
+    reviewInvariant(
+      !reviewedIds.has(decision.id),
+      `${location}.id duplicates ${decision.id}`,
+    );
+    reviewedIds.add(decision.id);
+    reviewInvariant(
+      ["accepted", "rejected", "unvalidated"].includes(decision.outcome),
+      `${location}.outcome must be accepted, rejected, or unvalidated`,
+    );
+    reviewInvariant(
+      typeof decision.notes === "string" && decision.notes.trim(),
+      `${location}.notes is required`,
+    );
+    const captured = evidenceById.get(decision.id);
+    reviewInvariant(
+      captured.captureStatus === "captured-unreviewed" ||
+        decision.outcome === "unvalidated",
+      `${location}.outcome must be unvalidated when capture failed`,
+    );
+  }
+  reviewInvariant(
+    reviewedIds.size === evidenceById.size,
+    "scenarios must cover every captured scenario",
+  );
+  return review;
+}
+
 export function servedFilePath(workspace, servedPath) {
   validateServedPath(servedPath, "servedPath");
   const pathname = decodeURIComponent(new URL(servedPath, "http://127.0.0.1").pathname);
@@ -192,8 +373,9 @@ export function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function scenarioCard(scenario) {
+function scenarioCard(scenario, decision) {
   const passed = scenario.captureStatus === "captured-unreviewed";
+  const invalidated = scenario.captureStatus === "capture-invalidated";
   const paired = scenario.comparison.kind === "paired";
   const screenshots = passed
     ? paired
@@ -206,27 +388,57 @@ function scenarioCard(scenario) {
         <p class="unvalidated"><strong>Sem referência visual equivalente.</strong> ${escapeHtml(scenario.comparison.reason)}</p>
       </div>`
     : `<pre class="failure">${escapeHtml(scenario.error ?? "Falha sem mensagem")}</pre>`;
-  const status = passed
-    ? paired
-      ? "Capturado · não revisado"
-      : "Implementação capturada · não revisada"
-    : "Captura falhou";
+  const status = decision
+    ? decision.outcome === "accepted"
+      ? "Aceito · revisão registrada"
+      : decision.outcome === "rejected"
+        ? "Rejeitado · revisão registrada"
+        : "Não validado · revisão registrada"
+    : passed
+      ? paired
+        ? "Capturado · não revisado"
+        : "Implementação capturada · não revisada"
+      : invalidated
+        ? "Captura invalidada"
+        : "Captura falhou";
   const referenceMeta = paired
     ? ` · <a href="${escapeHtml(scenario.referenceUrl)}">referência</a>`
     : " · sem referência equivalente";
 
-  return `<article class="scenario ${passed ? "scenario--captured" : "scenario--failed"}">
+  const reviewClass = decision ? ` scenario--${decision.outcome}` : "";
+  const reviewNote = decision
+    ? `<p class="review-note"><strong>Decisão:</strong> ${escapeHtml(decision.notes)}</p>`
+    : "";
+
+  const captureClass = passed
+    ? "scenario--captured"
+    : invalidated
+      ? "scenario--invalidated"
+      : "scenario--failed";
+
+  return `<article class="scenario ${captureClass}${reviewClass}">
     <header>
       <div><p class="scenario-id">${escapeHtml(scenario.id)}</p><h2>${escapeHtml(scenario.title)}</h2></div>
       <span class="status">${status}</span>
     </header>
     <p class="meta">${escapeHtml(`${scenario.viewport.width} × ${scenario.viewport.height}`)} · superfície: <code>${escapeHtml(scenario.comparison.surface)}</code> · <a href="${escapeHtml(scenario.implementationUrl)}">implementação</a>${referenceMeta}</p>
     ${screenshots}
+    ${reviewNote}
   </article>`;
 }
 
-export function renderUiAcceptanceReport(evidence) {
-  const scenarioHtml = evidence.scenarios.map(scenarioCard).join("\n");
+export function renderUiAcceptanceReport(evidence, review) {
+  const reviewById = review
+    ? new Map(
+        validateUiAcceptanceReview(evidence, review).scenarios.map((decision) => [
+          decision.id,
+          decision,
+        ]),
+      )
+    : new Map();
+  const scenarioHtml = evidence.scenarios
+    .map((scenario) => scenarioCard(scenario, reviewById.get(scenario.id)))
+    .join("\n");
   const captured = evidence.scenarios.filter((scenario) => scenario.captureStatus === "captured-unreviewed").length;
   const capturedPaired = evidence.scenarios.filter(
     (scenario) =>
@@ -234,7 +446,32 @@ export function renderUiAcceptanceReport(evidence) {
       scenario.comparison.kind === "paired",
   ).length;
   const capturedImplementationOnly = captured - capturedPaired;
-  const failed = evidence.scenarios.length - captured;
+  const invalidated = evidence.scenarios.filter(
+    (scenario) => scenario.captureStatus === "capture-invalidated",
+  ).length;
+  const failed = evidence.scenarios.length - captured - invalidated;
+  const accepted = review?.scenarios.filter(
+    (decision) => decision.outcome === "accepted",
+  ).length ?? 0;
+  const rejected = review?.scenarios.filter(
+    (decision) => decision.outcome === "rejected",
+  ).length ?? 0;
+  const unvalidated = review?.scenarios.filter(
+    (decision) => decision.outcome === "unvalidated",
+  ).length ?? 0;
+  const sourceInvalidationReason =
+    evidence.sourceInputs?.invalidationReason;
+  const sourceInputsSummary =
+    evidence.sourceInputsDirty === true
+      ? " · árvore com alterações locais"
+      : evidence.sourceInputsDirty === false
+        ? " · árvore limpa"
+        : " · estado da árvore indisponível";
+  const reviewNotice = review
+    ? `<div class="notice notice--reviewed"><strong>Revisão registrada por ${escapeHtml(review.reviewer)}.</strong> ${escapeHtml(accepted)} aceitos, ${escapeHtml(rejected)} rejeitados e ${escapeHtml(unvalidated)} não validados em ${escapeHtml(review.reviewedAtUtc)}. A decisão está vinculada ao commit capturado.</div>`
+    : evidence.captureStatus === "capture-invalidated"
+      ? `<div class="notice notice--invalidated"><strong>Evidência invalidada: a integridade das fontes não pôde ser garantida.</strong> As imagens permanecem apenas para diagnóstico e não podem ser revisadas. Motivo: ${escapeHtml(sourceInvalidationReason ?? "integridade das fontes não verificada")}.</div>`
+      : '<div class="notice"><strong>Nenhuma captura foi aprovada automaticamente.</strong> O estado “capturado” confirma somente que a evidência reproduzível foi produzida. Uma pessoa ainda deve comparar cada par e registrar o resultado da revisão.</div>';
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -250,16 +487,23 @@ export function renderUiAcceptanceReport(evidence) {
     h1 { margin: 0; font-size: 30px; font-weight: 650; }
     .summary { max-width: 820px; color: #6e6259; line-height: 1.55; }
     .notice { margin: 22px 0 30px; padding: 14px 16px; border-left: 3px solid #b6805c; background: #fffaf6; color: #654b3a; }
+    .notice--reviewed { border-left-color: #3f7959; background: #edf6f0; color: #40614b; }
+    .notice--invalidated { border-left-color: #9b3e36; background: #fff5f3; color: #7a2e29; }
     .scenario { margin: 0 0 28px; padding: 20px; border: 1px solid #ddd5cc; background: #fff; box-shadow: 0 7px 22px rgb(66 52 39 / 7%); }
     .scenario > header { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
     h2 { margin: 0; font-size: 18px; font-weight: 600; }
     .status { padding: 5px 9px; border-radius: 999px; background: #eee9e3; color: #6d5f54; font-size: 12px; white-space: nowrap; }
     .scenario--failed .status { background: #fae7e4; color: #9b3e36; }
+    .scenario--invalidated .status { background: #fbf3df; color: #74571f; }
+    .scenario--accepted .status { background: #edf6f0; color: #40614b; }
+    .scenario--rejected .status { background: #fae7e4; color: #9b3e36; }
+    .scenario--unvalidated .status { background: #fbf3df; color: #74571f; }
     .meta { margin: 12px 0 18px; color: #857970; font: 12px/1.4 Consolas, monospace; }
     a { color: #356e98; }
     .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
     .implementation-only { display: grid; gap: 14px; }
     .unvalidated { margin: 0; padding: 12px 14px; border-left: 3px solid #b6805c; background: #fffaf6; color: #654b3a; line-height: 1.5; }
+    .review-note { margin: 16px 0 0; padding: 11px 13px; background: #f7f5f1; color: #5f584f; line-height: 1.45; }
     figure { margin: 0; min-width: 0; }
     figcaption { margin-bottom: 7px; color: #6d6259; font-size: 12px; font-weight: 600; }
     img { display: block; width: 100%; height: auto; border: 1px solid #d8d1c8; background: #faf9f7; }
@@ -273,11 +517,11 @@ export function renderUiAcceptanceReport(evidence) {
     <header>
       <p class="eyebrow">MYALBUNS · EVIDÊNCIA DE DESENVOLVIMENTO</p>
       <h1>Aceitação visual</h1>
-      <p class="summary">${escapeHtml(captured)} de ${escapeHtml(evidence.scenarios.length)} cenários foram capturados (${escapeHtml(capturedPaired)} pares e ${escapeHtml(capturedImplementationOnly)} somente da implementação); ${escapeHtml(failed)} falharam. Commit: <code>${escapeHtml(evidence.gitCommit)}</code>${evidence.sourceInputsDirty ? " · árvore com alterações locais" : " · árvore limpa"}.</p>
+      <p class="summary">${escapeHtml(captured)} de ${escapeHtml(evidence.scenarios.length)} cenários foram capturados (${escapeHtml(capturedPaired)} pares e ${escapeHtml(capturedImplementationOnly)} somente da implementação); ${escapeHtml(invalidated)} foram invalidados; ${escapeHtml(failed)} falharam. Commit: <code>${escapeHtml(evidence.gitCommit)}</code>${sourceInputsSummary}.</p>
     </header>
-    <div class="notice"><strong>Nenhuma captura foi aprovada automaticamente.</strong> O estado “capturado” confirma somente que a evidência reproduzível foi produzida. Uma pessoa ainda deve comparar cada par e registrar o resultado da revisão.</div>
+    ${reviewNotice}
     ${scenarioHtml}
-    <footer>Gerado em ${escapeHtml(evidence.collectedAtUtc)} · status global: ${escapeHtml(evidence.captureStatus)}</footer>
+    <footer>Gerado em ${escapeHtml(evidence.collectedAtUtc)} · status global: ${escapeHtml(review ? "reviewed" : evidence.captureStatus)}</footer>
   </main>
 </body>
 </html>`;
