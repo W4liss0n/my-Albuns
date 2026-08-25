@@ -258,8 +258,7 @@ test("keeps one grouped validation tooltip open until correction or outside clic
     });
   }
 
-  const message =
-    "Informe uma medida decimal que corresponda a micrômetros inteiros.";
+  const message = "Informe uma medida válida em pol.";
   expect(screen.getByRole("tooltip")).toHaveTextContent(message);
   expect(screen.getAllByRole("alert")).toHaveLength(1);
   const descriptionId = screen.getByRole("alert").id;
@@ -302,7 +301,9 @@ test("keeps one grouped validation tooltip open until correction or outside clic
   fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), {
     target: { value: "600.0001" },
   });
-  expect(await screen.findByRole("tooltip")).toHaveTextContent(message);
+  expect(await screen.findByRole("tooltip")).toHaveTextContent(
+    "Informe uma medida válida em mm.",
+  );
 });
 
 test("keeps the calculated Page dimension visible when DPI is invalid", () => {
@@ -336,6 +337,24 @@ test("shows validation from the core and blocks Apply", async () => {
 
   expect(await screen.findByText("A Sangria deve manter uma Área de corte positiva.")).toBeVisible();
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+});
+
+test("presents raster limits in the pending Unit instead of pixels", async () => {
+  const onValidate = vi.fn(async (): Promise<AlbumInformationValidation> => ({
+    errors: ["sheetWidthRasterOutOfRange"],
+    impact: null,
+  }));
+  renderForm({ onValidate });
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "cm" },
+  });
+
+  const tooltip = await screen.findByRole("tooltip");
+  expect(tooltip).toHaveTextContent(
+    "Para 300 DPI, informe a largura da Lâmina entre 0.0086 cm e 554.8672 cm.",
+  );
+  expect(tooltip).not.toHaveTextContent(/pixels?/i);
 });
 
 test("preserves an unapplied draft across a semantically equivalent projection", async () => {

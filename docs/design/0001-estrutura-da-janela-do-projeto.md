@@ -422,6 +422,8 @@ Novas configurações globais devem ser incorporadas a `Informações do Álbum`
 
 Em `Documento`, trocar a Unidade converte imediatamente somente a apresentação dos valores, sem alterar tamanho físico ou pixels. A Unidade pendente passa a representar toda medida física visível na Janela do Projeto enquanto o draft de `Informações do Álbum` existir, inclusive medidas apresentadas no cabeçalho e em `Design do Álbum`; nenhuma dessas conversões persiste antes de `Aplicar`.
 
+Mensagens de validação que orientam a correção de uma medida física seguem essa mesma Unidade pendente e o DPI corrente. Limites internos de raster são convertidos para o intervalo físico equivalente do campo — inclusive distinguindo largura da Lâmina aberta e largura da Lâmina fechada — em vez de expor pixels ou micrômetros como se fossem a entrada esperada da pessoa.
+
 O estado físico continua armazenado em micrômetros. Propagar a Unidade pendente não altera o draft de `Design do Álbum`, não habilita seu `Aplicar` e não cria operação de Undo/Redo. Descartar ou desmontar o formulário de `Informações do Álbum`, assim como trocar de Projeto, elimina essa apresentação pendente e restaura imediatamente a Unidade aplicada. Largura, altura e DPI permanecem pendentes até o mesmo `Aplicar` de `Informações do Álbum`, cuja confirmação apresenta o tamanho físico e a resolução final.
 
 As entradas numéricas de `Informações do Álbum` mostram um `X` dentro do controle somente enquanto o próprio draft diverge do último valor aplicado. Essa ação restaura apenas a entrada correspondente. Para medidas físicas, o valor restaurado é apresentado na Unidade corrente; trocar somente a Unidade não marca as medidas como editadas nem cria ações de restauração falsas.

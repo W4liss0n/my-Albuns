@@ -1293,11 +1293,11 @@ test("blocks locally unrepresentable text, then revalidates through the Core aft
     name: "Largura da Lâmina fechada",
   });
   fireEvent.change(width, { target: { value: "60.0001" } });
-  expect(screen.queryByText(/micrômetros inteiros/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/medida válida em mm/i)).not.toBeInTheDocument();
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   expect(width).toHaveFocus();
-  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/medida válida em mm/i);
   expect(onValidate).not.toHaveBeenCalled();
 
   fireEvent.change(width, { target: { value: "600" } });
@@ -1384,6 +1384,29 @@ test("shows every Core error, focuses the first field and refreshes errors after
   ).toBeInTheDocument();
 });
 
+test("presents creation raster limits in the selected Unit and closed Sheet measurement", async () => {
+  const user = userEvent.setup();
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={vi.fn(async () => ({
+        status: "invalid" as const,
+        errors: ["sheetWidthRasterOutOfRange" as const],
+      }))}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "cm" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const tooltip = await screen.findByRole("tooltip");
+  expect(tooltip).toHaveTextContent(
+    "Para 300 DPI, informe a largura da Lâmina fechada entre 0.0043 cm e 277.4336 cm.",
+  );
+  expect(tooltip).not.toHaveTextContent(/pixels?/i);
+});
+
 test("anchors validation to the first invalid field in visual order", async () => {
   const user = userEvent.setup();
   const onValidate = vi
@@ -1448,7 +1471,7 @@ test("preserves errors from untouched fields during live validation", async () =
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
     { target: { value: "600.0001" } },
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/medida válida em mm/i);
   expect(screen.getByRole("alert")).toHaveTextContent(
     /DPI inteiro entre 1 e 1\.200/i,
   );
@@ -1458,7 +1481,7 @@ test("preserves errors from untouched fields during live validation", async () =
   await act(async () => {
     liveValidation.resolve({ status: "valid" });
   });
-  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros inteiros/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(/medida válida em mm/i);
   expect(screen.getByRole("alert")).toHaveTextContent(
     /DPI inteiro entre 1 e 1\.200/i,
   );
@@ -1495,12 +1518,16 @@ test("ignores a late validation response after a newer edit", async () => {
       errors: ["sheetWidthNotEven"],
     });
   });
-  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros pares/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /duas Páginas com a mesma medida/i,
+  );
 
   await act(async () => {
     first.resolve({ status: "valid" });
   });
-  expect(screen.getByRole("alert")).toHaveTextContent(/micrômetros pares/i);
+  expect(screen.getByRole("alert")).toHaveTextContent(
+    /duas Páginas com a mesma medida/i,
+  );
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();

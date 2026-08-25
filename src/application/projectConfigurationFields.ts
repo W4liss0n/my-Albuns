@@ -1,4 +1,9 @@
 import type { ProjectConfigurationValidationError } from "../domain/generated/ProjectConfigurationValidationError";
+import type { DisplayUnit } from "../domain/project";
+import {
+  displayUnitLabel,
+  formatPhysicalMeasurement,
+} from "./physicalMeasurements";
 
 export type ProjectConfigurationFieldName =
   | "sheetWidth"
@@ -12,15 +17,29 @@ export type ProjectConfigurationErrors = Partial<
   Record<ProjectConfigurationFieldName, readonly string[]>
 >;
 
-export const INVALID_PHYSICAL_MEASUREMENT_MESSAGE =
-  "Informe uma medida decimal que corresponda a micrômetros inteiros.";
+export interface ProjectConfigurationValidationPresentationContext {
+  displayUnit: DisplayUnit;
+  dpi: number;
+  sheetWidthPresentation: "openSheet" | "closedSheet";
+}
+
+export function invalidPhysicalMeasurementMessage(unit: DisplayUnit): string {
+  return `Informe uma medida válida em ${displayUnitLabel(unit)}.`;
+}
 
 const MAX_SAFE_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
 const MAX_NUMERIC_INPUT_LENGTH = 128;
+const MICROMETERS_PER_INCH = 25_400n;
+const RASTER_ROUNDING_OFFSET = 12_700n;
+const MAX_RASTER_AXIS = 65_535n;
+
+type ValidationMessage =
+  | string
+  | ((context: ProjectConfigurationValidationPresentationContext) => string);
 
 const validationPresentation: Record<
   ProjectConfigurationValidationError,
-  { field: ProjectConfigurationFieldName; message: string }
+  { field: ProjectConfigurationFieldName; message: ValidationMessage }
 > = {
   sheetWidthNotPositive: {
     field: "sheetWidth",
@@ -32,12 +51,12 @@ const validationPresentation: Record<
   },
   sheetWidthNotEven: {
     field: "sheetWidth",
-    message: "A largura da Lâmina precisa resultar em micrômetros pares.",
+    message:
+      "A largura da Lâmina precisa permitir duas Páginas com a mesma medida.",
   },
   sheetWidthRasterOutOfRange: {
     field: "sheetWidth",
-    message:
-      "Lâmina e Página devem ter largura raster entre 1 e 65.535 pixels.",
+    message: (context) => rasterRangeMessage("width", context),
   },
   sheetHeightNotPositive: {
     field: "sheetHeight",
@@ -49,7 +68,7 @@ const validationPresentation: Record<
   },
   sheetHeightRasterOutOfRange: {
     field: "sheetHeight",
-    message: "A altura raster deve ficar entre 1 e 65.535 pixels.",
+    message: (context) => rasterRangeMessage("height", context),
   },
   sheetDimensionsNotProportional: {
     field: "sheetWidth",
@@ -93,16 +112,80 @@ const validationPresentation: Record<
 
 export function presentConfigurationValidationErrors(
   validationErrors: readonly ProjectConfigurationValidationError[],
+  context: ProjectConfigurationValidationPresentationContext,
 ): ProjectConfigurationErrors {
   const errors: ProjectConfigurationErrors = {};
   for (const error of validationErrors) {
     const presentation = validationPresentation[error];
+    const message =
+      typeof presentation.message === "function"
+        ? presentation.message(context)
+        : presentation.message;
     errors[presentation.field] = [
       ...(errors[presentation.field] ?? []),
-      presentation.message,
+      message,
     ];
   }
   return errors;
+}
+
+function rasterRangeMessage(
+  axis: "width" | "height",
+  context: ProjectConfigurationValidationPresentationContext,
+): string {
+  const rangeKind =
+    axis === "height" ? "height" : context.sheetWidthPresentation;
+  const range = physicalRasterRange(context.dpi, rangeKind);
+  const dimension =
+    axis === "height"
+      ? "altura da Lâmina"
+      : context.sheetWidthPresentation === "closedSheet"
+        ? "largura da Lâmina fechada"
+        : "largura da Lâmina";
+  if (!range) {
+    return `A ${dimension} precisa ser ajustada para o DPI informado.`;
+  }
+
+  const minimum = formatPhysicalMeasurement(
+    range.minimumUm,
+    context.displayUnit,
+  );
+  const maximum = formatPhysicalMeasurement(
+    range.maximumUm,
+    context.displayUnit,
+  );
+  const approximation =
+    context.displayUnit === "in" ? "aproximadamente " : "";
+  return `Para ${context.dpi} DPI, informe a ${dimension} entre ${approximation}${minimum} e ${maximum}.`;
+}
+
+function physicalRasterRange(
+  dpi: number,
+  kind: "height" | "openSheet" | "closedSheet",
+): { minimumUm: number; maximumUm: number } | null {
+  if (!Number.isSafeInteger(dpi) || dpi <= 0) return null;
+
+  const dpiValue = BigInt(dpi);
+  const minimumAxisUm =
+    (RASTER_ROUNDING_OFFSET + dpiValue - 1n) / dpiValue;
+  const maximumAxisUm =
+    ((MAX_RASTER_AXIS + 1n) * MICROMETERS_PER_INCH -
+      1n -
+      RASTER_ROUNDING_OFFSET) /
+    dpiValue;
+  let minimumUm = minimumAxisUm;
+  let maximumUm = maximumAxisUm;
+  if (kind === "openSheet") {
+    minimumUm *= 2n;
+    maximumUm -= maximumUm % 2n;
+  } else if (kind === "closedSheet") {
+    maximumUm /= 2n;
+  }
+
+  return {
+    minimumUm: Number(minimumUm),
+    maximumUm: Number(maximumUm),
+  };
 }
 
 export function parseIntegerText(text: string): number | null {

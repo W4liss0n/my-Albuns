@@ -158,7 +158,11 @@ export function NewProjectFlow({
       return;
     }
     if (outcome.status === "invalid") {
-      const errors = presentConfigurationValidationErrors(outcome.errors);
+      const errors = presentConfigurationValidationErrors(outcome.errors, {
+        displayUnit: configuration.document.displayUnit,
+        dpi: configuration.document.dpi,
+        sheetWidthPresentation: "closedSheet",
+      });
       setValidationErrors(errors);
       if (focusInvalid) {
         focusFirstInvalid(errors);

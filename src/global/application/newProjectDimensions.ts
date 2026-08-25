@@ -4,7 +4,7 @@ import type {
   ProjectEndSheetFormat,
 } from "./globalProjectPort";
 import {
-  INVALID_PHYSICAL_MEASUREMENT_MESSAGE,
+  invalidPhysicalMeasurementMessage,
   parseIntegerText,
   type ProjectConfigurationErrors,
   type ProjectConfigurationFieldName,
@@ -100,10 +100,20 @@ export function getLocalInputErrors(
   draft: NewProjectDimensionsDraft,
 ): ProjectConfigurationErrors {
   const errors: ProjectConfigurationErrors = {};
-  addPhysicalInputError(errors, "sheetWidth", draft.closedSheetWidth);
-  addPhysicalInputError(errors, "sheetHeight", draft.sheetHeight);
-  addPhysicalInputError(errors, "bleed", draft.bleed);
-  addPhysicalInputError(errors, "safety", draft.safety);
+  addPhysicalInputError(
+    errors,
+    "sheetWidth",
+    draft.closedSheetWidth,
+    draft.displayUnit,
+  );
+  addPhysicalInputError(
+    errors,
+    "sheetHeight",
+    draft.sheetHeight,
+    draft.displayUnit,
+  );
+  addPhysicalInputError(errors, "bleed", draft.bleed, draft.displayUnit);
+  addPhysicalInputError(errors, "safety", draft.safety, draft.displayUnit);
   if (
     draft.closedSheetWidth.hasExactValue &&
     !Number.isSafeInteger(draft.closedSheetWidth.valueUm * 2)
@@ -160,8 +170,9 @@ function addPhysicalInputError(
   errors: ProjectConfigurationErrors,
   name: ProjectConfigurationFieldName,
   field: PhysicalFieldDraft,
+  displayUnit: ProjectDisplayUnit,
 ) {
   if (!field.hasExactValue) {
-    errors[name] = [INVALID_PHYSICAL_MEASUREMENT_MESSAGE];
+    errors[name] = [invalidPhysicalMeasurementMessage(displayUnit)];
   }
 }
