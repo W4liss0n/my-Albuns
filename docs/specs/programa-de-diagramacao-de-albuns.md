@@ -535,6 +535,8 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 
 ### Estrutura da interface
 
+- Todo diálogo do aplicativo abre como uma janela nativa separada e pertencente à janela que o solicitou. Fora da abertura de um Projeto existente, a proprietária permanece visível ao fundo, bloqueada para interação enquanto o diálogo estiver aberto, e recupera interação e foco quando ele termina.
+- `Abrir Projeto`, inclusive por `Projetos recentes`, é a única transição que retira a superfície de origem antes de mostrar o progresso. Se a abertura falhar, a superfície reaparece atrás do diálogo de falha; `Novo Projeto`, confirmações, avisos e demais progressos não usam essa exceção.
 - Toda operação que precisa de uma janela de progresso usa a mesma representação minimalista.
 - Com total conhecido, ela mostra uma linha curta de estado, uma barra geral, porcentagem e uma estimativa de tempo somente quando confiável; a própria linha pode expressar a unidade como `X/Y`. Sem total confiável, usa barra animada indeterminada e omite porcentagem, contagem e estimativa.
 - O modo de lote reutiliza a barra geral e mostra somente item atual, estado desse item, posição `X/Y` e uma síntese compacta da fila; não exibe tabela nem trabalhos simultâneos.
@@ -573,7 +575,7 @@ Quando duas fontes parecerem incompatíveis, a implementação deve parar até q
 - A Barra da Lâmina e o Painel de Layouts existem somente no Canvas contínuo do modo normal; ambos ficam ausentes e indisponíveis no Modo de edição.
 - Se o Painel estava aberto ao entrar no Modo de edição, seu alvo e estado ficam suspensos; ao sair com `Esc`, ele reaparece para a mesma Lâmina com candidatos recalculados. Um Painel anteriormente fechado continua fechado.
 - O Canvas contínuo do modo normal não possui Zoom. O Zoom de visualização existe exclusivamente para a Lâmina isolada no Modo de edição.
-- No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical, somente navegação horizontal.
+- No modo normal, todas as Lâminas compartilham uma escala automática que enquadra sua altura completa com margem; não existe rolagem vertical. Uma barra de rolagem horizontal sempre visível abaixo do Canvas representa os mesmos limites da navegação pela roda e permite percorrer a mesma visualização, sem criar estado do Projeto.
 - Nas extremidades da navegação, o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou o splitter do Painel de imagens sincroniza primeiro a superfície do renderizador com a área útil e então recalcula essa escala, mantendo a Lâmina inteira visível sem alterar o Projeto ou criar um estado de Zoom.
 - Fora do Modo de edição, `Alt` + clique e arraste sobre um Frame faz Pan da Foto e `Alt` + roda do mouse altera o Zoom da Foto sob o ponteiro, sem mudar a geometria do Frame; ambos integram a `MediaTransform` persistente da colocação.

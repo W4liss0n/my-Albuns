@@ -10,7 +10,7 @@ pub(crate) const OWNED_WINDOW_TITLEBAR_HEIGHT: f64 = 38.0;
 const OPENING_PROGRESS_LABEL: &str = "dialog-opening-progress";
 const PROJECT_FAILURE_LABEL: &str = "dialog-project-failure";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum LaunchProgressKind {
     Creating,
     Opening,
@@ -23,19 +23,39 @@ impl LaunchProgressKind {
             Self::Opening => "dialog.html?kind=opening-project",
         }
     }
+
+    fn owner_presentation(self) -> OwnerPresentation {
+        match self {
+            Self::Opening => OwnerPresentation::Replace,
+            Self::Creating => OwnerPresentation::BlockedBehindDialog,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OwnerPresentation {
+    Replace,
+    BlockedBehindDialog,
 }
 
 pub(crate) struct LaunchProgressDialog {
     closed: bool,
     owner: WebviewWindow,
+    owner_presentation: OwnerPresentation,
     window: WebviewWindow,
 }
 
 impl LaunchProgressDialog {
     pub(crate) fn finish(mut self, restore_owner_window: bool) {
         let _ = self.window.destroy();
-        if restore_owner_window {
-            restore_owner(&self.owner);
+        match self.owner_presentation {
+            OwnerPresentation::Replace if restore_owner_window => {
+                restore_owner(&self.owner);
+            }
+            OwnerPresentation::BlockedBehindDialog => {
+                release_blocked_owner(&self.owner, restore_owner_window);
+            }
+            OwnerPresentation::Replace => {}
         }
         self.closed = true;
     }
@@ -45,6 +65,7 @@ impl Drop for LaunchProgressDialog {
     fn drop(&mut self) {
         if !self.closed {
             let _ = self.window.destroy();
+            restore_owner(&self.owner);
         }
     }
 }
@@ -67,10 +88,15 @@ pub(crate) async fn show_launch_progress(
     )
     .await?;
 
-    display_transition_dialog(&owner, &window)?;
+    let owner_presentation = kind.owner_presentation();
+    match owner_presentation {
+        OwnerPresentation::Replace => display_transition_dialog(&owner, &window)?,
+        OwnerPresentation::BlockedBehindDialog => display_owned_dialog(&owner, &window)?,
+    }
     Ok(LaunchProgressDialog {
         closed: false,
         owner,
+        owner_presentation,
         window,
     })
 }
@@ -111,7 +137,7 @@ pub(crate) async fn show_project_failure(
         }
     });
 
-    display_transition_dialog(&owner, &window)
+    display_owned_dialog(&owner, &window)
 }
 
 fn owned_window(app: &AppHandle, label: &str) -> io::Result<WebviewWindow> {
@@ -172,11 +198,23 @@ pub(crate) async fn build_hidden_owned_window(
     }
 }
 
-pub(crate) fn display_transition_dialog(
+fn display_transition_dialog(owner: &WebviewWindow, window: &WebviewWindow) -> io::Result<()> {
+    display_dialog(owner, window, OwnerPresentation::Replace)
+}
+
+pub(crate) fn display_owned_dialog(
     owner: &WebviewWindow,
     window: &WebviewWindow,
 ) -> io::Result<()> {
-    owner.hide().map_err(io::Error::other)?;
+    display_dialog(owner, window, OwnerPresentation::BlockedBehindDialog)
+}
+
+fn display_dialog(
+    owner: &WebviewWindow,
+    window: &WebviewWindow,
+    owner_presentation: OwnerPresentation,
+) -> io::Result<()> {
+    prepare_owner(owner, owner_presentation)?;
     if let Err(error) = window.show() {
         let _ = window.destroy();
         restore_owner(owner);
@@ -191,8 +229,54 @@ pub(crate) fn display_transition_dialog(
 }
 
 pub(crate) fn restore_owner(owner: &WebviewWindow) {
-    let _ = owner.show();
-    let _ = owner.set_focus();
+    release_owner(owner, true);
+}
+
+fn release_blocked_owner(owner: &WebviewWindow, focus: bool) {
+    release_owner(owner, focus);
+}
+
+trait DialogOwner {
+    fn hide_dialog_owner(&self) -> io::Result<()>;
+    fn show_dialog_owner(&self) -> io::Result<()>;
+    fn set_dialog_owner_enabled(&self, enabled: bool) -> io::Result<()>;
+    fn focus_dialog_owner(&self) -> io::Result<()>;
+}
+
+impl DialogOwner for WebviewWindow {
+    fn hide_dialog_owner(&self) -> io::Result<()> {
+        self.hide().map_err(io::Error::other)
+    }
+
+    fn show_dialog_owner(&self) -> io::Result<()> {
+        self.show().map_err(io::Error::other)
+    }
+
+    fn set_dialog_owner_enabled(&self, enabled: bool) -> io::Result<()> {
+        self.set_enabled(enabled).map_err(io::Error::other)
+    }
+
+    fn focus_dialog_owner(&self) -> io::Result<()> {
+        self.set_focus().map_err(io::Error::other)
+    }
+}
+
+fn prepare_owner(owner: &impl DialogOwner, presentation: OwnerPresentation) -> io::Result<()> {
+    match presentation {
+        OwnerPresentation::Replace => owner.hide_dialog_owner(),
+        OwnerPresentation::BlockedBehindDialog => {
+            owner.show_dialog_owner()?;
+            owner.set_dialog_owner_enabled(false)
+        }
+    }
+}
+
+fn release_owner(owner: &impl DialogOwner, focus: bool) {
+    let _ = owner.set_dialog_owner_enabled(true);
+    let _ = owner.show_dialog_owner();
+    if focus {
+        let _ = owner.focus_dialog_owner();
+    }
 }
 
 fn encode_component(value: &str) -> String {
@@ -217,7 +301,36 @@ fn encode_component_chars(chars: impl Iterator<Item = char>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+
     use super::*;
+
+    #[derive(Default)]
+    struct RecordingOwner {
+        actions: RefCell<Vec<String>>,
+    }
+
+    impl DialogOwner for RecordingOwner {
+        fn hide_dialog_owner(&self) -> io::Result<()> {
+            self.actions.borrow_mut().push("hide".into());
+            Ok(())
+        }
+
+        fn show_dialog_owner(&self) -> io::Result<()> {
+            self.actions.borrow_mut().push("show".into());
+            Ok(())
+        }
+
+        fn set_dialog_owner_enabled(&self, enabled: bool) -> io::Result<()> {
+            self.actions.borrow_mut().push(format!("enabled:{enabled}"));
+            Ok(())
+        }
+
+        fn focus_dialog_owner(&self) -> io::Result<()> {
+            self.actions.borrow_mut().push("focus".into());
+            Ok(())
+        }
+    }
 
     #[test]
     fn dialog_text_is_bounded_and_encoded_as_a_query_component() {
@@ -226,5 +339,39 @@ mod tests {
             "Projeto%20inv%C3%A1lido%20%26%20tente%20novamente."
         );
         assert!(encode_component(&"a".repeat(900)).len() <= 800);
+    }
+
+    #[test]
+    fn only_opening_a_project_replaces_the_owner_window() {
+        assert_eq!(
+            LaunchProgressKind::Opening.owner_presentation(),
+            OwnerPresentation::Replace
+        );
+        assert_eq!(
+            LaunchProgressKind::Creating.owner_presentation(),
+            OwnerPresentation::BlockedBehindDialog
+        );
+    }
+
+    #[test]
+    fn owned_dialogs_keep_the_owner_visible_and_blocked_until_release() {
+        let owner = RecordingOwner::default();
+
+        prepare_owner(&owner, OwnerPresentation::BlockedBehindDialog).unwrap();
+        assert_eq!(owner.actions.take(), ["show", "enabled:false"]);
+
+        release_owner(&owner, true);
+        assert_eq!(owner.actions.take(), ["enabled:true", "show", "focus"]);
+    }
+
+    #[test]
+    fn opening_transition_hides_then_restores_the_owner() {
+        let owner = RecordingOwner::default();
+
+        prepare_owner(&owner, OwnerPresentation::Replace).unwrap();
+        assert_eq!(owner.actions.take(), ["hide"]);
+
+        release_owner(&owner, false);
+        assert_eq!(owner.actions.take(), ["enabled:true", "show"]);
     }
 }

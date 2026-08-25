@@ -185,7 +185,7 @@ pub(crate) async fn present_project_dialog(
         dialog
             .emit(PROJECT_DIALOG_STATE_EVENT, &state)
             .map_err(|error| error.to_string())?;
-        return native_dialog_window::display_transition_dialog(&owner, &dialog)
+        return native_dialog_window::display_owned_dialog(&owner, &dialog)
             .map_err(|error| error.to_string());
     }
 
@@ -213,8 +213,7 @@ pub(crate) async fn present_project_dialog(
             native_dialog_window::restore_owner(&owner_after_close);
         }
     });
-    native_dialog_window::display_transition_dialog(&owner, &dialog)
-        .map_err(|error| error.to_string())
+    native_dialog_window::display_owned_dialog(&owner, &dialog).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

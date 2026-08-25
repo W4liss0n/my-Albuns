@@ -20,6 +20,8 @@ export { InlineNotice } from "./InlineNotice";
 export { MessageDialog } from "./MessageDialog";
 export { OwnedWindowShell } from "./OwnedWindowShell";
 export { ProgressDialog } from "./ProgressDialog";
+export { TextInput } from "./TextInput";
+export type { TextInputProps } from "./TextInput";
 export type { DialogAction } from "./DialogAction";
 export type { ProgressDialogState } from "./ProgressDialog";
 export {

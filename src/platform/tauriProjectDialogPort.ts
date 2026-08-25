@@ -10,8 +10,10 @@ export const PROJECT_DIALOG_ACTION_EVENT =
   "myalbuns://project-dialog-action";
 
 const projectDialogActions = new Set<ProjectDialogAction>([
+  "cancelAlbumInformation",
   "cancelExport",
   "cancelProjectClose",
+  "confirmAlbumInformation",
   "discardAndClose",
   "dismissExport",
   "dismissProjectCloseFailure",

@@ -11,6 +11,8 @@ O aplicativo reutiliza uma única representação simples para operações que p
 
 Cada tentativa fornece seu próprio `ProgressSink` ao componente. A janela somente apresenta os eventos recebidos: não possui o trabalho, a exclusividade global ou o token de cancelamento e não mantém um serviço global de progresso.
 
+A representação também não decide o ciclo de vida da janela solicitante. Ela segue a política do fluxo que a abriu: o padrão de [diálogo pertencente](0001-estrutura-da-janela-do-projeto.md#diálogos-pertencentes-a-uma-janela) preserva a proprietária visível e bloqueada, e somente a [transição de abertura de um Projeto existente](0002-tela-de-boas-vindas.md#transição-de-abertura) a substitui temporariamente.
+
 ## Progresso determinado
 
 Quando a operação conhece um total confiável, a janela mostra:

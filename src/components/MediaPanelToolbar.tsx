@@ -16,7 +16,7 @@ import {
   type MediaPanelViewPreferences,
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
-import { AppIcon } from "../ui";
+import { AppIcon, TextInput } from "../ui";
 
 interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
@@ -182,7 +182,7 @@ export function MediaPanelToolbar({
           className="media-search ui-embedded-field"
           role="search"
         >
-          <input
+          <TextInput
             aria-label={`Buscar ${activeKindLabel}`}
             className="ui-embedded-input"
             placeholder="Buscar…"

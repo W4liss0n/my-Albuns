@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import { threeSheetComposition } from "./albumCanvasTestFixtures";
@@ -117,6 +117,44 @@ test("resizes the Pixi renderer before fitting a taller Canvas", async () => {
     width: 900,
     scale: expectedScale,
   });
+});
+
+test("exposes a horizontal scrollbar bound to the continuous Canvas viewport", async () => {
+  const onCenteredSheetChange = vi.fn();
+  const onViewportChange = vi.fn();
+  renderCanvas({
+    compositionPlan: threeSheetComposition,
+    onCenteredSheetChange,
+    onViewportChange,
+  });
+  await finishPixiInitialization();
+
+  const scrollbar = screen.getByRole("scrollbar", {
+    name: "Navegação horizontal das Lâminas",
+  });
+  expect(scrollbar).toHaveAttribute("aria-orientation", "horizontal");
+
+  Object.defineProperty(scrollbar, "scrollLeft", {
+    configurable: true,
+    value: 900,
+    writable: true,
+  });
+  fireEvent.scroll(scrollbar);
+
+  const layout = createContinuousCanvasLayout(
+    threeSheetComposition.sheets,
+  );
+  const scale = continuousCanvasScale(500, 300);
+  const maximum = layout.centeredOffset(
+    "sheet-001",
+    scale,
+    1_200,
+  );
+  expect(maximum).not.toBeNull();
+  expect(onViewportChange).toHaveBeenLastCalledWith({
+    offsetX: (maximum ?? 0) - 900,
+  });
+  expect(onCenteredSheetChange).toHaveBeenCalled();
 });
 
 test("centers the edited Sheet in the first normal Canvas update", async () => {

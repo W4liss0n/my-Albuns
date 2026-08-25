@@ -43,6 +43,7 @@ export class AlbumCanvasScene {
   private canvasScale = 1;
   private lastCanvasMetrics: CanvasMetrics | null = null;
   private lastMediaDemandSignature: string | null = null;
+  private pendingViewportOffsetX: number | null = null;
   private readonly previewTextures: ViewportTexturePool;
   private readonly photoInteractions: PhotoInteractionSession;
 
@@ -131,8 +132,18 @@ export class AlbumCanvasScene {
             this.app.screen.width,
           )
         : null;
+    if (transitionOffsetX !== null) {
+      this.pendingViewportOffsetX = transitionOffsetX;
+    } else if (
+      this.pendingViewportOffsetX !== null &&
+      Math.abs(input.viewport.offsetX - this.pendingViewportOffsetX) < 0.0001
+    ) {
+      this.pendingViewportOffsetX = null;
+    }
     const requestedOffsetX =
-      transitionOffsetX ?? input.viewport.offsetX;
+      transitionOffsetX ??
+      this.pendingViewportOffsetX ??
+      input.viewport.offsetX;
     const boundedOffsetX =
       modePolicy.enablesContinuousNavigation
         ? layout.clampOffset(
@@ -206,6 +217,7 @@ export class AlbumCanvasScene {
     this.lastCanvasMetrics = null;
     this.lastMediaDemandSignature = null;
     this.modeSignature = null;
+    this.pendingViewportOffsetX = null;
   }
 
   private resetTransientInteractions() {
@@ -476,6 +488,7 @@ export class AlbumCanvasScene {
     event.preventDefault();
     if (event.ctrlKey) return;
     const layout = this.input.continuousCanvasLayout;
+    this.pendingViewportOffsetX = null;
     const nextOffset = layout.clampOffset(
       this.input.viewport.offsetX - (event.deltaX || event.deltaY) * 0.9,
       this.canvasScale,

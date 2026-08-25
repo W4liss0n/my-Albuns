@@ -27,6 +27,12 @@ Campos, seletores e ações comuns preservam o foco de teclado por uma mudança 
 
 No Windows, o host desabilita diretamente no WebView2 todos os aceleradores de navegador e o menu de contexto padrão; uma falha nessa configuração impede a abertura da Janela do Projeto. Zoom nativo e ferramentas de desenvolvimento também ficam desabilitados na configuração declarativa da janela. A política DOM cuida somente de navegação por link ou arquivo solto e das ações nativas dos botões auxiliares do mouse. Nenhuma dessas políticas executa comandos do produto ou substitui o registro contextual de comandos e atalhos.
 
+## Diálogos pertencentes a uma janela
+
+Confirmações, avisos, seletores e progressos abrem em uma janela nativa separada com a janela solicitante como proprietária. A proprietária continua visível atrás do diálogo, mas fica desabilitada para mouse, teclado e comandos enquanto o diálogo estiver aberto. A relação nativa mantém o diálogo à frente sem recorrer a uma camada modal dentro da WebView. Fechar, cancelar ou concluir o diálogo reabilita a proprietária e devolve o foco a ela.
+
+A única política de substituição pertence ao fluxo `Abrir Projeto`: depois que um arquivo existente ou um Projeto recente foi escolhido, a superfície de origem sai da área visível antes da janela de progresso. O detalhamento e a recuperação em caso de falha pertencem ao design da [Tela de Boas-vindas](0002-tela-de-boas-vindas.md). `Novo Projeto`, a confirmação de `Informações do Álbum`, fechamento, Exportação e os demais avisos ou progressos seguem o padrão de proprietário visível e bloqueado.
+
 ## Estrutura-base
 
 ```text
@@ -135,6 +141,7 @@ Os comandos exatos e seus atalhos serão definidos no mapa de fluxos. A barra de
 - Sangria e Área de segurança são projetadas diretamente das medidas canônicas do Documento. No Modo normal do Canvas, uma máscara transitória recorta a composição nos limites da Área de corte, sem pintar uma faixa no espaço oculto nem desenhar guias técnicas. No Modo de edição da Lâmina, a superfície ativa inteira permanece visível e as medidas aparecem como guias tracejadas vermelha e azul; valor zero desativa somente a guia correspondente. Em uma Página única, a borda voltada ao lado inativo não recebe máscara nem guia. Máscara e guias permanecem abaixo da Barra da Lâmina e fora da Exportação.
 - No Modo normal do Canvas, superfície, sombras, contorno de foco, hover, área de interação e Barra da Lâmina usam uma única geometria de apresentação derivada dos limites visíveis depois da máscara. A separação horizontal de `46 px` é medida entre esses limites, sem conservar espaço invisível para a Sangria. Em uma Lâmina de página única, essa geometria une a Área de corte da Página ativa ao Lado inativo preservado. No Modo de edição da Lâmina, a geometria de apresentação volta a usar a superfície completa. O contorno de foco reutiliza a linha técnica azul de `1 px` da Seleção de Frames, centralizada nessa geometria e sem ampliá-la; o contorno externo permanece exclusivo da seleção de escopo na Personalização do diálogo `Novo Projeto`.
 - O modo normal não possui rolagem vertical; a navegação entre Lâminas é exclusivamente horizontal.
+- Uma barra de rolagem horizontal permanece visível imediatamente abaixo da área renderizada. Seu intervalo usa os mesmos limites lógicos da roda: a extremidade inicial representa a primeira Lâmina centralizada, a final representa a última e qualquer mudança por barra, roda ou comando atualiza a mesma Transformação da visualização. A barra não pertence ao Projeto, ao Histórico, ao Salvamento ou à Exportação.
 - A navegação horizontal é limitada nas extremidades: o centro da primeira e o centro da última Lâmina podem alcançar o centro visível do Canvas, mas nunca ultrapassá-lo em direção à borda oposta.
 - Redimensionar a Janela ou mover o splitter entre Canvas e Painel de imagens sincroniza primeiro a superfície do renderizador com a nova área útil e então recalcula a escala automática, mantendo a Lâmina inteira visível sem criar estado de Zoom.
 

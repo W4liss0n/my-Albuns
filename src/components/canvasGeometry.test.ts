@@ -56,6 +56,10 @@ const threeSheets: CompositionPlan["sheets"] = [
 test("limits continuous Canvas movement at the edge sheet centers", () => {
   const layout = createContinuousCanvasLayout(threeSheets);
 
+  expect(layout.offsetBounds(0.5, 1_000)).toEqual({
+    minimum: -342,
+    maximum: 350,
+  });
   expect(layout.clampOffset(999, 0.5, 1_000)).toBe(350);
   expect(layout.clampOffset(-999, 0.5, 1_000)).toBe(-342);
   expect(layout.clampOffset(4, 0.5, 1_000)).toBe(4);
@@ -135,6 +139,7 @@ test("measures sheet geometry once and reuses it", () => {
   expect(widthReads).toBe(threeSheets.length);
 
   layout.clampOffset(999, 0.5, 1_000);
+  layout.offsetBounds(0.5, 1_000);
   layout.centeredSheetId(4, 0.5, 1_000);
   layout.centeredOffset("sheet-003", 0.5, 1_000);
   expect(widthReads).toBe(threeSheets.length);

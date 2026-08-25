@@ -27,6 +27,7 @@ import {
   AppIcon,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
+  TextInput,
   fieldValidationTooltipAttributes,
   type FieldValidationTooltipModel,
   useFieldValidationTooltip,
@@ -546,7 +547,7 @@ function TextField({
     <div className="album-information-field">
       <label htmlFor={inputId}>{label}</label>
       <span className="album-entry-control">
-        <input
+        <TextInput
           aria-label={label}
           className="ui-field-control"
           id={inputId}
@@ -594,7 +595,7 @@ function MeasurementField({
     <div className="album-information-field">
       <label htmlFor={inputId}>{label}</label>
       <span className="album-entry-control album-measurement-control">
-        <input
+        <TextInput
           aria-label={label}
           className="ui-field-control"
           id={inputId}

@@ -50,6 +50,7 @@ import {
   FailureNotice,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
+  TextInput,
   fieldValidationTooltipAttributes,
   type FieldValidationTooltipModel,
   useFieldValidationTooltip,
@@ -768,7 +769,7 @@ function PresetControl({
             <label className="ui-visually-hidden" htmlFor={presetNameId}>
               Nome do modelo
             </label>
-            <input
+            <TextInput
               autoFocus
               id={presetNameId}
               onChange={(event) => setName(event.target.value)}
@@ -873,7 +874,7 @@ const NumericField = forwardRef<HTMLInputElement, NumericFieldProps>(
         <span
           className={`new-project-input-shell${suffix ? " new-project-input-shell--suffix" : ""}${hasControls ? " new-project-input-shell--controlled" : ""}`}
         >
-          <input
+          <TextInput
             inputMode={inputMode}
             id={inputId}
             onChange={(event) => onChange(event.target.value)}

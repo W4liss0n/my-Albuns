@@ -55,8 +55,17 @@ export interface ContinuousCanvasEntry {
   right: number;
 }
 
+export interface ContinuousCanvasOffsetBounds {
+  minimum: number;
+  maximum: number;
+}
+
 export interface ContinuousCanvasLayout {
   entriesAtScale(scale: number): readonly ContinuousCanvasEntry[];
+  offsetBounds(
+    scale: number,
+    canvasWidth: number,
+  ): ContinuousCanvasOffsetBounds | null;
   centeredOffset(
     sheetId: string,
     scale: number,
@@ -107,6 +116,17 @@ export function createContinuousCanvasLayout(
 
   return {
     entriesAtScale,
+    offsetBounds(scale, canvasWidth) {
+      const entries = entriesAtScale(scale);
+      const first = entries[0];
+      const last = entries[entries.length - 1];
+      if (!first || !last || scale <= 0) return null;
+
+      return {
+        minimum: canvasWidth / 2 - last.center * scale,
+        maximum: canvasWidth / 2 - first.center * scale,
+      };
+    },
     centeredOffset(sheetId, scale, canvasWidth) {
       const entries = entriesAtScale(scale);
       const entriesBySheetId = new Map(
@@ -118,13 +138,9 @@ export function createContinuousCanvasLayout(
         : null;
     },
     clampOffset(offsetX, scale, canvasWidth) {
-      const entries = entriesAtScale(scale);
-      const first = entries[0];
-      const last = entries[entries.length - 1];
-      if (!first || !last || scale <= 0) return offsetX;
-
-      const maximum = canvasWidth / 2 - first.center * scale;
-      const minimum = canvasWidth / 2 - last.center * scale;
+      const bounds = this.offsetBounds(scale, canvasWidth);
+      if (!bounds) return offsetX;
+      const { minimum, maximum } = bounds;
       return Math.min(maximum, Math.max(minimum, offsetX));
     },
     centeredSheetId(offsetX, scale, canvasWidth) {

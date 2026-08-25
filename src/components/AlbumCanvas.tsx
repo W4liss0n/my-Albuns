@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Layers3 } from "lucide-react";
 import { Application } from "pixi.js";
 
@@ -9,7 +9,11 @@ import {
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { AppIcon, EmptyState } from "../ui";
 import { AlbumCanvasScene } from "./albumCanvasScene";
-import type { AlbumCanvasProps } from "./albumCanvasContract";
+import type {
+  AlbumCanvasProps,
+  CanvasMetrics,
+} from "./albumCanvasContract";
+import { CanvasHorizontalScrollbar } from "./CanvasHorizontalScrollbar";
 import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
@@ -35,8 +39,27 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   const logger = useLogger();
   const canvasGraphicsDiagnosticProbe =
     useCanvasGraphicsDiagnosticProbe();
-  const latestPropsRef = useRef(props);
-  latestPropsRef.current = props;
+  const externalMetricsCallbackRef = useRef(props.onCanvasMetricsChange);
+  externalMetricsCallbackRef.current = props.onCanvasMetricsChange;
+  const [canvasMetrics, setCanvasMetrics] = useState<CanvasMetrics | null>(
+    null,
+  );
+  const handleCanvasMetricsChange = useCallback((metrics: CanvasMetrics) => {
+    setCanvasMetrics((current) =>
+      current &&
+      Math.abs(current.width - metrics.width) < 0.0001 &&
+      Math.abs(current.scale - metrics.scale) < 0.0001
+        ? current
+        : metrics,
+    );
+    externalMetricsCallbackRef.current?.(metrics);
+  }, []);
+  const sceneProps = {
+    ...props,
+    onCanvasMetricsChange: handleCanvasMetricsChange,
+  };
+  const latestPropsRef = useRef(sceneProps);
+  latestPropsRef.current = sceneProps;
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<AlbumCanvasScene | null>(null);
   const sceneInstanceIdRef = useRef<string | null>(null);
@@ -305,7 +328,7 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
     const scene = sceneRef.current;
     const host = hostRef.current;
     if (!ready || !scene || !host) return;
-    scene.update(props, host.clientHeight);
+    scene.update(sceneProps, host.clientHeight);
     if (materializedSceneRef.current !== scene) {
       materializedSceneRef.current = scene;
       logger.write({
@@ -333,36 +356,47 @@ export function AlbumCanvas(props: AlbumCanvasProps) {
   }
 
   return (
-    <div className="canvas-host" ref={hostRef}>
-      <div
-        aria-label="Ações da Barra da Lâmina"
-        className="ui-visually-hidden"
-        role="group"
-      >
-        <button
-          aria-label="Trocar Frames — indisponível nesta versão"
-          disabled
-          type="button"
-        />
-        <button
-          aria-label="Abrir Painel de Layouts — indisponível nesta versão"
-          disabled
-          type="button"
-        />
+    <div className="canvas-shell">
+      <div className="canvas-host" ref={hostRef}>
+        <div
+          aria-label="Ações da Barra da Lâmina"
+          className="ui-visually-hidden"
+          role="group"
+        >
+          <button
+            aria-label="Trocar Frames — indisponível nesta versão"
+            disabled
+            type="button"
+          />
+          <button
+            aria-label="Abrir Painel de Layouts — indisponível nesta versão"
+            disabled
+            type="button"
+          />
+        </div>
+        {graphicsState === "initializing" && (
+          <span className="canvas-loading">Iniciando WebGL2…</span>
+        )}
+        {graphicsState === "recovering" && (
+          <span className="canvas-loading" role="status">
+            Restaurando o contexto gráfico…
+          </span>
+        )}
+        {graphicsState === "failed" && (
+          <span className="canvas-loading" role="alert">
+            O editor gráfico está indisponível.
+          </span>
+        )}
       </div>
-      {graphicsState === "initializing" && (
-        <span className="canvas-loading">Iniciando WebGL2…</span>
-      )}
-      {graphicsState === "recovering" && (
-        <span className="canvas-loading" role="status">
-          Restaurando o contexto gráfico…
-        </span>
-      )}
-      {graphicsState === "failed" && (
-        <span className="canvas-loading" role="alert">
-          O editor gráfico está indisponível.
-        </span>
-      )}
+      <CanvasHorizontalScrollbar
+        centeredSheetId={props.centeredSheetId}
+        layout={props.continuousCanvasLayout}
+        metrics={canvasMetrics}
+        mode={props.mode}
+        onCenteredSheetChange={props.onCenteredSheetChange}
+        onViewportChange={props.onViewportChange}
+        viewport={props.viewport}
+      />
     </div>
   );
 }
