@@ -12,6 +12,7 @@ import {
   SaveProjectError,
   type ExportPort,
   type ExportProgressEvent,
+  type MediaPreviewRequest,
   type MediaPreviewPort,
   type ProjectStartupPort,
   type ProjectSessionPort,
@@ -35,6 +36,7 @@ import type { WorkspacePreferences as IpcWorkspacePreferences } from "./generate
 import type { SettingsPreferenceChange as IpcSettingsPreferenceChange } from "./generated/SettingsPreferenceChange";
 import type { MediaPreview as IpcMediaPreview } from "./generated/MediaPreview";
 import type { MediaPreviewCommandError as IpcMediaPreviewCommandError } from "./generated/MediaPreviewCommandError";
+import type { MediaPreviewDemand as IpcMediaPreviewDemand } from "./generated/MediaPreviewDemand";
 import type { SaveProjectOutcome as IpcSaveProjectOutcome } from "./generated/SaveProjectOutcome";
 import type { SaveProjectResult as IpcSaveProjectResult } from "./generated/SaveProjectResult";
 import { isIpcRecord, isIpcRevision } from "./ipcGuards";
@@ -66,6 +68,16 @@ function normalizeMediaPreviewError(error: unknown) {
     "read_failed",
     "Não foi possível preparar as Prévias de mídia vinculada.",
   );
+}
+
+function toIpcMediaPreviewDemand(
+  demand: MediaPreviewRequest,
+): IpcMediaPreviewDemand {
+  return {
+    preloadMediaIds: [...demand.preloadMediaIds],
+    revision: demand.revision,
+    visibleMediaIds: [...demand.visibleMediaIds],
+  };
 }
 
 function isCancelledExportError(
@@ -224,11 +236,11 @@ export const tauriProjectStartupPort: ProjectStartupPort = {
 
 export const tauriMediaPreviewPort: MediaPreviewPort = {
   prepareMediaPreviews: (demand) =>
-    invoke<IpcMediaPreview[] | null>("prepare_media_previews", { demand }).catch(
-      (error: unknown) => {
-        throw normalizeMediaPreviewError(error);
-      },
-    ),
+    invoke<IpcMediaPreview[] | null>("prepare_media_previews", {
+      demand: toIpcMediaPreviewDemand(demand),
+    }).catch((error: unknown) => {
+      throw normalizeMediaPreviewError(error);
+    }),
   onMediaChanged: (listener) =>
     listen<IpcLinkedMediaChanged>(
       "myalbuns://linked-media-changed",

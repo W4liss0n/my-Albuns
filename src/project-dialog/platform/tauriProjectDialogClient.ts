@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+import {
+  parseProjectDialogState,
+  toIpcProjectDialogAction,
+} from "../../platform/projectDialogContract";
 import type { ProjectDialogClient } from "../application/projectDialogClient";
-import { parseProjectDialogState } from "../application/projectDialogState";
 
 export const PROJECT_DIALOG_STATE_EVENT =
   "myalbuns://project-dialog-state";
@@ -36,5 +39,7 @@ export const tauriProjectDialogClient: ProjectDialogClient = {
     }
   },
   submit: (action) =>
-    invoke<void>("submit_project_dialog_action", { action }),
+    invoke<void>("submit_project_dialog_action", {
+      action: toIpcProjectDialogAction(action),
+    }),
 };

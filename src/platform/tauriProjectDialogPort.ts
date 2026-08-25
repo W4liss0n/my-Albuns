@@ -5,33 +5,22 @@ import type {
   ProjectDialogAction,
   ProjectDialogPort,
 } from "../application/projectDialogPort";
+import {
+  parseProjectDialogAction,
+  toIpcProjectDialogState,
+} from "./projectDialogContract";
 
 export const PROJECT_DIALOG_ACTION_EVENT =
   "myalbuns://project-dialog-action";
 
-const projectDialogActions = new Set<ProjectDialogAction>([
-  "cancelAlbumInformation",
-  "cancelExport",
-  "cancelProjectClose",
-  "confirmAlbumInformation",
-  "discardAndClose",
-  "dismissExport",
-  "dismissProjectCloseFailure",
-  "dismissProjectOperationFailure",
-  "retryExport",
-  "saveAndClose",
-]);
-
-function isProjectDialogAction(
-  value: unknown,
-): value is ProjectDialogAction {
-  return (
-    typeof value === "string" &&
-    projectDialogActions.has(value as ProjectDialogAction)
-  );
-}
-
 let dialogMutationQueue: Promise<void> = Promise.resolve();
+const actionListeners = new Set<
+  (action: ProjectDialogAction) => void
+>();
+let actionSubscription:
+  | Promise<() => void>
+  | undefined;
+let unlistenFromActions: (() => void) | undefined;
 
 function enqueueDialogMutation<T>(mutation: () => Promise<T>) {
   const result = dialogMutationQueue.then(mutation);
@@ -42,17 +31,58 @@ function enqueueDialogMutation<T>(mutation: () => Promise<T>) {
   return result;
 }
 
+async function ensureActionSubscription() {
+  actionSubscription ??= listen<unknown>(
+    PROJECT_DIALOG_ACTION_EVENT,
+    ({ payload }) => {
+      const action = parseProjectDialogAction(payload);
+      if (!action) return;
+      for (const listener of actionListeners) listener(action);
+    },
+  ).then(
+    (unlisten) => {
+      unlistenFromActions = unlisten;
+      return unlisten;
+    },
+    (error: unknown) => {
+      actionSubscription = undefined;
+      throw error;
+    },
+  );
+  await actionSubscription;
+}
+
+function releaseActionSubscriptionIfUnused() {
+  if (actionListeners.size > 0 || !unlistenFromActions) return;
+  unlistenFromActions();
+  unlistenFromActions = undefined;
+  actionSubscription = undefined;
+}
+
 export const tauriProjectDialogPort: ProjectDialogPort = {
   dismiss: () =>
     enqueueDialogMutation(() => invoke<void>("dismiss_project_dialog")),
-  onAction: (listener) =>
-    listen<unknown>(PROJECT_DIALOG_ACTION_EVENT, ({ payload }) => {
-      if (isProjectDialogAction(payload)) {
-        listener(payload);
-      }
-    }),
+  onAction: async (listener) => {
+    actionListeners.add(listener);
+    try {
+      await ensureActionSubscription();
+    } catch (error: unknown) {
+      actionListeners.delete(listener);
+      throw error;
+    }
+
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      actionListeners.delete(listener);
+      releaseActionSubscriptionIfUnused();
+    };
+  },
   present: (state) =>
     enqueueDialogMutation(() =>
-      invoke<void>("present_project_dialog", { state }),
+      invoke<void>("present_project_dialog", {
+        state: toIpcProjectDialogState(state),
+      }),
     ),
 };

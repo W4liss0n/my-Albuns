@@ -81,9 +81,7 @@ test("forwards only valid semantic actions from the native dialog", async () => 
     return unlisten;
   });
 
-  await expect(tauriProjectDialogPort.onAction(listener)).resolves.toBe(
-    unlisten,
-  );
+  const dispose = await tauriProjectDialogPort.onAction(listener);
   expect(listen).toHaveBeenCalledWith(
     "myalbuns://project-dialog-action",
     expect.any(Function),
@@ -103,4 +101,30 @@ test("forwards only valid semantic actions from the native dialog", async () => 
     "dismissProjectOperationFailure",
   );
   expect(listener).toHaveBeenNthCalledWith(4, "retryExport");
+  dispose();
+  expect(unlisten).toHaveBeenCalledOnce();
+});
+
+test("owns one native action subscription for every Project dialog consumer", async () => {
+  const firstListener = vi.fn();
+  const secondListener = vi.fn();
+  const unlisten = vi.fn();
+  let emit!: (payload: unknown) => void;
+  vi.mocked(listen).mockImplementation(async (_event, handler) => {
+    emit = (payload) => handler({ payload } as never);
+    return unlisten;
+  });
+
+  const disposeFirst = await tauriProjectDialogPort.onAction(firstListener);
+  const disposeSecond = await tauriProjectDialogPort.onAction(secondListener);
+
+  expect(listen).toHaveBeenCalledOnce();
+  emit("cancelProjectClose");
+  expect(firstListener).toHaveBeenCalledWith("cancelProjectClose");
+  expect(secondListener).toHaveBeenCalledWith("cancelProjectClose");
+
+  disposeFirst();
+  expect(unlisten).not.toHaveBeenCalled();
+  disposeSecond();
+  expect(unlisten).toHaveBeenCalledOnce();
 });

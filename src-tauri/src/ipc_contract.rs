@@ -5,6 +5,184 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(tag = "kind")]
+pub enum ProjectDialogProgress {
+    Indeterminate {
+        status: String,
+    },
+    Determinate {
+        completed: u64,
+        status: String,
+        total: u64,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDialogDetail {
+    pub(crate) label: String,
+    pub(crate) value: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[ts(tag = "kind")]
+pub enum ProjectDialogState {
+    AlbumInformationConfirmation {
+        busy: bool,
+        details: Vec<ProjectDialogDetail>,
+    },
+    ProjectCloseConfirmation {
+        busy: bool,
+    },
+    ProjectCloseFailure {
+        message: String,
+    },
+    ProjectOperationFailure {
+        message: String,
+    },
+    ExportProgress {
+        cancel_requested: bool,
+        cancellable: bool,
+        progress: ProjectDialogProgress,
+    },
+    ExportFailure {
+        cancelled: bool,
+        message: String,
+        retry_disabled: bool,
+    },
+    ExportSuccess {
+        message: String,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectDialogAction {
+    CancelAlbumInformation,
+    CancelExport,
+    CancelProjectClose,
+    DiscardAndClose,
+    ConfirmAlbumInformation,
+    DismissExport,
+    DismissProjectCloseFailure,
+    DismissProjectOperationFailure,
+    RetryExport,
+    SaveAndClose,
+}
+
+#[cfg(test)]
+mod project_dialog_contract_tests {
+    use serde_json::json;
+
+    use super::{
+        ProjectDialogAction, ProjectDialogDetail, ProjectDialogProgress, ProjectDialogState,
+    };
+
+    #[test]
+    fn every_project_dialog_action_uses_its_stable_camel_case_wire_value() {
+        let cases = [
+            (
+                ProjectDialogAction::CancelAlbumInformation,
+                "cancelAlbumInformation",
+            ),
+            (ProjectDialogAction::CancelExport, "cancelExport"),
+            (
+                ProjectDialogAction::CancelProjectClose,
+                "cancelProjectClose",
+            ),
+            (ProjectDialogAction::DiscardAndClose, "discardAndClose"),
+            (
+                ProjectDialogAction::ConfirmAlbumInformation,
+                "confirmAlbumInformation",
+            ),
+            (ProjectDialogAction::DismissExport, "dismissExport"),
+            (
+                ProjectDialogAction::DismissProjectCloseFailure,
+                "dismissProjectCloseFailure",
+            ),
+            (
+                ProjectDialogAction::DismissProjectOperationFailure,
+                "dismissProjectOperationFailure",
+            ),
+            (ProjectDialogAction::RetryExport, "retryExport"),
+            (ProjectDialogAction::SaveAndClose, "saveAndClose"),
+        ];
+
+        for (action, expected) in cases {
+            let encoded = serde_json::to_value(action).expect("dialog action serializes");
+            assert_eq!(encoded, json!(expected));
+            assert_eq!(
+                serde_json::from_value::<ProjectDialogAction>(encoded)
+                    .expect("dialog action deserializes"),
+                action
+            );
+        }
+    }
+
+    #[test]
+    fn every_project_dialog_state_round_trips_through_its_discriminated_union() {
+        let states = [
+            ProjectDialogState::AlbumInformationConfirmation {
+                busy: false,
+                details: vec![ProjectDialogDetail {
+                    label: "DPI".into(),
+                    value: "300 → 240".into(),
+                }],
+            },
+            ProjectDialogState::ProjectCloseConfirmation { busy: true },
+            ProjectDialogState::ProjectCloseFailure {
+                message: "Falha ao fechar".into(),
+            },
+            ProjectDialogState::ProjectOperationFailure {
+                message: "Falha ao salvar".into(),
+            },
+            ProjectDialogState::ExportProgress {
+                cancel_requested: false,
+                cancellable: true,
+                progress: ProjectDialogProgress::Determinate {
+                    completed: 2,
+                    status: "Exportando".into(),
+                    total: 5,
+                },
+            },
+            ProjectDialogState::ExportFailure {
+                cancelled: false,
+                message: "Falha ao exportar".into(),
+                retry_disabled: false,
+            },
+            ProjectDialogState::ExportSuccess {
+                message: "Exportação concluída".into(),
+            },
+        ];
+        let expected_kinds = [
+            "albumInformationConfirmation",
+            "projectCloseConfirmation",
+            "projectCloseFailure",
+            "projectOperationFailure",
+            "exportProgress",
+            "exportFailure",
+            "exportSuccess",
+        ];
+
+        for (state, expected_kind) in states.into_iter().zip(expected_kinds) {
+            let encoded = serde_json::to_value(&state).expect("dialog state serializes");
+            assert_eq!(encoded["kind"], json!(expected_kind));
+            assert_eq!(
+                serde_json::from_value::<ProjectDialogState>(encoded)
+                    .expect("dialog state deserializes"),
+                state
+            );
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspacePreferences {
     pub(crate) inspector_sections: BTreeMap<String, bool>,

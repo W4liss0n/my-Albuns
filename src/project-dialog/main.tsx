@@ -6,6 +6,7 @@ import type {
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
+import { parseInitialProjectDialogState } from "../platform/projectDialogContract";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import {
   MessageDialog,
@@ -14,33 +15,11 @@ import {
   type WindowControls,
 } from "../ui";
 import type { ProjectDialogClient } from "./application/projectDialogClient";
-import { parseInitialProjectDialogState } from "./application/projectDialogState";
+import { defaultProjectDialogCloseAction } from "./application/projectDialogLifecycle";
 import { ProjectDialogView } from "./ProjectDialogView";
 import { tauriProjectDialogClient } from "./platform/tauriProjectDialogClient";
 import "../ui/theme.css";
 import "../ui/ui.css";
-
-function defaultCloseAction(
-  state: ProjectDialogState,
-): ProjectDialogAction | null {
-  switch (state.kind) {
-    case "albumInformationConfirmation":
-      return state.busy ? null : "cancelAlbumInformation";
-    case "projectCloseConfirmation":
-      return state.busy ? null : "cancelProjectClose";
-    case "projectCloseFailure":
-      return "dismissProjectCloseFailure";
-    case "projectOperationFailure":
-      return "dismissProjectOperationFailure";
-    case "exportProgress":
-      return state.cancellable && !state.cancelRequested
-        ? "cancelExport"
-        : null;
-    case "exportFailure":
-    case "exportSuccess":
-      return "dismissExport";
-  }
-}
 
 function ProjectDialogApplication({
   client,
@@ -66,7 +45,9 @@ function ProjectDialogApplication({
     };
   }, [client]);
 
-  const closeAction = state ? defaultCloseAction(state) : null;
+  const closeAction = state
+    ? defaultProjectDialogCloseAction(state)
+    : null;
   const controls = useMemo<WindowControls>(
     () => ({
       ...tauriWindowControls,

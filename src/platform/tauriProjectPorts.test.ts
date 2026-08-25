@@ -321,6 +321,33 @@ test("maps the Project and media ports to the desktop commands", async () => {
   expect(previews?.[0].url).toBe("http://asset.localhost/cache-preview");
 });
 
+test("materializes an owned media-demand DTO at the native seam", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce([]);
+  const visibleMediaIds = Object.freeze(["media-a-001"]);
+  const preloadMediaIds = Object.freeze(["media-b-001"]);
+
+  await tauriMediaPreviewPort.prepareMediaPreviews({
+    preloadMediaIds,
+    revision: 7,
+    visibleMediaIds,
+  });
+
+  const request = vi.mocked(invoke).mock.calls[0][1] as {
+    demand: {
+      preloadMediaIds: string[];
+      revision: number;
+      visibleMediaIds: string[];
+    };
+  };
+  expect(request.demand).toEqual({
+    preloadMediaIds: ["media-b-001"],
+    revision: 7,
+    visibleMediaIds: ["media-a-001"],
+  });
+  expect(request.demand.visibleMediaIds).not.toBe(visibleMediaIds);
+  expect(request.demand.preloadMediaIds).not.toBe(preloadMediaIds);
+});
+
 test("maps stable linked-media events to the reactive preview seam", async () => {
   const listener = vi.fn();
 

@@ -166,8 +166,6 @@ pub(crate) async fn show_launch_progress(
         kind.url(),
         DIALOG_WIDTH,
         126.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-        false,
-        false,
     )
     .await?;
 
@@ -202,8 +200,6 @@ pub(crate) async fn show_project_failure(
         &url,
         DIALOG_WIDTH,
         210.0 + OWNED_WINDOW_TITLEBAR_HEIGHT,
-        false,
-        false,
     )
     .await
     {
@@ -244,8 +240,6 @@ pub(crate) async fn build_hidden_owned_window(
     url: &str,
     width: f64,
     height: f64,
-    closable: bool,
-    resizable: bool,
 ) -> io::Result<WebviewWindow> {
     if let Some(existing) = app.get_webview_window(label) {
         let _ = existing.destroy();
@@ -261,10 +255,10 @@ pub(crate) async fn build_hidden_owned_window(
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App(ready_url.into()))
         .title("MyAlbuns")
         .inner_size(width, height)
-        .resizable(resizable)
+        .resizable(false)
         .maximizable(false)
         .minimizable(false)
-        .closable(closable)
+        .closable(false)
         .decorations(false)
         .skip_taskbar(true)
         .shadow(true)
@@ -391,7 +385,7 @@ impl DialogOwner for WebviewWindow {
         #[cfg(windows)]
         {
             let handle = self.hwnd().map_err(io::Error::other)?;
-            return Ok(unsafe { IsWindowEnabled(handle) }.as_bool());
+            Ok(unsafe { IsWindowEnabled(handle) }.as_bool())
         }
         #[cfg(not(windows))]
         {

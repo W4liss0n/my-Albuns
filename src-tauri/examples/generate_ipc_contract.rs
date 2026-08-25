@@ -5,10 +5,10 @@ use myalbuns_desktop_lib::ipc_contract::{
     FrontendLogEvent, LinkedMediaChanged, MediaPanelSettings, MediaPanelTabSettings,
     MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
     MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
-    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution,
-    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
-    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
-    WorkspacePreferenceChange, WorkspacePreferences,
+    ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
+    ProjectDialogState, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
+    SettingsPreferenceChange, WorkspacePanelKind, WorkspacePanelPreference,
+    WorkspacePanelPreferences, WorkspacePreferenceChange, WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -49,6 +49,10 @@ fn main() {
     MediaThumbnailSizes::export_all(&config)
         .expect("media thumbnail size bindings should be generated");
     MediaUsageFilter::export_all(&config).expect("media usage filter bindings should be generated");
+    ProjectDialogAction::export_all(&config)
+        .expect("Project dialog action bindings should be generated");
+    ProjectDialogState::export_all(&config)
+        .expect("Project dialog state bindings should be generated");
     ProjectCloseChoice::export_all(&config)
         .expect("Project close choice bindings should be generated");
     ProjectCloseRequestOutcome::export_all(&config)
