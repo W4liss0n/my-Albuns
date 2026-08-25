@@ -53,7 +53,7 @@
 }
 
 .media-preview-card:focus-visible .media-preview-thumbnail {
-  outline: 1px solid var(--ui-text-muted);
+  outline: 1px solid var(--ui-focus-neutral);
   outline-offset: 2px;
 }
 

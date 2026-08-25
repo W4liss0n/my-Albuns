@@ -55,7 +55,9 @@ interface ProjectWorkspaceProps {
   onProjectionChange(projection: EditorProjection): void;
   onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
   onPreferencesReady?(projectId: string): void;
-  workspacePreferencesPort?: WorkspacePreferencesPort;
+  workspacePreferences:
+    | { kind: "persistent"; port: WorkspacePreferencesPort }
+    | { kind: "memory" };
 }
 
 const SHEET_EDITING_MEDIA_PANEL_HEIGHT = 120;
@@ -72,14 +74,23 @@ export function ProjectWorkspace({
   onProjectionChange,
   onGraphicsUnavailable,
   onPreferencesReady,
-  workspacePreferencesPort,
+  workspacePreferences: workspacePreferencesMode,
 }: ProjectWorkspaceProps) {
   const fallbackWorkspacePreferencesPort =
     useRef<WorkspacePreferencesPort | null>(null);
-  fallbackWorkspacePreferencesPort.current ??=
-    createFallbackWorkspacePreferencesPort();
+  if (
+    workspacePreferencesMode.kind === "memory" &&
+    !fallbackWorkspacePreferencesPort.current
+  ) {
+    fallbackWorkspacePreferencesPort.current =
+      createFallbackWorkspacePreferencesPort();
+  }
+  const workspacePreferencesPort =
+    workspacePreferencesMode.kind === "persistent"
+      ? workspacePreferencesMode.port
+      : fallbackWorkspacePreferencesPort.current!;
   const workspacePreferences = useWorkspacePreferences(
-    workspacePreferencesPort ?? fallbackWorkspacePreferencesPort.current,
+    workspacePreferencesPort,
   );
   const projectId = projection.state.projectId;
   useEffect(() => {
@@ -363,6 +374,7 @@ export function ProjectWorkspace({
           visualDefaults={projection.state.album.visualDefaults}
           focusedSheetId={controller.canvasProps.focusedSheetId}
           mediaPreviewUrls={mediaPreviewUrls}
+          revision={projection.state.revision}
           onBeginPhotoZoom={controller.beginZoomGesture}
           onUpdatePhotoZoom={controller.updateZoomGesture}
           onFinishPhotoZoom={controller.finishZoomGesture}
@@ -371,16 +383,16 @@ export function ProjectWorkspace({
           onPresentationUnitChange={changePresentationUnit}
           onValidateAlbumInformation={validateAlbumInformation}
           onNavigateToSheet={controller.navigateToSheet}
-          sectionPreferences={
-            workspacePreferences.preferences.inspectorSections
-          }
-          onSectionPreferenceChange={(preferenceKey, open) =>
-            workspacePreferences.update({
-              kind: "inspectorSection",
-              preferenceKey,
-              open,
-            })
-          }
+          sectionState={{
+            kind: "controlled",
+            values: workspacePreferences.preferences.inspectorSections,
+            onChange: (preferenceKey, open) =>
+              workspacePreferences.update({
+                kind: "inspectorSection",
+                preferenceKey,
+                open,
+              }),
+          }}
         />}
 
         {workspacePanels.panels.media.visible && <MediaPanel
@@ -389,31 +401,30 @@ export function ProjectWorkspace({
           mediaPreviews={mediaPreviews}
           onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
-          thumbnailSizes={
-            workspacePreferences.preferences.mediaThumbnailSizes
-          }
-          onThumbnailSizeChange={(mediaKind, size) =>
-            workspacePreferences.update({
-              kind: "mediaThumbnailSize",
-              mediaKind,
-              size,
-            })
-          }
-          persistentPreferences={workspacePreferences.preferences.mediaPanel}
-          onSortDirectionChange={(mediaKind, sortDirection) =>
-            workspacePreferences.update({
-              kind: "mediaPanelSortDirection",
-              mediaKind,
-              sortDirection,
-            })
-          }
-          onUsageFilterChange={(mediaKind, usageFilter) =>
-            workspacePreferences.update({
-              kind: "mediaPanelUsageFilter",
-              mediaKind,
-              usageFilter,
-            })
-          }
+          preferences={{
+            kind: "controlled",
+            persistent: workspacePreferences.preferences.mediaPanel,
+            thumbnailSizes:
+              workspacePreferences.preferences.mediaThumbnailSizes,
+            onThumbnailSizeChange: (mediaKind, size) =>
+              workspacePreferences.update({
+                kind: "mediaThumbnailSize",
+                mediaKind,
+                size,
+              }),
+            onSortDirectionChange: (mediaKind, sortDirection) =>
+              workspacePreferences.update({
+                kind: "mediaPanelSortDirection",
+                mediaKind,
+                sortDirection,
+              }),
+            onUsageFilterChange: (mediaKind, usageFilter) =>
+              workspacePreferences.update({
+                kind: "mediaPanelUsageFilter",
+                mediaKind,
+                usageFilter,
+              }),
+          }}
         />}
       </div>
 

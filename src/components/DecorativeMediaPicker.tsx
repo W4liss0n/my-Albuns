@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 
 import type { MediaCatalogItem } from "../domain/project";
 import { AppIcon } from "../ui";
+import { useDismissableSurface } from "../ui/useDismissableSurface";
 import { MediaThumbnail } from "./MediaThumbnail";
 import "./DecorativeMediaPicker.css";
 
@@ -50,38 +51,26 @@ export function DecorativeMediaPicker({
     (selected ?? first ?? menu)?.focus({ preventScroll: true });
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-
-    const restoreTrigger = () => {
-      triggerRef.current?.focus({ preventScroll: true });
-    };
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
+  useDismissableSurface({
+    enabled: open,
+    rootRef,
+    onDismiss: ({ reason, event }) => {
+      const restoreTrigger = () => {
+        triggerRef.current?.focus({ preventScroll: true });
+      };
+      if (reason === "pointerOutside") {
         onOpenChange(false);
         const openingAnotherPicker =
           event.target instanceof Element &&
           event.target.closest("[data-decorative-picker-trigger]");
         if (!openingAnotherPicker) window.setTimeout(restoreTrigger, 0);
+        return;
       }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
       event.preventDefault();
       onOpenChange(false);
       restoreTrigger();
-    };
-
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [onOpenChange, open]);
+    },
+  });
 
   function closeAndRestoreFocus() {
     onOpenChange(false);

@@ -6,6 +6,7 @@ import type {
   CanvasMetrics,
 } from "./albumCanvasContract";
 import type { ContinuousCanvasLayout } from "./canvasGeometry";
+import "./CanvasHorizontalScrollbar.css";
 
 interface CanvasHorizontalScrollbarProps {
   centeredSheetId: string | null;

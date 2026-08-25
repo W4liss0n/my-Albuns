@@ -30,25 +30,33 @@ import { MediaThumbnail } from "./MediaThumbnail";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 import "./MediaPanel.css";
 
+export type MediaPanelPreferenceMode =
+  | {
+      kind: "controlled";
+      persistent: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
+      thumbnailSizes: Readonly<Record<MediaKind, number>>;
+      onSortDirectionChange(
+        mediaKind: MediaKind,
+        sortDirection: MediaPanelPersistentPreference["sortDirection"],
+      ): void;
+      onUsageFilterChange(
+        mediaKind: MediaKind,
+        usageFilter: MediaPanelPersistentPreference["usageFilter"],
+      ): void;
+      onThumbnailSizeChange(mediaKind: MediaKind, size: number): void;
+    }
+  | {
+      kind: "local";
+      initial?: Partial<Record<MediaKind, MediaPanelViewPreferences>>;
+    };
+
 export interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
   mediaPreviews?: Readonly<Record<string, MediaPreview>>;
   onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
-  onSortDirectionChange?(
-    mediaKind: MediaKind,
-    sortDirection: MediaPanelPersistentPreference["sortDirection"],
-  ): void;
-  onUsageFilterChange?(
-    mediaKind: MediaKind,
-    usageFilter: MediaPanelPersistentPreference["usageFilter"],
-  ): void;
-  onThumbnailSizeChange?(mediaKind: MediaKind, size: number): void;
-  persistentPreferences?: Readonly<
-    Record<MediaKind, MediaPanelPersistentPreference>
-  >;
-  thumbnailSizes?: Readonly<Record<MediaKind, number>>;
+  preferences: MediaPanelPreferenceMode;
 }
 
 const naturalNameCollator = new Intl.Collator("pt-BR", {
@@ -62,12 +70,14 @@ export function MediaPanel({
   mediaPreviews = {},
   onMediaDemandChange,
   onFillPhoto,
-  onSortDirectionChange,
-  onThumbnailSizeChange,
-  persistentPreferences,
-  thumbnailSizes,
-  onUsageFilterChange,
+  preferences: preferenceMode,
 }: MediaPanelProps) {
+  const controlledPersistent =
+    preferenceMode.kind === "controlled" ? preferenceMode.persistent : null;
+  const controlledThumbnailSizes =
+    preferenceMode.kind === "controlled"
+      ? preferenceMode.thumbnailSizes
+      : null;
   const [activeMediaKind, setActiveMediaKind] =
     useState<MediaKind>("photo");
   const [searchByKind, setSearchByKind] = useState<Record<MediaKind, string>>({
@@ -79,15 +89,11 @@ export function MediaPanel({
   >(() => ({
     decorative: {
       ...createMediaPanelViewPreferences(),
-      ...(persistentPreferences?.decorative ?? {}),
-      ...(thumbnailSizes
-        ? { thumbnailSize: thumbnailSizes.decorative }
-        : {}),
+      ...initialPreferences(preferenceMode, "decorative"),
     },
     photo: {
       ...createMediaPanelViewPreferences(),
-      ...(persistentPreferences?.photo ?? {}),
-      ...(thumbnailSizes ? { thumbnailSize: thumbnailSizes.photo } : {}),
+      ...initialPreferences(preferenceMode, "photo"),
     },
   }));
   const [selectedMediaIds, setSelectedMediaIds] = useState<ReadonlySet<string>>(
@@ -140,32 +146,32 @@ export function MediaPanel({
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!thumbnailSizes) return;
+    if (!controlledThumbnailSizes) return;
     setPreferencesByKind((current) => ({
       decorative: {
         ...current.decorative,
-        thumbnailSize: thumbnailSizes.decorative,
+        thumbnailSize: controlledThumbnailSizes.decorative,
       },
       photo: {
         ...current.photo,
-        thumbnailSize: thumbnailSizes.photo,
+        thumbnailSize: controlledThumbnailSizes.photo,
       },
     }));
-  }, [thumbnailSizes]);
+  }, [controlledThumbnailSizes]);
 
   useEffect(() => {
-    if (!persistentPreferences) return;
+    if (!controlledPersistent) return;
     setPreferencesByKind((current) => ({
       decorative: {
         ...current.decorative,
-        ...persistentPreferences.decorative,
+        ...controlledPersistent.decorative,
       },
       photo: {
         ...current.photo,
-        ...persistentPreferences.photo,
+        ...controlledPersistent.photo,
       },
     }));
-  }, [persistentPreferences]);
+  }, [controlledPersistent]);
 
   useEffect(() => {
     setSelectedMediaIds((current) => {
@@ -234,20 +240,32 @@ export function MediaPanel({
   function updatePreferences(
     nextPreferences: Partial<MediaPanelViewPreferences>,
   ) {
-    if (nextPreferences.thumbnailSize !== undefined) {
-      onThumbnailSizeChange?.(
+    if (
+      preferenceMode.kind === "controlled" &&
+      nextPreferences.thumbnailSize !== undefined
+    ) {
+      preferenceMode.onThumbnailSizeChange(
         activeMediaKind,
         nextPreferences.thumbnailSize,
       );
     }
-    if (nextPreferences.sortDirection !== undefined) {
-      onSortDirectionChange?.(
+    if (
+      preferenceMode.kind === "controlled" &&
+      nextPreferences.sortDirection !== undefined
+    ) {
+      preferenceMode.onSortDirectionChange(
         activeMediaKind,
         nextPreferences.sortDirection,
       );
     }
-    if (nextPreferences.usageFilter !== undefined) {
-      onUsageFilterChange?.(activeMediaKind, nextPreferences.usageFilter);
+    if (
+      preferenceMode.kind === "controlled" &&
+      nextPreferences.usageFilter !== undefined
+    ) {
+      preferenceMode.onUsageFilterChange(
+        activeMediaKind,
+        nextPreferences.usageFilter,
+      );
     }
     setPreferencesByKind((current) => ({
       ...current,
@@ -432,6 +450,18 @@ export function MediaPanel({
       </div>
     </section>
   );
+}
+
+function initialPreferences(
+  mode: MediaPanelPreferenceMode,
+  mediaKind: MediaKind,
+): Partial<MediaPanelViewPreferences> {
+  return mode.kind === "controlled"
+    ? {
+        ...mode.persistent[mediaKind],
+        thumbnailSize: mode.thumbnailSizes[mediaKind],
+      }
+    : mode.initial?.[mediaKind] ?? {};
 }
 
 function normalizeSearchText(value: string) {

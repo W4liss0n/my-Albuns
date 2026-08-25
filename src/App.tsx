@@ -29,9 +29,12 @@ import {
 import { ProjectWorkspace } from "./components/ProjectWorkspace";
 import { useProjectMutationRunner } from "./components/useProjectMutationRunner";
 import { BrandWordmark, InlineNotice } from "./ui";
+import "./ui/theme.css";
+import "./ui/ui.css";
+import "./components/StartupSurface.css";
 import "./App.css";
 
-interface AppProps {
+type AppProps = {
   exportPort: ExportPort;
   mediaPreviewPort: MediaPreviewPort;
   projectStartupPort: ProjectStartupPort;
@@ -41,8 +44,16 @@ interface AppProps {
   graphicsProbe: GraphicsProbe;
   canvasGraphicsDiagnosticProbe: CanvasGraphicsDiagnosticProbe;
   logger: Logger;
-  workspacePreferencesPort?: WorkspacePreferencesPort;
-}
+} & (
+  | {
+      workspacePreferencesPort: WorkspacePreferencesPort;
+      workspacePreferencesMode?: never;
+    }
+  | {
+      workspacePreferencesPort?: never;
+      workspacePreferencesMode: "memory";
+    }
+);
 
 function App({
   exportPort,
@@ -55,6 +66,7 @@ function App({
   canvasGraphicsDiagnosticProbe,
   logger,
   workspacePreferencesPort,
+  workspacePreferencesMode,
 }: AppProps) {
   const graphics = useMemo(() => graphicsProbe(), [graphicsProbe]);
   const [runtimeGraphicsDiagnostic, setRuntimeGraphicsDiagnostic] =
@@ -315,7 +327,11 @@ function App({
           onProjectionChange={setProjection}
           onGraphicsUnavailable={setRuntimeGraphicsDiagnostic}
           onPreferencesReady={handlePreferencesReady}
-          workspacePreferencesPort={workspacePreferencesPort}
+          workspacePreferences={
+            workspacePreferencesPort
+              ? { kind: "persistent", port: workspacePreferencesPort }
+              : { kind: workspacePreferencesMode }
+          }
         />
       </CanvasGraphicsDiagnosticProbeProvider>
     </LoggingProvider>

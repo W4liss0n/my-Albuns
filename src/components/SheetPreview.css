@@ -1,0 +1,8 @@
+.sheet-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  border-radius: 0;
+  pointer-events: none;
+}

@@ -16,6 +16,10 @@ import type {
   ProjectedVisualDefaults,
   SheetSnapshot,
 } from "../domain/project";
+import type {
+  AlbumDesignProjectDraft,
+  AlbumInformationProjectDraft,
+} from "../application/projectSettingsDraft";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
@@ -51,6 +55,14 @@ export type InspectorContext =
       editingSheet?: ComposedSheet;
     };
 
+export type InspectorSectionState =
+  | {
+      kind: "controlled";
+      values: Readonly<Record<string, boolean>>;
+      onChange(preferenceKey: string, open: boolean): void;
+    }
+  | { kind: "local" };
+
 export interface InspectorPanelProps {
   context: InspectorContext;
   displayedPhotoZoom: number;
@@ -65,24 +77,23 @@ export interface InspectorPanelProps {
   visualDefaults: ProjectedVisualDefaults;
   focusedSheetId: string | null;
   mediaPreviewUrls?: Readonly<Record<string, string>>;
+  revision: number;
   onBeginPhotoZoom(): void;
   onUpdatePhotoZoom(value: number): void;
   onFinishPhotoZoom(): void | Promise<void>;
   onApplyAlbumInformation(
-    information: AlbumInformation,
-    baseline: AlbumInformation,
+    draft: AlbumInformationProjectDraft,
     impact: AlbumInformationImpact,
   ): void | Promise<unknown>;
   onApplyAlbumDesign(
-    visualDefaults: ProjectedVisualDefaults,
+    draft: AlbumDesignProjectDraft,
   ): void | Promise<unknown>;
   onValidateAlbumInformation(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;
   onPresentationUnitChange(unit: DisplayUnit | null): void;
   onNavigateToSheet(sheetId: string): void;
-  onSectionPreferenceChange?(preferenceKey: string, open: boolean): void;
-  sectionPreferences?: Readonly<Record<string, boolean>>;
+  sectionState: InspectorSectionState;
 }
 
 export function InspectorPanel({
@@ -99,6 +110,7 @@ export function InspectorPanel({
   visualDefaults,
   focusedSheetId,
   mediaPreviewUrls = {},
+  revision,
   onBeginPhotoZoom,
   onUpdatePhotoZoom,
   onFinishPhotoZoom,
@@ -107,8 +119,7 @@ export function InspectorPanel({
   onPresentationUnitChange,
   onValidateAlbumInformation,
   onNavigateToSheet,
-  onSectionPreferenceChange,
-  sectionPreferences,
+  sectionState,
 }: InspectorPanelProps) {
   const [informationDirty, setInformationDirty] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
@@ -155,8 +166,7 @@ export function InspectorPanel({
               key="frame-photo-design"
               title="Design"
               preferenceKey="frame-photo.design"
-              sectionPreferences={sectionPreferences}
-              onSectionPreferenceChange={onSectionPreferenceChange}
+              sectionState={sectionState}
               defaultOpen
             >
               <PropertyRow
@@ -215,8 +225,7 @@ export function InspectorPanel({
             key="sheet-design"
             title="Design da Lâmina"
             preferenceKey="sheet.design"
-            sectionPreferences={sectionPreferences}
-            onSectionPreferenceChange={onSectionPreferenceChange}
+            sectionState={sectionState}
             defaultOpen
           >
             <SheetDesignInspector
@@ -250,14 +259,14 @@ export function InspectorPanel({
               key="album-information"
               title="Informações do Álbum"
               preferenceKey="album.information"
-              sectionPreferences={sectionPreferences}
-              onSectionPreferenceChange={onSectionPreferenceChange}
+              sectionState={sectionState}
               defaultOpen
             >
               <div className="inspector-subsections">
                 <AlbumInformationForm
                   document={document}
                   formId={ALBUM_INFORMATION_FORM_ID}
+                  revision={revision}
                   onApply={onApplyAlbumInformation}
                   onPresentationUnitChange={onPresentationUnitChange}
                   onReadyChange={setInformationDirty}
@@ -282,8 +291,7 @@ export function InspectorPanel({
               key="album-design"
               title="Design do Álbum"
               preferenceKey="album.design"
-              sectionPreferences={sectionPreferences}
-              onSectionPreferenceChange={onSectionPreferenceChange}
+              sectionState={sectionState}
               defaultOpen
             >
               <AlbumDesignForm
@@ -292,6 +300,7 @@ export function InspectorPanel({
                 formId={ALBUM_DESIGN_FORM_ID}
                 mediaItems={mediaItems}
                 mediaPreviewUrls={mediaPreviewUrls}
+                revision={revision}
                 value={visualDefaults}
                 onApply={onApplyAlbumDesign}
                 onReadyChange={setDesignDirty}
@@ -302,8 +311,7 @@ export function InspectorPanel({
               key="album-sheet-grid"
               title="Grade de Lâminas"
               preferenceKey="album.sheet-grid"
-              sectionPreferences={sectionPreferences}
-              onSectionPreferenceChange={onSectionPreferenceChange}
+              sectionState={sectionState}
               meta={sheets.length}
               defaultOpen
             >
@@ -378,8 +386,7 @@ function InspectorSection({
   meta,
   defaultOpen = false,
   children,
-  onSectionPreferenceChange,
-  sectionPreferences,
+  sectionState,
 }: {
   action?: ReactNode;
   accessibleTitle?: string;
@@ -388,16 +395,18 @@ function InspectorSection({
   meta?: ReactNode;
   defaultOpen?: boolean;
   children: ReactNode;
-  onSectionPreferenceChange?(preferenceKey: string, open: boolean): void;
-  sectionPreferences?: Readonly<Record<string, boolean>>;
+  sectionState: InspectorSectionState;
 }) {
   const [fallbackOpen, setFallbackOpen] = useState(defaultOpen);
-  const open = sectionPreferences?.[preferenceKey] ?? fallbackOpen;
+  const open =
+    sectionState.kind === "controlled"
+      ? sectionState.values[preferenceKey] ?? defaultOpen
+      : fallbackOpen;
 
   function toggle() {
     const next = !open;
-    if (onSectionPreferenceChange) {
-      onSectionPreferenceChange(preferenceKey, next);
+    if (sectionState.kind === "controlled") {
+      sectionState.onChange(preferenceKey, next);
       return;
     }
     setFallbackOpen(next);

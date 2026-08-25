@@ -18,6 +18,7 @@ import {
   useCanvasGraphicsDiagnosticProbe,
 } from "./canvasGraphicsDiagnosticProbeContext";
 import { useLogger } from "./loggingContext";
+import "./AlbumCanvas.css";
 import "./pixiRuntime";
 
 const isOpaqueCachePreview = (url: string) =>

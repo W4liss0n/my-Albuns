@@ -13,6 +13,7 @@ import {
   type WorkspacePanel,
   type WorkspacePanelPreference,
 } from "../application/workspacePreferences";
+import "./WorkspacePanelLayout.css";
 
 interface WorkspacePanelDefinition {
   className: string;

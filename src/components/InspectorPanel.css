@@ -80,7 +80,7 @@
 }
 
 .context-heading span {
-  color: var(--ui-accent);
+  color: var(--ui-accent-text);
   font-family: var(--ui-font-mono);
   font-size: var(--ui-font-size-micro);
   font-weight: 650;
@@ -181,112 +181,6 @@
   font-weight: 650;
 }
 
-.album-information-form {
-  display: grid;
-  gap: var(--ui-space-4);
-}
-
-.album-information-field {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-caption);
-  gap: var(--ui-space-1);
-}
-
-.inspector-readout-grid
-  > .album-information-field
-  > .ui-field-validation-auto-tooltip {
-  width: calc(200% + var(--ui-space-3));
-}
-
-.inspector-readout-grid
-  > .album-information-field:last-child
-  > .ui-field-validation-auto-tooltip {
-  --ui-field-validation-pointer-inline-start: auto;
-  --ui-field-validation-pointer-inline-end: 14px;
-
-  right: 0;
-  left: auto;
-}
-
-.album-information-form__status {
-  margin: 0;
-  color: var(--ui-danger);
-  font-size: var(--ui-font-size-caption);
-  line-height: 1.35;
-}
-
-.album-information-dimension {
-  display: grid;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  gap: var(--ui-space-2);
-}
-
-.album-information-dimension legend {
-  margin: 0 0 var(--ui-space-2);
-  padding: 0;
-  color: var(--ui-text-secondary);
-  font-size: var(--ui-font-size-support);
-  font-weight: 600;
-}
-
-.album-entry-control {
-  position: relative;
-  display: block;
-  min-width: 0;
-}
-
-.album-entry-control .ui-field-control {
-  padding-right: 30px;
-}
-
-.album-entry-reset {
-  position: absolute;
-  top: 50%;
-  right: var(--ui-space-1);
-  display: grid;
-  width: 20px;
-  height: 20px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ui-radius-small);
-  color: var(--ui-text-muted);
-  background: transparent;
-  transform: translateY(-50%);
-  place-items: center;
-}
-
-.album-entry-reset:hover,
-.album-entry-reset:focus-visible {
-  color: var(--ui-text);
-  background: var(--ui-surface-muted);
-}
-
-.album-measurement-control .ui-field-control {
-  padding-right: 54px;
-  font-family: var(--ui-font-mono);
-}
-
-.album-measurement-control .album-entry-reset {
-  right: 28px;
-}
-
-.album-measurement-control > span {
-  position: absolute;
-  top: 50%;
-  right: var(--ui-space-2);
-  color: var(--ui-text-muted);
-  font-family: var(--ui-font-mono);
-  font-size: var(--ui-font-size-micro);
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
 .document-compact-controls {
   display: grid;
   align-items: end;
@@ -304,181 +198,6 @@
 .inspector-subsections > .inspector-subsection:first-child {
   padding-top: 0;
   border-top: 0;
-}
-
-.album-design-preview {
-  height: 132px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-canvas);
-  box-shadow: var(--ui-shadow-thumbnail);
-}
-
-.album-design-preview .visual-preview-viewport {
-  padding: var(--ui-space-2);
-}
-
-.album-design-scope-label {
-  margin: calc(var(--ui-space-1) * -1) 0 0;
-  text-align: center;
-}
-
-.visual-default-field {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--ui-space-2);
-}
-
-/* Sem overflow: a faixa tem duas opções fixas, e um container rolável
-   recortaria o seletor flutuante ancorado no quadrado de Decorativo. */
-.visual-default-picker {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  padding: 4px 2px;
-  gap: var(--ui-space-2);
-}
-
-.visual-default-picker__option {
-  position: relative;
-  display: grid;
-  width: 26px;
-  min-width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  flex: none;
-  place-items: center;
-  color: var(--ui-text-muted);
-  background: transparent;
-}
-
-.visual-default-picker__tile {
-  display: block;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 5px;
-  background: var(--ui-surface-raised);
-}
-
-.visual-default-label {
-  flex: none;
-  width: 62px;
-  color: var(--ui-text-muted);
-  font-size: var(--ui-font-size-support);
-}
-
-.visual-default-picker__divider {
-  width: 1px;
-  height: 26px;
-  flex: none;
-  background: var(--ui-border);
-}
-
-.visual-default-picker__tile--add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-color: var(--ui-text-muted);
-  border-style: dashed;
-  color: var(--ui-text-muted);
-  background: transparent;
-}
-
-.visual-default-picker__preview--none {
-  background: linear-gradient(
-    135deg,
-    var(--ui-surface-raised) 0 47%,
-    var(--ui-border-strong) 47% 53%,
-    var(--ui-surface-raised) 53%
-  );
-}
-
-.visual-default-picker__option:hover,
-.visual-default-picker__option:focus-visible {
-  color: var(--ui-text);
-}
-
-.visual-default-picker__option:hover .visual-default-picker__tile,
-.visual-default-picker__color:hover .visual-default-picker__tile {
-  border-color: var(--ui-text-muted);
-}
-
-.visual-default-picker__option:focus-visible {
-  outline: 0;
-}
-
-.visual-default-picker__option:focus-visible .visual-default-picker__tile,
-.visual-default-picker__color:has(input:focus-visible)
-  .visual-default-picker__tile {
-  outline: 1px solid var(--ui-text-muted);
-  outline-offset: 2px;
-}
-
-.visual-default-picker__option[aria-pressed="true"]
-  .visual-default-picker__tile,
-.visual-default-picker__option[data-selected="true"]
-  .visual-default-picker__tile {
-  border-color: var(--ui-accent);
-}
-
-.visual-default-picker__color {
-  cursor: default;
-}
-
-.visual-default-picker__color input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  opacity: 0;
-}
-
-.album-frame-border-color-picker input {
-  position: absolute;
-  inset: -8px;
-  width: calc(100% + 16px);
-  height: calc(100% + 16px);
-  padding: 0;
-  border: 0;
-}
-
-.album-frame-border-color-picker:has(input:focus-visible) {
-  border-color: var(--ui-text-muted);
-  box-shadow: 0 0 0 1px var(--ui-border-strong);
-}
-
-/* Cor e espessura dividem a mesma linha: o seletor sozinho não justifica uma
-   faixa inteira do painel. */
-.album-frame-border-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--ui-space-3);
-}
-
-.album-frame-border-row > .ui-range-control {
-  min-width: 0;
-  flex: 1;
-}
-
-.album-frame-border-color-picker {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  overflow: hidden;
-  padding: 0;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-small);
-}
-
-.album-frame-border-color-picker:hover {
-  border-color: var(--ui-text-muted);
 }
 
 .photo-zoom-control {
@@ -544,7 +263,7 @@
 }
 
 .sheet-tile:focus-visible {
-  outline: 1px solid var(--ui-text-muted);
+  outline: 1px solid var(--ui-focus-neutral);
   outline-offset: 2px;
 }
 
@@ -626,6 +345,6 @@
 
 .sheet-tile.active .sheet-tile__number,
 .sheet-tile.active .sheet-tile__pages {
-  color: #fff;
-  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  background: var(--ui-accent-fill);
 }

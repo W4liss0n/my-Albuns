@@ -15,10 +15,19 @@
   --ui-border-strong: #d4cfc4;
   --ui-text: #2c2924;
   --ui-text-secondary: #655f56;
-  --ui-text-muted: #9a9388;
+  /* Supporting copy is still quiet, but remains readable on every application
+     surface. Inactive/decorative content has its own non-reading token. */
+  --ui-text-muted: #6d665c;
+  --ui-text-disabled: #9a9388;
   --ui-accent: #2f7fba;
   --ui-accent-hover: #286fa5;
   --ui-accent-soft: #e8f2f9;
+  --ui-accent-text: #286fa5;
+  --ui-accent-fill: #286fa5;
+  --ui-accent-fill-hover: #245f8b;
+  --ui-on-accent: #ffffff;
+  --ui-focus-neutral: #655f56;
+  --ui-focus-on-accent: #ffffff;
   --ui-danger: #bd4d45;
   --ui-danger-border: #e5bbb6;
   --ui-danger-text: #7f4a45;
@@ -37,8 +46,10 @@
   --ui-shadow-dialog: 0 22px 60px rgb(60 54 44 / 18%);
   --ui-shadow-menu: 0 12px 28px rgb(60 54 44 / 16%);
   --ui-scrollbar-track: transparent;
-  --ui-scrollbar-thumb: #c9c4ba;
-  --ui-scrollbar-thumb-hover: #b5afa4;
+  --ui-scrollbar-thumb: #817a70;
+  --ui-scrollbar-thumb-hover: #6d665c;
+  --ui-range-track: #817a70;
+  --ui-range-thumb-border: #6d665c;
   --ui-radius-small: 4px;
   --ui-radius: 6px;
   --ui-titlebar-height: 38px;

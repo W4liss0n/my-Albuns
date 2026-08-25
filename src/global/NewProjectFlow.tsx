@@ -1,7 +1,6 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useId,
   useRef,
   useState,
@@ -14,6 +13,7 @@ import {
   type ProjectConfigurationFieldName as DimensionsFieldName,
 } from "../application/projectConfigurationFields";
 import { displayUnitLabel } from "../application/physicalMeasurements";
+import { useDismissableSurface } from "../ui/useDismissableSurface";
 import type {
   NewProjectConfiguration,
   ProjectConfigurationValidationOutcome,
@@ -699,28 +699,14 @@ function PresetControl({
     closeAndRestoreFocus();
   };
 
-  useEffect(() => {
-    if (!isSaving) return;
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
-        closeAndRestoreFocus();
-      }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
+  useDismissableSurface({
+    enabled: isSaving,
+    rootRef,
+    onDismiss: ({ reason, event }) => {
+      if (reason === "escape") event.preventDefault();
       closeAndRestoreFocus();
-    };
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [closeAndRestoreFocus, isSaving]);
+    },
+  });
 
   return (
     <ControlSection

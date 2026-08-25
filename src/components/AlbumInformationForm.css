@@ -1,0 +1,105 @@
+.album-information-form {
+  display: grid;
+  gap: var(--ui-space-4);
+}
+
+.album-information-field {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-caption);
+  gap: var(--ui-space-1);
+}
+
+.inspector-readout-grid
+  > .album-information-field
+  > .ui-field-validation-auto-tooltip {
+  width: calc(200% + var(--ui-space-3));
+}
+
+.inspector-readout-grid
+  > .album-information-field:last-child
+  > .ui-field-validation-auto-tooltip {
+  --ui-field-validation-pointer-inline-start: auto;
+  --ui-field-validation-pointer-inline-end: 14px;
+
+  right: 0;
+  left: auto;
+}
+
+.album-information-form__status {
+  margin: 0;
+  color: var(--ui-danger);
+  font-size: var(--ui-font-size-caption);
+  line-height: 1.35;
+}
+
+.album-information-dimension {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: var(--ui-space-2);
+}
+
+.album-information-dimension legend {
+  margin: 0 0 var(--ui-space-2);
+  padding: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-support);
+  font-weight: 600;
+}
+
+.album-entry-control {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.album-entry-control .ui-field-control {
+  padding-right: 30px;
+}
+
+.album-entry-reset {
+  position: absolute;
+  top: 50%;
+  right: var(--ui-space-1);
+  display: grid;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-small);
+  color: var(--ui-text-muted);
+  background: transparent;
+  transform: translateY(-50%);
+  place-items: center;
+}
+
+.album-entry-reset:hover,
+.album-entry-reset:focus-visible {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.album-measurement-control .ui-field-control {
+  padding-right: 54px;
+  font-family: var(--ui-font-mono);
+}
+
+.album-measurement-control .album-entry-reset {
+  right: 28px;
+}
+
+.album-measurement-control > span {
+  position: absolute;
+  top: 50%;
+  right: var(--ui-space-2);
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-micro);
+  pointer-events: none;
+  transform: translateY(-50%);
+}

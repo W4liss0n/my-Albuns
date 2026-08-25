@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import type { GraphicsDiagnostic } from "../application/graphics";
 import { ActionButton, ApplicationHeader, InlineNotice } from "../ui";
+import "./StartupSurface.css";
+import "./SafeApplicationShell.css";
 
 type SafeSurface = "welcome" | "settings" | "diagnostic";
 type SafeSettingsSection = "performance" | "photoshop";

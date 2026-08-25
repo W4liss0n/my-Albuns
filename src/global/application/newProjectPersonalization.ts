@@ -17,7 +17,6 @@ import {
   type ScopedValueRead,
   type VisualScope,
 } from "../../application/scopedValues";
-import type { VisualPersonalizationPreview } from "../../ui/visualPreview";
 
 export type {
   NewProjectCreationConfiguration,
@@ -190,25 +189,6 @@ function mapOverlay(content: OverlayDraftContent): InitialOverlayContent {
   return content
     ? { kind: "image", selectionId: content.selection.selectionId }
     : null;
-}
-
-export function personalizationPreviewFromDraft(
-  draft: NewProjectPersonalizationDraft,
-): VisualPersonalizationPreview {
-  return {
-    fixedScope: draft.fixedScope,
-    background: mapScoped(draft.background, (content) =>
-      content.kind === "color"
-        ? content
-        : { kind: "image", previewUrl: content.selection.previewUrl },
-    ),
-    overlay: mapScoped(draft.overlay, (content) =>
-      content
-        ? { kind: "image", previewUrl: content.selection.previewUrl }
-        : null,
-    ),
-    frameBorder: draft.frameBorder,
-  };
 }
 
 function sameBackground(

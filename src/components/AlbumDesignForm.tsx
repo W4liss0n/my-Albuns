@@ -12,7 +12,11 @@ import {
   createFrameBorderEditorState,
 } from "../application/frameBorderEditor";
 import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
-import { readScopedValue, type VisualScope } from "../application/scopedValues";
+import { readScopedValue } from "../application/scopedValues";
+import {
+  createAlbumDesignProjectDraft,
+  type AlbumDesignProjectDraft,
+} from "../application/projectSettingsDraft";
 import type {
   DisplayUnit,
   DocumentSnapshot,
@@ -35,6 +39,7 @@ import {
 } from "./albumDesignDraft";
 import { DecorativeMediaPicker } from "./DecorativeMediaPicker";
 import { useSemanticBaseline } from "./useSemanticBaseline";
+import "./AlbumDesignForm.css";
 
 const DEFAULT_FRAME_BORDER = { rgb: "#2C2924", widthUm: 1_000 };
 
@@ -44,8 +49,9 @@ interface AlbumDesignFormProps {
   formId: string;
   mediaItems: readonly MediaCatalogItem[];
   mediaPreviewUrls: Readonly<Record<string, string>>;
+  revision: number;
   value: ProjectedVisualDefaults;
-  onApply(value: ProjectedVisualDefaults): void | Promise<unknown>;
+  onApply(draft: AlbumDesignProjectDraft): void | Promise<unknown>;
   onReadyChange(ready: boolean): void;
 }
 
@@ -55,16 +61,21 @@ export function AlbumDesignForm({
   formId,
   mediaItems,
   mediaPreviewUrls,
+  revision,
   value,
   onApply,
   onReadyChange,
 }: AlbumDesignFormProps) {
   const baselineSignature = JSON.stringify(value);
-  const baseline = useSemanticBaseline(value, baselineSignature);
-  const [draft, setDraft] = useState(baseline);
+  const baseline = useSemanticBaseline(
+    { revision, value },
+    baselineSignature,
+  );
+  const [projectDraft, setProjectDraft] = useState(() =>
+    createAlbumDesignProjectDraft(baseline.revision, baseline.value),
+  );
+  const draft = projectDraft.value;
   const [scope, setScope] = useState<AlbumDesignScope>("both");
-  const [focusedScope, setFocusedScope] = useState<VisualScope | null>(null);
-  const [hoveredScope, setHoveredScope] = useState<VisualScope | null>(null);
   const [borderEditor, setBorderEditor] = useState(() =>
     value.frameBorder.kind === "solid"
       ? { rgb: value.frameBorder.rgb, widthUm: value.frameBorder.widthUm }
@@ -86,7 +97,7 @@ export function AlbumDesignForm({
     "Background" | "Overlay" | null
   >(null);
   const [applying, setApplying] = useState(false);
-  const dirty = JSON.stringify(draft) !== baselineSignature;
+  const dirty = projectDraft.changed;
   const ready = dirty && !applying;
   const background = backgroundAtScope(draft, scope);
   const overlay = overlayAtScope(draft, scope);
@@ -104,12 +115,14 @@ export function AlbumDesignForm({
   };
 
   useEffect(() => {
-    setDraft(baseline);
+    setProjectDraft(
+      createAlbumDesignProjectDraft(baseline.revision, baseline.value),
+    );
     setBorderEditor((current) =>
-      baseline.frameBorder.kind === "solid"
+      baseline.value.frameBorder.kind === "solid"
         ? {
-            rgb: baseline.frameBorder.rgb,
-            widthUm: baseline.frameBorder.widthUm,
+            rgb: baseline.value.frameBorder.rgb,
+            widthUm: baseline.value.frameBorder.widthUm,
           }
         : current,
     );
@@ -125,16 +138,22 @@ export function AlbumDesignForm({
   );
 
   function chooseBackground(content: ProjectedBackgroundContent) {
-    setDraft((current) => setAlbumBackground(current, scope, content));
+    setProjectDraft((current) =>
+      current.transition(setAlbumBackground(current.value, scope, content)),
+    );
   }
 
   function chooseOverlay(content: ProjectedOverlayContent | null) {
-    setDraft((current) => setAlbumOverlay(current, scope, content));
+    setProjectDraft((current) =>
+      current.transition(setAlbumOverlay(current.value, scope, content)),
+    );
   }
 
   function updateBorder(next: ReturnType<typeof createFrameBorderEditorState>) {
     setBorderEditor(next.solid);
-    setDraft((current) => setAlbumFrameBorder(current, next.border));
+    setProjectDraft((current) =>
+      current.transition(setAlbumFrameBorder(current.value, next.border)),
+    );
   }
 
   /**
@@ -154,7 +173,7 @@ export function AlbumDesignForm({
     if (!ready) return;
     setApplying(true);
     try {
-      await onApply(draft);
+      await onApply(projectDraft);
     } finally {
       setApplying(false);
     }
@@ -178,15 +197,12 @@ export function AlbumDesignForm({
             width={previewGeometry.widthUm}
           >
             <PersonalizationScopeSurface
+              focus={{ kind: "local" }}
               includeBothSidesControl
-              focusedScope={focusedScope}
               frameGapUm={frameGapUm}
               geometry={previewGeometry}
-              hoveredScope={hoveredScope}
               personalization={previewPersonalization}
               presentation={ALBUM_DESIGN_SCOPE_PRESENTATION}
-              onFocusedScopeChange={setFocusedScope}
-              onHoveredScopeChange={setHoveredScope}
               onScopeChange={setScope}
             />
           </ProportionalPreviewViewport>

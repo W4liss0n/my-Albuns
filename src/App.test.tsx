@@ -145,6 +145,7 @@ test("reports a defensive Project Canvas failure without claiming that no Sessio
   const prepareMediaPreviews = vi.fn(async () => null);
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -191,6 +192,7 @@ test("opens the Project in the real workspace when hardware WebGL2 is available"
   const confirmUiReady = vi.fn(async () => undefined);
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={{ confirmUiReady }}
       projectDialogPort={projectDialogPort}
@@ -302,6 +304,7 @@ test("prepares real media previews after opening without blocking the Workspace"
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -362,6 +365,7 @@ test("reprepares demanded media when the stable Monitor reports a change", async
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -425,6 +429,7 @@ test("keeps the last known preview when linked media becomes unavailable", async
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -480,6 +485,7 @@ test("labels first-observation unavailability without claiming a previous previe
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -522,6 +528,7 @@ test("keeps one Monitor subscription while demand revisions change", async () =>
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -562,6 +569,7 @@ test("cancels resident media demand when runtime graphics become unavailable", a
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}
@@ -618,6 +626,7 @@ test("logs the typed media preview failure code without replacing it with unknow
 
   render(
     <App
+      workspacePreferencesMode="memory"
       exportPort={exportPort}
       projectStartupPort={projectStartupPort}
       projectDialogPort={projectDialogPort}

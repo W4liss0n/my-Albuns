@@ -39,6 +39,8 @@ function inspectorProps(
       },
     })),
     presentationUnit: representativeProjection.state.document.displayUnit,
+    revision: representativeProjection.state.revision,
+    sectionState: { kind: "local" },
     sheets: representativeProjection.composition.sheets,
     sheetStates: representativeProjection.state.album.sheets,
     visualDefaults: representativeProjection.state.album.visualDefaults,
@@ -188,8 +190,11 @@ test("reads and publishes accordion preferences through the shared workspace sta
   const view = render(
     <InspectorPanel
       {...inspectorProps(sheetContext())}
-      sectionPreferences={{ "sheet.design": true }}
-      onSectionPreferenceChange={onSectionPreferenceChange}
+      sectionState={{
+        kind: "controlled",
+        values: { "sheet.design": true },
+        onChange: onSectionPreferenceChange,
+      }}
     />,
   );
 
@@ -205,8 +210,11 @@ test("reads and publishes accordion preferences through the shared workspace sta
   view.rerender(
     <InspectorPanel
       {...inspectorProps(sheetContext())}
-      sectionPreferences={{ "sheet.design": false }}
-      onSectionPreferenceChange={onSectionPreferenceChange}
+      sectionState={{
+        kind: "controlled",
+        values: { "sheet.design": false },
+        onChange: onSectionPreferenceChange,
+      }}
     />,
   );
   expect(trigger).toHaveAttribute("aria-expanded", "false");

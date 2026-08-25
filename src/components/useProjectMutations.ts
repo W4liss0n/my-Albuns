@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
 import type {
-  AlbumInformation,
   EditorProjection,
   ProjectIntent,
-  ProjectedVisualDefaults,
 } from "../domain/project";
+import {
+  materializeProjectIntent,
+  type AlbumDesignProjectDraft,
+  type AlbumInformationProjectDraft,
+  type ProjectSettingsDraft,
+} from "../application/projectSettingsDraft";
+import {
+  albumInformationReviewEquals,
+  albumInformationReviewHasChanges,
+  createAlbumInformationReview,
+  type AlbumInformationCommitResult,
+  type AlbumInformationReview,
+} from "../application/albumInformationReview";
 import type {
   ProjectMutationOperation,
   ProjectMutationRunner,
@@ -54,8 +65,15 @@ export function useProjectMutations({
   }
 
   function applyIntent(intent: ProjectIntent) {
-    return runWithErrorFeedback((port) =>
-      port.apply(intent),
+    const capturedProjection = projection;
+    return runWithErrorFeedback((port, latestProjection) =>
+      port.apply(
+        materializeProjectIntent(
+          intent,
+          capturedProjection,
+          latestProjection ?? capturedProjection,
+        ),
+      ),
     );
   }
 
@@ -89,10 +107,90 @@ export function useProjectMutations({
   }
 
   async function commitInteraction(intent: ProjectIntent) {
-    setMessage(null);
-    const outcome = await runProjectMutation.run((port) =>
-      port.apply(intent),
+    const capturedProjection = projection;
+    return commitMutation((port, latestProjection) =>
+      port.apply(
+        materializeProjectIntent(
+          intent,
+          capturedProjection,
+          latestProjection ?? capturedProjection,
+        ),
+      ),
     );
+  }
+
+  function commitProjectSettingsDraft<Value, Delta>(
+    draft: ProjectSettingsDraft<Value, Delta>,
+  ) {
+    return commitMutation((port, latestProjection) =>
+      port.apply(draft.materialize(latestProjection ?? projection)),
+    );
+  }
+
+  async function commitAlbumInformation(
+    draft: AlbumInformationProjectDraft,
+    confirmedReview: AlbumInformationReview,
+  ): Promise<AlbumInformationCommitResult> {
+    setMessage(null);
+    let currentReview: AlbumInformationReview | null = null;
+    let validationRejected = false;
+    let reviewRequired = false;
+    let applyRequested = false;
+    let intentAlreadySatisfied = false;
+    const outcome = await runProjectMutation.run(
+      async (port, latestProjection) => {
+        const effectiveProjection = latestProjection ?? projection;
+        const materialized = draft.materializeAgainst(effectiveProjection);
+        const validation = await port.validateAlbumInformation(
+          materialized.value,
+        );
+        if (validation.errors.length > 0 || !validation.impact) {
+          validationRejected = true;
+          return effectiveProjection;
+        }
+        currentReview = createAlbumInformationReview(
+          materialized.baseline,
+          materialized.value,
+          validation.impact,
+        );
+        if (!albumInformationReviewHasChanges(currentReview)) {
+          intentAlreadySatisfied = true;
+          return effectiveProjection;
+        }
+        if (!albumInformationReviewEquals(confirmedReview, currentReview)) {
+          reviewRequired = true;
+          return effectiveProjection;
+        }
+        applyRequested = true;
+        return port.apply(materialized.intent);
+      },
+    );
+
+    if (outcome.status === "completed") {
+      if (validationRejected) {
+        setMessage(
+          "As Informações do Álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
+        );
+        return { kind: "rejected" };
+      }
+      if (reviewRequired && currentReview) {
+        return { kind: "reviewRequired", review: currentReview };
+      }
+      if (intentAlreadySatisfied) return { kind: "completed" };
+      if (applyRequested) {
+        onProjectionChange(outcome.projection);
+        return { kind: "completed" };
+      }
+    } else if (outcome.status === "failed") {
+      setMessage(messageFromError(outcome.error));
+      return { kind: "rejected" };
+    }
+    return { kind: "rejected" };
+  }
+
+  async function commitMutation(operation: ProjectMutationOperation) {
+    setMessage(null);
+    const outcome = await runProjectMutation.run(operation);
     if (outcome.status === "completed") {
       onProjectionChange(outcome.projection);
       return true;
@@ -107,16 +205,9 @@ export function useProjectMutations({
     message,
     applyIntent,
     commitInteraction,
-    applyAlbumInformation: (information: AlbumInformation) =>
-      commitInteraction({
-        kind: "setAlbumInformation",
-        information,
-      }),
-    applyAlbumDesign: (visualDefaults: ProjectedVisualDefaults) =>
-      commitInteraction({
-        kind: "setVisualDefaults",
-        visualDefaults,
-      }),
+    applyAlbumInformation: commitAlbumInformation,
+    applyAlbumDesign: (draft: AlbumDesignProjectDraft) =>
+      commitProjectSettingsDraft(draft),
     save: () => void saveVisibleRevision(),
     undo: () => void runHistoryCommand("canUndo", "undo"),
     redo: () => void runHistoryCommand("canRedo", "redo"),

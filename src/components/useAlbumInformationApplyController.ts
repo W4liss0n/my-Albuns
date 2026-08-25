@@ -9,6 +9,12 @@ import type {
   AlbumInformation,
   AlbumInformationImpact,
 } from "../domain/project";
+import type { AlbumInformationProjectDraft } from "../application/projectSettingsDraft";
+import {
+  createAlbumInformationReview,
+  type AlbumInformationCommitResult,
+  type AlbumInformationReview,
+} from "../application/albumInformationReview";
 import {
   displayUnitLabel,
   formatPhysicalMeasurement,
@@ -16,16 +22,18 @@ import {
 
 interface AlbumInformationApplyControllerOptions {
   projectDialogPort: ProjectDialogPort;
-  onApply(information: AlbumInformation): Promise<boolean>;
+  onApply(
+    draft: AlbumInformationProjectDraft,
+    confirmedReview: AlbumInformationReview,
+  ): Promise<AlbumInformationCommitResult>;
   onError(message: string): void;
 }
 
 type Phase = "idle" | "deciding" | "applying";
 
 interface PendingAlbumInformation {
-  baseline: AlbumInformation;
-  impact: AlbumInformationImpact;
-  information: AlbumInformation;
+  draft: AlbumInformationProjectDraft;
+  review: AlbumInformationReview;
 }
 
 export function useAlbumInformationApplyController({
@@ -49,18 +57,22 @@ export function useAlbumInformationApplyController({
 
   const requestApply = useCallback(
     async (
-      information: AlbumInformation,
-      baseline: AlbumInformation,
+      draft: AlbumInformationProjectDraft,
       impact: AlbumInformationImpact,
     ) => {
       if (phaseRef.current !== "idle") return;
       phaseRef.current = "deciding";
-      pendingRef.current = { baseline, impact, information };
+      const review = createAlbumInformationReview(
+        draft.baseline,
+        draft.value,
+        impact,
+      );
+      pendingRef.current = { draft, review };
       setActive(true);
       try {
         await projectDialogPort.present({
           busy: false,
-          details: albumInformationDetails(information, baseline, impact),
+          details: detailsFromReview(review),
           kind: "albumInformationConfirmation",
         });
       } catch (error: unknown) {
@@ -80,20 +92,30 @@ export function useAlbumInformationApplyController({
     void projectDialogPort
       .present({
         busy: true,
-        details: albumInformationDetails(
-          pending.information,
-          pending.baseline,
-          pending.impact,
-        ),
+        details: detailsFromReview(pending.review),
         kind: "albumInformationConfirmation",
       })
       .catch(() => undefined);
     try {
-      await onApply(pending.information);
+      const result = await onApply(pending.draft, pending.review);
+      if (result.kind === "reviewRequired") {
+        pendingRef.current = { draft: pending.draft, review: result.review };
+        phaseRef.current = "deciding";
+        try {
+          await projectDialogPort.present({
+            busy: false,
+            details: detailsFromReview(result.review),
+            kind: "albumInformationConfirmation",
+          });
+        } catch (error: unknown) {
+          phaseRef.current = "applying";
+          onError(messageFromError(error));
+        }
+      }
     } finally {
-      finish();
+      if (phaseRef.current === "applying") finish();
     }
-  }, [finish, onApply, projectDialogPort]);
+  }, [finish, onApply, onError, projectDialogPort]);
 
   actionListenerRef.current = (action) => {
     if (action === "cancelAlbumInformation" && phaseRef.current === "deciding") {
@@ -125,10 +147,18 @@ export function useAlbumInformationApplyController({
   return { active, requestApply };
 }
 
+function detailsFromReview(review: AlbumInformationReview) {
+  return albumInformationDetails(
+    review.information,
+    review.baseline,
+    review.impact,
+  );
+}
+
 export function albumInformationDetails(
-  information: AlbumInformation,
-  baseline: AlbumInformation,
-  impact: AlbumInformationImpact,
+  information: Readonly<AlbumInformation>,
+  baseline: Readonly<AlbumInformation>,
+  impact: Readonly<AlbumInformationImpact>,
 ) {
   const measurement = (valueUm: number) =>
     formatPhysicalMeasurement(valueUm, information.displayUnit);

@@ -253,6 +253,16 @@ test("keeps preview strokes aligned with Canvas units at other sheet heights", (
   ).toHaveAttribute("stroke-width", "1000");
 });
 
+test("keeps the physical Sheet surface straight in every renderer", () => {
+  render(<SheetPreview sheet={placeholderSheet} />);
+
+  const surface = screen
+    .getByRole("img", { name: "Prévia da Lâmina 02" })
+    .querySelector(":scope > rect");
+
+  expect(surface).toHaveAttribute("rx", "0");
+});
+
 test("represents a single-page extremity as the normalized active surface", () => {
   const singlePageSheet = {
     ...placeholderSheet,

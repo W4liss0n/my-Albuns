@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import "./App.css";
+import "./ui/theme.css";
+import "./ui/ui.css";
 import { MediaPanel } from "./components/MediaPanel";
 import { mediaPanelPreviewFixture } from "./test/mediaPanelPreviewFixtures";
 import "./media-panel-preview.css";
@@ -24,6 +25,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         mediaPreviews={mediaPreviews}
         mediaUsage={mediaUsage}
         onFillPhoto={() => undefined}
+        preferences={{ kind: "local" }}
       />
     </main>
   </React.StrictMode>,

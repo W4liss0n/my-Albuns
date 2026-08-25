@@ -70,8 +70,8 @@
 }
 
 .new-project-steps li[aria-current="step"] > span {
-  color: #fff;
-  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  background: var(--ui-accent-fill);
 }
 
 .new-project-content {

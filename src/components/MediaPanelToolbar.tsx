@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ChevronDown,
   Image as ImageIcon,
@@ -17,6 +17,7 @@ import {
   type MediaUsageFilter,
 } from "../state/mediaPanelPreferences";
 import { AppIcon, TextInput } from "../ui";
+import { useDismissableSurface } from "../ui/useDismissableSurface";
 
 interface MediaPanelToolbarProps {
   activeMediaKind: MediaKind;
@@ -46,33 +47,21 @@ export function MediaPanelToolbar({
   const activeKindLabel =
     activeMediaKind === "photo" ? "Fotos" : "Decorativos";
 
-  useEffect(() => {
-    if (!openPopup) return;
-
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
+  useDismissableSurface({
+    enabled: openPopup !== null,
+    rootRef,
+    onDismiss: ({ reason, event }) => {
+      if (reason === "pointerOutside") {
         setOpenPopup(null);
+        return;
       }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopPropagation();
       const restoreOptionsFocus = openPopup === "options";
       setOpenPopup(null);
       if (restoreOptionsFocus) optionsButtonRef.current?.focus();
-    };
-
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [openPopup]);
+    },
+  });
 
   function changeMediaKind(mediaKind: MediaKind) {
     setOpenPopup(null);

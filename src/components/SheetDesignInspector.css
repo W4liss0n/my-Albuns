@@ -121,7 +121,7 @@
 }
 
 .sheet-design-preview__target:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--ui-text-muted);
+  box-shadow: inset 0 0 0 1px var(--ui-focus-neutral);
 }
 
 .sheet-design-scope-status {

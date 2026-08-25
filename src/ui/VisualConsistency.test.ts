@@ -23,10 +23,19 @@ const newProjectPreviewStyles = readStyles(
   "src/global/NewProjectPreviewPanel.css",
 );
 const editorStyles = readStyles("src/App.css");
+const menuStyles = readStyles("src/components/ApplicationMenuBar.css");
+const canvasStyles = readStyles("src/components/AlbumCanvas.css");
+const canvasScrollbarStyles = readStyles(
+  "src/components/CanvasHorizontalScrollbar.css",
+);
 const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
+const albumInformationStyles = readStyles(
+  "src/components/AlbumInformationForm.css",
+);
+const albumDesignStyles = readStyles("src/components/AlbumDesignForm.css");
 const decorativePickerStyles = readStyles(
   "src/components/DecorativeMediaPicker.css",
 );
@@ -43,6 +52,9 @@ const newProjectPersonalizationSource = readStyles(
   "src/global/PersonalizationStep.tsx",
 );
 const albumDesignSource = readStyles("src/components/AlbumDesignForm.tsx");
+const applicationMenuSource = readStyles(
+  "src/components/ApplicationMenuBar.tsx",
+);
 const sharedVisualPreviewSources = [
   "src/ui/visualPreview/PersonalizationPreview.tsx",
   "src/ui/visualPreview/PersonalizationScopeSurface.tsx",
@@ -166,7 +178,7 @@ test("keeps media hover and selection on the straight image border", () => {
     /\.media-preview-card:hover \.media-preview-thumbnail\s*\{[^}]*box-shadow/s,
   );
   expect(mediaThumbnailStyles).toMatch(
-    /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*outline:\s*1px solid var\(--ui-text-muted\);/s,
+    /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);/s,
   );
   expect(mediaThumbnailStyles).not.toMatch(
     /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*border-color:/s,
@@ -190,6 +202,9 @@ test("shares only the equivalent chrome of floating surfaces", () => {
   expect(newProjectSource).toContain(
     'className="ui-floating-surface new-project-save-preset"',
   );
+  expect(applicationMenuSource).toContain(
+    'className="ui-floating-surface app-menu-popup"',
+  );
   expect(decorativePickerStyles).not.toMatch(
     /\.visual-default-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
   );
@@ -198,6 +213,9 @@ test("shares only the equivalent chrome of floating surfaces", () => {
   );
   expect(newProjectStyles).not.toMatch(
     /\.new-project-save-preset\s*\{[^}]*(?:background|box-shadow|border:)/s,
+  );
+  expect(menuStyles).not.toMatch(
+    /\.app-menu-popup\s*\{[^}]*(?:background|box-shadow|border:)/s,
   );
 });
 
@@ -237,12 +255,21 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
 });
 
 test("keeps compact visual-default focus independent from selection", () => {
-  expect(inspectorPanelStyles).toMatch(
-    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile,[\s\S]*outline:\s*1px solid var\(--ui-text-muted\);[\s\S]*outline-offset:\s*2px;/,
+  expect(albumDesignStyles).toMatch(
+    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile,[\s\S]*outline:\s*1px solid var\(--ui-focus-neutral\);[\s\S]*outline-offset:\s*2px;/,
   );
-  expect(inspectorPanelStyles).toMatch(
+  expect(albumDesignStyles).toMatch(
     /\.visual-default-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
   );
+});
+
+test("keeps physical Sheet previews straight in every surface", () => {
+  expect(readStyles("src/components/SheetPreview.css")).toMatch(
+    /\.sheet-preview\s*\{[^}]*border-radius:\s*0;/s,
+  );
+  expect(
+    readStyles("src/ui/visualPreview/PersonalizationPreview.css"),
+  ).toMatch(/\.visual-preview-sheet\s*\{[^}]*border-radius:\s*0;/s);
 });
 
 test("matches the compact sheet grid instead of using generic cards", () => {
@@ -271,7 +298,7 @@ test("matches the compact sheet grid instead of using generic cards", () => {
     /\.sheet-tile__number,\s*\n\.sheet-tile__pages\s*\{[^}]*position:\s*absolute;/s,
   );
   expect(inspectorPanelStyles).toMatch(
-    /\.sheet-tile\.active \.sheet-tile__number,\s*\n\.sheet-tile\.active \.sheet-tile__pages\s*\{[^}]*color:\s*#fff;[^}]*background:\s*var\(--ui-accent\);/s,
+    /\.sheet-tile\.active \.sheet-tile__number,\s*\n\.sheet-tile\.active \.sheet-tile__pages\s*\{[^}]*color:\s*var\(--ui-on-accent\);[^}]*background:\s*var\(--ui-accent-fill\);/s,
   );
 });
 
@@ -285,6 +312,7 @@ test("integrates read-only Album information without making editable controls lo
   expect(inspectorPanelStyles).toMatch(
     /\.document-compact-controls\s*\{[^}]*grid-template-columns:\s*72px minmax\(0, 1fr\);/s,
   );
+  expect(albumInformationStyles).toMatch(/\.album-information-form\s*\{/);
 });
 
 test("lets the continuous Canvas preview use the complete available height", () => {
@@ -295,16 +323,16 @@ test("lets the continuous Canvas preview use the complete available height", () 
 });
 
 test("uses the focused Sheet instead of the Canvas perimeter as the keyboard focus indicator", () => {
-  expect(editorStyles).toMatch(
+  expect(canvasStyles).toMatch(
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*none;/s,
   );
-  expect(editorStyles).toMatch(
-    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-border\);[^}]*--ui-scrollbar-thumb:\s*var\(--ui-panel-surface\);/s,
+  expect(canvasScrollbarStyles).toMatch(
+    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-border\);/s,
   );
-  expect(editorStyles).toMatch(
+  expect(canvasScrollbarStyles).toMatch(
     /\.canvas-horizontal-scrollbar:focus-visible\s*\{[^}]*background:\s*var\(--ui-scrollbar-track\);/s,
   );
-  expect(editorStyles).not.toMatch(
+  expect(canvasStyles).not.toMatch(
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-accent\);/s,
   );
 });

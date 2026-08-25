@@ -19,7 +19,6 @@ import {
 import {
   clearOverlay,
   fixPersonalizationScope,
-  personalizationPreviewFromDraft,
   readBackgroundForFixedScope,
   readOverlayForFixedScope,
   setBackgroundColor,
@@ -27,6 +26,7 @@ import {
   setOverlayImage,
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
+import { personalizationPreviewFromDraft } from "./newProjectPersonalizationPreview";
 import { ActionButton, AppIcon, FailureNotice } from "../ui";
 import { PersonalizationScopeSurface } from "../ui/visualPreview";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
@@ -49,9 +49,6 @@ export function PersonalizationStep({
   const [pickerFailure, setPickerFailure] =
     useState<ProjectLaunchFailure | null>(null);
   const [focusedScope, setFocusedScope] = useState<
-    NewProjectPersonalizationDraft["fixedScope"] | null
-  >(null);
-  const [hoveredScope, setHoveredScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
@@ -133,14 +130,15 @@ export function PersonalizationStep({
       >
         {(geometry) => (
           <PersonalizationScopeSurface
-            focusedScope={focusedScope}
+            focus={{
+              kind: "controlled",
+              value: focusedScope,
+              onChange: setFocusedScope,
+            }}
             frameGapUm={frameGapUm}
             geometry={geometry}
-            hoveredScope={hoveredScope}
             personalization={personalizationPreviewFromDraft(personalization)}
             presentation={NEW_PROJECT_SCOPE_PRESENTATION}
-            onFocusedScopeChange={setFocusedScope}
-            onHoveredScopeChange={setHoveredScope}
             onScopeChange={(scope) =>
               onChange(fixPersonalizationScope(personalization, scope))
             }

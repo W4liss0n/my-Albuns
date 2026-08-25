@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { VisualScope } from "../../application/scopedValues";
 import type {
   VisualPersonalizationPreview,
@@ -14,29 +16,36 @@ export interface PersonalizationScopeSurfacePresentation {
 
 interface PersonalizationScopeSurfaceProps {
   includeBothSidesControl?: boolean;
-  focusedScope: VisualScope | null;
+  focus:
+    | { kind: "local" }
+    | {
+        kind: "controlled";
+        value: VisualScope | null;
+        onChange(scope: VisualScope | null): void;
+      };
   frameGapUm: number;
   geometry: VisualPreviewGeometry;
-  hoveredScope: VisualScope | null;
   personalization: VisualPersonalizationPreview;
   presentation: PersonalizationScopeSurfacePresentation;
-  onFocusedScopeChange(scope: VisualScope | null): void;
-  onHoveredScopeChange(scope: VisualScope | null): void;
   onScopeChange(scope: VisualScope): void;
 }
 
 export function PersonalizationScopeSurface({
   includeBothSidesControl = false,
-  focusedScope,
+  focus,
   frameGapUm,
   geometry,
-  hoveredScope,
   personalization,
   presentation,
-  onFocusedScopeChange,
-  onHoveredScopeChange,
   onScopeChange,
 }: PersonalizationScopeSurfaceProps) {
+  const [localFocusedScope, setLocalFocusedScope] =
+    useState<VisualScope | null>(null);
+  const [hoveredScope, setHoveredScope] = useState<VisualScope | null>(null);
+  const focusedScope =
+    focus.kind === "controlled" ? focus.value : localFocusedScope;
+  const setFocusedScope =
+    focus.kind === "controlled" ? focus.onChange : setLocalFocusedScope;
   const previewedScope =
     personalization.fixedScope === "both" ||
     personalization.fixedScope === hoveredScope
@@ -85,16 +94,16 @@ export function PersonalizationScopeSurface({
             aria-label={label}
             aria-pressed={personalization.fixedScope === scope}
             key={scope}
-            onBlur={() => onFocusedScopeChange(null)}
+            onBlur={() => setFocusedScope(null)}
             onClick={() => onScopeChange(scope)}
             onFocus={(event) =>
-              onFocusedScopeChange(
+              setFocusedScope(
                 event.currentTarget.matches(":focus-visible") ? scope : null,
               )
             }
-            onPointerEnter={() => onHoveredScopeChange(scope)}
+            onPointerEnter={() => setHoveredScope(scope)}
             onPointerLeave={() =>
-              onHoveredScopeChange(
+              setHoveredScope(
                 hoveredScope === scope ? null : hoveredScope,
               )
             }

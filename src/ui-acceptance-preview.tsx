@@ -2,7 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import manifest from "./test/uiAcceptanceScenarios.json";
-import "./App.css";
+import "./ui/theme.css";
+import "./ui/ui.css";
 import "./ui-acceptance-preview.css";
 
 type PreviewScenario = (typeof manifest.scenarios)[number];

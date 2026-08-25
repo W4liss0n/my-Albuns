@@ -13,6 +13,7 @@ import {
   photoPaletteIndexForStripe,
   SHEET_VISUAL_STYLE,
 } from "./sheetVisualStyle";
+import "./SheetPreview.css";
 
 interface SheetPreviewProps {
   sheet: ComposedSheet;

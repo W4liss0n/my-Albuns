@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
 import type { ProjectedVisualDefaults } from "../domain/project";
@@ -21,9 +21,7 @@ function Harness({
   onApply,
   value,
 }: {
-  onApply: (
-    value: ProjectedVisualDefaults,
-  ) => void | Promise<unknown>;
+  onApply: ComponentProps<typeof AlbumDesignForm>["onApply"];
   value: ProjectedVisualDefaults;
 }) {
   const [ready, setReady] = useState(false);
@@ -35,6 +33,7 @@ function Harness({
         mediaItems={[]}
         mediaPreviewUrls={{}}
         presentationUnit="mm"
+        revision={representativeProjection.state.revision}
         value={value}
         onApply={onApply}
         onReadyChange={setReady}
@@ -51,7 +50,7 @@ function Harness({
 }
 
 test("preserves an unapplied draft across a semantically equivalent projection", async () => {
-  const onApply = vi.fn<(value: ProjectedVisualDefaults) => void>();
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;
   const view = render(<Harness onApply={onApply} value={baseline} />);
   fireEvent.change(screen.getByLabelText("Cor do Background"), {
@@ -70,7 +69,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
 });
 
 test("resets the draft when the authoritative Album design really changes", async () => {
-  const onApply = vi.fn<(value: ProjectedVisualDefaults) => void>();
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;
   const changed: ProjectedVisualDefaults = {
     ...cloneVisualDefaults(baseline),

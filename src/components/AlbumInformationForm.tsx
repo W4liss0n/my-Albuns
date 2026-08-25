@@ -24,6 +24,10 @@ import {
   type ProjectConfigurationErrors as DimensionsErrors,
 } from "../application/projectConfigurationFields";
 import {
+  createAlbumInformationProjectDraft,
+  type AlbumInformationProjectDraft,
+} from "../application/projectSettingsDraft";
+import {
   AppIcon,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
@@ -33,14 +37,15 @@ import {
   useFieldValidationTooltip,
 } from "../ui";
 import { useSemanticBaseline } from "./useSemanticBaseline";
+import "./AlbumInformationForm.css";
 
 interface AlbumInformationFormProps {
   document: DocumentSnapshot;
   formId: string;
+  revision: number;
   sheetStates: readonly SheetSnapshot[];
   onApply(
-    information: AlbumInformation,
-    baseline: AlbumInformation,
+    draft: AlbumInformationProjectDraft,
     impact: AlbumInformationImpact,
   ): void | Promise<unknown>;
   onReadyChange(ready: boolean): void;
@@ -81,6 +86,7 @@ const END_SHEET_OPTIONS = [
 export function AlbumInformationForm({
   document,
   formId,
+  revision,
   sheetStates,
   onApply,
   onPresentationUnitChange,
@@ -88,10 +94,11 @@ export function AlbumInformationForm({
   onValidate,
 }: AlbumInformationFormProps) {
   const projectedBaseline = createDraft(document, sheetStates);
-  const baseline = useSemanticBaseline(
-    projectedBaseline,
+  const semanticBaseline = useSemanticBaseline(
+    { fields: projectedBaseline, revision },
     JSON.stringify(toCandidate(projectedBaseline).information),
   );
+  const baseline = semanticBaseline.fields;
   const [draft, setDraft] = useState(baseline);
   const [validated, setValidated] = useState<{
     key: string;
@@ -109,7 +116,14 @@ export function AlbumInformationForm({
   const candidate = local.information;
   const baselineInformation = toCandidate(baseline).information;
   const candidateKey = candidate ? JSON.stringify(candidate) : "";
-  const dirty = candidateKey !== JSON.stringify(baselineInformation);
+  const projectDraft =
+    candidate && baselineInformation
+      ? createAlbumInformationProjectDraft(
+          semanticBaseline.revision,
+          baselineInformation,
+        ).transition(candidate)
+      : null;
+  const dirty = projectDraft?.changed ?? false;
 
   useEffect(() => {
     if (!candidate || !dirty || Object.keys(local.errors).length > 0) {
@@ -186,7 +200,7 @@ export function AlbumInformationForm({
   async function submit() {
     if (
       !candidate ||
-      !baselineInformation ||
+      !projectDraft ||
       !validated?.impact ||
       !ready
     ) {
@@ -194,7 +208,7 @@ export function AlbumInformationForm({
     }
     setApplying(true);
     try {
-      await onApply(candidate, baselineInformation, validated.impact);
+      await onApply(projectDraft, validated.impact);
     } finally {
       setApplying(false);
     }

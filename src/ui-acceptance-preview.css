@@ -35,7 +35,7 @@ body {
 }
 
 .acceptance-index__eyebrow {
-  color: var(--ui-accent) !important;
+  color: var(--ui-accent-text) !important;
   font-size: var(--ui-font-size-support);
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -115,7 +115,7 @@ body {
 
 .acceptance-scenario__actions a:first-child {
   border-color: var(--ui-accent);
-  color: var(--ui-accent);
+  color: var(--ui-accent-text);
 }
 
 .acceptance-scenario__actions a:hover {

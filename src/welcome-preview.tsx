@@ -4,7 +4,8 @@ import ReactDOM from "react-dom/client";
 import type { GlobalProjectPort } from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
-import "./App.css";
+import "./ui/theme.css";
+import "./ui/ui.css";
 import "./global/GlobalShell.css";
 
 const projectPort: GlobalProjectPort = {
@@ -30,6 +31,7 @@ const projectPort: GlobalProjectPort = {
 };
 
 const newProjectPort = createNewProjectPortStub();
+const previewParameters = new URLSearchParams(window.location.search);
 
 const supportedGraphics = {
   supported: true,
@@ -42,10 +44,23 @@ const supportedGraphics = {
   },
 } as const;
 
+const unavailableGraphics = {
+  supported: false,
+  code: "hardware_unconfirmed",
+  renderer: "Microsoft Basic Render Driver",
+  reason: "A aceleração WebGL2 por hardware não pôde ser confirmada.",
+  limits: null,
+} as const;
+
+const graphicsDiagnostic =
+  previewParameters.get("graphics") === "unsupported"
+    ? unavailableGraphics
+    : supportedGraphics;
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
-      graphicsDiagnostic={supportedGraphics}
+      graphicsDiagnostic={graphicsDiagnostic}
       newProjectPort={newProjectPort}
       projectPort={projectPort}
     />

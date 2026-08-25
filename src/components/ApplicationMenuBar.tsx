@@ -4,6 +4,9 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
+import { useDismissableSurface } from "../ui/useDismissableSurface";
+
+import "./ApplicationMenuBar.css";
 
 export type ApplicationMenuCommand =
   | {
@@ -87,18 +90,15 @@ export function ApplicationMenuBar({
     }
   }, [openSubmenuId]);
 
-  useEffect(() => {
-    if (openMenuId === null) return;
-
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
+  useDismissableSurface({
+    enabled: openMenuId !== null,
+    includeFocusOutside: true,
+    rootRef,
+    onDismiss: ({ reason, event }) => {
+      if (reason === "pointerOutside" || reason === "focusOutside") {
         closeMenus();
+        return;
       }
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.key !== "Escape") return;
       event.preventDefault();
       if (openSubmenuIdRef.current !== null) {
@@ -106,25 +106,8 @@ export function ApplicationMenuBar({
       } else {
         closeMenus(true);
       }
-    };
-    const closeOnOutsideFocus = (event: FocusEvent) => {
-      if (
-        event.target instanceof Node &&
-        !rootRef.current?.contains(event.target)
-      ) {
-        closeMenus();
-      }
-    };
-
-    document.addEventListener("pointerdown", closeOnOutsidePointer);
-    document.addEventListener("keydown", closeOnEscape);
-    document.addEventListener("focusin", closeOnOutsideFocus);
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutsidePointer);
-      document.removeEventListener("keydown", closeOnEscape);
-      document.removeEventListener("focusin", closeOnOutsideFocus);
-    };
-  }, [openMenuId]);
+    },
+  });
 
   function focusFirstMenuItem(popupId: string) {
     queueMicrotask(() => {
@@ -359,7 +342,7 @@ export function ApplicationMenuBar({
             {open && (
               <div
                 aria-label={group.label}
-                className="app-menu-popup"
+                className="ui-floating-surface app-menu-popup"
                 id={popupId}
                 role="menu"
                 tabIndex={-1}
@@ -414,7 +397,7 @@ export function ApplicationMenuBar({
                       {submenuOpen && (
                         <div
                           aria-label={item.label}
-                          className="app-menu-popup app-menu-submenu-popup"
+                          className="ui-floating-surface app-menu-popup app-menu-submenu-popup"
                           id={submenuId}
                           role="menu"
                           tabIndex={-1}

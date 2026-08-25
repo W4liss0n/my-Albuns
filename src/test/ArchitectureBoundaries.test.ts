@@ -27,13 +27,14 @@ function discoverSourceFiles(directory: string): string[] {
 
 function layerOf(candidate: string): ArchitecturalLayer | "feature" {
   const relative = path.relative(sourceRoot, path.resolve(candidate));
-  const [rootDirectory] = relative.split(path.sep);
-  if (
-    rootDirectory === "application" ||
-    rootDirectory === "domain" ||
-    rootDirectory === "ui"
-  ) {
-    return rootDirectory;
+  for (const segment of relative.split(path.sep)) {
+    if (
+      segment === "application" ||
+      segment === "domain" ||
+      segment === "ui"
+    ) {
+      return segment;
+    }
   }
   return "feature";
 }
@@ -58,6 +59,15 @@ function relativeImports(sourcePath: string): string[] {
   });
   return imports;
 }
+
+test("recognizes architectural layers nested inside feature directories", () => {
+  expect(
+    layerOf(path.join(sourceRoot, "global", "application", "example.ts")),
+  ).toBe("application");
+  expect(
+    layerOf(path.join(sourceRoot, "project-dialog", "application", "example.ts")),
+  ).toBe("application");
+});
 
 test("keeps domain, application, and shared UI dependencies pointing inward", () => {
   const violations: string[] = [];

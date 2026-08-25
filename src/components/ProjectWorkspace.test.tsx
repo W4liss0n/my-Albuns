@@ -261,10 +261,14 @@ type TestProjectWorkspaceProps = Omit<
   | "projectDialogPort"
   | "projectWindowPort"
   | "validateAlbumInformation"
+  | "workspacePreferences"
 > & {
   projectDialogPort?: ProjectDialogPort;
   projectSessionPort: ProjectSessionPort;
   projectWindowPort?: ProjectWindowPort;
+  workspacePreferences?: ComponentProps<
+    typeof ProjectWorkspaceView
+  >["workspacePreferences"];
 };
 
 function ProjectWorkspace({
@@ -272,6 +276,7 @@ function ProjectWorkspace({
   projectSessionPort,
   projectWindowPort = inertProjectWindowPort,
   projection,
+  workspacePreferences = { kind: "memory" },
   ...props
 }: TestProjectWorkspaceProps) {
   const runProjectMutation = useProjectMutationRunner(
@@ -286,6 +291,7 @@ function ProjectWorkspace({
       projectWindowPort={projectWindowPort}
       runProjectMutation={runProjectMutation}
       validateAlbumInformation={projectSessionPort.validateAlbumInformation}
+      workspacePreferences={workspacePreferences}
     />
   );
 }
@@ -489,7 +495,10 @@ test("hydrates and publishes machine-local Inspector and media density preferenc
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      workspacePreferencesPort={workspacePreferencesPort}
+      workspacePreferences={{
+        kind: "persistent",
+        port: workspacePreferencesPort,
+      }}
       onProjectionChange={() => undefined}
     />,
   );
@@ -542,7 +551,10 @@ test("toggles canonical panel commands and persists visibility with the current 
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      workspacePreferencesPort={{ load: async () => persisted, update }}
+      workspacePreferences={{
+        kind: "persistent",
+        port: { load: async () => persisted, update },
+      }}
       onProjectionChange={() => undefined}
     />,
   );
@@ -965,7 +977,10 @@ test("restores accordion preferences after context changes and remounts", async 
         exportPort={exportPort}
         projection={projection}
         projectSessionPort={projectSessionPortWithApply(async () => projection)}
-        workspacePreferencesPort={workspacePreferencesPort}
+        workspacePreferences={{
+          kind: "persistent",
+          port: workspacePreferencesPort,
+        }}
         onProjectionChange={() => undefined}
       />,
     );
@@ -2841,6 +2856,514 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
   expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
 });
 
+test("materializes an Album Design draft over the projection produced by a pending Undo", async () => {
+  const pendingUndo = deferredProjection();
+  const afterUndo: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      canRedo: true,
+      canUndo: false,
+      revision: projection.state.revision - 1,
+      album: {
+        ...projection.state.album,
+        visualDefaults: {
+          ...projection.state.album.visualDefaults,
+          background: {
+            scope: "perSide",
+            left: { kind: "color", rgb: "#AABBCC" },
+            right: { kind: "color", rgb: "#223344" },
+          },
+          overlay: {
+            scope: "bothSides",
+            both: { kind: "media", mediaId: "history-overlay" },
+          },
+          frameBorder: {
+            kind: "solid",
+            rgb: "#445566",
+            widthUm: 2_000,
+          },
+        },
+      },
+    },
+  };
+  const appliedProjection: EditorProjection = {
+    ...afterUndo,
+    state: {
+      ...afterUndo.state,
+      revision: afterUndo.state.revision + 1,
+      album: {
+        ...afterUndo.state.album,
+        visualDefaults: {
+          ...afterUndo.state.album.visualDefaults,
+          background: {
+            scope: "perSide",
+            left: { kind: "color", rgb: "#F7F5F0" },
+            right: { kind: "color", rgb: "#223344" },
+          },
+        },
+      },
+    },
+  };
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    appliedProjection,
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.undo = vi.fn(() => pendingUndo.promise);
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.click(design.getByRole("button", { name: "Lado esquerdo" }));
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  await waitFor(() => expect(projectSessionPort.undo).toHaveBeenCalledOnce());
+  fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
+  expect(apply).not.toHaveBeenCalled();
+
+  await act(async () => {
+    pendingUndo.resolve(afterUndo);
+    await pendingUndo.promise;
+  });
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setVisualDefaults",
+      visualDefaults: {
+        background: {
+          scope: "perSide",
+          left: { kind: "color", rgb: "#F7F5F0" },
+          right: { kind: "color", rgb: "#223344" },
+        },
+        overlay: afterUndo.state.album.visualDefaults.overlay,
+        frameBorder: afterUndo.state.album.visualDefaults.frameBorder,
+      },
+    }),
+  );
+});
+
+test("applies an Album Design draft over its captured baseline when pending Undo fails", async () => {
+  const pendingUndo = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () => projection);
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.undo = vi.fn(() => pendingUndo.promise);
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  await waitFor(() => expect(projectSessionPort.undo).toHaveBeenCalledOnce());
+  fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
+
+  await act(async () => {
+    pendingUndo.reject(new Error("Undo indisponível."));
+    await pendingUndo.promise.catch(() => undefined);
+  });
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setVisualDefaults",
+      visualDefaults: {
+        background: {
+          scope: "bothSides",
+          both: { kind: "color", rgb: "#F7F5F0" },
+        },
+        overlay: projection.state.album.visualDefaults.overlay,
+        frameBorder: projection.state.album.visualDefaults.frameBorder,
+      },
+    }),
+  );
+});
+
+test("materializes an Album Information draft over the projection produced by a pending Redo", async () => {
+  const beforeRedo: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      canRedo: true,
+      canUndo: false,
+      revision: projection.state.revision - 1,
+    },
+  };
+  const afterRedo: EditorProjection = {
+    ...beforeRedo,
+    state: {
+      ...beforeRedo.state,
+      canRedo: false,
+      canUndo: true,
+      revision: beforeRedo.state.revision + 1,
+      document: {
+        ...beforeRedo.state.document,
+        bleedUm: 5_000,
+        safetyUm: 7_000,
+      },
+    },
+  };
+  const appliedProjection: EditorProjection = {
+    ...afterRedo,
+    state: {
+      ...afterRedo.state,
+      revision: afterRedo.state.revision + 1,
+      document: { ...afterRedo.state.document, dpi: 600 },
+    },
+  };
+  const pendingRedo = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    appliedProjection,
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.redo = vi.fn(() => pendingRedo.promise);
+  const dialog = projectDialogHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={beforeRedo}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+  await waitFor(() => expect(projectSessionPort.redo).toHaveBeenCalledOnce());
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+  dialog.emit("confirmAlbumInformation");
+  expect(apply).not.toHaveBeenCalled();
+
+  await act(async () => {
+    pendingRedo.resolve(afterRedo);
+    await pendingRedo.promise;
+  });
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setAlbumInformation",
+      information: {
+        displayUnit: afterRedo.state.document.displayUnit,
+        sheetWidthUm: afterRedo.state.document.sheetWidthUm,
+        sheetHeightUm: afterRedo.state.document.sheetHeightUm,
+        dpi: 600,
+        bleedUm: 5_000,
+        safetyUm: 7_000,
+        firstSheet: "double",
+        lastSheet: "double",
+      },
+    }),
+  );
+});
+
+test("applies an Album Information draft over its captured baseline when pending Redo fails", async () => {
+  const beforeRedo: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      canRedo: true,
+      canUndo: false,
+      revision: projection.state.revision - 1,
+    },
+  };
+  const pendingRedo = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () => projection);
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.redo = vi.fn(() => pendingRedo.promise);
+  const dialog = projectDialogHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={beforeRedo}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+  await waitFor(() => expect(projectSessionPort.redo).toHaveBeenCalledOnce());
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+  dialog.emit("confirmAlbumInformation");
+
+  await act(async () => {
+    pendingRedo.reject(new Error("Redo indisponível."));
+    await pendingRedo.promise.catch(() => undefined);
+  });
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setAlbumInformation",
+      information: {
+        displayUnit: beforeRedo.state.document.displayUnit,
+        sheetWidthUm: beforeRedo.state.document.sheetWidthUm,
+        sheetHeightUm: beforeRedo.state.document.sheetHeightUm,
+        dpi: 600,
+        bleedUm: beforeRedo.state.document.bleedUm,
+        safetyUm: beforeRedo.state.document.safetyUm,
+        firstSheet: "double",
+        lastSheet: "double",
+      },
+    }),
+  );
+});
+
+test("revalidates materialized Album Information after pending History and blocks an invalid Apply", async () => {
+  const beforeRedo: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      canRedo: true,
+      canUndo: false,
+      revision: projection.state.revision - 1,
+    },
+  };
+  const afterRedo: EditorProjection = {
+    ...beforeRedo,
+    state: {
+      ...beforeRedo.state,
+      canRedo: false,
+      canUndo: true,
+      revision: beforeRedo.state.revision + 1,
+      document: {
+        ...beforeRedo.state.document,
+        sheetWidthUm: 2_000_000,
+      },
+    },
+  };
+  const pendingRedo = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () => afterRedo);
+  const validateAlbumInformation = vi.fn<
+    ProjectSessionPort["validateAlbumInformation"]
+  >(async (information) =>
+    information.sheetWidthUm === afterRedo.state.document.sheetWidthUm &&
+    information.dpi === 600
+      ? { errors: ["sheetWidthRasterOutOfRange"], impact: null }
+      : {
+          errors: [],
+          impact: {
+            sheetWidthPx: 7_087,
+            pageWidthPx: 3_543,
+            heightPx: 3_543,
+          },
+        },
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.redo = vi.fn(() => pendingRedo.promise);
+  projectSessionPort.validateAlbumInformation = validateAlbumInformation;
+  const dialog = projectDialogHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={beforeRedo}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+  await waitFor(() => expect(projectSessionPort.redo).toHaveBeenCalledOnce());
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+  dialog.emit("confirmAlbumInformation");
+
+  await act(async () => {
+    pendingRedo.resolve(afterRedo);
+    await pendingRedo.promise;
+  });
+
+  await waitFor(() =>
+    expect(validateAlbumInformation).toHaveBeenCalledWith({
+      displayUnit: afterRedo.state.document.displayUnit,
+      sheetWidthUm: 2_000_000,
+      sheetHeightUm: afterRedo.state.document.sheetHeightUm,
+      dpi: 600,
+      bleedUm: afterRedo.state.document.bleedUm,
+      safetyUm: afterRedo.state.document.safetyUm,
+      firstSheet: "double",
+      lastSheet: "double",
+    }),
+  );
+  expect(apply).not.toHaveBeenCalled();
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message:
+        "As Informações do Álbum mudaram enquanto a confirmação estava aberta e precisam ser revistas antes de Aplicar.",
+    }),
+  );
+});
+
+test("updates a stale Album Information summary and requires reconfirmation after History", async () => {
+  const beforeRedo: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      canRedo: true,
+      canUndo: false,
+      revision: projection.state.revision - 1,
+    },
+  };
+  const afterRedo: EditorProjection = {
+    ...beforeRedo,
+    state: {
+      ...beforeRedo.state,
+      canRedo: false,
+      canUndo: true,
+      revision: beforeRedo.state.revision + 1,
+      document: { ...beforeRedo.state.document, dpi: 400 },
+    },
+  };
+  const appliedProjection: EditorProjection = {
+    ...afterRedo,
+    state: {
+      ...afterRedo.state,
+      revision: afterRedo.state.revision + 1,
+      document: { ...afterRedo.state.document, dpi: 600 },
+    },
+  };
+  const pendingRedo = deferredProjection();
+  const apply = vi.fn<ProjectSessionPort["apply"]>(async () =>
+    appliedProjection,
+  );
+  const projectSessionPort = projectSessionPortWithApply(apply);
+  projectSessionPort.redo = vi.fn(() => pendingRedo.promise);
+  const dialog = projectDialogHarness();
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={beforeRedo}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.keyDown(window, { ctrlKey: true, key: "y" });
+  await waitFor(() => expect(projectSessionPort.redo).toHaveBeenCalledOnce());
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+  dialog.emit("confirmAlbumInformation");
+
+  await act(async () => {
+    pendingRedo.resolve(afterRedo);
+    await pendingRedo.promise;
+  });
+
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      busy: false,
+      details: expect.arrayContaining([
+        { label: "DPI", value: "400 → 600" },
+      ]),
+      kind: "albumInformationConfirmation",
+    }),
+  );
+  expect(apply).not.toHaveBeenCalled();
+
+  dialog.emit("confirmAlbumInformation");
+
+  await waitFor(() =>
+    expect(apply).toHaveBeenCalledWith({
+      kind: "setAlbumInformation",
+      information: {
+        displayUnit: afterRedo.state.document.displayUnit,
+        sheetWidthUm: afterRedo.state.document.sheetWidthUm,
+        sheetHeightUm: afterRedo.state.document.sheetHeightUm,
+        dpi: 600,
+        bleedUm: afterRedo.state.document.bleedUm,
+        safetyUm: afterRedo.state.document.safetyUm,
+        firstSheet: "double",
+        lastSheet: "double",
+      },
+    }),
+  );
+});
+
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {
   const save = vi.fn<ProjectSessionPort["save"]>(async () => ({
     outcome: { kind: "saved", revision: projection.state.revision },
@@ -3329,7 +3852,10 @@ test("resizes both workspace panels and persists only completed drags", async ()
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      workspacePreferencesPort={workspacePreferencesPort}
+      workspacePreferences={{
+        kind: "persistent",
+        port: workspacePreferencesPort,
+      }}
       onProjectionChange={() => undefined}
     />,
   );
@@ -3382,7 +3908,10 @@ test("resizes both workspace panels and persists only completed drags", async ()
       exportPort={exportPort}
       projection={projection}
       projectSessionPort={projectSessionPortWithApply(async () => projection)}
-      workspacePreferencesPort={workspacePreferencesPort}
+      workspacePreferences={{
+        kind: "persistent",
+        port: workspacePreferencesPort,
+      }}
       onProjectionChange={() => undefined}
     />,
   );

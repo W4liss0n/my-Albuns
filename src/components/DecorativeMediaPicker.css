@@ -54,3 +54,8 @@
   box-shadow: none;
   place-items: center;
 }
+
+.visual-default-card--import:disabled .visual-default-card__thumb--import {
+  border-color: var(--ui-text-disabled);
+  color: var(--ui-text-disabled);
+}

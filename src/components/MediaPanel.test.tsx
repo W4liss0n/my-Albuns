@@ -69,6 +69,7 @@ test("renders only centered copy when the media catalog is empty", () => {
       mediaItems={[]}
       mediaUsage={[]}
       onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
     />,
   );
 
@@ -231,9 +232,18 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
     <MediaPanel
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
-      thumbnailSizes={{ decorative: 110, photo: 124 }}
       onFillPhoto={vi.fn()}
-      onThumbnailSizeChange={onThumbnailSizeChange}
+      preferences={{
+        kind: "controlled",
+        persistent: {
+          decorative: { sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortDirection: "ascending", usageFilter: "all" },
+        },
+        thumbnailSizes: { decorative: 110, photo: 124 },
+        onSortDirectionChange: vi.fn(),
+        onThumbnailSizeChange,
+        onUsageFilterChange: vi.fn(),
+      }}
     />,
   );
 
@@ -264,13 +274,18 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
     <MediaPanel
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
-      onSortDirectionChange={onSortDirectionChange}
-      persistentPreferences={{
-        decorative: { sortDirection: "ascending", usageFilter: "all" },
-        photo: { sortDirection: "descending", usageFilter: "unused" },
-      }}
       onFillPhoto={vi.fn()}
-      onUsageFilterChange={onUsageFilterChange}
+      preferences={{
+        kind: "controlled",
+        persistent: {
+          decorative: { sortDirection: "ascending", usageFilter: "all" },
+          photo: { sortDirection: "descending", usageFilter: "unused" },
+        },
+        thumbnailSizes: { decorative: 84, photo: 84 },
+        onSortDirectionChange,
+        onThumbnailSizeChange: vi.fn(),
+        onUsageFilterChange,
+      }}
     />,
   );
 
@@ -316,6 +331,7 @@ test("clears preview demand when the panel unmounts", () => {
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
       onMediaDemandChange={onMediaDemandChange}
+      preferences={{ kind: "local" }}
     />,
   );
   onMediaDemandChange.mockClear();
@@ -347,6 +363,7 @@ test("uses image orientation and opacity without visible names or usage counts",
       }}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
     />,
   );
 
@@ -507,6 +524,7 @@ test("uses the intrinsic preview ratio when source dimensions are unavailable", 
       }}
       mediaUsage={[]}
       onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
     />,
   );
 
@@ -535,6 +553,7 @@ function renderPanel() {
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
+      preferences={{ kind: "local" }}
     />,
   );
 }

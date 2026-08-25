@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
 import type {
@@ -20,11 +20,7 @@ function renderForm({
   onApply = vi.fn(),
   onValidate = vi.fn(async () => ({ errors: [], impact: validImpact })),
 }: {
-  onApply?: (
-    information: AlbumInformation,
-    baseline: AlbumInformation,
-    impact: typeof validImpact,
-  ) => void | Promise<unknown>;
+  onApply?: ComponentProps<typeof AlbumInformationForm>["onApply"];
   onValidate?: (
     information: AlbumInformation,
   ) => Promise<AlbumInformationValidation>;
@@ -37,6 +33,7 @@ function renderForm({
         <AlbumInformationForm
           document={representativeProjection.state.document}
           formId="album-information-test"
+          revision={representativeProjection.state.revision}
           sheetStates={representativeProjection.state.album.sheets}
           onApply={onApply}
           onPresentationUnitChange={onPresentationUnitChange}
@@ -74,6 +71,7 @@ function ProjectionHarness({
       <AlbumInformationForm
         document={document}
         formId="album-information-equivalent-projection"
+        revision={representativeProjection.state.revision}
         sheetStates={sheetStates}
         onApply={vi.fn()}
         onPresentationUnitChange={onPresentationUnitChange}
@@ -125,19 +123,22 @@ test("edits every Album information field and submits one complete candidate", a
 
   await waitFor(() =>
     expect(onApply).toHaveBeenCalledWith(
-      {
-        displayUnit: "mm",
-        sheetWidthUm: 700_000,
-        sheetHeightUm: 350_000,
-        dpi: 240,
-        bleedUm: 4_000,
-        safetyUm: 6_000,
-        firstSheet: "singlePage",
-        lastSheet: "singlePage",
-      },
       expect.objectContaining({
-        sheetWidthUm: 600_000,
-        sheetHeightUm: 300_000,
+        baseline: expect.objectContaining({
+          sheetWidthUm: 600_000,
+          sheetHeightUm: 300_000,
+        }),
+        baselineRevision: representativeProjection.state.revision,
+        value: {
+          displayUnit: "mm",
+          sheetWidthUm: 700_000,
+          sheetHeightUm: 350_000,
+          dpi: 240,
+          bleedUm: 4_000,
+          safetyUm: 6_000,
+          firstSheet: "singlePage",
+          lastSheet: "singlePage",
+        },
       }),
       validImpact,
     ),

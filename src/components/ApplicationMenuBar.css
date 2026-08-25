@@ -1,0 +1,120 @@
+.app-menu {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  flex: 1;
+}
+
+.app-menu-entry {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.app-menu button {
+  padding: 0 var(--ui-space-3);
+  border: 0;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  font-size: var(--ui-font-size-control);
+}
+
+.app-menu button:hover,
+.app-menu button:focus-visible {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.app-menu-entry > button[aria-expanded="true"] {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+}
+
+.app-menu > .app-menu-entry > button:disabled {
+  color: var(--ui-text-disabled);
+  background: transparent;
+}
+
+.app-menu-popup {
+  position: absolute;
+  top: var(--ui-commandbar-height);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  min-width: 232px;
+  padding: var(--ui-space-1) 0;
+}
+
+.app-menu-popup button {
+  display: flex;
+  width: 100%;
+  min-height: var(--ui-compact-control-height);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--ui-space-3);
+  border-radius: 0;
+  gap: var(--ui-space-5);
+  text-align: left;
+}
+
+.app-menu-popup button:hover:not(:disabled),
+.app-menu-popup button:focus-visible:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--ui-surface-muted);
+  outline: 0;
+}
+
+.app-menu-popup button:hover:not(:disabled) .app-menu-shortcut,
+.app-menu-popup button:focus-visible:not(:disabled) .app-menu-shortcut,
+.app-menu-popup button:hover:not(:disabled) .app-menu-cascade,
+.app-menu-popup button:focus-visible:not(:disabled) .app-menu-cascade {
+  color: var(--ui-text-muted);
+}
+
+.app-menu-popup button:disabled {
+  color: var(--ui-text-disabled);
+  background: transparent;
+  cursor: default;
+  opacity: 0.72;
+}
+
+.app-menu-separator {
+  display: block;
+  height: 1px;
+  margin: var(--ui-space-1) 0;
+  background: var(--ui-border);
+}
+
+.app-menu-submenu {
+  position: relative;
+}
+
+.app-menu-submenu-popup {
+  top: calc(0px - var(--ui-space-1) - 1px);
+  left: calc(100% - var(--ui-space-1));
+}
+
+.app-menu-cascade {
+  color: var(--ui-text-muted);
+  font-size: var(--ui-font-size-heading);
+  line-height: 1;
+}
+
+.app-menu-shortcut {
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-support);
+  font-weight: 400;
+}
+
+.app-menu-checkmark {
+  display: inline-block;
+  width: var(--ui-space-4);
+  color: var(--ui-text-secondary);
+}
+
+@media (max-width: 1180px) {
+  .app-menu button {
+    padding: 0 var(--ui-space-2);
+  }
+}

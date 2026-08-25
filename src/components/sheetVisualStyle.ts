@@ -4,7 +4,7 @@ export const SHEET_VISUAL_STYLE = {
     outline: "#d8d3c9",
     outlineOpacity: 0.85,
     outlineWidthPx: 1,
-    cornerRadiusPx: 3,
+    cornerRadiusPx: 0,
   },
   centerLine: {
     color: "#eeeae1",

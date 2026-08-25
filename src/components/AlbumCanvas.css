@@ -1,0 +1,43 @@
+.canvas-shell,
+.canvas-host,
+.canvas-empty {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas-shell {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) 11px;
+}
+
+.canvas-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.pixi-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+/* O foco espacial é desenhado na Lâmina pelo renderer; um contorno em torno
+   do Canvas confundiria o alvo atual com o viewport inteiro. */
+.pixi-canvas:focus-visible {
+  outline: none;
+}
+
+.canvas-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: var(--ui-text-muted);
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-font-size-support);
+  transform: translate(-50%, -50%);
+}

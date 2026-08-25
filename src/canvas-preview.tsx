@@ -6,7 +6,8 @@ import React, {
 } from "react";
 import ReactDOM from "react-dom/client";
 
-import "./App.css";
+import "./ui/theme.css";
+import "./ui/ui.css";
 import { AlbumCanvas } from "./components/AlbumCanvas";
 import type {
   AlbumCanvasMode,

@@ -86,7 +86,7 @@ body,
   background: transparent;
   font-size: var(--ui-font-size-caption);
   font-weight: 400;
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .global-action-divider {
@@ -116,6 +116,7 @@ body,
 }
 
 .global-secondary-actions button:disabled {
+  color: var(--ui-text-disabled);
   opacity: 1;
 }
 
