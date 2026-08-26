@@ -31,6 +31,7 @@ const tauriCommandSources = {
   global: [
     "../global/platform/tauriGlobalProjectPort.ts",
     "../global/platform/tauriNewProjectPort.ts",
+    "../global/platform/tauriProjectFailureDialogPort.ts",
   ],
 } as const;
 
