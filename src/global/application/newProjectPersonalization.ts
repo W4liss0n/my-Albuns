@@ -12,6 +12,7 @@ import type {
 } from "../../application/frameBorderEditor";
 import {
   applyScopedValue,
+  mapScopedValue,
   readScopedValue,
   type ScopedValue,
   type ScopedValueRead,
@@ -147,24 +148,11 @@ export function toCreationConfiguration(
   return {
     ...dimensions,
     visualDefaults: {
-      background: mapScoped(personalization.background, mapBackground),
-      overlay: mapScoped(personalization.overlay, mapOverlay),
+      background: mapScopedValue(personalization.background, mapBackground),
+      overlay: mapScopedValue(personalization.overlay, mapOverlay),
       frameBorder: personalization.frameBorder,
     } satisfies InitialVisualDefaults,
   };
-}
-
-function mapScoped<T, U>(
-  scoped: ScopedValue<T>,
-  map: (content: T) => U,
-): ScopedValue<U> {
-  return scoped.scope === "bothSides"
-    ? { scope: "bothSides", both: map(scoped.both) }
-    : {
-        scope: "perSide",
-        left: map(scoped.left),
-        right: map(scoped.right),
-      };
 }
 
 function collectScoped<T>(

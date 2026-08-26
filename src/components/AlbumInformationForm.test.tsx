@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { useState, type ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
@@ -54,15 +61,19 @@ function renderForm({
 
 function ProjectionHarness({
   document,
+  onApply = vi.fn(),
   onPresentationUnitChange,
   onValidate,
+  revision = representativeProjection.state.revision,
   sheetStates,
 }: {
   document: typeof representativeProjection.state.document;
+  onApply?: ComponentProps<typeof AlbumInformationForm>["onApply"];
   onPresentationUnitChange: (unit: DisplayUnit | null) => void;
   onValidate: (
     information: AlbumInformation,
   ) => Promise<AlbumInformationValidation>;
+  revision?: number;
   sheetStates: typeof representativeProjection.state.album.sheets;
 }) {
   const [ready, setReady] = useState(false);
@@ -71,9 +82,9 @@ function ProjectionHarness({
       <AlbumInformationForm
         document={document}
         formId="album-information-equivalent-projection"
-        revision={representativeProjection.state.revision}
+        revision={revision}
         sheetStates={sheetStates}
-        onApply={vi.fn()}
+        onApply={onApply}
         onPresentationUnitChange={onPresentationUnitChange}
         onReadyChange={setReady}
         onValidate={onValidate}
@@ -424,4 +435,100 @@ test("resets the draft when authoritative Album information really changes", asy
     expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("240"),
   );
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+});
+
+test("preserves edits made after submit when the applied Album information projection arrives", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const view = render(
+    <ProjectionHarness
+      document={representativeProjection.state.document}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+    { target: { value: "8" } },
+  );
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...representativeProjection.state.document, dpi: 240 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("textbox", { name: "Área de segurança" }),
+    ).toHaveValue("8"),
+  );
+  await act(async () => {
+    finishApply(true);
+    await pendingApply;
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+});
+
+test("keeps the full Album information draft after a pending submit is cancelled", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  renderForm({ onApply });
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+    { target: { value: "8" } },
+  );
+
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+
+  expect(screen.getByRole("textbox", { name: "DPI" })).toHaveValue("240");
+  expect(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("8");
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
 });

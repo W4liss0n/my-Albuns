@@ -6,7 +6,9 @@ import type {
 } from "../application/projectDialogPort";
 import {
   parseInitialProjectDialogState,
+  parseInitialProjectDialogSessionId,
   parseProjectDialogAction,
+  parseProjectDialogActionEvent,
   parseProjectDialogState,
   toIpcProjectDialogAction,
   toIpcProjectDialogState,
@@ -100,4 +102,28 @@ test("decodes the initial URL only through the validated state contract", () => 
   expect(
     parseInitialProjectDialogState("?state=%7Bnot-json%7D"),
   ).toBeNull();
+});
+
+test("keeps the dialog action and initial window bound to their session", () => {
+  expect(
+    parseProjectDialogActionEvent({
+      action: "confirmAlbumInformation",
+      sessionId: "album-information-7",
+    }),
+  ).toEqual({
+    action: "confirmAlbumInformation",
+    sessionId: "album-information-7",
+  });
+  expect(
+    parseProjectDialogActionEvent({
+      action: "confirmAlbumInformation",
+      sessionId: "",
+    }),
+  ).toBeNull();
+  expect(
+    parseInitialProjectDialogSessionId(
+      "?sessionId=album-information-7",
+    ),
+  ).toBe("album-information-7");
+  expect(parseInitialProjectDialogSessionId("?sessionId=")).toBeNull();
 });

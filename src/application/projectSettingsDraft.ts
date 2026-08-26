@@ -15,7 +15,7 @@ type ScopedDelta<Value> =
   | { kind: "none" }
   | { kind: "both"; value: Value }
   | { kind: "sides"; left?: Value; right?: Value }
-  | { kind: "replace"; value: ScopedValue<Value> };
+  | { kind: "perSide" };
 
 interface AlbumDesignDelta {
   background: ScopedDelta<ProjectedBackgroundContent>;
@@ -36,6 +36,11 @@ export interface ProjectSettingsDraft<Value, Delta = SettingsDelta<Value>> {
   readonly changed: boolean;
   equals(value: Value): boolean;
   transition(value: Value): ProjectSettingsDraft<Value, Delta>;
+  /** Carries the same semantic delta onto a newer authoritative baseline. */
+  rebase(
+    baselineRevision: number,
+    baseline: Value,
+  ): ProjectSettingsDraft<Value, Delta>;
   materializeAgainst(
     latestProjection: EditorProjection,
   ): MaterializedProjectSettings<Value>;
@@ -46,6 +51,8 @@ export interface MaterializedProjectSettings<Value> {
   readonly baselineRevision: number;
   readonly baseline: Readonly<Value>;
   readonly value: Readonly<Value>;
+  /** Whether applying `intent` would change this authoritative baseline. */
+  readonly changed: boolean;
   readonly intent: ProjectIntent;
 }
 
@@ -134,6 +141,7 @@ function createProjectSettingsDraft<Value, Delta>(
       baselineRevision: latestProjection.state.revision,
       baseline: latest,
       value: materialized,
+      changed: !structuralEquals(latest, materialized),
       intent: createIntent(materialized),
     };
   };
@@ -156,6 +164,18 @@ function createProjectSettingsDraft<Value, Delta>(
         applyDelta,
         deltaChanged,
         candidate,
+      );
+    },
+    rebase(nextBaselineRevision, nextBaseline) {
+      return createProjectSettingsDraft(
+        nextBaselineRevision,
+        nextBaseline,
+        readLatestValue,
+        createIntent,
+        calculateDelta,
+        applyDelta,
+        deltaChanged,
+        applyDelta(nextBaseline, delta),
       );
     },
     materializeAgainst,
@@ -231,7 +251,7 @@ function scopedDelta<Value>(
     value.right,
   );
   if (!leftChanged && !rightChanged) {
-    return { kind: "replace", value };
+    return { kind: "perSide" };
   }
   return {
     kind: "sides",
@@ -249,8 +269,10 @@ function applyScopedDelta<Value>(
       return latest;
     case "both":
       return applyScopedValue(latest, "both", delta.value);
-    case "replace":
-      return delta.value;
+    case "perSide":
+      return latest.scope === "perSide"
+        ? latest
+        : { scope: "perSide", left: latest.both, right: latest.both };
     case "sides": {
       const withLeft =
         delta.left === undefined

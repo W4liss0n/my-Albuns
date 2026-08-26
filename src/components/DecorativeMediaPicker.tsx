@@ -9,8 +9,9 @@ import { Plus } from "lucide-react";
 import type { MediaCatalogItem } from "../domain/project";
 import { AppIcon } from "../ui";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
-import { MediaThumbnail } from "./MediaThumbnail";
+import { MediaPreviewCard } from "./MediaPreviewCard";
 import "./DecorativeMediaPicker.css";
+import "./VisualDefaultPicker.css";
 
 const IMPORT_PLACEHOLDER_TITLE = "Ainda não disponível nesta versão";
 
@@ -152,47 +153,36 @@ export function DecorativeMediaPicker({
             {decorativeMedia.map((media) => {
               const selected = selectedMediaId === media.id;
               return (
-                <button
+                <MediaPreviewCard
                   aria-label={`Usar ${label} ${media.name}${
                     selected ? ". Selecionado" : ""
                   }`}
-                  className="media-preview-card visual-default-card"
-                  data-selected={String(selected)}
                   key={media.id}
+                  kind="media"
+                  loading="eager"
+                  media={media}
+                  previewUrl={mediaPreviewUrls[media.id]}
                   role="menuitem"
+                  selected={selected}
                   title={media.name}
-                  type="button"
                   onClick={() => {
                     onSelect(media.id);
                     closeAndRestoreFocus();
                   }}
-                >
-                  <MediaThumbnail
-                    className="visual-default-card__thumb"
-                    loading="eager"
-                    media={media}
-                    previewUrl={mediaPreviewUrls[media.id]}
-                  />
-                </button>
+                />
               );
             })}
             {/* PLACEHOLDER UI: import commands await their application port. */}
-            <button
+            <MediaPreviewCard
               aria-label="Importar Decorativo"
-              className="visual-default-card visual-default-card--import"
               data-placeholder-feature="import-decorative-files"
               disabled
+              kind="placeholder"
               role="menuitem"
               title={IMPORT_PLACEHOLDER_TITLE}
-              type="button"
             >
-              <span
-                aria-hidden="true"
-                className="visual-default-card__thumb visual-default-card__thumb--import"
-              >
-                <AppIcon icon={Plus} size={16} />
-              </span>
-            </button>
+              <AppIcon icon={Plus} size={16} />
+            </MediaPreviewCard>
           </div>
         </div>
       ) : null}

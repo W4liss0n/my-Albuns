@@ -4,6 +4,7 @@ import type {
   ProjectDialogDetail,
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "../application/projectDialogPort";
 import type {
   AlbumInformation,
@@ -36,6 +37,10 @@ interface PendingAlbumInformation {
   review: AlbumInformationReview;
 }
 
+interface ApplyCompletion {
+  resolve(completed: boolean): void;
+}
+
 export function useAlbumInformationApplyController({
   projectDialogPort,
   onApply,
@@ -44,23 +49,35 @@ export function useAlbumInformationApplyController({
   const [active, setActive] = useState(false);
   const phaseRef = useRef<Phase>("idle");
   const pendingRef = useRef<PendingAlbumInformation | null>(null);
+  const completionRef = useRef<ApplyCompletion | null>(null);
+  const dialogSessionRef = useRef<ProjectDialogSession | null>(null);
   const actionListenerRef = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
 
-  const finish = useCallback(() => {
+  const finish = useCallback((completed: boolean) => {
     phaseRef.current = "idle";
     pendingRef.current = null;
+    const completion = completionRef.current;
+    completionRef.current = null;
     setActive(false);
-    void projectDialogPort.dismiss().catch(() => undefined);
-  }, [projectDialogPort]);
+    const session = dialogSessionRef.current;
+    dialogSessionRef.current = null;
+    void session?.dismiss().catch(() => undefined);
+    completion?.resolve(completed);
+  }, []);
 
   const requestApply = useCallback(
     async (
       draft: AlbumInformationProjectDraft,
       impact: AlbumInformationImpact,
     ) => {
-      if (phaseRef.current !== "idle") return;
+      if (phaseRef.current !== "idle") return false;
+      let resolveCompletion!: (completed: boolean) => void;
+      const completion = new Promise<boolean>((resolve) => {
+        resolveCompletion = resolve;
+      });
+      completionRef.current = { resolve: resolveCompletion };
       phaseRef.current = "deciding";
       const review = createAlbumInformationReview(
         draft.baseline,
@@ -69,18 +86,28 @@ export function useAlbumInformationApplyController({
       );
       pendingRef.current = { draft, review };
       setActive(true);
+      const session = projectDialogPort.acquire(
+        (action) => actionListenerRef.current(action),
+      );
+      dialogSessionRef.current = session;
       try {
-        await projectDialogPort.present({
+        await session.present({
           busy: false,
           details: detailsFromReview(review),
           kind: "albumInformationConfirmation",
         });
       } catch (error: unknown) {
+        if (dialogSessionRef.current !== session) return completion;
+        dialogSessionRef.current = null;
+        void session.dismiss().catch(() => undefined);
         phaseRef.current = "idle";
         pendingRef.current = null;
         setActive(false);
+        completionRef.current = null;
+        resolveCompletion(false);
         onError(messageFromError(error));
       }
+      return completion;
     },
     [onError, projectDialogPort],
   );
@@ -89,60 +116,58 @@ export function useAlbumInformationApplyController({
     const pending = pendingRef.current;
     if (phaseRef.current !== "deciding" || !pending) return;
     phaseRef.current = "applying";
-    void projectDialogPort
-      .present({
+    void dialogSessionRef.current
+      ?.present({
         busy: true,
         details: detailsFromReview(pending.review),
         kind: "albumInformationConfirmation",
       })
       .catch(() => undefined);
+    let result: AlbumInformationCommitResult;
     try {
-      const result = await onApply(pending.draft, pending.review);
-      if (result.kind === "reviewRequired") {
-        pendingRef.current = { draft: pending.draft, review: result.review };
-        phaseRef.current = "deciding";
-        try {
-          await projectDialogPort.present({
-            busy: false,
-            details: detailsFromReview(result.review),
-            kind: "albumInformationConfirmation",
-          });
-        } catch (error: unknown) {
-          phaseRef.current = "applying";
-          onError(messageFromError(error));
-        }
-      }
-    } finally {
-      if (phaseRef.current === "applying") finish();
+      result = await onApply(pending.draft, pending.review);
+    } catch (error: unknown) {
+      onError(messageFromError(error));
+      finish(false);
+      return;
     }
-  }, [finish, onApply, onError, projectDialogPort]);
+    if (result.kind === "reviewRequired") {
+      pendingRef.current = { draft: pending.draft, review: result.review };
+      phaseRef.current = "deciding";
+      try {
+        await dialogSessionRef.current?.present({
+          busy: false,
+          details: detailsFromReview(result.review),
+          kind: "albumInformationConfirmation",
+        });
+      } catch (error: unknown) {
+        onError(messageFromError(error));
+        finish(false);
+      }
+      return;
+    }
+    finish(result.kind === "completed");
+  }, [finish, onApply, onError]);
 
   actionListenerRef.current = (action) => {
     if (action === "cancelAlbumInformation" && phaseRef.current === "deciding") {
-      finish();
+      finish(false);
     }
     if (action === "confirmAlbumInformation") {
       void confirm();
     }
   };
 
-  useEffect(() => {
-    let current = true;
-    let unsubscribe: (() => void) | undefined;
-    void projectDialogPort
-      .onAction((action) => actionListenerRef.current(action))
-      .then((registeredUnsubscribe) => {
-        if (current) unsubscribe = registeredUnsubscribe;
-        else registeredUnsubscribe();
-      })
-      .catch((error: unknown) => {
-        if (current) onError(messageFromError(error));
-      });
-    return () => {
-      current = false;
-      unsubscribe?.();
-    };
-  }, [onError, projectDialogPort]);
+  useEffect(
+    () => () => {
+      const session = dialogSessionRef.current;
+      dialogSessionRef.current = null;
+      completionRef.current?.resolve(false);
+      completionRef.current = null;
+      void session?.dismiss().catch(() => undefined);
+    },
+    [],
+  );
 
   return { active, requestApply };
 }

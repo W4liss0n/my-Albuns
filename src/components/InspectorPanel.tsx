@@ -84,10 +84,10 @@ export interface InspectorPanelProps {
   onApplyAlbumInformation(
     draft: AlbumInformationProjectDraft,
     impact: AlbumInformationImpact,
-  ): void | Promise<unknown>;
+  ): Promise<boolean>;
   onApplyAlbumDesign(
     draft: AlbumDesignProjectDraft,
-  ): void | Promise<unknown>;
+  ): Promise<boolean>;
   onValidateAlbumInformation(
     information: AlbumInformation,
   ): Promise<AlbumInformationValidation>;

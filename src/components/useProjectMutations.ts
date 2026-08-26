@@ -122,9 +122,13 @@ export function useProjectMutations({
   function commitProjectSettingsDraft<Value, Delta>(
     draft: ProjectSettingsDraft<Value, Delta>,
   ) {
-    return commitMutation((port, latestProjection) =>
-      port.apply(draft.materialize(latestProjection ?? projection)),
-    );
+    return commitMutation((port, latestProjection) => {
+      const effectiveProjection = latestProjection ?? projection;
+      const materialized = draft.materializeAgainst(effectiveProjection);
+      return materialized.changed
+        ? port.apply(materialized.intent)
+        : Promise.resolve(effectiveProjection);
+    });
   }
 
   async function commitAlbumInformation(

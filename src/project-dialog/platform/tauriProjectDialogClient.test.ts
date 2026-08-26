@@ -31,7 +31,10 @@ test("submits semantic actions and receives validated owner state", async () => 
   );
   emit({ busy: true, kind: "projectCloseConfirmation" });
   emit({ busy: "yes", kind: "projectCloseConfirmation" });
-  await tauriProjectDialogClient.submit("cancelProjectClose");
+  await tauriProjectDialogClient.submit(
+    "project-close-3",
+    "cancelProjectClose",
+  );
 
   expect(listener).toHaveBeenCalledTimes(2);
   expect(listener).toHaveBeenNthCalledWith(1, {
@@ -45,6 +48,7 @@ test("submits semantic actions and receives validated owner state", async () => 
   expect(invoke).toHaveBeenNthCalledWith(1, "current_project_dialog_state");
   expect(invoke).toHaveBeenCalledWith("submit_project_dialog_action", {
     action: "cancelProjectClose",
+    sessionId: "project-close-3",
   });
 });
 

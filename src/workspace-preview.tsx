@@ -71,9 +71,10 @@ const projectWindowPort: ProjectWindowPort = {
 };
 
 const projectDialogPort: ProjectDialogPort = {
-  dismiss: async () => undefined,
-  onAction: async () => () => undefined,
-  present: async () => undefined,
+  acquire: () => ({
+    dismiss: async () => undefined,
+    present: async () => undefined,
+  }),
 };
 
 const projectStartupPort: ProjectStartupPort = {

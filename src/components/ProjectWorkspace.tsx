@@ -50,11 +50,11 @@ interface ProjectWorkspaceProps {
   projectWindowPort: ProjectWindowPort;
   runProjectMutation: ProjectMutationRunner;
   validateAlbumInformation: ProjectSessionPort["validateAlbumInformation"];
-  mediaPreviews?: Readonly<Record<string, MediaPreview>>;
-  onMediaDemandChange?(demand: MediaPreviewDemand): void;
+  mediaPreviews: Readonly<Record<string, MediaPreview>>;
+  onMediaDemandChange(demand: MediaPreviewDemand): void;
   onProjectionChange(projection: EditorProjection): void;
-  onGraphicsUnavailable?(diagnostic: GraphicsDiagnostic): void;
-  onPreferencesReady?(projectId: string): void;
+  onGraphicsUnavailable(diagnostic: GraphicsDiagnostic): void;
+  onPreferencesReady(projectId: string): void;
   workspacePreferences:
     | { kind: "persistent"; port: WorkspacePreferencesPort }
     | { kind: "memory" };
@@ -69,7 +69,7 @@ export function ProjectWorkspace({
   projectWindowPort,
   runProjectMutation,
   validateAlbumInformation,
-  mediaPreviews = {},
+  mediaPreviews,
   onMediaDemandChange,
   onProjectionChange,
   onGraphicsUnavailable,
@@ -94,7 +94,7 @@ export function ProjectWorkspace({
   );
   const projectId = projection.state.projectId;
   useEffect(() => {
-    if (workspacePreferences.ready) onPreferencesReady?.(projectId);
+    if (workspacePreferences.ready) onPreferencesReady(projectId);
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
@@ -130,7 +130,6 @@ export function ProjectWorkspace({
     [projection.state.album.media],
   );
   useEffect(() => {
-    if (!onMediaDemandChange) return;
     const visible = Array.from(
       new Set([
         ...canvasMediaDemand.visibleMediaIds,
@@ -398,8 +397,6 @@ export function ProjectWorkspace({
         {workspacePanels.panels.media.visible && <MediaPanel
           mediaItems={projection.state.album.media}
           mediaUsage={projection.mediaUsage}
-          mediaPreviews={mediaPreviews}
-          onMediaDemandChange={setPanelMediaDemand}
           onFillPhoto={controller.fillMedia}
           preferences={{
             kind: "controlled",
@@ -424,6 +421,11 @@ export function ProjectWorkspace({
                 mediaKind,
                 usageFilter,
               }),
+          }}
+          previewSource={{
+            kind: "connected",
+            previews: mediaPreviews,
+            onDemandChange: setPanelMediaDemand,
           }}
         />}
       </div>

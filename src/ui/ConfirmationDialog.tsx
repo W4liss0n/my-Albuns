@@ -5,6 +5,7 @@ import { ActionButton } from "./ActionButton";
 import { AppIcon } from "./AppIcon";
 import type { DialogAction } from "./DialogAction";
 import { DialogWindowFrame } from "./DialogWindowFrame";
+import "./ConfirmationDialog.css";
 
 type ConfirmationTone = "danger" | "neutral" | "question";
 
@@ -49,9 +50,14 @@ export function ConfirmationDialog({
             {cancelAction.label}
           </ActionButton>
           <ActionButton
+            className={
+              tone === "danger"
+                ? "ui-confirmation-dialog__danger-action"
+                : undefined
+            }
             disabled={confirmAction.disabled}
             onClick={confirmAction.onClick}
-            variant={tone === "danger" ? "danger" : "primary"}
+            variant={tone === "danger" ? "secondary" : "primary"}
           >
             {confirmAction.label}
           </ActionButton>

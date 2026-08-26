@@ -1,0 +1,18 @@
+.ui-dialog-window__footer
+  .ui-action-button.ui-confirmation-dialog__danger-action {
+  padding-inline: 18px;
+  border-color: var(--ui-danger);
+  color: #fff;
+  background: var(--ui-danger);
+}
+
+.ui-dialog-window__footer
+  .ui-action-button.ui-confirmation-dialog__danger-action:hover:not(:disabled) {
+  border-color: var(--ui-danger-hover);
+  background: var(--ui-danger-hover);
+}
+
+.ui-dialog-window__footer
+  .ui-action-button.ui-confirmation-dialog__danger-action:focus-visible:not(:disabled) {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 82%);
+}

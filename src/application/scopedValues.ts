@@ -43,6 +43,23 @@ export function applyScopedValue<T>(
     : { scope: "perSide", left, right: value };
 }
 
+/**
+ * Projects content while preserving whether it is shared by both sides or
+ * independently owned by each side.
+ */
+export function mapScopedValue<T, U>(
+  scoped: ScopedValue<T>,
+  map: (value: T) => U,
+): ScopedValue<U> {
+  return scoped.scope === "bothSides"
+    ? { scope: "bothSides", both: map(scoped.both) }
+    : {
+        scope: "perSide",
+        left: map(scoped.left),
+        right: map(scoped.right),
+      };
+}
+
 function valueAtSide<T>(scoped: ScopedValue<T>, side: "left" | "right"): T {
   return scoped.scope === "bothSides" ? scoped.both : scoped[side];
 }

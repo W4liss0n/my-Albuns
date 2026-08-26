@@ -96,7 +96,8 @@ test("keeps confirmation actions in their standard semantic positions", async ()
     name: "Excluir lâmina",
   });
 
-  expect(confirm).toHaveClass("ui-action-button--danger");
+  expect(confirm).toHaveClass("ui-confirmation-dialog__danger-action");
+  expect(confirm).not.toHaveClass("ui-action-button--danger");
   await user.click(confirm);
   await user.click(within(dialog).getByRole("button", { name: "Descartar" }));
   expect(onConfirm).toHaveBeenCalledOnce();

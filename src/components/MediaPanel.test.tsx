@@ -69,6 +69,7 @@ test("renders only centered copy when the media catalog is empty", () => {
       mediaItems={[]}
       mediaUsage={[]}
       onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
       preferences={{ kind: "local" }}
     />,
   );
@@ -233,6 +234,7 @@ test("hydrates per-tab thumbnail sizes and publishes later changes", async () =>
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
       preferences={{
         kind: "controlled",
         persistent: {
@@ -275,6 +277,7 @@ test("hydrates authoritative per-tab settings and publishes only the changed fie
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
       preferences={{
         kind: "controlled",
         persistent: {
@@ -330,7 +333,11 @@ test("clears preview demand when the panel unmounts", () => {
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
-      onMediaDemandChange={onMediaDemandChange}
+      previewSource={{
+        kind: "connected",
+        previews: {},
+        onDemandChange: onMediaDemandChange,
+      }}
       preferences={{ kind: "local" }}
     />,
   );
@@ -349,16 +356,19 @@ test("uses image orientation and opacity without visible names or usage counts",
   render(
     <MediaPanel
       mediaItems={mediaItems}
-      mediaPreviews={{
-        "photo-album-10": {
-          mediaId: "photo-album-10",
-          state: "ready",
-          url: "/album-10.jpg",
-        },
-        "photo-retrato": {
-          mediaId: "photo-retrato",
-          state: "ready",
-          url: "/retrato.jpg",
+      previewSource={{
+        kind: "static",
+        previews: {
+          "photo-album-10": {
+            mediaId: "photo-album-10",
+            state: "ready",
+            url: "/album-10.jpg",
+          },
+          "photo-retrato": {
+            mediaId: "photo-retrato",
+            state: "ready",
+            url: "/retrato.jpg",
+          },
         },
       }}
       mediaUsage={mediaUsage}
@@ -379,9 +389,11 @@ test("uses image orientation and opacity without visible names or usage counts",
   expect(usedCard).not.toHaveTextContent("Álbum 10");
   expect(usedCard?.querySelector(".media-usage-badge")).toBeNull();
   expect(usedCard?.querySelector(".media-meta")).toBeNull();
-  const landscapeThumb = usedCard?.querySelector<HTMLElement>(".media-thumb");
+  const landscapeThumb = usedCard?.querySelector<HTMLElement>(
+    ".media-preview-thumbnail",
+  );
   const portraitThumb =
-    portraitCard?.querySelector<HTMLElement>(".media-thumb");
+    portraitCard?.querySelector<HTMLElement>(".media-preview-thumbnail");
 
   expect(landscapeThumb).toHaveAttribute("data-portrait", "false");
   expect(landscapeThumb).toHaveAttribute("data-has-preview", "true");
@@ -515,11 +527,14 @@ test("uses the intrinsic preview ratio when source dimensions are unavailable", 
   render(
     <MediaPanel
       mediaItems={[mediaWithoutDimensions]}
-      mediaPreviews={{
-        "photo-no-metadata": {
-          mediaId: "photo-no-metadata",
-          state: "ready",
-          url: "/portrait-without-metadata.jpg",
+      previewSource={{
+        kind: "static",
+        previews: {
+          "photo-no-metadata": {
+            mediaId: "photo-no-metadata",
+            state: "ready",
+            url: "/portrait-without-metadata.jpg",
+          },
         },
       }}
       mediaUsage={[]}
@@ -539,7 +554,7 @@ test("uses the intrinsic preview ratio when source dimensions are unavailable", 
   fireEvent.load(image!);
 
   const thumb = document.querySelector<HTMLElement>(
-    '[data-media-id="photo-no-metadata"] .media-thumb',
+    '[data-media-id="photo-no-metadata"] .media-preview-thumbnail',
   );
   expect(thumb).toHaveAttribute("data-portrait", "true");
   expect(thumb).toHaveStyle({
@@ -553,6 +568,7 @@ function renderPanel() {
       mediaItems={mediaItems}
       mediaUsage={mediaUsage}
       onFillPhoto={vi.fn()}
+      previewSource={{ kind: "static" }}
       preferences={{ kind: "local" }}
     />,
   );

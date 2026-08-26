@@ -131,8 +131,14 @@ export function SheetGridPreview() {
         }
         revision={representativeProjection.state.revision}
         sectionState={{ kind: "local" }}
-        onApplyAlbumInformation={(draft) => applyInformation(draft.value)}
-        onApplyAlbumDesign={(draft) => setVisualDefaults(draft.value)}
+        onApplyAlbumInformation={async (draft) => {
+          applyInformation(draft.value);
+          return true;
+        }}
+        onApplyAlbumDesign={async (draft) => {
+          setVisualDefaults(draft.value);
+          return true;
+        }}
         onBeginPhotoZoom={() => undefined}
         onFinishPhotoZoom={async () => undefined}
         onNavigateToSheet={setFocusedSheetId}

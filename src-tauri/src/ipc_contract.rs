@@ -76,12 +76,20 @@ pub enum ProjectDialogAction {
     SaveAndClose,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDialogActionEvent {
+    pub(crate) action: ProjectDialogAction,
+    pub(crate) session_id: String,
+}
+
 #[cfg(test)]
 mod project_dialog_contract_tests {
     use serde_json::json;
 
     use super::{
-        ProjectDialogAction, ProjectDialogDetail, ProjectDialogProgress, ProjectDialogState,
+        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail, ProjectDialogProgress,
+        ProjectDialogState,
     };
 
     #[test]
@@ -179,6 +187,21 @@ mod project_dialog_contract_tests {
                 state
             );
         }
+    }
+
+    #[test]
+    fn dialog_actions_keep_the_logical_owner_on_the_wire() {
+        assert_eq!(
+            serde_json::to_value(ProjectDialogActionEvent {
+                action: ProjectDialogAction::ConfirmAlbumInformation,
+                session_id: "album-information-7".into(),
+            })
+            .expect("the owned action serializes"),
+            json!({
+                "action": "confirmAlbumInformation",
+                "sessionId": "album-information-7"
+            })
+        );
     }
 }
 

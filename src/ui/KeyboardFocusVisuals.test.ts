@@ -8,13 +8,10 @@ function stylesheet(relativePath: string) {
 }
 
 test("keeps keyboard focus visible inside destructive actions", () => {
-  const css = stylesheet("./ui.css");
+  const css = stylesheet("./ConfirmationDialog.css");
 
   expect(css).toMatch(
-    /\.ui-action-button--danger:focus-visible:not\(:disabled\)\s*\{[^}]*box-shadow:/s,
-  );
-  expect(css).toMatch(
-    /\.ui-dialog-window__footer\s+\.ui-action-button--danger:focus-visible:not\(:disabled\)\s*\{[^}]*box-shadow:/s,
+    /\.ui-dialog-window__footer[\s\S]*\.ui-confirmation-dialog__danger-action:focus-visible:not\(:disabled\)\s*\{[^}]*box-shadow:/s,
   );
 });
 

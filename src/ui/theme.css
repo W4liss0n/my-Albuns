@@ -20,7 +20,6 @@
   --ui-text-muted: #6d665c;
   --ui-text-disabled: #9a9388;
   --ui-accent: #2f7fba;
-  --ui-accent-hover: #286fa5;
   --ui-accent-soft: #e8f2f9;
   --ui-accent-text: #286fa5;
   --ui-accent-fill: #286fa5;
@@ -48,6 +47,10 @@
   --ui-scrollbar-track: transparent;
   --ui-scrollbar-thumb: #817a70;
   --ui-scrollbar-thumb-hover: #6d665c;
+  --ui-canvas-scrollbar-track: #e1ddd4;
+  --ui-canvas-scrollbar-thumb: #fbfaf8;
+  --ui-canvas-scrollbar-thumb-hover: #f3f1ec;
+  --ui-canvas-scrollbar-thumb-border: #655f56;
   --ui-range-track: #817a70;
   --ui-range-thumb-border: #6d665c;
   --ui-radius-small: 4px;

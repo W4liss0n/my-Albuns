@@ -1,10 +1,12 @@
 import type {
   ProjectDialogAction,
+  ProjectDialogActionEvent,
   ProjectDialogDetail,
   ProjectDialogProgress,
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import type { ProjectDialogAction as IpcProjectDialogAction } from "./generated/ProjectDialogAction";
+import type { ProjectDialogActionEvent as IpcProjectDialogActionEvent } from "./generated/ProjectDialogActionEvent";
 import type { ProjectDialogDetail as IpcProjectDialogDetail } from "./generated/ProjectDialogDetail";
 import type { ProjectDialogProgress as IpcProjectDialogProgress } from "./generated/ProjectDialogProgress";
 import type { ProjectDialogState as IpcProjectDialogState } from "./generated/ProjectDialogState";
@@ -172,6 +174,26 @@ export function parseProjectDialogAction(
     : null;
 }
 
+export function parseProjectDialogActionEvent(
+  value: unknown,
+): ProjectDialogActionEvent | null {
+  if (
+    !isRecord(value) ||
+    typeof value.sessionId !== "string" ||
+    value.sessionId.length === 0 ||
+    value.sessionId.length > 128
+  ) {
+    return null;
+  }
+  const action = parseProjectDialogAction(value.action);
+  if (!action) return null;
+  const event = {
+    action: toIpcProjectDialogAction(action),
+    sessionId: value.sessionId,
+  } satisfies IpcProjectDialogActionEvent;
+  return { action: projectDialogActionMap[event.action], sessionId: event.sessionId };
+}
+
 export function toIpcProjectDialogAction(
   action: ProjectDialogAction,
 ): IpcProjectDialogAction {
@@ -316,6 +338,13 @@ export function parseInitialProjectDialogState(
   } catch {
     return null;
   }
+}
+
+export function parseInitialProjectDialogSessionId(
+  search: string,
+): string | null {
+  const sessionId = new URLSearchParams(search).get("sessionId");
+  return sessionId && sessionId.length <= 128 ? sessionId : null;
 }
 
 function assertNever(value: never): never {

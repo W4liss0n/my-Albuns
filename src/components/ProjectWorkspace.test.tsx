@@ -21,6 +21,7 @@ import type {
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "../application/projectDialogPort";
 import {
   ProjectCloseError,
@@ -190,28 +191,61 @@ const inertProjectWindowPort: ProjectWindowPort = {
 };
 
 const inertProjectDialogPort: ProjectDialogPort = {
-  dismiss: async () => undefined,
-  onAction: async () => () => undefined,
-  present: async () => undefined,
+  acquire: () => ({
+    dismiss: async () => undefined,
+    present: async () => undefined,
+  }),
 };
 
 function projectDialogHarness() {
-  const listeners = new Set<(action: ProjectDialogAction) => void>();
+  interface HarnessSession {
+    active: boolean;
+    closed: boolean;
+    listener(action: ProjectDialogAction): void;
+  }
+  const sessions: HarnessSession[] = [];
   const dismiss = vi.fn(async () => undefined);
-  const present = vi.fn(async () => undefined);
-  const onAction = vi.fn<ProjectDialogPort["onAction"]>(async (nextListener) => {
-    listeners.add(nextListener);
-    return () => {
-      listeners.delete(nextListener);
+  const present = vi.fn<ProjectDialogSession["present"]>(
+    async () => undefined,
+  );
+  const onAction = vi.fn(
+    (_nextListener: (action: ProjectDialogAction) => void) => undefined,
+  );
+  const acquire: ProjectDialogPort["acquire"] = (nextListener) => {
+    onAction(nextListener);
+    const session: HarnessSession = {
+      active: false,
+      closed: false,
+      listener: nextListener,
     };
-  });
+    return {
+      dismiss: async () => {
+        await dismiss();
+        if (session.closed) return;
+        session.closed = true;
+        const index = sessions.indexOf(session);
+        if (index >= 0) sessions.splice(index, 1);
+        if (session.active) {
+          session.active = false;
+          const next = sessions[0];
+          if (next) next.active = true;
+        }
+      },
+      present: async (state) => {
+        await present(state);
+        if (session.closed || sessions.includes(session)) return;
+        sessions.push(session);
+        if (sessions.length === 1) session.active = true;
+      },
+    };
+  };
   return {
     dismiss,
     emit: (action: ProjectDialogAction) => {
-      for (const listener of listeners) listener(action);
+      sessions.find((session) => session.active)?.listener(action);
     },
     onAction,
-    port: { dismiss, onAction, present } satisfies ProjectDialogPort,
+    port: { acquire } satisfies ProjectDialogPort,
     present,
   };
 }
@@ -261,8 +295,22 @@ type TestProjectWorkspaceProps = Omit<
   | "projectDialogPort"
   | "projectWindowPort"
   | "validateAlbumInformation"
+  | "mediaPreviews"
+  | "onGraphicsUnavailable"
+  | "onMediaDemandChange"
+  | "onPreferencesReady"
   | "workspacePreferences"
 > & {
+  mediaPreviews?: ComponentProps<typeof ProjectWorkspaceView>["mediaPreviews"];
+  onGraphicsUnavailable?: ComponentProps<
+    typeof ProjectWorkspaceView
+  >["onGraphicsUnavailable"];
+  onMediaDemandChange?: ComponentProps<
+    typeof ProjectWorkspaceView
+  >["onMediaDemandChange"];
+  onPreferencesReady?: ComponentProps<
+    typeof ProjectWorkspaceView
+  >["onPreferencesReady"];
   projectDialogPort?: ProjectDialogPort;
   projectSessionPort: ProjectSessionPort;
   projectWindowPort?: ProjectWindowPort;
@@ -272,6 +320,10 @@ type TestProjectWorkspaceProps = Omit<
 };
 
 function ProjectWorkspace({
+  mediaPreviews = {},
+  onGraphicsUnavailable = () => undefined,
+  onMediaDemandChange = () => undefined,
+  onPreferencesReady = () => undefined,
   projectDialogPort = inertProjectDialogPort,
   projectSessionPort,
   projectWindowPort = inertProjectWindowPort,
@@ -286,6 +338,10 @@ function ProjectWorkspace({
   return (
     <ProjectWorkspaceView
       {...props}
+      mediaPreviews={mediaPreviews}
+      onGraphicsUnavailable={onGraphicsUnavailable}
+      onMediaDemandChange={onMediaDemandChange}
+      onPreferencesReady={onPreferencesReady}
       projectDialogPort={projectDialogPort}
       projection={projection}
       projectWindowPort={projectWindowPort}
@@ -739,6 +795,80 @@ test("offers the three close choices for a native request and Cancel keeps the P
   expect(
     getApplicationCommand("Editar", "Desfazer"),
   ).toBeEnabled();
+});
+
+test("releases an application close when its confirmation window cannot be presented", async () => {
+  const harness = projectWindowHarness();
+  const restoredProjection = {
+    ...projection,
+    state: { ...projection.state, revision: projection.state.revision + 1 },
+  };
+  const onProjectionChange = vi.fn();
+  harness.dialog.present.mockRejectedValueOnce(
+    new Error("Não foi possível abrir a confirmação."),
+  );
+  harness.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection: restoredProjection,
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={harness.dialog.port}
+      projectWindowPort={harness.port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
+
+  await waitFor(() =>
+    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel"),
+  );
+  expect(onProjectionChange).toHaveBeenCalledWith(restoredProjection);
+  expect(harness.dialog.present).toHaveBeenLastCalledWith({
+    kind: "projectOperationFailure",
+    message: "Não foi possível abrir a confirmação.",
+  });
+});
+
+test("releases a native close when its confirmation window cannot be presented", async () => {
+  const harness = projectWindowHarness();
+  const onProjectionChange = vi.fn();
+  harness.dialog.present.mockRejectedValueOnce(
+    new Error("Não foi possível abrir a confirmação."),
+  );
+  harness.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectDialogPort={harness.dialog.port}
+      projectWindowPort={harness.port}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+  await waitFor(() => expect(harness.port.onCloseRequested).toHaveBeenCalled());
+
+  act(() => harness.emitCloseRequested());
+
+  await waitFor(() =>
+    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel"),
+  );
+  expect(onProjectionChange).toHaveBeenCalledWith(projection);
+  expect(harness.dialog.present).toHaveBeenLastCalledWith({
+    kind: "projectOperationFailure",
+    message: "Não foi possível abrir a confirmação.",
+  });
 });
 
 test("uses the same close decision for the application command and blocks it while resolving", async () => {
@@ -2856,6 +2986,152 @@ test("preserves both unapplied Album drafts across equivalent Undo and Redo proj
   expect(design.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0");
 });
 
+test("keeps a mutation failure behind Album Information and releases both owners in order", async () => {
+  const pendingDesign = deferredProjection();
+  const dialog = projectDialogHarness();
+  const projectSessionPort = projectSessionPortWithApply(
+    () => pendingDesign.promise,
+  );
+
+  render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={projection}
+      projectDialogPort={dialog.port}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const design = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(design.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  fireEvent.click(design.getByRole("button", { name: "Aplicar" }));
+
+  const information = within(
+    screen
+      .getByRole("button", { name: "Informações do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+  fireEvent.change(information.getByLabelText("DPI"), {
+    target: { value: "600" },
+  });
+  await waitFor(() =>
+    expect(information.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(information.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "albumInformationConfirmation" }),
+    ),
+  );
+
+  const failure = new Error("O Design do Álbum não pôde ser aplicado.");
+  await act(async () => {
+    pendingDesign.reject(failure);
+    await pendingDesign.promise.catch(() => undefined);
+  });
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: failure.message,
+    }),
+  );
+
+  const dismissalsBeforeStaleAction = dialog.dismiss.mock.calls.length;
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  expect(dialog.dismiss).toHaveBeenCalledTimes(dismissalsBeforeStaleAction);
+  expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled();
+
+  act(() => dialog.emit("cancelAlbumInformation"));
+  await waitFor(() =>
+    expect(dialog.dismiss).toHaveBeenCalledTimes(
+      dismissalsBeforeStaleAction + 1,
+    ),
+  );
+  act(() => dialog.emit("dismissProjectOperationFailure"));
+  await waitFor(() =>
+    expect(dialog.dismiss).toHaveBeenCalledTimes(
+      dismissalsBeforeStaleAction + 2,
+    ),
+  );
+  expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled();
+});
+
+test("queues native Close behind Export and routes every action to its owning session", async () => {
+  let emitExport!: (event: ExportProgressEvent) => void;
+  let finishExport!: (outcome: ExportOutcome) => void;
+  const completion = new Promise<ExportOutcome>((resolve) => {
+    finishExport = resolve;
+  });
+  const cancel = vi.fn(async () => "requested" as const);
+  const close = projectWindowHarness();
+  close.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+  const controlledExportPort: ExportPort = {
+    startSheet: (_sheetId, onEvent) => {
+      emitExport = onEvent;
+      return { cancel, completion };
+    },
+  };
+
+  render(
+    <ProjectWorkspace
+      exportPort={controlledExportPort}
+      projection={projection}
+      projectDialogPort={close.dialog.port}
+      projectSessionPort={projectSessionPortWithApply(async () => projection)}
+      projectWindowPort={close.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
+  act(() => emitExport({ event: "started", cancellable: true }));
+  await waitFor(() =>
+    expect(close.dialog.present).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "exportProgress" }),
+    ),
+  );
+
+  act(() => close.emitCloseRequested());
+  await waitFor(() =>
+    expect(close.dialog.present).toHaveBeenCalledWith({
+      busy: false,
+      kind: "projectCloseConfirmation",
+    }),
+  );
+
+  act(() => close.dialog.emit("cancelProjectClose"));
+  expect(close.port.resolveClose).not.toHaveBeenCalled();
+
+  act(() => close.dialog.emit("cancelExport"));
+  expect(cancel).toHaveBeenCalledOnce();
+  await act(async () => {
+    finishExport({ status: "cancelled" });
+    await completion;
+  });
+  await act(async () => {
+    close.dialog.emit("dismissExport");
+    await Promise.resolve();
+  });
+
+  act(() => close.dialog.emit("cancelProjectClose"));
+  await waitFor(() =>
+    expect(close.port.resolveClose).toHaveBeenCalledWith("cancel"),
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Editar" })).toBeEnabled(),
+  );
+});
+
 test("materializes an Album Design draft over the projection produced by a pending Undo", async () => {
   const pendingUndo = deferredProjection();
   const afterUndo: EditorProjection = {
@@ -3611,7 +3887,7 @@ test("uses reduced Cache previews in the media panel and Canvas", () => {
 
   expect(
     view.container.querySelector<HTMLImageElement>(
-      '.media-thumb img[src="asset://localhost/cache/media-001.jpg"]',
+      '.media-preview-thumbnail img[src="asset://localhost/cache/media-001.jpg"]',
     ),
   ).not.toBeNull();
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(
@@ -3755,7 +4031,7 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
   ).not.toBeInTheDocument();
   expect(
     view.container.querySelector<HTMLImageElement>(
-      `.media-thumb img[src="${decorativePreviewUrl}"]`,
+      `.media-preview-thumbnail img[src="${decorativePreviewUrl}"]`,
     ),
   ).not.toBeNull();
   expect(

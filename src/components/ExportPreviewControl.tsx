@@ -9,6 +9,7 @@ import {
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import type {
@@ -64,6 +65,7 @@ export const ExportPreviewControl = forwardRef<
   const interactionActive = useRef(false);
   const lastDialogState = useRef<ProjectDialogState | undefined>(undefined);
   const dialogPresentationFailed = useRef(false);
+  const dialogSession = useRef<ProjectDialogSession | null>(null);
   const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
@@ -87,33 +89,19 @@ export const ExportPreviewControl = forwardRef<
   };
 
   useLayoutEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | undefined;
-    void dialogPort
-      .onAction((action) => dialogActionListener.current(action))
-      .then((dispose) => {
-        if (active) {
-          unlisten = dispose;
-        } else {
-          dispose();
-        }
-      });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
-  }, [dialogPort]);
-
-  useLayoutEffect(() => {
     setPhase("idle");
     lastDialogState.current = undefined;
     dialogPresentationFailed.current = false;
-    void dialogPort.dismiss().catch(() => undefined);
+    const previousSession = dialogSession.current;
+    dialogSession.current = null;
+    void previousSession?.dismiss().catch(() => undefined);
 
     return () => {
       retireActiveAttempt();
       lastDialogState.current = undefined;
-      void dialogPort.dismiss().catch(() => undefined);
+      const session = dialogSession.current;
+      dialogSession.current = null;
+      void session?.dismiss().catch(() => undefined);
     };
   }, [dialogPort, projectId]);
 
@@ -235,15 +223,26 @@ export const ExportPreviewControl = forwardRef<
     }
     setPhase("idle");
     lastDialogState.current = undefined;
-    void dialogPort.dismiss().catch(() => undefined);
+    const session = dialogSession.current;
+    dialogSession.current = null;
+    void session?.dismiss().catch(() => undefined);
     endInteraction();
   }
 
   function presentDialog(state: ProjectDialogState) {
     lastDialogState.current = state;
-    void dialogPort.present(state).catch(() => {
+    const session =
+      dialogSession.current ??
+      dialogPort.acquire(
+        (action) => dialogActionListener.current(action),
+      );
+    dialogSession.current = session;
+    void session.present(state).catch(() => {
+      if (dialogSession.current !== session) return;
       if (dialogPresentationFailed.current) return;
       dialogPresentationFailed.current = true;
+      dialogSession.current = null;
+      void session.dismiss().catch(() => undefined);
       const current = activeAttempt.current;
       if (current && !current.cancelRequested) {
         current.cancelRequested = true;

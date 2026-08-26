@@ -1,7 +1,16 @@
-import { expect, test } from "vitest";
+import { act, renderHook } from "@testing-library/react";
+import { expect, test, vi } from "vitest";
 
+import type {
+  ProjectDialogAction,
+  ProjectDialogPort,
+} from "../application/projectDialogPort";
+import { createAlbumInformationProjectDraft } from "../application/projectSettingsDraft";
 import type { AlbumInformation } from "../domain/project";
-import { albumInformationDetails } from "./useAlbumInformationApplyController";
+import {
+  albumInformationDetails,
+  useAlbumInformationApplyController,
+} from "./useAlbumInformationApplyController";
 
 const baseline: AlbumInformation = {
   displayUnit: "mm",
@@ -88,4 +97,148 @@ test("uses the selected Unit for changed measurements without unrelated raster d
     { label: "Unidade", value: "mm → cm" },
     { label: "Sangria", value: "0.3 cm → 0.5 cm" },
   ]);
+});
+
+function dialogHarness() {
+  let listener: ((action: ProjectDialogAction) => void) | null = null;
+  const dismiss = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
+  const port: ProjectDialogPort = {
+    acquire: (nextListener) => {
+      listener = nextListener;
+      return { dismiss, present };
+    },
+  };
+  return {
+    dismiss,
+    emit(action: ProjectDialogAction) {
+      listener?.(action);
+    },
+    port,
+    present,
+  };
+}
+
+const changedDraft = createAlbumInformationProjectDraft(3, baseline).transition({
+  ...baseline,
+  dpi: 600,
+});
+const impact = {
+  heightPx: 7_087,
+  pageWidthPx: 7_087,
+  sheetWidthPx: 14_173,
+};
+
+test("completes the Apply request only after the owned confirmation commits", async () => {
+  const dialog = dialogHarness();
+  const onApply = vi.fn(async () => ({ kind: "completed" as const }));
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply,
+      onError: vi.fn(),
+    }),
+  );
+
+  let completion!: Promise<boolean>;
+  await act(async () => {
+    completion = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+  });
+  expect(result.current.active).toBe(true);
+
+  await act(async () => {
+    dialog.emit("confirmAlbumInformation");
+    await expect(completion).resolves.toBe(true);
+  });
+
+  expect(onApply).toHaveBeenCalledOnce();
+  expect(result.current.active).toBe(false);
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+});
+
+test("resolves cancellation and a rejected commit without orphaning command blocking", async () => {
+  const dialog = dialogHarness();
+  const onApply = vi.fn(async () => ({ kind: "rejected" as const }));
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply,
+      onError: vi.fn(),
+    }),
+  );
+
+  let cancelled!: Promise<boolean>;
+  await act(async () => {
+    cancelled = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+    dialog.emit("cancelAlbumInformation");
+    await expect(cancelled).resolves.toBe(false);
+  });
+  expect(result.current.active).toBe(false);
+
+  let rejected!: Promise<boolean>;
+  await act(async () => {
+    rejected = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+    dialog.emit("confirmAlbumInformation");
+    await expect(rejected).resolves.toBe(false);
+  });
+  expect(result.current.active).toBe(false);
+});
+
+test("resolves false when confirmation presentation or the commit fails", async () => {
+  const presentationFailure = new Error("Falha ao abrir a confirmação.");
+  const dialog = dialogHarness();
+  dialog.present.mockRejectedValueOnce(presentationFailure);
+  const onError = vi.fn();
+  const onApply = vi.fn(async () => {
+    throw new Error("Falha ao aplicar a alteração.");
+  });
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply,
+      onError,
+    }),
+  );
+
+  await act(async () => {
+    await expect(result.current.requestApply(changedDraft, impact)).resolves.toBe(
+      false,
+    );
+  });
+  expect(onError).toHaveBeenCalledWith(presentationFailure.message);
+  expect(result.current.active).toBe(false);
+
+  let completion!: Promise<boolean>;
+  await act(async () => {
+    completion = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+    dialog.emit("confirmAlbumInformation");
+    await expect(completion).resolves.toBe(false);
+  });
+  expect(onError).toHaveBeenLastCalledWith("Falha ao aplicar a alteração.");
+  expect(result.current.active).toBe(false);
+});
+
+test("settles an outstanding Apply completion when its controller unmounts", async () => {
+  const dialog = dialogHarness();
+  const { result, unmount } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply: vi.fn(async () => ({ kind: "completed" as const })),
+      onError: vi.fn(),
+    }),
+  );
+
+  let completion!: Promise<boolean>;
+  await act(async () => {
+    completion = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+  });
+  unmount();
+
+  await expect(completion).resolves.toBe(false);
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
 });

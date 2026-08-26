@@ -5,6 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "../application/projectDialogPort";
 import type {
   ExportAttempt,
@@ -47,12 +48,25 @@ function createExportHarness() {
 function createDialogHarness() {
   let listener: ((action: ProjectDialogAction) => void) | undefined;
   const dismiss = vi.fn(async () => undefined);
-  const present = vi.fn(async () => undefined);
-  const unlisten = vi.fn();
-  const onAction = vi.fn<ProjectDialogPort["onAction"]>(async (nextListener) => {
+  const present = vi.fn<ProjectDialogSession["present"]>(
+    async () => undefined,
+  );
+  const onAction = vi.fn((nextListener: (action: ProjectDialogAction) => void) => {
     listener = nextListener;
-    return unlisten;
   });
+  const acquire: ProjectDialogPort["acquire"] = (nextListener) => {
+    onAction(nextListener);
+    let active = true;
+    return {
+      dismiss: async () => {
+        await dismiss();
+        if (!active) return;
+        active = false;
+        if (listener === nextListener) listener = undefined;
+      },
+      present,
+    };
+  };
 
   return {
     dismiss,
@@ -60,9 +74,8 @@ function createDialogHarness() {
       act(() => listener?.(action));
     },
     onAction,
-    port: { dismiss, onAction, present } satisfies ProjectDialogPort,
+    port: { acquire } satisfies ProjectDialogPort,
     present,
-    unlisten,
   };
 }
 
@@ -165,11 +178,11 @@ test("projects measured and unmeasured progress through the dialog port", async 
 test("handles cancellation actions from the child window and keeps feedback there", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
   await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
+  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
 
   dialog.emit("cancelExport");
   dialog.emit("cancelExport");
@@ -270,11 +283,11 @@ test("replaces native progress with the standard success dialog", async () => {
 test("retries and dismisses terminal feedback from semantic child-window actions", async () => {
   const user = userEvent.setup();
   const { dialog, exportHarness } = renderControl();
-  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
   await user.click(screen.getByRole("button", { name: "Exportar Lâmina" }));
   act(() => {
     exportHarness.attempts[0].emit({ event: "started", cancellable: true });
   });
+  await waitFor(() => expect(dialog.onAction).toHaveBeenCalledOnce());
   await act(async () => {
     exportHarness.attempts[0].reject(new Error("Mídia indisponível"));
     await Promise.resolve();

@@ -47,7 +47,7 @@ interface AlbumInformationFormProps {
   onApply(
     draft: AlbumInformationProjectDraft,
     impact: AlbumInformationImpact,
-  ): void | Promise<unknown>;
+  ): Promise<boolean>;
   onReadyChange(ready: boolean): void;
   onPresentationUnitChange(unit: DisplayUnit | null): void;
   onValidate(
@@ -64,6 +64,15 @@ interface AlbumInformationDraft {
   safety: PhysicalFieldDraft;
   firstSheet: EndSheetFormat;
   lastSheet: EndSheetFormat;
+}
+
+interface AlbumInformationDraftSession {
+  current: AlbumInformationDraft;
+  pending: {
+    attempt: AlbumInformationProjectDraft;
+    submitted: AlbumInformationProjectDraft;
+    submittedFields: AlbumInformationDraft;
+  } | null;
 }
 
 type MeasurementDraftKey =
@@ -99,7 +108,10 @@ export function AlbumInformationForm({
     JSON.stringify(toCandidate(projectedBaseline).information),
   );
   const baseline = semanticBaseline.fields;
-  const [draft, setDraft] = useState(baseline);
+  const [draftSession, setDraftSession] = useState<AlbumInformationDraftSession>(
+    () => ({ current: baseline, pending: null }),
+  );
+  const draft = draftSession.current;
   const [validated, setValidated] = useState<{
     key: string;
     errors: DimensionsErrors;
@@ -109,8 +121,14 @@ export function AlbumInformationForm({
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
-    setDraft(baseline);
-  }, [baseline]);
+    setDraftSession((session) =>
+      rebaseDraftSession(
+        session,
+        semanticBaseline.revision,
+        baseline,
+      ),
+    );
+  }, [baseline, semanticBaseline.revision]);
 
   const local = toCandidate(draft);
   const candidate = local.information;
@@ -206,10 +224,27 @@ export function AlbumInformationForm({
     ) {
       return;
     }
+    const submitted = projectDraft;
+    setDraftSession((session) => ({
+      ...session,
+      pending: {
+        attempt: submitted,
+        submitted,
+        submittedFields: session.current,
+      },
+    }));
     setApplying(true);
+    let completed = false;
     try {
-      await onApply(projectDraft, validated.impact);
+      completed = await onApply(submitted, validated.impact);
     } finally {
+      if (!completed) {
+        setDraftSession((session) =>
+          session.pending?.attempt === submitted
+            ? { current: session.current, pending: null }
+            : session,
+        );
+      }
       setApplying(false);
     }
   }
@@ -218,20 +253,26 @@ export function AlbumInformationForm({
     key: Key,
     value: AlbumInformationDraft[Key],
   ) {
-    setDraft((current) => ({ ...current, [key]: value }));
+    setDraftSession((session) => ({
+      ...session,
+      current: { ...session.current, [key]: value },
+    }));
   }
 
   function setMeasurement(
     key: MeasurementDraftKey,
     text: string,
   ) {
-    setDraft((current) => ({
-      ...current,
-      [key]: editPhysicalFieldDraft(
-        current[key],
-        text,
-        current.displayUnit,
-      ),
+    setDraftSession((session) => ({
+      ...session,
+      current: {
+        ...session.current,
+        [key]: editPhysicalFieldDraft(
+          session.current[key],
+          text,
+          session.current.displayUnit,
+        ),
+      },
     }));
   }
 
@@ -248,12 +289,15 @@ export function AlbumInformationForm({
   }
 
   function resetMeasurement(key: MeasurementDraftKey) {
-    setDraft((current) => ({
-      ...current,
-      [key]: createPhysicalFieldDraft(
-        baseline[key].valueUm,
-        current.displayUnit,
-      ),
+    setDraftSession((session) => ({
+      ...session,
+      current: {
+        ...session.current,
+        [key]: createPhysicalFieldDraft(
+          baseline[key].valueUm,
+          session.current.displayUnit,
+        ),
+      },
     }));
   }
 
@@ -262,18 +306,22 @@ export function AlbumInformationForm({
   }
 
   function changeUnit(unit: DocumentSnapshot["displayUnit"]) {
-    setDraft((current) => {
-      if (unit === current.displayUnit) return current;
+    setDraftSession((session) => {
+      const current = session.current;
+      if (unit === current.displayUnit) return session;
       return {
-        ...current,
-        displayUnit: unit,
-        sheetWidth: createPhysicalFieldDraft(current.sheetWidth.valueUm, unit),
-        sheetHeight: createPhysicalFieldDraft(
-          current.sheetHeight.valueUm,
-          unit,
-        ),
-        bleed: createPhysicalFieldDraft(current.bleed.valueUm, unit),
-        safety: createPhysicalFieldDraft(current.safety.valueUm, unit),
+        ...session,
+        current: {
+          ...current,
+          displayUnit: unit,
+          sheetWidth: createPhysicalFieldDraft(current.sheetWidth.valueUm, unit),
+          sheetHeight: createPhysicalFieldDraft(
+            current.sheetHeight.valueUm,
+            unit,
+          ),
+          bleed: createPhysicalFieldDraft(current.bleed.valueUm, unit),
+          safety: createPhysicalFieldDraft(current.safety.valueUm, unit),
+        },
       };
     });
   }
@@ -445,6 +493,85 @@ function createDraft(
     safety: createPhysicalFieldDraft(document.safetyUm, document.displayUnit),
     firstSheet: endSheetFormat(sheetStates[0]),
     lastSheet: endSheetFormat(sheetStates[sheetStates.length - 1]),
+  };
+}
+
+function createDraftFromInformation(
+  information: Readonly<AlbumInformation>,
+): AlbumInformationDraft {
+  return {
+    displayUnit: information.displayUnit,
+    sheetWidth: createPhysicalFieldDraft(
+      information.sheetWidthUm,
+      information.displayUnit,
+    ),
+    sheetHeight: createPhysicalFieldDraft(
+      information.sheetHeightUm,
+      information.displayUnit,
+    ),
+    dpi: String(information.dpi),
+    bleed: createPhysicalFieldDraft(
+      information.bleedUm,
+      information.displayUnit,
+    ),
+    safety: createPhysicalFieldDraft(
+      information.safetyUm,
+      information.displayUnit,
+    ),
+    firstSheet: information.firstSheet,
+    lastSheet: information.lastSheet,
+  };
+}
+
+function rebaseDraftSession(
+  session: AlbumInformationDraftSession,
+  baselineRevision: number,
+  baseline: AlbumInformationDraft,
+): AlbumInformationDraftSession {
+  const pending = session.pending;
+  if (!pending) return { current: baseline, pending: null };
+
+  const baselineInformation = toCandidate(baseline).information;
+  if (!baselineInformation) return { current: baseline, pending: null };
+  const submitted = pending.submitted.rebase(
+    baselineRevision,
+    baselineInformation,
+  );
+  const submittedFields = createDraftFromInformation(submitted.value);
+  const current = preserveSubsequentDraft(
+    submittedFields,
+    pending.submittedFields,
+    session.current,
+  );
+  if (!submitted.changed) return { current, pending: null };
+  return {
+    current,
+    pending: {
+      attempt: pending.attempt,
+      submitted,
+      submittedFields,
+    },
+  };
+}
+
+function preserveSubsequentDraft(
+  rebasedSubmitted: AlbumInformationDraft,
+  submitted: AlbumInformationDraft,
+  current: AlbumInformationDraft,
+): AlbumInformationDraft {
+  const preserved = <Key extends keyof AlbumInformationDraft>(key: Key) =>
+    JSON.stringify(current[key]) === JSON.stringify(submitted[key])
+      ? rebasedSubmitted[key]
+      : current[key];
+  return {
+    displayUnit: preserved("displayUnit"),
+    sheetWidth: preserved("sheetWidth"),
+    sheetHeight: preserved("sheetHeight"),
+    dpi: preserved("dpi"),
+    bleed: preserved("bleed"),
+    safety: preserved("safety"),
+    firstSheet: preserved("firstSheet"),
+    lastSheet: preserved("lastSheet"),
   };
 }
 

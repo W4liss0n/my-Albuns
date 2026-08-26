@@ -1,16 +1,3 @@
-.media-preview-card {
-  appearance: none;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  aspect-ratio: 1;
-  place-items: center;
-}
-
 .media-preview-thumbnail {
   position: relative;
   display: grid;
@@ -42,23 +29,6 @@
 .media-preview-thumbnail[data-portrait="true"] {
   width: auto;
   height: 100%;
-}
-
-.media-preview-card:hover .media-preview-thumbnail {
-  border-color: var(--ui-border-strong);
-}
-
-.media-preview-card:focus-visible {
-  outline: 0;
-}
-
-.media-preview-card:focus-visible .media-preview-thumbnail {
-  outline: 1px solid var(--ui-focus-neutral);
-  outline-offset: 2px;
-}
-
-.media-preview-card[data-selected="true"] .media-preview-thumbnail {
-  border-color: var(--ui-accent);
 }
 
 .media-preview-thumbnail img {

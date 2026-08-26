@@ -6,8 +6,8 @@ use myalbuns_desktop_lib::ipc_contract::{
     MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
     MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
     ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
-    ProjectDialogState, SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult,
-    SettingsPreferenceChange, WorkspacePanelKind, WorkspacePanelPreference,
+    ProjectDialogActionEvent, ProjectDialogState, SaveProjectCommandError, SaveProjectOutcome,
+    SaveProjectResult, SettingsPreferenceChange, WorkspacePanelKind, WorkspacePanelPreference,
     WorkspacePanelPreferences, WorkspacePreferenceChange, WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
@@ -51,6 +51,8 @@ fn main() {
     MediaUsageFilter::export_all(&config).expect("media usage filter bindings should be generated");
     ProjectDialogAction::export_all(&config)
         .expect("Project dialog action bindings should be generated");
+    ProjectDialogActionEvent::export_all(&config)
+        .expect("owned Project dialog action bindings should be generated");
     ProjectDialogState::export_all(&config)
         .expect("Project dialog state bindings should be generated");
     ProjectCloseChoice::export_all(&config)

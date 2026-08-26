@@ -62,10 +62,22 @@ export type ProjectDialogAction =
   | "retryExport"
   | "saveAndClose";
 
-export interface ProjectDialogPort {
+export interface ProjectDialogActionEvent {
+  action: ProjectDialogAction;
+  sessionId: string;
+}
+
+/**
+ * Owns one logical Project dialog from its first projection until dismissal.
+ * A released session is obsolete: later updates and dismissals are harmless.
+ */
+export interface ProjectDialogSession {
   dismiss(): Promise<void>;
-  onAction(
-    listener: (action: ProjectDialogAction) => void,
-  ): Promise<() => void>;
   present(state: ProjectDialogState): Promise<void>;
+}
+
+export interface ProjectDialogPort {
+  acquire(
+    onAction: (action: ProjectDialogAction) => void,
+  ): ProjectDialogSession;
 }

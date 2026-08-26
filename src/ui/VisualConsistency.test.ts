@@ -31,11 +31,16 @@ const canvasScrollbarStyles = readStyles(
 const canvasPreviewStyles = readStyles("src/canvas-preview.css");
 const mediaPanelStyles = readStyles("src/components/MediaPanel.css");
 const mediaThumbnailStyles = readStyles("src/components/MediaThumbnail.css");
+const mediaPreviewCardStyles = readStyles(
+  "src/components/MediaPreviewCard.css",
+);
 const inspectorPanelStyles = readStyles("src/components/InspectorPanel.css");
 const albumInformationStyles = readStyles(
   "src/components/AlbumInformationForm.css",
 );
-const albumDesignStyles = readStyles("src/components/AlbumDesignForm.css");
+const visualDefaultPickerStyles = readStyles(
+  "src/components/VisualDefaultPicker.css",
+);
 const decorativePickerStyles = readStyles(
   "src/components/DecorativeMediaPicker.css",
 );
@@ -59,7 +64,8 @@ const sharedVisualPreviewSources = [
   "src/ui/visualPreview/PersonalizationPreview.tsx",
   "src/ui/visualPreview/PersonalizationScopeSurface.tsx",
   "src/ui/visualPreview/ProportionalPreviewViewport.tsx",
-  "src/ui/visualPreview/PersonalizationPreview.css",
+  "src/ui/visualPreview/PersonalizationScopeSurface.css",
+  "src/ui/visualPreview/VisualPreviewSheet.css",
   "src/ui/visualPreview/ProportionalPreviewViewport.css",
 ].map((path) => ({ path, source: readStyles(path) }));
 const exportStyles = readStyles("src/components/ExportPreviewControl.css");
@@ -89,7 +95,8 @@ test("centralizes the shared type scale used by every application surface", () =
   expect(applicationStyles.map(({ path }) => path)).toEqual(
     expect.arrayContaining([
       "src/components/DecorativeMediaPicker.css",
-      "src/ui/visualPreview/PersonalizationPreview.css",
+      "src/ui/visualPreview/PersonalizationScopeSurface.css",
+      "src/ui/visualPreview/VisualPreviewSheet.css",
       "src/ui/visualPreview/ProportionalPreviewViewport.css",
     ]),
   );
@@ -164,23 +171,26 @@ test("keeps media hover and selection on the straight image border", () => {
   expect(mediaThumbnailStyles).toMatch(
     /\.media-preview-thumbnail\s*\{[^}]*border:\s*3px solid #fff;[^}]*border-radius:\s*0;/s,
   );
-  expect(mediaThumbnailStyles).toMatch(
+  expect(mediaPreviewCardStyles).toMatch(
     /\.media-preview-card:hover \.media-preview-thumbnail\s*\{\s*border-color:\s*var\(--ui-border-strong\);\s*\}/,
   );
-  expect(mediaThumbnailStyles).toMatch(
+  expect(mediaPreviewCardStyles).toMatch(
     /\.media-preview-card\[data-selected="true"\] \.media-preview-thumbnail\s*\{\s*border-color:\s*var\(--ui-accent\);\s*\}/,
   );
   expect(mediaThumbnailStyles).toMatch(
     /\.media-preview-thumbnail img\s*\{[^}]*object-fit:\s*contain;/s,
   );
   expect(mediaPanelStyles).toContain("user-select: none;");
-  expect(mediaThumbnailStyles).not.toMatch(
+  expect(mediaPreviewCardStyles).not.toMatch(
     /\.media-preview-card:hover \.media-preview-thumbnail\s*\{[^}]*box-shadow/s,
   );
-  expect(mediaThumbnailStyles).toMatch(
+  expect(mediaPreviewCardStyles).toMatch(
+    /\.media-preview-card\[data-dimmed="true"\] \.media-preview-thumbnail img\s*\{[^}]*opacity:\s*0\.45;/s,
+  );
+  expect(mediaPreviewCardStyles).toMatch(
     /\.media-preview-card:focus-visible \.media-preview-thumbnail\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);/s,
   );
-  expect(mediaThumbnailStyles).not.toMatch(
+  expect(mediaPreviewCardStyles).not.toMatch(
     /\.media-preview-card:focus(?:-visible)? \.media-preview-thumbnail\s*\{[^}]*border-color:/s,
   );
 });
@@ -255,10 +265,10 @@ test("keeps the shared visual preview neutral from New Project chrome", () => {
 });
 
 test("keeps compact visual-default focus independent from selection", () => {
-  expect(albumDesignStyles).toMatch(
-    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile,[\s\S]*outline:\s*1px solid var\(--ui-focus-neutral\);[\s\S]*outline-offset:\s*2px;/,
+  expect(visualDefaultPickerStyles).toMatch(
+    /\.visual-default-picker__option:focus-visible \.visual-default-picker__tile\s*\{[^}]*outline:\s*1px solid var\(--ui-focus-neutral\);[^}]*outline-offset:\s*2px;/s,
   );
-  expect(albumDesignStyles).toMatch(
+  expect(visualDefaultPickerStyles).toMatch(
     /\.visual-default-picker__option\[data-selected="true"\][\s\S]*border-color:\s*var\(--ui-accent\);/,
   );
 });
@@ -268,7 +278,7 @@ test("keeps physical Sheet previews straight in every surface", () => {
     /\.sheet-preview\s*\{[^}]*border-radius:\s*0;/s,
   );
   expect(
-    readStyles("src/ui/visualPreview/PersonalizationPreview.css"),
+    readStyles("src/ui/visualPreview/VisualPreviewSheet.css"),
   ).toMatch(/\.visual-preview-sheet\s*\{[^}]*border-radius:\s*0;/s);
 });
 
@@ -327,10 +337,13 @@ test("uses the focused Sheet instead of the Canvas perimeter as the keyboard foc
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*none;/s,
   );
   expect(canvasScrollbarStyles).toMatch(
-    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-border\);/s,
+    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-canvas-scrollbar-track\);/s,
   );
   expect(canvasScrollbarStyles).toMatch(
     /\.canvas-horizontal-scrollbar:focus-visible\s*\{[^}]*background:\s*var\(--ui-scrollbar-track\);/s,
+  );
+  expect(canvasScrollbarStyles).toMatch(
+    /\.canvas-horizontal-scrollbar:focus-visible::-webkit-scrollbar-thumb\s*\{[^}]*border-width:\s*2px;[^}]*border-color:\s*var\(--ui-focus-neutral\);/s,
   );
   expect(canvasStyles).not.toMatch(
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-accent\);/s,

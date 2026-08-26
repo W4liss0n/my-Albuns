@@ -6,8 +6,9 @@ import type {
   VisualPreviewGeometry,
 } from "./types";
 import { PersonalizationPreview } from "./PersonalizationPreview";
+import "./PersonalizationScopeSurface.css";
 
-export interface PersonalizationScopeSurfacePresentation {
+interface PersonalizationScopeSurfacePresentation {
   accessiblePreviewLabel: string;
   externalSelection: boolean;
   scopeControlsLabel: string;

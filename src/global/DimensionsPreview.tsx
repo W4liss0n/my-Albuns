@@ -2,7 +2,7 @@ import type {
   NewProjectDimensionsDraft,
 } from "./application/newProjectDimensions";
 import { SheetGuideLayer } from "../ui/visualPreview";
-import "../ui/visualPreview/PersonalizationPreview.css";
+import "../ui/visualPreview/VisualPreviewSheet.css";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 
 interface DimensionsPreviewProps {
@@ -20,7 +20,7 @@ export function DimensionsPreview({ draft }: DimensionsPreviewProps) {
         return (
           <svg
             aria-label="Prévia das Dimensões"
-            className="visual-preview-sheet new-project-dimensions-sheet"
+            className="visual-preview-sheet"
             height={heightUm}
             preserveAspectRatio="xMidYMid meet"
             role="img"

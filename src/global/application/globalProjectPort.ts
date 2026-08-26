@@ -54,17 +54,13 @@ export type InitialOverlayContent =
   | { kind: "image"; selectionId: string }
   | null;
 
-export type InitialScopedContent<T> =
-  | { scope: "bothSides"; both: T }
-  | { scope: "perSide"; left: T; right: T };
-
 export type InitialFrameBorder =
   | { kind: "none" }
   | { kind: "solid"; rgb: string; widthUm: number };
 
 export interface InitialVisualDefaults {
-  background: InitialScopedContent<InitialBackgroundContent>;
-  overlay: InitialScopedContent<InitialOverlayContent>;
+  background: ScopedValue<InitialBackgroundContent>;
+  overlay: ScopedValue<InitialOverlayContent>;
   frameBorder: InitialFrameBorder;
 }
 
@@ -129,3 +125,4 @@ export interface NewProjectPort {
   chooseProvisionalDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
   releaseProvisionalDecorative(selectionId: string): Promise<void>;
 }
+import type { ScopedValue } from "../../application/scopedValues";

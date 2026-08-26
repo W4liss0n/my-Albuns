@@ -38,8 +38,9 @@ export const tauriProjectDialogClient: ProjectDialogClient = {
       throw error;
     }
   },
-  submit: (action) =>
+  submit: (sessionId, action) =>
     invoke<void>("submit_project_dialog_action", {
       action: toIpcProjectDialogAction(action),
+      sessionId,
     }),
 };

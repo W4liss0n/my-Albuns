@@ -323,10 +323,6 @@
   grid-column: 1;
 }
 
-.media-card[data-used="true"] .media-thumb img {
-  opacity: 0.45;
-}
-
 .media-availability {
   position: absolute;
   z-index: 2;

@@ -44,9 +44,10 @@ const exportPort: ExportPort = {
 };
 
 const projectDialogPort: ProjectDialogPort = {
-  dismiss: async () => undefined,
-  onAction: async () => () => undefined,
-  present: async () => undefined,
+  acquire: () => ({
+    dismiss: async () => undefined,
+    present: async () => undefined,
+  }),
 };
 
 const projectWindowPort: ProjectWindowPort = {
@@ -62,6 +63,10 @@ test("derives Album, Sheet and Frame Inspector contexts from the editing state",
       projectDialogPort={projectDialogPort}
       projectWindowPort={projectWindowPort}
       projection={representativeProjection}
+      mediaPreviews={{}}
+      onGraphicsUnavailable={() => undefined}
+      onMediaDemandChange={() => undefined}
+      onPreferencesReady={() => undefined}
       workspacePreferences={{ kind: "memory" }}
       runProjectMutation={{
         run: async () => ({ status: "obsolete" }),

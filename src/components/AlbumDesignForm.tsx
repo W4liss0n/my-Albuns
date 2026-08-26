@@ -12,7 +12,10 @@ import {
   createFrameBorderEditorState,
 } from "../application/frameBorderEditor";
 import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
-import { readScopedValue } from "../application/scopedValues";
+import {
+  mapScopedValue,
+  readScopedValue,
+} from "../application/scopedValues";
 import {
   createAlbumDesignProjectDraft,
   type AlbumDesignProjectDraft,
@@ -40,6 +43,7 @@ import {
 import { DecorativeMediaPicker } from "./DecorativeMediaPicker";
 import { useSemanticBaseline } from "./useSemanticBaseline";
 import "./AlbumDesignForm.css";
+import "./VisualDefaultPicker.css";
 
 const DEFAULT_FRAME_BORDER = { rgb: "#2C2924", widthUm: 1_000 };
 
@@ -51,8 +55,16 @@ interface AlbumDesignFormProps {
   mediaPreviewUrls: Readonly<Record<string, string>>;
   revision: number;
   value: ProjectedVisualDefaults;
-  onApply(draft: AlbumDesignProjectDraft): void | Promise<unknown>;
+  onApply(draft: AlbumDesignProjectDraft): Promise<boolean>;
   onReadyChange(ready: boolean): void;
+}
+
+interface AlbumDesignDraftSession {
+  current: AlbumDesignProjectDraft;
+  pending: {
+    submitted: AlbumDesignProjectDraft;
+    subsequent: AlbumDesignProjectDraft;
+  } | null;
 }
 
 export function AlbumDesignForm({
@@ -71,9 +83,16 @@ export function AlbumDesignForm({
     { revision, value },
     baselineSignature,
   );
-  const [projectDraft, setProjectDraft] = useState(() =>
-    createAlbumDesignProjectDraft(baseline.revision, baseline.value),
+  const [draftSession, setDraftSession] = useState<AlbumDesignDraftSession>(
+    () => ({
+      current: createAlbumDesignProjectDraft(
+        baseline.revision,
+        baseline.value,
+      ),
+      pending: null,
+    }),
   );
+  const projectDraft = draftSession.current;
   const draft = projectDraft.value;
   const [scope, setScope] = useState<AlbumDesignScope>("both");
   const [borderEditor, setBorderEditor] = useState(() =>
@@ -115,18 +134,38 @@ export function AlbumDesignForm({
   };
 
   useEffect(() => {
-    setProjectDraft(
-      createAlbumDesignProjectDraft(baseline.revision, baseline.value),
-    );
-    setBorderEditor((current) =>
-      baseline.value.frameBorder.kind === "solid"
-        ? {
-            rgb: baseline.value.frameBorder.rgb,
-            widthUm: baseline.value.frameBorder.widthUm,
-          }
-        : current,
-    );
+    setDraftSession((session) => {
+      const { pending } = session;
+      if (
+        !pending ||
+        pending.submitted.rebase(baseline.revision, baseline.value).changed
+      ) {
+        return {
+          ...session,
+          current: session.current.rebase(
+            baseline.revision,
+            baseline.value,
+          ),
+        };
+      }
+      return {
+        current: pending.subsequent.rebase(
+          baseline.revision,
+          baseline.value,
+        ),
+        pending: null,
+      };
+    });
   }, [baseline]);
+
+  useEffect(() => {
+    if (draft.frameBorder.kind === "solid") {
+      setBorderEditor({
+        rgb: draft.frameBorder.rgb,
+        widthUm: draft.frameBorder.widthUm,
+      });
+    }
+  }, [draft.frameBorder]);
 
   useLayoutEffect(() => onReadyChange(ready), [onReadyChange, ready]);
 
@@ -138,22 +177,40 @@ export function AlbumDesignForm({
   );
 
   function chooseBackground(content: ProjectedBackgroundContent) {
-    setProjectDraft((current) =>
-      current.transition(setAlbumBackground(current.value, scope, content)),
+    transitionProjectDraft((current) =>
+      setAlbumBackground(current, scope, content),
     );
   }
 
   function chooseOverlay(content: ProjectedOverlayContent | null) {
-    setProjectDraft((current) =>
-      current.transition(setAlbumOverlay(current.value, scope, content)),
+    transitionProjectDraft((current) =>
+      setAlbumOverlay(current, scope, content),
     );
   }
 
   function updateBorder(next: ReturnType<typeof createFrameBorderEditorState>) {
     setBorderEditor(next.solid);
-    setProjectDraft((current) =>
-      current.transition(setAlbumFrameBorder(current.value, next.border)),
+    transitionProjectDraft((current) =>
+      setAlbumFrameBorder(current, next.border),
     );
+  }
+
+  function transitionProjectDraft(
+    transition: (current: ProjectedVisualDefaults) => ProjectedVisualDefaults,
+  ) {
+    setDraftSession((session) => ({
+      current: session.current.transition(
+        transition(session.current.value),
+      ),
+      pending: session.pending
+        ? {
+            ...session.pending,
+            subsequent: session.pending.subsequent.transition(
+              transition(session.pending.subsequent.value),
+            ),
+          }
+        : null,
+    }));
   }
 
   /**
@@ -171,10 +228,29 @@ export function AlbumDesignForm({
 
   async function submit() {
     if (!ready) return;
+    const submitted = projectDraft;
+    setDraftSession((session) => ({
+      ...session,
+      pending: {
+        submitted,
+        subsequent: createAlbumDesignProjectDraft(
+          submitted.baselineRevision,
+          submitted.value,
+        ),
+      },
+    }));
     setApplying(true);
+    let completed = false;
     try {
-      await onApply(projectDraft);
+      completed = await onApply(submitted);
     } finally {
+      if (!completed) {
+        setDraftSession((session) =>
+          session.pending?.submitted === submitted
+            ? { current: session.current, pending: null }
+            : session,
+        );
+      }
       setApplying(false);
     }
   }
@@ -412,28 +488,8 @@ function albumDesignPreviewDraft(
 
   return {
     fixedScope: scope,
-    background:
-      defaults.background.scope === "bothSides"
-        ? {
-            scope: "bothSides",
-            both: backgroundContent(defaults.background.both),
-          }
-        : {
-            scope: "perSide",
-            left: backgroundContent(defaults.background.left),
-            right: backgroundContent(defaults.background.right),
-          },
-    overlay:
-      defaults.overlay.scope === "bothSides"
-        ? {
-            scope: "bothSides",
-            both: overlayContent(defaults.overlay.both),
-          }
-        : {
-            scope: "perSide",
-            left: overlayContent(defaults.overlay.left),
-            right: overlayContent(defaults.overlay.right),
-          },
+    background: mapScopedValue(defaults.background, backgroundContent),
+    overlay: mapScopedValue(defaults.overlay, overlayContent),
     frameBorder: defaults.frameBorder,
   };
 }

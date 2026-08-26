@@ -105,6 +105,25 @@ describe("semantic color contracts", () => {
     }
   });
 
+  test("keeps the Canvas scrollbar indicator lighter with a perceivable edge", () => {
+    const track = themeColor("ui-canvas-scrollbar-track");
+    const thumb = themeColor("ui-canvas-scrollbar-thumb");
+    const thumbHover = themeColor("ui-canvas-scrollbar-thumb-hover");
+    const thumbBorder = themeColor("ui-canvas-scrollbar-thumb-border");
+
+    expect(track).toBe(themeColor("ui-border"));
+    expect(relativeLuminance(thumb), "Canvas scrollbar thumb luminance")
+      .toBeGreaterThan(relativeLuminance(track));
+    expect(
+      relativeLuminance(thumbHover),
+      "Canvas scrollbar hover/focus thumb luminance",
+    ).toBeGreaterThan(relativeLuminance(track));
+    expect(
+      contrastRatio(thumbBorder, track),
+      "Canvas scrollbar thumb edge on its track",
+    ).toBeGreaterThanOrEqual(3);
+  });
+
   test("does not fade readable text inside active controls", () => {
     expect(mediaPanelStyles).toMatch(
       /\.media-folder-chip small\s*\{[^}]*opacity:\s*1;/s,

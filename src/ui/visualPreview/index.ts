@@ -1,7 +1,5 @@
-export { PersonalizationPreview } from "./PersonalizationPreview";
 export {
   PersonalizationScopeSurface,
-  type PersonalizationScopeSurfacePresentation,
 } from "./PersonalizationScopeSurface";
 export {
   ProportionalPreviewViewport,

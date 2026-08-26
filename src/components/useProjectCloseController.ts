@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ProjectDialogAction,
   ProjectDialogPort,
+  ProjectDialogSession,
 } from "../application/projectDialogPort";
 import {
   ProjectCloseError,
@@ -51,6 +52,7 @@ export function useProjectCloseController({
 }: ProjectCloseControllerOptions) {
   const [phase, setPhase] = useState<ClosePhase>("idle");
   const phaseRef = useRef<ClosePhase>("idle");
+  const dialogSessionRef = useRef<ProjectDialogSession | null>(null);
   const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
@@ -60,15 +62,50 @@ export function useProjectCloseController({
     setPhase(nextPhase);
   }, []);
 
+  const dismissDialog = useCallback(() => {
+    const session = dialogSessionRef.current;
+    dialogSessionRef.current = null;
+    void session?.dismiss().catch(() => undefined);
+  }, []);
+
   const presentConfirmation = useCallback(() => {
     transition("deciding");
-    void projectDialogPort
+    const session = projectDialogPort.acquire(
+      (action) => dialogActionListener.current(action),
+    );
+    dialogSessionRef.current = session;
+    void session
       .present({ busy: false, kind: "projectCloseConfirmation" })
-      .catch((error: unknown) => {
-        if (phaseRef.current === "deciding") transition("idle");
-        onError(closeErrorMessage(error));
+      .catch(async (error: unknown) => {
+        if (
+          dialogSessionRef.current !== session ||
+          phaseRef.current !== "deciding"
+        ) {
+          return;
+        }
+        dialogSessionRef.current = null;
+        await session.dismiss().catch(() => undefined);
+        try {
+          const resolution = await projectWindowPort.resolveClose("cancel");
+          if (resolution.kind === "cancelled") {
+            onProjectionChange(resolution.projection);
+            transition("idle");
+          } else {
+            transition("terminal");
+          }
+          onError(closeErrorMessage(error));
+        } catch (releaseError: unknown) {
+          transition("terminal");
+          onError(closeErrorMessage(releaseError));
+        }
       });
-  }, [onError, projectDialogPort, transition]);
+  }, [
+    onError,
+    onProjectionChange,
+    projectDialogPort,
+    projectWindowPort,
+    transition,
+  ]);
 
   const requestClose = useCallback(async () => {
     if (phaseRef.current !== "idle") return;
@@ -105,10 +142,19 @@ export function useProjectCloseController({
     async (choice: ProjectCloseChoice) => {
       if (phaseRef.current !== "deciding") return;
       transition("resolving");
+      let dialogProjection = Promise.resolve();
       if (choice !== "cancel") {
-        void projectDialogPort
-          .present({ busy: true, kind: "projectCloseConfirmation" })
-          .catch((error: unknown) => onError(closeErrorMessage(error)));
+        const session = dialogSessionRef.current;
+        dialogProjection =
+          session
+            ?.present({ busy: true, kind: "projectCloseConfirmation" })
+            .catch((error: unknown) => {
+              if (dialogSessionRef.current === session) {
+                dialogSessionRef.current = null;
+                void session.dismiss().catch(() => undefined);
+              }
+              onError(closeErrorMessage(error));
+            }) ?? Promise.resolve();
       }
 
       try {
@@ -116,24 +162,38 @@ export function useProjectCloseController({
         if (resolution.kind === "cancelled") {
           onProjectionChange(resolution.projection);
           transition("idle");
-          void projectDialogPort.dismiss().catch(() => undefined);
+          dismissDialog();
           return;
         }
         transition("terminal");
       } catch (error: unknown) {
+        await dialogProjection;
         const message = closeErrorMessage(error);
         const indeterminate =
           error instanceof ProjectCloseError &&
           error.code === "save_state_indeterminate";
         transition(indeterminate ? "terminal" : "failed");
-        void projectDialogPort
+        const session =
+          dialogSessionRef.current ??
+          projectDialogPort.acquire(
+            (action) => dialogActionListener.current(action),
+          );
+        dialogSessionRef.current = session;
+        void session
           .present({ kind: "projectCloseFailure", message })
-          .catch(() => onError(message));
+          .catch(() => {
+            if (dialogSessionRef.current === session) dismissDialog();
+            if (!indeterminate && phaseRef.current === "failed") {
+              transition("idle");
+            }
+            onError(message);
+          });
       }
     },
     [
       onError,
       onProjectionChange,
+      dismissDialog,
       projectDialogPort,
       projectWindowPort,
       transition,
@@ -152,31 +212,13 @@ export function useProjectCloseController({
         void resolveClose("saveAndClose");
         break;
       case "dismissProjectCloseFailure":
-        void projectDialogPort.dismiss().catch(() => undefined);
+        dismissDialog();
         if (phaseRef.current === "failed") transition("idle");
         break;
       default:
         break;
     }
   };
-
-  useEffect(() => {
-    let active = true;
-    let unsubscribe: (() => void) | undefined;
-    void projectDialogPort
-      .onAction((action) => dialogActionListener.current(action))
-      .then((registeredUnsubscribe) => {
-        if (active) unsubscribe = registeredUnsubscribe;
-        else registeredUnsubscribe();
-      })
-      .catch((error: unknown) => {
-        if (active) onError(closeErrorMessage(error));
-      });
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [onError, projectDialogPort]);
 
   useEffect(() => {
     let active = true;
@@ -232,6 +274,15 @@ export function useProjectCloseController({
     transition,
     waitForPendingMutations,
   ]);
+
+  useEffect(
+    () => () => {
+      const session = dialogSessionRef.current;
+      dialogSessionRef.current = null;
+      void session?.dismiss().catch(() => undefined);
+    },
+    [],
+  );
 
   return {
     interactionBlocked: phase !== "idle",

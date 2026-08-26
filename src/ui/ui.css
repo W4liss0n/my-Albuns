@@ -443,16 +443,6 @@ kbd {
   background: transparent;
 }
 
-.ui-action-button--danger {
-  border-color: var(--ui-danger-border);
-  color: var(--ui-danger);
-  background: var(--ui-danger-soft);
-}
-
-.ui-action-button--danger:focus-visible:not(:disabled) {
-  box-shadow: inset 0 0 0 1px var(--ui-danger);
-}
-
 .ui-action-button:disabled {
   cursor: default;
   opacity: 0.52;
@@ -580,25 +570,8 @@ kbd {
   padding: 18px;
 }
 
-.ui-dialog-window__footer .ui-action-button--primary,
-.ui-dialog-window__footer .ui-action-button--danger {
+.ui-dialog-window__footer .ui-action-button--primary {
   padding-inline: 18px;
-}
-
-.ui-dialog-window__footer .ui-action-button--danger {
-  border-color: var(--ui-danger);
-  color: #fff;
-  background: var(--ui-danger);
-}
-
-.ui-dialog-window__footer .ui-action-button--danger:hover:not(:disabled) {
-  border-color: var(--ui-danger-hover);
-  background: var(--ui-danger-hover);
-}
-
-.ui-dialog-window__footer
-  .ui-action-button--danger:focus-visible:not(:disabled) {
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 82%);
 }
 
 .ui-dialog-action-spacer,

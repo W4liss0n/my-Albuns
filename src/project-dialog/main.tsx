@@ -6,7 +6,10 @@ import type {
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
-import { parseInitialProjectDialogState } from "../platform/projectDialogContract";
+import {
+  parseInitialProjectDialogSessionId,
+  parseInitialProjectDialogState,
+} from "../platform/projectDialogContract";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
 import {
   MessageDialog,
@@ -23,9 +26,11 @@ import "../ui/ui.css";
 
 function ProjectDialogApplication({
   client,
+  sessionId,
   initialState,
 }: {
   client: ProjectDialogClient;
+  sessionId: string | null;
   initialState: ProjectDialogState | null;
 }) {
   const [state, setState] = useState(initialState);
@@ -52,13 +57,17 @@ function ProjectDialogApplication({
     () => ({
       ...tauriWindowControls,
       close: closeAction
-        ? () => client.submit(closeAction)
+        ? () =>
+            sessionId
+              ? client.submit(sessionId, closeAction)
+              : tauriWindowControls.close()
         : tauriWindowControls.close,
     }),
-    [client, closeAction],
+    [client, closeAction, sessionId],
   );
   const submit = (action: ProjectDialogAction) => {
-    void client.submit(action).catch(() => undefined);
+    if (!sessionId) return;
+    void client.submit(sessionId, action).catch(() => undefined);
   };
 
   return (
@@ -89,6 +98,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <ProjectDialogApplication
       client={tauriProjectDialogClient}
       initialState={parseInitialProjectDialogState(window.location.search)}
+      sessionId={parseInitialProjectDialogSessionId(window.location.search)}
     />
   </React.StrictMode>,
 );

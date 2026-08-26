@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState, type ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
@@ -68,7 +68,7 @@ test("preserves an unapplied draft across a semantically equivalent projection",
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });
 
-test("resets the draft when the authoritative Album design really changes", async () => {
+test("rebases an unapplied draft over an authoritative Album design change", async () => {
   const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>();
   const baseline = representativeProjection.state.album.visualDefaults;
   const changed: ProjectedVisualDefaults = {
@@ -89,7 +89,49 @@ test("resets the draft when the authoritative Album design really changes", asyn
   view.rerender(<Harness onApply={onApply} value={changed} />);
 
   await waitFor(() =>
-    expect(screen.getByLabelText("Cor do Background")).toHaveValue("#112233"),
+    expect(screen.getByLabelText("Cor do Background")).toHaveValue("#f7f5f0"),
   );
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
+});
+
+test("preserves edits made after submit while the applied projection arrives", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumDesignForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const baseline = representativeProjection.state.album.visualDefaults;
+  const applied: ProjectedVisualDefaults = {
+    ...cloneVisualDefaults(baseline),
+    background: {
+      scope: "bothSides",
+      both: { kind: "color", rgb: "#F7F5F0" },
+    },
+  };
+  const view = render(<Harness onApply={onApply} value={baseline} />);
+
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#f7f5f0" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
   expect(screen.getByRole("button", { name: "Aplicar" })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText("Cor do Background"), {
+    target: { value: "#ffffff" },
+  });
+  view.rerender(<Harness onApply={onApply} value={applied} />);
+
+  await waitFor(() =>
+    expect(screen.getByLabelText("Cor do Background")).toHaveValue("#ffffff"),
+  );
+  await act(async () => {
+    finishApply(true);
+    await pendingApply;
+  });
+  expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled();
 });

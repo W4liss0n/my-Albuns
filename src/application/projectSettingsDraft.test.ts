@@ -98,6 +98,7 @@ test("owns Album Information baseline, revision, equality, transition and execut
   const materialized = transitioned.materializeAgainst(latestProjection);
   expect(materialized).toEqual({
     baselineRevision: 26,
+    changed: true,
     baseline: {
       ...baselineInformation,
       bleedUm: 5_000,
@@ -192,4 +193,80 @@ test("replays only the changed Album Design side over the latest scoped values",
       frameBorder: latestProjection.state.album.visualDefaults.frameBorder,
     },
   });
+});
+
+test("preserves the selected side scope without replacing the opposite side changed by History", () => {
+  const candidate: ProjectedVisualDefaults = {
+    ...baselineVisualDefaults,
+    overlay: { scope: "perSide", left: null, right: null },
+  };
+  const draft = createAlbumDesignProjectDraft(
+    representativeProjection.state.revision,
+    baselineVisualDefaults,
+  ).transition(candidate);
+  const latestProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      album: {
+        ...representativeProjection.state.album,
+        visualDefaults: {
+          ...baselineVisualDefaults,
+          overlay: {
+            scope: "perSide",
+            left: null,
+            right: { kind: "media", mediaId: "history-overlay" },
+          },
+        },
+      },
+    },
+  };
+
+  expect(draft.materialize(latestProjection)).toEqual({
+    kind: "setVisualDefaults",
+    visualDefaults: {
+      ...baselineVisualDefaults,
+      overlay: {
+        scope: "perSide",
+        left: null,
+        right: { kind: "media", mediaId: "history-overlay" },
+      },
+    },
+  });
+});
+
+test("recognizes when History has already materialized the Album Design intent", () => {
+  const target: ProjectedVisualDefaults = {
+    ...baselineVisualDefaults,
+    background: {
+      scope: "bothSides",
+      both: { kind: "color", rgb: "#F7F5F0" },
+    },
+  };
+  const draft = createAlbumDesignProjectDraft(
+    representativeProjection.state.revision,
+    baselineVisualDefaults,
+  ).transition(target);
+  const alreadyMaterialized: ProjectedVisualDefaults = {
+    ...target,
+    overlay: {
+      scope: "bothSides",
+      both: { kind: "media", mediaId: "history-overlay" },
+    },
+  };
+  const latestProjection: EditorProjection = {
+    ...representativeProjection,
+    state: {
+      ...representativeProjection.state,
+      revision: representativeProjection.state.revision + 1,
+      canRedo: true,
+      album: {
+        ...representativeProjection.state.album,
+        visualDefaults: alreadyMaterialized,
+      },
+    },
+  };
+
+  expect(draft.materializeAgainst(latestProjection).changed).toBe(false);
 });

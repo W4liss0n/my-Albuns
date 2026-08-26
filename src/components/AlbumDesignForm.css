@@ -32,29 +32,6 @@
   gap: var(--ui-space-2);
 }
 
-.visual-default-picker__option {
-  position: relative;
-  display: grid;
-  width: 26px;
-  min-width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  flex: none;
-  place-items: center;
-  color: var(--ui-text-muted);
-  background: transparent;
-}
-
-.visual-default-picker__tile {
-  display: block;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 5px;
-  background: var(--ui-surface-raised);
-}
-
 .visual-default-label {
   flex: none;
   width: 62px;
@@ -69,16 +46,6 @@
   background: var(--ui-border);
 }
 
-.visual-default-picker__tile--add {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-color: var(--ui-text-muted);
-  border-style: dashed;
-  color: var(--ui-text-muted);
-  background: transparent;
-}
-
 .visual-default-picker__preview--none {
   background: linear-gradient(
     135deg,
@@ -88,32 +55,10 @@
   );
 }
 
-.visual-default-picker__option:hover,
-.visual-default-picker__option:focus-visible {
-  color: var(--ui-text);
-}
-
-.visual-default-picker__option:hover .visual-default-picker__tile,
-.visual-default-picker__color:hover .visual-default-picker__tile {
-  border-color: var(--ui-text-muted);
-}
-
-.visual-default-picker__option:focus-visible {
-  outline: 0;
-}
-
-.visual-default-picker__option:focus-visible .visual-default-picker__tile,
 .visual-default-picker__color:has(input:focus-visible)
   .visual-default-picker__tile {
   outline: 1px solid var(--ui-focus-neutral);
   outline-offset: 2px;
-}
-
-.visual-default-picker__option[aria-pressed="true"]
-  .visual-default-picker__tile,
-.visual-default-picker__option[data-selected="true"]
-  .visual-default-picker__tile {
-  border-color: var(--ui-accent);
 }
 
 .visual-default-picker__color {

@@ -7,5 +7,5 @@ export interface ProjectDialogClient {
   onState(
     listener: (state: ProjectDialogState) => void,
   ): Promise<() => void>;
-  submit(action: ProjectDialogAction): Promise<void>;
+  submit(sessionId: string, action: ProjectDialogAction): Promise<void>;
 }

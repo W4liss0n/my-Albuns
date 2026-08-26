@@ -22,10 +22,10 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     >
       <MediaPanel
         mediaItems={mediaItems}
-        mediaPreviews={mediaPreviews}
         mediaUsage={mediaUsage}
         onFillPhoto={() => undefined}
         preferences={{ kind: "local" }}
+        previewSource={{ kind: "static", previews: mediaPreviews }}
       />
     </main>
   </React.StrictMode>,

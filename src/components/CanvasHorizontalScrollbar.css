@@ -1,5 +1,7 @@
 .canvas-horizontal-scrollbar {
-  --ui-scrollbar-track: var(--ui-border);
+  --ui-scrollbar-track: var(--ui-canvas-scrollbar-track);
+  --ui-scrollbar-thumb: var(--ui-canvas-scrollbar-thumb);
+  --ui-scrollbar-thumb-hover: var(--ui-canvas-scrollbar-thumb-hover);
 
   min-width: 0;
   height: 11px;
@@ -11,14 +13,21 @@
   overscroll-behavior-x: none;
 }
 
+.canvas-horizontal-scrollbar::-webkit-scrollbar-thumb {
+  border: 1px solid var(--ui-canvas-scrollbar-thumb-border);
+  background-clip: padding-box;
+}
+
 .canvas-horizontal-scrollbar:focus-visible {
   outline: none;
   background: var(--ui-scrollbar-track);
 }
 
 .canvas-horizontal-scrollbar:focus-visible::-webkit-scrollbar-thumb {
+  border-width: 2px;
+  border-color: var(--ui-focus-neutral);
   background: var(--ui-scrollbar-thumb-hover);
-  background-clip: content-box;
+  background-clip: padding-box;
 }
 
 .canvas-horizontal-scrollbar__content {

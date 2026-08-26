@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import { draftFrameBorderFillRects } from "./draftFrameBorderGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
-import "./PersonalizationPreview.css";
+import "./VisualPreviewSheet.css";
 
 interface PersonalizationPreviewProps {
   accessibleLabel: string;
@@ -63,7 +63,7 @@ export function PersonalizationPreview({
   return (
     <svg
       aria-label={accessibleLabel}
-      className="visual-preview-sheet visual-personalization-preview"
+      className="visual-preview-sheet"
       height={heightUm}
       preserveAspectRatio="xMidYMid meet"
       role="img"

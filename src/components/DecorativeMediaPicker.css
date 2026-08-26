@@ -29,33 +29,12 @@
   user-select: none;
 }
 
-.visual-default-card--import {
-  appearance: none;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  aspect-ratio: 1;
-  place-items: center;
-}
-
-.visual-default-card__thumb--import {
-  display: grid;
-  width: 100%;
-  height: auto;
-  border: 1px dashed var(--ui-text-muted);
-  border-radius: var(--ui-radius-small);
+.visual-default-picker__tile--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--ui-text-muted);
+  border-style: dashed;
   color: var(--ui-text-muted);
   background: transparent;
-  aspect-ratio: 1;
-  box-shadow: none;
-  place-items: center;
-}
-
-.visual-default-card--import:disabled .visual-default-card__thumb--import {
-  border-color: var(--ui-text-disabled);
-  color: var(--ui-text-disabled);
 }

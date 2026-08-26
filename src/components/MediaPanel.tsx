@@ -26,11 +26,11 @@ import {
 } from "../state/mediaPanelPreferences";
 import { MediaPanelEmptyState } from "./MediaPanelEmptyState";
 import { MediaPanelToolbar } from "./MediaPanelToolbar";
-import { MediaThumbnail } from "./MediaThumbnail";
+import { MediaPreviewCard } from "./MediaPreviewCard";
 import { isTextEntryTarget } from "./isTextEntryTarget";
 import "./MediaPanel.css";
 
-export type MediaPanelPreferenceMode =
+type MediaPanelPreferenceMode =
   | {
       kind: "controlled";
       persistent: Readonly<Record<MediaKind, MediaPanelPersistentPreference>>;
@@ -50,13 +50,23 @@ export type MediaPanelPreferenceMode =
       initial?: Partial<Record<MediaKind, MediaPanelViewPreferences>>;
     };
 
-export interface MediaPanelProps {
+type MediaPanelPreviewSource =
+  | {
+      kind: "connected";
+      previews: Readonly<Record<string, MediaPreview>>;
+      onDemandChange(demand: MediaPreviewDemand): void;
+    }
+  | {
+      kind: "static";
+      previews?: Readonly<Record<string, MediaPreview>>;
+    };
+
+interface MediaPanelProps {
   mediaItems: readonly MediaCatalogItem[];
   mediaUsage: readonly MediaUsage[];
-  mediaPreviews?: Readonly<Record<string, MediaPreview>>;
-  onMediaDemandChange?(demand: MediaPreviewDemand): void;
   onFillPhoto(mediaId: string): void;
   preferences: MediaPanelPreferenceMode;
+  previewSource: MediaPanelPreviewSource;
 }
 
 const naturalNameCollator = new Intl.Collator("pt-BR", {
@@ -67,11 +77,13 @@ const naturalNameCollator = new Intl.Collator("pt-BR", {
 export function MediaPanel({
   mediaItems,
   mediaUsage,
-  mediaPreviews = {},
-  onMediaDemandChange,
   onFillPhoto,
   preferences: preferenceMode,
+  previewSource,
 }: MediaPanelProps) {
+  const mediaPreviews = previewSource.previews ?? {};
+  const onMediaDemandChange =
+    previewSource.kind === "connected" ? previewSource.onDemandChange : null;
   const controlledPersistent =
     preferenceMode.kind === "controlled" ? preferenceMode.persistent : null;
   const controlledThumbnailSizes =
@@ -404,15 +416,17 @@ export function MediaPanel({
               .filter(Boolean)
               .join(". ");
             return (
-              <button
+              <MediaPreviewCard
                 aria-label={accessibleLabel}
                 aria-pressed={isSelected}
-                className="media-preview-card media-card"
-                type="button"
-                key={media.id}
                 data-media-id={media.id}
-                data-selected={String(isSelected)}
                 data-used={String(isUsed)}
+                dimmed={isUsed}
+                key={media.id}
+                kind="media"
+                media={media}
+                previewUrl={preview?.url ?? undefined}
+                selected={isSelected}
                 onClick={(event) => selectMedia(media.id, event)}
                 onContextMenu={() => selectMediaForContextMenu(media.id)}
                 onDoubleClick={
@@ -426,24 +440,18 @@ export function MediaPanel({
                     : undefined
                 }
               >
-                <MediaThumbnail
-                  className="media-thumb"
-                  media={media}
-                  previewUrl={preview?.url ?? undefined}
-                >
-                  {preview?.state === "unavailable" && (
-                    <span
-                      aria-label={availabilityLabel ?? undefined}
-                      className="media-availability"
-                      role="status"
-                    >
-                      {preview.url
-                        ? "Indisponível · prévia anterior"
-                        : "Indisponível"}
-                    </span>
-                  )}
-                </MediaThumbnail>
-              </button>
+                {preview?.state === "unavailable" && (
+                  <span
+                    aria-label={availabilityLabel ?? undefined}
+                    className="media-availability"
+                    role="status"
+                  >
+                    {preview.url
+                      ? "Indisponível · prévia anterior"
+                      : "Indisponível"}
+                  </span>
+                )}
+              </MediaPreviewCard>
             );
           })
         )}
