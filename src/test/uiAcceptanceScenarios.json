@@ -212,13 +212,30 @@
       "referencePath": "/docs/references/ui-programa-diagramacao/Criar%20projeto.dc.html",
       "comparison": { "kind": "paired", "surface": "new-project-window" },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[aria-label=\"Criar\"]",
+      "readySelector": "[aria-label=\"Criar Projeto\"]",
       "actions": [
         { "type": "click", "selector": "[aria-label=\"Novo Projeto\"]" },
         { "type": "click", "selector": "[aria-label=\"Continuar\"]" }
       ],
       "referenceActions": [
         { "type": "click-text", "text": "Continuar" }
+      ]
+    },
+    {
+      "id": "new-project-keyboard-focus",
+      "title": "Novo Projeto — foco de teclado na etapa atual",
+      "implementationPath": "/welcome-preview.html",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "new-project-keyboard-focus",
+        "implementationCaptureSelector": ".global-shell--new-project",
+        "reason": "A referência visual vigente não define o indicador de foco da etapa atual exigido pela navegação por teclado aceita posteriormente."
+      },
+      "viewport": { "width": 1280, "height": 720 },
+      "readySelector": ".new-project-steps li[aria-current=\"step\"]:focus",
+      "actions": [
+        { "type": "focus", "selector": "[aria-label=\"Novo Projeto\"]" },
+        { "type": "key", "key": "Enter" }
       ]
     },
     {
@@ -237,6 +254,22 @@
       "referenceReadySelector": "[data-l=\"2\"]",
       "actions": [],
       "referenceActions": []
+    },
+    {
+      "id": "project-workspace-album-design-decorative-unavailable",
+      "title": "Janela do Projeto — fallback de Decorativo indisponível",
+      "implementationPath": "/workspace-preview.html?decorative=unavailable",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "project-workspace-album-design-decorative-unavailable",
+        "implementationCaptureSelector": ".app-shell",
+        "reason": "A referência visual vigente antecede o estado explícito de Cache indisponível e seu fallback compartilhado com Canvas e Grade."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[aria-label=\"Overlay de ambos os lados\"][data-preview-state=\"unavailable\"]",
+      "actions": [
+        { "type": "click", "selector": "#contextual-panel button[aria-label=\"Design do Álbum\"]" }
+      ]
     },
     {
       "id": "project-workspace-sheet-context",

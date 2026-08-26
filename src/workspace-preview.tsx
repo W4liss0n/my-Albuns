@@ -28,7 +28,9 @@ import "./ui/ui.css";
 
 const previewParameters = new URLSearchParams(window.location.search);
 const frameContext = previewParameters.get("frame");
-let projection = createPreviewProjection(frameContext);
+const decorativeContext = previewParameters.get("decorative");
+const unavailableDecorativeId = "decorative-preview-unavailable";
+let projection = createPreviewProjection(frameContext, decorativeContext);
 
 const projectSessionPort: ProjectSessionPort = {
   load: async () => projection,
@@ -50,7 +52,16 @@ const projectSessionPort: ProjectSessionPort = {
 };
 
 const mediaPreviewPort: MediaPreviewPort = {
-  prepareMediaPreviews: async () => null,
+  prepareMediaPreviews: async () =>
+    decorativeContext === "unavailable"
+      ? [
+          {
+            mediaId: unavailableDecorativeId,
+            state: "unavailable",
+            url: null,
+          },
+        ]
+      : null,
   onMediaChanged: async () => () => undefined,
 };
 
@@ -139,8 +150,41 @@ if (root) {
   );
 }
 
-function createPreviewProjection(frameMode: string | null): EditorProjection {
+function createPreviewProjection(
+  frameMode: string | null,
+  decorativeMode: string | null,
+): EditorProjection {
   const preview = structuredClone(createTwoSheetProjection());
+  if (decorativeMode === "unavailable") {
+    preview.state.album.media.push({
+      id: unavailableDecorativeId,
+      kind: "decorative",
+      name: "Overlay indisponível.png",
+      sourceWidthPx: 2_400,
+      sourceHeightPx: 1_800,
+      palette: ["#17344a", "#88b7c5", "#d4a15e"],
+    });
+    preview.state.album.visualDefaults.overlay = {
+      scope: "bothSides",
+      both: { kind: "media", mediaId: unavailableDecorativeId },
+    };
+    for (const sheet of preview.composition.sheets) {
+      sheet.overlays.push({
+        mediaId: unavailableDecorativeId,
+        name: "Overlay indisponível.png",
+        drawRect: {
+          x: 0,
+          y: 0,
+          width: sheet.widthUm,
+          height: sheet.heightUm,
+        },
+      });
+    }
+    preview.mediaUsage.push({
+      mediaId: unavailableDecorativeId,
+      count: preview.composition.sheets.length,
+    });
+  }
   if (frameMode !== "photo" && frameMode !== "empty") return preview;
 
   const sheet = preview.state.album.sheets[0];
