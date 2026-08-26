@@ -131,6 +131,77 @@ test("owns Album Information baseline, revision, equality, transition and execut
   });
 });
 
+test("keeps the submitted delta through a temporarily matching History baseline", () => {
+  const submitted = createAlbumInformationProjectDraft(
+    25,
+    baselineInformation,
+  ).transition({ ...baselineInformation, dpi: 240 });
+
+  const temporarilySatisfied = submitted.rebase(26, {
+    ...baselineInformation,
+    dpi: 240,
+  });
+  expect(temporarilySatisfied.changed).toBe(false);
+  expect(temporarilySatisfied.delta).toEqual({ dpi: 240 });
+
+  const withSubsequentEdit = temporarilySatisfied.transition({
+    ...temporarilySatisfied.value,
+    safetyUm: 8_000,
+  });
+  expect(withSubsequentEdit.delta).toEqual({
+    dpi: 240,
+    safetyUm: 8_000,
+  });
+
+  const movedAgain = withSubsequentEdit.rebase(27, {
+    ...baselineInformation,
+  });
+  expect(movedAgain.changed).toBe(true);
+  expect(movedAgain.delta).toEqual({ dpi: 240, safetyUm: 8_000 });
+  expect(movedAgain.value).toEqual({
+    ...baselineInformation,
+    dpi: 240,
+    safetyUm: 8_000,
+  });
+});
+
+test("composes a later side edit without dropping a temporarily satisfied both-sides intent", () => {
+  const bothTarget: ProjectedVisualDefaults = {
+    ...baselineVisualDefaults,
+    background: {
+      scope: "bothSides",
+      both: { kind: "color", rgb: "#F7F5F0" },
+    },
+  };
+  const temporarilySatisfied = createAlbumDesignProjectDraft(
+    25,
+    baselineVisualDefaults,
+  )
+    .transition(bothTarget)
+    .rebase(26, bothTarget);
+  const withLeftEdit = temporarilySatisfied.transition({
+    ...temporarilySatisfied.value,
+    background: {
+      scope: "perSide",
+      left: { kind: "color", rgb: "#AABBCC" },
+      right: { kind: "color", rgb: "#F7F5F0" },
+    },
+  });
+  const changedAgain: ProjectedVisualDefaults = {
+    ...baselineVisualDefaults,
+    background: {
+      scope: "bothSides",
+      both: { kind: "color", rgb: "#112233" },
+    },
+  };
+
+  expect(withLeftEdit.rebase(27, changedAgain).value.background).toEqual({
+    scope: "perSide",
+    left: { kind: "color", rgb: "#AABBCC" },
+    right: { kind: "color", rgb: "#F7F5F0" },
+  });
+});
+
 test("replays only the changed Album Design side over the latest scoped values", () => {
   const baseline = representativeProjection.state.album.visualDefaults;
   const candidate: ProjectedVisualDefaults = {

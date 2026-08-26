@@ -66,13 +66,24 @@ interface AlbumInformationDraft {
   lastSheet: EndSheetFormat;
 }
 
+type AlbumInformationPending =
+  | {
+      kind: "applying";
+      attempt: AlbumInformationProjectDraft;
+      localFields: ReadonlySet<keyof AlbumInformationDraft>;
+      submitted: AlbumInformationProjectDraft;
+      submittedFields: AlbumInformationDraft;
+      settled: boolean;
+    }
+  | {
+      kind: "followUp";
+      baselineFields: AlbumInformationDraft;
+      localFields: ReadonlySet<keyof AlbumInformationDraft>;
+    };
+
 interface AlbumInformationDraftSession {
   current: AlbumInformationDraft;
-  pending: {
-    attempt: AlbumInformationProjectDraft;
-    submitted: AlbumInformationProjectDraft;
-    submittedFields: AlbumInformationDraft;
-  } | null;
+  pending: AlbumInformationPending | null;
 }
 
 type MeasurementDraftKey =
@@ -111,6 +122,9 @@ export function AlbumInformationForm({
   const [draftSession, setDraftSession] = useState<AlbumInformationDraftSession>(
     () => ({ current: baseline, pending: null }),
   );
+  const applySettled =
+    draftSession.pending?.kind === "applying" &&
+    draftSession.pending.settled;
   const draft = draftSession.current;
   const [validated, setValidated] = useState<{
     key: string;
@@ -128,7 +142,7 @@ export function AlbumInformationForm({
         baseline,
       ),
     );
-  }, [baseline, semanticBaseline.revision]);
+  }, [applySettled, baseline, semanticBaseline.revision]);
 
   const local = toCandidate(draft);
   const candidate = local.information;
@@ -228,9 +242,12 @@ export function AlbumInformationForm({
     setDraftSession((session) => ({
       ...session,
       pending: {
+        kind: "applying",
         attempt: submitted,
+        localFields: new Set(),
         submitted,
         submittedFields: session.current,
+        settled: false,
       },
     }));
     setApplying(true);
@@ -238,13 +255,18 @@ export function AlbumInformationForm({
     try {
       completed = await onApply(submitted, validated.impact);
     } finally {
-      if (!completed) {
-        setDraftSession((session) =>
-          session.pending?.attempt === submitted
-            ? { current: session.current, pending: null }
-            : session,
-        );
-      }
+      setDraftSession((session) => {
+        const pending = session.pending;
+        if (
+          pending?.kind !== "applying" ||
+          pending.attempt !== submitted
+        ) {
+          return session;
+        }
+        return completed
+          ? { ...session, pending: { ...pending, settled: true } }
+          : { current: session.current, pending: null };
+      });
       setApplying(false);
     }
   }
@@ -253,27 +275,33 @@ export function AlbumInformationForm({
     key: Key,
     value: AlbumInformationDraft[Key],
   ) {
-    setDraftSession((session) => ({
-      ...session,
-      current: { ...session.current, [key]: value },
-    }));
+    setDraftSession((session) => {
+      const current = { ...session.current, [key]: value };
+      return {
+        current,
+        pending: trackLocalField(session.pending, key, current),
+      };
+    });
   }
 
   function setMeasurement(
     key: MeasurementDraftKey,
     text: string,
   ) {
-    setDraftSession((session) => ({
-      ...session,
-      current: {
+    setDraftSession((session) => {
+      const current = {
         ...session.current,
         [key]: editPhysicalFieldDraft(
           session.current[key],
           text,
           session.current.displayUnit,
         ),
-      },
-    }));
+      };
+      return {
+        current,
+        pending: trackLocalField(session.pending, key, current),
+      };
+    });
   }
 
   function measurementChanged(key: MeasurementDraftKey) {
@@ -289,16 +317,19 @@ export function AlbumInformationForm({
   }
 
   function resetMeasurement(key: MeasurementDraftKey) {
-    setDraftSession((session) => ({
-      ...session,
-      current: {
+    setDraftSession((session) => {
+      const current = {
         ...session.current,
         [key]: createPhysicalFieldDraft(
           baseline[key].valueUm,
           session.current.displayUnit,
         ),
-      },
-    }));
+      };
+      return {
+        current,
+        pending: trackLocalField(session.pending, key, current),
+      };
+    });
   }
 
   function measurementResetAction(key: MeasurementDraftKey) {
@@ -309,19 +340,33 @@ export function AlbumInformationForm({
     setDraftSession((session) => {
       const current = session.current;
       if (unit === current.displayUnit) return session;
+      const next = {
+        ...current,
+        displayUnit: unit,
+        sheetWidth: createPhysicalFieldDraft(
+          current.sheetWidth.valueUm,
+          unit,
+        ),
+        sheetHeight: createPhysicalFieldDraft(
+          current.sheetHeight.valueUm,
+          unit,
+        ),
+        bleed: createPhysicalFieldDraft(current.bleed.valueUm, unit),
+        safety: createPhysicalFieldDraft(current.safety.valueUm, unit),
+      };
       return {
-        ...session,
-        current: {
-          ...current,
-          displayUnit: unit,
-          sheetWidth: createPhysicalFieldDraft(current.sheetWidth.valueUm, unit),
-          sheetHeight: createPhysicalFieldDraft(
-            current.sheetHeight.valueUm,
-            unit,
-          ),
-          bleed: createPhysicalFieldDraft(current.bleed.valueUm, unit),
-          safety: createPhysicalFieldDraft(current.safety.valueUm, unit),
-        },
+        current: next,
+        pending: trackLocalFields(
+          session.pending,
+          [
+            "displayUnit",
+            "sheetWidth",
+            "sheetHeight",
+            "bleed",
+            "safety",
+          ],
+          next,
+        ),
       };
     });
   }
@@ -531,6 +576,24 @@ function rebaseDraftSession(
   const pending = session.pending;
   if (!pending) return { current: baseline, pending: null };
 
+  if (pending.kind === "followUp") {
+    const current = preserveSubsequentDraft(
+      baseline,
+      session.current,
+      pending.localFields,
+    );
+    return pending.localFields.size === 0
+      ? { current: baseline, pending: null }
+      : {
+          current,
+          pending: {
+            kind: "followUp",
+            baselineFields: baseline,
+            localFields: pending.localFields,
+          },
+        };
+  }
+
   const baselineInformation = toCandidate(baseline).information;
   if (!baselineInformation) return { current: baseline, pending: null };
   const submitted = pending.submitted.rebase(
@@ -539,40 +602,131 @@ function rebaseDraftSession(
   );
   const submittedFields = createDraftFromInformation(submitted.value);
   const current = preserveSubsequentDraft(
-    submittedFields,
-    pending.submittedFields,
+    pending.settled && !submitted.changed ? baseline : submittedFields,
     session.current,
+    pending.localFields,
   );
-  if (!submitted.changed) return { current, pending: null };
+  if (pending.settled && !submitted.changed) {
+    return pending.localFields.size === 0
+      ? { current: baseline, pending: null }
+      : {
+          current,
+          pending: {
+            kind: "followUp",
+            baselineFields: baseline,
+            localFields: pending.localFields,
+          },
+        };
+  }
   return {
     current,
     pending: {
+      kind: "applying",
       attempt: pending.attempt,
+      localFields: pending.localFields,
       submitted,
       submittedFields,
+      settled: pending.settled,
     },
   };
 }
 
 function preserveSubsequentDraft(
   rebasedSubmitted: AlbumInformationDraft,
-  submitted: AlbumInformationDraft,
   current: AlbumInformationDraft,
+  localFields: ReadonlySet<keyof AlbumInformationDraft>,
 ): AlbumInformationDraft {
-  const preserved = <Key extends keyof AlbumInformationDraft>(key: Key) =>
-    JSON.stringify(current[key]) === JSON.stringify(submitted[key])
-      ? rebasedSubmitted[key]
-      : current[key];
+  const displayUnit = localFields.has("displayUnit")
+    ? current.displayUnit
+    : rebasedSubmitted.displayUnit;
+  const measurement = (key: MeasurementDraftKey) =>
+    localFields.has(key)
+      ? current[key]
+      : createPhysicalFieldDraft(rebasedSubmitted[key].valueUm, displayUnit);
   return {
-    displayUnit: preserved("displayUnit"),
-    sheetWidth: preserved("sheetWidth"),
-    sheetHeight: preserved("sheetHeight"),
-    dpi: preserved("dpi"),
-    bleed: preserved("bleed"),
-    safety: preserved("safety"),
-    firstSheet: preserved("firstSheet"),
-    lastSheet: preserved("lastSheet"),
+    displayUnit,
+    sheetWidth: measurement("sheetWidth"),
+    sheetHeight: measurement("sheetHeight"),
+    dpi: localFields.has("dpi") ? current.dpi : rebasedSubmitted.dpi,
+    bleed: measurement("bleed"),
+    safety: measurement("safety"),
+    firstSheet: localFields.has("firstSheet")
+      ? current.firstSheet
+      : rebasedSubmitted.firstSheet,
+    lastSheet: localFields.has("lastSheet")
+      ? current.lastSheet
+      : rebasedSubmitted.lastSheet,
   };
+}
+
+function trackLocalField(
+  pending: AlbumInformationPending | null,
+  key: keyof AlbumInformationDraft,
+  current: AlbumInformationDraft,
+): AlbumInformationPending | null {
+  if (!pending) return null;
+  const baseline =
+    pending.kind === "applying"
+      ? pending.submittedFields
+      : pending.baselineFields;
+  const localFields = new Set(pending.localFields);
+  if (albumInformationFieldEquals(key, current, baseline)) {
+    localFields.delete(key);
+  } else {
+    localFields.add(key);
+  }
+  return { ...pending, localFields };
+}
+
+function trackLocalFields(
+  pending: AlbumInformationPending | null,
+  keys: readonly (keyof AlbumInformationDraft)[],
+  current: AlbumInformationDraft,
+) {
+  return keys.reduce<AlbumInformationPending | null>(
+    (tracked, key) => trackLocalField(tracked, key, current),
+    pending,
+  );
+}
+
+function albumInformationFieldEquals(
+  key: keyof AlbumInformationDraft,
+  left: AlbumInformationDraft,
+  right: AlbumInformationDraft,
+) {
+  switch (key) {
+    case "sheetWidth":
+    case "sheetHeight":
+    case "bleed":
+    case "safety":
+      return physicalFieldDraftEquals(left[key], right[key]);
+    case "dpi":
+      return integerDraftEquals(left.dpi, right.dpi);
+    default:
+      return left[key] === right[key];
+  }
+}
+
+function physicalFieldDraftEquals(
+  left: PhysicalFieldDraft,
+  right: PhysicalFieldDraft,
+) {
+  if (left.hasExactValue && right.hasExactValue) {
+    return left.valueUm === right.valueUm;
+  }
+  return (
+    left.text === right.text &&
+    left.hasExactValue === right.hasExactValue &&
+    left.valueUm === right.valueUm
+  );
+}
+
+function integerDraftEquals(left: string, right: string) {
+  const leftValue = parseIntegerText(left);
+  const rightValue = parseIntegerText(right);
+  return leftValue === null || rightValue === null
+    ? left === right
+    : leftValue === rightValue;
 }
 
 function endSheetFormat(sheet: SheetSnapshot | undefined): EndSheetFormat {

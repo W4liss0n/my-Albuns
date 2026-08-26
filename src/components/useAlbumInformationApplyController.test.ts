@@ -222,6 +222,36 @@ test("resolves false when confirmation presentation or the commit fails", async 
   expect(result.current.active).toBe(false);
 });
 
+test("aborts before committing when the owned busy projection fails", async () => {
+  const busyFailure = new Error("Falha ao bloquear a confirmação.");
+  const dialog = dialogHarness();
+  dialog.present
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(busyFailure);
+  const onApply = vi.fn(async () => ({ kind: "completed" as const }));
+  const onError = vi.fn();
+  const { result } = renderHook(() =>
+    useAlbumInformationApplyController({
+      projectDialogPort: dialog.port,
+      onApply,
+      onError,
+    }),
+  );
+
+  let completion!: Promise<boolean>;
+  await act(async () => {
+    completion = result.current.requestApply(changedDraft, impact);
+    await Promise.resolve();
+    dialog.emit("confirmAlbumInformation");
+    await expect(completion).resolves.toBe(false);
+  });
+
+  expect(onApply).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledWith(busyFailure.message);
+  expect(dialog.dismiss).toHaveBeenCalledOnce();
+  expect(result.current.active).toBe(false);
+});
+
 test("settles an outstanding Apply completion when its controller unmounts", async () => {
   const dialog = dialogHarness();
   const { result, unmount } = renderHook(() =>

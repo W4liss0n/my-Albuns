@@ -62,8 +62,10 @@ interface AlbumDesignFormProps {
 interface AlbumDesignDraftSession {
   current: AlbumDesignProjectDraft;
   pending: {
+    attempt: AlbumDesignProjectDraft;
     submitted: AlbumDesignProjectDraft;
     subsequent: AlbumDesignProjectDraft;
+    settled: boolean;
   } | null;
 }
 
@@ -93,6 +95,7 @@ export function AlbumDesignForm({
     }),
   );
   const projectDraft = draftSession.current;
+  const applySettled = draftSession.pending?.settled ?? false;
   const draft = projectDraft.value;
   const [scope, setScope] = useState<AlbumDesignScope>("both");
   const [borderEditor, setBorderEditor] = useState(() =>
@@ -136,10 +139,7 @@ export function AlbumDesignForm({
   useEffect(() => {
     setDraftSession((session) => {
       const { pending } = session;
-      if (
-        !pending ||
-        pending.submitted.rebase(baseline.revision, baseline.value).changed
-      ) {
+      if (!pending) {
         return {
           ...session,
           current: session.current.rebase(
@@ -148,15 +148,29 @@ export function AlbumDesignForm({
           ),
         };
       }
+      const submitted = pending.submitted.rebase(
+        baseline.revision,
+        baseline.value,
+      );
+      if (pending.settled && !submitted.changed) {
+        return {
+          current: pending.subsequent.rebase(
+            baseline.revision,
+            baseline.value,
+          ),
+          pending: null,
+        };
+      }
+      const subsequent = pending.subsequent.rebase(
+        baseline.revision,
+        submitted.value,
+      );
       return {
-        current: pending.subsequent.rebase(
-          baseline.revision,
-          baseline.value,
-        ),
-        pending: null,
+        current: submitted.transition(subsequent.value),
+        pending: { ...pending, submitted, subsequent },
       };
     });
-  }, [baseline]);
+  }, [applySettled, baseline]);
 
   useEffect(() => {
     if (draft.frameBorder.kind === "solid") {
@@ -232,11 +246,13 @@ export function AlbumDesignForm({
     setDraftSession((session) => ({
       ...session,
       pending: {
+        attempt: submitted,
         submitted,
         subsequent: createAlbumDesignProjectDraft(
           submitted.baselineRevision,
           submitted.value,
         ),
+        settled: false,
       },
     }));
     setApplying(true);
@@ -244,13 +260,13 @@ export function AlbumDesignForm({
     try {
       completed = await onApply(submitted);
     } finally {
-      if (!completed) {
-        setDraftSession((session) =>
-          session.pending?.submitted === submitted
-            ? { current: session.current, pending: null }
-            : session,
-        );
-      }
+      setDraftSession((session) => {
+        const pending = session.pending;
+        if (!pending || pending.attempt !== submitted) return session;
+        return completed
+          ? { ...session, pending: { ...pending, settled: true } }
+          : { current: session.current, pending: null };
+      });
       setApplying(false);
     }
   }

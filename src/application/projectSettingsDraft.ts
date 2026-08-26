@@ -35,6 +35,7 @@ export interface ProjectSettingsDraft<Value, Delta = SettingsDelta<Value>> {
   readonly delta: Readonly<Delta>;
   readonly changed: boolean;
   equals(value: Value): boolean;
+  /** Composes only paths changed from the currently materialized value. */
   transition(value: Value): ProjectSettingsDraft<Value, Delta>;
   /** Carries the same semantic delta onto a newer authoritative baseline. */
   rebase(
@@ -73,6 +74,7 @@ export function createAlbumInformationProjectDraft(
     changedFields,
     (latest, delta) => ({ ...latest, ...delta }),
     (delta) => Object.keys(delta).length > 0,
+    transitionChangedFields,
   );
 }
 
@@ -88,6 +90,7 @@ export function createAlbumDesignProjectDraft(
     albumDesignDelta,
     applyAlbumDesignDelta,
     albumDesignDeltaChanged,
+    transitionAlbumDesignDelta,
   );
 }
 
@@ -129,9 +132,16 @@ function createProjectSettingsDraft<Value, Delta>(
   calculateDelta: (baseline: Value, value: Value) => Delta,
   applyDelta: (latest: Value, delta: Delta) => Value,
   deltaChanged: (delta: Delta) => boolean,
+  transitionDelta: (
+    baseline: Value,
+    current: Value,
+    candidate: Value,
+    delta: Delta,
+  ) => Delta,
   value: Value = baseline,
+  carriedDelta?: Delta,
 ): ProjectSettingsDraft<Value, Delta> {
-  const delta = calculateDelta(baseline, value);
+  const delta = carriedDelta ?? calculateDelta(baseline, value);
   const materializeAgainst = (
     latestProjection: EditorProjection,
   ): MaterializedProjectSettings<Value> => {
@@ -150,7 +160,7 @@ function createProjectSettingsDraft<Value, Delta>(
     baseline,
     value,
     delta,
-    changed: deltaChanged(delta),
+    changed: deltaChanged(delta) && !structuralEquals(baseline, value),
     equals(candidate) {
       return structuralEquals(value, candidate);
     },
@@ -163,7 +173,9 @@ function createProjectSettingsDraft<Value, Delta>(
         calculateDelta,
         applyDelta,
         deltaChanged,
+        transitionDelta,
         candidate,
+        transitionDelta(baseline, value, candidate, delta),
       );
     },
     rebase(nextBaselineRevision, nextBaseline) {
@@ -175,7 +187,9 @@ function createProjectSettingsDraft<Value, Delta>(
         calculateDelta,
         applyDelta,
         deltaChanged,
+        transitionDelta,
         applyDelta(nextBaseline, delta),
+        delta,
       );
     },
     materializeAgainst,
@@ -196,6 +210,24 @@ function changedFields<Value>(
     }
   }
   return delta;
+}
+
+function transitionChangedFields<Value>(
+  baseline: Value,
+  current: Value,
+  candidate: Value,
+  delta: SettingsDelta<Value>,
+): SettingsDelta<Value> {
+  const next = { ...delta };
+  for (const key of Object.keys(candidate as object) as Array<keyof Value>) {
+    if (structuralEquals(current[key], candidate[key])) continue;
+    if (structuralEquals(baseline[key], candidate[key])) {
+      delete next[key];
+    } else {
+      next[key] = candidate[key];
+    }
+  }
+  return next;
 }
 
 function structuralEquals(left: unknown, right: unknown) {
@@ -221,6 +253,38 @@ function albumDesignDeltaChanged(delta: AlbumDesignDelta) {
     delta.overlay.kind !== "none" ||
     delta.frameBorder !== undefined
   );
+}
+
+function transitionAlbumDesignDelta(
+  baseline: ProjectedVisualDefaults,
+  current: ProjectedVisualDefaults,
+  candidate: ProjectedVisualDefaults,
+  delta: AlbumDesignDelta,
+): AlbumDesignDelta {
+  const frameChanged = !structuralEquals(
+    current.frameBorder,
+    candidate.frameBorder,
+  );
+  const frameBorder = frameChanged
+    ? structuralEquals(baseline.frameBorder, candidate.frameBorder)
+      ? undefined
+      : candidate.frameBorder
+    : delta.frameBorder;
+  return {
+    background: transitionScopedDelta(
+      baseline.background,
+      current.background,
+      candidate.background,
+      delta.background,
+    ),
+    overlay: transitionScopedDelta(
+      baseline.overlay,
+      current.overlay,
+      candidate.overlay,
+      delta.overlay,
+    ),
+    ...(frameBorder === undefined ? {} : { frameBorder }),
+  };
 }
 
 function applyAlbumDesignDelta(
@@ -283,6 +347,46 @@ function applyScopedDelta<Value>(
         : applyScopedValue(withLeft, "right", delta.right);
     }
   }
+}
+
+function transitionScopedDelta<Value>(
+  baseline: ScopedValue<Value>,
+  current: ScopedValue<Value>,
+  candidate: ScopedValue<Value>,
+  delta: ScopedDelta<Value>,
+): ScopedDelta<Value> {
+  if (structuralEquals(current, candidate)) return delta;
+  if (candidate.scope === "bothSides") {
+    return structuralEquals(baseline, candidate)
+      ? { kind: "none" }
+      : { kind: "both", value: candidate.both };
+  }
+
+  const intendedSides: { left?: Value; right?: Value } = {};
+  if (delta.kind === "both") {
+    intendedSides.left = delta.value;
+    intendedSides.right = delta.value;
+  } else if (delta.kind === "sides") {
+    if (delta.left !== undefined) intendedSides.left = delta.left;
+    if (delta.right !== undefined) intendedSides.right = delta.right;
+  }
+
+  for (const side of ["left", "right"] as const) {
+    const currentValue = valueAtSide(current, side);
+    if (structuralEquals(currentValue, candidate[side])) continue;
+    if (structuralEquals(valueAtSide(baseline, side), candidate[side])) {
+      delete intendedSides[side];
+    } else {
+      intendedSides[side] = candidate[side];
+    }
+  }
+
+  if (intendedSides.left !== undefined || intendedSides.right !== undefined) {
+    return { kind: "sides", ...intendedSides };
+  }
+  return baseline.scope === "bothSides"
+    ? { kind: "perSide" }
+    : { kind: "none" };
 }
 
 function valueAtSide<Value>(

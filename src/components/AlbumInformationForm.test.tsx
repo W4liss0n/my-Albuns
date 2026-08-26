@@ -496,6 +496,259 @@ test("preserves edits made after submit when the applied Album information proje
   );
 });
 
+test("keeps post-submit edits through two successful History predecessors", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const baselineDocument = representativeProjection.state.document;
+  const view = render(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, dpi: 240 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+    { target: { value: "8" } },
+  );
+
+  view.rerender(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 2}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(
+      screen.getByRole("textbox", { name: "Área de segurança" }),
+    ).toHaveValue("8"),
+  );
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+});
+
+test("treats unit reformatting as equal while rebasing concurrent measurements", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const baselineDocument = representativeProjection.state.document;
+  const view = render(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "cm" },
+  });
+  fireEvent.change(screen.getByRole("textbox", { name: "Sangria" }), {
+    target: { value: "0.30" },
+  });
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, bleedUm: 5_000 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue(
+      "0.5",
+    ),
+  );
+  expect(screen.getByRole("combobox", { name: "Unidade" })).toHaveValue(
+    "cm",
+  );
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+});
+
+test("continues following unedited concurrent fields across multiple predecessors", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const baselineDocument = representativeProjection.state.document;
+  const view = render(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, bleedUm: 5_000 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("5"),
+  );
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, bleedUm: 7_000 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 2}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue("7"),
+  );
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+});
+
+test("clears a normalized invalid measurement marker when Unidade changes", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const baselineDocument = representativeProjection.state.document;
+  const view = render(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  fireEvent.change(screen.getByRole("textbox", { name: "Sangria" }), {
+    target: { value: "abc" },
+  });
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "cm" },
+  });
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, bleedUm: 5_000 }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("textbox", { name: "Sangria" })).toHaveValue(
+      "0.5",
+    ),
+  );
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+});
+
 test("keeps the full Album information draft after a pending submit is cancelled", async () => {
   let finishApply!: (completed: boolean) => void;
   const pendingApply = new Promise<boolean>((resolve) => {

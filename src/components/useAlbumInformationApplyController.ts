@@ -116,13 +116,30 @@ export function useAlbumInformationApplyController({
     const pending = pendingRef.current;
     if (phaseRef.current !== "deciding" || !pending) return;
     phaseRef.current = "applying";
-    void dialogSessionRef.current
-      ?.present({
+    const session = dialogSessionRef.current;
+    if (!session) {
+      finish(false);
+      return;
+    }
+    try {
+      await session.present({
         busy: true,
         details: detailsFromReview(pending.review),
         kind: "albumInformationConfirmation",
-      })
-      .catch(() => undefined);
+      });
+    } catch (error: unknown) {
+      if (dialogSessionRef.current !== session) return;
+      onError(messageFromError(error));
+      finish(false);
+      return;
+    }
+    if (
+      dialogSessionRef.current !== session ||
+      phaseRef.current !== "applying" ||
+      pendingRef.current !== pending
+    ) {
+      return;
+    }
     let result: AlbumInformationCommitResult;
     try {
       result = await onApply(pending.draft, pending.review);
