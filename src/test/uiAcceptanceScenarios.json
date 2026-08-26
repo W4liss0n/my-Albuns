@@ -281,9 +281,7 @@
       },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "[aria-label=\"Overlay de ambos os lados\"][data-preview-state=\"unavailable\"]",
-      "actions": [
-        { "type": "click", "selector": "#contextual-panel button[aria-label=\"Design do Álbum\"]" }
-      ]
+      "actions": []
     },
     {
       "id": "project-workspace-sheet-context",
