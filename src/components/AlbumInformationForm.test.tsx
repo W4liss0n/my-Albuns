@@ -207,10 +207,8 @@ test("restores edited entries to their last applied values", () => {
   fireEvent.change(width, { target: { value: "23.621" } });
   fireEvent.change(width, { target: { value: "23.622" } });
   expect(
-    screen.getByRole("button", { name: "Restaurar Largura" }),
-  ).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "Restaurar Largura" }));
-  expect(width).toHaveValue("23.622");
+    screen.queryByRole("button", { name: "Restaurar Largura" }),
+  ).not.toBeInTheDocument();
 });
 
 test("changing Unidade converts presentation without changing physical dimensions", async () => {
@@ -250,6 +248,48 @@ test("changing Unidade converts presentation without changing physical dimension
       }),
     ),
   );
+});
+
+test("accepts the generated inch text again after a temporary exact edit", async () => {
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange = vi.fn<(unit: DisplayUnit | null) => void>();
+  render(
+    <ProjectionHarness
+      document={{
+        ...representativeProjection.state.document,
+        displayUnit: "cm",
+        sheetWidthUm: 400_000,
+        sheetHeightUm: 300_000,
+      }}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Unidade" }), {
+    target: { value: "in" },
+  });
+  const width = screen.getByRole("textbox", { name: "Largura" });
+  expect(width).toHaveValue("15.748");
+
+  fireEvent.change(width, { target: { value: "15.74" } });
+  await waitFor(() =>
+    expect(onValidate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sheetWidthUm: 399_796 }),
+    ),
+  );
+
+  fireEvent.change(width, { target: { value: "15.748" } });
+  await waitFor(() =>
+    expect(onValidate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sheetWidthUm: 400_000 }),
+    ),
+  );
+  expect(width).not.toHaveAttribute("aria-invalid", "true");
+  expect(
+    screen.queryByText("Informe uma medida válida em pol."),
+  ).not.toBeInTheDocument();
 });
 
 test("keeps one grouped validation tooltip open until correction or outside click", async () => {

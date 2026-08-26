@@ -282,7 +282,7 @@ test("keeps physical Sheet previews straight in every surface", () => {
   ).toMatch(/\.visual-preview-sheet\s*\{[^}]*border-radius:\s*0;/s);
 });
 
-test("matches the compact sheet grid instead of using generic cards", () => {
+test("matches the compact proportional sheet grid instead of using generic cards", () => {
   expect(themeStyles).toContain(
     "--ui-shadow-thumbnail: 0 1px 2px rgb(60 54 44 / 10%);",
   );
@@ -290,7 +290,10 @@ test("matches the compact sheet grid instead of using generic cards", () => {
     /\.sheet-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\);/s,
   );
   expect(inspectorPanelStyles).toMatch(
-    /\.sheet-tile\s*\{[^}]*position:\s*relative;[^}]*padding:\s*0;[^}]*overflow:\s*hidden;[^}]*border:\s*0;[^}]*border-radius:\s*0;[^}]*aspect-ratio:\s*2;/s,
+    /\.sheet-tile\s*\{[^}]*position:\s*relative;[^}]*padding:\s*0;[^}]*overflow:\s*hidden;[^}]*border:\s*0;[^}]*border-radius:\s*0;/s,
+  );
+  expect(inspectorPanelStyles).not.toMatch(
+    /\.sheet-tile\s*\{[^}]*aspect-ratio:/s,
   );
   expect(inspectorPanelStyles).toMatch(
     /\.sheet-tile\.active\s*\{[^}]*box-shadow:\s*0 0 0 2px var\(--ui-accent\),\s*var\(--ui-shadow-thumbnail\);/s,

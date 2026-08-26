@@ -4,6 +4,7 @@ export interface PhysicalFieldDraft {
   text: string;
   valueUm: number;
   hasExactValue: boolean;
+  roundTripValueUm: number;
 }
 
 const MICROMETERS_PER_UNIT: Record<DisplayUnit, bigint> = {
@@ -28,6 +29,7 @@ export function createPhysicalFieldDraft(
     text: formatMicrometers(valueUm, unit),
     valueUm,
     hasExactValue: true,
+    roundTripValueUm: valueUm,
   };
 }
 
@@ -37,10 +39,17 @@ export function editPhysicalFieldDraft(
   unit: DisplayUnit,
 ): PhysicalFieldDraft {
   const parsed = parsePhysicalText(text, unit);
+  const restored =
+    parsed === null &&
+    normalizePhysicalText(text) ===
+      formatMicrometers(field.roundTripValueUm, unit)
+      ? field.roundTripValueUm
+      : parsed;
   return {
     text,
-    valueUm: parsed ?? field.valueUm,
-    hasExactValue: parsed !== null,
+    valueUm: restored ?? field.valueUm,
+    hasExactValue: restored !== null,
+    roundTripValueUm: field.roundTripValueUm,
   };
 }
 
@@ -76,7 +85,7 @@ export function parsePhysicalText(
   text: string,
   unit: DisplayUnit,
 ): number | null {
-  const normalized = text.trim().replace(",", ".");
+  const normalized = normalizePhysicalText(text);
   if (normalized.length > MAX_NUMERIC_INPUT_LENGTH) {
     return null;
   }
@@ -96,4 +105,8 @@ export function parsePhysicalText(
   const value = numerator / denominator;
   if (value > MAX_SAFE_INTEGER || value < -MAX_SAFE_INTEGER) return null;
   return Number(value);
+}
+
+function normalizePhysicalText(text: string): string {
+  return text.trim().replace(",", ".");
 }

@@ -337,6 +337,15 @@ export function InspectorPanel({
                     const accessiblePageLabel =
                       pageMetadata?.accessibleLabel ?? `Lâmina ${number}`;
                     const active = sheet.sheetId === focusedSheetId;
+                    const tileStyle = {
+                      aspectRatio: `${document.sheetWidthUm} / ${document.sheetHeightUm}`,
+                      ...(sheet.activeSides === "both"
+                        ? {}
+                        : {
+                            "--sheet-inactive-side-gradient":
+                              inactiveSideCssGradient(sheet.activeSides),
+                          }),
+                    } as CSSProperties;
                     return (
                       <Button
                         aria-current={active ? "true" : undefined}
@@ -344,14 +353,7 @@ export function InspectorPanel({
                         key={sheet.sheetId}
                         className={active ? "sheet-tile active" : "sheet-tile"}
                         data-active-sides={sheet.activeSides}
-                        style={
-                          sheet.activeSides === "both"
-                            ? undefined
-                            : ({
-                                "--sheet-inactive-side-gradient":
-                                  inactiveSideCssGradient(sheet.activeSides),
-                              } as CSSProperties)
-                        }
+                        style={tileStyle}
                         onPress={() => onNavigateToSheet(sheet.sheetId)}
                       >
                         <SheetPreview

@@ -1233,6 +1233,11 @@ test("converts periodic display values without changing physical values and keep
   expect(width.closest(".new-project-input-shell")).not.toHaveTextContent(
     "in",
   );
+  fireEvent.change(width, { target: { value: "11.81" } });
+  fireEvent.change(width, { target: { value: "11.811" } });
+  expect(
+    screen.queryByText("Informe uma medida válida em pol."),
+  ).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "mm" }));
   expect(width).toHaveValue("300");
   expect(height).toHaveValue("300");

@@ -245,7 +245,6 @@
   border-radius: 0;
   color: var(--ui-text-muted);
   background: var(--ui-surface);
-  aspect-ratio: 2;
   box-shadow:
     0 0 0 1px var(--ui-border),
     var(--ui-shadow-thumbnail);

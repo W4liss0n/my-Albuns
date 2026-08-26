@@ -3738,6 +3738,38 @@ test("renders each Grade item from its own composed sheet", () => {
   expect(within(sheetGrid).getAllByRole("img")).toHaveLength(2);
 });
 
+test("sizes every Grade tile from the open Sheet proportions", () => {
+  const fourByThreeProjection: EditorProjection = {
+    ...twoSheetProjection,
+    state: {
+      ...twoSheetProjection.state,
+      document: {
+        ...twoSheetProjection.state.document,
+        sheetWidthUm: 400_000,
+        sheetHeightUm: 300_000,
+      },
+    },
+  };
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={fourByThreeProjection}
+      projectSessionPort={projectSessionPortWithApply(
+        async () => fourByThreeProjection,
+      )}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  const tiles = Array.from(
+    view.container.querySelectorAll<HTMLElement>(".sheet-tile"),
+  );
+  expect(tiles).not.toHaveLength(0);
+  for (const tile of tiles) {
+    expect(tile).toHaveStyle({ aspectRatio: "400000 / 300000" });
+  }
+});
+
 test("presents the Grade with reference metadata and navigation state", () => {
   const projectionWithProjectedPageNumbers: EditorProjection = {
     ...twoSheetProjection,
