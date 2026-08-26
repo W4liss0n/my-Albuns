@@ -20,11 +20,23 @@ export function personalizationPreviewFromDraft(
 function mapBackground(content: BackgroundDraftContent) {
   return content.kind === "color"
     ? content
-    : { kind: "image" as const, previewUrl: content.selection.previewUrl };
+    : {
+        kind: "image" as const,
+        preview: {
+          state: "ready" as const,
+          url: content.selection.previewUrl,
+        },
+      };
 }
 
 function mapOverlay(content: OverlayDraftContent) {
   return content
-    ? { kind: "image" as const, previewUrl: content.selection.previewUrl }
+    ? {
+        kind: "image" as const,
+        preview: {
+          state: "ready" as const,
+          url: content.selection.previewUrl,
+        },
+      }
     : null;
 }

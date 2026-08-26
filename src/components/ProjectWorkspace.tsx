@@ -17,6 +17,7 @@ import {
 } from "../application/physicalMeasurements";
 import type { ProjectDialogPort } from "../application/projectDialogPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
+import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import type { DisplayUnit, EditorProjection } from "../domain/project";
 import { ApplicationHeader } from "../ui";
 import { AlbumCanvas } from "./AlbumCanvas";
@@ -114,12 +115,7 @@ export function ProjectWorkspace({
       preloadMediaIds: [],
     });
   const mediaPreviewUrls = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.entries(mediaPreviews).flatMap(([mediaId, preview]) =>
-          preview.url ? [[mediaId, preview.url]] : [],
-        ),
-      ),
+    () => renderableMediaPreviewUrls(mediaPreviews),
     [mediaPreviews],
   );
   const albumDesignPreloadMediaIds = useMemo(
@@ -372,7 +368,7 @@ export function ProjectWorkspace({
           frameBorder={projection.composition.frameBorder}
           visualDefaults={projection.state.album.visualDefaults}
           focusedSheetId={controller.canvasProps.focusedSheetId}
-          mediaPreviewUrls={mediaPreviewUrls}
+          mediaPreviews={mediaPreviews}
           revision={projection.state.revision}
           onBeginPhotoZoom={controller.beginZoomGesture}
           onUpdatePhotoZoom={controller.updateZoomGesture}

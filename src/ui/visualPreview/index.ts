@@ -7,6 +7,7 @@ export {
 } from "./ProportionalPreviewViewport";
 export { SheetGuideLayer } from "./SheetGuideLayer";
 export type {
+  DecorativePreview,
   PreviewBackgroundContent,
   PreviewOverlayContent,
   VisualPersonalizationPreview,

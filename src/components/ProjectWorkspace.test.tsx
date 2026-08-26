@@ -4074,6 +4074,111 @@ test("shares one Decorative Cache preview across Panel, Canvas, and Grade", () =
   expect(canvasHarness.props?.mediaPreviewUrls).toEqual(mediaPreviewUrls);
 });
 
+test("keeps a demanded Decorative pending until its ready Cache preview arrives", () => {
+  const projectSessionPort = projectSessionPortWithApply(
+    async () => decorativeProjection,
+  );
+  const view = render(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      projection={decorativeProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  const albumDesign = within(
+    screen
+      .getByRole("button", { name: "Design do Álbum" })
+      .closest("section") as HTMLElement,
+  );
+
+  expect(
+    albumDesign.getByLabelText("Overlay de ambos os lados"),
+  ).toHaveAttribute("data-preview-state", "pending");
+  expect(view.container.querySelector('image[href=""]')).toBeNull();
+
+  view.rerender(
+    <ProjectWorkspace
+      exportPort={exportPort}
+      mediaPreviews={{
+        "decorative-overlay": {
+          mediaId: "decorative-overlay",
+          state: "ready",
+          url: decorativePreviewUrl,
+        },
+      }}
+      projection={decorativeProjection}
+      projectSessionPort={projectSessionPort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  expect(
+    albumDesign.getByLabelText("Overlay de ambos os lados"),
+  ).toHaveAttribute("data-preview-state", "ready");
+  expect(
+    albumDesign.getByLabelText("Overlay de ambos os lados"),
+  ).toHaveAttribute("href", decorativePreviewUrl);
+});
+
+test.each(["absent", "unavailable"] as const)(
+  "preserves a %s Decorative state through the Album Design fallback",
+  (state) => {
+    const albumDesign = within(
+      render(
+        <ProjectWorkspace
+          exportPort={exportPort}
+          mediaPreviews={{
+            "decorative-overlay": {
+              mediaId: "decorative-overlay",
+              state,
+              url: null,
+            },
+          }}
+          projection={decorativeProjection}
+          projectSessionPort={projectSessionPortWithApply(
+            async () => decorativeProjection,
+          )}
+          onProjectionChange={() => undefined}
+        />,
+      ).getByLabelText("Prévia do padrão visual do Álbum"),
+    );
+
+    expect(
+      albumDesign.getByLabelText("Overlay de ambos os lados"),
+    ).toHaveAttribute("data-preview-state", state);
+  },
+);
+
+test("keeps a retained Decorative preview while preserving unavailable state", () => {
+  const albumDesign = within(
+    render(
+      <ProjectWorkspace
+        exportPort={exportPort}
+        mediaPreviews={{
+          "decorative-overlay": {
+            mediaId: "decorative-overlay",
+            state: "unavailable",
+            url: decorativePreviewUrl,
+          },
+        }}
+        projection={decorativeProjection}
+        projectSessionPort={projectSessionPortWithApply(
+          async () => decorativeProjection,
+        )}
+        onProjectionChange={() => undefined}
+      />,
+    ).getByLabelText("Prévia do padrão visual do Álbum"),
+  );
+
+  expect(
+    albumDesign.getByLabelText("Overlay de ambos os lados"),
+  ).toHaveAttribute("data-preview-state", "unavailable");
+  expect(
+    albumDesign.getByLabelText("Overlay de ambos os lados"),
+  ).toHaveAttribute("href", decorativePreviewUrl);
+});
+
 test("renders derived media usage as the thumbnail opacity state", () => {
   render(
     <ProjectWorkspace

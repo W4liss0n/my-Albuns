@@ -1,3 +1,5 @@
+import { VISUAL_MEDIA_FALLBACK_STYLE } from "../ui/visualPreview/visualMediaFallbackStyle";
+
 export const SHEET_VISUAL_STYLE = {
   surface: {
     fill: "#f3f1ec",
@@ -11,9 +13,7 @@ export const SHEET_VISUAL_STYLE = {
     opacity: 1,
     widthPx: 1,
   },
-  mediaFallback: {
-    fill: "#D8DEE2",
-  },
+  mediaFallback: VISUAL_MEDIA_FALLBACK_STYLE.background,
   canvasShadow: {
     close: {
       color: "#3c362c",
@@ -91,11 +91,11 @@ export const SHEET_VISUAL_STYLE = {
     handleSizePx: 8,
   },
   overlay: {
-    outline: "#2f7fba",
-    outlineOpacity: 0.52,
-    outlineWidthPx: 2,
+    cornerRadiusPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusPx,
     insetPx: 8,
-    cornerRadiusPx: 2,
+    outline: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outline,
+    outlineOpacity: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineOpacity,
+    outlineWidthPx: VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthPx,
   },
 } as const;
 

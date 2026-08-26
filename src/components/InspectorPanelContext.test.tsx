@@ -22,7 +22,7 @@ function inspectorProps(
     focusedSheetId: composedSheet.sheetId,
     frameBorder: representativeProjection.composition.frameBorder,
     mediaItems: representativeProjection.state.album.media,
-    mediaPreviewUrls: {},
+    mediaPreviews: {},
     onApplyAlbumDesign: vi.fn(),
     onApplyAlbumInformation: vi.fn(),
     onBeginPhotoZoom: vi.fn(),

@@ -121,11 +121,19 @@ export function SheetGridPreview() {
         frameBorder={visualDefaults.frameBorder}
         focusedSheetId={focusedSheetId}
         mediaItems={mediaItems}
-        mediaPreviewUrls={
+        mediaPreviews={
           previewUrl
             ? {
-                "media-001": previewUrl,
-                [decorativePreview.id]: previewUrl,
+                "media-001": {
+                  mediaId: "media-001",
+                  state: "ready",
+                  url: previewUrl,
+                },
+                [decorativePreview.id]: {
+                  mediaId: decorativePreview.id,
+                  state: "ready",
+                  url: previewUrl,
+                },
               }
             : {}
         }

@@ -12,6 +12,7 @@ import {
   createFrameBorderEditorState,
 } from "../application/frameBorderEditor";
 import { formatPhysicalMeasurement } from "../application/physicalMeasurements";
+import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import {
   mapScopedValue,
   readScopedValue,
@@ -20,6 +21,7 @@ import {
   createAlbumDesignProjectDraft,
   type AlbumDesignProjectDraft,
 } from "../application/projectSettingsDraft";
+import type { MediaPreview } from "../application/projectPorts";
 import type {
   DisplayUnit,
   DocumentSnapshot,
@@ -31,6 +33,7 @@ import type {
 import {
   PersonalizationScopeSurface,
   ProportionalPreviewViewport,
+  type DecorativePreview,
   type VisualPersonalizationPreview,
   type VisualPreviewGeometry,
 } from "../ui/visualPreview";
@@ -52,7 +55,7 @@ interface AlbumDesignFormProps {
   presentationUnit: DisplayUnit;
   formId: string;
   mediaItems: readonly MediaCatalogItem[];
-  mediaPreviewUrls: Readonly<Record<string, string>>;
+  mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
   value: ProjectedVisualDefaults;
   onApply(draft: AlbumDesignProjectDraft): Promise<boolean>;
@@ -74,7 +77,7 @@ export function AlbumDesignForm({
   presentationUnit,
   formId,
   mediaItems,
-  mediaPreviewUrls,
+  mediaPreviews,
   revision,
   value,
   onApply,
@@ -107,6 +110,10 @@ export function AlbumDesignForm({
     () => mediaItems.filter((media) => media.kind === "decorative"),
     [mediaItems],
   );
+  const mediaPreviewUrls = useMemo(
+    () => renderableMediaPreviewUrls(mediaPreviews),
+    [mediaPreviews],
+  );
   // PLACEHOLDER UI: o espaço entre Frames ainda não possui contrato de
   // persistência; a medida física controla somente a prévia desta seção.
   const [frameGapUm, setFrameGapUm] = useState(6_000);
@@ -127,7 +134,7 @@ export function AlbumDesignForm({
   const previewPersonalization = albumDesignPreviewDraft(
     draft,
     scope,
-    mediaPreviewUrls,
+    mediaPreviews,
   );
   const previewGeometry: VisualPreviewGeometry = {
     bleedUm: document.bleedUm,
@@ -490,16 +497,21 @@ function VisualDefaultControl({
 function albumDesignPreviewDraft(
   defaults: ProjectedVisualDefaults,
   scope: AlbumDesignScope,
-  mediaPreviewUrls: Readonly<Record<string, string>>,
+  mediaPreviews: Readonly<Record<string, MediaPreview>>,
 ): VisualPersonalizationPreview {
-  const previewUrl = (mediaId: string) => mediaPreviewUrls[mediaId] ?? "";
   const backgroundContent = (content: ProjectedBackgroundContent) =>
     content.kind === "color"
       ? content
-      : { kind: "image" as const, previewUrl: previewUrl(content.mediaId) };
+      : {
+          kind: "image" as const,
+          preview: decorativePreview(content.mediaId, mediaPreviews),
+        };
   const overlayContent = (content: ProjectedOverlayContent | null) =>
     content
-      ? { kind: "image" as const, previewUrl: previewUrl(content.mediaId) }
+      ? {
+          kind: "image" as const,
+          preview: decorativePreview(content.mediaId, mediaPreviews),
+        }
       : null;
 
   return {
@@ -507,6 +519,24 @@ function albumDesignPreviewDraft(
     background: mapScopedValue(defaults.background, backgroundContent),
     overlay: mapScopedValue(defaults.overlay, overlayContent),
     frameBorder: defaults.frameBorder,
+  };
+}
+
+function decorativePreview(
+  mediaId: string,
+  mediaPreviews: Readonly<Record<string, MediaPreview>>,
+): DecorativePreview {
+  const preview = mediaPreviews[mediaId];
+  if (!preview) return { state: "pending" as const };
+  if (preview.state === "ready") {
+    return { state: "ready" as const, url: preview.url };
+  }
+  if (preview.state === "absent") {
+    return { state: "absent" as const };
+  }
+  return {
+    state: "unavailable" as const,
+    url: preview.url,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { VisualScope } from "../../application/scopedValues";
 import type {
+  DecorativePreview,
   PreviewBackgroundContent,
   PreviewOverlayContent,
   VisualPersonalizationPreview,
@@ -7,6 +8,7 @@ import type {
 } from "./types";
 import { draftFrameBorderFillRects } from "./draftFrameBorderGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
+import { VISUAL_MEDIA_FALLBACK_STYLE } from "./visualMediaFallbackStyle";
 import "./VisualPreviewSheet.css";
 
 interface PersonalizationPreviewProps {
@@ -330,17 +332,43 @@ function OverlayContent({
   width: number;
   x: number;
 }) {
-  return content ? (
+  if (!content) return null;
+  const previewUrl = renderablePreviewUrl(content.preview);
+  return previewUrl ? (
     <image
       aria-label={label}
+      data-preview-state={content.preview.state}
       height={height}
-      href={content.previewUrl}
+      href={previewUrl}
       preserveAspectRatio="none"
       width={width}
       x={x}
       y="0"
     />
-  ) : null;
+  ) : (
+    <rect
+      aria-label={label}
+      data-preview-state={content.preview.state}
+      fill="none"
+      height={height}
+      rx={Math.round(
+        height *
+          VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusToHeightRatio,
+      )}
+      stroke={VISUAL_MEDIA_FALLBACK_STYLE.overlay.outline}
+      strokeOpacity={VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineOpacity}
+      strokeWidth={Math.max(
+        1,
+        Math.round(
+          height *
+            VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthToHeightRatio,
+        ),
+      )}
+      width={width}
+      x={x}
+      y="0"
+    />
+  );
 }
 
 function BackgroundContent({
@@ -356,24 +384,49 @@ function BackgroundContent({
   width: number;
   x: number;
 }) {
-  return content.kind === "color" ? (
-    <rect
-      aria-label={label}
-      fill={content.rgb}
-      height={height}
-      width={width}
-      x={x}
-      y="0"
-    />
-  ) : (
+  if (content.kind === "color") {
+    return (
+      <rect
+        aria-label={label}
+        fill={content.rgb}
+        height={height}
+        width={width}
+        x={x}
+        y="0"
+      />
+    );
+  }
+  const previewUrl = renderablePreviewUrl(content.preview);
+  return previewUrl ? (
     <image
       aria-label={label}
+      data-preview-state={content.preview.state}
       height={height}
-      href={content.previewUrl}
+      href={previewUrl}
       preserveAspectRatio="none"
       width={width}
       x={x}
       y="0"
     />
+  ) : (
+    <rect
+      aria-label={label}
+      data-preview-state={content.preview.state}
+      fill={VISUAL_MEDIA_FALLBACK_STYLE.background.fill}
+      height={height}
+      width={width}
+      x={x}
+      y="0"
+    />
   );
+}
+
+function renderablePreviewUrl(
+  preview: DecorativePreview,
+) {
+  if (preview.state !== "ready" && preview.state !== "unavailable") {
+    return null;
+  }
+  const url = preview.url?.trim();
+  return url ? preview.url : null;
 }

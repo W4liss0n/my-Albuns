@@ -1,4 +1,10 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { Button } from "react-aria-components";
 import { ChevronDown, ChevronRight, PanelsTopLeft } from "lucide-react";
 
@@ -20,6 +26,8 @@ import type {
   AlbumDesignProjectDraft,
   AlbumInformationProjectDraft,
 } from "../application/projectSettingsDraft";
+import type { MediaPreview } from "../application/projectPorts";
+import { renderableMediaPreviewUrls } from "../application/mediaPreviews";
 import { ActionButton, AppIcon, EmptyState } from "../ui";
 import { AlbumDesignForm } from "./AlbumDesignForm";
 import { AlbumInformationForm } from "./AlbumInformationForm";
@@ -76,7 +84,7 @@ export interface InspectorPanelProps {
   frameBorder: ProjectedFrameBorder;
   visualDefaults: ProjectedVisualDefaults;
   focusedSheetId: string | null;
-  mediaPreviewUrls?: Readonly<Record<string, string>>;
+  mediaPreviews: Readonly<Record<string, MediaPreview>>;
   revision: number;
   onBeginPhotoZoom(): void;
   onUpdatePhotoZoom(value: number): void;
@@ -109,7 +117,7 @@ export function InspectorPanel({
   frameBorder,
   visualDefaults,
   focusedSheetId,
-  mediaPreviewUrls = {},
+  mediaPreviews,
   revision,
   onBeginPhotoZoom,
   onUpdatePhotoZoom,
@@ -121,6 +129,10 @@ export function InspectorPanel({
   onNavigateToSheet,
   sectionState,
 }: InspectorPanelProps) {
+  const mediaPreviewUrls = useMemo(
+    () => renderableMediaPreviewUrls(mediaPreviews),
+    [mediaPreviews],
+  );
   const [informationDirty, setInformationDirty] = useState(false);
   const [designDirty, setDesignDirty] = useState(false);
   const [sheetScopeSelection, setSheetScopeSelection] = useState<{
@@ -299,7 +311,7 @@ export function InspectorPanel({
                 presentationUnit={presentationUnit}
                 formId={ALBUM_DESIGN_FORM_ID}
                 mediaItems={mediaItems}
-                mediaPreviewUrls={mediaPreviewUrls}
+                mediaPreviews={mediaPreviews}
                 revision={revision}
                 value={visualDefaults}
                 onApply={onApplyAlbumDesign}

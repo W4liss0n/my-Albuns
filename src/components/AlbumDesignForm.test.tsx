@@ -33,7 +33,7 @@ function Harness({
         document={representativeProjection.state.document}
         formId="album-design-equivalent-projection"
         mediaItems={[]}
-        mediaPreviewUrls={{}}
+        mediaPreviews={{}}
         presentationUnit="mm"
         revision={revision}
         value={value}
