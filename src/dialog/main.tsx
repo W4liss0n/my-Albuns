@@ -42,6 +42,7 @@ function DialogContent() {
   }
 
   if (kind === "project-failure") {
+    const title = parameter("title", "Não foi possível abrir o Projeto");
     const message = parameter(
       "message",
       "Não foi possível abrir este Projeto.",
@@ -57,7 +58,7 @@ function DialogContent() {
           </>
         }
         secondaryAction={{ label: "Fechar", onClick: closeDialog }}
-        title="Não foi possível abrir o Projeto"
+        title={title}
         tone="error"
       />
     );

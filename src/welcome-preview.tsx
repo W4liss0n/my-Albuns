@@ -1,7 +1,10 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-import type { GlobalProjectPort } from "./global/application/globalProjectPort";
+import type {
+  GlobalProjectPort,
+  ProjectFailureDialogPort,
+} from "./global/application/globalProjectPort";
 import { GlobalShell } from "./global/GlobalShell";
 import { createNewProjectPortStub } from "./global/testing/newProjectPortStub";
 import "./ui/theme.css";
@@ -27,7 +30,10 @@ const projectPort: GlobalProjectPort = {
   ],
   openRecentProject: async () => ({ status: "cancelled" }),
   startupOpenFailure: async () => null,
-  showLaunchFailure: async () => undefined,
+};
+
+const failureDialogPort: ProjectFailureDialogPort = {
+  present: async () => undefined,
 };
 
 const newProjectPort = createNewProjectPortStub();
@@ -60,6 +66,7 @@ const graphicsDiagnostic =
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <GlobalShell
+      failureDialogPort={failureDialogPort}
       graphicsDiagnostic={graphicsDiagnostic}
       newProjectPort={newProjectPort}
       projectPort={projectPort}

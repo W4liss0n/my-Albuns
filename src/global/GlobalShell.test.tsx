@@ -1,15 +1,32 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
 import type {
   GlobalProjectPort,
   OpenProjectFailure,
   OpenProjectOutcome,
+  ProjectFailureDialogPort,
 } from "./application/globalProjectPort";
 import type { GraphicsDiagnostic } from "../application/graphics";
-import { GlobalShell } from "./GlobalShell";
+import { GlobalShell as ProductGlobalShell } from "./GlobalShell";
 import { createNewProjectPortStub } from "./testing/newProjectPortStub";
+
+type GlobalShellProps = ComponentProps<typeof ProductGlobalShell>;
+
+function GlobalShell({
+  failureDialogPort = { present: async () => undefined },
+  ...props
+}: Omit<GlobalShellProps, "failureDialogPort"> &
+  Partial<Pick<GlobalShellProps, "failureDialogPort">>) {
+  return (
+    <ProductGlobalShell
+      {...props}
+      failureDialogPort={failureDialogPort}
+    />
+  );
+}
 
 const supportedGraphics: GraphicsDiagnostic = {
   supported: true,
@@ -47,7 +64,6 @@ function createProjectPort(
     listRecentProjects: async () => [],
     openRecentProject: async () => ({ status: "cancelled" }),
     startupOpenFailure: async () => null,
-    showLaunchFailure: async () => undefined,
     ...overrides,
   };
 }
@@ -108,6 +124,32 @@ test("activates the Windows shortcuts displayed on welcome", async () => {
   fireEvent.keyDown(window, { ctrlKey: true, key: "o" });
 
   await waitFor(() => expect(openProject).toHaveBeenCalledOnce());
+});
+
+test("transfers keyboard focus into New Project and restores its trigger on cancel", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      newProjectPort={createNewProjectPortStub()}
+      projectPort={createProjectPort()}
+    />,
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "n" });
+
+  const currentStep = screen
+    .getByRole("list", { name: "Etapas da criação" })
+    .querySelector<HTMLElement>('[aria-current="step"]');
+  expect(currentStep).not.toBeNull();
+  expect(currentStep).toHaveFocus();
+
+  const cancel = screen.getByRole("button", { name: "Cancelar" });
+  cancel.focus();
+  await user.keyboard("{Enter}");
+
+  expect(screen.getByRole("button", { name: "Novo Projeto" })).toHaveFocus();
 });
 
 test("blocks Project hosts at the global graphics boundary when hardware WebGL2 is unavailable", async () => {
@@ -178,6 +220,46 @@ test("replaces welcome with New Project in the same window and restores welcome 
   ).toHaveClass("ui-section-eyebrow");
 });
 
+test("routes New Project operational failures through its owned native dialog port", async () => {
+  const user = userEvent.setup();
+  const error = {
+    code: "validation_unavailable",
+    message: "A validação está indisponível.",
+    action: "Tente novamente.",
+  };
+  const present = vi.fn(async () => undefined);
+  const failureDialogPort: ProjectFailureDialogPort = { present };
+
+  render(
+    <GlobalShell
+      graphicsDiagnostic={supportedGraphics}
+      failureDialogPort={failureDialogPort}
+      newProjectPort={createNewProjectPortStub({
+        validateProjectConfiguration: async () => ({
+          status: "failed",
+          error,
+        }),
+      })}
+      projectPort={createProjectPort()}
+    />,
+  );
+
+  await user.click(screen.getByRole("button", { name: "Novo Projeto" }));
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  await waitFor(() =>
+    expect(present).toHaveBeenCalledWith({
+      context: "configurationValidation",
+      error,
+    }),
+  );
+  expect(present).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Configurações" }),
+  ).toBeInTheDocument();
+});
+
 test("keeps opening progress out of the welcome document", async () => {
   const user = userEvent.setup();
   const opening = deferred<OpenProjectOutcome>();
@@ -207,7 +289,7 @@ test("keeps opening progress out of the welcome document", async () => {
 
 test("shows an actionable structured failure without exposing a pathname", async () => {
   const user = userEvent.setup();
-  const showLaunchFailure = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
   const failure = {
     code: "project_in_use",
     message: "Este Projeto já está aberto em outra janela.",
@@ -220,14 +302,18 @@ test("shows an actionable structured failure without exposing a pathname", async
 
   render(
     <GlobalShell
+      failureDialogPort={{ present }}
       graphicsDiagnostic={supportedGraphics}
       newProjectPort={createNewProjectPortStub()}
-      projectPort={createProjectPort({ openProject, showLaunchFailure })}
+      projectPort={createProjectPort({ openProject })}
     />,
   );
   await user.click(screen.getByRole("button", { name: "Abrir Projeto" }));
 
-  expect(showLaunchFailure).toHaveBeenCalledWith(failure);
+  expect(present).toHaveBeenCalledWith({
+    context: "projectOpening",
+    error: failure,
+  });
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Abrir Projeto" }),
@@ -295,7 +381,7 @@ test("reopens a recent Project using only its opaque id", async () => {
 });
 
 test("shows the startup failure from a direct Windows opening", async () => {
-  const showLaunchFailure = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
   const startupOpenFailure = vi.fn(async () => ({
     code: "invalid_project",
     message: "O arquivo selecionado não é um Projeto válido.",
@@ -304,20 +390,23 @@ test("shows the startup failure from a direct Windows opening", async () => {
 
   render(
     <GlobalShell
+      failureDialogPort={{ present }}
       graphicsDiagnostic={supportedGraphics}
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
-        showLaunchFailure,
         startupOpenFailure,
       })}
     />,
   );
 
   await waitFor(() => {
-    expect(showLaunchFailure).toHaveBeenCalledWith({
-      code: "invalid_project",
-      message: "O arquivo selecionado não é um Projeto válido.",
-      action: "Escolha outro arquivo .myalbuns.",
+    expect(present).toHaveBeenCalledWith({
+      context: "projectOpening",
+      error: {
+        code: "invalid_project",
+        message: "O arquivo selecionado não é um Projeto válido.",
+        action: "Escolha outro arquivo .myalbuns.",
+      },
     });
   });
   expect(startupOpenFailure).toHaveBeenCalledOnce();
@@ -326,15 +415,15 @@ test("shows the startup failure from a direct Windows opening", async () => {
 test("does not overwrite a newer opening attempt with a late startup failure", async () => {
   const user = userEvent.setup();
   const startupFailure = deferred<OpenProjectFailure | null>();
-  const showLaunchFailure = vi.fn(async () => undefined);
+  const present = vi.fn(async () => undefined);
 
   render(
     <GlobalShell
+      failureDialogPort={{ present }}
       graphicsDiagnostic={supportedGraphics}
       newProjectPort={createNewProjectPortStub()}
       projectPort={createProjectPort({
         openProject: async () => ({ status: "cancelled" }),
-        showLaunchFailure,
         startupOpenFailure: () => startupFailure.promise,
       })}
     />,
@@ -348,5 +437,5 @@ test("does not overwrite a newer opening attempt with a late startup failure", a
     });
   });
 
-  expect(showLaunchFailure).not.toHaveBeenCalled();
+  expect(present).not.toHaveBeenCalled();
 });

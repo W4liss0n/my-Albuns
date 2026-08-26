@@ -82,11 +82,4 @@ export const tauriGlobalProjectPort: GlobalProjectPort = {
       return null;
     }
   },
-  showLaunchFailure: async (error) => {
-    try {
-      await invoke<void>("show_project_failure_dialog", { error });
-    } catch {
-      // Logging and the safe fallback remain owned by the native host.
-    }
-  },
 };

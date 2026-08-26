@@ -2,6 +2,7 @@ import {
   forwardRef,
   useCallback,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -16,10 +17,10 @@ import { displayUnitLabel } from "../application/physicalMeasurements";
 import { useDismissableSurface } from "../ui/useDismissableSurface";
 import type {
   NewProjectConfiguration,
+  NewProjectOperationalFailure,
   ProjectConfigurationValidationOutcome,
   ProjectDisplayUnit,
   ProjectEndSheetFormat,
-  ProjectLaunchFailure,
   ProjectLaunchOutcome,
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
@@ -47,7 +48,6 @@ import {
 import {
   ActionButton,
   AppIcon,
-  FailureNotice,
   FieldValidationAutoTooltip,
   FieldValidationTooltip,
   TextInput,
@@ -65,6 +65,7 @@ interface NewProjectFlowProps {
   onCreate(
     configuration: NewProjectCreationConfiguration,
   ): Promise<ProjectLaunchOutcome>;
+  onOperationalFailure(failure: NewProjectOperationalFailure): Promise<void>;
   onValidate(
     configuration: NewProjectConfiguration,
   ): Promise<ProjectConfigurationValidationOutcome>;
@@ -77,6 +78,7 @@ export function NewProjectFlow({
   onCancel,
   onChooseDecorative = noDecorativeSelection,
   onCreate,
+  onOperationalFailure,
   onReleaseDecorative = ignoreReleasedDecorative,
   onValidate,
 }: NewProjectFlowProps) {
@@ -90,16 +92,15 @@ export function NewProjectFlow({
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [validationAttempted, setValidationAttempted] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [failure, setFailure] = useState<ProjectLaunchFailure | null>(null);
   const [validationErrors, setValidationErrors] =
     useState<DimensionsErrors>({});
-  const [validationFailure, setValidationFailure] =
-    useState<ProjectLaunchFailure | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [validatedConfiguration, setValidatedConfiguration] =
     useState<NewProjectConfiguration | null>(null);
   const validationRequest = useRef(0);
   const nextCustomPreset = useRef(1);
+  const configurationStepRef = useRef<HTMLLIElement>(null);
+  const personalizationStepRef = useRef<HTMLLIElement>(null);
   const fieldRefs = useRef<
     Partial<Record<DimensionsFieldName, HTMLInputElement>>
   >({});
@@ -122,7 +123,6 @@ export function NewProjectFlow({
     const request = validationRequest.current + 1;
     validationRequest.current = request;
     setValidatedConfiguration(null);
-    setValidationFailure(null);
 
     const localErrors = getLocalInputErrors(candidateDraft);
     setValidationErrors((currentErrors) =>
@@ -154,7 +154,10 @@ export function NewProjectFlow({
     }
     setIsValidating(false);
     if (outcome.status === "failed") {
-      setValidationFailure(outcome.error);
+      await onOperationalFailure({
+        context: "configurationValidation",
+        error: outcome.error,
+      });
       return;
     }
     if (outcome.status === "invalid") {
@@ -233,7 +236,6 @@ export function NewProjectFlow({
     }
     validationRequest.current += 1;
     setIsValidating(false);
-    setValidationFailure(null);
     setValidatedConfiguration(null);
     setDraft(preset.dimensions);
     updatePersonalization(preset.personalization);
@@ -266,12 +268,14 @@ export function NewProjectFlow({
       return;
     }
     setIsCreating(true);
-    setFailure(null);
     const outcome = await onCreate(
       toCreationConfiguration(configuration, personalization),
     );
     if (outcome.status === "failed") {
-      setFailure(outcome.error);
+      await onOperationalFailure({
+        context: "projectCreation",
+        error: outcome.error,
+      });
     }
     if (outcome.status === "opened") {
       const consumedIds = new Set(
@@ -288,6 +292,26 @@ export function NewProjectFlow({
     setIsCreating(false);
   };
 
+  useLayoutEffect(() => {
+    const currentStep =
+      step === "configuration"
+        ? configurationStepRef.current
+        : personalizationStepRef.current;
+    currentStep?.focus({ preventScroll: true });
+  }, [step]);
+
+  const chooseDecorative = async () => {
+    const outcome = await onChooseDecorative();
+    if (outcome.status !== "failed") {
+      return outcome;
+    }
+    await onOperationalFailure({
+      context: "decorativeSelection",
+      error: outcome.error,
+    });
+    return { status: "cancelled" as const };
+  };
+
   return (
     <main
       aria-labelledby="new-project-step-title"
@@ -298,12 +322,18 @@ export function NewProjectFlow({
           {step === "configuration" ? "Configurações" : "Personalização"}
         </h2>
         <ol aria-label="Etapas da criação" className="new-project-steps">
-          <li aria-current={step === "configuration" ? "step" : undefined}>
+          <li
+            aria-current={step === "configuration" ? "step" : undefined}
+            ref={configurationStepRef}
+            tabIndex={-1}
+          >
             <span>1</span>
             Configurações
           </li>
           <li
             aria-current={step === "personalization" ? "step" : undefined}
+            ref={personalizationStepRef}
+            tabIndex={-1}
           >
             <span>2</span>
             Personalização
@@ -324,14 +354,12 @@ export function NewProjectFlow({
           errors={validationErrors}
           fieldRefs={fieldRefs}
           onChange={updateDraft}
-          validationFailure={validationFailure}
         />
       ) : (
         <PersonalizationStep
           draft={draft}
-          failure={failure}
           onChange={updatePersonalization}
-          onChooseDecorative={onChooseDecorative}
+          onChooseDecorative={chooseDecorative}
           personalization={personalization}
         />
       )}
@@ -357,7 +385,7 @@ export function NewProjectFlow({
           ) : null}
           {step === "configuration" ? (
             <ActionButton
-              aria-label="Continuar"
+              aria-label={isValidating ? "Validando…" : "Continuar"}
               disabled={isValidating}
               onClick={goToPersonalization}
               variant="primary"
@@ -366,7 +394,7 @@ export function NewProjectFlow({
             </ActionButton>
           ) : (
             <ActionButton
-              aria-label="Criar"
+              aria-label={isCreating ? "Criando Projeto…" : "Criar Projeto"}
               disabled={isCreating}
               onClick={() => void createProject()}
               variant="primary"
@@ -438,7 +466,6 @@ function ConfigurationStep({
   errors,
   fieldRefs,
   onChange,
-  validationFailure,
 }: {
   attempted: boolean;
   draft: NewProjectDimensionsDraft;
@@ -450,7 +477,6 @@ function ConfigurationStep({
     draft: NewProjectDimensionsDraft,
     changedFields: readonly DimensionsFieldName[],
   ): void;
-  validationFailure: ProjectLaunchFailure | null;
 }) {
   const validationTooltipId = useId();
   const validationTooltip = useFieldValidationTooltip(
@@ -632,12 +658,6 @@ function ConfigurationStep({
           </div>
         </ControlSection>
 
-        {validationFailure ? (
-          <FailureNotice
-            failure={validationFailure}
-            title="Não foi possível validar as Configurações"
-          />
-        ) : null}
       </div>
     </div>
   );

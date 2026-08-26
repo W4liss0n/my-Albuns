@@ -13,6 +13,29 @@ export type ProjectLaunchOutcome =
 export type OpenProjectFailure = ProjectLaunchFailure;
 export type OpenProjectOutcome = ProjectLaunchOutcome;
 
+export type NewProjectOperationalFailureContext =
+  | "configurationValidation"
+  | "decorativeSelection"
+  | "projectCreation";
+
+export interface NewProjectOperationalFailure {
+  context: NewProjectOperationalFailureContext;
+  error: ProjectLaunchFailure;
+}
+
+export type ProjectFailureDialogContext =
+  | "projectOpening"
+  | NewProjectOperationalFailureContext;
+
+export interface ProjectFailureDialogRequest {
+  context: ProjectFailureDialogContext;
+  error: ProjectLaunchFailure;
+}
+
+export interface ProjectFailureDialogPort {
+  present(failure: ProjectFailureDialogRequest): Promise<void>;
+}
+
 export type ProjectDisplayUnit = "mm" | "cm" | "in";
 export type ProjectEndSheetFormat = "double" | "singlePage";
 
@@ -112,7 +135,6 @@ export interface GlobalProjectPort {
   listRecentProjects(): Promise<readonly RecentProjectSummary[]>;
   openRecentProject(id: string): Promise<OpenProjectOutcome>;
   startupOpenFailure(): Promise<OpenProjectFailure | null>;
-  showLaunchFailure(failure: OpenProjectFailure): Promise<void>;
 }
 
 export interface NewProjectPort {

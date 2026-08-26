@@ -7,6 +7,7 @@ import type {
 } from "../application/globalProjectPort";
 import { tauriGlobalProjectPort } from "./tauriGlobalProjectPort";
 import { tauriNewProjectPort } from "./tauriNewProjectPort";
+import { tauriProjectFailureDialogPort } from "./tauriProjectFailureDialogPort";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -221,6 +222,30 @@ test("keeps an unavailable creation distinct from an unavailable opening", async
   });
 });
 
+test.each([
+  "configurationValidation",
+  "decorativeSelection",
+  "projectCreation",
+] as const)(
+  "presents the %s failure through the canonical owned dialog command",
+  async (context) => {
+    const error = {
+      code: "operation_failed",
+      message: "A operação falhou.",
+      action: "Tente novamente.",
+    };
+    vi.mocked(invoke).mockResolvedValueOnce(undefined);
+
+    await expect(
+      tauriProjectFailureDialogPort.present({ context, error }),
+    ).resolves.toBeUndefined();
+    expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
+      context,
+      error,
+    });
+  },
+);
+
 test.each(["opened", "cancelled"] as const)(
   "opens through the native backend and returns the %s terminal without a pathname",
   async (status) => {
@@ -333,9 +358,13 @@ test("delegates a launch failure to the owned native dialog window", async () =>
   vi.mocked(invoke).mockResolvedValueOnce(undefined);
 
   await expect(
-    tauriGlobalProjectPort.showLaunchFailure(error),
+    tauriProjectFailureDialogPort.present({
+      context: "projectOpening",
+      error,
+    }),
   ).resolves.toBeUndefined();
   expect(invoke).toHaveBeenCalledWith("show_project_failure_dialog", {
+    context: "projectOpening",
     error,
   });
 });

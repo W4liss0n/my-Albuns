@@ -9,6 +9,7 @@ use std::{
     time::Duration,
 };
 
+use serde::Deserialize;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 
 #[cfg(windows)]
@@ -112,6 +113,30 @@ enum OwnerPresentation {
     BlockedBehindDialog,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ProjectFailureDialogContext {
+    ProjectOpening,
+    ConfigurationValidation,
+    DecorativeSelection,
+    ProjectCreation,
+}
+
+impl ProjectFailureDialogContext {
+    fn title(self) -> &'static str {
+        match self {
+            Self::ProjectOpening => "Não foi possível abrir o Projeto",
+            Self::ConfigurationValidation => "Não foi possível validar as Configurações",
+            Self::DecorativeSelection => "Não foi possível escolher a Imagem decorativa",
+            Self::ProjectCreation => "Não foi possível criar o Projeto",
+        }
+    }
+
+    fn owner_presentation(self) -> OwnerPresentation {
+        OwnerPresentation::BlockedBehindDialog
+    }
+}
+
 pub(crate) struct LaunchProgressDialog {
     closed: bool,
     owner: WebviewWindow,
@@ -184,12 +209,14 @@ pub(crate) async fn show_launch_progress(
 
 pub(crate) async fn show_project_failure(
     app: &AppHandle,
+    context: ProjectFailureDialogContext,
     message: &str,
     action: Option<&str>,
 ) -> io::Result<()> {
     let owner = owned_window(app, GLOBAL_WINDOW_LABEL)?;
     let url = format!(
-        "dialog.html?kind=project-failure&message={}&action={}",
+        "dialog.html?kind=project-failure&title={}&message={}&action={}",
+        encode_component(context.title()),
         encode_component(message),
         encode_component(action.unwrap_or("Feche esta janela e tente novamente.")),
     );
@@ -216,7 +243,7 @@ pub(crate) async fn show_project_failure(
         }
     });
 
-    display_owned_dialog(&owner, &window)
+    display_dialog(&owner, &window, context.owner_presentation())
 }
 
 #[tauri::command]
@@ -676,6 +703,36 @@ mod tests {
             LaunchProgressKind::Creating.owner_presentation(),
             OwnerPresentation::BlockedBehindDialog
         );
+    }
+
+    #[test]
+    fn every_project_failure_context_keeps_the_owner_blocked_and_uses_a_specific_title() {
+        let cases = [
+            (
+                ProjectFailureDialogContext::ProjectOpening,
+                "Não foi possível abrir o Projeto",
+            ),
+            (
+                ProjectFailureDialogContext::ConfigurationValidation,
+                "Não foi possível validar as Configurações",
+            ),
+            (
+                ProjectFailureDialogContext::DecorativeSelection,
+                "Não foi possível escolher a Imagem decorativa",
+            ),
+            (
+                ProjectFailureDialogContext::ProjectCreation,
+                "Não foi possível criar o Projeto",
+            ),
+        ];
+
+        for (context, expected_title) in cases {
+            assert_eq!(
+                context.owner_presentation(),
+                OwnerPresentation::BlockedBehindDialog
+            );
+            assert_eq!(context.title(), expected_title);
+        }
     }
 
     #[test]

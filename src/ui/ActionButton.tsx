@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 type ActionButtonVariant =
   | "primary"
@@ -10,25 +10,31 @@ interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ActionButtonVariant;
 }
 
-export function ActionButton({
-  className,
-  density = "regular",
-  type = "button",
-  variant = "secondary",
-  ...props
-}: ActionButtonProps) {
-  return (
-    <button
-      {...props}
-      className={[
-        "ui-action-button",
-        `ui-action-button--${variant}`,
-        `ui-action-button--${density}`,
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      type={type}
-    />
-  );
-}
+export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
+  function ActionButton(
+    {
+      className,
+      density = "regular",
+      type = "button",
+      variant = "secondary",
+      ...props
+    },
+    ref,
+  ) {
+    return (
+      <button
+        {...props}
+        className={[
+          "ui-action-button",
+          `ui-action-button--${variant}`,
+          `ui-action-button--${density}`,
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        ref={ref}
+        type={type}
+      />
+    );
+  },
+);

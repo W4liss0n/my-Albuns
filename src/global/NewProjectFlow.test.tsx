@@ -7,6 +7,7 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { expect, test, vi } from "vitest";
 
 import type {
@@ -17,7 +18,22 @@ import type {
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
 import type { NewProjectCreationConfiguration } from "./application/newProjectPersonalization";
-import { NewProjectFlow } from "./NewProjectFlow";
+import { NewProjectFlow as ProductNewProjectFlow } from "./NewProjectFlow";
+
+type NewProjectFlowProps = ComponentProps<typeof ProductNewProjectFlow>;
+
+function NewProjectFlow({
+  onOperationalFailure = async () => undefined,
+  ...props
+}: Omit<NewProjectFlowProps, "onOperationalFailure"> &
+  Partial<Pick<NewProjectFlowProps, "onOperationalFailure">>) {
+  return (
+    <ProductNewProjectFlow
+      {...props}
+      onOperationalFailure={onOperationalFailure}
+    />
+  );
+}
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -124,6 +140,72 @@ test("shares one header between the steps and the preset control", async () => {
   );
 });
 
+test("moves keyboard focus with the current New Project step", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+
+  const currentStep = () => {
+    const step = screen
+      .getByRole("list", { name: "Etapas da criação" })
+      .querySelector<HTMLElement>('[aria-current="step"]');
+    if (!step) throw new Error("Etapa atual não encontrada.");
+    return step;
+  };
+
+  expect(currentStep()).toHaveTextContent("Configurações");
+  expect(currentStep()).toHaveFocus();
+
+  const continueAction = screen.getByRole("button", { name: "Continuar" });
+  continueAction.focus();
+  await user.keyboard("{Enter}");
+
+  await screen.findByRole("heading", { name: "Personalização" });
+  expect(currentStep()).toHaveTextContent("Personalização");
+  expect(currentStep()).toHaveFocus();
+
+  const backAction = screen.getByRole("button", { name: "Voltar" });
+  backAction.focus();
+  await user.keyboard("{Enter}");
+
+  expect(currentStep()).toHaveTextContent("Configurações");
+  expect(currentStep()).toHaveFocus();
+});
+
+test("keeps every New Project action label in its accessible name", async () => {
+  const user = userEvent.setup();
+
+  render(
+    <NewProjectFlow
+      onCancel={vi.fn()}
+      onCreate={vi.fn(async () => ({ status: "cancelled" as const }))}
+      onValidate={validConfiguration}
+    />,
+  );
+  await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+  const actionForVisibleLabel = (label: string) => {
+    const action = screen.getByText(label, { exact: true }).closest("button");
+    if (!action) throw new Error(`Ação visível não encontrada: ${label}`);
+    return action;
+  };
+
+  const create = actionForVisibleLabel("Criar Projeto");
+  expect(create).toHaveAccessibleName("Criar Projeto");
+
+  const chooseBackground = actionForVisibleLabel("Usar imagem…");
+  expect(chooseBackground).toHaveAccessibleName(/Usar imagem…/);
+
+  const chooseOverlay = actionForVisibleLabel("Escolher imagem…");
+  expect(chooseOverlay).toHaveAccessibleName(/Escolher imagem…/);
+});
+
 test("validates and creates with the complete neutral configuration", async () => {
   const user = userEvent.setup();
   const onValidate = vi.fn(validConfiguration);
@@ -216,7 +298,7 @@ test("validates and creates with the complete neutral configuration", async () =
   } satisfies NewProjectConfiguration;
   expect(onValidate).toHaveBeenCalledWith(expectedConfiguration);
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   expect(onCreate).toHaveBeenCalledWith({
     ...expectedConfiguration,
     visualDefaults: neutralVisualDefaults,
@@ -251,9 +333,13 @@ test("isolates cancellation and keeps backwards navigation beside the primary ac
   expect(footerActionNames()).toEqual(["Cancelar", "Continuar"]);
 
   await user.click(screen.getByRole("button", { name: "Continuar" }));
-  await screen.findByRole("button", { name: "Criar" });
+  await screen.findByRole("button", { name: "Criar Projeto" });
 
-  expect(footerActionNames()).toEqual(["Cancelar", "Voltar", "Criar"]);
+  expect(footerActionNames()).toEqual([
+    "Cancelar",
+    "Voltar",
+    "Criar Projeto",
+  ]);
 });
 
 test("creates from the neutral visual defaults without copying the demonstrative Frames", async () => {
@@ -333,7 +419,7 @@ test("creates from the neutral visual defaults without copying the demonstrative
     "#FFFFFF",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
 
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -560,7 +646,7 @@ test("hover fills only an unselected candidate without changing the fixed scope"
     "#123456",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: expect.objectContaining({
@@ -701,7 +787,8 @@ test("uses the sheet outline as the keyboard focus indicator", async () => {
 
   const left = await screen.findByRole("button", { name: "Lado esquerdo" });
   const right = await screen.findByRole("button", { name: "Lado direito" });
-  right.focus();
+  left.focus();
+  await user.tab();
   expect(right).toHaveFocus();
   await waitFor(() =>
     expect(
@@ -774,7 +861,7 @@ test("shows a solid Frame border immediately and sends its canonical values", as
   expect(firstFrameSegments[3]).toHaveAttribute("x", "144500");
   expect(firstFrameSegments[3]).toHaveAttribute("width", "2500");
 
-  fireEvent.click(screen.getByRole("button", { name: "Criar" }));
+  fireEvent.click(screen.getByRole("button", { name: "Criar Projeto" }));
   await waitFor(() =>
     expect(onCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -823,7 +910,7 @@ test("restores the chosen Frame border color after passing through zero", async 
     expect(segment).toHaveAttribute("fill", "#C5A46D");
   }
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: expect.objectContaining({
@@ -877,7 +964,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     await screen.findByRole("button", { name: "Lado esquerdo" }),
   );
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no Background" }),
   );
   expect(await screen.findByText("Background esquerdo.jpg")).toBeInTheDocument();
   const leftBackground = screen.getByLabelText("Background do lado esquerdo");
@@ -895,10 +982,10 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
 
   await user.click(screen.getByRole("button", { name: "Lado direito" }));
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no Background" }),
   );
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Overlay" }),
+    screen.getByRole("button", { name: "Escolher imagem… de Overlay" }),
   );
   expect(await screen.findByText("Overlay direito.png")).toBeInTheDocument();
   expect(screen.getByLabelText("Overlay do lado direito")).toHaveAttribute(
@@ -906,7 +993,7 @@ test("keeps distinct provisional images by side and sends only their opaque ids"
     "blob:overlay-right",
   );
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   expect(onCreate).toHaveBeenCalledWith(
     expect.objectContaining({
       visualDefaults: {
@@ -939,6 +1026,7 @@ test("preserves provisional personalization and releases it when creation is can
   const user = userEvent.setup();
   const onCancel = vi.fn();
   const onReleaseDecorative = vi.fn();
+  const onOperationalFailure = vi.fn(async () => undefined);
   const selection = {
     selectionId: "selection-kept",
     displayName: "Background preservado.jpg",
@@ -954,22 +1042,24 @@ test("preserves provisional personalization and releases it when creation is can
       onCancel={onCancel}
       onChooseDecorative={onChooseDecorative}
       onCreate={async () => ({ status: "cancelled" })}
+      onOperationalFailure={onOperationalFailure}
       onReleaseDecorative={onReleaseDecorative}
       onValidate={validConfiguration}
     />,
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no Background" }),
   );
   expect(await screen.findByText(selection.displayName)).toBeInTheDocument();
 
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no Background" }),
   );
   expect(screen.getByText(selection.displayName)).toBeInTheDocument();
   expect(onReleaseDecorative).not.toHaveBeenCalled();
+  expect(onOperationalFailure).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   await user.click(screen.getByRole("button", { name: "Continuar" }));
@@ -1006,7 +1096,9 @@ test("applies a reusable preset across both creation steps", async () => {
     screen.getByRole("textbox", { name: "Área de segurança" }),
   ).toHaveValue("5");
 
-  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Continuar" }),
+  );
   expect(
     await screen.findByRole("button", {
       name: "Usar Background #f7f5f0",
@@ -1067,7 +1159,9 @@ test("keeps a custom preset across both steps for the current placeholder sessio
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
   ).toHaveValue("320");
 
-  await user.click(screen.getByRole("button", { name: "Continuar" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Continuar" }),
+  );
   expect(
     await screen.findByRole("button", {
       name: "Usar Background #1d2a3a",
@@ -1130,34 +1224,39 @@ test("dismisses the Save model popover and restores focus to its trigger", async
 
 test("shows a typed native picker failure without changing personalization", async () => {
   const user = userEvent.setup();
+  const error = {
+    code: "unsupported_image",
+    message: "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+    action: "Escolha outro arquivo JPEG ou PNG.",
+  };
+  const onOperationalFailure = vi.fn(async () => undefined);
 
   render(
     <NewProjectFlow
       onCancel={vi.fn()}
       onChooseDecorative={vi.fn(async () => ({
         status: "failed" as const,
-        error: {
-          code: "unsupported_image",
-          message: "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
-          action: "Escolha outro arquivo JPEG ou PNG.",
-        },
+        error,
       }))}
       onCreate={async () => ({ status: "cancelled" })}
+      onOperationalFailure={onOperationalFailure}
       onReleaseDecorative={vi.fn()}
       onValidate={validConfiguration}
     />,
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(
-    screen.getByRole("button", { name: "Escolher imagem de Background" }),
+    screen.getByRole("button", { name: "Usar imagem… no Background" }),
   );
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "O arquivo escolhido não contém uma imagem JPEG ou PNG.",
+  await waitFor(() =>
+    expect(onOperationalFailure).toHaveBeenCalledWith({
+      context: "decorativeSelection",
+      error,
+    }),
   );
-  expect(screen.getByRole("alert")).toHaveTextContent(
-    "Escolha outro arquivo JPEG ou PNG.",
-  );
+  expect(onOperationalFailure).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(screen.getByText("Cor do Background")).toBeInTheDocument();
 });
 
@@ -1189,7 +1288,7 @@ test("releases a provisional image as soon as it is no longer referenced", async
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   const chooseBackground = await screen.findByRole("button", {
-    name: "Escolher imagem de Background",
+    name: "Usar imagem… no Background",
   });
   await user.click(chooseBackground);
   expect(await screen.findByText(firstSelection.displayName)).toBeInTheDocument();
@@ -1264,7 +1363,7 @@ test("converts periodic display values without changing physical values and keep
   expect(
     await screen.findByLabelText("Prévia do formato da Lâmina"),
   ).toHaveStyle({ aspectRatio: "508000 / 254000" });
-  await user.click(screen.getByRole("button", { name: "Criar" }));
+  await user.click(screen.getByRole("button", { name: "Criar Projeto" }));
   expect(onCreate).toHaveBeenCalledWith({
     document: {
       displayUnit: "cm",
@@ -1541,27 +1640,34 @@ test("ignores a late validation response after a newer edit", async () => {
 test("blocks navigation and shows an actionable operational validation failure", async () => {
   const user = userEvent.setup();
   const onCreate = vi.fn(async () => ({ status: "cancelled" as const }));
+  const error = {
+    code: "validation_unavailable",
+    message: "A validação está indisponível.",
+    action: "Tente novamente.",
+  };
+  const onOperationalFailure = vi.fn(async () => undefined);
 
   render(
     <NewProjectFlow
       onCancel={vi.fn()}
       onCreate={onCreate}
+      onOperationalFailure={onOperationalFailure}
       onValidate={async () => ({
         status: "failed",
-        error: {
-          code: "validation_unavailable",
-          message: "A validação está indisponível.",
-          action: "Tente novamente.",
-        },
+        error,
       })}
     />,
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "A validação está indisponível.",
+  await waitFor(() =>
+    expect(onOperationalFailure).toHaveBeenCalledWith({
+      context: "configurationValidation",
+      error,
+    }),
   );
-  expect(screen.getByRole("alert")).toHaveTextContent("Tente novamente.");
+  expect(onOperationalFailure).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(
     screen.getByRole("heading", { name: "Configurações" }),
   ).toBeInTheDocument();
@@ -1573,11 +1679,13 @@ test("cancels before validation or creation", async () => {
   const onCancel = vi.fn();
   const onValidate = vi.fn(validConfiguration);
   const onCreate = vi.fn(async () => ({ status: "opened" as const }));
+  const onOperationalFailure = vi.fn(async () => undefined);
 
   render(
     <NewProjectFlow
       onCancel={onCancel}
       onCreate={onCreate}
+      onOperationalFailure={onOperationalFailure}
       onValidate={onValidate}
     />,
   );
@@ -1585,26 +1693,30 @@ test("cancels before validation or creation", async () => {
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onValidate).not.toHaveBeenCalled();
   expect(onCreate).not.toHaveBeenCalled();
+  expect(onOperationalFailure).not.toHaveBeenCalled();
 });
 
 test("preserves the draft after native cancellation and structured creation failure", async () => {
   const user = userEvent.setup();
   const nativeCreation = deferred<ProjectLaunchOutcome>();
+  const error = {
+    code: "destination_conflict",
+    message: "Outro objeto passou a ocupar este destino.",
+  };
+  const onOperationalFailure = vi.fn(async () => undefined);
   const onCreate = vi
     .fn<() => Promise<ProjectLaunchOutcome>>()
     .mockReturnValueOnce(nativeCreation.promise)
     .mockResolvedValueOnce({
       status: "failed",
-      error: {
-        code: "destination_conflict",
-        message: "Outro objeto passou a ocupar este destino.",
-      },
+      error,
     });
 
   render(
     <NewProjectFlow
       onCancel={vi.fn()}
       onCreate={onCreate}
+      onOperationalFailure={onOperationalFailure}
       onValidate={validConfiguration}
     />,
   );
@@ -1613,18 +1725,28 @@ test("preserves the draft after native cancellation and structured creation fail
     { target: { value: "500" } },
   );
   await user.click(screen.getByRole("button", { name: "Continuar" }));
-  await user.click(await screen.findByRole("button", { name: "Criar" }));
+  await user.click(
+    await screen.findByRole("button", { name: "Criar Projeto" }),
+  );
   await act(async () => nativeCreation.resolve({ status: "cancelled" }));
+  expect(onOperationalFailure).not.toHaveBeenCalled();
 
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),
   ).toHaveValue("500");
   await user.click(screen.getByRole("button", { name: "Continuar" }));
-  await user.click(await screen.findByRole("button", { name: "Criar" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Outro objeto passou a ocupar este destino.",
+  await user.click(
+    await screen.findByRole("button", { name: "Criar Projeto" }),
   );
+  await waitFor(() =>
+    expect(onOperationalFailure).toHaveBeenCalledWith({
+      context: "projectCreation",
+      error,
+    }),
+  );
+  expect(onOperationalFailure).toHaveBeenCalledOnce();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   await user.click(screen.getByRole("button", { name: "Voltar" }));
   expect(
     screen.getByRole("textbox", { name: "Largura da Lâmina fechada" }),

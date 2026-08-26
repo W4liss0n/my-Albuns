@@ -16,7 +16,7 @@ use crate::{
         GRAPHICS_GATE_TIMEOUT, GraphicsGateCompletion, GraphicsGateReport, GraphicsLaunchGate,
     },
     logging,
-    native_dialog_window::{self, LaunchProgressKind},
+    native_dialog_window::{self, LaunchProgressKind, ProjectFailureDialogContext},
     native_project_dialog, path_io,
     project_bootstrap::{
         BootstrapFailure, BootstrapFailureKind, CreateWriteAuthorization, FailureCode,
@@ -358,10 +358,18 @@ fn startup_open_failure(
 }
 
 #[tauri::command]
-async fn show_project_failure_dialog(app: AppHandle, error: ProjectLaunchFailure) {
-    if let Err(dialog_error) =
-        native_dialog_window::show_project_failure(&app, &error.message, error.action.as_deref())
-            .await
+async fn show_project_failure_dialog(
+    app: AppHandle,
+    context: ProjectFailureDialogContext,
+    error: ProjectLaunchFailure,
+) {
+    if let Err(dialog_error) = native_dialog_window::show_project_failure(
+        &app,
+        context,
+        &error.message,
+        error.action.as_deref(),
+    )
+    .await
     {
         tracing::warn!(
             target: "myalbuns.desktop",

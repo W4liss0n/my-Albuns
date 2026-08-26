@@ -74,6 +74,12 @@
   background: var(--ui-accent-fill);
 }
 
+.new-project-steps li:focus-visible {
+  border-radius: var(--ui-radius);
+  outline: 2px solid var(--ui-focus-neutral);
+  outline-offset: 3px;
+}
+
 .new-project-content {
   min-width: 0;
   min-height: 0;

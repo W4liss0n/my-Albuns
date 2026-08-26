@@ -10,7 +10,6 @@ import {
   formatMicrometers,
 } from "../application/physicalMeasurements";
 import type {
-  ProjectLaunchFailure,
   ProvisionalDecorativeSelectionOutcome,
 } from "./application/globalProjectPort";
 import {
@@ -27,27 +26,25 @@ import {
   type NewProjectPersonalizationDraft,
 } from "./application/newProjectPersonalization";
 import { personalizationPreviewFromDraft } from "./newProjectPersonalizationPreview";
-import { ActionButton, AppIcon, FailureNotice } from "../ui";
+import { ActionButton, AppIcon } from "../ui";
 import { PersonalizationScopeSurface } from "../ui/visualPreview";
 import { NewProjectPreviewPanel } from "./NewProjectPreviewPanel";
 
 interface PersonalizationStepProps {
   draft: NewProjectDimensionsDraft;
-  failure: ProjectLaunchFailure | null;
   onChange(personalization: NewProjectPersonalizationDraft): void;
-  onChooseDecorative(): Promise<ProvisionalDecorativeSelectionOutcome>;
+  onChooseDecorative(): Promise<
+    Exclude<ProvisionalDecorativeSelectionOutcome, { status: "failed" }>
+  >;
   personalization: NewProjectPersonalizationDraft;
 }
 
 export function PersonalizationStep({
   draft,
-  failure,
   onChange,
   onChooseDecorative,
   personalization,
 }: PersonalizationStepProps) {
-  const [pickerFailure, setPickerFailure] =
-    useState<ProjectLaunchFailure | null>(null);
   const [focusedScope, setFocusedScope] = useState<
     NewProjectPersonalizationDraft["fixedScope"] | null
   >(null);
@@ -96,20 +93,14 @@ export function PersonalizationStep({
     });
   };
   const chooseBackground = async () => {
-    setPickerFailure(null);
     const outcome = await onChooseDecorative();
-    if (outcome.status === "failed") {
-      setPickerFailure(outcome.error);
-    } else if (outcome.status === "selected") {
+    if (outcome.status === "selected") {
       onChange(setBackgroundImage(personalization, outcome.selection));
     }
   };
   const chooseOverlay = async () => {
-    setPickerFailure(null);
     const outcome = await onChooseDecorative();
-    if (outcome.status === "failed") {
-      setPickerFailure(outcome.error);
-    } else if (outcome.status === "selected") {
+    if (outcome.status === "selected") {
       onChange(setOverlayImage(personalization, outcome.selection));
     }
   };
@@ -186,7 +177,7 @@ export function PersonalizationStep({
             </label>
           </div>
           <ActionButton
-            aria-label="Escolher imagem de Background"
+            aria-label="Usar imagem… no Background"
             className="new-project-image-action"
             onClick={() => void chooseBackground()}
           >
@@ -204,7 +195,7 @@ export function PersonalizationStep({
         <section className="new-project-value-group">
           <h2>Overlay</h2>
           <ActionButton
-            aria-label="Escolher imagem de Overlay"
+            aria-label="Escolher imagem… de Overlay"
             className="new-project-image-action new-project-image-action--dashed"
             onClick={() => void chooseOverlay()}
           >
@@ -283,18 +274,6 @@ export function PersonalizationStep({
         <p className="new-project-native-note">
           Nome e Localização serão escolhidos no diálogo do Windows ao criar.
         </p>
-        {pickerFailure ? (
-          <FailureNotice
-            failure={pickerFailure}
-            title="Não foi possível escolher a Imagem decorativa"
-          />
-        ) : null}
-        {failure ? (
-          <FailureNotice
-            failure={failure}
-            title="Não foi possível criar o Projeto"
-          />
-        ) : null}
       </div>
     </div>
   );

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronRight,
   Download,
@@ -18,6 +24,7 @@ import type {
   GlobalProjectPort,
   NewProjectPort,
   OpenProjectOutcome,
+  ProjectFailureDialogPort,
   RecentProjectSummary,
 } from "./application/globalProjectPort";
 import { NewProjectFlow } from "./NewProjectFlow";
@@ -30,6 +37,7 @@ import {
 } from "../ui";
 
 interface GlobalShellProps {
+  failureDialogPort: ProjectFailureDialogPort;
   graphicsDiagnostic: GraphicsDiagnostic;
   newProjectPort: NewProjectPort;
   projectPort: GlobalProjectPort;
@@ -39,6 +47,7 @@ const recentCoverVariants = [1, 2, 1, 3, 4, 1, 2] as const;
 const portraitCoverIndexes = new Set([1, 4, 6]);
 
 export function GlobalShell({
+  failureDialogPort,
   graphicsDiagnostic,
   newProjectPort,
   projectPort,
@@ -52,6 +61,8 @@ export function GlobalShell({
   >([]);
   const openingAttempt = useRef(0);
   const graphicsGateReported = useRef(false);
+  const newProjectTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreNewProjectTriggerFocus = useRef(false);
 
   useEffect(() => {
     if (graphicsGateReported.current) return;
@@ -60,10 +71,13 @@ export function GlobalShell({
       .completeGraphicsGate(graphicsDiagnostic.supported)
       .then((outcome) => {
         if (outcome?.status === "failed") {
-          void projectPort.showLaunchFailure(outcome.error);
+          void failureDialogPort.present({
+            context: "projectOpening",
+            error: outcome.error,
+          });
         }
       });
-  }, [graphicsDiagnostic.supported, projectPort]);
+  }, [failureDialogPort, graphicsDiagnostic.supported, projectPort]);
 
   useEffect(() => {
     let active = true;
@@ -79,13 +93,16 @@ export function GlobalShell({
         startupFailure &&
         openingAttempt.current === startupAttempt
       ) {
-        void projectPort.showLaunchFailure(startupFailure);
+        void failureDialogPort.present({
+          context: "projectOpening",
+          error: startupFailure,
+        });
       }
     });
     return () => {
       active = false;
     };
-  }, [projectPort]);
+  }, [failureDialogPort, projectPort]);
 
   const runOpening = useCallback(
     async (attempt: () => Promise<OpenProjectOutcome>) => {
@@ -93,11 +110,14 @@ export function GlobalShell({
       setIsOpening(true);
       const outcome = await attempt();
       if (outcome.status === "failed") {
-        await projectPort.showLaunchFailure(outcome.error);
+        await failureDialogPort.present({
+          context: "projectOpening",
+          error: outcome.error,
+        });
       }
       setIsOpening(false);
     },
-    [projectPort],
+    [failureDialogPort],
   );
 
   const openProject = useCallback(
@@ -112,6 +132,22 @@ export function GlobalShell({
     openingAttempt.current += 1;
     setSurface("newProject");
   }, []);
+
+  const cancelCreation = useCallback(() => {
+    restoreNewProjectTriggerFocus.current = true;
+    setSurface("welcome");
+  }, []);
+
+  useLayoutEffect(() => {
+    if (
+      surface !== "welcome" ||
+      !restoreNewProjectTriggerFocus.current
+    ) {
+      return;
+    }
+    restoreNewProjectTriggerFocus.current = false;
+    newProjectTriggerRef.current?.focus({ preventScroll: true });
+  }, [surface]);
 
   useEffect(() => {
     if (
@@ -156,12 +192,15 @@ export function GlobalShell({
       <div className="global-shell global-shell--new-project">
         <ApplicationHeader context="Novo Projeto" />
         <NewProjectFlow
-          onCancel={() => setSurface("welcome")}
+          onCancel={cancelCreation}
           onChooseDecorative={() =>
             newProjectPort.chooseProvisionalDecorative()
           }
           onCreate={(configuration) =>
             newProjectPort.createProject(configuration)
+          }
+          onOperationalFailure={(failure) =>
+            failureDialogPort.present(failure)
           }
           onReleaseDecorative={(selectionId) =>
             newProjectPort.releaseProvisionalDecorative(selectionId)
@@ -243,6 +282,7 @@ export function GlobalShell({
               aria-keyshortcuts={projectCommandShortcutAria("new-project")}
               disabled={isOpening}
               onClick={startCreation}
+              ref={newProjectTriggerRef}
               variant="primary"
             >
               <AppIcon icon={Plus} size={16} />
