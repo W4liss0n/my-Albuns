@@ -279,7 +279,7 @@ mod tests {
         assert_eq!(
             allowed_commands(&project_dialog_permission),
             BTreeSet::from([
-                "current_project_dialog_state",
+                "current_project_dialog_presentation",
                 "owned_window_content_ready",
                 "submit_project_dialog_action"
             ])

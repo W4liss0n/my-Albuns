@@ -2,35 +2,35 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 import {
-  parseProjectDialogState,
+  parseProjectDialogPresentation,
   toIpcProjectDialogAction,
 } from "../../platform/projectDialogContract";
 import type { ProjectDialogClient } from "../application/projectDialogClient";
 
-export const PROJECT_DIALOG_STATE_EVENT =
-  "myalbuns://project-dialog-state";
+export const PROJECT_DIALOG_PRESENTATION_EVENT =
+  "myalbuns://project-dialog-presentation";
 
 export const tauriProjectDialogClient: ProjectDialogClient = {
-  onState: async (listener) => {
+  onPresentation: async (listener) => {
     let hydrated = false;
-    let stateReceivedDuringHydration: ReturnType<
-      typeof parseProjectDialogState
+    let presentationReceivedDuringHydration: ReturnType<
+      typeof parseProjectDialogPresentation
     > = null;
     const unlisten = await listen<unknown>(
-      PROJECT_DIALOG_STATE_EVENT,
+      PROJECT_DIALOG_PRESENTATION_EVENT,
       ({ payload }) => {
-        const state = parseProjectDialogState(payload);
-        if (!state) return;
-        if (hydrated) listener(state);
-        else stateReceivedDuringHydration = state;
+        const presentation = parseProjectDialogPresentation(payload);
+        if (!presentation) return;
+        if (hydrated) listener(presentation);
+        else presentationReceivedDuringHydration = presentation;
       },
     );
     try {
-      const current = parseProjectDialogState(
-        await invoke<unknown>("current_project_dialog_state"),
+      const current = parseProjectDialogPresentation(
+        await invoke<unknown>("current_project_dialog_presentation"),
       );
       hydrated = true;
-      const latest = stateReceivedDuringHydration ?? current;
+      const latest = presentationReceivedDuringHydration ?? current;
       if (latest) listener(latest);
       return unlisten;
     } catch (error) {

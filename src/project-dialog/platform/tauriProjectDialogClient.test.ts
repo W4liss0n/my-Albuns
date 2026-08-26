@@ -2,7 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { beforeEach, expect, test, vi } from "vitest";
 
-import { tauriProjectDialogClient } from "./tauriProjectDialogClient";
+import {
+  PROJECT_DIALOG_PRESENTATION_EVENT,
+  tauriProjectDialogClient,
+} from "./tauriProjectDialogClient";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
@@ -12,7 +15,7 @@ beforeEach(() => {
   vi.mocked(listen).mockReset();
 });
 
-test("submits semantic actions and receives validated owner state", async () => {
+test("submits semantic actions and receives a validated owned presentation", async () => {
   const listener = vi.fn();
   const unlisten = vi.fn();
   let emit!: (payload: unknown) => void;
@@ -21,38 +24,54 @@ test("submits semantic actions and receives validated owner state", async () => 
     return unlisten;
   });
   vi.mocked(invoke).mockImplementation(async (command) =>
-    command === "current_project_dialog_state"
-      ? { busy: false, kind: "projectCloseConfirmation" }
+    command === "current_project_dialog_presentation"
+      ? {
+          sessionId: "project-close-3",
+          state: { busy: false, kind: "projectCloseConfirmation" },
+        }
       : undefined,
   );
 
-  await expect(tauriProjectDialogClient.onState(listener)).resolves.toBe(
-    unlisten,
-  );
-  emit({ busy: true, kind: "projectCloseConfirmation" });
-  emit({ busy: "yes", kind: "projectCloseConfirmation" });
+  await expect(
+    tauriProjectDialogClient.onPresentation(listener),
+  ).resolves.toBe(unlisten);
+  emit({
+    sessionId: "project-close-4",
+    state: { busy: true, kind: "projectCloseConfirmation" },
+  });
+  emit({
+    sessionId: "project-close-5",
+    state: { busy: "yes", kind: "projectCloseConfirmation" },
+  });
   await tauriProjectDialogClient.submit(
     "project-close-3",
     "cancelProjectClose",
   );
 
   expect(listener).toHaveBeenCalledTimes(2);
+  expect(listen).toHaveBeenCalledWith(
+    PROJECT_DIALOG_PRESENTATION_EVENT,
+    expect.any(Function),
+  );
   expect(listener).toHaveBeenNthCalledWith(1, {
-    busy: false,
-    kind: "projectCloseConfirmation",
+    sessionId: "project-close-3",
+    state: { busy: false, kind: "projectCloseConfirmation" },
   });
   expect(listener).toHaveBeenNthCalledWith(2, {
-    busy: true,
-    kind: "projectCloseConfirmation",
+    sessionId: "project-close-4",
+    state: { busy: true, kind: "projectCloseConfirmation" },
   });
-  expect(invoke).toHaveBeenNthCalledWith(1, "current_project_dialog_state");
+  expect(invoke).toHaveBeenNthCalledWith(
+    1,
+    "current_project_dialog_presentation",
+  );
   expect(invoke).toHaveBeenCalledWith("submit_project_dialog_action", {
     action: "cancelProjectClose",
     sessionId: "project-close-3",
   });
 });
 
-test("prefers state emitted while the initial state is being hydrated", async () => {
+test("prefers an owned presentation emitted during initial hydration", async () => {
   const listener = vi.fn();
   const unlisten = vi.fn();
   let emit!: (payload: unknown) => void;
@@ -68,28 +87,37 @@ test("prefers state emitted while the initial state is being hydrated", async ()
       }),
   );
 
-  const subscription = tauriProjectDialogClient.onState(listener);
+  const subscription = tauriProjectDialogClient.onPresentation(listener);
   await Promise.resolve();
   await Promise.resolve();
   emit({
-    cancelled: false,
-    kind: "exportFailure",
-    message: "Falha mais recente",
-    retryDisabled: false,
+    sessionId: "export-2",
+    state: {
+      cancelled: false,
+      kind: "exportFailure",
+      message: "Falha mais recente",
+      retryDisabled: false,
+    },
   });
   resolveCurrent({
-    cancelRequested: false,
-    cancellable: true,
-    kind: "exportProgress",
-    progress: { kind: "indeterminate", status: "Estado anterior" },
+    sessionId: "export-1",
+    state: {
+      cancelRequested: false,
+      cancellable: true,
+      kind: "exportProgress",
+      progress: { kind: "indeterminate", status: "Estado anterior" },
+    },
   });
 
   await expect(subscription).resolves.toBe(unlisten);
   expect(listener).toHaveBeenCalledOnce();
   expect(listener).toHaveBeenCalledWith({
-    cancelled: false,
-    kind: "exportFailure",
-    message: "Falha mais recente",
-    retryDisabled: false,
+    sessionId: "export-2",
+    state: {
+      cancelled: false,
+      kind: "exportFailure",
+      message: "Falha mais recente",
+      retryDisabled: false,
+    },
   });
 });

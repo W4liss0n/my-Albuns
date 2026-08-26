@@ -67,6 +67,11 @@ export interface ProjectDialogActionEvent {
   sessionId: string;
 }
 
+export interface ProjectDialogPresentation {
+  sessionId: string;
+  state: ProjectDialogState;
+}
+
 /**
  * Owns one logical Project dialog from its first projection until dismissal.
  * A released session is obsolete: later updates and dismissals are harmless.

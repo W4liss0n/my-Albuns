@@ -1,11 +1,11 @@
 import type {
   ProjectDialogAction,
-  ProjectDialogState,
+  ProjectDialogPresentation,
 } from "../../application/projectDialogPort";
 
 export interface ProjectDialogClient {
-  onState(
-    listener: (state: ProjectDialogState) => void,
+  onPresentation(
+    listener: (presentation: ProjectDialogPresentation) => void,
   ): Promise<() => void>;
   submit(sessionId: string, action: ProjectDialogAction): Promise<void>;
 }

@@ -5,10 +5,11 @@ import type {
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import {
-  parseInitialProjectDialogState,
-  parseInitialProjectDialogSessionId,
+  parseInitialProjectDialogPresentation,
+  parseInitialProjectDialogPreviewState,
   parseProjectDialogAction,
   parseProjectDialogActionEvent,
+  parseProjectDialogPresentation,
   parseProjectDialogState,
   toIpcProjectDialogAction,
   toIpcProjectDialogState,
@@ -95,12 +96,12 @@ test("rejects malformed states and actions at the native seam", () => {
 test("decodes the initial URL only through the validated state contract", () => {
   const state = states[1];
   expect(
-    parseInitialProjectDialogState(
+    parseInitialProjectDialogPreviewState(
       `?state=${encodeURIComponent(JSON.stringify(state))}`,
     ),
   ).toEqual(state);
   expect(
-    parseInitialProjectDialogState("?state=%7Bnot-json%7D"),
+    parseInitialProjectDialogPreviewState("?state=%7Bnot-json%7D"),
   ).toBeNull();
 });
 
@@ -120,10 +121,20 @@ test("keeps the dialog action and initial window bound to their session", () => 
       sessionId: "",
     }),
   ).toBeNull();
+  const presentation = {
+    sessionId: "album-information-7",
+    state: states[0],
+  };
+  expect(parseProjectDialogPresentation(presentation)).toEqual(presentation);
   expect(
-    parseInitialProjectDialogSessionId(
-      "?sessionId=album-information-7",
+    parseInitialProjectDialogPresentation(
+      `?presentation=${encodeURIComponent(JSON.stringify(presentation))}`,
     ),
-  ).toBe("album-information-7");
-  expect(parseInitialProjectDialogSessionId("?sessionId=")).toBeNull();
+  ).toEqual(presentation);
+  expect(
+    parseProjectDialogPresentation({ sessionId: "", state: states[0] }),
+  ).toBeNull();
+  expect(
+    parseInitialProjectDialogPresentation("?presentation=%7Bnot-json%7D"),
+  ).toBeNull();
 });

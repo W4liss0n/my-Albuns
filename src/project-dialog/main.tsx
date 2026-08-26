@@ -1,104 +1,41 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import ReactDOM from "react-dom/client";
 
-import type {
-  ProjectDialogAction,
-  ProjectDialogState,
-} from "../application/projectDialogPort";
 import { installDesktopWebViewPolicy } from "../platform/desktopWebViewPolicy";
 import {
-  parseInitialProjectDialogSessionId,
-  parseInitialProjectDialogState,
+  parseInitialProjectDialogPresentation,
+  parseInitialProjectDialogPreviewState,
 } from "../platform/projectDialogContract";
 import { tauriWindowControls } from "../platform/tauriWindowControls";
-import {
-  MessageDialog,
-  OwnedWindowShell,
-  WindowControlsProvider,
-  type WindowControls,
-} from "../ui";
-import type { ProjectDialogClient } from "./application/projectDialogClient";
-import { defaultProjectDialogCloseAction } from "./application/projectDialogLifecycle";
-import { ProjectDialogView } from "./ProjectDialogView";
+import { ProjectDialogApplication } from "./ProjectDialogApplication";
 import { tauriProjectDialogClient } from "./platform/tauriProjectDialogClient";
 import "../ui/theme.css";
 import "../ui/ui.css";
 
-function ProjectDialogApplication({
-  client,
-  sessionId,
-  initialState,
-}: {
-  client: ProjectDialogClient;
-  sessionId: string | null;
-  initialState: ProjectDialogState | null;
-}) {
-  const [state, setState] = useState(initialState);
-
-  useEffect(() => {
-    let active = true;
-    let unlisten: (() => void) | undefined;
-    void client.onState((nextState) => {
-      if (active) setState(nextState);
-    }).then((dispose) => {
-      if (active) unlisten = dispose;
-      else dispose();
-    });
-    return () => {
-      active = false;
-      unlisten?.();
-    };
-  }, [client]);
-
-  const closeAction = state
-    ? defaultProjectDialogCloseAction(state)
-    : null;
-  const controls = useMemo<WindowControls>(
-    () => ({
-      ...tauriWindowControls,
-      close: closeAction
-        ? () =>
-            sessionId
-              ? client.submit(sessionId, closeAction)
-              : tauriWindowControls.close()
-        : tauriWindowControls.close,
-    }),
-    [client, closeAction, sessionId],
-  );
-  const submit = (action: ProjectDialogAction) => {
-    if (!sessionId) return;
-    void client.submit(sessionId, action).catch(() => undefined);
-  };
-
-  return (
-    <WindowControlsProvider controls={controls}>
-      <OwnedWindowShell controls={closeAction ? "close" : "none"}>
-        {state ? (
-          <ProjectDialogView onAction={submit} state={state} />
-        ) : (
-          <MessageDialog
-            description="O estado desta janela não pôde ser carregado."
-            secondaryAction={{
-              label: "Fechar",
-              onClick: () => void tauriWindowControls.close(),
-            }}
-            title="Não foi possível abrir o diálogo"
-            tone="error"
-          />
-        )}
-      </OwnedWindowShell>
-    </WindowControlsProvider>
-  );
-}
-
 installDesktopWebViewPolicy(document);
+
+const initialPresentation = parseInitialProjectDialogPresentation(
+  window.location.search,
+);
+const previewState = parseInitialProjectDialogPreviewState(
+  window.location.search,
+);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <ProjectDialogApplication
-      client={tauriProjectDialogClient}
-      initialState={parseInitialProjectDialogState(window.location.search)}
-      sessionId={parseInitialProjectDialogSessionId(window.location.search)}
-    />
+    {previewState && !initialPresentation ? (
+      <ProjectDialogApplication
+        mode="preview"
+        state={previewState}
+        windowControls={tauriWindowControls}
+      />
+    ) : (
+      <ProjectDialogApplication
+        client={tauriProjectDialogClient}
+        initialPresentation={initialPresentation}
+        mode="owned"
+        windowControls={tauriWindowControls}
+      />
+    )}
   </React.StrictMode>,
 );

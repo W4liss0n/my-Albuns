@@ -2,12 +2,14 @@ import type {
   ProjectDialogAction,
   ProjectDialogActionEvent,
   ProjectDialogDetail,
+  ProjectDialogPresentation,
   ProjectDialogProgress,
   ProjectDialogState,
 } from "../application/projectDialogPort";
 import type { ProjectDialogAction as IpcProjectDialogAction } from "./generated/ProjectDialogAction";
 import type { ProjectDialogActionEvent as IpcProjectDialogActionEvent } from "./generated/ProjectDialogActionEvent";
 import type { ProjectDialogDetail as IpcProjectDialogDetail } from "./generated/ProjectDialogDetail";
+import type { ProjectDialogPresentation as IpcProjectDialogPresentation } from "./generated/ProjectDialogPresentation";
 import type { ProjectDialogProgress as IpcProjectDialogProgress } from "./generated/ProjectDialogProgress";
 import type { ProjectDialogState as IpcProjectDialogState } from "./generated/ProjectDialogState";
 
@@ -47,6 +49,10 @@ function isWireU64(value: unknown): value is number {
     Number.isSafeInteger(value) &&
     value >= 0
   );
+}
+
+function isProjectDialogSessionId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 128;
 }
 
 function decodeDetails(
@@ -179,9 +185,7 @@ export function parseProjectDialogActionEvent(
 ): ProjectDialogActionEvent | null {
   if (
     !isRecord(value) ||
-    typeof value.sessionId !== "string" ||
-    value.sessionId.length === 0 ||
-    value.sessionId.length > 128
+    !isProjectDialogSessionId(value.sessionId)
   ) {
     return null;
   }
@@ -192,6 +196,24 @@ export function parseProjectDialogActionEvent(
     sessionId: value.sessionId,
   } satisfies IpcProjectDialogActionEvent;
   return { action: projectDialogActionMap[event.action], sessionId: event.sessionId };
+}
+
+export function parseProjectDialogPresentation(
+  value: unknown,
+): ProjectDialogPresentation | null {
+  if (!isRecord(value) || !isProjectDialogSessionId(value.sessionId)) {
+    return null;
+  }
+  const state = parseProjectDialogState(value.state);
+  if (!state) return null;
+  const presentation = {
+    sessionId: value.sessionId,
+    state: toIpcProjectDialogState(state),
+  } satisfies IpcProjectDialogPresentation;
+  return {
+    sessionId: presentation.sessionId,
+    state: fromIpcProjectDialogState(presentation.state),
+  };
 }
 
 export function toIpcProjectDialogAction(
@@ -328,7 +350,7 @@ function fromIpcProjectDialogProgress(
   return assertNever(progress);
 }
 
-export function parseInitialProjectDialogState(
+export function parseInitialProjectDialogPreviewState(
   search: string,
 ): ProjectDialogState | null {
   const encoded = new URLSearchParams(search).get("state");
@@ -340,11 +362,16 @@ export function parseInitialProjectDialogState(
   }
 }
 
-export function parseInitialProjectDialogSessionId(
+export function parseInitialProjectDialogPresentation(
   search: string,
-): string | null {
-  const sessionId = new URLSearchParams(search).get("sessionId");
-  return sessionId && sessionId.length <= 128 ? sessionId : null;
+): ProjectDialogPresentation | null {
+  const encoded = new URLSearchParams(search).get("presentation");
+  if (!encoded) return null;
+  try {
+    return parseProjectDialogPresentation(JSON.parse(encoded));
+  } catch {
+    return null;
+  }
 }
 
 function assertNever(value: never): never {

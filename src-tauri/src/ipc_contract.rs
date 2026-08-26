@@ -61,6 +61,13 @@ pub enum ProjectDialogState {
     },
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDialogPresentation {
+    pub(crate) session_id: String,
+    pub(crate) state: ProjectDialogState,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectDialogAction {
@@ -88,8 +95,8 @@ mod project_dialog_contract_tests {
     use serde_json::json;
 
     use super::{
-        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail, ProjectDialogProgress,
-        ProjectDialogState,
+        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail,
+        ProjectDialogPresentation, ProjectDialogProgress, ProjectDialogState,
     };
 
     #[test]
@@ -200,6 +207,26 @@ mod project_dialog_contract_tests {
             json!({
                 "action": "confirmAlbumInformation",
                 "sessionId": "album-information-7"
+            })
+        );
+    }
+
+    #[test]
+    fn dialog_presentations_keep_owner_and_state_atomic_on_the_wire() {
+        assert_eq!(
+            serde_json::to_value(ProjectDialogPresentation {
+                session_id: "export-8".into(),
+                state: ProjectDialogState::ExportSuccess {
+                    message: "Exportação concluída".into(),
+                },
+            })
+            .expect("the owned presentation serializes"),
+            json!({
+                "sessionId": "export-8",
+                "state": {
+                    "kind": "exportSuccess",
+                    "message": "Exportação concluída"
+                }
             })
         );
     }

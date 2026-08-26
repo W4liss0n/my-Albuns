@@ -96,7 +96,7 @@ pub(crate) fn run(
         .manage(MediaRuntime::default())
         .manage(MediaMonitor::default())
         .manage(ExportAttempts::default())
-        .manage(crate::project_dialog_window::ProjectDialogStateStore::default())
+        .manage(crate::project_dialog_window::ProjectDialogPresentationStore::default())
         .manage(crate::settings_preferences::SettingsStore::new(&app_paths))
         .manage(crate::workspace_preferences::WorkspacePreferencesStore::new(&app_paths))
         .on_window_event(|window, event| {
@@ -165,7 +165,7 @@ pub(crate) fn run(
             crate::project_close_commands::resolve_project_close,
             crate::project_dialog_window::present_project_dialog,
             crate::project_dialog_window::dismiss_project_dialog,
-            crate::project_dialog_window::current_project_dialog_state,
+            crate::project_dialog_window::current_project_dialog_presentation,
             crate::project_dialog_window::submit_project_dialog_action,
             crate::media_preview_commands::prepare_media_previews,
             crate::export_commands::export_sheet,

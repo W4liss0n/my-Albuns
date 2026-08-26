@@ -4,15 +4,15 @@ use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent};
 
 use crate::{
     ipc_contract::{
-        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail, ProjectDialogProgress,
-        ProjectDialogState,
+        ProjectDialogAction, ProjectDialogActionEvent, ProjectDialogDetail,
+        ProjectDialogPresentation, ProjectDialogProgress, ProjectDialogState,
     },
     native_dialog_window,
     product_runtime::PROJECT_WINDOW_LABEL,
 };
 
 pub(crate) const PROJECT_DIALOG_ACTION_EVENT: &str = "myalbuns://project-dialog-action";
-pub(crate) const PROJECT_DIALOG_STATE_EVENT: &str = "myalbuns://project-dialog-state";
+pub(crate) const PROJECT_DIALOG_PRESENTATION_EVENT: &str = "myalbuns://project-dialog-presentation";
 const PROJECT_DIALOG_LABEL: &str = "project-dialog";
 const MAX_DIALOG_TEXT_CHARS: usize = 800;
 const MAX_DIALOG_DETAILS: usize = 10;
@@ -105,16 +105,10 @@ impl ProjectDialogState {
     }
 }
 
-#[derive(Clone)]
-struct OwnedProjectDialogState {
-    session_id: String,
-    state: ProjectDialogState,
-}
-
 #[derive(Default)]
-pub(crate) struct ProjectDialogStateStore(Mutex<Option<OwnedProjectDialogState>>);
+pub(crate) struct ProjectDialogPresentationStore(Mutex<Option<ProjectDialogPresentation>>);
 
-impl ProjectDialogStateStore {
+impl ProjectDialogPresentationStore {
     fn present(&self, session_id: &str, state: ProjectDialogState) -> Result<(), String> {
         let mut current = self
             .0
@@ -127,14 +121,14 @@ impl ProjectDialogStateStore {
             current.state = state;
             return Ok(());
         }
-        *current = Some(OwnedProjectDialogState {
+        *current = Some(ProjectDialogPresentation {
             session_id: session_id.into(),
             state,
         });
         Ok(())
     }
 
-    fn current(&self) -> Result<Option<OwnedProjectDialogState>, String> {
+    fn current(&self) -> Result<Option<ProjectDialogPresentation>, String> {
         self.0
             .lock()
             .map(|state| state.clone())
@@ -174,26 +168,29 @@ pub(crate) async fn present_project_dialog(
     window: WebviewWindow,
     session_id: String,
     state: ProjectDialogState,
-    state_store: State<'_, ProjectDialogStateStore>,
+    state_store: State<'_, ProjectDialogPresentationStore>,
 ) -> Result<(), String> {
     require_project_owner(&window)?;
     require_dialog_session_id(&session_id)?;
     let state = state.sanitized();
     state_store.present(&session_id, state.clone())?;
+    let presentation = ProjectDialogPresentation {
+        session_id: session_id.clone(),
+        state: state.clone(),
+    };
     let owner = window;
-    let presentation = async {
+    let display_result = async {
         if let Some(dialog) = app.get_webview_window(PROJECT_DIALOG_LABEL) {
             dialog
-                .emit(PROJECT_DIALOG_STATE_EVENT, &state)
+                .emit(PROJECT_DIALOG_PRESENTATION_EVENT, &presentation)
                 .map_err(|error| error.to_string())?;
             return native_dialog_window::display_owned_dialog(&owner, &dialog)
                 .map_err(|error| error.to_string());
         }
 
-        let serialized = serde_json::to_string(&state).map_err(|error| error.to_string())?;
+        let serialized = serde_json::to_string(&presentation).map_err(|error| error.to_string())?;
         let url = format!(
-            "project-dialog.html?sessionId={}&state={}",
-            native_dialog_window::encode_unbounded_component(&session_id),
+            "project-dialog.html?presentation={}",
             native_dialog_window::encode_unbounded_component(&serialized)
         );
         let (width, height) = state.initial_dimensions();
@@ -217,7 +214,7 @@ pub(crate) async fn present_project_dialog(
             .map_err(|error| error.to_string())
     }
     .await;
-    if presentation.is_err() {
+    if display_result.is_err() {
         let window_was_released = match app.get_webview_window(PROJECT_DIALOG_LABEL) {
             Some(dialog) => {
                 native_dialog_window::dismiss_blocked_window(&owner, &dialog, true).is_ok()
@@ -228,20 +225,18 @@ pub(crate) async fn present_project_dialog(
             state_store.clear(&session_id)?;
         }
     }
-    presentation
+    display_result
 }
 
 #[tauri::command]
-pub(crate) fn current_project_dialog_state(
+pub(crate) fn current_project_dialog_presentation(
     window: WebviewWindow,
-    state_store: State<'_, ProjectDialogStateStore>,
-) -> Result<Option<ProjectDialogState>, String> {
+    state_store: State<'_, ProjectDialogPresentationStore>,
+) -> Result<Option<ProjectDialogPresentation>, String> {
     if window.label() != PROJECT_DIALOG_LABEL {
-        return Err("dialog state belongs only to the Project dialog window".into());
+        return Err("dialog presentation belongs only to the Project dialog window".into());
     }
-    state_store
-        .current()
-        .map(|current| current.map(|current| current.state))
+    state_store.current()
 }
 
 #[tauri::command]
@@ -249,7 +244,7 @@ pub(crate) fn dismiss_project_dialog(
     app: AppHandle,
     window: WebviewWindow,
     session_id: String,
-    state_store: State<'_, ProjectDialogStateStore>,
+    state_store: State<'_, ProjectDialogPresentationStore>,
 ) -> Result<(), String> {
     require_project_owner(&window)?;
     require_dialog_session_id(&session_id)?;
@@ -270,7 +265,7 @@ pub(crate) fn submit_project_dialog_action(
     window: WebviewWindow,
     session_id: String,
     action: ProjectDialogAction,
-    state_store: State<'_, ProjectDialogStateStore>,
+    state_store: State<'_, ProjectDialogPresentationStore>,
 ) -> Result<(), String> {
     if window.label() != PROJECT_DIALOG_LABEL {
         return Err("dialog actions belong only to the Project dialog window".into());
@@ -343,8 +338,8 @@ mod tests {
     }
 
     #[test]
-    fn project_dialog_state_store_returns_only_the_latest_projection() {
-        let store = ProjectDialogStateStore::default();
+    fn project_dialog_presentation_store_returns_only_the_latest_projection() {
+        let store = ProjectDialogPresentationStore::default();
         store
             .present(
                 "close",
@@ -364,7 +359,7 @@ mod tests {
 
         assert!(matches!(
             store.current().expect("the current state is readable"),
-            Some(OwnedProjectDialogState {
+            Some(ProjectDialogPresentation {
                 state: ProjectDialogState::ExportFailure { message, .. },
                 ..
             })
@@ -374,7 +369,7 @@ mod tests {
 
     #[test]
     fn stale_dialog_session_cannot_replace_or_clear_the_current_owner() {
-        let store = ProjectDialogStateStore::default();
+        let store = ProjectDialogPresentationStore::default();
         store
             .present(
                 "album-information",
@@ -409,6 +404,40 @@ mod tests {
         assert!(matches!(
             current.state,
             ProjectDialogState::AlbumInformationConfirmation { .. }
+        ));
+    }
+
+    #[test]
+    fn a_reused_window_exposes_the_next_owner_with_its_state() {
+        let store = ProjectDialogPresentationStore::default();
+        store
+            .present(
+                "project-close-1",
+                ProjectDialogState::ProjectCloseConfirmation { busy: false },
+            )
+            .expect("the first owner is stored");
+        assert!(
+            store
+                .clear("project-close-1")
+                .expect("the first owner is released")
+        );
+        store
+            .present(
+                "export-2",
+                ProjectDialogState::ExportSuccess {
+                    message: "Exportação concluída".into(),
+                },
+            )
+            .expect("the reused window accepts the next owner");
+
+        let current = store
+            .current()
+            .expect("the current presentation is readable")
+            .expect("the next owner is present");
+        assert_eq!(current.session_id, "export-2");
+        assert!(matches!(
+            current.state,
+            ProjectDialogState::ExportSuccess { .. }
         ));
     }
 }

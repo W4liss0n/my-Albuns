@@ -6,9 +6,10 @@ use myalbuns_desktop_lib::ipc_contract::{
     MediaPreferenceKind, MediaPreview, MediaPreviewCommandError, MediaPreviewDemand,
     MediaPreviewState, MediaSortDirection, MediaThumbnailSizes, MediaUsageFilter,
     ProjectCloseChoice, ProjectCloseRequestOutcome, ProjectCloseResolution, ProjectDialogAction,
-    ProjectDialogActionEvent, ProjectDialogState, SaveProjectCommandError, SaveProjectOutcome,
-    SaveProjectResult, SettingsPreferenceChange, WorkspacePanelKind, WorkspacePanelPreference,
-    WorkspacePanelPreferences, WorkspacePreferenceChange, WorkspacePreferences,
+    ProjectDialogActionEvent, ProjectDialogPresentation, ProjectDialogState,
+    SaveProjectCommandError, SaveProjectOutcome, SaveProjectResult, SettingsPreferenceChange,
+    WorkspacePanelKind, WorkspacePanelPreference, WorkspacePanelPreferences,
+    WorkspacePreferenceChange, WorkspacePreferences,
 };
 use ts_rs::{Config, TS};
 
@@ -53,6 +54,8 @@ fn main() {
         .expect("Project dialog action bindings should be generated");
     ProjectDialogActionEvent::export_all(&config)
         .expect("owned Project dialog action bindings should be generated");
+    ProjectDialogPresentation::export_all(&config)
+        .expect("owned Project dialog presentation bindings should be generated");
     ProjectDialogState::export_all(&config)
         .expect("Project dialog state bindings should be generated");
     ProjectCloseChoice::export_all(&config)
