@@ -110,6 +110,14 @@ test("the manifest covers the integrated workspace and every critical Project di
   );
 
   const criticalStates = {
+    "album-information-confirmation-single-change": {
+      busy: false,
+      kind: "albumInformationConfirmation",
+    },
+    "album-information-confirmation-busy": {
+      busy: true,
+      kind: "albumInformationConfirmation",
+    },
     "project-close-confirmation": {
       busy: false,
       kind: "projectCloseConfirmation",
@@ -121,13 +129,21 @@ test("the manifest covers the integrated workspace and every critical Project di
     "project-close-failure": { kind: "projectCloseFailure" },
     "export-progress-determinate": {
       cancelRequested: false,
+      cancellable: true,
       kind: "exportProgress",
       progressKind: "determinate",
     },
     "export-progress-cancel-requested": {
       cancelRequested: true,
+      cancellable: true,
       kind: "exportProgress",
       progressKind: "indeterminate",
+    },
+    "export-progress-non-cancellable": {
+      cancelRequested: false,
+      cancellable: false,
+      kind: "exportProgress",
+      progressKind: "determinate",
     },
     "export-failure-retryable": {
       cancelled: false,
@@ -157,6 +173,7 @@ test("the manifest covers the integrated workspace and every critical Project di
       "busy",
       "cancelRequested",
       "cancelled",
+      "cancellable",
       "retryDisabled",
     ]) {
       if (modifier in expected) {

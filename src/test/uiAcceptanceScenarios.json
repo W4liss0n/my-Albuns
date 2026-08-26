@@ -68,6 +68,20 @@
       "actions": []
     },
     {
+      "id": "album-information-confirmation-busy",
+      "title": "Diálogo de Informações do Álbum — aplicação em andamento",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Atrue%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-confirmation-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "O estado ocupado preserva o resumo confirmado e bloqueia suas ações enquanto a aplicação termina, conforme o fluxo nativo aceito posterior à referência."
+      },
+      "viewport": { "width": 600, "height": 320 },
+      "readySelector": ".album-information-change-list",
+      "actions": []
+    },
+    {
       "id": "project-close-confirmation",
       "title": "Diálogo do Projeto — confirmar fechamento",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22projectCloseConfirmation%22%2C%22busy%22%3Afalse%7D",
@@ -132,6 +146,20 @@
         "surface": "owned-progress-dialog",
         "implementationCaptureSelector": ".ui-owned-window-shell",
         "reason": "O cancelamento em andamento não possui equivalente na referência visual vigente."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
+      "actions": []
+    },
+    {
+      "id": "export-progress-non-cancellable",
+      "title": "Diálogo de Exportação — publicação não cancelável",
+      "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22exportProgress%22%2C%22cancelRequested%22%3Afalse%2C%22cancellable%22%3Afalse%2C%22progress%22%3A%7B%22kind%22%3A%22determinate%22%2C%22completed%22%3A8%2C%22total%22%3A8%2C%22status%22%3A%22Publicando%20Exporta%C3%A7%C3%A3o%E2%80%A6%22%7D%7D",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-progress-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "A fase de publicação pode retirar a ação Cancelar quando o adaptador produtivo informa que a tentativa deixou de ser cancelável."
       },
       "viewport": { "width": 520, "height": 320 },
       "readySelector": ".ui-progress-dialog__track[role=\"progressbar\"]",
@@ -235,7 +263,7 @@
         "kind": "implementation-only",
         "surface": "project-workspace-photo-context",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "A referência visual vigente não representa o contexto produtivo atual de Frame e Foto depois da seleção no Modo de edição da Lâmina."
+        "reason": "A referência visual vigente não representa a composição integrada de Frame e Foto exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel [aria-label=\"Zoom da Foto\"]",
@@ -253,7 +281,7 @@
         "kind": "implementation-only",
         "surface": "project-workspace-frame-context",
         "implementationCaptureSelector": ".app-shell",
-        "reason": "A referência visual vigente não representa o contexto produtivo atual de Frame placeholder depois da seleção no Modo de edição da Lâmina."
+        "reason": "A referência visual vigente não representa a composição integrada de Frame placeholder exercitada aqui pelo App real com projeção e portas determinísticas de aceitação."
       },
       "viewport": { "width": 1440, "height": 900 },
       "readySelector": "#contextual-panel:has(.context-heading):not(:has([aria-label=\"Zoom da Foto\"])) .context-heading h2",
