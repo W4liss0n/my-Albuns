@@ -51,3 +51,7 @@ The repository uses the canonical Matt Pocock triage labels. See `docs/agents/tr
 ### Domain docs
 
 The repository uses a single domain context at `CONTEXT.md`, with architectural decisions under `docs/adr/`. See `docs/agents/domain.md`.
+
+### Review findings
+
+Before reporting audit or code-review findings, apply the admission and disposition rules in `docs/agents/review-findings.md`. Prove production reachability or concrete architectural leverage, and reconcile prior `wontfix` and `.out-of-scope/` decisions.
