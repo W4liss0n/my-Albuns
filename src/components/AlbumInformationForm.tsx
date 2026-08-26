@@ -639,10 +639,21 @@ function preserveSubsequentDraft(
   const displayUnit = localFields.has("displayUnit")
     ? current.displayUnit
     : rebasedSubmitted.displayUnit;
-  const measurement = (key: MeasurementDraftKey) =>
-    localFields.has(key)
-      ? current[key]
-      : createPhysicalFieldDraft(rebasedSubmitted[key].valueUm, displayUnit);
+  const measurement = (key: MeasurementDraftKey) => {
+    if (!localFields.has(key)) {
+      return createPhysicalFieldDraft(
+        rebasedSubmitted[key].valueUm,
+        displayUnit,
+      );
+    }
+    const local = current[key];
+    if (current.displayUnit === displayUnit || !local.hasExactValue) {
+      // Invalid input has no exact representation to convert; retain its raw
+      // text so the user can repair it in the newly projected Unit.
+      return local;
+    }
+    return createPhysicalFieldDraft(local.valueUm, displayUnit);
+  };
   return {
     displayUnit,
     sheetWidth: measurement("sheetWidth"),

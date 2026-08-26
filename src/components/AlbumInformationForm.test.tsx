@@ -564,6 +564,73 @@ test("keeps post-submit edits through two successful History predecessors", asyn
   });
 });
 
+test("reformats exact post-submit measurements when History changes only the presentation Unit", async () => {
+  let finishApply!: (completed: boolean) => void;
+  const pendingApply = new Promise<boolean>((resolve) => {
+    finishApply = resolve;
+  });
+  const onApply = vi.fn<ComponentProps<typeof AlbumInformationForm>["onApply"]>(
+    () => pendingApply,
+  );
+  const onValidate = vi.fn(async () => ({ errors: [], impact: validImpact }));
+  const onPresentationUnitChange =
+    vi.fn<(unit: DisplayUnit | null) => void>();
+  const baselineDocument = representativeProjection.state.document;
+  const view = render(
+    <ProjectionHarness
+      document={baselineDocument}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  fireEvent.change(screen.getByRole("textbox", { name: "DPI" }), {
+    target: { value: "240" },
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+  await waitFor(() => expect(onApply).toHaveBeenCalledOnce());
+  fireEvent.change(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+    { target: { value: "8" } },
+  );
+
+  view.rerender(
+    <ProjectionHarness
+      document={{ ...baselineDocument, displayUnit: "cm" }}
+      onApply={onApply}
+      onPresentationUnitChange={onPresentationUnitChange}
+      onValidate={onValidate}
+      revision={representativeProjection.state.revision + 1}
+      sheetStates={representativeProjection.state.album.sheets}
+    />,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByRole("combobox", { name: "Unidade" })).toHaveValue(
+      "cm",
+    ),
+  );
+  expect(
+    screen.getByRole("textbox", { name: "Área de segurança" }),
+  ).toHaveValue("0.8");
+  await act(async () => {
+    finishApply(false);
+    await pendingApply;
+  });
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Aplicar" })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+
+  await waitFor(() => expect(onApply).toHaveBeenCalledTimes(2));
+  expect(onApply.mock.calls[1]?.[0].value.safetyUm).toBe(8_000);
+});
+
 test("treats unit reformatting as equal while rebasing concurrent measurements", async () => {
   let finishApply!: (completed: boolean) => void;
   const pendingApply = new Promise<boolean>((resolve) => {
