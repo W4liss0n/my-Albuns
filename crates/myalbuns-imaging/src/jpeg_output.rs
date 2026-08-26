@@ -68,7 +68,12 @@ impl RasterPlan {
             .try_reserve_exact(byte_count)
             .map_err(|_| resource_failure("não há memória suficiente para compor a Exportação"))?;
         pixels.resize(byte_count, 0);
-        for pixel in pixels.chunks_exact_mut(4) {
+        let (pixels_rgba, remainder) = pixels.as_chunks_mut::<4>();
+        debug_assert!(
+            remainder.is_empty(),
+            "the allocated RGBA buffer must contain complete pixels"
+        );
+        for pixel in pixels_rgba {
             pixel.copy_from_slice(&color.0);
         }
         RgbaImage::from_raw(self.width_px, self.height_px, pixels)

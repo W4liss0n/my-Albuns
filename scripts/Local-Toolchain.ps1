@@ -1,5 +1,8 @@
+. (Join-Path $PSScriptRoot 'Rust-Toolchain.ps1')
+
 function Initialize-MyAlbunsToolchain {
     $script:WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+    $script:RustToolchain = Get-MyAlbunsRustToolchain -WorkspaceRoot $script:WorkspaceRoot
     $script:ToolRoot = Join-Path $script:WorkspaceRoot '.tools'
     $script:CargoHome = Join-Path $script:ToolRoot 'cargo'
     $script:RustupHome = Join-Path $script:ToolRoot 'rustup'
@@ -16,6 +19,7 @@ function Initialize-MyAlbunsToolchain {
     if ($env:MYALBUNS_LOCAL_TOOLCHAIN_INITIALIZED -eq '1') {
         $env:RUSTUP_HOME = $script:RustupHome
         $env:CARGO_HOME = $script:CargoHome
+        $env:RUSTUP_TOOLCHAIN = $script:RustToolchain
         if (
             $cargoBin -notin @(
                 $env:PATH -split ';' |
@@ -36,6 +40,7 @@ function Initialize-MyAlbunsToolchain {
 
     $env:RUSTUP_HOME = $script:RustupHome
     $env:CARGO_HOME = $script:CargoHome
+    $env:RUSTUP_TOOLCHAIN = $script:RustToolchain
     $env:PATH = "$cargoBin;$env:PATH"
     $env:MYALBUNS_LOCAL_TOOLCHAIN_INITIALIZED = '1'
 }

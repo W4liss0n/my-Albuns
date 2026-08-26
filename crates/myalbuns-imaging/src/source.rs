@@ -1324,29 +1324,29 @@ fn normalize_rgba(
             }
         }
         ColorType::La8 => {
-            for value in raw.chunks_exact(2) {
+            for value in exact_chunks::<2>(&raw)? {
                 rgba.extend_from_slice(&[value[0], value[0], value[0], value[1]]);
             }
         }
         ColorType::Rgb8 => {
-            for value in raw.chunks_exact(3) {
+            for value in exact_chunks::<3>(&raw)? {
                 rgba.extend_from_slice(&[value[0], value[1], value[2], 255]);
             }
         }
         ColorType::L16 => {
-            for value in raw.chunks_exact(2) {
+            for value in exact_chunks::<2>(&raw)? {
                 let luminance = reduce_16(value);
                 rgba.extend_from_slice(&[luminance, luminance, luminance, 255]);
             }
         }
         ColorType::La16 => {
-            for value in raw.chunks_exact(4) {
+            for value in exact_chunks::<4>(&raw)? {
                 let luminance = reduce_16(&value[..2]);
                 rgba.extend_from_slice(&[luminance, luminance, luminance, reduce_16(&value[2..4])]);
             }
         }
         ColorType::Rgb16 => {
-            for value in raw.chunks_exact(6) {
+            for value in exact_chunks::<6>(&raw)? {
                 rgba.extend_from_slice(&[
                     reduce_16(&value[..2]),
                     reduce_16(&value[2..4]),
@@ -1356,7 +1356,7 @@ fn normalize_rgba(
             }
         }
         ColorType::Rgba16 => {
-            for value in raw.chunks_exact(8) {
+            for value in exact_chunks::<8>(&raw)? {
                 rgba.extend_from_slice(&[
                     reduce_16(&value[..2]),
                     reduce_16(&value[2..4]),
@@ -1373,10 +1373,7 @@ fn normalize_rgba(
         }
     }
     if rgba.len() != output_len {
-        return Err(SourceFailure::new(
-            ImagingFailureCode::DecodeFailed,
-            "o tamanho decodificado não corresponde às dimensões da fonte",
-        ));
+        return Err(decoded_size_failure());
     }
     RgbaImage::from_raw(width, height, rgba).ok_or_else(|| {
         SourceFailure::new(
@@ -1384,6 +1381,22 @@ fn normalize_rgba(
             "não foi possível materializar o raster RGBA8",
         )
     })
+}
+
+fn exact_chunks<const N: usize>(bytes: &[u8]) -> Result<&[[u8; N]], SourceFailure> {
+    let (chunks, remainder) = bytes.as_chunks::<N>();
+    if remainder.is_empty() {
+        Ok(chunks)
+    } else {
+        Err(decoded_size_failure())
+    }
+}
+
+fn decoded_size_failure() -> SourceFailure {
+    SourceFailure::new(
+        ImagingFailureCode::DecodeFailed,
+        "o tamanho decodificado não corresponde às dimensões da fonte",
+    )
 }
 
 fn reduce_16(bytes: &[u8]) -> u8 {

@@ -74,3 +74,7 @@ O mapa de implementação está em [`.scratch/programa-diagramacao/`](.scratch/p
 ## Estado do repositório
 
 Windows 10/11 x64 é o escopo inicial. No Windows 11 x64, o spike executável validou WebGL2 com backend de hardware verificável e Tauri 2 com React/TypeScript e Rust. A arquitetura aceita usa `MyAlbuns.exe` como processo global leve, um host independente por Projeto e um Processador de Imagens separado, conforme o [ADR 0005](docs/adr/0005-adotar-tauri-react-rust.md).
+
+## Toolchain de desenvolvimento
+
+O Rust está fixado na versão exata declarada em [`rust-toolchain.toml`](rust-toolchain.toml), incluindo `clippy` e `rustfmt`. `npm run setup:local` instala essa versão dentro de `.tools/`, também em checkouts que já possuíam uma instalação local, e a torna o padrão do `rustup` local. Os comandos Rust do repositório devem ser executados pelos scripts `npm run check:rust`, `npm run test:rust` e `npm run quality:rust`, que selecionam a mesma versão fixada.
