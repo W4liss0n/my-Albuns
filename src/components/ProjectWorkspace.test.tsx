@@ -826,13 +826,13 @@ test("releases an application close when its confirmation window cannot be prese
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Fechar Projeto" }));
 
-  await waitFor(() =>
-    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel"),
-  );
-  expect(onProjectionChange).toHaveBeenCalledWith(restoredProjection);
-  expect(harness.dialog.present).toHaveBeenLastCalledWith({
-    kind: "projectOperationFailure",
-    message: "Não foi possível abrir a confirmação.",
+  await waitFor(() => {
+    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
+    expect(onProjectionChange).toHaveBeenCalledWith(restoredProjection);
+    expect(harness.dialog.present).toHaveBeenLastCalledWith({
+      kind: "projectOperationFailure",
+      message: "Não foi possível abrir a confirmação.",
+    });
   });
 });
 
@@ -861,13 +861,13 @@ test("releases a native close when its confirmation window cannot be presented",
 
   act(() => harness.emitCloseRequested());
 
-  await waitFor(() =>
-    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel"),
-  );
-  expect(onProjectionChange).toHaveBeenCalledWith(projection);
-  expect(harness.dialog.present).toHaveBeenLastCalledWith({
-    kind: "projectOperationFailure",
-    message: "Não foi possível abrir a confirmação.",
+  await waitFor(() => {
+    expect(harness.port.resolveClose).toHaveBeenCalledWith("cancel");
+    expect(onProjectionChange).toHaveBeenCalledWith(projection);
+    expect(harness.dialog.present).toHaveBeenLastCalledWith({
+      kind: "projectOperationFailure",
+      message: "Não foi possível abrir a confirmação.",
+    });
   });
 });
 
