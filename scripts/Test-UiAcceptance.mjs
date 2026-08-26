@@ -31,6 +31,9 @@ test("editor scenarios declare honest, surface-matched comparisons", () => {
   const editorScenarioIds = new Set([
     "album-information-validation-tooltip",
     "canvas-normal",
+    "canvas-scrollbar-focus",
+    "canvas-scrollbar-hover",
+    "canvas-scrollbar-idle",
     "canvas-sheet-editing",
     "canvas-sheet-editing-exit",
     "media-panel",
@@ -278,6 +281,28 @@ test("the manifest covers critical integrated workspace, panel, menu, and graphi
         `${id} must exercise the declared user transition`,
       );
     }
+  }
+});
+
+test("the manifest captures the rendered Canvas scrollbar at idle, hover, and focus", () => {
+  const scenariosById = new Map(
+    manifest.scenarios.map((scenario) => [scenario.id, scenario]),
+  );
+  const expectedActions = {
+    "canvas-scrollbar-idle": [],
+    "canvas-scrollbar-hover": ["hover"],
+    "canvas-scrollbar-focus": ["focus"],
+  };
+
+  for (const [id, actionTypes] of Object.entries(expectedActions)) {
+    const scenario = scenariosById.get(id);
+    assert.ok(scenario, `${id} is missing`);
+    assert.equal(scenario.readySelector, ".canvas-horizontal-scrollbar__thumb");
+    assert.equal(scenario.comparison.surface, "continuous-canvas-scrollbar");
+    assert.deepEqual(
+      scenario.actions.map((action) => action.type),
+      actionTypes,
+    );
   }
 });
 

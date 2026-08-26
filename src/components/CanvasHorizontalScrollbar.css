@@ -1,33 +1,70 @@
-.canvas-horizontal-scrollbar {
+.canvas-horizontal-scrollbar-shell {
   --ui-scrollbar-track: var(--ui-canvas-scrollbar-track);
   --ui-scrollbar-thumb: var(--ui-canvas-scrollbar-thumb);
   --ui-scrollbar-thumb-hover: var(--ui-canvas-scrollbar-thumb-hover);
 
+  position: relative;
   min-width: 0;
   height: 11px;
-  overflow-x: scroll;
-  overflow-y: hidden;
   border-top: 1px solid var(--ui-border);
-  outline: none;
   background: var(--ui-scrollbar-track);
-  overscroll-behavior-x: none;
 }
 
+.canvas-horizontal-scrollbar {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  min-width: 0;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  outline: none;
+  background: transparent;
+  overscroll-behavior-x: none;
+  scrollbar-color: transparent transparent;
+}
+
+.canvas-horizontal-scrollbar::-webkit-scrollbar-track,
 .canvas-horizontal-scrollbar::-webkit-scrollbar-thumb {
-  border: 1px solid var(--ui-canvas-scrollbar-thumb-border);
-  background-clip: padding-box;
+  border: 0;
+  background: transparent;
 }
 
 .canvas-horizontal-scrollbar:focus-visible {
   outline: none;
-  background: var(--ui-scrollbar-track);
 }
 
-.canvas-horizontal-scrollbar:focus-visible::-webkit-scrollbar-thumb {
+.canvas-horizontal-scrollbar__visual-track {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.canvas-horizontal-scrollbar__thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  box-sizing: border-box;
+  border: 1px solid var(--ui-canvas-scrollbar-thumb-border);
+  border-radius: 99px;
+  background: var(--ui-scrollbar-thumb);
+  transition:
+    border-color 100ms ease,
+    background-color 100ms ease;
+}
+
+.canvas-horizontal-scrollbar-shell:hover
+  .canvas-horizontal-scrollbar__thumb {
+  background: var(--ui-scrollbar-thumb-hover);
+}
+
+.canvas-horizontal-scrollbar:focus-visible
+  + .canvas-horizontal-scrollbar__visual-track
+  .canvas-horizontal-scrollbar__thumb {
   border-width: 2px;
   border-color: var(--ui-focus-neutral);
   background: var(--ui-scrollbar-thumb-hover);
-  background-clip: padding-box;
 }
 
 .canvas-horizontal-scrollbar__content {

@@ -537,6 +537,52 @@
       ]
     },
     {
+      "id": "canvas-scrollbar-idle",
+      "title": "Canvas — scrollbar horizontal em repouso",
+      "implementationPath": "/canvas-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-scrollbar",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "reason": "A referência visual vigente antecede a direção cromática da scrollbar horizontal do Canvas definida nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".canvas-horizontal-scrollbar__thumb",
+      "actions": []
+    },
+    {
+      "id": "canvas-scrollbar-hover",
+      "title": "Canvas — scrollbar horizontal em hover",
+      "implementationPath": "/canvas-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-scrollbar",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "reason": "A referência visual vigente antecede o hover da scrollbar horizontal do Canvas definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".canvas-horizontal-scrollbar__thumb",
+      "actions": [
+        { "type": "hover", "selector": ".canvas-horizontal-scrollbar-shell" }
+      ]
+    },
+    {
+      "id": "canvas-scrollbar-focus",
+      "title": "Canvas — scrollbar horizontal em foco",
+      "implementationPath": "/canvas-preview.html?acceptance=editor",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "continuous-canvas-scrollbar",
+        "implementationCaptureSelector": ".canvas-preview[data-acceptance-surface=\"editor\"]",
+        "reason": "A referência visual vigente antecede o indicador neutro de foco da scrollbar horizontal do Canvas definido nas decisões aceitas posteriores."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": ".canvas-horizontal-scrollbar__thumb",
+      "actions": [
+        { "type": "focus", "selector": ".canvas-horizontal-scrollbar" }
+      ]
+    },
+    {
       "id": "canvas-sheet-editing-exit",
       "title": "Canvas — saída da Edição da Lâmina",
       "implementationPath": "/canvas-preview.html?acceptance=editor&mode=sheet-editing&sheet=sheet-002",

@@ -40,6 +40,16 @@ export function CanvasHorizontalScrollbar({
       Math.min(bounds.maximum, Math.max(bounds.minimum, viewport.offsetX))
     : 0;
   const contentWidth = (metrics?.width ?? 0) + scrollDistance;
+  const trackWidth = metrics?.width ?? 0;
+  const scrollProgress =
+    scrollDistance > 0 ? scrollLeft / scrollDistance : 0;
+  const idealThumbWidth =
+    contentWidth > 0 ? (trackWidth * trackWidth) / contentWidth : 0;
+  const thumbWidth = Math.min(
+    trackWidth,
+    Math.max(24, idealThumbWidth),
+  );
+  const thumbLeft = scrollProgress * (trackWidth - thumbWidth);
 
   useLayoutEffect(() => {
     const scrollbar = scrollbarRef.current;
@@ -73,24 +83,37 @@ export function CanvasHorizontalScrollbar({
   };
 
   return (
-    <div
-      aria-disabled={!bounds}
-      aria-label="Navegação horizontal das Lâminas"
-      aria-orientation="horizontal"
-      aria-valuemax={scrollDistance}
-      aria-valuemin={0}
-      aria-valuenow={scrollLeft}
-      className="canvas-horizontal-scrollbar"
-      onScroll={handleScroll}
-      ref={scrollbarRef}
-      role="scrollbar"
-      tabIndex={0}
-    >
+    <div className="canvas-horizontal-scrollbar-shell">
+      <div
+        aria-disabled={!bounds}
+        aria-label="Navegação horizontal das Lâminas"
+        aria-orientation="horizontal"
+        aria-valuemax={scrollDistance}
+        aria-valuemin={0}
+        aria-valuenow={scrollLeft}
+        className="canvas-horizontal-scrollbar"
+        onScroll={handleScroll}
+        ref={scrollbarRef}
+        role="scrollbar"
+        tabIndex={0}
+      >
+        <div
+          aria-hidden="true"
+          className="canvas-horizontal-scrollbar__content"
+          style={{ width: `${contentWidth}px` }}
+        />
+      </div>
       <div
         aria-hidden="true"
-        className="canvas-horizontal-scrollbar__content"
-        style={{ width: `${contentWidth}px` }}
-      />
+        className="canvas-horizontal-scrollbar__visual-track"
+      >
+        {bounds && trackWidth > 0 ? (
+          <span
+            className="canvas-horizontal-scrollbar__thumb"
+            style={{ left: `${thumbLeft}px`, width: `${thumbWidth}px` }}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

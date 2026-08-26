@@ -337,13 +337,13 @@ test("uses the focused Sheet instead of the Canvas perimeter as the keyboard foc
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*none;/s,
   );
   expect(canvasScrollbarStyles).toMatch(
-    /\.canvas-horizontal-scrollbar\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-canvas-scrollbar-track\);/s,
+    /\.canvas-horizontal-scrollbar-shell\s*\{[^}]*--ui-scrollbar-track:\s*var\(--ui-canvas-scrollbar-track\);/s,
   );
   expect(canvasScrollbarStyles).toMatch(
-    /\.canvas-horizontal-scrollbar:focus-visible\s*\{[^}]*background:\s*var\(--ui-scrollbar-track\);/s,
+    /\.canvas-horizontal-scrollbar__thumb\s*\{[^}]*background:\s*var\(--ui-scrollbar-thumb\);/s,
   );
   expect(canvasScrollbarStyles).toMatch(
-    /\.canvas-horizontal-scrollbar:focus-visible::-webkit-scrollbar-thumb\s*\{[^}]*border-width:\s*2px;[^}]*border-color:\s*var\(--ui-focus-neutral\);/s,
+    /\.canvas-horizontal-scrollbar:focus-visible[\s\S]*\.canvas-horizontal-scrollbar__thumb\s*\{[^}]*border-width:\s*2px;[^}]*border-color:\s*var\(--ui-focus-neutral\);/s,
   );
   expect(canvasStyles).not.toMatch(
     /\.pixi-canvas:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-accent\);/s,
