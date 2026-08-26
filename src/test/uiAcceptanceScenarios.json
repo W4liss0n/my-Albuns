@@ -26,6 +26,20 @@
       "actions": []
     },
     {
+      "id": "new-project-operational-failure-dialog",
+      "title": "Novo Projeto — falha operacional em diálogo pertencente",
+      "implementationPath": "/dialog.html?kind=project-failure&title=N%C3%A3o%20foi%20poss%C3%ADvel%20escolher%20a%20Imagem%20decorativa&message=O%20arquivo%20escolhido%20n%C3%A3o%20cont%C3%A9m%20uma%20imagem%20JPEG%20ou%20PNG.&action=Escolha%20outro%20arquivo%20JPEG%20ou%20PNG.",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "owned-message-dialog",
+        "implementationCaptureSelector": ".ui-owned-window-shell",
+        "reason": "Falhas operacionais de Novo Projeto usam o diálogo pertencente canônico definido nas decisões aceitas posteriores; o título mais longo valida a fronteira visual comum aos contextos tipados."
+      },
+      "viewport": { "width": 520, "height": 320 },
+      "readySelector": ".ui-standard-message[role=\"alert\"]",
+      "actions": []
+    },
+    {
       "id": "album-information-confirmation-single-change",
       "title": "Diálogo de Informações do Álbum — uma alteração",
       "implementationPath": "/project-dialog.html?state=%7B%22kind%22%3A%22albumInformationConfirmation%22%2C%22busy%22%3Afalse%2C%22details%22%3A%5B%7B%22label%22%3A%22Primeira%20L%C3%A2mina%22%2C%22value%22%3A%22P%C3%A1gina%20%C3%BAnica%20%E2%86%92%20L%C3%A2mina%20dupla%22%7D%5D%7D",
