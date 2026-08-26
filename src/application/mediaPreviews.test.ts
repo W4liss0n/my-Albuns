@@ -1,6 +1,29 @@
 import { expect, test } from "vitest";
 
-import { renderableMediaPreviewUrls } from "./mediaPreviews";
+import {
+  renderableMediaPreviewUrl,
+  renderableMediaPreviewUrls,
+} from "./mediaPreviews";
+
+test.each([
+  [{ state: "pending" as const }, null],
+  [{ state: "absent" as const }, null],
+  [{ state: "ready" as const, url: "" }, null],
+  [
+    { state: "ready" as const, url: "asset://localhost/cache/ready.png" },
+    "asset://localhost/cache/ready.png",
+  ],
+  [{ state: "unavailable" as const, url: null }, null],
+  [
+    {
+      state: "unavailable" as const,
+      url: "asset://localhost/cache/retained.png",
+    },
+    "asset://localhost/cache/retained.png",
+  ],
+])("selects one renderable Cache URL from %o", (preview, expected) => {
+  expect(renderableMediaPreviewUrl(preview)).toBe(expected);
+});
 
 test("projects only ready and retained unavailable Cache preview URLs", () => {
   expect(

@@ -1,6 +1,6 @@
 import type { VisualScope } from "../../application/scopedValues";
+import { renderableMediaPreviewUrl } from "../../application/mediaPreviews";
 import type {
-  DecorativePreview,
   PreviewBackgroundContent,
   PreviewOverlayContent,
   VisualPersonalizationPreview,
@@ -8,7 +8,10 @@ import type {
 } from "./types";
 import { draftFrameBorderFillRects } from "./draftFrameBorderGeometry";
 import { SheetGuideLayer } from "./SheetGuideLayer";
-import { VISUAL_MEDIA_FALLBACK_STYLE } from "./visualMediaFallbackStyle";
+import {
+  scaleVisualMediaFallbackLength,
+  VISUAL_MEDIA_FALLBACK_STYLE,
+} from "./visualMediaFallbackStyle";
 import "./VisualPreviewSheet.css";
 
 interface PersonalizationPreviewProps {
@@ -333,7 +336,7 @@ function OverlayContent({
   x: number;
 }) {
   if (!content) return null;
-  const previewUrl = renderablePreviewUrl(content.preview);
+  const previewUrl = renderableMediaPreviewUrl(content.preview);
   return previewUrl ? (
     <image
       aria-label={label}
@@ -351,17 +354,17 @@ function OverlayContent({
       data-preview-state={content.preview.state}
       fill="none"
       height={height}
-      rx={Math.round(
-        height *
-          VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusToHeightRatio,
+      rx={scaleVisualMediaFallbackLength(
+        height,
+        VISUAL_MEDIA_FALLBACK_STYLE.overlay.cornerRadiusPx,
       )}
       stroke={VISUAL_MEDIA_FALLBACK_STYLE.overlay.outline}
       strokeOpacity={VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineOpacity}
       strokeWidth={Math.max(
         1,
-        Math.round(
-          height *
-            VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthToHeightRatio,
+        scaleVisualMediaFallbackLength(
+          height,
+          VISUAL_MEDIA_FALLBACK_STYLE.overlay.outlineWidthPx,
         ),
       )}
       width={width}
@@ -396,7 +399,7 @@ function BackgroundContent({
       />
     );
   }
-  const previewUrl = renderablePreviewUrl(content.preview);
+  const previewUrl = renderableMediaPreviewUrl(content.preview);
   return previewUrl ? (
     <image
       aria-label={label}
@@ -419,14 +422,4 @@ function BackgroundContent({
       y="0"
     />
   );
-}
-
-function renderablePreviewUrl(
-  preview: DecorativePreview,
-) {
-  if (preview.state !== "ready" && preview.state !== "unavailable") {
-    return null;
-  }
-  const url = preview.url?.trim();
-  return url ? preview.url : null;
 }
