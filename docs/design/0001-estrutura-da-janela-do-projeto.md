@@ -280,7 +280,7 @@ Quando a Lâmina alvo possui Layout travado, a preview aplicada permanece destac
 - O menu de contexto de um Frame preenchido oferece `Abrir no Photoshop`. A ação envia somente o Arquivo vinculado original da Foto, sem aplicar seu enquadramento ou efeitos do MyAlbuns; o atalho fixo do MVP é `Ctrl + E`.
 - `Abrir no Photoshop` exige exatamente uma Foto contextual. Quando houver vários Frames selecionados, o comando e seu atalho ficam indisponíveis e nunca abrem vários arquivos em massa.
 - `Editar > Adicionar Frame` e `Adicionar Frame` no menu de contexto da área vazia do Canvas criam imediatamente um único placeholder centralizado e selecionado.
-- O Frame novo usa dimensões proporcionais à superfície ativa, nunca um tamanho físico fixo. Em Lâmina dupla, é centralizado na Lâmina inteira e pode atravessar a divisão; em Página única, é centralizado somente na Página ativa.
+- O Frame novo usa proporção `3:2` e largura de `40%` da superfície ativa, reduzida somente quando a altura disponível exigir; nunca usa um tamanho físico fixo. Em Lâmina dupla, é centralizado na Lâmina inteira e pode atravessar a divisão; em Página única, é centralizado somente na Página ativa.
 - Não existe modo de desenho nem ferramenta persistente para essa criação. O comando gera uma ação de Undo/Redo e fica indisponível em Layout travado.
 - Painel contextual e Painel de imagens continuam disponíveis.
 - O Painel de imagens assume automaticamente uma altura compacta para priorizar o Canvas, sem ser completamente ocultado.
@@ -301,7 +301,7 @@ Durante o Modo de edição, a `ViewportTransform` temporária pode alterar o Zoo
 
 Quando o Zoom ultrapassa `Ajustar Lâmina`, `Espaço` + arraste com o botão esquerdo ou arraste com o botão do meio executam Pan do Canvas dentro da mesma `ViewportTransform`. O cursor assume a forma de mão e o gesto nunca move Frame ou Foto, não participa de Undo/Redo e não integra o Projeto.
 
-`Ajustar Lâmina` é o limite mínimo: o usuário não pode reduzir a visualização abaixo do enquadramento completo. O limite máximo será calibrado no protótipo conforme nitidez e desempenho.
+`Ajustar Lâmina` é o limite mínimo: o usuário não pode reduzir a visualização abaixo do enquadramento completo. `4× Ajustar Lâmina` é o teto calibrado; tentativas de ultrapassar mínimo ou máximo são contidas por clamp.
 
 ## Painel de imagens
 
@@ -563,6 +563,4 @@ As propriedades em lote respeitam o tipo do elemento:
 
 ## Decisões ainda abertas
 
-- limite máximo do Zoom exclusivo do Modo de edição, a ser calibrado no protótipo;
 - largura proporcional exata da faixa central de soltura dos Decorativos, a ser calibrada no protótipo;
-- proporção inicial exata do Frame placeholder criado manualmente.

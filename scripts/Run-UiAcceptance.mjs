@@ -422,46 +422,50 @@ async function navigateAndCapture({
   label,
 }) {
   await setExactViewport(request, sessionId, scenario.viewport);
-  const targetUrl = `${frontendOrigin}${servedPath}`;
-  await request("POST", `/session/${sessionId}/url`, {
-    url: targetUrl,
-  });
-  await waitForNavigation(request, sessionId, targetUrl, label);
-  await settleDocument(request, sessionId);
-  await neutralizeUiAcceptancePointer({
-    request,
-    sessionId,
-    viewport: scenario.viewport,
-  });
-  await settleDocument(request, sessionId);
-  const locateSelector = (selector) =>
-    waitForElement(request, sessionId, selector, `${label} action`);
-  const locateText = (text) =>
-    waitForButtonText(request, sessionId, text, `${label} action`);
-  for (const action of actions) {
-    await performUiAcceptanceAction({
-      action,
-      execute: (script, args) => execute(request, sessionId, script, args),
-      locateSelector,
-      locateText,
+  try {
+    const targetUrl = `${frontendOrigin}${servedPath}`;
+    await request("POST", `/session/${sessionId}/url`, {
+      url: targetUrl,
+    });
+    await waitForNavigation(request, sessionId, targetUrl, label);
+    await settleDocument(request, sessionId);
+    await neutralizeUiAcceptancePointer({
+      request,
+      sessionId,
+      viewport: scenario.viewport,
+    });
+    await settleDocument(request, sessionId);
+    const locateSelector = (selector) =>
+      waitForElement(request, sessionId, selector, `${label} action`);
+    const locateText = (text) =>
+      waitForButtonText(request, sessionId, text, `${label} action`);
+    for (const action of actions) {
+      await performUiAcceptanceAction({
+        action,
+        execute: (script, args) => execute(request, sessionId, script, args),
+        locateSelector,
+        locateText,
+        request,
+        sessionId,
+      });
+      await settleDocument(request, sessionId);
+    }
+    await waitForElement(request, sessionId, readySelector, label);
+    await settleDocument(request, sessionId);
+    const screenshot = await captureUiAcceptanceScreenshot({
+      captureSelector,
+      locateSelector: (selector) =>
+        waitForElement(request, sessionId, selector, `${label} capture`),
       request,
       sessionId,
     });
-    await settleDocument(request, sessionId);
+    if (typeof screenshot !== "string" || !screenshot) {
+      throw new Error(`${label} returned no screenshot`);
+    }
+    writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
+  } finally {
+    await request("DELETE", `/session/${sessionId}/actions`);
   }
-  await waitForElement(request, sessionId, readySelector, label);
-  await settleDocument(request, sessionId);
-  const screenshot = await captureUiAcceptanceScreenshot({
-    captureSelector,
-    locateSelector: (selector) =>
-      waitForElement(request, sessionId, selector, `${label} capture`),
-    request,
-    sessionId,
-  });
-  if (typeof screenshot !== "string" || !screenshot) {
-    throw new Error(`${label} returned no screenshot`);
-  }
-  writeFileSync(screenshotPath, Buffer.from(screenshot, "base64"));
 }
 
 const managedProcesses = [];

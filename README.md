@@ -33,13 +33,14 @@ Contratos detalhados por área. Os de interface descrevem superfícies e intera�
 
 - [0001 — Estrutura da Janela do Projeto](docs/design/0001-estrutura-da-janela-do-projeto.md) — Canvas contínuo, Barra da Lâmina, Painel de Layouts, Modo de edição, Painel de imagens e Painel contextual.
 - [0002 — Tela de Boas-vindas](docs/design/0002-tela-de-boas-vindas.md) — ponto de entrada do aplicativo e sua relação com as Janelas de Projeto.
-- [0003 — Criação de Projeto](docs/design/0003-criacao-de-projeto.md) — etapas `Dimensões` e `Personalização` e o diálogo nativo de Nome e Localização.
+- [0003 — Criação de Projeto](docs/design/0003-criacao-de-projeto.md) — etapas `Configurações` e `Personalização` e o diálogo nativo de Nome e Localização.
 - [0004 — Exportação normal](docs/design/0004-exportacao-normal.md) — escopo, modo, formato, destino, preparação e publicação.
 - [0005 — Tela de Problemas](docs/design/0005-tela-de-problemas.md) — superfície tabular reutilizável de bloqueios, conflitos e resultados.
 - [0006 — Configuração da Exportação em lote](docs/design/0006-configuracao-da-exportacao-em-lote.md) — seleção, pré-validação e entrada no Modo de lote exclusivo.
 - [0007 — Progresso de operações](docs/design/0007-progresso-de-operacoes.md) — representação única de progresso determinado e indeterminado.
 - [0008 — Configuração da Geração em lote](docs/design/0008-configuracao-da-geracao-em-lote.md) — Projeto modelo, origem, destino e verificação prévia.
 - [0009 — Configurações do aplicativo](docs/design/0009-configuracoes-do-aplicativo.md) — abas `Desempenho` e `Photoshop`, e o catálogo de comandos.
+- [0018 — Mapa de navegação e interação da interface](docs/design/0018-mapa-de-navegacao-e-interacao-da-interface.md) — superfícies, nomes atuais, modos, transições, ownership e registro de validação visual.
 
 ### Núcleo
 
