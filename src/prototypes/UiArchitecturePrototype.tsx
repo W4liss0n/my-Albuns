@@ -272,6 +272,11 @@ function ReorderStrip({
       data-reorder-state={state}
       data-reorder-surface={surface}
       data-sheet-order={order.join(",")}
+      onPointerUp={() => {
+        if (gesture?.origin === surface) {
+          onPointerUp(surface, gesture.targetId);
+        }
+      }}
     >
       <header>
         <strong>{surfaceName}</strong>
@@ -313,7 +318,6 @@ function ReorderStrip({
                   onPointerDown(surface, sheetId);
                 }}
                 onPointerMove={() => onPointerMove(surface, sheetId)}
-                onPointerUp={() => onPointerUp(surface, sheetId)}
                 type="button"
               >
                 <span>{sheet?.label}</span>
@@ -780,6 +784,7 @@ export function UiArchitecturePrototype({
             <p
               className="prototype-layout-lock-feedback"
               data-blocked={String(layoutLockFeedback)}
+              data-layout-lock-feedback=""
               data-testid="layout-lock-feedback"
             >
               Layout travado: seleção preservada; mover e redimensionar estão bloqueados.

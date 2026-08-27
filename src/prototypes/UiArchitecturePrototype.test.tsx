@@ -105,7 +105,7 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
 
   fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 2 });
   fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 2 });
-  fireEvent.pointerUp(target, { clientX: 40, clientY: 40, pointerId: 2 });
+  fireEvent.pointerUp(bar, { clientX: 40, clientY: 40, pointerId: 2 });
 
   expect(bar).toHaveAttribute("data-reorder-state", "committed");
   expect(bar).toHaveAttribute("data-sheet-order", reordered);
@@ -249,6 +249,9 @@ test("moves and resizes one selected Frame, then blocks both gestures when Layou
   expect(frame).toHaveAttribute("data-y", "18");
   expect(screen.getByTestId("layout-lock-feedback")).toHaveTextContent(
     "Layout travado: seleção preservada; mover e redimensionar estão bloqueados.",
+  );
+  expect(screen.getByTestId("layout-lock-feedback")).toHaveAttribute(
+    "data-layout-lock-feedback",
   );
   expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("2");
 });
