@@ -70,6 +70,17 @@ function sensitivePathFragments(originalPath) {
 
   const directory = path.win32.dirname(nativePath);
   const root = path.win32.parse(nativePath).root;
+  const windowsRoot =
+    /^[a-z]:[\\/]$/iu.test(root) || root.startsWith("\\\\");
+  if (windowsRoot) {
+    fragments.add(root);
+    fragments.add(root.replaceAll("\\", "/"));
+    if (root.startsWith("\\\\")) {
+      const shareRoot = root.replace(/[\\/]+$/u, "");
+      fragments.add(shareRoot);
+      fragments.add(shareRoot.replaceAll("\\", "/"));
+    }
+  }
   if (directory !== "." && directory !== root) {
     fragments.add(directory);
     fragments.add(directory.replaceAll("\\", "/"));

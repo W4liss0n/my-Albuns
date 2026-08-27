@@ -112,6 +112,7 @@ export function ProjectWorkspace({
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
   const [saveAsBarrierActive, setSaveAsBarrierActive] = useState(false);
+  const saveAsBarrierRef = useRef(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
@@ -171,6 +172,21 @@ export function ProjectWorkspace({
   const reportCloseError = useCallback((value: string) => {
     setCloseMessage(value);
   }, []);
+  const changeSaveAsBarrier = useCallback((active: boolean) => {
+    saveAsBarrierRef.current = active;
+    setSaveAsBarrierActive(active);
+  }, []);
+
+  useEffect(() => {
+    const rejectTerminalKeyboardInput = (event: KeyboardEvent) => {
+      if (!saveAsBarrierRef.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", rejectTerminalKeyboardInput, true);
+    return () =>
+      window.removeEventListener("keydown", rejectTerminalKeyboardInput, true);
+  }, []);
   const projectClose = useProjectCloseController({
     projectDialogPort,
     projectWindowPort,
@@ -186,7 +202,7 @@ export function ProjectWorkspace({
     runProjectMutation,
     projectCorePort,
     onProjectionChange,
-    onSaveAsBarrierChange: setSaveAsBarrierActive,
+    onSaveAsBarrierChange: changeSaveAsBarrier,
   });
   const albumInformationApply = useAlbumInformationApplyController({
     projectDialogPort,

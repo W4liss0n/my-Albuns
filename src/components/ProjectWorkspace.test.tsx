@@ -3823,15 +3823,37 @@ test("makes Salvar como a terminal barrier after an accepted deferred import", a
     />,
   );
 
+  act(() => canvasHarness.props?.onEditSheet?.("sheet-001"));
+  expect(canvasHarness.props?.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
+
   fireEvent.click(screen.getByRole("button", { name: "Importar" }));
   fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
   await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Filtro, ordem e tamanho" }),
+  );
+  expect(
+    screen.getByRole("group", { name: "Filtro, ordem e tamanho" }),
+  ).toBeInTheDocument();
 
   fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "s" });
   await waitFor(() =>
     expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
   );
   expect(screen.getByRole("button", { name: "Importar" })).toBeDisabled();
+
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(
+    screen.getByRole("group", { name: "Filtro, ordem e tamanho" }),
+  ).toBeInTheDocument();
+  expect(canvasHarness.props?.mode).toEqual({
+    kind: "sheet-editing",
+    sheetId: "sheet-001",
+  });
 
   fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
   fireEvent.doubleClick(screen.getByRole("button", { name: "Campo.jpg" }));

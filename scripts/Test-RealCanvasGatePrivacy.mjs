@@ -40,6 +40,10 @@ test("rejects directory-qualified Windows and UNC Original paths in DOM forms", 
       source: String.raw`<output data-directory="C:\Users\Ana & João\Álbuns"></output>`,
     },
     {
+      label: "Windows drive root without basename",
+      source: String.raw`<output data-directory="C:\"></output>`,
+    },
+    {
       label: "directory-qualified relative path",
       source: `<span data-source="Álbuns/background-original.png"></span>`,
     },
@@ -50,6 +54,10 @@ test("rejects directory-qualified Windows and UNC Original paths in DOM forms", 
     {
       label: "UNC attribute",
       source: String.raw`<img data-source="\\nas-01\Fotos Família\overlay-original.png">`,
+    },
+    {
+      label: "UNC share root without basename",
+      source: String.raw`<output data-directory="\\nas-01\Fotos Família"></output>`,
     },
     {
       label: "HTML-encoded UNC text",
