@@ -422,6 +422,15 @@ test("the manifest proves every Program 05 closeout interaction through the isol
     assert.match(scenariosById.get(id).implementationPath, /mode=normal/u);
     assert.match(scenariosById.get(id).readySelector, /data-editor-mode/u);
   }
+  for (const id of [
+    "sheet-reorder-bar-preview",
+    "sheet-reorder-grid-preview",
+  ]) {
+    assert.match(
+      scenariosById.get(id).readySelector,
+      /^\[data-editor-mode="normal"\] \[data-reorder-surface=/u,
+    );
+  }
 });
 
 test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {

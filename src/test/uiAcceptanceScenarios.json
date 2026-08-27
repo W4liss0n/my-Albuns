@@ -768,7 +768,7 @@
         "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"]))",
+      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"bar\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
       "actions": [
         { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
@@ -800,7 +800,7 @@
         "reason": "A referência visual vigente não representa os estados intermediários de reordenação aceitos posteriormente."
       },
       "viewport": { "width": 1440, "height": 900 },
-      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"]))",
+      "readySelector": "[data-editor-mode=\"normal\"] [data-reorder-surface=\"grid\"][data-reorder-state=\"preview\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"][data-preview-order=\"sheet-001,sheet-004,sheet-002,sheet-003,sheet-005\"]:has([data-testid=\"reorder-placeholder\"]):has([data-testid=\"reorder-ghost\"])",
       "actions": [
         { "type": "drag", "selector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"grid\"] [data-sheet-id=\"sheet-002\"]", "phase": "preview" }
       ]
