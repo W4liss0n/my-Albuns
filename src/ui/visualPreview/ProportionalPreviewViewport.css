@@ -11,17 +11,6 @@
   place-items: center;
 }
 
-.visual-preview-outside-action {
-  position: absolute;
-  z-index: 0;
-  inset: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  cursor: default;
-}
-
 .visual-preview-surface {
   position: relative;
   z-index: 1;

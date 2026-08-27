@@ -6,7 +6,6 @@ import {
 } from "../application/physicalMeasurements";
 import {
   ProportionalPreviewViewport,
-  type PreviewOutsideSurfaceAction,
   type VisualPreviewGeometry,
 } from "../ui/visualPreview";
 import { SHEET_GUIDE_STYLE } from "../ui/sheetGuideGeometry";
@@ -14,6 +13,13 @@ import type { NewProjectDimensionsDraft } from "./application/newProjectDimensio
 import { createNewProjectPreviewGeometry } from "./newProjectPreviewGeometry";
 
 import "./NewProjectPreviewPanel.css";
+
+interface PreviewOutsideSurfaceAction {
+  label: string;
+  onFocusChange(focused: boolean): void;
+  onPress(): void;
+  pressed: boolean;
+}
 
 interface NewProjectPreviewPanelProps {
   children(geometry: VisualPreviewGeometry): ReactNode;
@@ -58,14 +64,33 @@ export function NewProjectPreviewPanel({
           Área de segurança
         </span>
       </p>
-      <ProportionalPreviewViewport
-        height={geometry.heightUm}
-        label={surfaceLabel}
-        outsideSurfaceAction={outsideSurfaceAction}
-        width={geometry.widthUm}
-      >
-        {children(geometry)}
-      </ProportionalPreviewViewport>
+      <div className="new-project-preview-viewport">
+        {outsideSurfaceAction ? (
+          <button
+            aria-label={outsideSurfaceAction.label}
+            aria-pressed={outsideSurfaceAction.pressed}
+            className="new-project-preview-outside-action"
+            onBlur={() => outsideSurfaceAction.onFocusChange(false)}
+            onClick={(event) => {
+              event.stopPropagation();
+              outsideSurfaceAction.onPress();
+            }}
+            onFocus={(event) =>
+              outsideSurfaceAction.onFocusChange(
+                event.currentTarget.matches(":focus-visible"),
+              )
+            }
+            type="button"
+          />
+        ) : null}
+        <ProportionalPreviewViewport
+          height={geometry.heightUm}
+          label={surfaceLabel}
+          width={geometry.widthUm}
+        >
+          {children(geometry)}
+        </ProportionalPreviewViewport>
+      </div>
       <p className="new-project-preview-caption">
         Proporção real da Lâmina aberta.
       </p>

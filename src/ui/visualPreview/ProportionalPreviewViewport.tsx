@@ -8,18 +8,10 @@ import {
 
 import "./ProportionalPreviewViewport.css";
 
-export interface PreviewOutsideSurfaceAction {
-  label: string;
-  onFocusChange(focused: boolean): void;
-  onPress(): void;
-  pressed: boolean;
-}
-
 interface ProportionalPreviewViewportProps {
   children: ReactNode;
   height: number;
   label?: string;
-  outsideSurfaceAction?: PreviewOutsideSurfaceAction;
   width: number;
 }
 
@@ -34,7 +26,6 @@ export function ProportionalPreviewViewport({
   children,
   height,
   label,
-  outsideSurfaceAction,
   width,
 }: ProportionalPreviewViewportProps) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -99,24 +90,6 @@ export function ProportionalPreviewViewport({
 
   return (
     <div className="visual-preview-viewport" ref={viewportRef}>
-      {outsideSurfaceAction ? (
-        <button
-          aria-label={outsideSurfaceAction.label}
-          aria-pressed={outsideSurfaceAction.pressed}
-          className="visual-preview-outside-action"
-          onBlur={() => outsideSurfaceAction.onFocusChange(false)}
-          onClick={(event) => {
-            event.stopPropagation();
-            outsideSurfaceAction.onPress();
-          }}
-          onFocus={(event) =>
-            outsideSurfaceAction.onFocusChange(
-              event.currentTarget.matches(":focus-visible"),
-            )
-          }
-          type="button"
-        />
-      ) : null}
       <div
         aria-label={label}
         className="visual-preview-surface"

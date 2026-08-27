@@ -37,6 +37,30 @@ test("keeps visual preview structure with its direct owner", () => {
   );
 });
 
+test("keeps the outside-surface interaction with its sole New Project owner", () => {
+  const sharedViewportSources = [
+    "src/ui/visualPreview/ProportionalPreviewViewport.tsx",
+    "src/ui/visualPreview/ProportionalPreviewViewport.css",
+    "src/ui/visualPreview/index.ts",
+  ] as const;
+
+  for (const path of sharedViewportSources) {
+    expect(source(path), path).not.toMatch(
+      /PreviewOutsideSurfaceAction|outsideSurfaceAction|visual-preview-outside-action/,
+    );
+  }
+
+  expect(source("src/global/NewProjectPreviewPanel.tsx")).toContain(
+    "interface PreviewOutsideSurfaceAction",
+  );
+  expect(source("src/global/NewProjectPreviewPanel.tsx")).toContain(
+    'className="new-project-preview-outside-action"',
+  );
+  expect(source("src/global/NewProjectPreviewPanel.css")).toContain(
+    ".new-project-preview-outside-action",
+  );
+});
+
 test("keeps shared visual-default option policy in a neutral module", () => {
   for (const owner of [
     "src/components/AlbumDesignForm.tsx",

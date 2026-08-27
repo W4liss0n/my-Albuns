@@ -8,6 +8,33 @@
   grid-template-rows: 50px minmax(0, 1fr) auto;
 }
 
+.new-project-preview-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.new-project-preview-outside-action {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.new-project-preview-viewport > .visual-preview-viewport {
+  pointer-events: none;
+}
+
+.new-project-preview-viewport .visual-preview-surface {
+  pointer-events: auto;
+}
+
 .new-project-preview-metadata {
   display: flex;
   width: 100%;

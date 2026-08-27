@@ -1,10 +1,7 @@
 export {
   PersonalizationScopeSurface,
 } from "./PersonalizationScopeSurface";
-export {
-  ProportionalPreviewViewport,
-  type PreviewOutsideSurfaceAction,
-} from "./ProportionalPreviewViewport";
+export { ProportionalPreviewViewport } from "./ProportionalPreviewViewport";
 export { SheetGuideLayer } from "./SheetGuideLayer";
 export type {
   DecorativePreview,
