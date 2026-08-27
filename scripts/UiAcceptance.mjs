@@ -194,6 +194,17 @@ export function validateUiAcceptanceManifest(manifest) {
             action.phase === "preview" || action.phase === "drop",
             `${actionLocation}.phase must be preview or drop`,
           );
+          if (action.dropTargetSelector !== undefined) {
+            invariant(
+              typeof action.dropTargetSelector === "string" &&
+                action.dropTargetSelector.trim(),
+              `${actionLocation}.dropTargetSelector must be a non-empty string`,
+            );
+            invariant(
+              action.phase === "drop",
+              `${actionLocation}.dropTargetSelector is valid only for drop`,
+            );
+          }
         }
       }
     }

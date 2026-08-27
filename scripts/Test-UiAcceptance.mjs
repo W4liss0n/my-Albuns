@@ -346,6 +346,7 @@ test("the manifest proves every Program 05 closeout interaction through the isol
     "sheet-reorder-grid-preview": ["drag"],
     "sheet-reorder-grid-commit": ["drag"],
     "sheet-reorder-cancelled": ["drag", "key"],
+    "sheet-reorder-cross-surface-cancelled": ["drag"],
     "sheet-reorder-invalid-drop": ["drag"],
     "frame-multi-selection-mixed": ["click", "click"],
     "frame-multi-selection-absolute-edit": ["click", "click", "input"],
@@ -404,6 +405,7 @@ test("the manifest proves every Program 05 closeout interaction through the isol
   for (const id of [
     "sheet-reorder-bar-commit",
     "sheet-reorder-grid-commit",
+    "sheet-reorder-cross-surface-cancelled",
     "sheet-reorder-invalid-drop",
     "frame-manipulation-move",
     "frame-manipulation-resize",
@@ -417,6 +419,7 @@ test("the manifest proves every Program 05 closeout interaction through the isol
     "sheet-reorder-grid-preview",
     "sheet-reorder-grid-commit",
     "sheet-reorder-cancelled",
+    "sheet-reorder-cross-surface-cancelled",
     "sheet-reorder-invalid-drop",
   ]) {
     assert.match(scenariosById.get(id).implementationPath, /mode=normal/u);
@@ -449,7 +452,8 @@ test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
       type: "drag",
       selector: "#source",
       targetSelector: "#target",
-      phase: "preview",
+      dropTargetSelector: "#opposite-surface",
+      phase: "drop",
     },
   ];
 
@@ -484,6 +488,13 @@ test("manifest schema 3 accepts real modifier, wheel, and drag actions", () => {
   assert.throws(
     () => validateUiAcceptanceManifest(invalidDrag),
     /phase.*preview or drop/u,
+  );
+
+  const invalidDropTarget = structuredClone(interactive);
+  invalidDropTarget.scenarios[0].actions[3].dropTargetSelector = "";
+  assert.throws(
+    () => validateUiAcceptanceManifest(invalidDropTarget),
+    /dropTargetSelector.*non-empty string/u,
   );
 });
 
@@ -669,13 +680,30 @@ test("runner emits W3C actions for Ctrl gestures, wheel, and preview or committe
       type: "drag",
       selector: "#source",
       targetSelector: "#target",
+      dropTargetSelector: "#opposite-surface",
       phase: "drop",
     },
   });
   assert.deepEqual(
     requests.at(-1).body.actions[0].actions.map((action) => action.type),
-    ["pointerMove", "pointerDown", "pointerMove", "pointerUp"],
+    [
+      "pointerMove",
+      "pointerDown",
+      "pointerMove",
+      "pointerMove",
+      "pointerUp",
+    ],
   );
+  assert.deepEqual(requests.at(-1).body.actions[0].actions.at(-2), {
+    type: "pointerMove",
+    duration: 220,
+    origin: {
+      "element-6066-11e4-a52e-4f735466cecf":
+        "element:#opposite-surface",
+    },
+    x: 0,
+    y: 0,
+  });
 });
 
 test("runner neutralizes pointer state before each captured surface", async () => {

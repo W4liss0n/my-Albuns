@@ -193,7 +193,15 @@ test("previews, cancels, and commits one synchronized reorder from the Barra", (
 
   fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 5 });
   fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 5 });
-  fireEvent.pointerUp(bar, { clientX: 40, clientY: 40, pointerId: 5 });
+  fireEvent.pointerUp(grid, { clientX: 1200, clientY: 780, pointerId: 5 });
+  expect(bar).toHaveAttribute("data-reorder-state", "cancelled");
+  expect(bar).toHaveAttribute("data-sheet-order", originalOrder);
+  expect(within(bar).queryByTestId("reorder-ghost")).not.toBeInTheDocument();
+  expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("0");
+
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10, pointerId: 6 });
+  fireEvent.pointerMove(target, { clientX: 40, clientY: 40, pointerId: 6 });
+  fireEvent.pointerUp(bar, { clientX: 40, clientY: 40, pointerId: 6 });
 
   expect(bar).toHaveAttribute("data-reorder-state", "committed");
   expect(bar).toHaveAttribute("data-sheet-order", reordered);
@@ -235,6 +243,28 @@ test("keeps the Canvas stable during a Grade preview and rejects an interior Pá
   });
   expect(grid).toHaveAttribute("data-reorder-state", "invalid");
   expect(grid).toHaveAttribute("data-sheet-order", originalOrder);
+  expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("0");
+
+  const validSource = within(grid).getByRole("button", {
+    name: "Reordenar Lâmina 04 pela Grade",
+  });
+  const validTarget = within(grid).getByRole("button", {
+    name: "Reordenar Lâmina 02 pela Grade",
+  });
+  fireEvent.pointerDown(validSource, {
+    clientX: 10,
+    clientY: 10,
+    pointerId: 4,
+  });
+  fireEvent.pointerMove(validTarget, {
+    clientX: 80,
+    clientY: 80,
+    pointerId: 4,
+  });
+  fireEvent.pointerUp(bar, { clientX: 100, clientY: 200, pointerId: 4 });
+  expect(grid).toHaveAttribute("data-reorder-state", "cancelled");
+  expect(grid).toHaveAttribute("data-sheet-order", originalOrder);
+  expect(within(grid).queryByTestId("reorder-ghost")).not.toBeInTheDocument();
   expect(screen.getByTestId("prototype-history-count")).toHaveTextContent("0");
 });
 

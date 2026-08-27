@@ -222,6 +222,9 @@ export async function performUiAcceptanceAction({
 
   if (action.type === "drag") {
     const targetId = await locateSelector(action.targetSelector);
+    const dropTargetId = action.dropTargetSelector
+      ? await locateSelector(action.dropTargetSelector)
+      : null;
     const pointerActions = [
       {
         type: "pointerMove",
@@ -240,6 +243,15 @@ export async function performUiAcceptanceAction({
       },
     ];
     if (action.phase === "drop") {
+      if (dropTargetId) {
+        pointerActions.push({
+          type: "pointerMove",
+          duration: 220,
+          origin: elementReference(dropTargetId),
+          x: 0,
+          y: 0,
+        });
+      }
       pointerActions.push({ type: "pointerUp", button: 0 });
     }
     await request("POST", `/session/${sessionId}/actions`, {

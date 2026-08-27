@@ -257,7 +257,10 @@ type ReorderStripProps = {
     sheetId: string,
     event: ReactPointerEvent<HTMLElement>,
   ) => void;
-  onPointerUp: (surface: ReorderSurface) => void;
+  onPointerUp: (
+    surface: ReorderSurface,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => void;
   order: string[];
   result: ReorderResult | null;
   surface: ReorderSurface;
@@ -299,7 +302,7 @@ function ReorderStrip({
       data-sheet-order={order.join(",")}
       onPointerUp={(event) => {
         event.stopPropagation();
-        onPointerUp(surface);
+        onPointerUp(surface, event);
       }}
     >
       <header>
@@ -520,8 +523,22 @@ export function UiArchitecturePrototype({
     );
   };
 
-  const finishReorder = (origin: ReorderSurface) => {
-    if (!reorderPointer || reorderPointer.origin !== origin) return;
+  const finishReorder = (
+    origin: ReorderSurface,
+    event: ReactPointerEvent<HTMLElement>,
+  ) => {
+    if (!reorderPointer || reorderPointer.pointerId !== event.pointerId) return;
+    if (reorderPointer.origin !== origin) {
+      if (reorderGesture) {
+        setReorderResult({
+          origin: reorderPointer.origin,
+          state: "cancelled",
+        });
+      }
+      setReorderGesture(null);
+      setReorderPointer(null);
+      return;
+    }
     if (!reorderGesture || reorderGesture.origin !== origin) {
       setCenteredSheetId(reorderPointer.sourceId);
       setReorderPointer(null);
@@ -565,6 +582,7 @@ export function UiArchitecturePrototype({
   useEffect(() => {
     const cancelExternalDrop = (event: globalThis.PointerEvent) => {
       if (!reorderPointer) return;
+      if (reorderPointer.pointerId !== event.pointerId) return;
       if (reorderGesture) {
         setReorderResult({
           origin: reorderGesture.origin,

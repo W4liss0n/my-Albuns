@@ -839,6 +839,22 @@
       ]
     },
     {
+      "id": "sheet-reorder-cross-surface-cancelled",
+      "title": "Reordenação — cancelamento ao soltar na representação oposta",
+      "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
+      "comparison": {
+        "kind": "implementation-only",
+        "surface": "sheet-reordering",
+        "implementationCaptureSelector": ".ui-architecture-prototype",
+        "reason": "A referência visual vigente não representa o cancelamento de uma prévia ao soltar fora da superfície originadora."
+      },
+      "viewport": { "width": 1440, "height": 900 },
+      "readySelector": "[data-editor-mode=\"normal\"]:has([data-reorder-surface=\"bar\"][data-reorder-state=\"cancelled\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"]):has([data-reorder-surface=\"grid\"][data-sheet-order=\"sheet-001,sheet-002,sheet-003,sheet-004,sheet-005\"])",
+      "actions": [
+        { "type": "drag", "selector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-004\"]", "targetSelector": "[data-reorder-surface=\"bar\"] [data-sheet-id=\"sheet-002\"]", "dropTargetSelector": "[data-reorder-surface=\"grid\"]", "phase": "drop" }
+      ]
+    },
+    {
       "id": "sheet-reorder-invalid-drop",
       "title": "Reordenação — drop inválido de Página única",
       "implementationPath": "/ui-architecture-prototype.html?view=editor&mode=normal",
