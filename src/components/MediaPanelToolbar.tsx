@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   Image as ImageIcon,
@@ -67,6 +67,10 @@ export function MediaPanelToolbar({
     },
   });
 
+  useEffect(() => {
+    if (importDisabled && openPopup === "import") setOpenPopup(null);
+  }, [importDisabled, openPopup]);
+
   function changeMediaKind(mediaKind: MediaKind) {
     setOpenPopup(null);
     onActiveMediaKindChange(mediaKind);
@@ -102,6 +106,7 @@ export function MediaPanelToolbar({
           aria-expanded={openPopup === "import"}
           aria-haspopup="menu"
           className="media-toolbar-text-button"
+          disabled={importDisabled}
           type="button"
           onClick={() =>
             setOpenPopup((current) =>

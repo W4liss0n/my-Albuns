@@ -24,6 +24,7 @@ type ClosePhase =
 interface ProjectCloseControllerOptions {
   projectDialogPort: ProjectDialogPort;
   projectWindowPort: ProjectWindowPort;
+  requestBlocked?: boolean;
   waitForPendingMutations(): Promise<ProjectMutationOutcome | null>;
   onProjectionChange(projection: EditorProjection): void;
   onError(message: string): void;
@@ -46,16 +47,19 @@ function hasClosePhase(
 export function useProjectCloseController({
   projectDialogPort,
   projectWindowPort,
+  requestBlocked = false,
   waitForPendingMutations,
   onProjectionChange,
   onError,
 }: ProjectCloseControllerOptions) {
   const [phase, setPhase] = useState<ClosePhase>("idle");
   const phaseRef = useRef<ClosePhase>("idle");
+  const requestBlockedRef = useRef(requestBlocked);
   const dialogSessionRef = useRef<ProjectDialogSession | null>(null);
   const dialogActionListener = useRef<(action: ProjectDialogAction) => void>(
     () => undefined,
   );
+  requestBlockedRef.current = requestBlocked;
 
   const transition = useCallback((nextPhase: ClosePhase) => {
     phaseRef.current = nextPhase;
@@ -108,7 +112,7 @@ export function useProjectCloseController({
   ]);
 
   const requestClose = useCallback(async () => {
-    if (phaseRef.current !== "idle") return;
+    if (requestBlockedRef.current || phaseRef.current !== "idle") return;
     transition("requesting");
     try {
       const pendingOutcome = await waitForPendingMutations();
@@ -243,6 +247,10 @@ export function useProjectCloseController({
       .onCloseRequested(() => {
         if (!active || phaseRef.current !== "idle") return;
         transition("requesting");
+        if (requestBlockedRef.current) {
+          void releaseNativeClose();
+          return;
+        }
         void waitForPendingMutations().then((pendingOutcome) => {
           if (!active || !hasClosePhase(phaseRef, "requesting")) return;
           if (

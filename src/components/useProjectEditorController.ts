@@ -18,6 +18,7 @@ interface ProjectEditorControllerInput {
   runProjectMutation: ProjectMutationRunner;
   projectCorePort: ProjectCorePort;
   onProjectionChange(projection: EditorProjection): void;
+  onSaveAsBarrierChange?(active: boolean): void;
 }
 
 export function useProjectEditorController({
@@ -26,6 +27,7 @@ export function useProjectEditorController({
   runProjectMutation,
   projectCorePort,
   onProjectionChange,
+  onSaveAsBarrierChange,
 }: ProjectEditorControllerInput) {
   const navigation = useProjectNavigation(projection);
   const canvasMode = useMemo<AlbumCanvasMode>(
@@ -43,6 +45,7 @@ export function useProjectEditorController({
     runProjectMutation,
     onProjectionChange,
     onAffectedFrame: navigation.selectFrame,
+    onSaveAsBarrierChange,
   });
   const selectedFrame = useMemo(
     () =>

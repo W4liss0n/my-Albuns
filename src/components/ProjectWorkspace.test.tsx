@@ -3768,6 +3768,237 @@ test("uses the native Salvar como flow and adopts the new Project projection", a
   expect(onProjectionChange).toHaveBeenCalledWith(savedAsProjection);
 });
 
+test("makes Salvar como a terminal barrier after an accepted deferred import", async () => {
+  const importedProjection: EditorProjection = {
+    ...projection,
+    state: {
+      ...projection.state,
+      revision: projection.state.revision + 1,
+      canUndo: true,
+    },
+  };
+  const savedAsProjection: EditorProjection = {
+    ...importedProjection,
+    state: {
+      ...importedProjection.state,
+      projectId: "81f68858-c8f5-4fcb-8e0f-185c3ff45cf5",
+      projectName: "Versão independente",
+      savedRevision: importedProjection.state.revision,
+      dirty: false,
+    },
+  };
+  type ImportPhotoResult = Awaited<
+    ReturnType<ProjectCorePort["importPhoto"]>
+  >;
+  let resolveImport!: (result: ImportPhotoResult) => void;
+  const pendingImport = new Promise<ImportPhotoResult>((resolve) => {
+    resolveImport = resolve;
+  });
+  const importPhoto = vi.fn<ProjectCorePort["importPhoto"]>(
+    () => pendingImport,
+  );
+  const saveAs = vi.fn<ProjectCorePort["saveAs"]>(async () => ({
+    outcome: {
+      kind: "savedAs",
+      previousProjectId: projection.state.projectId,
+      projectId: savedAsProjection.state.projectId,
+      revision: savedAsProjection.state.revision,
+    },
+    projection: savedAsProjection,
+  }));
+  const apply = vi.fn<ProjectCorePort["apply"]>(async () => projection);
+  const undo = vi.fn<ProjectCorePort["undo"]>(async () => projection);
+  const projectCorePort = projectCorePortWithApply(apply);
+  projectCorePort.importPhoto = importPhoto;
+  projectCorePort.saveAs = saveAs;
+  projectCorePort.undo = undo;
+  const onProjectionChange = vi.fn();
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      onProjectionChange={onProjectionChange}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Arquivo JPEG…" }));
+  await waitFor(() => expect(importPhoto).toHaveBeenCalledOnce());
+
+  fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "s" });
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
+  );
+  expect(screen.getByRole("button", { name: "Importar" })).toBeDisabled();
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  fireEvent.doubleClick(screen.getByRole("button", { name: "Campo.jpg" }));
+  expect(undo).not.toHaveBeenCalled();
+  expect(apply).not.toHaveBeenCalled();
+
+  await act(async () => {
+    resolveImport({
+      kind: "imported",
+      projection: importedProjection,
+      mediaId: "media-imported",
+    });
+    await pendingImport;
+  });
+
+  await waitFor(() =>
+    expect(saveAs).toHaveBeenCalledWith(importedProjection.state.revision),
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  expect(onProjectionChange).toHaveBeenNthCalledWith(1, importedProjection);
+  expect(onProjectionChange).toHaveBeenNthCalledWith(2, savedAsProjection);
+  expect(undo).not.toHaveBeenCalled();
+  expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled();
+});
+
+test("releases the Salvar como barrier after native cancellation", async () => {
+  type SaveAsResult = Awaited<ReturnType<ProjectCorePort["saveAs"]>>;
+  let resolveSaveAs!: (result: SaveAsResult) => void;
+  const pendingSaveAs = new Promise<SaveAsResult>((resolve) => {
+    resolveSaveAs = resolve;
+  });
+  const saveAs = vi.fn<ProjectCorePort["saveAs"]>(() => pendingSaveAs);
+  const undo = vi.fn<ProjectCorePort["undo"]>(async () => projection);
+  const projectCorePort = projectCorePortWithApply(async () => projection);
+  projectCorePort.saveAs = saveAs;
+  projectCorePort.undo = undo;
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "s" });
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
+  );
+
+  await act(async () => {
+    resolveSaveAs({ outcome: { kind: "cancelled" }, projection });
+    await pendingSaveAs;
+  });
+
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled(),
+  );
+  expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled();
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+});
+
+test("releases the Salvar como barrier after a reported failure", async () => {
+  type SaveAsResult = Awaited<ReturnType<ProjectCorePort["saveAs"]>>;
+  let rejectSaveAs!: (reason: unknown) => void;
+  const pendingSaveAs = new Promise<SaveAsResult>((_resolve, reject) => {
+    rejectSaveAs = reject;
+  });
+  const saveAs = vi.fn<ProjectCorePort["saveAs"]>(() => pendingSaveAs);
+  const undo = vi.fn<ProjectCorePort["undo"]>(async () => projection);
+  const dialog = projectDialogHarness();
+  const projectCorePort = projectCorePortWithApply(async () => projection);
+  projectCorePort.saveAs = saveAs;
+  projectCorePort.undo = undo;
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      projectDialogPort={dialog.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "s" });
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
+  );
+
+  await act(async () => {
+    rejectSaveAs(
+      new SaveProjectError(
+        "destination_conflict",
+        "Já existe um Projeto no destino escolhido.",
+      ),
+    );
+    await pendingSaveAs.catch(() => undefined);
+  });
+
+  await waitFor(() =>
+    expect(dialog.present).toHaveBeenCalledWith({
+      kind: "projectOperationFailure",
+      message: "Já existe um Projeto no destino escolhido.",
+    }),
+  );
+  expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Importar" })).toBeEnabled();
+
+  fireEvent.keyDown(window, { ctrlKey: true, key: "z" });
+  await waitFor(() => expect(undo).toHaveBeenCalledOnce());
+});
+
+test("rejects a native close command while the Salvar como barrier is active", async () => {
+  type SaveAsResult = Awaited<ReturnType<ProjectCorePort["saveAs"]>>;
+  let resolveSaveAs!: (result: SaveAsResult) => void;
+  const pendingSaveAs = new Promise<SaveAsResult>((resolve) => {
+    resolveSaveAs = resolve;
+  });
+  const projectCorePort = projectCorePortWithApply(async () => projection);
+  projectCorePort.saveAs = vi.fn(() => pendingSaveAs);
+  const close = projectWindowHarness();
+  close.port.resolveClose = vi.fn(async () => ({
+    kind: "cancelled" as const,
+    projection,
+  }));
+
+  render(
+    <ProjectWorkspace
+      exportPipelinePort={exportPipelinePort}
+      projection={projection}
+      projectCorePort={projectCorePort}
+      projectDialogPort={close.dialog.port}
+      projectWindowPort={close.port}
+      onProjectionChange={() => undefined}
+    />,
+  );
+  await waitFor(() =>
+    expect(close.port.onCloseRequested).toHaveBeenCalledOnce(),
+  );
+
+  fireEvent.keyDown(window, { ctrlKey: true, shiftKey: true, key: "s" });
+  await waitFor(() =>
+    expect(screen.getByRole("menuitem", { name: "Arquivo" })).toBeDisabled(),
+  );
+  act(() => close.emitCloseRequested());
+
+  await waitFor(() =>
+    expect(close.port.resolveClose).toHaveBeenCalledWith("cancel"),
+  );
+  expect(close.dialog.present).not.toHaveBeenCalledWith({
+    busy: false,
+    kind: "projectCloseConfirmation",
+  });
+
+  await act(async () => {
+    resolveSaveAs({ outcome: { kind: "cancelled" }, projection });
+    await pendingSaveAs;
+  });
+});
+
 test("uses Ctrl+S for Project save and prevents the browser default", async () => {
   const save = vi.fn<ProjectCorePort["save"]>(async () => ({
     outcome: { kind: "saved", revision: projection.state.revision },

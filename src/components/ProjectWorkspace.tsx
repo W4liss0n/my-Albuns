@@ -111,6 +111,7 @@ export function ProjectWorkspace({
     if (workspacePreferences.ready) onPreferencesReady(projectId);
   }, [onPreferencesReady, projectId, workspacePreferences.ready]);
   const [exportActive, setExportActive] = useState(false);
+  const [saveAsBarrierActive, setSaveAsBarrierActive] = useState(false);
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [closeMessage, setCloseMessage] = useState<string | null>(null);
@@ -173,16 +174,19 @@ export function ProjectWorkspace({
   const projectClose = useProjectCloseController({
     projectDialogPort,
     projectWindowPort,
+    requestBlocked: saveAsBarrierActive,
     waitForPendingMutations: runProjectMutation.waitForIdle,
     onProjectionChange,
     onError: reportCloseError,
   });
   const controller = useProjectEditorController({
-    interactionBlocked: exportActive || projectClose.interactionBlocked,
+    interactionBlocked:
+      exportActive || projectClose.interactionBlocked || saveAsBarrierActive,
     projection,
     runProjectMutation,
     projectCorePort,
     onProjectionChange,
+    onSaveAsBarrierChange: setSaveAsBarrierActive,
   });
   const albumInformationApply = useAlbumInformationApplyController({
     projectDialogPort,
@@ -282,7 +286,8 @@ export function ProjectWorkspace({
   const commandsBlocked =
     exportActive ||
     projectClose.interactionBlocked ||
-    albumInformationApply.active;
+    albumInformationApply.active ||
+    saveAsBarrierActive;
   useProjectCommandShortcuts({
     canRedo: projection.state.canRedo,
     canUndo: projection.state.canUndo,
@@ -333,7 +338,7 @@ export function ProjectWorkspace({
         <ExportPreviewControl
           ref={exportControlRef}
           dialogPort={projectDialogPort}
-          disabled={projectClose.interactionBlocked}
+          disabled={projectClose.interactionBlocked || saveAsBarrierActive}
           exportPipelinePort={exportPipelinePort}
           onActiveChange={setExportActive}
           projectId={projection.state.projectId}
@@ -342,7 +347,9 @@ export function ProjectWorkspace({
       </div>
 
       <div
+        aria-busy={saveAsBarrierActive || undefined}
         className="workspace-grid"
+        inert={saveAsBarrierActive}
         ref={workspacePanels.workspaceRef}
         style={workspaceStyle}
       >

@@ -27,6 +27,7 @@ interface ProjectMutationsInput {
   runProjectMutation: ProjectMutationRunner;
   onProjectionChange(projection: EditorProjection): void;
   onAffectedFrame(frameId: string): void;
+  onSaveAsBarrierChange?(active: boolean): void;
 }
 
 function messageFromError(error: unknown) {
@@ -38,18 +39,31 @@ export function useProjectMutations({
   runProjectMutation,
   onProjectionChange,
   onAffectedFrame,
+  onSaveAsBarrierChange,
 }: ProjectMutationsInput) {
   const [message, setMessage] = useState<string | null>(null);
   const feedbackTokenRef = useRef(0);
+  const saveAsBarrierRef = useRef(false);
 
   useEffect(() => {
     setMessage(null);
   }, [runProjectMutation, projection.state.projectId]);
 
+  useEffect(() => {
+    saveAsBarrierRef.current = false;
+    onSaveAsBarrierChange?.(false);
+  }, [onSaveAsBarrierChange, projection.state.projectId]);
+
+  function releaseSaveAsBarrier() {
+    saveAsBarrierRef.current = false;
+    onSaveAsBarrierChange?.(false);
+  }
+
   async function runWithErrorFeedback(
     operation: ProjectMutationOperation,
     cancelAfterPendingFailure = false,
   ) {
+    if (saveAsBarrierRef.current) return false;
     const feedbackToken = feedbackTokenRef.current + 1;
     feedbackTokenRef.current = feedbackToken;
     setMessage(null);
@@ -122,16 +136,39 @@ export function useProjectMutations({
   }
 
   function saveVisibleRevisionAs() {
+    if (saveAsBarrierRef.current) return Promise.resolve();
+    saveAsBarrierRef.current = true;
+    onSaveAsBarrierChange?.(true);
     const visibleRevision = projection.state.revision;
-    return runWithErrorFeedback(
-      async (port, latestProjection) => {
-        const expectedRevision =
-          latestProjection?.state.revision ?? visibleRevision;
-        const result = await port.saveAs(expectedRevision);
-        return result.projection;
-      },
-      true,
-    );
+    const feedbackToken = feedbackTokenRef.current + 1;
+    feedbackTokenRef.current = feedbackToken;
+    setMessage(null);
+    let savedAs = false;
+    return runProjectMutation
+      .run(
+        async (port, latestProjection) => {
+          const expectedRevision =
+            latestProjection?.state.revision ?? visibleRevision;
+          const result = await port.saveAs(expectedRevision);
+          savedAs = result.outcome.kind === "savedAs";
+          return result.projection;
+        },
+        { cancelAfterPendingFailure: true },
+      )
+      .then((outcome) => {
+        try {
+          if (outcome.status === "completed") {
+            onProjectionChange(outcome.projection);
+          } else if (
+            outcome.status === "failed" &&
+            feedbackToken === feedbackTokenRef.current
+          ) {
+            setMessage(messageFromError(outcome.error));
+          }
+        } finally {
+          if (!savedAs) releaseSaveAsBarrier();
+        }
+      });
   }
 
   async function commitInteraction(intent: ProjectIntent) {
@@ -163,6 +200,7 @@ export function useProjectMutations({
     draft: AlbumInformationProjectDraft,
     confirmedReview: AlbumInformationReview,
   ): Promise<AlbumInformationCommitResult> {
+    if (saveAsBarrierRef.current) return { kind: "rejected" };
     setMessage(null);
     let currentReview: AlbumInformationReview | null = null;
     let validationRejected = false;
@@ -221,6 +259,7 @@ export function useProjectMutations({
   }
 
   async function commitMutation(operation: ProjectMutationOperation) {
+    if (saveAsBarrierRef.current) return false;
     setMessage(null);
     const outcome = await runProjectMutation.run(operation);
     if (outcome.status === "completed") {
@@ -253,6 +292,7 @@ export function useProjectMutations({
       return completed ? selectedMediaId : null;
     },
     dropPhoto: async (intent: ProjectIntent) => {
+      if (saveAsBarrierRef.current) return false;
       setMessage(null);
       let affectedFrameId: string | null = null;
       const outcome = await runProjectMutation.run(async (port) => {
